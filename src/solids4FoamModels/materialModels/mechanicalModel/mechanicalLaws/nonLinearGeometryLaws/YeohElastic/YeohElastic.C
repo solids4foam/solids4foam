@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -107,7 +101,7 @@ Foam::YeohElastic::YeohElastic
     else if (dict.found("nu") && !dict.found("K"))
     {
         const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
-        
+
         // Young's modulus
         const volScalarField E(6.0*c1_);
 

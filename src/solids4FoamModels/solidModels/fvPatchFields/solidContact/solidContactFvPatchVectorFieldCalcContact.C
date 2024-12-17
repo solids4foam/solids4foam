@@ -293,7 +293,7 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
     const volVectorField& field =
         db().lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -339,13 +339,13 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
             zoneToZones_.set
             (
                 shadPatchI,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 new amiZoneInterpolation
                 (
                     zone().globalPatch(),
                     shadowZones()[shadPatchI].globalPatch(),
                     faceAreaIntersect::tmMesh, // triMode
-                    true,   // requireMatch
+                    false,   // requireMatch
                     -1,     // lowWeightCorrection
                     false,  // reverseTarget
                     true    // use globalPolyPatch
@@ -370,7 +370,18 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 #endif
             );
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
+            // Check pointwise or integral normal gap calculation
+            const Switch integralNormalGap =
+                dict_.lookupOrDefault<Switch>
+                (
+                    "integralNormalGap", true
+                );
+            Info<< "integralNormalGap: " << integralNormalGap << endl;
+
+            zoneToZones_[shadPatchI].normalGapIntegration() =
+                integralNormalGap;
+
             // Check which point distance calculation method to use
             const Switch useNewPointDistanceMethod =
                 dict_.lookupOrDefault<Switch>
@@ -380,7 +391,9 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 
             Info<< "    " << type() << ": " << patch().name() << nl
                 << "        useNewPointDistanceMethod: "
-                << useNewPointDistanceMethod
+                << useNewPointDistanceMethod << nl
+                << "        integralNormalGap: "
+                << integralNormalGap
                 << endl;
 
             zoneToZones_[shadPatchI].useNewPointDistanceMethod() =
@@ -487,7 +500,7 @@ Foam::solidContactFvPatchVectorField::zone() const
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -521,7 +534,7 @@ Foam::globalPolyPatch& Foam::solidContactFvPatchVectorField::zone()
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -559,7 +572,7 @@ Foam::solidContactFvPatchVectorField::shadowZones() const
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -594,7 +607,7 @@ Foam::solidContactFvPatchVectorField::shadowZones()
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -615,7 +628,7 @@ Foam::solidContactFvPatchVectorField::shadowZones()
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 const Foam::PtrList<Foam::amiZoneInterpolation>&
 #else
 const Foam::PtrList<Foam::newGgiStandAlonePatchInterpolation>&
@@ -636,7 +649,7 @@ Foam::solidContactFvPatchVectorField::zoneToZones() const
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -654,7 +667,7 @@ Foam::solidContactFvPatchVectorField::zoneToZones() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::PtrList<Foam::amiZoneInterpolation>&
 #else
 Foam::PtrList<Foam::newGgiStandAlonePatchInterpolation>&
@@ -677,7 +690,7 @@ Foam::solidContactFvPatchVectorField::zoneToZones()
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -699,7 +712,7 @@ Foam::solidContactFvPatchVectorField::zoneToZones()
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 const Foam::amiZoneInterpolation&
 #else
 const Foam::newGgiStandAlonePatchInterpolation&

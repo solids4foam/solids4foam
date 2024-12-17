@@ -222,7 +222,7 @@ void Foam::interpolationTable<Type>::check() const
 template<class Type>
 void Foam::interpolationTable<Type>::write(Ostream& os) const
 {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "file", fileName_);
     writeEntry(os, "outOfBounds", boundsHandlingToWord(boundsHandling_));
 #else
@@ -395,7 +395,7 @@ void Foam::interpolationTable<Type>::operator=
     List<Tuple2<scalar, Type>>::operator=(interpTable);
     boundsHandling_ = interpTable.boundsHandling_;
     fileName_ = interpTable.fileName_;
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     reader_.reset(interpTable.reader_.clone());
 #else
     reader_ = interpTable.reader_;  // note: steals reader. Used in write().

@@ -4,10 +4,9 @@ cd ${0%/*} || exit 1    # run from this directory
 echo "optionalFixes/Allcheck"
 
 # This script reports on files that require fixes in the OpenFOAM installation.
-# Currently, only foam-extend-4.1 requires fixes.
 # To skip these checks, set S4F_NO_FILE_FIXES=1, i.e.
 #   export S4F_NO_FILE_FIXES=1
-# To see the consequence of these fixes, visit solids4foam.github.io
+# To see the consequence of these fixes, visit www.solids4foam.com.
 
 # Function for the checking and reporting how to replace a file
 # Arguments:
@@ -20,18 +19,18 @@ checkAndReport()
     if [ -n "$S4F_NO_FILE_FIXES" ]
     then
         echo "The S4F_NO_FILE_FIXES variable is set so checks will not be performed"
-    elif cmp --silent "./${1}" "${2}/${1}"
+    elif cmp --silent "./${1}/${2}" "${3}/${2}"
     then
-        echo "'${1}' has already been replaced"
+        echo "'${2}' has already been replaced"
         return 0
     else
         echo
         echo "******** PLEASE FIX THIS ***********"
-        echo "You should replace the file '${2}/${1}' with 'optionalFixes/${1}'"
+        echo "You should replace the file '${3}/${2}' with 'optionalFixes/${1}/${2}'"
         echo
         echo "You can do it by running the following commands:"
-        echo "    cp optionalFixes/${1} ${2}/"
-        echo "    wmake libso ${3}"
+        echo "    cp optionalFixes/${1}/${2} ${3}/"
+        echo "    wmake libso ${4}"
         echo "************************************"
         echo
         return 1
@@ -46,6 +45,7 @@ then
     # This fixes the segmentation error that happens at the end of solver due to
     # a mesh object being freed twice
     checkAndReport \
+        "foam-extend-4.1" \
         "meshObjectBase.H" \
         "$FOAM_SRC/foam/meshes/MeshObject" \
         "$FOAM_SRC/foam"
@@ -54,13 +54,53 @@ then
     # This fixes segmentation errors related to point fields when mesh
     # topological changes occur
     checkAndReport \
+        "foam-extend-4.1" \
         "pointBoundaryMesh.C" \
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
+    
+    # This fixes consistent Rhie-Chow interpolation
+    # for Euler scheme
+    checkAndReport \
+        "foam-extend-4.1" \
+        "EulerDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
+
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "foam-extend-4.1" \
+        "GeometricField.C" \
+        "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
+        "$FOAM_SRC/foam"
+    if [ $? -ne 0 ]; then result=1; fi
+elif [[ $WM_PROJECT_VERSION == v* ]]
+then
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-v2012" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
 else
-    echo "No fixes needed for this version of OpenFOAM"; echo
-    exit 0;
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-9" \
+        "GeometricField.C" \
+        "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
+        "$FOAM_SRC/OpenFOAM"
+    if [ $? -ne 0 ]; then result=1; fi
+
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-9" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
 fi
 
 echo

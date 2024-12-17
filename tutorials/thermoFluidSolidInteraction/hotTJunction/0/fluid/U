@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet1
+    {
+        type            fixedValue;
+        value           uniform (0.1 0 0);
+    }
+
+    inlet2
+    {
+        // OpenFOAM
+//        type            scaledFixedValue;
+
+        // Time vs scale factor
+        scale table
+        (
+            (0.0 0.0)
+            (0.1 1.0)
+            (0.2 0.0)
+        );
+
+        // The true velocity is the reference value times the scale factor
+        refValue
+        {
+            type            fixedValue;
+            value           uniform (0 -1 0);
+        }
+
+        // foam extend
+        type            timeVaryingUniformFixedValue;
+        "file|fileName"   "$FOAM_CASE/constant/fluid/timeVsVelocity.fe41";
+        outOfBounds       clamp;
+    }
+
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+    
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //

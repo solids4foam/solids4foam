@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -78,12 +72,17 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
         Field<scalar>::operator=(scalarField("value", dict, p.size()));
     }
 
+    if (dict.found("prevPressure"))
+    {
+        Field<scalar>::operator=(scalarField("prevPressure", dict, p.size()));
+    }
+
     this->coeff0() = 1.0;
     this->coeff1() = 1.0;
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 (
     const elasticWallPressureFvPatchScalarField& pivpvf
@@ -135,7 +134,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
@@ -202,7 +201,8 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            IOobject::NO_WRITE,
+            false  // Do not register
         )
     );
 
@@ -224,7 +224,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     const fvPatch& p = patch();
     const vectorField n(p.nf());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const word fieldName = internalField().name();
 #else
     const word fieldName = dimensionedInternalField().name();
@@ -274,7 +274,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
         rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
 #else
     flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();
@@ -285,6 +285,11 @@ void elasticWallPressureFvPatchScalarField::patchFlux
 void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
+#ifdef OPENFOAM_ORG
+    writeEntry(os, "prevPressure", prevPressure_);
+#else
+    prevPressure_.writeEntry("prevPressure", os);
+#endif
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

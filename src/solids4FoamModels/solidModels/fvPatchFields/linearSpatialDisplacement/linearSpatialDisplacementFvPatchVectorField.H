@@ -21,10 +21,10 @@ Class
 Description
     Displacement varying linearly in space as:
 
-        u(x_i) = a_i + cmptMultiply(b_i, x_i)
+        u(x) = a + (b & x)
 
-    where a_i and b_i are the vector coefficients and x_i are the patch face
-    centre positions.
+    where a is a vector coefficient, b is tensor coefficient, and x are the
+    patch face centre positions.
 
 SourceFiles
     linearSpatialDisplacementFvPatchVectorField.C
@@ -54,9 +54,12 @@ class linearSpatialDisplacementFvPatchVectorField
 {
     // Private Data
 
-        //- Coefficients
-        vector a_;
-        vector b_;
+        //- Offset vector coefficients
+        const vector a_;
+
+        //- Tensor coefficients
+        const tensor b_;
+
 
 public:
 
@@ -95,7 +98,7 @@ public:
         linearSpatialDisplacementFvPatchVectorField
         (
             const linearSpatialDisplacementFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

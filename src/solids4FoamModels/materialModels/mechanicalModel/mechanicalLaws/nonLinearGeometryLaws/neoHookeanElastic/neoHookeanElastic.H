@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -59,7 +53,7 @@ Author
 #define neoHookeanElastic_H
 
 #include "mechanicalLaw.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "surfaceFields.H"
 #endif
 
@@ -123,11 +117,33 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-        //- Calculate the stress
+#ifdef OPENFOAM_COM
+        //- Return material tangent
+        tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
+
+        //- Return the bulk modulus field
+        virtual tmp<volScalarField> bulkModulus() const;
+
+        //- Calculate the volField stress
         virtual void correct(volSymmTensorField& sigma);
 
-        //- Calculate the stress
+        //- Calculate the surfaceField stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Calculate the stress using the displacement gradient
+        virtual void correct
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& gradD
+        ) const;
+
+        //- Calculate the stress using the deformation gradient
+        virtual void correctF
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& F
+        ) const;
 
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly

@@ -133,7 +133,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mesh().ddtScheme("ddt(" + D().name() +')')
 #else
             mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
@@ -180,7 +180,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     }
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -205,7 +205,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
           + rho()*g()
-          + stabilisation().stabilisation(DD(), gradDD(), impK_)
+          + stabilisation().stabilisation(D(), gradD(), impK_)
         );
 
         // Under-relax the linear system
@@ -213,11 +213,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 
         // Enforce any cell displacements
         solidModel::setCellDisps(DEqn);
-
-        // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
 
         // Solve the linear system
         solverPerfD = DEqn.solve();
@@ -256,7 +251,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
        !converged
         (
             iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mag(solverPerfD.initialResidual()),
             cmptMax(solverPerfD.nIterations()),
 #else
@@ -268,7 +263,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    mechanical().interpolate(D(), gradD(), pointD());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
@@ -276,7 +271,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

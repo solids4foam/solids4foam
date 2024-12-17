@@ -20,11 +20,11 @@ matchTolerance 1e-3;
 
 pointSync false;
 
-patchInfo
+"patches|patchInfo"
 (
     {
-        name punchContact;
-        dictionary
+        name cylinderTractionFree;
+        "patchInfo|dictionary"
         {
             type patch;
         }
@@ -32,8 +32,8 @@ patchInfo
         patches ("auto0");
     }
     {
-        name cylinderTractionFree;
-        dictionary
+        name punchContact;
+        "patchInfo|dictionary"
         {
             type patch;
         }
@@ -42,34 +42,25 @@ patchInfo
     }
     {
         name symmx;
-        dictionary
+        "patchInfo|dictionary"
         {
             type symmetryPlane;
         }
         constructFrom patches;
-        patches ("auto2" "auto8");
+        patches ("auto8" "auto3");
     }
     {
         name cylinderContact;
-        dictionary
+        "patchInfo|dictionary"
         {
             type patch;
         }
         constructFrom patches;
-        patches ("auto3");
+        patches ("auto2");
     }
     {
         name punchLoading;
-        dictionary
-        {
-            type patch;
-        }
-        constructFrom patches;
-        patches ("auto4");
-    }
-    {
-        name cylinderFixed;
-        dictionary
+        "patchInfo|dictionary"
         {
             type patch;
         }
@@ -77,8 +68,17 @@ patchInfo
         patches ("auto5");
     }
     {
+        name cylinderFixed;
+        "patchInfo|dictionary"
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto4");
+    }
+    {
         name symmy;
-        dictionary
+        "patchInfo|dictionary"
         {
             type symmetryPlane;
         }

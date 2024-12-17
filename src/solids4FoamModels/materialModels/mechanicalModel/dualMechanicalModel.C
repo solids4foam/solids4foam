@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -30,7 +24,7 @@ License
 #include "twoDPointCorrector.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "ZoneIDs.H"
 #else
     #include "ZoneID.H"
@@ -199,28 +193,30 @@ void Foam::dualMechanicalModel::makeDualFaceInThisMaterialList() const
             dualFaceMask[dualFaceI] = cellInThisMat;
         }
 
+        /*
         // Boundary faces are not set, as the dualFaceToCell map may not be
         // defined. In any case, it shouldn't be needed
-        // forAll(dualFaceInThisMaterialList_[lawI].boundaryField(), patchI)
-        // {
-        //     scalarField& dualFaceMaskP =
-        //         dualFaceInThisMaterialList_[lawI].boundaryField()[patchI];
+        forAll(dualFaceInThisMaterialList_[lawI].boundaryField(), patchI)
+        {
+            scalarField& dualFaceMaskP =
+                dualFaceInThisMaterialList_[lawI].boundaryFieldRef()[patchI];
 
-        //     forAll(dualFaceMaskP, dualFaceI)
-        //     {
-        //         // Dual face ID
-        //         const label dFaceID =
-        //             mesh_.boundaryMesh()[patchI].start() + dualFaceI;
+            forAll(dualFaceMaskP, dualFaceI)
+            {
+                // Dual face ID
+                const label dFaceID =
+                    mesh_.boundaryMesh()[patchI].start() + dualFaceI;
 
-        //         // Primary mesh cell
-        //         const label cellID = dualFaceToCell_[dFaceID];
+                // Primary mesh cell
+                const label cellID = dualFaceToCell_[dFaceID];
 
-        //         // Material in primary mesh cell
-        //         const scalar cellInThisMat = cellMask[cellID];
+                // Material in primary mesh cell
+                const scalar cellInThisMat = cellMask[cellID];
 
-        //         dualFaceMaskP[dualFaceI] = cellInThisMat;
-        //     }
-        // }
+                dualFaceMaskP[dualFaceI] = cellInThisMat;
+            }
+        }
+        */
     }
 }
 
@@ -266,12 +262,12 @@ Foam::dualMechanicalModel::dualMechanicalModel
     Info<< "Creating the dualMechanicalModel" << endl;
 
     // Read the mechanical laws
-    const PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
+    PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
 
     PtrList<mechanicalLaw>& laws = *this;
     laws.setSize(lawEntries.size());
 
-    // Create mechancial laws
+    // Create mechanical laws
     forAll(laws, lawI)
     {
         if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
@@ -334,22 +330,21 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
     return mesh_;
 }
 
-
-Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+#ifdef OPENFOAM_NOT_EXTEND
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
     // Prepare the field
-    tmp< Field<symmTensor4thOrder> > tresult
+    tmp<Field<scalarSquareMatrix>> tresult
     (
-        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
+        new Field<scalarSquareMatrix>
+        (
+            mesh().nFaces(), scalarSquareMatrix(6)
+        )
     );
-#ifdef OPENFOAMESIORFOUNDATION
-    Field<symmTensor4thOrder>& result = tresult.ref();
-#else
-    Field<symmTensor4thOrder>& result = tresult();
-#endif
+    Field<scalarSquareMatrix>& result = tresult.ref();
 
     if (laws.size() == 1)
     {
@@ -366,24 +361,140 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     {
         // Accumulate data for all materials
         // Note: the value on each dual face is uniquely set by one material law
+        // forAll(laws, lawI)
+        // {
+        //     const Field<scalarSquareMatrix> matTanI
+        //     (
+        //         laws[lawI].materialTangentField()
+        //     );
+
+        //     if (matTanI.size() != mesh().nFaces())
+        //     {
+        //         FatalErrorIn("dualMechanicalModel::materialTangentField()")
+        //             << "The materialTangentField field for law " << lawI
+        //             << " is the wrong size!" << abort(FatalError);
+        //     }
+
+        //     // Insert values from actual material region into main sigma field
+        //     result += dualFaceInThisMaterialList()[lawI]*matTanI;
+        // }
+
+        // This does work but the problem can be that the maps for the boundary
+        // faces sometimes struggle to be defined when creating the
+        // dualFaceInThisMaterialList function. It should be possible to make
+        // this robust
+        notImplemented("Not implemented for more than one material");
+    }
+
+    return tresult;
+}
+#endif
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::dualMechanicalModel::impKf() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< surfaceScalarField > tresult
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "dualImpKf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    surfaceScalarField& result = tresult.ref();
+#else
+    surfaceScalarField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = fvc::interpolate(laws[0].impK());
+    }
+    else
+    {
+        // Accumulate data for all fields
+        // Each face in the dualMesh lies in one cell (and hence one material)
+        // in the primary mesh
         forAll(laws, lawI)
         {
-            const Field<symmTensor4thOrder> matTanI
-            (
-                laws[lawI].materialTangentField()
-            );
-
-            if (matTanI.size() != mesh().nFaces())
-            {
-                FatalErrorIn("dualMechanicalModel::materialTangentField()")
-                    << "The materialTangentField field for law " << lawI
-                    << " is the wrong size!" << abort(FatalError);
-            }
-
             // Insert values from actual material region into main sigma field
-            result += dualFaceInThisMaterialList()[lawI]*matTanI;
+            result +=
+                dualFaceInThisMaterialList()[lawI]*fvc::interpolate
+                (
+                    laws[lawI].impK()
+                );
         }
     }
+
+    // Info<< "Writing " << result.name() << endl;
+    // result.write();
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::dualMechanicalModel::bulkModulus() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< surfaceScalarField > tresult
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "dualBulkModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    surfaceScalarField& result = tresult.ref();
+#else
+    surfaceScalarField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = fvc::interpolate(laws[0].bulkModulus());
+    }
+    else
+    {
+        // Accumulate data for all fields
+        // Each face in the dualMesh lies in one cell (and hence one material)
+        // in the primary mesh
+        forAll(laws, lawI)
+        {
+            // Insert values from actual material region into main sigma field
+            result +=
+                dualFaceInThisMaterialList()[lawI]*fvc::interpolate
+                (
+                    laws[lawI].bulkModulus()
+                );
+        }
+    }
+
+    // Info<< "Writing " << result.name() << endl;
+    // result.write();
 
     return tresult;
 }
@@ -406,6 +517,10 @@ void Foam::dualMechanicalModel::correct(surfaceSymmTensorField& sigma)
         // for all dual faces, and then the values of the faces that are
         // actually in that material are inserted into the global stress to be
         // returned to the solver
+
+        // Reset stress to zero then accumulate it
+        sigma = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
+
         forAll(laws, lawI)
         {
             // Create temporary stress field for this material

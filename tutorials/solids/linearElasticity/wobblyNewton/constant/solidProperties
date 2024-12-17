@@ -17,77 +17,42 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     vertexCentredLinearGeometry;
-// solidModel     linearGeometry;
+// linearGeometry: assumes small strains and rotations
 // solidModel     linearGeometryTotalDisplacement;
-// solidModel     explicitUnsLinearGeometryTotalDisplacement;
-// solidModel     explicitLinearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
+solidModel     vertexCentredLinearGeometry;
 
-vertexCentredLinearGeometryCoeffs
+"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
-    // Maximum number of Newton-Raphson iterations
-    // Set to 1 for linear cases, otherwise the solver may perform a second
-    // iteration
-    nCorrectors     1;
-
-    // Tolerance for Newton-Raphson loop
-    // This obviouosly has no effect if nCorrectors is set to 1
-    solutionTolerance 1e-6;
+    // Solution algorithm (implicitCoupled, implicitSegregated, explicit, ...)
+    solutionAlgorithm implicitCoupled;
 
     // Update the stiffness matrix every outer iteration
     fullNewton no;
 
-    // Scaling of fixed DOF equations
-    //fixedDofScale 1;
+    // Compact edge discretisation fraction
+    // 0 -> more accurate but oscillations more likely
+    // 1 -> less accurate but oscillations less likely
+    zeta            0.0;
+
+    // Maximum number of Newton-Raphson iterations
+    nCorrectors 1;
+
+    // Tolerance for Newton-Raphson loop
+    solutionTolerance 1e-6;
 
     // Fraction of compact edge direction gradient used
-    // Must be greater than 0.0 for stability
-    alpha 0.2;
+    zeta 1.0;
 
-    // Use PETSc. If "no" then Eigen LU direct solver (serial only) is used.
-    usePETSc yes;
-
-    // PETSc options file
-    optionsFile "$FOAM_CASE/petscOptions";
-
-    // Line search settings for nonlinear cases
+    // Line search settings
     lineSearch no;
     lineSearchRTol 0.5;
-}
 
-"linearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs"
-{
-    // Maximum number of momentum correctors
-    nCorrectors     10000;
-
-    // Solution tolerance for displacement
-    solutionTolerance 1e-04;
-
-    // Alternative solution tolerance for displacement
-    alternativeTolerance 1e-04;
-
-    // Material law solution tolerance
-    materialTolerance 1e-05;
-
-    // Write frequency for the residuals
-    infoFrequency   100;
-}
-
-"explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryTotalDisplacementCoeffs"
-{
-    // Linear bulk viscosity coefficient to kill high frequency oscillations
-    // Defaults to 0.06
-    linearBulkViscosityCoeff 0.06;
-
-    // Scale factor for JST smoothing term to quell checkerboarding
-    // Note: the solver can explode if this is too small or too large :)
-    JSTScaleFactor   0.5;
-
-    // Numerical viscosity for 1st temporal derivative term
-    numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
-
-    // Frequency at which time-step energy information is printed to the std out
-    infoFrequency 100;
+    // Use PETSc, else use Eigen SparseLU
+    usePETSc yes;
+    //optionsFile petscOptions.mumps;
+    optionsFile petscOptions.hypre;
+    //optionsFile petscOptions.cg;
 }
 
 // ************************************************************************* //

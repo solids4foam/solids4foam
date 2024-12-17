@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -25,7 +19,7 @@ License
 
 #include "viscousHookeanElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "zeroGradientFvPatchFields.H"
 #endif
 
@@ -92,7 +86,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     ),
     WilliamsLandelFerryShift_
     (
-        dict.lookupOrDefault<Switch>("WilliamsLandelFerry", false)
+        mechanicalLaw::dict().lookupOrAddDefault<Switch>("WilliamsLandelFerry", false)
     ),
     C1_
     (
@@ -131,7 +125,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The E and relaxationTimes lists should have the same length!"
             << abort(FatalError);
@@ -158,7 +152,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All relaxation times should be positive!"
             << abort(FatalError);
@@ -173,7 +167,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All values of stiffness E should be positive!"
             << abort(FatalError);
@@ -257,7 +251,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);
@@ -576,7 +570,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                             hf_[MaxwellModelI].primitiveField()
                           - hf_[MaxwellModelI].prevIter().primitiveField()
 #else
@@ -588,7 +582,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                    /gMax
                     (
                         SMALL
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                       + mag(hf_[MaxwellModelI].prevIter().primitiveField())
 #else
                       + mag(hf_[MaxwellModelI].prevIter().internalField())
@@ -611,7 +605,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                             h_[MaxwellModelI].primitiveField()
                           - h_[MaxwellModelI].prevIter().primitiveField()
 #else
@@ -623,7 +617,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                    /gMax
                     (
                         SMALL
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                       + mag(h_[MaxwellModelI].prevIter().primitiveField())
 #else
                       + mag(h_[MaxwellModelI].prevIter().internalField())

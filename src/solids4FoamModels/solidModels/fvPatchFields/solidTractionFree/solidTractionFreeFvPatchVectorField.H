@@ -89,7 +89,7 @@ public:
         solidTractionFreeFvPatchVectorField
         (
             const solidTractionFreeFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

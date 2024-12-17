@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -61,12 +55,27 @@ autoPtr<thermalLaw> thermalLaw::New
     const dictionary& dict
 )
 {
-    const word thermalTypeName(dict.lookup("type"));
+    const word modelType(dict.lookup("type"));
 
-    Info<< "Selecting thermal model " << thermalTypeName << endl;
+    Info<< "Selecting thermal model " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "thermalLaw",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(thermalTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -79,13 +88,16 @@ autoPtr<thermalLaw> thermalLaw::New
             ")",
             dict
         )   << "Unknown thermalLaw type "
-            << thermalTypeName << endl << endl
+            << modelType << endl << endl
             << "Valid  thermalLaws are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<thermalLaw>(cstrIter()(name, mesh, dict));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<thermalLaw>(ctorPtr(name, mesh, dict));
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

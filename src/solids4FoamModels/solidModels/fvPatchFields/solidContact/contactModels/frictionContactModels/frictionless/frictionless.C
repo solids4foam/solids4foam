@@ -50,7 +50,8 @@ Foam::frictionless::frictionless
         masterPatchID,
         slavePatchID
     ),
-    slaveTraction_(mesh().boundaryMesh()[slavePatchID].size(), vector::zero)
+    slaveTraction_(mesh().boundaryMesh()[slavePatchID].size(), vector::zero),
+    masterTraction_(mesh().boundaryMesh()[masterPatchID].size(), vector::zero)
 {}
 
 
@@ -58,7 +59,8 @@ Foam::frictionless::frictionless
 Foam::frictionless::frictionless(const frictionless& fricLaw)
 :
     frictionContactModel(fricLaw),
-    slaveTraction_(fricLaw.slaveTraction_)
+    slaveTraction_(fricLaw.slaveTraction_),
+    masterTraction_(fricLaw.masterTraction_)
 {}
 
 
@@ -82,10 +84,12 @@ void Foam::frictionless::autoMap(const fvPatchFieldMapper& m)
         )   << "autoMap" << endl;
     }
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(slaveTraction_, slaveTraction_);
+    m(masterTraction_, masterTraction_);
 #else
     slaveTraction_.autoMap(m);
+    masterTraction_.autoMap(m);
 #endif
 }
 

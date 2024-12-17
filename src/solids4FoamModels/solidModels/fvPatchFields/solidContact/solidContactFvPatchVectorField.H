@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -37,6 +31,10 @@ Description
 
     The distance calculations and interpolations are performed by the GGI class.
 
+    Two normal force calculation methods are available:
+        - Point-to-segment. Enabled with "integralNormalGap false;"
+        - Segment-to-segment. Enabled with "integralNormalGap true;"
+
     More details in:
 
     P. Cardiff, A. Karać, A. Ivanković: Development of a Finite Volume contact
@@ -50,14 +48,25 @@ Description
     P. Cardiff, Development of the Finite Volume Method for Hip Joint Stress
     Analysis, PhD thesis, University College Dublin, 2012.
 
+    I. Batistić, P. Cardiff, A. Ivanković, and Ž. Tuković. A finite volume
+    penalty‐based implicit procedure for the treatment of the frictionless
+    contact boundaries. International Journal for Numerical Methods in
+    Engineering, vol. 124, no. 18, pp. 4171-4191, Sep. 2023.
+
+    I. Batistić, P. Cardiff, and Ž. Tuković. A finite volume penalty based
+    segment-to-segment method for frictional contact problems. Applied
+    Mathematical Modelling, vol. 101, pp. 673-693, Jan. 2022.
+
 
 SourceFiles
     solidContactFvPatchVectorField.C
     solidContactFvPatchVectorFieldCalcContact.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
-    Rewrite by Hrvoje Jasak.
+    Philip Cardiff
+    Ivan Batistic
+    Zeljko Tukovic
+    Hrvoje Jasak
 
 \*---------------------------------------------------------------------------*/
 
@@ -72,7 +81,7 @@ Author
 #include "Switch.H"
 #include "boundBox.H"
 #include "standAlonePatch.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "amiZoneInterpolation.H"
 #else
     #include "newGgiInterpolation.H"
@@ -110,7 +119,7 @@ class solidContactFvPatchVectorField
         //- Shadow patch indices
         mutable labelList* shadowPatchIndicesPtr_;
 
-        //- Is the contact boundary active
+        //- Is the master contact boundary active
         Switch rigidMaster_;
 
         //- Normal contact model pointers
@@ -130,7 +139,7 @@ class solidContactFvPatchVectorField
         mutable PtrList<globalPolyPatch> shadowZones_;
 
         //- Zone-to-zone interpolations
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         mutable PtrList<amiZoneInterpolation> zoneToZones_;
 #else
         mutable PtrList<newGgiStandAlonePatchInterpolation> zoneToZones_;
@@ -267,7 +276,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         //- Construct as copy
         solidContactFvPatchVectorField
         (
@@ -359,7 +368,7 @@ public:
             //- Return reference to deformed shadow zones
             PtrList<globalPolyPatch>& shadowZones();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             //- Return const reference to patch-to-patch interpolation
             const PtrList<amiZoneInterpolation>& zoneToZones() const;
 
@@ -377,7 +386,7 @@ public:
             //- Return const reference to zone-to-zone interpolation for the
             //  current slave patch; an error is thrown if the master calls this
             //  function
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const amiZoneInterpolation& zoneToZoneForThisSlave() const;
 #else
             const newGgiStandAlonePatchInterpolation&

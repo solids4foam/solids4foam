@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -22,6 +16,8 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
+
+#ifndef OPENFOAM_ORG
 
 #include "freeEdgeDisplacementFaPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
@@ -223,5 +219,7 @@ namespace Foam
         freeEdgeDisplacementFaPatchScalarField
     );
 }
+
+#endif // OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

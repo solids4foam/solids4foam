@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.1
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -58,12 +52,9 @@ Foam::newSubsetMotionSolverFvMesh::newSubsetMotionSolverFvMesh(const IOobject& i
                 "dynamicMeshDict",
                 io.time().constant(),
                 *this,
-#if FOAMEXTEND
-                IOobject::MUST_READ_IF_MODIFIED,
-#else
                 IOobject::MUST_READ,
-#endif
-                IOobject::NO_WRITE
+                IOobject::NO_WRITE,
+                false  // Do not register
             )
         ).subDict(typeName + "Coeffs")
     ),
