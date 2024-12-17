@@ -1,17 +1,18 @@
 # Contributing to solids4foam
 
 Thank you for considering contributing to **solids4foam**!
-Thanks for helping create a world where fluid and structure are solved using your favorite CFD code.
+
+Thanks for helping create a world where fluid and structure are solved using your favourite CFD code.
 
 ## How Can I Contribute?
 
 ### 1. Reporting Bugs
 
-If you encounter a bug, please open an [GitHub issue](https://github.com/solids4foam/solids4foam/issues) and include:
+If you encounter a bug, please open a [GitHub issue](https://github.com/solids4foam/solids4foam/issues) and include the following:
 
 - A concise and descriptive title.
 
-- Steps to reproduce the issue along with and explanation of the expected behavior.
+- Steps to reproduce the issue, along with explaining the expected behaviour.
 
 - Relevant details, such as screenshots, logs, or error messages and an environment description in the following form:
 
@@ -26,7 +27,7 @@ If you encounter a bug, please open an [GitHub issue](https://github.com/solids4
 
 We welcome ideas for new features! To suggest a feature:
 
-- Open a [GitHub issue](https://github.com/solids4foam/solids4foam/issues) with title: **Feature request: feature title**.
+- Open a [GitHub issue](https://github.com/solids4foam/solids4foam/issues) with the title: **Feature request: feature title**.
 - Provide a detailed description of the proposed feature.
 - Explain its potential benefits for the solids4foam toolbox.
 
@@ -43,30 +44,15 @@ We welcome ideas for new features! To suggest a feature:
     cd solids4foam
     ```
 
-#### Step 2: Create a Branch
-
-Create a new branch for your changes:
-
-```bash
-git checkout -b branch_name
-```
-
-Branch naming conventions:
-
-- **New features**: Start with `feature-name` (e.g., `feature-newSolver`).
-- **Bug fixes**: Start with `fix-name` (e.g., `fix-boundaryConditions`).
-- **Code refactoring**: Start with `refactor-name` (e.g., `refactor-meshHandling`).
-- **Documentation changes**: Start with `docs-name` (e.g., `docs-update-readme` or `docs-fix-typos`).
-
-#### Step 3: Make Your Changes
+#### Step 2: Make Your Changes
 
 - Follow the [OpenFOAM Coding Style Guide](https://openfoam.org/dev/coding-style-guide/)).
-- Ensure that your code can be compiled and adheres the existing code structure and organization.
+- Ensure your code can be compiled and adheres to the existing code structure and organisation.
 - Test your changes thoroughly with relevant test cases. Include or update tutorial cases if applicable.
 - Document your code with clear comments.
 - Before submitting, check the code using available linters or style checkers ([shellcheck](https://www.shellcheck.net/#), [markdownlint](https://dlaa.me/markdownlint/)).
 
-#### Step 4: Commit Your Changes
+#### Step 3: Commit Your Changes
 
 Write clear and descriptive commit messages and commit your changes. Reference any related issues using hashtags if applicable::
 
@@ -75,15 +61,15 @@ git add file_name.C
 git commit -m "Fix for issue #51"
 ```
 
-#### Step 5: Push and Open a Pull Request
+#### Step 4: Push and Open a Pull Request
 
 Push your branch to your fork:
 
 ```bash
-git push origin branch_name
+git push
 ```
 
-Go to the original solids4foam repository on GitHub and open a pull request (target the development branch for your pull request). Include:
+Go to the original solids4foam repository on GitHub and open a pull request (target the `development` branch for your pull request). Include:
 
 - **A clear title**, such as `Fix: Issue #123` or `Feature: Add new functionality`.
 - **A detailed description** of your changes.
@@ -92,6 +78,6 @@ Go to the original solids4foam repository on GitHub and open a pull request (tar
 
 ## Questions?
 
-If you have any questions or need assistance, feel free to open a [discussion](https://github.com/solids4foam/solids4foam/discussions).
+Feel free to open a [discussion thread](https://github.com/solids4foam/solids4foam/discussions) if you have any questions or need assistance, 
 
 Thank you for contributing to solids4foam!
