@@ -51,20 +51,22 @@ The assumed fluid and solid physical parameters are given in Table 1.
 
 **Table 1: Physical Parameters**
 
-|               Parameter                |       Symbol       |                 Value                  |
-| :------------------------------------: | :----------------: | :------------------------------------: |
-|             Solid Density              |     $$ \rho$$      |            1 kg m$$^{-3}$$             |
-| Solid Coefficient of Thermal Expansion |    $$ \alpha$$     |     $$1\times10^{-5}$$ K$$^{-1}$$      |
-|       Solid Thermal Conductivity       |       $$k$$        |            $$0.04$$ W/(m K)            |
-|      Solid Specific Heat Capacity      |      $$C_p$$       |           $$1010$$ J/(kg K)            |
-|            Fluid Viscosity             |      $$\mu$$       |               0.001 Pa s               |
-|             Fluid Density              |      $$\rho$$      |            1 kg m$$^{-3}$$             |
-| Fluid Coefficient of Thermal Expansion |     $$ \beta$$     |    $$2.85\times10^{-3}$$ K$$^{-1}$$    |
-|       Fluid Thermal Conductivity       |    $$\lambda$$     |            $$0.03$$ W/(m K)            |
-|      Fluid Specific Heat Capacity      |      $$ C_p$$      |           $$1010$$ J/(kg K)            |
-|      Fluid Reference Temperature       |    $$T_{ref}$$     |               $$303$$ K                |
-|     Fluid Turbulent Prandtl Number     | $$ \text{Pr}\_t $$ |                  0.85                  |
-|                Gravity                 |       $$g$$        | $$(0 \; $$-$$9.81 \; 0)$$ m $$s^{-2}$$ |
+|          Parameter           |       Symbol       |          Value           |
+| :--------------------------: | :----------------: | :----------------------: |
+|        Solid Density         |     $$ \rho$$      |       1 kg m$$^{-3}$$    |
+| Solid Coefficient of Thermal |   $$ \alpha$$ | $$1\times10^{-5}$$ K$$^{-1}$$ |
+|        Expansion             |                    |                          |
+|   Solid Thermal Conductivity |       $$k$$        |    $$0.04$$ W/(m K)      |
+| Solid Specific Heat Capacity |      $$C_p$$       |   $$1010$$ J/(kg K)      |
+|       Fluid Viscosity        |      $$\mu$$       |      0.001 Pa s          |
+|        Fluid Density         |      $$\rho$$      |       1 kg m$$^{-3}$$    |
+| Fluid Coefficient of Thermal | $$ \beta$$ | $$2.85\times10^{-3}$$ K$$^{-1}$$ |
+|        Expansion             |                    |                          |
+|   Fluid Thermal Conductivity |    $$\lambda$$     |    $$0.03$$ W/(m K)      |
+| Fluid Specific Heat Capacity |      $$ C_p$$      |   $$1010$$ J/(kg K)      |
+| Fluid Reference Temperature  |    $$T_{ref}$$     |       $$303$$ K          |
+| Fluid Turbulent Prandtl No.  | $$ \text{Pr}_t $$  |          0.85            |
+| Gravity        |       $$g$$        | $$(0 \; $$-$$9.81 \; 0)$$ m $$s^{-2}$$ |
 
 ## Results
 
