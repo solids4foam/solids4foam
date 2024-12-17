@@ -39,12 +39,8 @@ for the resulting stress and displacement fields.
 To avoid rigid-body translation, the displacement of one cell (near the centre
 of the slab) is constrained to zero.
 
-<div style="text-align: center;">
-  <img src="./images/slabCooling-geometry.png" alt="Image" width="450">
-    <figcaption>
-     <strong>Figure 1: Problem geometry; computational mesh</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry; computational mesh](./images/slabCooling-geometry.png)  
+**Figure 1: Problem geometry; computational mesh**
 
 ### Avoiding Rigid-Body Translations
 
@@ -92,12 +88,8 @@ The predicted displacement field is shown in Figure 2, where the slab contracts
 uniformly about its centre (where the displacement of an internal cell is
 constrained).
 
-<div style="text-align: center;">
-  <img src="./images/slabCooling-D.png" alt="Image" width="400">
-    <figcaption>
-     <strong>Figure 2: Displacement magnitude field</strong>
-    </figcaption>
-</div>
+![Figure 2: Displacement magnitude field](./images/slabCooling-D.png)  
+**Figure 2: Displacement magnitude field**
 
 As all boundaries are traction-free, the steady-state solution should be
 stress-free. This is shown in Figure 3, where one can see that the resulting
@@ -105,12 +97,8 @@ stress field has a magnitude of a few hundred pascals, which can be considered
 negligible and is caused by the usage of iterative procedures and chosen
 tolerances.
 
-<div style="text-align: center;">
-  <img src="./images/slabCooling-sigmaEq.png" alt="Image" width="400">
-    <figcaption>
-     <strong>Figure 3: Equivalent stress field</strong>
-    </figcaption>
-</div>
+![Figure 3: Equivalent stress field](./images/slabCooling-sigmaEq.png)  
+**Figure 3: Equivalent stress field**
 
 ---
 

@@ -17,7 +17,8 @@ You can find the files for this tutorial under
 
 ## Case Overview
 
-![](images/sol_overview_1.PNG)
+![Case geometry and mesh](images/sol_overview_1.PNG)
+**Case geometry and mesh*
 
 This case analyses the stresses and displacements generated in a spherical
 pressure vessel subjected to an increasing internal pressure and temperature.
@@ -39,7 +40,17 @@ thermal gradient. The deformations (strains/rotations) are expected to be
 “small”: this means we can use a small strain (linear geometry) approach, where
 the displacements are assumed not to affect the material geometry. The governing
 equations are given by the conservation equations are linear momentum (linear
-geometry form) and energy (heat equation form): ![](images/sol_theory_1.PNG)
+geometry form) and energy (heat equation form):
+
+$$
+\rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} = \nabla \cdot
+\boldsymbol{\sigma} + \rho \boldsymbol{g}
+$$
+
+$$
+\rho C \frac{\partial T}{\partial t} = \nabla \cdot (k \nabla T) +
+\boldsymbol{\sigma} : \nabla \frac{\partial \boldsymbol{u}}{\partial t}
+$$
 
 In this case, the solver employs a segregated solution methodology, where a loop
 is performed over the momentum equation (solved for displacement `D`) and the
@@ -63,7 +74,9 @@ end
 At 5 s, the expected temperature distribution across the wall thickness is
 expected to be close to linear, where, the von Mises stress distribution is
 quite nonlinear with a minimum 4 mm from the inner wall.
-![](images/sol_expres_1.PNG)
+
+![Expected results](images/sol_expres_1.PNG)
+**Expected results**
 
 ---
 
@@ -97,7 +110,8 @@ seen, the mesh in the fluent format is converted to the OpenFOAM format before
 running the `solids4Foam` solver.
 
 ```tip
-A tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
+A tutorial case can be cleaned and reset using the included `Allrun` script,
+i.e. `> ./Allclean`.
 ```
 
 ---
@@ -105,15 +119,18 @@ A tutorial case can be cleaned and reset using the included `Allrun` script, i.e
 ## Analysing the Results
 
 When viewing the results in ParaView, it can be insightful to warp the geometry
-by a scaled displacement field. This can be achieved using the _Warp By Vector_
-filter, where the `D` displacement field is selected as the _Vector_ and a
-_Scale Factor_ of 1 shows the true deformation. In this case, using a _Scale
-Factor_ of 100 allows the deformation to be seen. ![](images/sol_runcase_1.PNG)
-![](images/sol_runcase_2.PNG)
+by a scaled displacement field. This can be achieved using the *Warp By Vector*
+filter, where the `D` displacement field is selected as the *Vector* and a
+*Scale Factor* of 1 shows the true deformation. In this case, using a *Scale
+Factor* of 100 allows the deformation to be seen.
+
+![The case in ParaView 1](images/sol_runcase_1.PNG)
+![The case in ParaView 2](images/sol_runcase_2.PNG)
+**Visualising the case in ParaView**
 
 ---
 
-# Delving Deeper
+## Delving Deeper
 
 ---
 
@@ -122,11 +139,11 @@ how about you check out another tutorial.
 
 ---
 
-## Case Structure
+### Case Structure
 
 The case structure follows the typical OpenFOAM case structure:
 
-```
+```plaintext
 hotSphere
 ├── 0
 │   ├── D
@@ -154,14 +171,14 @@ hotSphere
 
 ---
 
-## Initial Conditions and Boundary Conditions
+### Initial Conditions and Boundary Conditions
 
 In this case, there are two primitive variables:
 
 - displacement (vector)
 - temperature (scalar)
 
-```
+```plaintext
 ├── 0
 │   ├── D   displacement vector field
 │   └── T   temperature scalar field
@@ -170,11 +187,11 @@ In this case, there are two primitive variables:
 This initial displacement field is assumed to be zero, and the initial
 temperature field is assumed to be 300 K.
 
-### Displacement Field `D` Boundary Conditions
+#### Displacement Field `D` Boundary Conditions
 
 A zero-traction condition is specified on the outer wall:
 
-```
+```c++
 outside
 {
     type            solidTraction;
@@ -185,12 +202,15 @@ outside
 ```
 
 ```note
-`pressure` here is referring to the normal component of the boundary traction vector; in general, this is not the same as the hydrostatic pressure. The total applied traction is: `appliedTraction = traction - n*pressure` where `n` is the boundary unit normal field.
+`pressure` here is referring to the normal component of the boundary traction
+vector; in general, this is not the same as the hydrostatic pressure. The total
+applied traction is: `appliedTraction = traction - n*pressure` where `n` is the
+boundary unit normal field.
 ```
 
 A time-varying traction condition is given on the inner wall:
 
-```
+```c++
 inside
 {
     type            solidTraction;
@@ -207,19 +227,19 @@ inside
 where `timeVsPressure` specifies time vs pressure as a XY piecewise linear
 series:
 
-```
+```c++
 (
     ( 0 0 )
     ( 5 1e6 )
 )
 ```
 
-### Temperature Field `T` Boundary Conditions
+#### Temperature Field `T` Boundary Conditions
 
 For the temperature field, a convection condition (Newton’s law of cooling) is
 specified on the outer wall:
 
-```
+```c++
 outside
 {
     type            thermalConvection;
@@ -231,7 +251,7 @@ outside
 
 A time-varying temperature is given on the inside wall:
 
-```
+```c++
 inside
 {
     type            fixedTemperature;
@@ -246,7 +266,7 @@ inside
 
 where `timeVsTemperature` specifies time vs temperature:
 
-```
+```c++
 (
     ( 0 300 )
     ( 5 500 )
@@ -255,12 +275,12 @@ where `timeVsTemperature` specifies time vs temperature:
 
 ---
 
-## Specifying the Type of Solid Analysis
+### Specifying the Type of Solid Analysis
 
 The type of solid analysis, which is called by the `solids4Foam` solver, is
 specified in the `constant/solidProperties` dictionary:
 
-```
+```c++
 solidModel thermalLinearGeometry;
 
 thermalLinearGeometryCoeffs
@@ -280,7 +300,10 @@ equation is solved (`thermal-`) and a linear geometry (`-LinearGeometry`)
 mechanical approach is taken.
 
 ```tip
-A **linear geometry** approach is also known as a “small strain” or “small strain/rotation” approach and means that we assume the cell geometry (volumes, face areas, etc.) to be **independent of the displacement field**. This assumption is typically OK when the deformation is “small”.
+A **linear geometry** approach is also known as a “small strain” or “small
+strain/rotation” approach and means that we assume the cell geometry (volumes,
+face areas, etc.) to be **independent of the displacement field**. This
+assumption is typically OK when the deformation is “small”.
 ```
 
 - `nCorrectors`: this is the maximum number of outer correctors per time-step.
@@ -295,13 +318,24 @@ A **linear geometry** approach is also known as a “small strain” or “small
 
 ---
 
-## The Mechanical Law
+### The Mechanical Law
 
 A “solid” analysis requires the definition of the mechanical properties via the
 `mechanicalProperties` dictionary; in this case the `thermoLinearElastic` law is
-specified (Duhamel-Nuemann form of Hooke’s law): ![](images/sol_runcase_8.PNG)
+specified (Duhamel-Nuemann form of Hooke’s law):
 
-```
+$$
+\boldsymbol{\sigma} = \mu \nabla \boldsymbol{u} + \mu (\nabla \boldsymbol{u})^T
++ \lambda \mathrm{tr}(\nabla \boldsymbol{u}) \mathbf{I}
+- (2\mu + 3\lambda) \alpha (T - T_0) \mathbf{I}
+$$
+
+$$
+\lambda = \frac{E \nu}{(1 + \nu)(1 - 2\nu)} \qquad
+\mu = G = \frac{E}{2(1 + \nu)}
+$$
+
+```c++
 mechanical
 (
     steel
@@ -323,9 +357,13 @@ of linear thermal expansion `α`.
 As we are performing a heat analysis, so we also need to specify the thermal
 properties via the `thermalProperties` dictionary. In this case the constant law
 is specified (Fourier’s conduction law) by specific heat `C` and thermal
-conductivity `k`: ![](images/sol_runcase_9.PNG)
+conductivity `k`:
 
-```
+$$
+    \boldsymbol{q} = -k \boldsymbol{\nabla} T
+$$
+
+```c++
 thermal
 {
     type      constant;
@@ -336,11 +374,11 @@ thermal
 
 ---
 
-## Examining the Solver Output
+### Examining the Solver Output
 
 Let us examine the output from the `solids4Foam` solver for this case:
 
-```
+```plaintext
 Time = 1
 
 Evolving thermal solid solver
@@ -372,18 +410,21 @@ a linear mechanical law was selected (no need to iterate).
 
 ---
 
-## `fvSchemes`
+### `fvSchemes`
 
 Switching between `steadyState` and `transient` analyses requires changing the
-_d2dt2_ and _ddt_ schemes.
+*d2dt2* and *ddt* schemes.
 
 The **gradient** schemes should almost always be `leastSquares` as the standard
 `Gauss linear` method can produce large errors in the stress field for skewed
-cells, e.g. on the `plateHole` case ![](images/sol_sett_1.PNG)
+cells, e.g. on the `plateHole` case
+
+![Effect of gradient scheme](images/sol_sett_1.PNG)
+**Effect of gradient scheme**
 
 ---
 
-## `fvSolution`
+### `fvSolution`
 
 The `D` and `T` equations are similar to the `p` equation in standard CFD
 approaches; as such, the preconditioned conjugate gradient (PCG) or the
@@ -407,9 +448,9 @@ factors should typically be greater than 0.1.
 
 ---
 
-## Code
+### Code
 
-### `solidModel`
+#### `solidModel`
 
 For the `hotSphere` test case, we have selected a “solid” analysis in the
 `physicsProperties` dictionary: this means a `solidModel` class will be
@@ -418,7 +459,7 @@ selected; then, we specify the actual `solidModel` class to be the
 
 The code for the thermoLinGeomSolidModel class is located at:
 
-```
+```plaintext
 solids4foam/src/solids4FoamModels/solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 ```
 
@@ -453,7 +494,13 @@ bool thermalLinGeomSolid::evolve()
 ...
 ```
 
-![](images/sol_code_1.PNG)
+$$
+\rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} = K_{\text{imp}}
+\nabla^2 \boldsymbol{u}
+- K_{\text{imp}} \nabla^2 \boldsymbol{u} + \nabla \cdot \boldsymbol{\sigma}
++ \rho \boldsymbol{g}
++ \text{Rhie-Chow}
+$$
 
 ```c++
         // Under-relaxation the linear system
@@ -484,12 +531,25 @@ bool thermalLinGeomSolid::evolve()
 ...
 ```
 
-![](images/sol_code_2.PNG)
+$$
+\rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
+\nabla \cdot \boldsymbol{\sigma} + \rho \boldsymbol{g}
+$$
 
 Also, we add an additional diffusion term to quell numerical oscillations (e.g.
 checker-boarding) based on Rhie-Chow correction:
 
-![](images/sol_code_3.PNG) ![](images/sol_code_4.PNG)
+$$
+\rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
+\underbrace{K_{\text{imp}} \nabla^2 \boldsymbol{u}}_{\text{implicit}}
+\underbrace{- K_{\text{imp}} \nabla^2 \boldsymbol{u} + \nabla \cdot
+\boldsymbol{\sigma} + \rho \boldsymbol{g}}_{\text{explicit}}
+$$
+
+$$
+\text{Rhie-Chow} = K_{\text{imp}} \nabla^2 \boldsymbol{u}
+- \nabla \cdot (K_{\text{imp}} \nabla \boldsymbol{u})
+$$
 
 ```c++
         // Under-relaxation the linear system
@@ -520,7 +580,13 @@ checker-boarding) based on Rhie-Chow correction:
 ...
 ```
 
-![](images/sol_code_5.PNG)
+$$
+\rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} = K_{\text{imp}}
+\nabla^2 \boldsymbol{u}
+- K_{\text{imp}} \nabla^2 \boldsymbol{u} + \nabla \cdot \boldsymbol{\sigma}
++ \rho \boldsymbol{g}
++ \text{Rhie-Chow}
+$$
 
 ```c++
         // Under-relaxation the linear system
@@ -569,7 +635,7 @@ checker-boarding) based on Rhie-Chow correction:
 The values of impK can affect convergence, but not the answer, assuming
 convergence is achieved.
 
-### `mechanicalLaw`
+#### `mechanicalLaw`
 
 For the `hotSphere` test case, we have selected the `thermoLinearElastic`
 mechanical law in the `mechanicalProperties` dictionary: this class will perform
@@ -581,8 +647,13 @@ The code for the `thermoLinearElastic` mechanical law class is located at:
 solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/linearGeometryLaws/thermoLinearElastic/thermoLinearElastic.C
 ```
 
-which calculates the stress according to the Duhamel-Neumann form of Hooke’s
-law: ![](images/sol_code_6.PNG)
+$$
+\boldsymbol{\sigma} = \mu \nabla \boldsymbol{u}
++ \mu (\nabla \boldsymbol{u})^T
++ \lambda \mathrm{tr}(\nabla \boldsymbol{u}) \mathbf{I}
+- (2\mu + 3\lambda)\alpha (T - T_0) \mathbf{I} \\
+$$
+where $$(2\mu + 3\lambda) = 3K$$.
 
 Let us examine the “correct” function of this class to see how the stress is
 calculated:
@@ -669,4 +740,13 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 
 where `sigma0_` is an optional initial residual stress field, and the standard
 Hooke’s law can be expressed in a number of equivalent forms:
-![](images/sol_code_7.PNG)
+
+$$
+\boldsymbol{\sigma} = \mu \nabla \boldsymbol{u} + \mu (\nabla \boldsymbol{u})^T
++ \lambda \mathrm{tr}(\nabla \boldsymbol{u}) \mathbf{I} \\
+= 2\mu \boldsymbol{\epsilon} + \lambda \mathrm{tr}(\boldsymbol{\epsilon})
+\mathbf{I} \\
+= 2\mu \mathrm{dev}[\boldsymbol{\epsilon}]
++ K \mathrm{tr}(\boldsymbol{\epsilon}) \mathbf{I} \\
+= 2\mu \mathrm{dev}[\boldsymbol{\epsilon}] - p \mathbf{I}
+$$

@@ -29,7 +29,7 @@ polymer where a Prony series represents its deviatoric response, and its
 bulk/volumetric response is assumed to be elastic. The mechanical parameters for
 the Prony series Maxwell models are given in Table 1.
 
-**Table 1: Viscoelastic mechanical properties given in terms of a Prony series**
+### Table 1: Viscoelastic mechanical properties given in terms of a Prony series
 
 |    Material parameter     |     Symbol     |     Value     |
 | :-----------------------: | :------------: | :-----------: |
@@ -53,12 +53,8 @@ terms are neglected, and the problem is solved as a plane strain. The cylinder
 is discretised with $$1,152$$ cells: $$24$$ cells in the radial direction and
 $$48$$ cells in the circumferential direction.
 
-<div style="text-align: center;">
-  <img src="./images/viscoTube-geometry.png" alt="Image" width="350">
-    <figcaption>
-     <strong>Figure 1: Problem geometry [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry [1]](./images/viscoTube-geometry.png)
+**Figure 1: Problem geometry [1]**
 
 ---
 
@@ -74,13 +70,11 @@ relatively insensitive to time-step size. As the step size is reduced, the
 predictions are seen to approach the reference finite element solution ("Abaqus
 FE").
 
-<div style="text-align: center;">
-  <img src="./images/viscoTube-radialStress.png" alt="Image" width="500">
-  <img src="./images/viscoTube-radialDisplacement.png" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 2: Radial stress and radial displacement predictions across the wall thickness, showing the effect of loading step size [1]. Comparison is given with finite element results from Abaqus ("Abaqus FE") </strong>
-    </figcaption>
-</div>
+![Radial stress](./images/viscoTube-radialStress.png)
+![Radial displacement]./images/viscoTube-radialDisplacement.png)
+**Figure 2: Radial stress and radial displacement predictions across the wall
+thickness, showing the effect of loading step size [1]. Comparison is given with
+finite element results from Abaqus ("Abaqus FE")**
 
 The above plots can be easily reproduced using post-processing function objects
 added to `controlDict`. For the chosen point in the domain, the
