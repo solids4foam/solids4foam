@@ -224,8 +224,6 @@ int main(int argc, char *argv[])
 #ifdef OPENFOAM_COM
     const scalar minCos(readScalar(perturbDict.lookup("minCos")));
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
-#else
-    const scalar minCos = 0;
 #endif
 
     // Convert fixedPatches list to a set
