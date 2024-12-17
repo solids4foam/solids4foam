@@ -4,7 +4,8 @@ sort: 1
 
 # My first tutorial: `hotSphere`
 
-You can find the files for this tutorial under [`tutorials/solids/thermoelasticity/hotSphere`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/solids/thermoelasticity/hotSphere).
+You can find the files for this tutorial under
+[`tutorials/solids/thermoelasticity/hotSphere`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/solids/thermoelasticity/hotSphere).
 
 ---
 
@@ -14,11 +15,18 @@ You can find the files for this tutorial under [`tutorials/solids/thermoelastici
 - Describe the structure of a solids4foam solid-only case;
 - Demonstrate how to perform a thermo-elastic analysis;
 
-
 ## Case Overview
+
 ![](images/sol_overview_1.PNG)
 
-This case analyses the stresses and displacements generated in a spherical pressure vessel subjected to an increasing internal pressure and temperature. The problem is 1-D axisymmetric in nature, but for demonstration purposes one eighth of the vessel is modelled here and symmetry planes are used. The outer surface of the vessel is stress/traction free and the heat flux is given by Newton’s law of cooling (a simplified convection boundary condition). The internal pressure and temperature are a function of time $t$:
+This case analyses the stresses and displacements generated in a spherical
+pressure vessel subjected to an increasing internal pressure and temperature.
+The problem is 1-D axisymmetric in nature, but for demonstration purposes one
+eighth of the vessel is modelled here and symmetry planes are used. The outer
+surface of the vessel is stress/traction free and the heat flux is given by
+Newton’s law of cooling (a simplified convection boundary condition). The
+internal pressure and temperature are a function of time $t$:
+
 $$
 \begin{align}
     T_{\text{inside}} = 40t + 300 ~\text{K} \\
@@ -26,10 +34,18 @@ $$
 \end{align}
 $$
 
-We expect the vessel to deform due to the applied pressure and also due to the thermal gradient. The deformations (strains/rotations) are expected to be “small”: this means we can use a small strain (linear geometry) approach, where the displacements are assumed not to affect the material geometry. The governing equations are given by the conservation equations are linear momentum (linear geometry form) and energy (heat equation form):
-![](images/sol_theory_1.PNG)
+We expect the vessel to deform due to the applied pressure and also due to the
+thermal gradient. The deformations (strains/rotations) are expected to be
+“small”: this means we can use a small strain (linear geometry) approach, where
+the displacements are assumed not to affect the material geometry. The governing
+equations are given by the conservation equations are linear momentum (linear
+geometry form) and energy (heat equation form): ![](images/sol_theory_1.PNG)
 
-In this case, the solver employs a segregated solution methodology, where a loop is performed over the momentum equation (solved for displacement `D`) and the energy equation (solved for temperature `T`) until convergence is achieved. This loop is performed within each time-step resulting in an overall method that is implicit in time.
+In this case, the solver employs a segregated solution methodology, where a loop
+is performed over the momentum equation (solved for displacement `D`) and the
+energy equation (solved for temperature `T`) until convergence is achieved. This
+loop is performed within each time-step resulting in an overall method that is
+implicit in time.
 
 ```pseudocode
 for all time-steps
@@ -44,14 +60,18 @@ end
 
 ## Expected Results
 
-At 5 s, the expected temperature distribution across the wall thickness is expected to be close to linear, where, the von Mises stress distribution is quite nonlinear with a minimum 4 mm from the inner wall.
+At 5 s, the expected temperature distribution across the wall thickness is
+expected to be close to linear, where, the von Mises stress distribution is
+quite nonlinear with a minimum 4 mm from the inner wall.
 ![](images/sol_expres_1.PNG)
 
 ---
 
 ## Running the Case
 
-As in all solids4foam tutorials, the tutorial case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
+As in all solids4foam tutorials, the tutorial case can be run using the included
+`Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
+
 ```bash
 #!/bin/bash
 
@@ -70,7 +90,11 @@ solids4Foam::runApplication fluentMeshToFoam hotSphere.msh
 # Run the solver
 solids4Foam::runApplication solids4Foam
 ```
-where the `solids4Foam::convertCaseFormat .` script makes minor changes to the case to make it compatible with your version of OpenFOAM/foam-extend. As can be seen, the mesh in the fluent format is converted to the OpenFOAM format before running the `solids4Foam` solver.
+
+where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
+case to make it compatible with your version of OpenFOAM/foam-extend. As can be
+seen, the mesh in the fluent format is converted to the OpenFOAM format before
+running the `solids4Foam` solver.
 
 ```tip
 A tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
@@ -80,10 +104,12 @@ A tutorial case can be cleaned and reset using the included `Allrun` script, i.e
 
 ## Analysing the Results
 
-When viewing the results in ParaView, it can be insightful to warp the geometry by a scaled displacement field. This can be achieved using the *Warp By Vector* filter, where the `D` displacement field is selected as the *Vector* and a *Scale Factor* of 1 shows the true deformation. In this case, using a *Scale Factor* of 100 allows the deformation to be seen.
-![](images/sol_runcase_1.PNG)
+When viewing the results in ParaView, it can be insightful to warp the geometry
+by a scaled displacement field. This can be achieved using the _Warp By Vector_
+filter, where the `D` displacement field is selected as the _Vector_ and a
+_Scale Factor_ of 1 shows the true deformation. In this case, using a _Scale
+Factor_ of 100 allows the deformation to be seen. ![](images/sol_runcase_1.PNG)
 ![](images/sol_runcase_2.PNG)
-
 
 ---
 
@@ -91,13 +117,15 @@ When viewing the results in ParaView, it can be insightful to warp the geometry 
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out another tutorial.
+If you would like to learn more about the case, then please continue; if not,
+how about you check out another tutorial.
 
 ---
 
 ## Case Structure
 
 The case structure follows the typical OpenFOAM case structure:
+
 ```
 hotSphere
 ├── 0
@@ -132,18 +160,20 @@ In this case, there are two primitive variables:
 
 - displacement (vector)
 - temperature (scalar)
+
 ```
 ├── 0
 │   ├── D   displacement vector field
 │   └── T   temperature scalar field
 ```
 
-This initial displacement field is assumed to be zero, and the initial temperature field is assumed to be 300 K.
-
+This initial displacement field is assumed to be zero, and the initial
+temperature field is assumed to be 300 K.
 
 ### Displacement Field `D` Boundary Conditions
 
 A zero-traction condition is specified on the outer wall:
+
 ```
 outside
 {
@@ -159,6 +189,7 @@ outside
 ```
 
 A time-varying traction condition is given on the inner wall:
+
 ```
 inside
 {
@@ -172,7 +203,10 @@ inside
     value           uniform (0 0 0);
 }
 ```
-where `timeVsPressure` specifies time vs pressure as a XY piecewise linear series:
+
+where `timeVsPressure` specifies time vs pressure as a XY piecewise linear
+series:
+
 ```
 (
     ( 0 0 )
@@ -182,7 +216,9 @@ where `timeVsPressure` specifies time vs pressure as a XY piecewise linear serie
 
 ### Temperature Field `T` Boundary Conditions
 
-For the temperature field, a convection condition (Newton’s law of cooling) is specified on the outer wall:
+For the temperature field, a convection condition (Newton’s law of cooling) is
+specified on the outer wall:
+
 ```
 outside
 {
@@ -194,6 +230,7 @@ outside
 ```
 
 A time-varying temperature is given on the inside wall:
+
 ```
 inside
 {
@@ -206,7 +243,9 @@ inside
     value           uniform 300;
 }
 ```
+
 where `timeVsTemperature` specifies time vs temperature:
+
 ```
 (
     ( 0 300 )
@@ -218,7 +257,9 @@ where `timeVsTemperature` specifies time vs temperature:
 
 ## Specifying the Type of Solid Analysis
 
-The type of solid analysis, which is called by the `solids4Foam` solver, is specified in the `constant/solidProperties` dictionary:
+The type of solid analysis, which is called by the `solids4Foam` solver, is
+specified in the `constant/solidProperties` dictionary:
+
 ```
 solidModel thermalLinearGeometry;
 
@@ -233,23 +274,32 @@ thermalLinearGeometryCoeffs
     infoFrequency        100;
 }
 ```
-Here, the `thermalLinearGeometry` is a solid mathematical model where the heat equation is solved (`thermal-`) and a linear geometry (`-LinearGeometry`) mechanical approach is taken.
+
+Here, the `thermalLinearGeometry` is a solid mathematical model where the heat
+equation is solved (`thermal-`) and a linear geometry (`-LinearGeometry`)
+mechanical approach is taken.
 
 ```tip
 A **linear geometry** approach is also known as a “small strain” or “small strain/rotation” approach and means that we assume the cell geometry (volumes, face areas, etc.) to be **independent of the displacement field**. This assumption is typically OK when the deformation is “small”.
 ```
 
-- `nCorrectors`: this is the maximum number of outer correctors per time-step. If `nCorrectors` is reached, this means the equations have not converged to the required tolerance.
-- `solutionTolerance` and `alternativeTolerance`: these are solution tolerances for the outer corrector loop. Further details are given below.
-- Iterations will continue until either the D (and T) have converged to the specific **tolerances** or the maximum number of correctors has been reached.
-- `infoFrequency`: this is the frequency that the outer loop residuals are printed to the standard output.
+- `nCorrectors`: this is the maximum number of outer correctors per time-step.
+  If `nCorrectors` is reached, this means the equations have not converged to
+  the required tolerance.
+- `solutionTolerance` and `alternativeTolerance`: these are solution tolerances
+  for the outer corrector loop. Further details are given below.
+- Iterations will continue until either the D (and T) have converged to the
+  specific **tolerances** or the maximum number of correctors has been reached.
+- `infoFrequency`: this is the frequency that the outer loop residuals are
+  printed to the standard output.
 
 ---
 
 ## The Mechanical Law
 
-A “solid” analysis requires the definition of the mechanical properties via the `mechanicalProperties` dictionary; in this case the `thermoLinearElastic` law is specified (Duhamel-Nuemann form of Hooke’s law):
-![](images/sol_runcase_8.PNG)
+A “solid” analysis requires the definition of the mechanical properties via the
+`mechanicalProperties` dictionary; in this case the `thermoLinearElastic` law is
+specified (Duhamel-Nuemann form of Hooke’s law): ![](images/sol_runcase_8.PNG)
 
 ```
 mechanical
@@ -265,10 +315,16 @@ mechanical
     }
 );
 ```
-where, in addition to the density, three mechanical properties must be specified: Elastic/Young’s modulus `E`, Poisson’s ratio `ν` and the coefficient of linear thermal expansion `α`.
 
-As we are performing a heat analysis, so we also need to specify the thermal properties via the `thermalProperties` dictionary. In this case the constant law is specified (Fourier’s conduction law) by specific heat `C` and thermal conductivity `k`:
-![](images/sol_runcase_9.PNG)
+where, in addition to the density, three mechanical properties must be
+specified: Elastic/Young’s modulus `E`, Poisson’s ratio `ν` and the coefficient
+of linear thermal expansion `α`.
+
+As we are performing a heat analysis, so we also need to specify the thermal
+properties via the `thermalProperties` dictionary. In this case the constant law
+is specified (Fourier’s conduction law) by specific heat `C` and thermal
+conductivity `k`: ![](images/sol_runcase_9.PNG)
+
 ```
 thermal
 {
@@ -278,12 +334,12 @@ thermal
 }
 ```
 
-
 ---
 
 ## Examining the Solver Output
 
 Let us examine the output from the `solids4Foam` solver for this case:
+
 ```
 Time = 1
 
@@ -305,37 +361,49 @@ ExecutionTime = 8.73 s  ClockTime = 9 s
 ```
 
 For solid analyses, the `solids4Foam` solver checks three types of residuals:
+
 - `res`: linear solver residual
 - `relRes`: relative residual - change of the primitive variable
 - `matRes`: material residual - for nonlinear material laws
 
-where the tolerances are specified in the `solidProperties` dictionary. In this case, there are residuals for `T` and `D`.  The material residual is zero because a linear mechanical law was selected (no need to iterate).
+where the tolerances are specified in the `solidProperties` dictionary. In this
+case, there are residuals for `T` and `D`. The material residual is zero because
+a linear mechanical law was selected (no need to iterate).
 
 ---
 
 ## `fvSchemes`
 
-Switching between `steadyState` and `transient` analyses requires changing the *d2dt2* and *ddt* schemes.
+Switching between `steadyState` and `transient` analyses requires changing the
+_d2dt2_ and _ddt_ schemes.
 
-The **gradient** schemes should almost always be `leastSquares` as the standard `Gauss linear` method can produce large errors in the stress field for skewed cells, e.g. on the `plateHole` case
-![](images/sol_sett_1.PNG)
+The **gradient** schemes should almost always be `leastSquares` as the standard
+`Gauss linear` method can produce large errors in the stress field for skewed
+cells, e.g. on the `plateHole` case ![](images/sol_sett_1.PNG)
 
 ---
 
 ## `fvSolution`
 
-The `D` and `T` equations are similar to the `p` equation in standard CFD approaches; as such, the preconditioned conjugate gradient (PCG) or the algebraic multi-grid (GAMG) linear solvers tend to work best. The `relTol` can set be 0.1 as outer iterations are performed over the momentum equation until convergence.
+The `D` and `T` equations are similar to the `p` equation in standard CFD
+approaches; as such, the preconditioned conjugate gradient (PCG) or the
+algebraic multi-grid (GAMG) linear solvers tend to work best. The `relTol` can
+set be 0.1 as outer iterations are performed over the momentum equation until
+convergence.
 
-In general, the `D` equation and `D` field do not require under-relaxation; however, it is beneficial or required in some cases:
+In general, the `D` equation and `D` field do not require under-relaxation;
+however, it is beneficial or required in some cases:
+
 - equation relaxation
-    - to restrict rigid body motion in contact analysis
+  - to restrict rigid body motion in contact analysis
 - field relaxation
-    - complex boundary conditions
-    - complex material behaviour, e.g. plasticity
-    - large strains
-    - poor meshes
+  - complex boundary conditions
+  - complex material behaviour, e.g. plasticity
+  - large strains
+  - poor meshes
 
-Equation relaxation values of 0.99-0.9999 are typical, while field relaxation factors should typically be greater than 0.1.
+Equation relaxation values of 0.99-0.9999 are typical, while field relaxation
+factors should typically be greater than 0.1.
 
 ---
 
@@ -343,9 +411,13 @@ Equation relaxation values of 0.99-0.9999 are typical, while field relaxation fa
 
 ### `solidModel`
 
-For the `hotSphere` test case, we have selected a “solid” analysis in the `physicsProperties` dictionary: this means a `solidModel` class will be selected; then, we specify the actual `solidModel` class to be the `thermoLinGeomSolidModel` class.
+For the `hotSphere` test case, we have selected a “solid” analysis in the
+`physicsProperties` dictionary: this means a `solidModel` class will be
+selected; then, we specify the actual `solidModel` class to be the
+`thermoLinGeomSolidModel` class.
 
 The code for the thermoLinGeomSolidModel class is located at:
+
 ```
 solids4foam/src/solids4FoamModels/solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 ```
@@ -411,12 +483,13 @@ bool thermalLinGeomSolid::evolve()
         );
 ...
 ```
+
 ![](images/sol_code_2.PNG)
 
-Also, we add an additional diffusion term to quell numerical oscillations (e.g. checker-boarding) based on Rhie-Chow correction:
+Also, we add an additional diffusion term to quell numerical oscillations (e.g.
+checker-boarding) based on Rhie-Chow correction:
 
-![](images/sol_code_3.PNG)
-![](images/sol_code_4.PNG)
+![](images/sol_code_3.PNG) ![](images/sol_code_4.PNG)
 
 ```c++
         // Under-relaxation the linear system
@@ -493,20 +566,26 @@ Also, we add an additional diffusion term to quell numerical oscillations (e.g. 
 }
 ```
 
-The values of impK can affect convergence, but not the answer, assuming convergence is achieved.
+The values of impK can affect convergence, but not the answer, assuming
+convergence is achieved.
 
 ### `mechanicalLaw`
 
-For the `hotSphere` test case, we have selected the `thermoLinearElastic` mechanical law in the `mechanicalProperties` dictionary: this class will perform the calculation of stress for the solid.
+For the `hotSphere` test case, we have selected the `thermoLinearElastic`
+mechanical law in the `mechanicalProperties` dictionary: this class will perform
+the calculation of stress for the solid.
 
 The code for the `thermoLinearElastic` mechanical law class is located at:
+
 ```bash
 solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/linearGeometryLaws/thermoLinearElastic/thermoLinearElastic.C
 ```
-which calculates the stress according to the Duhamel-Neumann form of Hooke’s law:
-![](images/sol_code_6.PNG)
 
-Let us examine the “correct” function of this class to see how the stress is calculated:
+which calculates the stress according to the Duhamel-Neumann form of Hooke’s
+law: ![](images/sol_code_6.PNG)
+
+Let us examine the “correct” function of this class to see how the stress is
+calculated:
 
 ```c++
 void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
@@ -529,10 +608,14 @@ void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
     }
 }
 ```
-As `thermoLinearElastic` derives from the **linearElastic law**, we will also examine the “correct” function for this class:
+
+As `thermoLinearElastic` derives from the **linearElastic law**, we will also
+examine the “correct” function for this class:
+
 ```bash
 solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/linearGeometryLaws/linearElastic/linearElastic.C
 ```
+
 ```c++
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
@@ -583,5 +666,7 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     sigma = 2.0*mu_*dev(epsilon_) + sigmaHyd_*I + sigma0_;
 }
 ```
-where `sigma0_` is an optional initial residual stress field, and the standard Hooke’s law can be expressed in a number of equivalent forms:
+
+where `sigma0_` is an optional initial residual stress field, and the standard
+Hooke’s law can be expressed in a number of equivalent forms:
 ![](images/sol_code_7.PNG)
