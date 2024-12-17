@@ -651,8 +651,9 @@ $$
 \boldsymbol{\sigma} = \mu \nabla \boldsymbol{u}
 + \mu (\nabla \boldsymbol{u})^T
 + \lambda \mathrm{tr}(\nabla \boldsymbol{u}) \mathbf{I}
-- (2\mu + 3\lambda)\alpha (T - T_0) \mathbf{I} \\
+- (2\mu + 3\lambda)\alpha (T - T_0) \mathbf{I}
 $$
+
 where $$(2\mu + 3\lambda) = 3K$$.
 
 Let us examine the “correct” function of this class to see how the stress is
