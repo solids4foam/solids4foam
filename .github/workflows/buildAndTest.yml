@@ -24,7 +24,7 @@ jobs:
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
           - name: "foam-extend-4.1"
-            image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest"
+            image: "philippic/foam-extend-4.1-ubuntu20.04:latest"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
 
