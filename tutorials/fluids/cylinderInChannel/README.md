@@ -29,7 +29,10 @@ We assume an incompressible Newtonian isothermal laminar fluid, where the
 Navier-Stokes governing equations take the form:
 
 $$
-\nabla \cdot \boldsymbol{v} = 0 \\
+\nabla \cdot \boldsymbol{v} = 0
+$$
+
+$$
 \frac{\partial \boldsymbol{v}}{\partial t}
 + \nabla \cdot (\boldsymbol{v}\boldsymbol{v})
 = \nu \nabla^2 \boldsymbol{v}
