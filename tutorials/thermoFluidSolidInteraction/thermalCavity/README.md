@@ -44,12 +44,8 @@ act in the negative vertical direction $$(0\;$$-$$9.81\; 0)$$ m/s$$^{2}$$ and
 thermal inertial effects are included. The end time is $$10$$ s and time-step
 size $$\Delta t = 0.01$$ s.
 
-<div style="text-align: center;">
-  <img src="./images/thermalCavity-geometry.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 1: Problem geometry and initial conditions</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry and initial conditions](./images/thermalCavity-geometry.png)
+**Figure 1: Problem geometry and initial conditions**
 
 The assumed fluid and solid physical parameters are given in Table 1.
 
@@ -77,15 +73,10 @@ thermal circulation to form in the fluid. The evolution of the temperature of
 velocity fields is shown in Video 1. The temperature distribution at $$t = 10$$
 s is shown in Figure 2.
 
-<div style="text-align: center;">
-  <img src="./images/thermalCavity-temperature.png" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 2: Temperature distribution at the end time</strong>
-    </figcaption>
-</div>
+![Figure 2: Temperature distribution at the end time](./images/thermalCavity-temperature.png)
+**Figure 2: Temperature distribution at the end time**
 
 {% include youtube.html id="5cIkFAXWTzQ" %}
-
 **Video 1: Evolution of the temperature and velocity distributions within the
 fluid and solid domains**
 
