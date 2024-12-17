@@ -25,8 +25,9 @@ Description
     By default, boundary points are slide along the patch. Patches which should
     not move can be defined via the fixedPatches entry.
 
-    Points on feature edges are not moved, where feature edges are defined by
-    the minimum cosine angle (minCos).
+    In OpenFOAM.com, points on feature edges are not moved, where feature edges
+    are defined by the minimum cosine angle (minCos). This feature is not
+    currently implemented with OpenFOAM.org and foam-extend.
 
     The inputs are defined in $FOAM_CASE/system/perturbMeshPointsDict, and
     consist of a seed (for the random number generator) and a scaling factor
@@ -52,6 +53,8 @@ Author
 using namespace Foam;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef OPENFOAM_COM
 
 // Copied from Foam::polyDualMesh in OpenFOAM-v2312
 void calcFeatures
@@ -188,6 +191,7 @@ void calcFeatures
     featureEdges.transfer(allFeatureEdges);
 }
 
+#endif // OPENFOAM_COM
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -216,10 +220,12 @@ int main(int argc, char *argv[])
     // Read inputs
     const scalar seed(readScalar(perturbDict.lookup("seed")));
     const vector scaleFactor(perturbDict.lookup("scaleFactor"));
-    const scalar minCos(readScalar(perturbDict.lookup("minCos")));
     const wordList fixedPatchesList(perturbDict.lookup("fixedPatches"));
 #ifdef OPENFOAM_COM
+    const scalar minCos(readScalar(perturbDict.lookup("minCos")));
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
+#else
+    const scalar minCos = 0;
 #endif
 
     // Convert fixedPatches list to a set
@@ -273,6 +279,7 @@ int main(int argc, char *argv[])
         }
     }
 
+#ifdef OPENFOAM_COM
     // Mark all feature points as fixed
     {
         // Calculate feature points and edges
@@ -293,6 +300,7 @@ int main(int argc, char *argv[])
             fixedPoint[curEdge.end()] = true;
         }
     }
+#endif // OPENFOAM_COM
 
     forAll(newPoints, pointI)
     {

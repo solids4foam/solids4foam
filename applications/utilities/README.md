@@ -119,7 +119,7 @@ When using `addTinyPatch` the original mesh is overwritten!
     
     By default, boundary points are slide along the patch. Patches which should not move can be defined via the fixedPatches entry.
     
-    Points on feature edges are not moved, where feature edges are defined by the minimum cosine angle (`minCos`).
+    In OpenFOAM.com, points on feature edges are not moved, where feature edges are defined by the minimum cosine angle (minCos). This feature is not currently implemented with OpenFOAM.org and foam-extend.
 
     The inputs are defined in `$FOAM_CASE/system/perturbMeshPointsDict`, and consist of a seed (for the random number generator) and a scaling factor to scale the perturbations relative to the local minimum edge length. The scaling factor is a vector to allow different scalings in different directions; for example, for 2-D, the Z
     component should be set to 0.0.
