@@ -48,7 +48,10 @@ The fluid is described by incompressible Newtonian isothermal laminar flow,
 where the Navier-Stokes governing equations take the form:
 
 $$
-\nabla \cdot \boldsymbol{v} = 0 \\
+\nabla \cdot \boldsymbol{v} = 0
+$$
+
+$$
 \frac{\partial \boldsymbol{v}}{\partial t}
 + \nabla \cdot (\boldsymbol{v} \boldsymbol{v})
 = \nu \nabla^2 \boldsymbol{v}
@@ -62,11 +65,17 @@ described by the neo-Hookean hyperelastic law:
 
 $$
 \rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
-\nabla \cdot \boldsymbol{\sigma} + \rho \boldsymbol{g} \\
+\nabla \cdot \boldsymbol{\sigma} + \rho \boldsymbol{g}
+$$
+
+$$
 \boldsymbol{\sigma} = \frac{1}{J}
 \left[ \frac{K}{2} (J^2 - 1) \mathbf{I}
 + \mu J^{-\frac{2}{3}} \mathrm{dev} \left[ \mathbf{F}
-\cdot \mathbf{F}^T \right] \right] \\
+\cdot \mathbf{F}^T \right] \right]
+$$
+
+$$
 \mathbf{F} = \mathbf{I} + (\nabla_0 \boldsymbol{u})^T \qquad J =
 \det [\mathbf{F}]
 $$
