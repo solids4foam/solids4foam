@@ -61,7 +61,7 @@ In all cases, the first-order Euler time scheme is used for the solid and fluid.
 
 ## Running the Case
 
-For approaches 1 to 4, the tutorial case is located at `solids4foam/tutorials/fluidSolidInteraction/3dTube`. The case can be run using the single `Allrun` script. Use `./Allrun` for approaches 1 and 2, `./Allrun sonicLiquidFluid` for approaches 3 and 4, and `./Allrun robin` for approach 5. The script update the case with links to the correct files to be used by each approach. The acceleration algorithm, Aitken's or IQNILS, is specified in the `constant/fsiProperties` file. 
+For approaches 1 to 4, the tutorial case is located at `solids4foam/tutorials/fluidSolidInteraction/3dTube`. The case can be run using the included `Allrun` scripts: `Allrun.pimpleFluid` for approaches 1 and 2, i.e.`./Allrun.pimpleFluid`, and `./Allrun.sonicLiquidFluid` for approaches 3 and 4. These scripts update the case with links to the correct files to be used by each approach. The acceleration algorithm, Aitken's or IQNILS, is specified in the `constant/fsiProperties` file, with IQNILS being set in this case unless changed by the user.
 
 For approach 5 (Robin-Neumann formulation), you should change the boundary conditions in the `0/fluid/p` and `0/fluid/U` files to the `elastic*` versions; currently, the Robin approach is only available in foam-extend-4.1.
 
