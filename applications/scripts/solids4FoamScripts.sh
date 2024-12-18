@@ -581,7 +581,7 @@ function solids4Foam::getNumberOfProcessors()
 {
     local dict="${1:-system/decomposeParDict}"
 
-    numberOfSubdomains=$(cat "$dict" | grep -i numberofsubdomains | cut -d' ' -f2 | sed 's/;//g')
+    numberOfSubdomains=$(grep -i numberOfSubdomains "$dict" | awk '{print $2}' | sed 's/;//g')
 
     if [ "$#" -eq 1 ]
     then
