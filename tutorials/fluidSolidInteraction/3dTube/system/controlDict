@@ -76,6 +76,12 @@ functions
         CofR                (0.5 0.1 0);
         region              fluid;
     }
+    fsiConvData
+    {
+        type fsiConvergenceData;        
+        region fluid;
+    }
+
 }
 
 DebugSwitches
