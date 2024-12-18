@@ -233,7 +233,7 @@ to `constant` before running the simulation!
   splitPatch
   ```
 
-![splitPatch: top patch before and after split](./images/splitPatch.png")
+![splitPatch: top patch before and after split](./images/splitPatch.png)
 **splitPatch: top patch before and after split**
 
   ```note
