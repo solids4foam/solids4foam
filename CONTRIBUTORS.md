@@ -2,6 +2,8 @@
 sort: 2
 ---
 
+# List of conctributors
+
 This list has been generated using `git shortlog -s --all`. If your name is
 missing, please let <philip.cardiff@ucd.ie> know.
 

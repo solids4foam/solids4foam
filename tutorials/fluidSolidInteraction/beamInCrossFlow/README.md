@@ -18,7 +18,7 @@ You can find the files for this tutorial under
 
 ![Case geometry and mesh](images/fs_over_1.PNG)
 
-**Case geometry and mesh**
+Case geometry and mesh
 
 This case consists of a thick elastic plate attached to the bottom surface of a
 rectangular channel (see the figure above). Due to symmetry, only half of the
@@ -134,7 +134,7 @@ channel ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
 
-**Expected results**
+Expected results
 
 ---
 
