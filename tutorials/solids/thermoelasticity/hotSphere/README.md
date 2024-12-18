@@ -61,8 +61,10 @@ implicit in time.
 ```pseudocode
 for all time-steps
     do
-        solve energy equation for T (terms depending on D are calculated explicitly)
-        solve momentum equation for D (terms depending on T are calculated explicitly)
+        solve energy equation for T (terms depending on D are calculated
+explicitly)
+        solve momentum equation for D (terms depending on T are calculated
+explicitly)
     while not converged
 end
 ```
@@ -460,7 +462,8 @@ selected; then, we specify the actual `solidModel` class to be the
 The code for the thermoLinGeomSolidModel class is located at:
 
 ```plaintext
-solids4foam/src/solids4FoamModels/solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
+solids4foam/src/solids4FoamModels/solidModels/thermalLinGeomSolid/thermalLinGeom
+Solid.C
 ```
 
 Let us examine the “evolve” function of this class to see the equations solved:
@@ -644,7 +647,8 @@ the calculation of stress for the solid.
 The code for the `thermoLinearElastic` mechanical law class is located at:
 
 ```bash
-solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/linearGeometryLaws/thermoLinearElastic/thermoLinearElastic.C
+solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/
+linearGeometryLaws/thermoLinearElastic/thermoLinearElastic.C
 ```
 
 $$
@@ -685,7 +689,8 @@ As `thermoLinearElastic` derives from the **linearElastic law**, we will also
 examine the “correct” function for this class:
 
 ```bash
-solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/linearGeometryLaws/linearElastic/linearElastic.C
+solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/
+linearGeometryLaws/linearElastic/linearElastic.C
 ```
 
 ```c++

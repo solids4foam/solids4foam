@@ -33,12 +33,10 @@ this results in an order of magnitude difference between the Young's modulii,
 i.e., $$E_2/E_1=10$$. The number of cells is set to $$120$$ circumferentially
 and $$50$$ radially.
 
-<div style="text-align: center;">
-  <img src="./images/layeredPipe-geometry.png" alt="Image" width="300">
-    <figcaption>
-     <strong>Figure 1: Problem geometry [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry [1]](./images/layeredPipe-geometry.png)
+
+Figure 1 - Problem geometry [1]
+
 ---
 
 ## Expected Results
@@ -48,25 +46,35 @@ circumferential and radial stresses in the radial direction through the
 cylinder, for which the analytical solutions are as follows [1]:
 
 $$
-\sigma_r = \frac{r_1^2p_i-r_2^2p_{12}+(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r_1^2} \qquad \text{for } r_1 \leq r < r_2,
+\sigma_r =
+\frac{r_1^2p_i-r_2^2p_{12}+(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r
+_1^2} \qquad \text{for } r_1 \leq r < r_2,
 $$
 
 $$
-\sigma_r = \frac{r_2^2p_{12}-p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad \text{for } r_2 < r \leq r_3,
+\sigma_r =
+\frac{r_2^2p_{12}-p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad
+\text{for } r_2 < r \leq r_3,
 $$
 
 $$
-\sigma_{\theta} = \frac{r_1^2p_i-r_2^2p_{12}-(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r_1^2} \qquad \text{for } r_1 \leq r < r_2,
+\sigma_{\theta} =
+\frac{r_1^2p_i-r_2^2p_{12}-(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r
+_1^2} \qquad \text{for } r_1 \leq r < r_2,
 $$
 
 $$
-\sigma_{\theta} = \frac{r_2^2p_{12}+p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad \text{for } r_2 < r \leq r_3,
+\sigma_{\theta} =
+\frac{r_2^2p_{12}+p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad
+\text{for } r_2 < r \leq r_3,
 $$
 
 where the pressure at the interface, $$p_{12}$$ is given as follows:
 
 $$
-p_{12}=\dfrac{\dfrac{2r_1^2p_i}{E_1(r_2^2-r_1^2)}}{\dfrac{1}{E_2}\left(\dfrac{r_3^2+r_2^2}{r_3^2-r_2^2}+\nu_2  \right) + \dfrac{1}{E_1}\left(\dfrac{r_2^2+r_1^2}{r_2^2-r_1^2}-\nu_1  \right)}.
+p_{12}=\dfrac{\dfrac{2r_1^2p_i}{E_1(r_2^2-r_1^2)}}{\dfrac{1}{E_2}\left(\dfrac{r_
+3^2+r_2^2}{r_3^2-r_2^2}+\nu_2  \right) +
+\dfrac{1}{E_1}\left(\dfrac{r_2^2+r_1^2}{r_2^2-r_1^2}-\nu_1  \right)}.
 $$
 
 Figures 2 and 3 show a comparison between the analytical and numerical solutions
@@ -74,19 +82,17 @@ of radial $$\sigma_r$$ and circumferential $$\sigma_{\theta}$$ stress
 distributions. One can see that the numerical solution closely matches the
 analytical one.
 
-<div style="text-align: center;">
-  <img src="./images/layeredPipe-sigmaR.png" alt="Image" width="700">
-    <figcaption>
-     <strong>Figure 2: Comparison of numerical (circles) and analytical (line) radial stress distributions</strong>
-    </figcaption>
-</div>
+![Figure 2: Comparison of numerical (circles) and analytical (line) radial
+stress distributions](./images/layeredPipe-sigmaR.png)
 
-<div style="text-align: center;">
-  <img src="./images/layeredPipe-sigmaTheta.png" alt="Image" width="700">
-    <figcaption>
-     <strong>Figure 3: Comparison of numerical (circles) and analytical (line) circumferential stress distributions</strong>
-    </figcaption>
-</div>
+Figure 2: Comparison of numerical (circles) and analytical (line) radial stress
+distributions
+
+![Figure 3: Comparison of numerical (circles) and analytical (line)
+circumferential stress distributions](./images/layeredPipe-sigmaTheta.png)
+
+Figure 3: Comparison of numerical (circles) and analytical (line)
+circumferential stress distributions
 
 The plots above are created automatically within the `Allrun` script using
 `sample` utility and `gnuplot`. The `transformStressToCylindrical` function
@@ -139,7 +145,9 @@ circumferential stress distributions are plotted in the `sigmaR.png` and
 `sigmaTheta.png` files.
 
 ```note
-For multi-material cases, solids4foam expects to find a cellZone for each material defined in constant/mechanicalProperties, where the cellZone name is assumed to be the same as the material name in constant/mechanicalProperties.
+For multi-material cases, solids4foam expects to find a cellZone for each
+material defined in constant/mechanicalProperties, where the cellZone name is
+assumed to be the same as the material name in constant/mechanicalProperties.
 ```
 
 ---
@@ -147,4 +155,7 @@ For multi-material cases, solids4foam expects to find a cellZone for each materi
 ### References
 
 [1]
-[Ž. Tuković, A. Ivanković, and A. Karač, “Finite-volume stress analysis in multi-material linear elastic body,” International Journal for Numerical Methods in Engineering, vol. 93, no. 4, pp. 400–419, 2013.](https://repozitorij.fsb.hr/4072/1/Finite_Tukovic.pdf)
+[Ž. Tuković, A. Ivanković, and A. Karač, “Finite-volume stress analysis in
+multi-material linear elastic body,” International Journal for Numerical
+Methods in Engineering, vol. 93, no. 4, pp. 400–419,
+2013.](https://repozitorij.fsb.hr/4072/1/Finite_Tukovic.pdf)

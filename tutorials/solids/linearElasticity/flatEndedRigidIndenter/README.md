@@ -31,12 +31,10 @@ force $$F_z = 10 000$$ N (see Eq (4)). The bottom surface of the finite
 half-space is held fixed (zero displacement). The contact between the punch and
 the elastic half-space is modelled as frictionless.
 
-<div style="text-align: center;">
-  <img src="./images/flatEndedRigidIndenter-geometry.png" alt="Image" width="300">
-    <figcaption>
-     <strong>Figure 1: Problem geometry (H = 0.2 m, a = 0.01 m) [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry (H = 0.2 m, a = 0.01 m)
+[1]](./images/flatEndedRigidIndenter-geometry.png)
+
+Figure 1: Problem geometry (H = 0.2 m, a = 0.01 m) [1]
 
 ---
 
@@ -57,7 +55,8 @@ The displacement of the rigid indentor $$d$$, related to the applied force
 $$F$$, can be obtained using:
 
 $$
-u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right],
+u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu)
+\right],
 $$
 
 where $$L$$ is the thickness of the elastic half-space.
@@ -65,7 +64,8 @@ where $$L$$ is the thickness of the elastic half-space.
 The boundary displacement outside the contact zone can be calculated as:
 
 $$
-u_z(x) = u_z + \frac{2(1-\nu^2)F}{\pi E} \text{ ln} \left[ \frac{x}{a} + \sqrt{\frac{x^2}{a^2}-1} \right] \qquad \text{for } |x| \geq a.
+u_z(x) = u_z + \frac{2(1-\nu^2)F}{\pi E} \text{ ln} \left[ \frac{x}{a} +
+\sqrt{\frac{x^2}{a^2}-1} \right] \qquad \text{for } |x| \geq a.
 $$
 
 Figure 2 shows the distribution of the contact pressure. The diagram is created
@@ -81,20 +81,21 @@ pressure integration method proposed in
 [[1]](https://repozitorij.unizg.hr/islandora/search/Segment-to-Segment%20Algorithm%20for%20Finite%20Volume%20Mechanical%20Contact%20Simulations?type=dismax)
 (this improved contact condition will soon be available in solids4foam).
 
-<div style="text-align: center;">
-  <img src="./images/flatEndedRigidIndenter-pressureDistribution.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 2: Contact pressure distribution</strong>
-    </figcaption>
-</div>
-Figure 3 shows the displacement profile of the half-space top surface. The displacement profile from `solids4Foam` matches the analytical one; a small discrepancy between results exists because the analytical solution has an abrupt profile change at the contact edge. As in Figure 2, the diagram shown in Figure 3 is automatically created within the `Allrun` script using `sample` utility and `gnuplot`.
+![Figure 2: Contact pressure
+distribution](./images/flatEndedRigidIndenter-pressureDistribution.png)
 
-<div style="text-align: center;">
-  <img src="./images/flatEndedRigidIndenter-displacement.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 3: Vertical displacement of the top half-space surface</strong>
-    </figcaption>
-</div>
+Figure 2: Contact pressure distribution
+Figure 3 shows the displacement profile of the half-space top surface. The
+displacement profile from `solids4Foam` matches the analytical one; a small
+discrepancy between results exists because the analytical solution has an
+abrupt profile change at the contact edge. As in Figure 2, the diagram shown in
+Figure 3 is automatically created within the `Allrun` script using `sample`
+utility and `gnuplot`.
+
+![Figure 3: Vertical displacement of the top half-space
+surface](./images/flatEndedRigidIndenter-displacement.png)
+
+Figure 3: Vertical displacement of the top half-space surface
 
 ---
 
@@ -113,7 +114,8 @@ followed by running the `solids4foam` solver (`> solids4Foam`). Optionally, if
 ### References
 
 [1]
-[Ivan Batistić. Segment-to-Segment Algorithm for Finite Volume Mechanical Contact Simulations. University of Zagreb, PhD thesis, 2022.](https://repozitorij.unizg.hr/islandora/object/fsb%3A8301)
+[Ivan Batistić. Segment-to-Segment Algorithm for Finite Volume Mechanical
+Contact Simulations. University of Zagreb, PhD thesis, 2022.](https://repozitorij.unizg.hr/islandora/object/fsb%3A8301)
 
 [2]
 [K. L. Johnson, Contact Mechanics. Cambridge University Press, 1985.](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2)

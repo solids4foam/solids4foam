@@ -20,23 +20,23 @@ This tutorial currently only works with foam-extend-4.1.
 
 ## Case Overview
 
-<img src="images/cylindrical-pressure-vessel.png" width="400" />
+![Thick cylindrical vessel](images/cylindrical-pressure-vessel.png)
 
 **Figure 1: Thick cylindrical vessel under inner pressure.**
 
 This benchmark consists of a thick cylindrical shell with an inner radius
-_R<sub>i</sub> = 7 m_ and outer radius _R<sub>o</sub> = 18.625 m_. Its material
+$$R_i = 7$$ m and outer radius $$R_o = 18.625$$ m. Its material
 is modelled as incompressible with the Mooney-Rivlin law with material
-parameters _c<sub>10</sub> = 80 MPa_, _c<sub>01</sub> = 20 MPa_, and
-_c<sub>11</sub> = 0.0 MPa_. The strain state is assumed to be plane due to the
+parameters $$c_{10} = 80$$ MPa_, $$c_{01} = 20$$ MPa, and
+$$c_{11} = 0.0$$ MPa. The strain state is assumed to be plane due to the
 geometric symmetry along the z-axis direction (see Figure 1). For the
 simulation, the inner pressure was linearly applied in equal increments along
-time until _p = 100 MPa_.
+time until $$p = 100$$ MPa.
 
 Due to symmetry, only a quarter of the cylinder section was simulated with a
 mesh density of 20 x 20 cells in the radial and circumferential directions,
 created using the `blockMesh` utility, respectively. A residual tolerance for
-the momentum equation of _10<sup>-6</sup>_ was selected. For the results
+the momentum equation of 10$$^{-6}$$ was selected. For the results
 presented here, we employed the
 `nonLinearGeometryTotalLagrangianTotalDisplacement` model, one of the total
 Lagrangian approaches available that solves for the _total_ displacement, which
@@ -51,12 +51,16 @@ Cauchy stress tensor along the _undeformed_ radius of the cylinder when the
 inner pressure is equal to _100 MPa_. To solve for the undeformed configuration,
 i.e. without automatically moving the mesh, you have to use one of the _total
 Lagrangian_ formulations available. The solution reference was found in
-[I. Bijelonja, I. Demirdžić, and S. Muzaferija, “A finite volume method for large strain analysis of incompressible hyperelastic materials,” International Journal for Numerical Methods in Engineering, vol. 64, pp. 1594–1609, Nov. 2005](https://hrcak.srce.hr/206941)
+[I. Bijelonja, I. Demirdžić, and S. Muzaferija, “A finite volume method for
+large strain analysis of incompressible hyperelastic materials,” International
+Journal for Numerical Methods in Engineering, vol. 64, pp. 1594–1609, Nov.
+2005](https://hrcak.srce.hr/206941)
 
-![](images/radial-stress.png) ![](images/hoop-stress.png)
+![Radial stress](images/radial-stress.png)
+![Hoop stress](images/hoop-stress.png)
 
-**Figure 2: Radial (left) and circumferential, or hoop, stresses (right) along
-the radius of the cylinder.**
+Figure 2 - Radial (left) and circumferential, or hoop, stresses (right) along
+the radius of the cylinder
 
 The results shown in the plots of Figure 2 were obtained with a Poisson's ratio
 of 0.49, which yielded a Jacobian in the interval _[0.98,0.99]_ for the last
@@ -79,10 +83,10 @@ demonstrate this, Figure 3 shows the residual drop of the first time step of the
 solution for four different values of the Poisson ratio, `nu`: 0.30, 0.40, 0.45,
 and 0.49.
 
-<img src="images/residuals-plot.png" width="400" />
+![Residuals](./images/residuals-plot.png)
 
-**Figure 3: Effect on convergence when approximating the purely incompressible
-behaviour in a solid.**
+Figure 3 - Effect on convergence when approximating the purely incompressible
+behaviour in a solid
 
 It is important to have this in mind when using the non-linear mechanical laws
 implemented.
@@ -93,5 +97,6 @@ implemented.
 
 The results and gnuplot scripts used to generate the figures above are available
 in the
-[solids4foam tutorials benchmark data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data)
+[solids4foam tutorials benchmark
+data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data)
 repository.

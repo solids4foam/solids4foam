@@ -34,12 +34,9 @@ $$\mu=0.1$$. The problem is solved with one load increment, neglecting inertia
 and gravity effects. The case can be solved using an axisymmetric computational
 model; however, the setup herein considers a 3-D model with symmetries.
 
-<div style="text-align: center;">
-  <img src="./images/punch-geometry.png" alt="Image" width="700">
-    <figcaption>
-     <strong>Figure 1: Problem geometry [2, 3]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry [2, 3]](./images/punch-geometry.png)
+
+Figure 1: Problem geometry [2, 3]
 
 ---
 
@@ -58,12 +55,11 @@ contact pressure as the mesh is refined [[2]](https://arxiv.org/abs/1808.10736).
 The `solids4foam` results match well with results reported in the literature
 [[1]](https://www.nafems.org/publications/resource_center/r0094/).
 
-<div style="text-align: center;">
-  <img src="./images/punch-results.png" alt="Image" width="1200">
-    <figcaption>
-     <strong>Figure 2: Radial and axial displacement predictions; contact pressure distribution [2]</strong>
-    </figcaption>
-</div>
+![Figure 2: Radial and axial displacement predictions; contact pressure
+distribution [2]](./images/punch-results.png)
+
+Figure 2: Radial and axial displacement predictions; contact pressure
+distribution [2]
 
 ---
 
@@ -130,10 +126,18 @@ script consists of the following steps:
 ### References
 
 [1]
-[A. Konter, FENet (Project), and National Agency for Finite Element Methods & Standards (Great Britain), Advanced Finite Element Contact Benchmarks. NAFEMS Limited, 2006.](https://www.nafems.org/publications/resource_center/r0094/)
+[A. Konter, FENet (Project), and National Agency for Finite Element Methods &
+Standards (Great Britain), Advanced Finite Element Contact Benchmarks. NAFEMS
+Limited, 2006.](https://www.nafems.org/publications/resource_center/r0094/)
 
 [2]
-[P. Cardiff, A. Karač, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, and Ž. Tuković, “An open-source finite volume toolbox for solid mechanics and fluid-solid interaction simulations,” arXiv preprint arXiv:1808.10736, 2018.](https://arxiv.org/abs/1808.10736)
+[P. Cardiff, A. Karač, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, and Ž.
+Tuković, “An open-source finite volume toolbox for solid mechanics and
+fluid-solid interaction simulations,” arXiv preprint arXiv:1808.10736,
+2018.](https://arxiv.org/abs/1808.10736)
 
 [4]
-[I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based segment-to-segment method for frictional contact problems,” Applied Mathematical Modelling, vol. 101, pp. 673–693, 2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)
+[I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based
+segment-to-segment method for frictional contact problems,” Applied
+Mathematical Modelling, vol. 101, pp. 673–693,
+2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)

@@ -28,12 +28,9 @@ the Poisson's ratio is $$\nu = 0.3$$. Gravitation effects are neglected, and
 there are no body forces. The problem is solved as static, using one loading
 increment.
 
-<div style="text-align: center;">
-  <img src="./images/curvedCantilever-geometry.png" alt="Image" width="300">
-    <figcaption>
-     <strong>Figure 1: Problem geometry [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry [1]](./images/curvedCantilever-geometry.png)
+
+Figure 1: Problem geometry [1]
 
 ---
 
@@ -49,22 +46,25 @@ N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right),
 $$
 
 $$
-\sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
+\sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin
+(\theta),
 $$
 
 $$
-\sigma_{\theta} = \frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
+\sigma_{\theta} =
+\frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
 $$
 
 $$
-\tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta).
+\tau_{r\theta} = \tau_{\theta r}
+=-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta).
 $$
 
 The analytical solution is generated alongside solution fields using the
 function object located in the `system/controlDict`, where one needs to input
 geometry and material data:
 
-```
+```c++
   functions
   {
       analyticalSolution
@@ -96,19 +96,15 @@ mesh refinement, numerical results converge to analytical ones. The data for
 plots presented in Figures 2 and 3 is extracted using the `sampleDict` located
 in the `system` directory.
 
-<div style="text-align: center;">
-  <img src="./images/sigmaAtTheta45deg-mesh100x10.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 2: Stress distribution for mesh consisting of 100x10 cells</strong>
-    </figcaption>
-</div>
+![Figure 2: Stress distribution for mesh consisting of 100x10
+cells](./images/sigmaAtTheta45deg-mesh100x10.png)
 
-<div style="text-align: center;">
-  <img src="./images/sigmaAtTheta45deg-mesh200x50.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 3: Stress distribution for mesh consisting of 200x50 cells</strong>
-    </figcaption>
-</div>
+Figure 2: Stress distribution for mesh consisting of 100x10 cells
+
+![Figure 3: Stress distribution for mesh consisting of 200x50
+cells](./images/sigmaAtTheta45deg-mesh200x50.png)
+
+Figure 3: Stress distribution for mesh consisting of 200x50 cells
 
 ---
 
@@ -123,7 +119,11 @@ followed by running the `solids4foam` solver (`> ./solids4Foam`) and
 distribution is plotted in the `sigmaAtTheta45deg.png` file.
 
 ```warning
-The coupled version of this case, which uses the `coupledUnsLinearGeometryLinearElastic`, can currently only be run using solids4foam built on foam-extend. To modify the case to run with the segregated `linearGeometryTotalDisplacement` solid model, follow the instructions in `tutorials/solids/linearElasticity/narrowTmember/README.md` file.
+The coupled version of this case, which uses the
+`coupledUnsLinearGeometryLinearElastic`, can currently only be run using
+solids4foam built on foam-extend. To modify the case to run with the segregated
+`linearGeometryTotalDisplacement` solid model, follow the instructions in
+`tutorials/solids/linearElasticity/narrowTmember/README.md` file.
 ```
 
 ---
@@ -131,7 +131,11 @@ The coupled version of this case, which uses the `coupledUnsLinearGeometryLinear
 ### References
 
 [1]
-[Sadd MH. Elasticity: Theory, Applications, and Numerics. Elsevier 2009.](https://www.sciencedirect.com/book/9780123744463/elasticity)
+[Sadd MH. Elasticity: Theory, Applications, and Numerics. Elsevier
+2009.](https://www.sciencedirect.com/book/9780123744463/elasticity)
 
 [2]
-[Pablo Castrillo, Alfredo Canelas, Eugenio Schillaci, Joaquim Rigola and Asensio Oliva. High-order finite volume method for linear elasticity on unstructured meshes. Computers & Structures. Volume 268, 2022,](https://www.sciencedirect.com/science/article/pii/S004579492200089X)
+[Pablo Castrillo, Alfredo Canelas, Eugenio Schillaci, Joaquim Rigola and
+Asensio Oliva. High-order finite volume method for linear elasticity on
+unstructured meshes. Computers & Structures. Volume 268,
+2022,](https://www.sciencedirect.com/science/article/pii/S004579492200089X)

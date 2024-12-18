@@ -27,15 +27,12 @@ of $$85$$ mm. A zero traction condition is applied to the outer cylinder
 boundary. Inertial and body forces are neglected, and the problem is solved
 using a 1-D axisymmetric mesh consisting of $$10$$ CVs in the radial direction.
 
-<div style="text-align: center;">
-  <img src="./images/cylinderExpansion-geometry.png" alt="Image" width="400">
-  <img src="./images/cylinderExpansion-mesh.png" alt="Image" width="100">
-    <figcaption>
-     <strong>Figure 1: Problem geometry, loading and mesh [1]</strong>
-    </figcaption>
-</div>
+![Geometry](./images/cylinderExpansion-geometry.png)
+![Mesh](./images/cylinderExpansion-mesh.png)
 
-**Table 1: Mechanical properties**
+Figure 1 - Problem geometry, loading and mesh [1]
+
+Table 1 - Mechanical properties
 
 | Parameter           | Symbol       | Value       |
 | ------------------- | ------------ | ----------- |
@@ -52,7 +49,9 @@ Assuming rigid plasticity, the radial (Cauchy) stress, $$\sigma_{rr}$$ , at the
 inner surface is given analytically as [2, 3]:
 
 $$
-\sigma_{rr}=\left(\dfrac{\sigma_Y}{\sqrt{3}}\right) \ln \left( \dfrac{\left(\dfrac{r_0}{a_0}\right)^2+\left(\dfrac{a}{a_0}\right)^2-1}{\left(\dfrac{b_0}{a_0}\right)^2 + \left(\dfrac{a}{a_0}\right)^2 -1}  \right)
+\sigma_{rr}=\left(\dfrac{\sigma_Y}{\sqrt{3}}\right) \ln \left(
+\dfrac{\left(\dfrac{r_0}{a_0}\right)^2+\left(\dfrac{a}{a_0}\right)^2-1}{\left(\d
+frac{b_0}{a_0}\right)^2 + \left(\dfrac{a}{a_0}\right)^2 -1}  \right)
 $$
 
 where $$a_0$$ is the initial inner radius, $$b_0$$ is the initial outer radius,
@@ -66,12 +65,10 @@ where one can see the plot of the radial (Cauchy) stress at the inner boundary
 versus the current inner radius. The plot is automatically generated using
 `plot.gnuplot` script when running the case using the `Allrun` script.
 
-<div style="text-align: center;">
-  <img src="./images/cylinderExpansion-sigmaR.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 2: Inner boundary stress vs. current inner radius</strong>
-    </figcaption>
-</div>
+![Figure 2: Inner boundary stress vs. current inner
+radius](./images/cylinderExpansion-sigmaR.png)
+
+Figure 2: Inner boundary stress vs. current inner radius
 
 ---
 
@@ -92,7 +89,10 @@ plotted in the `plot.pdf` file.
 ### References
 
 [1]
-[P. Cardiff, Ž. Tuković, P. D. Jaeger, M. Clancy, and A. Ivanković, “A Lagrangian cell-centred finite volume method for metal forming simulation,” International Journal for Numerical Methods in Engineering, vol. 109, no. 13, pp. 1777–1803, 2017.](https://onlinelibrary.wiley.com/doi/abs/10.1002/nme.5345)
+[P. Cardiff, Ž. Tuković, P. D. Jaeger, M. Clancy, and A. Ivanković, “A
+Lagrangian cell-centred finite volume method for metal forming simulation,”
+International Journal for Numerical Methods in Engineering, vol. 109, no. 13,
+pp. 1777–1803, 2017.](https://onlinelibrary.wiley.com/doi/abs/10.1002/nme.5345)
 
 [2] W. Prager and P. G. Hodge. Theory of Perfectly Plastic Solids. John Wiley
 and Sons, 1951.

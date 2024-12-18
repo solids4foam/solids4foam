@@ -15,7 +15,8 @@ Prepared by Ivan Batistić
   regime.
 
 ```note
-A small-strain elastic version of this tutorial is also available in solids4foam at tutorials/linearElasticity/cooksMembrane
+A small-strain elastic version of this tutorial is also available in
+solids4foam at tutorials/linearElasticity/cooksMembrane
 ```
 
 ## Case Overview
@@ -37,15 +38,13 @@ strain hardening function is the one presented in
 [[1]]((https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)):
 
 $$
-\sigma_y = \sigma_Y + (\sigma_{\infty} - \sigma_Y)(1-\text{exp}(-\delta\varepsilon_p)) + H\varepsilon_p.
+\sigma_y = \sigma_Y + (\sigma_{\infty} -
+\sigma_Y)(1-\text{exp}(-\delta\varepsilon_p)) + H\varepsilon_p.
 $$
 
-<div style="text-align: center;">
-  <img src="./images/cooksMembrane-geometry.png" alt="Image" width="400">
-    <figcaption>
-     <strong>Figure 1: Problem geometry</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry](./images/cooksMembrane-geometry.png)
+
+Figure 1: Problem geometry
 
 ---
 
@@ -75,7 +74,7 @@ In the `solids4foam` case, the vertical displacement at the top right corner is
 extracted using the `solidPointDisplacement` function object placed in the
 `controlDict`:
 
-```
+```c++
 functions
 {
     pointDisp
@@ -91,18 +90,15 @@ The `solidPointDisplacement` function finds the mesh vertex nearest to the
 specified `point` and writes the displacement of this vertex to
 `postProcessing/0/solidPointDisplacement_pointDisp.dat`.
 
-<div style="text-align: center;">
-  <img src="./images/cooksMembrane-verticalDisplacement.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 2: Convergence of the vertical displacement in the top right corner  </strong>
-    </figcaption>
-</div>
-<div style="text-align: center;">
-  <img src="./images/cooksMembrane-sigmay.png" alt="Image" width="500">
-    <figcaption>
-        <strong>Figure 3: Contours of yield stress. The black line denotes the initial undeformed configuration </strong>
-    </figcaption>
-</div>
+![Figure 2: Convergence of the vertical displacement in the top right corner
+](./images/cooksMembrane-verticalDisplacement.png)
+
+Figure 2: Convergence of the vertical displacement in the top right corner
+![Figure 3: Contours of yield stress. The black line denotes the initial
+undeformed configuration ](./images/cooksMembrane-sigmay.png)
+
+Figure 3: Contours of yield stress. The black line denotes the initial
+undeformed configuration
 
 ---
 
@@ -119,10 +115,14 @@ by running the `solids4foam` solver (`> solids4Foam`).
 ### References
 
 [1]
-[Simo, J. C., and F. Armero, “Geometrically Nonlinear Enhanced Strain Mixed Methods and the Method of Incompatible Modes,” International Journal for Numerical Methods in Engineering, vol. 33, pp. 1413–1449, 1992.](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)
+[Simo, J. C., and F. Armero, “Geometrically Nonlinear Enhanced Strain Mixed
+Methods and the Method of Incompatible Modes,” International Journal for
+Numerical Methods in Engineering, vol. 33, pp. 1413–1449, 1992.](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)
 
 [2]
 [http://www.simplassoftware.com/benchmarks.html](http://www.simplassoftware.com/benchmarks.html)
 
 [4]
-[J.M.A. César de Sá, P. Areias and R.M. Natal Jorge. “Quadrilateral elements for the solution of elasto-plastic finite strain problems“. _IJNME_, 51:883-917, 2001.](https://repositorio-aberto.up.pt/handle/10216/438)
+[J.M.A. César de Sá, P. Areias and R.M. Natal Jorge. “Quadrilateral elements
+for the solution of elasto-plastic finite strain problems“. _IJNME_,
+51:883-917, 2001.](https://repositorio-aberto.up.pt/handle/10216/438)

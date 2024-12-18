@@ -41,15 +41,21 @@ circumferential and radial stresses in the radial direction through the
 cylinder, for which the analytical solutions are as follows [1]:
 
 $$
-\sigma_r = \dfrac{\alpha E (T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[-\ln\dfrac{r_o}{r}-\dfrac{r_i^2}{r_o^2-r_i^2}\left(1-\dfrac{r_o^2}{r^2}\right) \ln\dfrac{r_o}{r_i}  \right],
+\sigma_r = \dfrac{\alpha E
+(T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[-\ln\dfrac{r_o}{r}-\dfrac{r_i^2}{r_
+o^2-r_i^2}\left(1-\dfrac{r_o^2}{r^2}\right) \ln\dfrac{r_o}{r_i}  \right],
 $$
 
 $$
-\sigma_{\theta} = \dfrac{\alpha E (T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[1-\ln\dfrac{r_o}{r}-\dfrac{r_i^2}{r_o^2-r_i^2}\left(1+\dfrac{r_o^2}{r^2}\right) \ln\dfrac{r_o}{r_i}  \right],
+\sigma_{\theta} = \dfrac{\alpha E
+(T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[1-\ln\dfrac{r_o}{r}-\dfrac{r_i^2}{r
+_o^2-r_i^2}\left(1+\dfrac{r_o^2}{r^2}\right) \ln\dfrac{r_o}{r_i}  \right],
 $$
 
 $$
-\sigma_z = \dfrac{\alpha E (T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[1-2\ln\dfrac{r_o}{r}-\dfrac{2r_i^2}{r_o^2-r_i^2} \ln\dfrac{r_o}{r_i}  \right].
+\sigma_z = \dfrac{\alpha E
+(T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[1-2\ln\dfrac{r_o}{r}-\dfrac{2r_i^2}
+{r_o^2-r_i^2} \ln\dfrac{r_o}{r_i}  \right].
 $$
 
 The analytical equation for temperature distribution is [1]:
@@ -92,7 +98,9 @@ analyticalHotCylinder
 ```
 
 ```note
-`hotCylinderAnalyticalSolution` function object does not read `mechanicalProperties` dictionary; therefore, it requires entering all material data that should correspond to those used in the case.
+`hotCylinderAnalyticalSolution` function object does not read
+`mechanicalProperties` dictionary; therefore, it requires entering all material
+data that should correspond to those used in the case.
 ```
 
 The `transformStressToCylindrical` function object in `system/controlDict` is
@@ -114,7 +122,8 @@ temperature field `T` are plotted along a $$\theta=45^{\circ}$$ line using the
 `sample` utility:
 
 ```c++
-fields( sigma:Transformed analyticalRadialStress analyticalHoopStress T analyticalT );
+fields( sigma:Transformed analyticalRadialStress analyticalHoopStress T
+analyticalT );
 
 sets
 (
@@ -132,26 +141,17 @@ If `gnuplot` is installed, Figures 1, 2 and 3 are automatically generated when
 running the case using the `Allrun` script. Figures 1 and 2 compare the
 analytical solutions with the numerically calculated ones.
 
-<div style="text-align: center;">
-  <img src="./images/hotCylinder-sigmaR.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 1: Radial stress</strong>
-    </figcaption>
-</div>
+![Figure 1: Radial stress](./images/hotCylinder-sigmaR.png)
 
-<div style="text-align: center;">
-  <img src="./images/hotCylinder-sigmaTheta.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 2: Circumferential stress</strong>
-    </figcaption>
-</div>
+Figure 1: Radial stress
 
-<div style="text-align: center;">
-  <img src="./images/hotCylinder-T.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 3: Temperature profile</strong>
-    </figcaption>
-</div>
+![Figure 2: Circumferential stress](./images/hotCylinder-sigmaTheta.png)
+
+Figure 2: Circumferential stress
+
+![Figure 3: Temperature profile](./images/hotCylinder-T.png)
+
+Figure 3: Temperature profile
 
 ---
 

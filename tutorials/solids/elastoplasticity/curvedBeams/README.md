@@ -31,12 +31,10 @@ friction are set to $$\mu = 0.3$$. The beams are discretised using 50 cells in
 the circumferential and 5 cells in the radial direction. The problem is solved
 using the plane strain assumption, neglecting inertial and body forces.
 
-<div style="text-align: center;">
-  <img src="./images/curvedBeams-geometry.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 1: Problem geometry (dimensions in mm) [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry (dimensions in mm)
+[1]](./images/curvedBeams-geometry.png)
+
+Figure 1: Problem geometry (dimensions in mm) [1]
 
 ---
 
@@ -55,31 +53,25 @@ results from the literature. Reported results in `solids4foam` are obtained
 using the updated Lagrangian formulation (`nonLinearGeometryUpdatedLagrangian`)
 and `foam-extend-4.1`.
 
-<div style="text-align: center;">
-  <img src="./images/curvedBeams-epsilonPEq.png" alt="Image" width="380">
-   <img src="./images/curvedBeams-epsilonPEq_NetoEtAl.png" alt="Image" width="380">
-    <figcaption>
-     <strong>Figure 2: Contours of equivalent plastic strain (epsilonPEq) at displacement of 15 mm (left), compared with solution from [2] (right)  </strong>
-    </figcaption>
-</div>
+![Plastic strain](./images/curvedBeams-epsilonPEq.png)
+![Plastic strain](./images/curvedBeams-epsilonPEq_NetoEtAl.png)
 
-<div style="text-align: center;">
-  <img src="./images/curvedBeams-reaction-x.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 3: Total reaction force in the x-direction  </strong>
-    </figcaption>
-</div>
+Figure 2 - Contours of equivalent plastic strain (epsilonPEq) at
+displacement of 15 mm (left), compared with solution from [2] (right)
 
-<div style="text-align: center;">
-   <img src="./images/curvedBeams-reaction-y.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 3: Total reaction force in the y-direction  </strong>
-    </figcaption>
-</div>
+![Figure 3: Total reaction force in the x-direction
+](./images/curvedBeams-reaction-x.png)
+
+Figure 3 - Total reaction force in the x-direction
+
+![Figure 3: Total reaction force in the y-direction
+](./images/curvedBeams-reaction-y.png)
+
+Figure 3 - Total reaction force in the y-direction
 
 {% include youtube.html id="l5eBz7TybpM" %}
 
-**Video 1: Evolution of the equivalent (von Mises) stress distribution**
+Video 1 - Evolution of the equivalent (von Mises) stress distribution
 
 ---
 
@@ -100,7 +92,13 @@ evolution of the horizontal and vertical reaction forces is plotted in the
 ### References
 
 [1]
-[I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based segment-to-segment method for frictional contact problems,” Applied Mathematical Modelling, vol. 101, pp. 673–693, 2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)
+[I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based
+segment-to-segment method for frictional contact problems,” Applied
+Mathematical Modelling, vol. 101, pp. 673–693,
+2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)
 
 [2]
-[D. Neto, M. Oliveira, L. Menezes, and J. Alves, “A contact smoothing method for arbitrary surface meshes using Nagata patches,” Computer Methods in Applied Mechanics and Engineering, vol. 299, pp. 283 – 315, 2016.](https://www.sciencedirect.com/science/article/abs/pii/S0045782515003643)
+[D. Neto, M. Oliveira, L. Menezes, and J. Alves, “A contact smoothing method
+for arbitrary surface meshes using Nagata patches,” Computer Methods in Applied
+Mechanics and Engineering, vol. 299, pp. 283 – 315,
+2016.](https://www.sciencedirect.com/science/article/abs/pii/S0045782515003643)

@@ -28,7 +28,9 @@ Poisson's radio $$\nu=0.3$$. The bottom surface of the elastic block is fixed
 prescribed time-varying displacement:
 
 $$
-d_y = -0.1 \mathrm{~mm}, \qquad d_x = \begin{cases}2 t / 50 \mathrm{~cm}, & \text { if } t \leq 50 \mathrm{~s} \\ 2(100-t) / 50 \mathrm{~cm}, & \text { if } 50<t \leq 100 \mathrm{~s}\end{cases}
+d_y = -0.1 \mathrm{~mm}, \qquad d_x = \begin{cases}2 t / 50 \mathrm{~cm}, &
+\text { if } t \leq 50 \mathrm{~s} \\ 2(100-t) / 50 \mathrm{~cm}, & \text { if
+} 50<t \leq 100 \mathrm{~s}\end{cases}
 $$
 
 where $$t$$ is the time. The case is solved using a 2-D model under the plane
@@ -36,12 +38,9 @@ strain assumption and without gravitational effects. Time is discretised using
 100 equally spaced increments. At the contact interface, a frictional response
 is considered, and the Coulomb coefficient of friction is set to 0.1.
 
-<div style="text-align: center;">
-  <img src="./images/slidingFrictionBall-geometry.png" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 1: Problem geometry [1]</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry [1]](./images/slidingFrictionBall-geometry.png)
+
+Figure 1: Problem geometry [1]
 
 ---
 
@@ -52,12 +51,10 @@ are shown in Figure 2, demonstrating the shear stress $$\sigma_{xy}$$ flips sign
 after the sliding direction changes. The evolution of the $$\sigma_{xy}$$ and
 $$\sigma_{eq}$$ fields in time are shown in Video 1.
 
-<div style="text-align: center;">
-  <img src="./images/slidingFrictionBall-results.png" alt="Image" width="900">
-    <figcaption>
-     <strong>Figure 2: Sigma XY and sigma equivalent stress fields at 30 s and 60 s [1].</strong>
-    </figcaption>
-</div>
+![Figure 2: Sigma XY and sigma equivalent stress fields at 30 s and 60 s
+[1].](./images/slidingFrictionBall-results.png)
+
+Figure 2: Sigma XY and sigma equivalent stress fields at 30 s and 60 s [1].
 
 {% include youtube.html id="UHCpYKMPhPw" %}
 
@@ -83,4 +80,6 @@ The case is currently not working with the ORG version of OpenFOAM!
 ### References
 
 [1]
-[Philip Cardiff, solids4foam - Another solid mechanics tutorial frictional sliding, PhD Interdoctoral Course at Politecnico di Milano, Computational Fluid Dynamics with Open-Source Software, 2022.](https://www.researchgate.net/publication/358743700_2c_-_solids4foam_-_Another_solid_mechanics_tutorial_frictional_sliding_-_2022_-_Philip_Cardiff)
+[Philip Cardiff, solids4foam - Another solid mechanics tutorial frictional
+sliding, PhD Interdoctoral Course at Politecnico di Milano, Computational Fluid
+Dynamics with Open-Source Software, 2022.](https://www.researchgate.net/publication/358743700_2c_-_solids4foam_-_Another_solid_mechanics_tutorial_frictional_sliding_-_2022_-_Philip_Cardiff)

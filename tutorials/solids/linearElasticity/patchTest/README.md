@@ -21,16 +21,18 @@ field. For example, if a local linear displacement field is assumed when
 deriving a discretisation, then this discretisation should produce zero
 discretisation (mesh) errors on cases where the true displacement solution is
 linear. For further details, see
-[T Belytschko, WK Liu, B Moran, K Elkhodary, Nonlinear finite elements for continua and structures, 2014, Wiley, 2nd Edition](https://www.wiley.com/en-br/Nonlinear+Finite+Elements+for+Continua+and+Structures,+2nd+Edition-p-9781118632703).
+[T Belytschko, WK Liu, B Moran, K Elkhodary, Nonlinear finite elements for
+continua and structures, 2014, Wiley, 2nd
+Edition](https://www.wiley.com/en-br/Nonlinear+Finite+Elements+for+Continua+and+Structures,+2nd+Edition-p-9781118632703).
 
 The case geometry (Figure 1) consists of an irregular quadrilateral, which is
 meshed using five irregular quadrilateral cells. It is important that distorted
 cells are used, as orthogonal cells may satisfy the patch test when arbitrary
 quadrilaterals do not.
 
-![](images/patch-test.png)
+![Patch test](images/patch-test.png)
 
-**Figure 1: Standard patch test geometry and mesh**
+Figure 1 - Standard patch test geometry and mesh
 
 Uniform, linear elastic material properties are assumed; in this case, Young's
 modulus of 200 GPa and Poisson's ratio of 0.3. Body forces are set to zero. In
@@ -38,7 +40,8 @@ this case, where we are examining spatially second-order solid solvers, a
 linearly-varying displacement field is prescribed for the four boundary patches:
 
 $$
-d_x = \alpha_{x0} +  \alpha_{x1}x +  \alpha_{x2}y, \quad d_y = \alpha_{y0} +  \alpha_{y1}x +  \alpha_{y2}y
+d_x = \alpha_{x0} +  \alpha_{x1}x +  \alpha_{x2}y, \quad d_y = \alpha_{y0} +
+\alpha_{y1}x +  \alpha_{y2}y
 $$
 
 Where $$d_x$$ is the x-component of displacement, $$d_y$$ is the y-component,
@@ -53,13 +56,16 @@ constant in the domain and given by
 $$
 \epsilon_{xx} = \frac{\partial d_x}{\partial x} = \alpha_{x1}, \quad
 \epsilon_{yy} = \frac{\partial d_y}{\partial y} = \alpha_{y2}, \quad
-\epsilon_{xy} = \epsilon_{yx}= \frac{1}{2} \left(\frac{\partial d_x}{\partial y} + \frac{\partial d_y}{\partial x} \right) = \frac{1}{2} \left( \alpha_{x2} + \alpha_{y1}\right)
+\epsilon_{xy} = \epsilon_{yx}= \frac{1}{2} \left(\frac{\partial d_x}{\partial
+y} + \frac{\partial d_y}{\partial x} \right) = \frac{1}{2} \left( \alpha_{x2} +
+\alpha_{y1}\right)
 $$
 
 The stresses should also be constant in the domain.
 
 ```note
-If higher-order discretisations were to be tested, higher-order displacement conditions would be applied.
+If higher-order discretisations were to be tested, higher-order displacement
+conditions would be applied.
 ```
 
 The patch test is not specific to solid mechanics, and, in fact, it can be used
@@ -84,7 +90,11 @@ simply consists of creating the mesh using blockMesh (`./blockMesh`) followed by
 running the solids4foam solver (`./solids4Foam`).
 
 ```warning
-For OpenFOAM.com and OpenFOAM.org, the `pointCellsLeastSquares` or `edgeCellsLeastSquares` gradient schemes should be used for calculating the gradient of displacement; these are the only gradient schemes available in these versions, which are consistent with the required boundary non-orthogonal corrections.
+For OpenFOAM.com and OpenFOAM.org, the `pointCellsLeastSquares` or
+`edgeCellsLeastSquares` gradient schemes should be used for calculating the
+gradient of displacement; these are the only gradient schemes available in
+these versions, which are consistent with the required boundary non-orthogonal
+corrections.
 ```
 
 ---
@@ -102,7 +112,7 @@ $$
 
 The constant xx-component of strain field (`epsilon[XX]`) is shown in Figure 2.
 
-![](images/patch-test-strain.png)
+![Strain](images/patch-test-strain.png)
 
-**Figure 2: Constant xx-component of the strain field ($$\epsilon_{xx}$$,
-`epsilon[XX]`) in the patch test**
+Figure 2 - Constant xx-component of the strain field ($$\epsilon_{xx}$$,
+`epsilon[XX]`) in the patch test

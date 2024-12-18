@@ -49,7 +49,8 @@ insignificant. Such rigid rotation cases are useful verification cases for
 testing various aspects of finite strain procedures, including the governing
 equation formulation, discretisation and material model implementation. See the
 section on
-[solid model formulations](https://www.solids4foam.com/documentation/solid-models.html)
+[solid model
+formulations](https://www.solids4foam.com/documentation/solid-models.html)
 for more details on small strain (linear geometry) and finite strain (nonlinear
 geometry) procedures.
 
@@ -67,14 +68,11 @@ object's centre of mass is prescribed to the outer boundary:
    general, allowing solver verification on 3-D unstructured meshes with
    boundary non-orthogonality.
 
-<div style="text-align: center;">
-  <img src="./images/rotatingBlock-geometry.png" alt="Image" width="300">
-  <img src="./images/rotatingCylinder-geometry.png" alt="Image" width="300">
-  <img src="./images/rotatingSphere-geometry.png" alt="Image" width="300">
-    <figcaption>
-     <strong>Figure 1: Problem geometry for the three rigid rotation cases: rotatingBlock (left), rotatingCylinder (centre) and rotatingSphere (right)</strong>
-    </figcaption>
-</div>
+![Block](./images/rotatingBlock-geometry.png)
+![Cylinder](./images/rotatingCylinder-geometry.png)
+![Sphere](./images/rotatingSphere-geometry.png)
+Figure 1: Problem geometry for the three rigid rotation cases: rotatingBlock
+(left), rotatingCylinder (centre) and rotatingSphere (right)
 
 All three cases assume a St.\ Venant Kirchhoff hyperelastic material with a
 Young's modulus of 200 GPa and a Poisson's ration of 0.3; however, all nonlinear
@@ -84,7 +82,7 @@ A rigid rotation is applied to the outer boundary of the domain in all three
 cases using the `fixedRotation` boundary condition; for example, in
 `rotatingCylinder/0/D` this is specified as
 
-```
+```c++
     cylinder
     {
         type            fixedRotation;
@@ -102,10 +100,10 @@ cases using the `fixedRotation` boundary condition; for example, in
 where the `timeVsAngle` file specifies a rotation of $$1^{\circ}$$ per second up
 to a maximum of $$100^{\circ}$$ at 100 s:
 
-```
+```plaintext
 (
-        ( 0     0 )
-        ( 100 100 )
+    ( 0   0 )
+    ( 100 100 )
 )
 ```
 
@@ -157,12 +155,11 @@ considered small, confirming that the implemented finite strain procedures
 accurately account for rigid body motion without unphysical deformations.
 Similar results can be seen in the `rotatingBlock` and `rotatingCylinder` cases.
 
-<div style="text-align: center;">
-  <img src="./images/rotatingSphere-stress.png" alt="Image" width="700">
-    <figcaption>
-     <strong>Figure 2: equivalent (von Mises) stress (in Pa) after 100 degrees of rigid body rotation</strong>
-    </figcaption>
-</div>
+![Figure 2: equivalent (von Mises) stress (in Pa) after 100 degrees of rigid
+body rotation](./images/rotatingSphere-stress.png)
+
+Figure 2: equivalent (von Mises) stress (in Pa) after 100 degrees of rigid body
+rotation
 
 {% include youtube.html id="8UmIZqwtgbE" %}
 

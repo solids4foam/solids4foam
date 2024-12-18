@@ -118,4 +118,7 @@ using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
 ### References
 
 [1]
-[P. Cardiff, A. Karač, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, and Ž. Tuković, “An open-source finite volume toolbox for solid mechanics and fluid-solid interaction simulations,” arXiv preprint arXiv:1808.10736, 2018.](https://arxiv.org/abs/1808.10736)
+[P. Cardiff, A. Karač, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, and Ž.
+Tuković, “An open-source finite volume toolbox for solid mechanics and
+fluid-solid interaction simulations,” arXiv preprint arXiv:1808.10736,
+2018.](https://arxiv.org/abs/1808.10736)

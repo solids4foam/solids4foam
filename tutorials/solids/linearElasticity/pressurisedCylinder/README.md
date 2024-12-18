@@ -29,13 +29,10 @@ cells: $$30$$ cells in the radial and $$30$$ in the circumferential direction.
 Gravitational and inertial effects are neglected, and the case is solved using
 one loading increment.
 
-<div style="text-align: center;">
-  <img src="./images/pressurisedCylinder-geometry-3D.png" alt="Image" width="400">
-  <img src="./images/pressurisedCylinder-geometry.png" alt="Image" width="300">
-    <figcaption>
-     <strong>Figure 1: Problem geometry</strong>
-    </figcaption>
-</div>
+![Geometry 3-D](./images/pressurisedCylinder-geometry-3D.png)
+![Geometry](./images/pressurisedCylinder-geometry.png)
+
+Figure 1 - Problem geometry
 
 ---
 
@@ -58,7 +55,9 @@ $$
 and for radial displacement:
 
 $$
-u_r = \dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\right].
+u_r =
+\dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\rig
+ht].
 $$
 
 Results presented in Figures 2 and 3 show numerical and analytical calculations
@@ -76,20 +75,16 @@ p = 10e6      # Internal pressure
 nu = 0.3      # Poissons ratio
 ```
 
-<div style="text-align: center;">
-  <img src="./images/pressurisedCylinder-dispR.png" alt="Image" width="470">
-    <figcaption>
-     <strong>Figure 2: Distribution of the radial displacement across cylinder thickness</strong>
-    </figcaption>
-</div>
+![Figure 2: Distribution of the radial displacement across cylinder
+thickness](./images/pressurisedCylinder-dispR.png)
 
-<div style="text-align: center;">
-  <img src="./images/pressurisedCylinder-sigmaR.png" alt="Image" width="450">
-  <img src="./images/pressurisedCylinder-sigmaTheta.png" alt="Image" width="450">
-    <figcaption>
-     <strong>Figure 3: Distribution of the circumferential and radial stress across cylinder thickness</strong>
-    </figcaption>
-</div>
+Figure 2: Distribution of the radial displacement across cylinder thickness
+
+![Radial stress](./images/pressurisedCylinder-sigmaR.png)
+![Circumferential stress](./images/pressurisedCylinder-sigmaTheta.png)
+
+Figure 3 - Distribution of the circumferential and radial stress across cylinder
+thickness
 
 ### Approaching the Incompressibility Limit
 
@@ -110,13 +105,11 @@ properties (Young’s modulus and Poisson’s ratio) because of the plane stress
 condition ($$\sigma_{zz}=0$$). Accordingly, the case is solved with a plane
 strain assumption ($$\varepsilon_{zz}=0$$) to generate these plots.
 
-<div style="text-align: center;">
-  <img src="./images/pressurisedCylinder-sigmaR-nu0495.png" alt="Image" width="450">
-  <img src="./images/pressurisedCylinder-sigmaTheta-nu0495.png" alt="Image" width="450">
-    <figcaption>
-     <strong>Figure 3: Distribution of the circumferential and radial stress across cylinder thickness</strong>
-    </figcaption>
-</div>
+![Radial stress](./images/pressurisedCylinder-sigmaR-nu0495.png)
+![Circumferential stress](./images/pressurisedCylinder-sigmaTheta-nu0495.png)
+
+Figure 3 - Distribution of the circumferential and radial stress across cylinder
+thickness
 
 ---
 
@@ -133,7 +126,9 @@ displacement are plotted in the `sigmaR.png`, `sigmaTheta.png` and `dispR.png`
 files.
 
 ```note
-The same case is solved with Mooney-Rivlin hyperelastic material and can be found in the `solids/hyperelasticity/cylindricalPressureVessel`. The hyperelastic case was initially proposed by Bijelonja et al. [2,3].
+The same case is solved with Mooney-Rivlin hyperelastic material and can be
+found in the `solids/hyperelasticity/cylindricalPressureVessel`. The
+hyperelastic case was initially proposed by Bijelonja et al. [2,3].
 ```
 
 ---
@@ -141,10 +136,15 @@ The same case is solved with Mooney-Rivlin hyperelastic material and can be foun
 ### References
 
 [1]
-[J. G. S.P. Timoshenko, Theory of Elasticity. McGraw-Hill, New York, 1970.]()
+J. G. S.P. Timoshenko, Theory of Elasticity. McGraw-Hill, New York, 1970.
 
 [2]
-[I. Bijelonja, I. Demirdžić, and S. Muzaferija, “A finite volume method for incompressible linear elasticity,” Computer methods in applied mechanics and engineering, vol. 195, no. 44-47, pp. 6378–6390, 2006.](https://www.sciencedirect.com/science/article/abs/pii/S0045782506000387)
+[I. Bijelonja, I. Demirdžić, and S. Muzaferija, “A finite volume method for
+incompressible linear elasticity,” Computer methods in applied mechanics and
+engineering, vol. 195, no. 44-47, pp. 6378–6390,
+2006.](https://www.sciencedirect.com/science/article/abs/pii/S0045782506000387)
 
 [3]
-[Bijelonja, I., I. Demirdžić, and S. Muzaferija. "A finite volume method for large strain analysis of incompressible hyperelastic materials." _International journal for numerical methods in engineering_ 64.12 (2005): 1594-1609.](https://www.researchgate.net/publication/230308043_A_finite_volume_method_for_large_strain_analysis_of_incompressible_hyperelastic_materials)
+[Bijelonja, I., I. Demirdžić, and S. Muzaferija. "A finite volume method for
+large strain analysis of incompressible hyperelastic materials." _International
+journal for numerical methods in engineering_ 64.12 (2005):1594-1609.](https://www.researchgate.net/publication/230308043_A_finite_volume_method_for_large_strain_analysis_of_incompressible_hyperelastic_materials)

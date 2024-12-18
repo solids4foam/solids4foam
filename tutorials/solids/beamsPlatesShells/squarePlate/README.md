@@ -18,7 +18,8 @@ Prepared by Philip Cardiff and Ivan Batistić
 ---
 
 ```warning
-This case currently only runs with foam extend as it uses the foam extend finite area discretisation framework.
+This case currently only runs with foam extend as it uses the foam extend
+finite area discretisation framework.
 ```
 
 ## Plate Theory Assumptions
@@ -49,7 +50,7 @@ approaches relative to a 3-D continuum approach.
 | **Moderately thick**: $$L/h > 5$$ |     x     |    ✓    |       ✓       |
 | **Thick**: $$L/h < 5$$            |     x     |    x    |       ✓       |
 
-**Kirchhoff-Love Plate Formulation**
+Kirchhoff-Love Plate Formulation
 
 For thin plates $$(L/h > 10)$$, Kirchhoff–Love shell theory allows the
 conservation of momentum to be reformulated into a fourth-order partial
@@ -68,7 +69,8 @@ $$h$$), and $$p$$ is the applied external pressure (transverse direction). This
 fourth-order equation can be re-written as two coupled second-order equations:
 
 $$
-\rho h \frac{\partial^2 w}{\partial t^2} =  \nabla^2 M + p, \qquad \text{where M is:}\qquad   M = - D \nabla^2 w.
+\rho h \frac{\partial^2 w}{\partial t^2} =  \nabla^2 M + p, \qquad \text{where
+M is:}\qquad   M = - D \nabla^2 w.
 $$
 
 These coupled second order equations are the starting point for _finite area_
@@ -92,12 +94,9 @@ plates (colored red in Figure 1), two configurations are considered:
 - The plate is _clamped_ at all sides (zero displacement and zero rotation);
 - All edges are simply supported (zero displacement and zero moment/torque).
 
-<div style="text-align: center;">
-  <img src="./images/squarePlate-geometry.png" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 1: Problem geometry</strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry](./images/squarePlate-geometry.png)
+
+Figure 1: Problem geometry
 
 ---
 
@@ -106,16 +105,15 @@ plates (colored red in Figure 1), two configurations are considered:
 The deflection in the simply supported case is expected to be larger as the
 plate can more freely bend, as shown in Figure 2.
 
-<div style="text-align: center;">
-  <img src="./images/squarePlate-comparison.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 2: Plate deflection in case of simply supported and fully clamped edges
-.</strong>
-    </figcaption>
-</div>
+![Figure 2: Plate deflection in case of simply supported and fully clamped edges
+.](./images/squarePlate-comparison.png)
+
+Figure 2: Plate deflection in case of simply supported and fully clamped edges
+.
 
 ```note
-By uncommenting the relevant lines in `0/M`, one can  switch between simply supported and fully clamped boundary conditions.
+By uncommenting the relevant lines in `0/M`, one can  switch between simply
+supported and fully clamped boundary conditions.
 ```
 
 The results for the fully clamped case can be compared with values from
@@ -123,26 +121,20 @@ literature [1]. Figures 3, 4, and 5 compare the predicted deflections, bending
 moment, and rotations. The `solids4foam` predictions closley match the reference
 results [1].
 
-<div style="text-align: center;">
-  <img src="./images/squarePlate-deflection.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 3: Deflection at the central point of the plate (point C).</strong>
-    </figcaption>
-</div>
+![Figure 3: Deflection at the central point of the plate (point
+C).](./images/squarePlate-deflection.png)
 
-<div style="text-align: center;">
-  <img src="./images/squarePlate-moment.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 4: The bending moment at the midpoint of the right edge (point B).</strong>
-    </figcaption>
-</div>
+Figure 3: Deflection at the central point of the plate (point C).
 
-<div style="text-align: center;">
-  <img src="./images/squarePlate-rotation.png" alt="Image" width="800">
-    <figcaption>
-     <strong>Figure 5: Rotation at point A (point with the coordinates x=7.5 m, y=5 m).</strong>
-    </figcaption>
-</div>
+![Figure 4: The bending moment at the midpoint of the right edge (point
+B).](./images/squarePlate-moment.png)
+
+Figure 4: The bending moment at the midpoint of the right edge (point B).
+
+![Figure 5: Rotation at point A (point with the coordinates x=7.5 m, y=5
+m).](./images/squarePlate-rotation.png)
+
+Figure 5: Rotation at point A (point with the coordinates x=7.5 m, y=5 m).
 
 ---
 
