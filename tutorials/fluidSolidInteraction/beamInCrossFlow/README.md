@@ -17,6 +17,7 @@ You can find the files for this tutorial under
 ## Case Overview
 
 ![Case geometry and mesh](images/fs_over_1.PNG)
+
 **Case geometry and mesh**
 
 This case consists of a thick elastic plate attached to the bottom surface of a
@@ -132,6 +133,7 @@ field in the beam, the fluid velocity streamlines, and the fluid pressure on the
 channel ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
+
 **Expected results**
 
 ---

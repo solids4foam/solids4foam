@@ -42,12 +42,8 @@ Figure 1: Problem geometry
 - The body is most stretched near the bottom side (negative hydrostatic
   compression).
 - There is no known analytical solution for this problem, but results from
-  various codes and procedures are available in the literature
-
-[[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html),
-  [2](https://www.sciencedirect.com/science/article/abs/pii/S0045794999001340),
-
-[3](https://www.tandfonline.com/doi/abs/10.1080/10407782.2017.1372665?journalCode=unht20),
+  various codes and procedures are available in the literature [[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html),
+  [2](https://www.sciencedirect.com/science/article/abs/pii/S0045794999001340), [3](https://www.tandfonline.com/doi/abs/10.1080/10407782.2017.1372665?journalCode=unht20),
   [4](https://www.sciencedirect.com/science/article/abs/pii/S0045782506000387)].
 
 Table 1 summarises predictions from various finite element codes for the
@@ -59,15 +55,10 @@ is 32.12 mm (using `foam-extend-4.1`). As the mesh is refined, the `solids4foam`
 prediction converges to the values reported in Table 1.
 
 **Table 1: Finite element predictions for the top-right corner vertical
-displacement, reported at
-[CoFEA
-[1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
+displacement, reported at [CoFEA [1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
 
-|   Solver   | Very Fine Mesh  
-  quadratic (Hexahedral mesh) [in mm] | Very Fine Mesh  
-  quadratic (Tetrahedral mesh) [in mm] |
-| :--------: | :-----------------------------------------------------: |
-:------------------------------------------------------: |
+| Solver | Very Fine Quadratic Mesh (in mm)| Very Fine Tetrehedral Mesh (in mm) |
+| :--------: | :--------:  | :-----------------------------: |
 |  Calculix  |    32.27    | 32.27                           |
 | Code_Aster |    32.20    | 32.20                           |
 |   Elmer    |    32.28    | 32.27                           |

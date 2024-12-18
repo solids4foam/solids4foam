@@ -22,7 +22,7 @@ Prepared by Philip Cardiff, Duo Huang and Ivan Batistić
 
 This case [1] demonstrates the process of cooling the slab from the initial
 $$T_o = 800$$ K to the reference temperature, $$T_{ref} = 300$$ K. The slab is
-$$6$$ m long, $$2$$ m wide, and $$1$$ m deep (Figure 1). The material of the
+$$6$$ m long, $$2$$ m wide, and $$1$$ m deep (shown below). The material of the
 slab is linear elastic with a Young modulus of $$E = 69$$ GPa and a Poisson's
 ratio of $$\nu = 0.33$$. The material density is $$\rho=7854$$ kg m$$^{-3}$$,
 thermal conductivity is $$k=250$$ W m$$^{-1}$$ K$$^{-1}$$, specific heat
@@ -39,9 +39,10 @@ for the resulting stress and displacement fields.
 To avoid rigid-body translation, the displacement of one cell (near the centre
 of the slab) is constrained to zero.
 
-![Figure 1: Problem geometry; computational
+![Problem geometry; computational
 mesh](./images/slabCooling-geometry.png)
-**Figure 1: Problem geometry; computational mesh**
+
+Problem geometry; computational mesh
 
 ### Avoiding Rigid-Body Translations
 
@@ -76,7 +77,7 @@ cellDisplacements
     cellDisp1
     {
         approximateCoordinate    (3 1 0.5);
-     displacement             (0 0 0);
+        displacement             (0 0 0);
     }
 }
 ```
@@ -85,21 +86,23 @@ cellDisplacements
 
 ## Expected Results
 
-The predicted displacement field is shown in Figure 2, where the slab contracts
+The predicted displacement field is shown below, where the slab contracts
 uniformly about its centre (where the displacement of an internal cell is
 constrained).
 
-![Figure 2: Displacement magnitude field](./images/slabCooling-D.png)
-**Figure 2: Displacement magnitude field**
+![Displacement magnitude field](./images/slabCooling-D.png)
+
+Displacement magnitude field
 
 As all boundaries are traction-free, the steady-state solution should be
-stress-free. This is shown in Figure 3, where one can see that the resulting
+stress-free. This is shown below, where one can see that the resulting
 stress field has a magnitude of a few hundred pascals, which can be considered
 negligible and is caused by the usage of iterative procedures and chosen
 tolerances.
 
-![Figure 3: Equivalent stress field](./images/slabCooling-sigmaEq.png)
-**Figure 3: Equivalent stress field**
+![Equivalent stress field](./images/slabCooling-sigmaEq.png)
+
+Equivalent stress field
 
 ---
 
