@@ -1,6 +1,10 @@
+# `solids4foam` Pull Request
+
 ## Pull Request Description 🚀
 
-Please provide a **concise summary** of your changes and the motivation behind them. For example:
+Please provide a **concise summary** of your changes and the motivation behind
+them. For example:
+
 - What issue or feature does this pull request address?
 - Why are these changes necessary?
 
@@ -9,7 +13,8 @@ Please provide a **concise summary** of your changes and the motivation behind t
 ## Related Issues and Discussions 🧩
 
 - Link to any related **issues** (e.g., #123) or **discussions**.
-- If this PR fixes a bug, include "Closes #issue-number" to automatically close it upon merging.
+- If this PR fixes a bug, include "Closes #issue-number" to automatically close
+  it upon merging.
 
 ---
 
@@ -21,8 +26,10 @@ Please provide a **concise summary** of your changes and the motivation behind t
 - [ ] **Documentation**: Updates to docs or comments.
 - [ ] **Other**: Explain any additional changes.
 
-### Summary of Changes:
-- **Files Modified**: List the key files affected (e.g., `solidsModel.C`, `solverFoam.H`).
+### Summary of Changes
+
+- **Files Modified**: List the key files affected (e.g., `solidsModel.C`,
+  `solverFoam.H`).
 - **Behavioural Changes**: Are there any changes in output or performance?
 
 ---
@@ -31,10 +38,12 @@ Please provide a **concise summary** of your changes and the motivation behind t
 
 Please ensure the following before submitting your PR:
 
-- [ ] Code compiles successfully with **OpenFOAM** or **foam-extend** versions (e.g., `v2312`, `4.1`).
+- [ ] Code compiles successfully with **OpenFOAM** or **foam-extend** versions
+      (e.g., `v2312`, `4.1`).
 - [ ] I tested the changes with the provided tutorial or relevant test cases.
 - [ ] Added relevant **comments** or **documentation** for clarity.
-- [ ] The PR passes existing **GitHub Actions CI checks** (e.g., build and test).
+- [ ] The PR passes existing **GitHub Actions CI checks** (e.g., build and
+      test).
 - [ ] Code follows the project's **coding style** and conventions.
 
 ---
@@ -42,17 +51,21 @@ Please ensure the following before submitting your PR:
 ## Test Cases and Results 📊
 
 Provide details of any test cases run and their results:
-- **Case Name**: e.g., `plateUnderCompression`, `beamBendingFSI`
-- **Results**: Brief description (e.g., "Results match the reference solution within tolerance").
 
-If applicable, add a **screenshot** or **plot** of the results for visual confirmation.
+- **Case Name**: e.g., `plateUnderCompression`, `beamBendingFSI`
+- **Results**: Brief description (e.g., "Results match the reference solution
+  within tolerance").
+
+If applicable, add a **screenshot** or **plot** of the results for visual
+confirmation.
 
 ---
 
 ## Additional Notes 💡
 
 - Highlight any potential **backward compatibility** issues.
-- Mention if there are **dependencies** (e.g., specific OpenFOAM versions, external libraries).
+- Mention if there are **dependencies** (e.g., specific OpenFOAM versions,
+  external libraries).
 - Any known limitations or remaining tasks for this PR.
 
 ---
@@ -65,6 +78,7 @@ Include relevant screenshots or plots for visualisation.
 
 ### Final Comments 💬
 
-Thank you for contributing to **solids4foam**! 🎉 
+Thank you for contributing to **solids4foam**! 🎉
 
-If this is your first time contributing, check out the [CONTRIBUTING.md](link-to-contributing-guide) for more details.
+If this is your first time contributing, check out the
+[CONTRIBUTING.md](link-to-contributing-guide) for more details.
