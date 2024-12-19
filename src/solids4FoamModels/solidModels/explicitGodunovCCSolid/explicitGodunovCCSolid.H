@@ -9,31 +9,43 @@ License
 
     solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    General Public License for more details.
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General 
+    Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam. If not, see <http://www.gnu.org/licenses/>.
+
+Original Authors
+    Jibran Haider - explicitSolidDynamics toolkit
+    Philip Cardiff, UCD - solids4foam toolbox
+
+    Original source code retrieved from:
+    https://github.com/jibranhaider/explicitSolidDynamics/
+
+Modifications by
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov 
+    scheme for solid mechanics as part of the solids4foam project. 
+    Additional modifications include the integration of a dual-time stepping 
+    algorithm. 
+
+    Note: The angular momentum algorithm has not been adapted to the new 
+    time discretization scheme. As a result, it may not provide accurate 
+    solutions if used in its current form. 
 
 Class
     explicitGodunovCCSolid
 
 Description
-    A solid model based on the  explicitSolidDynamics toolkit.
-    Solve a first order system of total Lagrangian mixed formulation
-    comprising of conservation laws for linear momentum and deformation
+    A solid model based on the explicitSolidDynamics toolkit.
+    Solves a first-order system of total Lagrangian mixed formulation
+    comprising conservation laws for linear momentum and deformation
     gradient.
-
-Author
-    Khoder Alhamwi Alshaar, IITB. All rights reserved.
-
-Original Author of explicitSolidDynamics toolkit
-    Jibran Haider
 
 SourceFiles
     explicitGodunovCCSolid.C
 
 \*---------------------------------------------------------------------------*/
+
 
 #ifndef explicitGodunovCCSolid_H
 #define explicitGodunovCCSolid_H

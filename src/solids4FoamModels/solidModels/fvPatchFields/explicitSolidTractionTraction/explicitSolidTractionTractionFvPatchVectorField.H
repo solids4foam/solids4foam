@@ -19,12 +19,16 @@ Class
     explicitSolidTractionTractionFvPatchVectorField
 
 Description
-    Fixed traction boundary condition for solid solvers.
+    Fixed traction boundary condition for explicitGodunovCC solid solver
+    for traction field.
 
-Author
+Original Authors
     Philip Cardiff, UCD.
     Zeljko Tukovic, FSB Zagreb.
-    Khoder Alhamwi Alshaar, IITB.
+
+Modifications by
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov 
+    scheme for solid mechanics as part of the solids4foam project.
 
 SourceFiles
     explicitSolidTractionTractionFvPatchVectorField.C
