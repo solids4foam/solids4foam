@@ -625,6 +625,7 @@ void Foam::fluidSolidInterface::setDeltaT(Time& runTime)
 {
     // For now, the fluid sets the time-step
     fluid().setDeltaT(runTime);
+    // solid().setDeltaT(runTime);
 }
 
 

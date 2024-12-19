@@ -103,7 +103,7 @@ EXE_INC = \
     -I$(LIB_SRC)/overset/oversetMesh/lnInclude \
     -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/incompressibleInterPhaseTransportModel/lnInclude \
     -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/VoFphaseIncompressibleTurbulenceModels/lnInclude \
-    -I$(LIB_SRC)/optimisation/adjointOptimisation/adjoint/lnInclude
+    -I$(LIB_SRC)/optimisation/adjointOptimisation/adjoint/lnInclude\
 
 LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \

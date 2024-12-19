@@ -1,0 +1,50 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// linearGeometry: assumes small strains and rotations
+//solidModel       coupledUnsLinearGeometryLinearElastic;
+//solidModel       coupledUnsLinGeometry;
+//solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
+solidModel     explicitGodunovCC;
+
+
+//"explicitGodunovCC|unsLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs"
+
+"explicitGodunovCCCoeffs|linearGeometryTotalDisplacementCoeffs"
+{
+    // Maximum number of momentum correctors
+    nCorrectors     100000;
+
+    // Solution tolerance 
+    solutionTolerance 1e-04;
+
+    angularMomentumConservation     yes;
+
+    incompressiblilityCoefficient   1.0;
+
+    dampingCoeff  dampingCoeff [ 0 0 -1 0 0 0 0 ] 128.56; //evaluated based on Bernoulli-Euler beam theory 
+
+    // Alternative solutions
+    alternativeTolerance 1e-07;
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+// ************************************************************************* //
