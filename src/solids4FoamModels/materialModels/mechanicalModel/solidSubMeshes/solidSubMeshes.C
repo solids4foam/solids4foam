@@ -136,7 +136,7 @@ void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
         (
             matI,
 #ifdef OPENFOAM_NOT_EXTEND
-            new volPointInterpolation
+            new enhancedVolPointInterpolation
 #else
             new newLeastSquaresVolPointInterpolation
 #endif
@@ -228,23 +228,9 @@ void Foam::solidSubMeshes::calcSubMeshSigma() const
         subMeshSigma_.set
         (
             matI,
-            new volSymmTensorField
+            lookupBaseMeshVolField<symmTensor>
             (
-                IOobject
-                (
-                    "sigma",
-                    subMeshes[matI].subMesh().time().timeName(),
-                    subMeshes[matI].subMesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                subMeshes[matI].subMesh(),
-                dimensionedSymmTensor
-                (
-                    "zero",
-                    dimForce/dimArea,
-                    symmTensor::zero
-                )
+                "sigma", subMeshes[matI].subMesh()
             )
         );
     }
@@ -276,23 +262,9 @@ void Foam::solidSubMeshes::calcSubMeshSigmaf() const
         subMeshSigmaf_.set
         (
             matI,
-            new surfaceSymmTensorField
+            lookupBaseMeshSurfaceField<symmTensor>
             (
-                IOobject
-                (
-                    "sigmaf",
-                    subMeshes[matI].subMesh().time().timeName(),
-                    subMeshes[matI].subMesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                subMeshes[matI].subMesh(),
-                dimensionedSymmTensor
-                (
-                    "zero",
-                    dimForce/dimArea,
-                    symmTensor::zero
-                )
+                "sigmaf", subMeshes[matI].subMesh()
             )
         );
     }
@@ -1421,7 +1393,7 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
 }
 
 #ifdef OPENFOAM_NOT_EXTEND
-    const Foam::PtrList<Foam::volPointInterpolation>&
+    const Foam::PtrList<Foam::enhancedVolPointInterpolation>&
 #else
     const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
 #endif

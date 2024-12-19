@@ -1,0 +1,96 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+echo "optionalFixes/Allreplace"
+
+# This script replaces files that require fixes in the OpenFOAM installation.
+# To see the consequence of these fixes, visit www.solids4foam.com.
+
+# Function for the checking and reporting how to replace a file
+# Arguments:
+#   $1  - File name
+#   $2  - Target path, without the file name and the slash at the end
+#   $3  - Path to library to be re-built
+#
+replaceFile()
+{
+    if cmp --silent "./${1}/${2}" "${3}/${2}"
+    then
+        echo "'${2}' has already been replaced"
+        return 0
+    else
+        echo "Replacing the file '${3}/${2}' with 'optionalFixes/${1}/${2}'"
+        cp "./${1}/${2}" "${3}/${2}"
+        return 0
+    fi
+}
+
+
+# Different checks required for each version of OpenFOAM/foam
+if [ "$WM_PROJECT" = "foam" ]
+then
+    # This fixes the segmentation error that happens at the end of solver due to
+    # a mesh object being freed twice
+    replaceFile \
+        "foam-extend-4.1" \
+        "meshObjectBase.H" \
+        "$FOAM_SRC/foam/meshes/MeshObject" \
+        "$FOAM_SRC/foam"
+
+    # This fixes segmentation errors related to point fields when mesh
+    # topological changes occur
+    replaceFile \
+        "foam-extend-4.1" \
+        "pointBoundaryMesh.C" \
+        "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
+        "$FOAM_SRC/foam"
+
+    # This fixes consistent Rhie-Chow interpolation
+    # for Euler scheme
+    replaceFile \
+        "foam-extend-4.1" \
+        "EulerDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+
+    # This fixes consistent Rhie-Chow interpolation
+    # for Euler scheme
+    replaceFile \
+        "foam-extend-4.1" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+
+    # Fix time index storage in the storeOldTimes function
+    replaceFile \
+        "foam-extend-4.1" \
+        "GeometricField.C" \
+        "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
+        "$FOAM_SRC/foam"
+elif [[ $WM_PROJECT_VERSION == v* ]]
+then
+    # Fix time index storage in the storeOldTimes function
+    replaceFile \
+        "OpenFOAM-v2012" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+else
+    # Fix time index storage in the storeOldTimes function
+    replaceFile \
+        "OpenFOAM-9" \
+        "GeometricField.C" \
+        "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
+        "$FOAM_SRC/OpenFOAM"
+
+    # Fix time index storage in the storeOldTimes function
+    replaceFile \
+        "OpenFOAM-9" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+fi
+
+echo
+echo "Please run (cd $FOAM_SRC && ./Allwmake -j) after files have been replaced"
+echo

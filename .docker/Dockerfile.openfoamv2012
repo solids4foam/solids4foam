@@ -1,0 +1,25 @@
+################################################################################
+# Dockerfile to build solids4foam with OpenFOAM-v2012
+# philip.cardiff@ucd.ie, Aug 2022
+################################################################################
+
+# Set the base image
+FROM philippic/openfoam-v2012-ubuntu20.04:latest
+
+# File Author / Maintainer
+MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
+
+# Change default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Add solids4Foam 
+COPY . /usr/lib/solids4foam
+
+# Compile solids4Foam
+RUN source /usr/lib/openfoam/openfoam2012/etc/bashrc && \
+    cd /usr/lib/solids4foam && \
+    ./Allwmake -j -s
+
+# Clean log files
+RUN cd /usr/lib/solids4foam && \
+    find . -name log.* | xargs rm

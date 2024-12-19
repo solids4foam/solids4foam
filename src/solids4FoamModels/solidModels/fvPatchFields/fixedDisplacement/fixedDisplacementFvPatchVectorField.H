@@ -154,7 +154,7 @@ public:
 
     // Destructors
 
-        //- Construct from patch and internal field
+        //- Destructor
         virtual ~fixedDisplacementFvPatchVectorField();
 
 

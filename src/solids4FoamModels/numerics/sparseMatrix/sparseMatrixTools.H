@@ -33,6 +33,7 @@ SourceFiles
 #define sparseMatrixTools_H
 
 #include "sparseMatrix.H"
+#include "SparseMatrixTemplate.H"
 #include "vectorField.H"
 #include "polyMesh.H"
 #ifdef OPENFOAM_NOT_EXTEND
@@ -57,6 +58,16 @@ namespace sparseMatrixTools
     //- Solve the linear system using Eigen's SparseLU direct solver
     void solveLinearSystemEigen
     (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool exportToMatlab = false,
+        const bool debug = false
+    );
+
+    //- Solve the linear system using Eigen's SparseLU direct solver
+    void solveLinearSystemEigen
+    (
         const sparseMatrix& matrix,
         const vectorField& source,
         vectorField& solution,
@@ -68,11 +79,23 @@ namespace sparseMatrixTools
 #ifdef USE_PETSC
 
     //- Solve the linear system using PETSc
-#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar> solveLinearSystemPETSc
+    (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool twoD,
+        fileName& optionsFile,
+        const pointField& points,
+        const boolList& ownedByThisProc,
+        const labelList& localToGlobalPointMap,
+        const labelList& stencilSizeOwned,
+        const labelList& stencilSizeNotOwned,
+        const bool debug = false
+    );
+
+    //- Solve the linear system using PETSc
     SolverPerformance<vector> solveLinearSystemPETSc
-#else
-    BlockSolverPerformance<vector> solveLinearSystemPETSc
-#endif
     (
         const sparseMatrix& matrix,
         const vectorField& source,
@@ -105,6 +128,18 @@ namespace sparseMatrixTools
     //- Check the PETSc error
     //  Exit with a FatalError if it is greater than 0
     void checkErr(const int ierr);
+
+    //- Enforce fixed DOF contributions on the linear system
+    void enforceFixedDof
+    (
+        sparseScalarMatrix& matrix,
+        scalarField& source,
+        const boolList& fixedDofs,
+        const scalarField& fixedDofDirections,
+        const scalarField& fixedDofValues,
+        const scalar fixedDofScale,
+        const bool debug
+    );
 
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof

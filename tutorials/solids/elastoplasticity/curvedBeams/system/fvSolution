@@ -19,34 +19,20 @@ FoamFile
 
 solvers
 {
-    "D|DD"
+    "D|DD|sigmaHyd"
     {
         solver          PCG;
         preconditioner  FDIC;
         tolerance       1e-09;
-        relTol          0.1;
-    }
-
-    sigmaHyd
-    {
-        solver          PCG;
-        preconditioner  FDIC;
-        tolerance       1e-09;
-        relTol          0.1;
+        relTol          0.99;
     }
 }
 
 relaxationFactors
 {
-    equations
-    {
-        //DD    0.999;
-    }
-
     fields
     {
         DD       0.95;
-        //sigmaHyd    0.5;
     }
 }
 

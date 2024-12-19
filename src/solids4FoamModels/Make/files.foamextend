@@ -230,7 +230,6 @@ $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
-numerics/backwardDdtScheme/backwardDdtSchemes.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
@@ -249,12 +248,11 @@ numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/patchCorrectionVectors/patchCorrectionVectors.C
+numerics/pointFieldFunctions/pointFieldFunctions.C
 
 numerics/deltaVectors/deltaVectors.C
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
-numerics/sparseMatrix/sparseMatrix.C
-numerics/sparseMatrix/sparseMatrixTools.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

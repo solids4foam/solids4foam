@@ -132,6 +132,9 @@ class fluidSolidInterface
         //- List of interfaces ref. point displacements
         List<vectorField> interfacesPointsDisplsPrev_;
 
+        //- Incremental or absolute residual calculation approach
+        const Switch incrementalResiduals_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
@@ -162,9 +165,6 @@ class fluidSolidInterface
 
     // Private Member Functions
 
-        //- Update the coupled switch based on the couplingStartTime
-        bool updateCoupled();
-
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
 
@@ -182,6 +182,9 @@ class fluidSolidInterface
 
 protected:
     // Protected Member Functions
+
+        //- Update the coupled switch based on the couplingStartTime
+        bool updateCoupled();
 
         //- Return sub-dictionary
         dictionary& fsiProperties()

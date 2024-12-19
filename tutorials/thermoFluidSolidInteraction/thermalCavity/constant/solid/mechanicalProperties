@@ -28,7 +28,7 @@ mechanical
         mechanicalLaw
         {
             type            linearElastic;
-            E               E [1 -1 -2 0 0 0 0] 1e+4;
+            E               E [1 -1 -2 0 0 0 0] 2e+11;
             nu              nu [0 0 0 0 0 0 0] 0.3;
         }
     }

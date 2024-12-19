@@ -1,0 +1,28 @@
+################################################################################
+# Dockerfile to build solids4foam with OpenFOAM-v2312
+# philip.cardiff@ucd.ie, Jun 2024
+################################################################################
+
+# Set the base image
+FROM opencfd/openfoam-dev:2312
+
+# File Author / Maintainer
+MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
+
+# Change default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Add solids4Foam 
+COPY . /usr/lib/solids4foam
+
+# Make optional fixes for solids4foam
+COPY optionalFixes/OpenFOAM-v2012/backwardDdtScheme.C /usr/lib/openfoam/openfoam2312/src/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme/
+
+# Compile solids4Foam
+RUN source /usr/lib/openfoam/openfoam2312/etc/bashrc && \
+    cd /usr/lib/solids4foam && \
+    ./Allwmake -j -s
+
+# Clean log files
+RUN cd /usr/lib/solids4foam && \
+    find . -name log.* | xargs rm

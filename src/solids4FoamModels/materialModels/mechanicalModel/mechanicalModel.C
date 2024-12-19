@@ -86,107 +86,6 @@ Foam::solidSubMeshes& Foam::mechanicalModel::solSubMeshes()
 }
 
 
-void Foam::mechanicalModel::calcImpKfcorr() const
-{
-    if (impKfcorrPtr_.valid())
-    {
-        FatalErrorIn
-        (
-            "const Foam::volScalarField& "
-            "Foam::mechanicalModel::calcImpKfcorr() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    impKfcorrPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "impKfcorr",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            impKf()
-        )
-    );
-
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() > 1)
-    {
-#ifndef OPENFOAM_NOT_EXTEND
-        // To disable Rhie-Chow correction on bi-material interface, we will set
-        // impKfcorr to zero on bi-material interface faces
-
-        surfaceScalarField& impKfcorr = impKfcorrPtr_();
-        scalarField& impKfcorrI = impKfcorrPtr_().internalField();
-
-        forAll(laws, lawI)
-        {
-            const fvMesh& subMesh = solSubMeshes().subMeshes()[lawI].subMesh();
-            const labelList& patchMap =
-                solSubMeshes().subMeshes()[lawI].patchMap();
-            const labelList& faceMap =
-                solSubMeshes().subMeshes()[lawI].faceMap();
-
-            forAll(subMesh.boundaryMesh(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
-                    const label start = ppatch.start();
-
-                    forAll(ppatch, faceI)
-                    {
-                        const label baseFaceID = faceMap[start + faceI];
-
-                        if (mesh().isInternalFace(baseFaceID))
-                        {
-                            impKfcorrI[baseFaceID] = 0.0;
-                        }
-                        else
-                        {
-                            // Face is on a coupled patch
-                            const label patchID =
-                                mesh().boundaryMesh().whichPatch(baseFaceID);
-
-                            const label basePatchStart =
-                                mesh().boundaryMesh()[patchID].start();
-
-                            impKfcorr.boundaryField()
-                            [
-                                patchID
-                            ][baseFaceID - basePatchStart] = 0.0;
-                        }
-                    }
-                }
-            }
-        }
-
-        impKfcorrPtr_().correctBoundaryConditions();
-#else
-        FatalErrorIn(type())
-            << "Not implemented for this version of OpenFOAM"
-            << abort(FatalError);
-#endif
-    }
-}
-
-
-const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
-{
-    if (impKfcorrPtr_.empty())
-    {
-        calcImpKfcorr();
-    }
-
-    return impKfcorrPtr_();
-}
-
-
 void Foam::mechanicalModel::clearOut()
 {
     // Clear the list of mechanical laws
@@ -226,8 +125,7 @@ Foam::mechanicalModel::mechanicalModel
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
     cellZoneNames_(),
-    solSubMeshes_(),
-    impKfcorrPtr_()
+    solSubMeshes_()
 {
     Info<< "Creating the mechanicalModel" << endl;
 
@@ -245,7 +143,7 @@ Foam::mechanicalModel::mechanicalModel
         cellZoneNames_[lawI] = lawEntries[lawI].keyword();
     }
 
-    // Create mechancial laws
+    // Create mechanical laws
     if (laws.size() == 1)
     {
         if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
@@ -378,16 +276,19 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
+const Foam::enhancedVolPointInterpolation&
+Foam::mechanicalModel::volToPoint() const
 {
-    return volPointInterpolation::New(mesh_);
+    return enhancedVolPointInterpolation::New(mesh_);
 }
 #else
-const Foam::newLeastSquaresVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
+const Foam::newLeastSquaresVolPointInterpolation&
+Foam::mechanicalModel::volToPoint() const
 {
     return newLeastSquaresVolPointInterpolation::New(mesh_);
 }
 #endif
+
 
 Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
 {
@@ -623,6 +524,28 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
         solSubMeshes().mapSubMeshSurfaceFields<symmTensor>
         (
             solSubMeshes().subMeshSigmaf(), sigma
+        );
+    }
+}
+
+
+void Foam::mechanicalModel::correct
+(
+    pointSymmTensorField& sigma, const pointTensorField& gradD
+)
+{
+    PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        laws[0].correct(sigma, gradD);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::correct(...): not implemented for more than "
+            "one material"
         );
     }
 }
@@ -903,64 +826,54 @@ void Foam::mechanicalModel::interpolate
 }
 
 
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
+void Foam::mechanicalModel::interpolate
 (
     const volVectorField& D,
     const volTensorField& gradD,
-    const surfaceScalarField& gamma
-) const
+    pointVectorField& pointD,
+    const bool useVolFieldSigma
+)
 {
-    // Mathematically "div(grad(phi))" is equivalent to "laplacian(phi)";
-    // however, numerically "div(grad(phi))" uses a larger stencil than the
-    // "laplacian(phi)"; the difference between these two approximations is
-    // a small amount of numerical diffusion that quells oscillations
-    //if (D.name() == "DD" || biMaterialInterfaceActive())
-    if (true)
+#ifdef OPENFOAM_NOT_EXTEND
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
     {
-        return
-        (
-            fvc::laplacian
-            (
-                gamma,
-                D,
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div(gamma*mesh().Sf() & fvc::interpolate(gradD))
-        );
+#ifdef OPENFOAM_COM
+        volToPoint().interpolate(D, gradD, pointD);
+#else
+        volToPoint().interpolate(D, pointD);
+#endif
     }
     else
     {
-        // We will calculate this numerical diffusion based on the increment of
-        // displacement, as it may become large of we base it on the total
-        // displacement
-        // Issue: The increment field "D - D.oldTime()" will be incorrect on
-        // non-orthogonal meshes as the grad(D - D.oldTime()) field would not be
-        // stored... we can/should fix this
-        return
+        // Interpolate the base D to the subMesh D
+        // If necessary, corrections are applied on bi-material interfaces
+        solSubMeshes().interpolateDtoSubMeshD(D, useVolFieldSigma);
+
+        // Accumulate data for all fields
+        forAll(laws, lawI)
+        {
+            // Interpolate the subMeshD to the subMeshPointD
+            solSubMeshes().subMeshVolToPoint()[lawI].interpolate
+            (
+                solSubMeshes().subMeshD()[lawI],
+#ifdef OPENFOAM_COM
+                solSubMeshes().subMeshGradD()[lawI],
+#endif
+                solSubMeshes().subMeshPointD()[lawI]
+            );
+        }
+
+        // Map subMesh pointD fields back to the base pointD field
+        solSubMeshes().mapSubMeshPointFields<vector>
         (
-            fvc::laplacian
-            (
-                gamma,
-                D - D.oldTime(),
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div
-            (
-                gamma*mesh().Sf()
-              & fvc::interpolate(gradD - gradD.oldTime())
-            )
+            solSubMeshes().subMeshPointD(), pointD
         );
     }
-}
-
-
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
-(
-    const volVectorField& D,
-    const volTensorField& gradD
-) const
-{
-    return RhieChowCorrection(D, gradD, impKfcorr());
+#else
+    this->interpolate(D, pointD, useVolFieldSigma);
+#endif
 }
 
 

@@ -1,0 +1,19 @@
+-ksp_type  cg
+#-ksp_cg_single_reduction  true
+-ksp_monitor_short
+-ksp_atol 1e-11
+-ksp_rtol 1e-11
+#-ksp_norm_type none
+-pc_type  hypre
+-pc_hypre_type boomeramg
+-pc_hypre_boomeramg_max_iter 1
+-pc_hypre_boomeramg_strong_threshold 0.25
+-pc_hypre_boomeramg_grid_sweeps_up 1
+-pc_hypre_boomeramg_grid_sweeps_down 1
+-pc_hypre_boomeramg_agg_nl 1
+-pc_hypre_boomeramg_agg_num_paths 1
+-pc_hypre_boomeramg_max_levels 25
+-pc_hypre_boomeramg_coarsen_type HMIS
+-pc_hypre_boomeramg_interp_type ext+i
+-pc_hypre_boomeramg_P_max 1
+-pc_hypre_boomeramg_truncfactor 0.3

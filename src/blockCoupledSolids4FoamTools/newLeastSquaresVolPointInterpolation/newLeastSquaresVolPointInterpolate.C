@@ -25,9 +25,13 @@ License
 #include "cyclicFvPatch.H"
 #include "processorPolyPatch.H"
 #include "transform.H"
+#include "fixedValuePointPatchFields.H"
+#include "symmetryPointPatchFields.H"
+
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
+    // #include "SymmetryPointPatchField.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -621,23 +625,129 @@ void newLeastSquaresVolPointInterpolation::interpolate
           + coeffs[2]*dr.z();
     }
 
-    // ZT: Correct only patches which are not coupled
+    // ZT: Correct only fixedValue and symmetry patches
     // (for example, processor patches should already be sinchronized)
     // pf.correctBoundaryConditions();
     forAll(pf.boundaryField(), patchI)
     {
-        if (!pf.boundaryField()[patchI].coupled())
+        if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                fixedValuePointPatchField<Type>
+#else
+                FixedValuePointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].initEvaluate();
+        }
+        else if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                symmetryPointPatchField<Type>
+#else
+                SymmetryPointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
         {
             pf.boundaryField()[patchI].initEvaluate();
         }
     }
+
     forAll(pf.boundaryField(), patchI)
     {
-        if (!pf.boundaryField()[patchI].coupled())
+        if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                fixedValuePointPatchField<Type>
+#else
+                FixedValuePointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].evaluate();
+        }
+        else if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                symmetryPointPatchField<Type>
+#else
+                SymmetryPointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
         {
             pf.boundaryField()[patchI].evaluate();
         }
     }
+
+    // forAll(pf.boundaryField(), patchI)
+    // {
+    //     if (!pf.boundaryField()[patchI].coupled())
+    //     {
+    //         pf.boundaryField()[patchI].initEvaluate();
+    //     }
+    // }
+    // forAll(pf.boundaryField(), patchI)
+    // {
+    //     if (!pf.boundaryField()[patchI].coupled())
+    //     {
+    //         pf.boundaryField()[patchI].evaluate();
+    //     }
+    // }
 
     // Correct axis point values
     forAll(mesh().boundaryMesh(), patchI)

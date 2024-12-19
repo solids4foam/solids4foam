@@ -9,13 +9,35 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
+
+if [[ $WM_PROJECT == "foam" ]]
+then
+    foamClearPolyMesh -region fluid
+    foamClearPolyMesh -region solid
+else
+    foamCleanPolyMesh -region fluid
+    foamCleanPolyMesh -region solid
+fi
+
 rm -rf case.foam postProcessing residuals
+rm -rf radialDisplacement.pdf fsiConvergence.pdf axialDisplacement.pdf
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
 
+# Check fvSolution for foundation version
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
+then
+    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'residualControl' with"
+        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
+        sed -i "s/outerCorrectorResidualControl/residualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
+    fi
+fi
+
 # Link files back to default with pimpleFluid
 for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
-do 
+do
     ln -vnsf ${file##*/} ${file%.*}
 done

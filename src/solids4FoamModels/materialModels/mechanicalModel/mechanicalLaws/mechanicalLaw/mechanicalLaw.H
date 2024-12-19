@@ -357,20 +357,33 @@ protected:
             const surfaceScalarField& K
         );
 
-        //- Update the hydrostatic stress field by solving a diffusion equation.
-        //  An explicit calculation of sigmaHyd is passed as an argument.
-        //  Passing a zero will enforce incompressibility, although for
-        //  covergence it may be better to pass a penalty calculation of
-        //  sigmaHyd
+        //- Update the provided hydrostatic stress field
+        void updateSigmaHyd
+        (
+            volScalarField& sigmaHyd,
+            const volScalarField& sigmaHydExplicit,
+            const dimensionedScalar& impK
+        );
+
+        //- Update the "sigmaHyd()" hydrostatic stress field
         void updateSigmaHyd
         (
             const volScalarField& sigmaHydExplicit,
             const dimensionedScalar& impK
         );
 
-        //- Update the hydrostatic stress field by solving a diffusion equation.
+        //- Update "sigmaHyd()" and "gradSigmaHyd()"
         void updateSigmaHyd
         (
+            const volScalarField& sigmaHydExplicit,
+            const volScalarField& impK
+        );
+
+        //- Update the provided hydrostatic stress field and its gradient
+        void updateSigmaHyd
+        (
+            volScalarField& sigmaHyd,
+            volVectorField& gradSigmaHyd,
             const volScalarField& sigmaHydExplicit,
             const volScalarField& impK
         );
@@ -495,6 +508,7 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
         virtual scalarSquareMatrix materialTangent() const
         {
@@ -505,10 +519,10 @@ public:
             return scalarSquareMatrix(0);
         }
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>>
+            materialTangentField() const;
 #endif
 
         //- Return bulk modulus
@@ -520,11 +534,17 @@ public:
             return rho();
         }
 
-        //- Calculate the stress
+        //- Calculate the volField stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 
-        //- Calculate the stress
+        //- Calculate the surfaceField stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Calculate the pointField stress given the displacement gradient
+        virtual void correct
+        (
+            pointSymmTensorField& sigma, const pointTensorField& gradD
+        );
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

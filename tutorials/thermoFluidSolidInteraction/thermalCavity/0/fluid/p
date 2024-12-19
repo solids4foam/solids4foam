@@ -24,6 +24,10 @@ boundaryField
     {
         type          zeroGradient;
         value         uniform 0;
+
+        // type newElasticWallPressure;
+	// virtualWallThickness uniform 0.001;
+        // value uniform 0;
     }
 
     left

@@ -1,3 +1,7 @@
+set terminal pdfcairo enhanced color solid
+
+set output "displacement.pdf"
+
 set style line 1 linecolor rgb 'black' linetype 6 linewidth 2 ps 1.8
 set style line 2 linecolor rgb 'red' linetype 6 linewidth 2 ps 1.8
 set style line 3 linecolor rgb 'blue' linetype 6 linewidth 2 ps 1.8

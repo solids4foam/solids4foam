@@ -301,7 +301,7 @@ bool poroLinGeomSolid::evolve()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + stabilisation().stabilisation(D(), gradD(), impK_)
         );
 
         // Under-relaxation the linear system

@@ -4,24 +4,44 @@ sort: 2
 
 # My second tutorial: `cylinderInChannel`
 
+You can find the files for this tutorial under
+[`tutorials/fluids/cylinderInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/cylinderInChannel).
+
 ---
 
 ## Tutorial Aims
 
 - Demonstrate how to perform a fluid-only analysis in solids4foam;
-- Explain how a solids4foam fluid case differs from a standard OpenFOAM fluid case.
+- Explain how a solids4foam fluid case differs from a standard OpenFOAM fluid
+  case.
 
 ## Case Overview
 
-![](images/flu_over_1.PNG)
+![Diagram of the flow over a cylinder geometry and mesh](images/flu_over_1.PNG)
 
-This is the classic “flow over a cylinder in a channel” test case, as analysed by, for example, Ferziger and Peric (2002). The problem is modelled as 2-D. The inlet flow velocity profile is specified (coming in from the left), and the outlet (right) gauge pressure is zero. The upper wall, lower wall and cylinder are no-slip walls.
+This is the classic “flow over a cylinder in a channel” test case, as analysed
+by, for example, Ferziger and Peric (2002). The problem is modelled as 2-D. The
+inlet flow velocity profile is specified (coming in from the left), and the
+outlet (right) gauge pressure is zero. The upper wall, lower wall and cylinder
+are no-slip walls.
 
-We assume an incompressible Newtonian isothermal laminar fluid, where the Navier-Stokes governing equations take the form:
+We assume an incompressible Newtonian isothermal laminar fluid, where the
+Navier-Stokes governing equations take the form:
 
-![](images/flu_theo_1.PNG)
+$$
+\nabla \cdot \boldsymbol{v} = 0
+$$
+
+$$
+\frac{\partial \boldsymbol{v}}{\partial t}
++ \nabla \cdot (\boldsymbol{v}\boldsymbol{v})
+= \nu \nabla^2 \boldsymbol{v}
+- \frac{1}{\rho} \nabla p
++ \boldsymbol{f_b}
+$$
 
 We will use the PIMPLE pressure-velocity coupling algorithm:
+
 ```pseudocode
 for all time-steps
     do
@@ -30,19 +50,26 @@ for all time-steps
     while not converged
 end
 ```
+
 ---
 
 ## Expected Results
 
-For Re = 100, the flow is expected to be unsteady, with vortices shedding from the cylinder.
+For Re = 100, the flow is expected to be unsteady, with vortices shedding from
+the cylinder.
 
-![](images/flu_over_3.PNG)
+![Pressure contours (top) and velocity vectors (bottom) from Ferziger and Peric (2002)](images/flu_over_3.PNG)
+
+**Pressure contours (top) and velocity vectors (bottom) from Ferziger and
+Peric (2002)**
 
 ---
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
+The tutorial case can be run using the included `Allrun` script, i.e.
+`> ./Allrun`. In this case, the `Allrun` script is
+
 ```bash
 #!/bin/bash
 
@@ -77,35 +104,44 @@ else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
 ```
-where the `solids4Foam::convertCaseFormat .` script makes minor changes to the case to make it compatible with your version of OpenFOAM/foam-extend. As can be seen, the mesh in the fluent format is converted to the OpenFOAM format before running the `solids4Foam` solver. After the solver has finished, a `force.pdf` plot is generated if the `gnuplot` program is installed. 
+
+where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
+case to make it compatible with your version of OpenFOAM/foam-extend. As can be
+seen, the mesh in the fluent format is converted to the OpenFOAM format before
+running the `solids4Foam` solver. After the solver has finished, a `force.pdf`
+plot is generated if the `gnuplot` program is installed.
 
 ```tip
-Remmber that a tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
+Remember that a tutorial case can be cleaned and reset using the included
+`Allrun` script, i.e. `> ./Allclean`.
 ```
 
 ---
 
 ## Analysing the Results
 
-In the ParaView, a [von Kármán vortex street](https://en.wikipedia.org/wiki/Kármán_vortex_street) is clearly visible by viewing the pressure field `p`:
-![](images/flu_run_1.PNG)
+In the ParaView, a [von Kármán vortex street](https://en.wikipedia.org/wiki/Kármán_vortex_street)
+is clearly visible by viewing the pressure field `p`:
 
-
----
-
-# Delving Deeper
+![Flow over a cylinder pressure field](images/flu_run_1.PNG)
+**Pressure field**
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out another tutorial.
+## Delving Deeper
 
 ---
 
-## Case Structure
+If you would like to learn more about the case, then please continue; if not,
+how about you check out another tutorial.
+
+---
+
+### Case Structure
 
 The case follows the typical `pimpleFoam` (or `pimpleDyMFoam`) case structure:
 
-```
+```plaintext
 cylinderInChannel
 ├── 0
 │   ├── U
@@ -128,16 +164,22 @@ cylinderInChannel
     ├── fvSchemes
     └── fvSolution
 ```
-The only difference with a `pimpleFoam` case is that a `constant/physicsProperties` dictionary must be present, where the type of analysis is specified:
-```
+
+The only difference with a `pimpleFoam` case is that a
+`constant/physicsProperties` dictionary must be present, where the type of
+analysis is specified:
+
+```c++
 type     fluid;
 //type   solid;
 //type   fluidSolidInteraction;
 ```
 
-In addition, as this is a "fluid" analysis, a `constant/fluidProperties` dictionary must also be present, where the PIMPLE algorithm for an incompressible isothermal fluid is specified:
+In addition, as this is a "fluid" analysis, a `constant/fluidProperties`
+dictionary must also be present, where the PIMPLE algorithm for an
+incompressible isothermal fluid is specified:
 
-```
+```c++
 fluidModel pimpleFluid;
 
 pimpleFluidCoeffs
@@ -145,21 +187,30 @@ pimpleFluidCoeffs
 ```
 
 ```note
-The `pimpleFluid` fluid model does not require any settings to be specified. Parameters related to the PIMPLE algorithm as instead specified in `system/fvSolution`, just like for the `pimpleFoam` solver.
+The `pimpleFluid` fluid model does not require any settings to be specified.
+Parameters related to the PIMPLE algorithm as instead specified in
+`system/fvSolution`, just like for the `pimpleFoam` solver.
 ```
 
-Apart from specifying the `physicsProperties` and `fluidProperties` dictionaries, the case is equivalent to a standard `pimpleFOAM` case, e.g. in terms of `transportProperties`, `RASProperties`, `dynamicMeshDict`, `U`, `p`, `fvSchemes`, etc.
+Apart from specifying the `physicsProperties` and `fluidProperties`
+dictionaries, the case is equivalent to a standard `pimpleFOAM` case, e.g. in
+terms of `transportProperties`, `RASProperties`, `dynamicMeshDict`, `U`, `p`,
+`fvSchemes`, etc.
 
 ---
 
-## Code
+### Code: `fluidModel`
 
-### `fluidModel`
-
-For the `cylinderInChannel` test case, we have selected a “fluid” analysis in the `physicsProperties` dictionary: this means a `fluidModel` class will be selected; then, we specify the actual `solidModel` class to be the `pimpleFluid` class.
+For the `cylinderInChannel` test case, we have selected a “fluid” analysis in
+the `physicsProperties` dictionary: this means a `fluidModel` class will be
+selected; then, we specify the actual `solidModel` class to be the `pimpleFluid`
+class.
 
 The code for the pimpleFluid class is located at:
-```
+
+```bash
 solids4foam/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.C
 ```
-and this code directly ports the `pimpleFoam` solver code; in particular, see the `evolve()` function with `pimpleFluid.C`.
+
+and this code directly ports the `pimpleFoam` solver code; in particular, see
+the `evolve()` function with `pimpleFluid.C`.
