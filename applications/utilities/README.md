@@ -137,6 +137,11 @@ When using `addTinyPatch` the original mesh is overwritten!
   factor is a vector to allow different scalings in different directions; for
   example, for 2-D, the Z component should be set to 0.0.
 
+  If checkMesh fails after moving the points, the local motion is reduced by
+  the factor beta (defaults to 0.8) and the motion is performed again. The
+  maximum number of corrections iterations is set with maxIter (defaults to
+  1000).
+
   This utility is useful for creating distorted grids for testing
   discretisations.
 
@@ -170,6 +175,14 @@ When using `addTinyPatch` the original mesh is overwritten!
   (
       // Add patch names here
   );
+
+  // Optional: maximum number of corrections iterations
+  // Defaults to 1000
+  //maxIter 1000;
+
+  // Optional: local motion rescale factor for applying corrections
+  // Defaults to 0.8
+  //beta 0.8;
   ```
 
   The `Gaussian` distribution can only be used in combination with

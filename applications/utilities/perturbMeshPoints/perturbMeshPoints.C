@@ -35,6 +35,11 @@ Description
     different scalings in different directions; for example, for 2-D, the Z
     component should be set to 0.0.
 
+    If checkMesh fails after moving the points, the local motion is reduced by
+    the factor beta (defaults to 0.8) and the motion is performed again. The
+    maximum number of corrections iterations is set with maxIter (defaults to
+    1000).
+
     This utility is useful for creating distorted grids for testing
     discretisations.
 
@@ -221,6 +226,8 @@ int main(int argc, char *argv[])
     const scalar seed(readScalar(perturbDict.lookup("seed")));
     const vector scaleFactor(perturbDict.lookup("scaleFactor"));
     const wordList fixedPatchesList(perturbDict.lookup("fixedPatches"));
+    const scalar beta(perturbDict.lookupOrDefault("beta", 0.8));
+    const int maxIter(perturbDict.lookupOrDefault("maxIter", 1000));
 #ifdef OPENFOAM_COM
     const scalar minCos(readScalar(perturbDict.lookup("minCos")));
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
@@ -236,14 +243,13 @@ int main(int argc, char *argv[])
     // Create random number generator
     Random rnd(seed);
 
-    // Calculate new points
+    // Store original points
     const pointField oldPoints = mesh.points();
-    pointField newPoints(mesh.points());
 
     // Calculate the minimum edge length connected to each point
     const labelListList& pointEdges = mesh.pointEdges();
     const edgeList& edges = mesh.edges();
-    scalarField minEdgeLength(newPoints.size(), GREAT);
+    scalarField minEdgeLength(oldPoints.size(), GREAT);
     forAll(minEdgeLength, pI)
     {
         const labelList& curPointEdges = pointEdges[pI];
@@ -260,7 +266,7 @@ int main(int argc, char *argv[])
     }
 
     // Calculate a mask to identify fixed points
-    boolList fixedPoint(newPoints.size(), false);
+    boolList fixedPoint(oldPoints.size(), false);
     forAll(mesh.boundary(), patchI)
     {
         const word& patchName = mesh.boundary()[patchI].name();
@@ -300,68 +306,142 @@ int main(int argc, char *argv[])
     }
 #endif // OPENFOAM_COM
 
-    forAll(newPoints, pointI)
+    // Perform loop
+    //     1. Apply mesh motion based on the scaled local minimum edge length
+    //     2. If checkMesh fails, reduce the local minimum edge length by the
+    //        factor beta (e.g., beta = 0.8)
+    //     3. Exit loop if checkMesh passes or the maximum number of iterations
+    //        is reached
+    bool checkMeshFailed = false;
+    int iter = 0;
+    do
     {
-        if (!fixedPoint[pointI])
+        // Calculate new points
+        pointField newPoints(oldPoints);
+
+        forAll(newPoints, pointI)
         {
-#ifdef OPENFOAM_COM
-            if (Gaussian)
+            if (!fixedPoint[pointI])
             {
-                // Gaussian distribution
-                newPoints[pointI] +=
-                    minEdgeLength[pointI]
-                   *vector
-                    (
-                        scaleFactor.x()*rnd.GaussNormal<scalar>(),
-                        scaleFactor.y()*rnd.GaussNormal<scalar>(),
-                        scaleFactor.z()*rnd.GaussNormal<scalar>()
-                    );
-            }
-            else
-#endif
-            {
-                // Uniform distribution
-                newPoints[pointI] +=
-                    minEdgeLength[pointI]
-                   *vector
-                    (
-#ifdef FOAMEXTEND
-                        scaleFactor.x()*(2.0*rnd.scalar01() - 1.0),
-                        scaleFactor.y()*(2.0*rnd.scalar01() - 1.0),
-                        scaleFactor.z()*(2.0*rnd.scalar01() - 1.0)
-#else
-                        scaleFactor.x()*(2.0*rnd.sample01<scalar>() - 1.0),
-                        scaleFactor.y()*(2.0*rnd.sample01<scalar>() - 1.0),
-                        scaleFactor.z()*(2.0*rnd.sample01<scalar>() - 1.0)
-#endif
-                    );
+    #ifdef OPENFOAM_COM
+                if (Gaussian)
+                {
+                    // Gaussian distribution
+                    newPoints[pointI] +=
+                        minEdgeLength[pointI]
+                       *vector
+                        (
+                            scaleFactor.x()*rnd.GaussNormal<scalar>(),
+                            scaleFactor.y()*rnd.GaussNormal<scalar>(),
+                            scaleFactor.z()*rnd.GaussNormal<scalar>()
+                        );
+                }
+                else
+    #endif
+                {
+                    // Uniform distribution
+                    newPoints[pointI] +=
+                        minEdgeLength[pointI]
+                       *vector
+                        (
+    #ifdef FOAMEXTEND
+                            scaleFactor.x()*(2.0*rnd.scalar01() - 1.0),
+                            scaleFactor.y()*(2.0*rnd.scalar01() - 1.0),
+                            scaleFactor.z()*(2.0*rnd.scalar01() - 1.0)
+    #else
+                            scaleFactor.x()*(2.0*rnd.sample01<scalar>() - 1.0),
+                            scaleFactor.y()*(2.0*rnd.sample01<scalar>() - 1.0),
+                            scaleFactor.z()*(2.0*rnd.sample01<scalar>() - 1.0)
+    #endif
+                        );
+                }
             }
         }
-    }
 
-    // Remove the normal component on boundary patches
-    forAll(mesh.boundary(), patchI)
-    {
-        const pointField& pointNormals =
-            mesh.boundaryMesh()[patchI].pointNormals();
-        const labelList& meshPoints = mesh.boundaryMesh()[patchI].meshPoints();
-
-        forAll(pointNormals, pI)
+        // Remove the normal component on boundary patches
+        forAll(mesh.boundary(), patchI)
         {
-            const vector& n = pointNormals[pI];
-            const label pointID = meshPoints[pI];
-            const vector disp = newPoints[pointID] - oldPoints[pointID];
+            const pointField& pointNormals =
+                mesh.boundaryMesh()[patchI].pointNormals();
+            const labelList& meshPoints = mesh.boundaryMesh()[patchI].meshPoints();
 
-            newPoints[pointID] = oldPoints[pointID] + ((I - sqr(n)) & disp);
+            forAll(pointNormals, pI)
+            {
+                const vector& n = pointNormals[pI];
+                const label pointID = meshPoints[pI];
+                const vector disp = newPoints[pointID] - oldPoints[pointID];
+
+                newPoints[pointID] = oldPoints[pointID] + ((I - sqr(n)) & disp);
+            }
+        }
+
+        // Correct points for 2-D
+        twoDPointCorrector twoD(mesh);
+        twoD.correctPoints(newPoints);
+
+        // Move the mesh
+        Info<< "Applying the perturbation to the points" << endl;
+        mesh.movePoints(newPoints);
+        mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
+
+        checkMeshFailed = mesh.checkMesh(false);
+
+        if (checkMeshFailed)
+        {
+            Info<< iter << ": checkMesh failed: reducing the local minimum edge "
+                "length by " << beta << endl;
+
+            // Mark all negative cell volumes
+            const scalarField& VI = mesh.V();
+            boolList negativeCellVol(VI.size(), false);
+            int nNegCellVol = 0;
+            forAll(VI, cellI)
+            {
+                if (VI[cellI] < VSMALL)
+                {
+                    negativeCellVol[cellI] = true;
+                    ++nNegCellVol;
+                }
+            }
+            Info<< "    Number of cells with negative volumes = " << nNegCellVol
+                << endl;
+
+            // Reduce the minEdgeLength for all points, which are contained in
+            // a negative volume cell
+            const labelListList& pointCells = mesh.pointCells();
+            forAll(minEdgeLength, pI)
+            {
+                const labelList& curPointCells = pointCells[pI];
+                bool negVol = false;
+                forAll(curPointCells, pcI)
+                {
+                    const label cellID = curPointCells[pcI];
+
+                    if (negativeCellVol[cellID])
+                    {
+                        negVol = true;
+                        break;
+                    }
+                }
+
+                if (negVol)
+                {
+                    // Update the minEdgeLength for this point
+                    minEdgeLength[pI] *= beta;
+                }
+            }
+        }
+
+        if (iter == maxIter)
+        {
+            FatalError
+                << "Maximum mesh correction steps reached, but the mesh is "
+                << "still failing checkMesh" << nl
+                << "You can try to increase maxIter or reduce scalarFactor"
+                << abort(FatalError);
         }
     }
-
-    // Correct points for 2-D
-    twoDPointCorrector twoD(mesh);
-    twoD.correctPoints(newPoints);
-
-    // Move the mesh
-    mesh.movePoints(newPoints);
+    while (checkMeshFailed && iter++ < maxIter);
 
     // Write the mesh
     Info<< "Writing the mesh" << endl;

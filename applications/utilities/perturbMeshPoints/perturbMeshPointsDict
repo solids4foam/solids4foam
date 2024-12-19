@@ -35,4 +35,12 @@ fixedPatches
     // Add patch names here
 );
 
+// Optional: maximum number of corrections iterations
+// Defaults to 1000
+//maxIter 1000;
+
+// Optional: local motion rescale factor for applying corrections
+// Defaults to 0.8
+//beta 0.8;
+
 // ************************************************************************* //
