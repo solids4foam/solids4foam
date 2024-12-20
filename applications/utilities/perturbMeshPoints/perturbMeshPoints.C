@@ -53,6 +53,8 @@ Author
 #include "argList.H"
 #include "Random.H"
 #include "twoDPointCorrector.H"
+#include "primitiveMeshTools.H"
+#include "unitConversion.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -199,6 +201,38 @@ void calcFeatures
 
 #endif // OPENFOAM_COM
 
+
+// Modified form OpenFOAM-v2312 primitiveMeshCheck.C
+label numSevereNonOrthoFaces(const fvMesh& mesh)
+{
+    // Calculate the mesh orthogonality
+    tmp<scalarField> tortho = primitiveMeshTools::faceOrthogonality
+    (
+        mesh,
+        mesh.faceAreas(),
+        mesh.cellCentres()
+    );
+    const scalarField& ortho = tortho();
+
+    // Severe nonorthogonality threshold
+    const scalar nonOrthThreshold = 70;
+    const scalar severeNonorthogonalityThreshold =
+        ::cos(degToRad(nonOrthThreshold));
+
+    label severeNonOrth = 0;
+
+    forAll(ortho, facei)
+    {
+        if (ortho[facei] < severeNonorthogonalityThreshold)
+        {
+            severeNonOrth++;
+        }
+    }
+
+    return severeNonOrth;
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -224,7 +258,7 @@ int main(int argc, char *argv[])
     );
 
     // Read inputs
-    const scalar seed(readScalar(perturbDict.lookup("seed")));
+    const int seed(readInt(perturbDict.lookup("seed")));
     const vector scaleFactor(perturbDict.lookup("scaleFactor"));
     const wordList fixedPatchesList(perturbDict.lookup("fixedPatches"));
     const scalar beta(perturbDict.lookupOrDefault("beta", 0.8));
@@ -252,6 +286,12 @@ int main(int argc, char *argv[])
     // We will not allow the volume of each cell to become less than this
     const scalarField minV(minCellVol*mesh.V());
 
+    // Calculate and store a copy of the mesh indexing as this will not change
+    // and we don't want to recalculate it
+    const labelListList cellCells(mesh.cellCells());
+    const labelListList pointCells(mesh.pointCells());
+    const labelListList pointPoints(mesh.pointPoints());
+
     // Calculate the minimum edge length connected to each point
     const labelListList& pointEdges = mesh.pointEdges();
     const edgeList& edges = mesh.edges();
@@ -270,6 +310,9 @@ int main(int argc, char *argv[])
 
         minEdgeLength[pI] = minLen;
     }
+
+    // Store the original minEdgeLength
+    const scalarField oldMinEdgeLength(minEdgeLength);
 
     // Calculate a mask to identify fixed points
     boolList fixedPoint(oldPoints.size(), false);
@@ -320,6 +363,7 @@ int main(int argc, char *argv[])
     //        is reached
     bool validMesh = false;
     int iter = 0;
+    int nRndReset = 0;
     do
     {
         Info<< "Iteration = " << iter << endl;
@@ -371,7 +415,8 @@ int main(int argc, char *argv[])
         {
             const pointField& pointNormals =
                 mesh.boundaryMesh()[patchI].pointNormals();
-            const labelList& meshPoints = mesh.boundaryMesh()[patchI].meshPoints();
+            const labelList& meshPoints =
+                mesh.boundaryMesh()[patchI].meshPoints();
 
             forAll(pointNormals, pI)
             {
@@ -411,22 +456,60 @@ int main(int argc, char *argv[])
             }
         }
 
-        validMesh = bool((nNegCellVol + nSmallCellVol) == 0);
+        // Check if there are any severely non-orthogonal faces
+        const label nNonOrthoFaces = numSevereNonOrthoFaces(mesh);
+
+        // A valid mesh has no negative or small volumes and no severely
+        // non-orthogonal faces
+        validMesh = bool((nNegCellVol + nSmallCellVol + nNonOrthoFaces) == 0);
 
         if (validMesh)
         {
-            Info<< "    There are no negative or small cell volumes" << endl;
+            Info<< "    There are no negative or small cell volumes or "
+                << "severely non-orthogonal faces" << endl;
         }
         else
         {
-            Info<< "    Number of cells with negative volumes = " << nNegCellVol
+            Info<< "    Number of cells with negative volumes: " << nNegCellVol
                 << nl
-                << "    Number of cells with small volumes = " << nSmallCellVol
+                << "    Number of cells with small volumes: " << nSmallCellVol
+                << nl
+                << "    Number of severely non-orthogonal faces: "
+                << nNonOrthoFaces
                 << endl;
+
+            // Expand the negativeCellVol marker field by layers of neighbours
+            // This will more quickly fix bad cells, and may be required in some
+            // case, e.g., a cell may be bad because neighbouring cells have
+            // moved in a way that makes it bad
+            // We will determine the number of layers based on the number of
+            // iteration
+            const label nFreq = 1;
+            const label maxLayers = 100;
+            const label nLayers = min(iter/nFreq + 1, maxLayers);
+            Info<< "    Expanding the smoothing region by " << nLayers
+                << " layers" << endl;
+            for (label layerI = 0; layerI < nLayers; ++layerI)
+            {
+                // Take a copy of the negative volume field
+                const boolList oldNegativeCellVol(negativeCellVol);
+                forAll(oldNegativeCellVol, cI)
+                {
+                    if (oldNegativeCellVol[cI])
+                    {
+                        const labelList& curCellCells = cellCells[cI];
+                        forAll(curCellCells, ccI)
+                        {
+                            const label neiCellID = curCellCells[ccI];
+                            negativeCellVol[neiCellID] = true;
+                        }
+                    }
+                }
+            }
 
             // Reduce the minEdgeLength for all points, which are contained in
             // a negative volume cell
-            const labelListList& pointCells = mesh.pointCells();
+            boolList minEdgeLengthUpdated(minEdgeLength.size(), false);
             forAll(minEdgeLength, pI)
             {
                 const labelList& curPointCells = pointCells[pI];
@@ -445,17 +528,65 @@ int main(int argc, char *argv[])
                 if (negVol)
                 {
                     // Update the minEdgeLength for this point
-                    minEdgeLength[pI] *= beta;
+                    if (!minEdgeLengthUpdated[pI])
+                    {
+                        minEdgeLength[pI] *= beta;
+                        minEdgeLengthUpdated[pI] = true;
+                    }
+
+                    // Update the minEdgeLength for the neighbouring points
+                    // const labelList& curPointPoints = pointPoints[pI];
+                    // forAll(curPointPoints, ppI)
+                    // {
+                    //     const label curPointID = curPointPoints[ppI];
+                    //     if (!minEdgeLengthUpdated[curPointID])
+                    //     {
+                    //         minEdgeLength[curPointID] *= beta;
+                    //         minEdgeLengthUpdated[curPointID] = true;
+                    //     }
+
+                    //     // Update the minEdgeLength for the second neighbours
+                    //     // const labelList& secondPointPoints =
+                    //     //     pointPoints[curPointID];
+                    //     // forAll(secondPointPoints, sppI)
+                    //     // {
+                    //     //     const label secondPointID = secondPointPoints[sppI];
+                    //     //     if (!minEdgeLengthUpdated[secondPointID])
+                    //     //     {
+                    //     //         minEdgeLength[secondPointID] *= beta;
+                    //     //         minEdgeLengthUpdated[secondPointID] = true;
+                    //     //     }
+                    //     // }
+                    // }
                 }
             }
 
             if (iter == maxIter)
             {
-                FatalError
-                    << "Maximum mesh correction steps reached, but the mesh is "
-                    << "still failing checkMesh" << nl
-                    << "You can try to increase maxIter or reduce scalarFactor"
-                    << abort(FatalError);
+                if (nRndReset++ == 10)
+                {
+                    FatalError
+                        << "Maximum mesh correction and seed reset steps "
+                        << "reached, but the mesh is still invalid."
+                        << abort(FatalError);
+                }
+                else
+                {
+                    Warning
+                        << "Maximum mesh correction steps reached, but the mesh "
+                        << "is still invalid" << endl;
+
+                    Info<< "Resetting the random number generator seed" << endl;
+
+                    // Change the seed for the random number generator
+                    rnd.reset(seed + 1);
+
+                    // Reset minEdgeLength
+                    minEdgeLength = oldMinEdgeLength;
+
+                    // Reset iter
+                    iter = 0;
+                }
             }
         }
     }
