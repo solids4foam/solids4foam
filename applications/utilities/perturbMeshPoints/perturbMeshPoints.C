@@ -35,10 +35,11 @@ Description
     different scalings in different directions; for example, for 2-D, the Z
     component should be set to 0.0.
 
-    If checkMesh fails after moving the points, the local motion is reduced by
-    the factor beta (defaults to 0.8) and the motion is performed again. The
-    maximum number of corrections iterations is set with maxIter (defaults to
-    1000).
+    If there are negative or small cell volumes after moving the points, the
+    local motion is reduced by the factor beta (defaults to 0.8) and the motion
+    is performed again. The maximum number of corrections iterations is set with
+    maxIter (defaults to 1000). A small volume is defined as the factor
+    minCellVol (defaults to 0.1) times the original cel volume.
 
     This utility is useful for creating distorted grids for testing
     discretisations.
@@ -228,6 +229,7 @@ int main(int argc, char *argv[])
     const wordList fixedPatchesList(perturbDict.lookup("fixedPatches"));
     const scalar beta(perturbDict.lookupOrDefault("beta", 0.8));
     const int maxIter(perturbDict.lookupOrDefault("maxIter", 1000));
+    const scalar minCellVol(perturbDict.lookupOrDefault("minCellVol", 0.1));
 #ifdef OPENFOAM_COM
     const scalar minCos(readScalar(perturbDict.lookup("minCos")));
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
@@ -245,6 +247,10 @@ int main(int argc, char *argv[])
 
     // Store original points
     const pointField oldPoints = mesh.points();
+
+    // Store the original cell volumes times the minCellVol factor (e.g. 0.1)
+    // We will not allow the volume of each cell to become less than this
+    const scalarField minV(minCellVol*mesh.V());
 
     // Calculate the minimum edge length connected to each point
     const labelListList& pointEdges = mesh.pointEdges();
@@ -312,10 +318,12 @@ int main(int argc, char *argv[])
     //        factor beta (e.g., beta = 0.8)
     //     3. Exit loop if checkMesh passes or the maximum number of iterations
     //        is reached
-    bool checkMeshFailed = false;
+    bool validMesh = false;
     int iter = 0;
     do
     {
+        Info<< "Iteration = " << iter << endl;
+
         // Calculate new points
         pointField newPoints(oldPoints);
 
@@ -384,26 +392,36 @@ int main(int argc, char *argv[])
         mesh.movePoints(newPoints);
         mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
 
-        checkMeshFailed = mesh.checkMesh(false);
-
-        if (checkMeshFailed)
+        // Check for negative or small cell volumes
+        const scalarField& VI = mesh.V();
+        boolList negativeCellVol(VI.size(), false);
+        int nNegCellVol = 0;
+        int nSmallCellVol = 0;
+        forAll(VI, cellI)
         {
-            Info<< iter << ": checkMesh failed: reducing the local minimum edge "
-                "length by " << beta << endl;
-
-            // Mark all negative cell volumes
-            const scalarField& VI = mesh.V();
-            boolList negativeCellVol(VI.size(), false);
-            int nNegCellVol = 0;
-            forAll(VI, cellI)
+            if (VI[cellI] < VSMALL)
             {
-                if (VI[cellI] < VSMALL)
-                {
-                    negativeCellVol[cellI] = true;
-                    ++nNegCellVol;
-                }
+                negativeCellVol[cellI] = true;
+                ++nNegCellVol;
             }
+            else if (VI[cellI] < minV[cellI])
+            {
+                negativeCellVol[cellI] = true;
+                ++nSmallCellVol;
+            }
+        }
+
+        validMesh = bool((nNegCellVol + nSmallCellVol) == 0);
+
+        if (validMesh)
+        {
+            Info<< "    There are no negative or small cell volumes" << endl;
+        }
+        else
+        {
             Info<< "    Number of cells with negative volumes = " << nNegCellVol
+                << nl
+                << "    Number of cells with small volumes = " << nSmallCellVol
                 << endl;
 
             // Reduce the minEdgeLength for all points, which are contained in
@@ -430,18 +448,18 @@ int main(int argc, char *argv[])
                     minEdgeLength[pI] *= beta;
                 }
             }
-        }
 
-        if (iter == maxIter)
-        {
-            FatalError
-                << "Maximum mesh correction steps reached, but the mesh is "
-                << "still failing checkMesh" << nl
-                << "You can try to increase maxIter or reduce scalarFactor"
-                << abort(FatalError);
+            if (iter == maxIter)
+            {
+                FatalError
+                    << "Maximum mesh correction steps reached, but the mesh is "
+                    << "still failing checkMesh" << nl
+                    << "You can try to increase maxIter or reduce scalarFactor"
+                    << abort(FatalError);
+            }
         }
     }
-    while (checkMeshFailed && iter++ < maxIter);
+    while (!validMesh && iter++ < maxIter);
 
     // Write the mesh
     Info<< "Writing the mesh" << endl;

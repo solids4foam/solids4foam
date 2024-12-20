@@ -43,4 +43,8 @@ fixedPatches
 // Defaults to 0.8
 //beta 0.8;
 
+// Optional: local minimum allow cell volume relative to the initial volume
+// Defaults to 0.1
+//minCellVol 0.1;
+
 // ************************************************************************* //
