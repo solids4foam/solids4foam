@@ -158,7 +158,7 @@ void gradientSchemes::distanceMatrixLocal
         {
             continue;
         }
-        
+
         forAll(mesh_.boundary()[patchID], facei)
         {
             const label& bCellID =
@@ -466,7 +466,7 @@ volTensorField gradientSchemes::localGradient
         {
             continue;
         }
-        
+
         forAll(mesh_.boundary()[patchID], facei)
         {
             const label& bCellID =
@@ -570,7 +570,7 @@ void gradientSchemes::reconstruct
         {
             continue;
         }
-        
+
         forAll(mesh_.boundaryMesh()[patchID],facei)
         {
             const label& bCellID =
@@ -614,7 +614,7 @@ void gradientSchemes::reconstruct
         {
             continue;
         }
-        
+
         forAll(mesh_.boundaryMesh()[patchID], facei)
         {
             const label& bCellID =
@@ -706,7 +706,7 @@ void gradientSchemes::reconstruct
         {
             continue;
         }
-        
+
         forAll(mesh_.boundaryMesh()[patchID], facei)
         {
             const label& bCellID =

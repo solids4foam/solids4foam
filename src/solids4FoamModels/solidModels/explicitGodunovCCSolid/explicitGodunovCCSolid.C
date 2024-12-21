@@ -44,7 +44,7 @@ bool explicitGodunovCCSolid::converged
     const int iCorr,
     const dimensionedScalar pDeltaT,
     const GeometricField<vector, fvPatchField, volMesh>& vf
-)  
+)
 {
     // We will check three residuals:
     // - relative linear momentum residual
@@ -69,7 +69,7 @@ bool explicitGodunovCCSolid::converged
 
     if (denom < SMALL)
     {
-        denom = 
+        denom =
         max
         (
             gMax
@@ -83,7 +83,7 @@ bool explicitGodunovCCSolid::converged
             SMALL
         );
     }
-    
+
     const scalar residualvf =
         gMax
         (
@@ -145,7 +145,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     (
         IOobject
         (
-            "mechanicalProperties", 
+            "mechanicalProperties",
             runTime.constant(),
             mesh(),
             IOobject::MUST_READ_IF_MODIFIED,
@@ -164,19 +164,19 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
             IOobject::NO_WRITE
         )
     ),
- 
+
     incompressibilityCoefficient_
     (
         solidModelDict().lookupOrAddDefault<scalar>("incompressiblilityCoefficient", 1)
     ),
 
     beta_(incompressibilityCoefficient_),
-   
+
     angularMomentumConservation_
     (
         solidModelDict().lookupOrAddDefault<word>("angularMomentumConservation", "no")
     ),
-    
+
 //-----------------------------------------------------------------
 
     op_(mesh()),
@@ -184,9 +184,9 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     Sf_(mesh().Sf()),
     h_(op_.minimumEdgeLength()),
 
-    // Creating mesh coordinate fields 
+    // Creating mesh coordinate fields
     C_(mesh().C()),
-    
+
     x_
     (
         IOobject("x", mesh()),
@@ -204,11 +204,11 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         pMesh(),
         dimensionedVector("xN", dimensionSet(0,1,0,0,0,0,0), vector::zero)
     ),
-   
+
     XN_(xN_),
-    
+
     xF_(mesh().Cf()),
-    
+
     // Creating mesh normal fields
     N_((Sf_ / mesh().magSf()).ref()),
     n_(N_),
@@ -257,21 +257,21 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         IOobject("J", mesh()),
         det(F_)
     ),
-    
+
     // Creating constitutive model
     model_
     (
         F_,
         mechanicalProperties_
     ),
-    
+
     rho_(model_.density()),
     p_(model_.pressure()),
     P_(model_.piola()),
     Px_(op_.decomposeTensorX(P_)),
     Py_(op_.decomposeTensorY(P_)),
     Pz_(op_.decomposeTensorZ(P_)),
-    
+
     mech_
     (
         F_,
@@ -283,7 +283,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         IOobject("Up", mesh()),
         mesh(),
         model_.Up()/beta_
-    ),    
+    ),
 
     Up_time_
     (
@@ -374,7 +374,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     // Local gradient of cell-averaged linear momentum
     lmRgrad_(grad_.localGradient(lmR_, lmC_)),
 
-    
+
     // Creating fields for angular momentum
     // Angular momentum class
     am_(mesh(), mechanicalProperties_),
@@ -410,14 +410,14 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
 
     // Time increment
     deltaT_(
-        "deltaT", 
-        dimTime, 
+        "deltaT",
+        dimTime,
         runTime.deltaTValue()
     ),
-    // Time increment 
+    // Time increment
     pDeltaT_(
-        "pDeltaT", 
-        dimTime, 
+        "pDeltaT",
+        dimTime,
         runTime.deltaTValue()
     ),
 
@@ -475,7 +475,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
 
     // Print centroid of geometry
     mech_.printCentroid();
-    #include "updateVariables.H"   
+    #include "updateVariables.H"
     #include "riemannSolver.H"
 
     x_.oldTime();
@@ -519,7 +519,7 @@ bool explicitGodunovCCSolid::evolve()
         {
             Info<< "Evolving solid solver form explicitGodunovCCSolid" << endl;
         }
-        
+
         // Pseudo time loop (Correction loop)
         do
         {
@@ -531,7 +531,7 @@ bool explicitGodunovCCSolid::evolve()
 
             F_.storePrevIter();
             lm_.storePrevIter();
-            xN_.storePrevIter();            
+            xN_.storePrevIter();
 
             mech_.time(runTime_, pDeltaT_, max(Up_time_));
 
@@ -553,7 +553,7 @@ bool explicitGodunovCCSolid::evolve()
 
             lm_ = 0.5*(lm_.prevIter() + lm_);
             F_ = 0.5*(F_.prevIter() + F_);
-            xN_ = 0.5*(xN_.prevIter() + xN_);            
+            xN_ = 0.5*(xN_.prevIter() + xN_);
 
             #include "updateVariables.H"
 
@@ -570,16 +570,16 @@ bool explicitGodunovCCSolid::evolve()
                 )
          && ++iCorr < nCorr()
         );
-        
+
         // Update the stress field based on the latest D field
         sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 
         // Increment of point displacement
         pointDD() = pointD() - pointD().oldTime();
- 
+
     }
     while (mesh().update());
-  
+
     return true;
 }
 

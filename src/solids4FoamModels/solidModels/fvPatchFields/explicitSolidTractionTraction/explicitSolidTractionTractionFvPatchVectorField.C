@@ -198,7 +198,7 @@ explicitSolidTractionTractionFvPatchVectorField
     {
         Info<< "    relaxation factor: " << relaxFac_ << endl;
     }
-   
+
     updateCoeffs();
 
 }

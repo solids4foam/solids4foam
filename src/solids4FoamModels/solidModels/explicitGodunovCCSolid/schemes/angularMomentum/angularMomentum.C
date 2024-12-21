@@ -60,7 +60,7 @@ void angularMomentum::AMconservation
     GeometricField<vector, fvPatchField, volMesh>& rhsLm1,
     const GeometricField<vector, fvPatchField, volMesh>& rhsAm,
     const scalar& RKstage,
-    const dimensionedScalar& pDeltaT 
+    const dimensionedScalar& pDeltaT
 ) const
 {
     const scalarField& V_ = mesh_.V();

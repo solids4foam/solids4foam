@@ -23,14 +23,14 @@ Original Authors
     https://github.com/jibranhaider/explicitSolidDynamics/
 
 Modifications by
-    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov 
-    scheme for solid mechanics as part of the solids4foam project. 
-    Additional modifications include the integration of a dual-time stepping 
-    algorithm. 
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov
+    scheme for solid mechanics as part of the solids4foam project.
+    Additional modifications include the integration of a dual-time stepping
+    algorithm.
 
-    Note: The angular momentum algorithm has not been adapted to the new 
-    time discretization scheme. As a result, it may not provide accurate 
-    solutions if used in its current form. 
+    Note: The angular momentum algorithm has not been adapted to the new
+    time discretization scheme. As a result, it may not provide accurate
+    solutions if used in its current form.
 
 Class
     explicitGodunovCCSolid
@@ -79,37 +79,37 @@ class explicitGodunovCCSolid
     // Private data
         Time& runTime_;
 
-    // Reading dictionaries 
+    // Reading dictionaries
     // Mechanical properties
     IOdictionary mechanicalProperties_;
 
     // Control dictionary
     IOdictionary controlDict_;
 
-    scalar incompressibilityCoefficient_; 
+    scalar incompressibilityCoefficient_;
     // Stabilisation parameter for near incompressibility
     const scalar& beta_;
 
     // Angular momentum conservation
     const word angularMomentumConservation_;
 
-    //Creating mesh parameters 
+    //Creating mesh parameters
 
     // Mesh-related fields
     operations op_;
 
     // Point mesh
-    // pointMesh pMesh(mesh); // available pMesh() 
+    // pointMesh pMesh(mesh); // available pMesh()
 
     // Material face area
     const surfaceScalarField& magSf_;
 
     // Material face area normal vector
     const surfaceVectorField& Sf_;
-    
+
     // Minimum edge length
     const dimensionedScalar h_;
-  
+
     //Creating mesh coordinate fields
 
     // Material cell center coordinates
@@ -124,7 +124,7 @@ class explicitGodunovCCSolid
     pointVectorField xN_;
 
     // Material nodal coordinates
-    pointVectorField XN_;   
+    pointVectorField XN_;
 
     // Spatial face center coordinates
     surfaceVectorField xF_;
@@ -144,7 +144,7 @@ class explicitGodunovCCSolid
     // Nodal linear momentum
     pointVectorField lmN_;
 
-    //Creating strain measure fields 
+    //Creating strain measure fields
 
     // Deformation gradient tensor
     volTensorField F_;
@@ -186,7 +186,7 @@ class explicitGodunovCCSolid
     // Shear wave speed
     volScalarField Us_;
 
-    // Creating fields for gradient  
+    // Creating fields for gradient
     // Gradient class
     gradientSchemes grad_;
 
@@ -198,7 +198,7 @@ class explicitGodunovCCSolid
     volTensorField PyGrad_;
     volTensorField PzGrad_;
 
-    //Creating fields for reconstruction 
+    //Creating fields for reconstruction
     // Reconstruction of linear momentum
     surfaceVectorField lm_M_;
     surfaceVectorField lm_P_;
@@ -253,7 +253,7 @@ class explicitGodunovCCSolid
     // Nodal displacement field
     pointVectorField uN_;
 
-    //Creating variables for time 
+    //Creating variables for time
     // Time increment
     dimensionedScalar deltaT_;
     // Time increment (pesudo)

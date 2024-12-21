@@ -22,7 +22,7 @@ Original Authors
     https://github.com/jibranhaider/explicitSolidDynamics/
 
 Modifications by
-    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov 
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov
     scheme for solid mechanics as part of the solids4foam project.
 
 Class
@@ -97,7 +97,7 @@ public:
                 GeometricField<vector, fvPatchField, volMesh>&,
                 const GeometricField<vector, fvPatchField, volMesh>&,
                 const scalar&,
-                const dimensionedScalar& pDeltaT 
+                const dimensionedScalar& pDeltaT
             ) const;
 
         // Print

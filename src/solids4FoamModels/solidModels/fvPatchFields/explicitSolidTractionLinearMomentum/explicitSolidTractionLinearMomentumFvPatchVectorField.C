@@ -206,7 +206,7 @@ explicitSolidTractionLinearMomentumFvPatchVectorField
     {
         Info<< "    relaxation factor: " << relaxFac_ << endl;
     }
-   
+
     updateCoeffs();
 
 }
@@ -396,7 +396,7 @@ void explicitSolidTractionLinearMomentumFvPatchVectorField::updateCoeffs()
 
 
     lm_C = lm_M_ + (S_t_ & ((traction_) - t_M_));
-    
+
 
 
     this->operator==(lm_C);

@@ -31,7 +31,7 @@ if (angularMomentumConservation_ == "yes")
         // Update coordinates
         x_ += pDeltaT_*(lm_/rho_) - pDeltaT_*( (x_.prevIter() - x_.oldTime())/(deltaT_));
         xF_ += pDeltaT_*(lmC_/rho_) - pDeltaT_*( (xF_.prevIter() - xF_.oldTime())/(deltaT_));
-    }   
+    }
     else
     {
         // Update coordinates

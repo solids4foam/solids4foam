@@ -27,7 +27,7 @@ Original Authors
     Zeljko Tukovic, FSB Zagreb.
 
 Modifications by
-    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov 
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov
     scheme for solid mechanics as part of the solids4foam project.
 
 SourceFiles
