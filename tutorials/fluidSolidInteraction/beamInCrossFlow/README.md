@@ -158,7 +158,7 @@ beamInCrossFlow
     └── solid
        └── ...
 ```
-where `fluid` and `solid' sub-directories are present in the `0`, `constant` and `system` directories.
+where `fluid` and `solid` sub-directories are present in the `0`, `constant` and `system` directories.
 
 As in all solids4foam cases, the `constant/physicsProperties` dictionary must be present, where, in this case, a fluid-solid interaction analysis is specified:
 ```c++
