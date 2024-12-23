@@ -570,6 +570,31 @@ function solids4Foam::runApplication()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# getNumberOfProcessors
+#      Extract 'numberOfSubdomains' from system/decomposeParDict
+#      (or alternative location). Copied from OpenFOAM-v2012 and adapted to
+#      work with all versions.
+# Arguments:
+#     1:decomposeParDict location
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::getNumberOfProcessors()
+{
+    local dict="${1:-system/decomposeParDict}"
+
+    numberOfSubdomains=$(grep -i numberOfSubdomains "$dict" | awk '{print $2}' | sed 's/;//g')
+
+    if [ "$#" -eq 1 ]
+    then
+        echo "$numberOfSubdomains"
+    else
+        echo "Error getting 'numberOfSubdomains' from '$dict'" 1>&2
+        echo 1      # Fallback is 1 proc (serial)
+        return 1
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # runParallel
 #     runParallel that works that same irrespective of the OpenFOAM version
 #     Copied from OpenFOAM-v2012
@@ -609,7 +634,7 @@ function solids4Foam::runParallel()
                 ;;
             -decomposeParDict)
                 appArgs="$appArgs $1 $2"
-                nProcs=$(getNumberOfProcessors "$2")
+                nProcs=$(solids4Foam::getNumberOfProcessor "$2")
                 shift
                 ;;
             '')
@@ -621,7 +646,7 @@ function solids4Foam::runParallel()
         shift
     done
 
-    [ -n "$nProcs" ] || nProcs=$(getNumberOfProcessors system/decomposeParDict)
+    [ -n "$nProcs" ] || nProcs=$(solids4Foam::getNumberOfProcessors "system/decomposeParDict")
 
     appName="${appRun##*/}"
     logFile="log.$appName$logFile"

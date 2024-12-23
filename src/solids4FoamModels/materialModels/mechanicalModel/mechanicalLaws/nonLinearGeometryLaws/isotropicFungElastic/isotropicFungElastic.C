@@ -63,13 +63,13 @@ Foam::isotropicFungElastic::isotropicFungElastic
 {
     // Compute material properties
     // Shear modulus: based on pure shear stress state for hyperelasticity
-    mu() = c1_;
+    this->mu(c1_);
 
     // Bulk modulus
     // The user can specify K directly or the Poisson's ratio, nu
     if (dict.found("K"))
     {
-        K() = dimensionedScalar(dict.lookup("K"));
+        this->K(dimensionedScalar(dict.lookup("K")));
     }
     else if (dict.found("nu") && !dict.found("K"))
     {
@@ -79,7 +79,7 @@ Foam::isotropicFungElastic::isotropicFungElastic
         const volScalarField E(3.0*c1_);
 
         // Compute K based on linear elasticity
-        K() = E/(3.0*(1.0 - 2.0*nu));
+        this->K(E/(3.0*(1.0 - 2.0*nu)));
     }
     else
     {
@@ -97,8 +97,8 @@ Foam::isotropicFungElastic::isotropicFungElastic
         << "    max(K) = "  << gMax(mag(K())())  << endl;
 
     // Set surface fields
-    muf() = fvc::interpolate(mu());
-    Kf()  = fvc::interpolate(K());
+    this->muf(fvc::interpolate(mu()));
+    this->Kf(fvc::interpolate(K()));
 
     // Force the initial stress field to be created/read
     sigma0();

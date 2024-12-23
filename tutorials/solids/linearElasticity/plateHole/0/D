@@ -33,6 +33,7 @@ boundaryField
         type            analyticalPlateHoleTraction;
         farFieldTractionX 1e6;
         holeRadius      0.5;
+	value           uniform (0 0 0);
     }
     down
     {
@@ -45,6 +46,7 @@ boundaryField
         type            analyticalPlateHoleTraction;
         farFieldTractionX 1e6;
         holeRadius      0.5;
+	value		uniform (0 0 0);
     }
     hole
     {
