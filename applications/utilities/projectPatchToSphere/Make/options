@@ -1,0 +1,13 @@
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude
+
+EXE_LIBS = \
+    -lfiniteVolume \
+    -lmeshTools 
