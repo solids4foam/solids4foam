@@ -53,8 +53,10 @@ Author
 #include "argList.H"
 #include "Random.H"
 #include "twoDPointCorrector.H"
-#include "primitiveMeshTools.H"
 #include "unitConversion.H"
+#ifdef OPENFOAMM_NOT_EXTEND
+    #include "primitiveMeshTools.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -202,6 +204,8 @@ void calcFeatures
 #endif // OPENFOAM_COM
 
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 // Modified form OpenFOAM-v2312 primitiveMeshCheck.C
 label numSevereNonOrthoFaces(const fvMesh& mesh)
 {
@@ -231,6 +235,8 @@ label numSevereNonOrthoFaces(const fvMesh& mesh)
 
     return severeNonOrth;
 }
+
+#endif // OPENFOAM_NOT_EXTEND
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -459,7 +465,11 @@ int main(int argc, char *argv[])
         }
 
         // Check if there are any severely non-orthogonal faces
+#ifdef OPENFOAM_NOT_EXTEND
         const label nNonOrthoFaces = numSevereNonOrthoFaces(mesh);
+#else
+        const label nNonOrthoFaces = 0;
+#endif
 
         // A valid mesh has no negative or small volumes and no severely
         // non-orthogonal faces
