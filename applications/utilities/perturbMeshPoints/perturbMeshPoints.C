@@ -435,7 +435,9 @@ int main(int argc, char *argv[])
         // Move the mesh
         Info<< "Applying the perturbation to the points" << endl;
         mesh.movePoints(newPoints);
+        #ifdef OPENFOAM_COM
         mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
+        #endif
 
         // Check for negative or small cell volumes
         const scalarField& VI = mesh.V();
@@ -572,6 +574,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
+#ifdef OPENFOAM_COM
                     Warning
                         << "Maximum mesh correction steps reached, but the mesh "
                         << "is still invalid" << endl;
@@ -586,6 +589,11 @@ int main(int argc, char *argv[])
 
                     // Reset iter
                     iter = 0;
+#else
+                    FatalError
+                        << "Maximum mesh correction steps reached, but the mesh "
+                        << "is still invalid" << abort(FatalError);
+#endif
                 }
             }
         }
