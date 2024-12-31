@@ -1,0 +1,43 @@
+name: Update Submodule in solids4foam.github.io
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the solids4foam repository (the one triggering this action)
+      - name: Checkout solids4foam repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for accurate submodule updates
+
+      # Step 2: Clone the solids4foam.github.io repository
+      - name: Clone solids4foam.github.io repository
+        run: |
+          git clone https://github.com/solids4foam/solids4foam.github.io.git
+          cd solids4foam.github.io
+          git submodule update --init --recursive
+
+      # Step 3: Update the submodule to the latest commit on the "development" branch
+      - name: Update submodule to latest commit
+        run: |
+          cd solids4foam.github.io
+          cd imported/solids4foam
+          git fetch origin development
+          git checkout origin/development
+          cd ..
+          git add solids4foam
+          git commit -m "Aotmated update of submodule to the latest development commit"
+
+      # Step 4: Push the changes back to the solids4foam.github.io repository
+      - name: Push updated submodule
+        run: |
+          cd solids4foam.github.io
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_IO }}
