@@ -31,10 +31,10 @@ The fluid is assumed incompressible, Newtonian and isothermal, with a density of
 of 1333.3 Pa, is applied at the tube inlet for a duration of 3e-3 s. The outlet
 pressure is held at 0 Pa throughout.
 
-The tube wall is assumed an isotropic elastic body under the small-strain
+The tube wall is assumed to be an isotropic elastic body under the small-strain
 regime, modelled with Hooke's law, for consistency with the original publication
 that proposed this benchmark. The density is 1200.0 kg/m3, Young's modulus is
-300 kPa, and Poisson's ratio is 0.3.
+300 kPa and Poisson's ratio is 0.3.
 
 The case demonstrates a strong coupling between the fluid and the solid due to
 the high fluid-to-solid density ratio. When using a partitioned solution
@@ -55,14 +55,14 @@ FSI coupling:
 - **Robin-Neumann coupling**, where a Dirichlet condition is applied to the
   fluid velocity, a Robin condition to the fluid pressure, and a Neumann
   condition to the solid displacement. This approach **does** require
-  modification of the underlying fluid solver, and hence it cannot be considered
+  modification of the underlying fluid solver, and hence, it cannot be considered
   a _black-box_ coupling approach; see
   [Tuković Ž, Bukač M, Cardiff P, Jasak H, Ivanković A, 2018, Added mass
   partitioned fluid–structure interaction solver based on a robin boundary
   condition for pressure. In: OpenFOAM selected papers of the 11th workshop.
   Springer, Berlin, pp 1–23](https://doi.org/10.1007/978-3-319-60846-4_1).
 
-For each of these two classes of approach, we can employ different methods to
+For each of these two classes of approaches, we can employ different methods to
 accelerate the FSI iteration loop convergence; within solids4foam, we can use:
 
 - Aitken's dynamic relaxation;
@@ -94,7 +94,7 @@ In this tutorial, we will compare six variants of the approaches above:
 5. **Robin-Neumann formulation with an incompressible fluid**: Support for this
    approach is implemented in the `pimpleFluid` model, where we apply special
    interface boundary conditions: `elasticWallPressure` for the fluid pressure
-   field; and `elasticWallVelocity` for the fluid velocity field.
+   field, and `elasticWallVelocity` for the fluid velocity field.
 6. **Dirichlet-Neumann formulation with IQNILS acceleration and an
    incompressible fluid model using preCICE**: This approach is the same as
    approach 1, except the [preCICE](http://precice.org) coupling implementation
@@ -105,10 +105,10 @@ In this tutorial, we will compare six variants of the approaches above:
    this preCICE IQNILS approach may perform differently than the built-in
    solids4foam approach.
 
-In all approaches, the solid domain setup is exactly the same, where an
+In all approaches, the solid domain setup is the same, where an
 incremental small strain formulation is used (the `linearGeometry` solid model).
 One-quarter of the tube's cross-section is considered, although the case could
-actually be modelled as 2-D axisymmetric. The test is run for 0.02 s. A
+be modelled as 2-D axisymmetric. The test is run for 0.02 s. A
 relatively tight FSI loop tolerance of 1e-6 is used for all approaches based on
 the interface motion. For approach 6 (preCICE), the relative displacement
 tolerance was set to 1e-6, and the relative force tolerance was set to 1e-3.
@@ -122,7 +122,7 @@ In all cases, the first-order Euler time scheme is used for the solid and fluid.
 For approaches 1 to 4, the tutorial case is located at `solids4foam/tutorials/fluidSolidInteraction/3dTube`.
 The case can be run using the single `Allrun` script. Use `./Allrun` for
 approaches 1 and 2, `./Allrun sonicLiquidFluid` for approaches 3 and 4, and
-`./Allrun robin` for approach 5. The script update the case with links to the
+`./Allrun robin` for approach 5. The script updates the case with links to the
 correct files to be used by each approach. The acceleration algorithm, Aitken's
 or IQNILS, is specified in the `constant/fsiProperties` file.
 
@@ -177,15 +177,15 @@ iterations per time step. In the figures, the approaches are designated as:
 
 The predictions from all approaches agree closely. Examining the number of FSI
 iterations per time step, both implementations (solids4foam and preCICE) of
-Dirichlet-Neumann coupling with IQN-ILS acceleration are seen to require the
-least number of iterations. The weakly compressible approach is the next best
+Dirichlet-Neumann coupling with IQN-ILS acceleration is seen to require the
+the fewest number of iterations. The weakly compressible approach is the next best
 performing approach, while the incompressible Aitken's-accelerated
 Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
 
 ### Small Time Step
 
 To observe the effect of the time step size, the cases were re-run with a
-smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial
+a smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial
 displacement, axial displacement and the number of iterations.
 
 !Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s[](./images/axial-displacement-deltaT2.5e-5.png)
@@ -207,7 +207,7 @@ shows the poorest performance, requiring an order of magnitude greater number of
 iterations than the best approach. The impressive performance of the
 Robin-Neumann approach can also be observed for smaller time steps; in general,
 for cases like this, if the time step is sufficiently small, the Robin-Neumann
-approach requires minimal iterations; however, once the time step is large, then
+approach requires minimal iterations; however, once the time step is large, 
 the Robin approach diverges or becomes uncompetitive.
 
 ### First-Order Euler vs Second-Order Backward Time Schemes
@@ -216,8 +216,8 @@ Finally, we demonstrate the effect of the time scheme by comparing the
 first-order `Euler` and second-order `backward` time schemes, where both the
 solid and fluid use the same time schemes. For this, we re-run the case with
 five time step sizes: 8e-4, 4e-4, 2e-4, 1e-4 and 5e-5 s. Figure 8 shows the
-first-order Euler radial displacements results, Figure 9 shows the second-order
-backward results, and Figure 10 compares both. The second-order scheme shows
+first-order Euler radial displacement results. Figure 9 shows the second-order
+backward results and Figure 10 compares both. The second-order scheme shows
 small time discretisation errors for each time step and is seen to converge more
 quickly as the time step size is reduced, as expected. The results were
 generated using the weakly compressible fluid model and Aitken's coupling;
@@ -242,9 +242,9 @@ schemes as the time step size is reduced**
 Table 1 gives the total clock time for each model when running these models in
 serial. Surprisingly, the fastest model is the backward method with the smallest
 time step (5e-5 s). The fastest Euler model uses the largest time step (8e-4 s),
-but next fastest model uses the second smallest time step (1e-4 s). The
+but the next fastest model uses the second smallest time step (1e-4 s). The
 explanation for this is that when using larger time steps, a much greater number
-of outer fluid-solid interaction iterations are required; whereas for smaller
+of outer fluid-solid interaction iterations are required, whereas for smaller
 time steps, much fewer iterations are required, possibly resulting in a lower
 overall clock time. If the time step sizes were reduced further, it would be
 expected that at some point, the models would start to become slower (e.g., as
