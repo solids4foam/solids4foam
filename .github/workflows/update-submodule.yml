@@ -18,10 +18,11 @@ jobs:
           fetch-depth: 0  # Fetch all history for accurate submodule updates
 
       # Step 2: Clone the solids4foam.github.io repository
-      - name: Clone solids4foam.github.io repository
+      - name: Clone solids4foam.github.io repository with submodules
         run: |
           git clone https://github.com/solids4foam/solids4foam.github.io.git
           cd solids4foam.github.io
+          git config submodule.imported/solids4foam.url https://github.com/solids4foam/solids4foam.git
           git submodule update --init --recursive
 
       # Step 3: Update the submodule to the latest commit on the "development" branch
