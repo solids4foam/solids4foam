@@ -46,6 +46,6 @@ jobs:
       - name: Push updated submodule
         run: |
           cd solids4foam.github.io
-          git push origin main
+          git push origin master
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_IO }}
