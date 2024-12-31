@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - development
+  workflow_dispatch:  # Enable manual triggering
 
 jobs:
   update-submodule:
