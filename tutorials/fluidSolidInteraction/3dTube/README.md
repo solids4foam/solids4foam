@@ -207,7 +207,7 @@ shows the poorest performance, requiring an order of magnitude greater number of
 iterations than the best approach. The impressive performance of the
 Robin-Neumann approach can also be observed for smaller time steps; in general,
 for cases like this, if the time step is sufficiently small, the Robin-Neumann
-approach requires minimal iterations; however, once the time step is large, 
+approach requires minimal iterations; however, once the time step is large,
 the Robin approach diverges or becomes uncompetitive.
 
 ### First-Order Euler vs Second-Order Backward Time Schemes
