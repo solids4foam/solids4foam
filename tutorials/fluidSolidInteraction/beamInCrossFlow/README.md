@@ -193,7 +193,7 @@ program is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
-`Allrun` script, i.e. `> ./Allclean`.
+`Allrun` script, i.e. `./Allclean`.
 ```
 
 ---

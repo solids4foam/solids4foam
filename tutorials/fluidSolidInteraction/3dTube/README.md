@@ -24,7 +24,8 @@ This case consists of a pressure pulse applied in a thick-walled elastic tube
 (Figure 1).
 
 ![Figure 1: Wave propagation in an elastic pipe](images/3dTube.png)
-**Figure 1: Wave propagation in an elastic pipe**
+
+Figure 1: Wave propagation in an elastic pipe
 
 The fluid is assumed incompressible, Newtonian and isothermal, with a density of
 1000.0 kg/m3 and kinematic viscosity of 3e-6 m2/s. A pressure wave, with a peak
@@ -119,16 +120,103 @@ In all cases, the first-order Euler time scheme is used for the solid and fluid.
 
 ## Running the Case
 
-For approaches 1 to 4, the tutorial case is located at `solids4foam/tutorials/fluidSolidInteraction/3dTube`.
-The case can be run using the single `Allrun` script. Use `./Allrun` for
-approaches 1 and 2, `./Allrun sonicLiquidFluid` for approaches 3 and 4, and
-`./Allrun robin` for approach 5. The script updates the case with links to the
-correct files to be used by each approach. The acceleration algorithm, Aitken's
-or IQNILS, is specified in the `constant/fsiProperties` file.
+For approaches 1 to 5, the tutorial case is located at `solids4foam/tutorials/fluidSolidInteraction/3dTube`.
+The tutorial case can be run using the included `Allrun` script, i.e.
+`> ./Allrun`. In this case, the `Allrun` script is
 
-For approach 5 (Robin-Neumann formulation), you should change the boundary
-conditions in the `0/fluid/p` and `0/fluid/U` files to the `elastic*` versions;
-currently, the Robin approach is only available in foam-extend-4.1.
+```bash
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Example usage
+# ./Allrun
+# ./Allrun sonicLiquidFluid
+# ./Allrun robin
+
+# Select approach
+if [[ "$1" == "sonicLiquidFluid" ]]; then
+    # Dirichlet-Neumann sonicLiquidFluid approach
+    echo "Using the Dirichlet-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.sonicLiquidFluid')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+elif [[ "$1" == "robin" ]]; then
+    # Robin-Neumann pimpleFluid approach
+    echo "Using the Robin-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+else
+    # Dirichlet-Neumann pimpleFluid approach
+    echo "Using the Dirichlet-Neumann pimpleFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+fi
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Check fvSolution for foundation version
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
+then
+    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'residualControl' with"
+        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
+        sed -i "s/residualControl/outerCorrectorResidualControl/g" \
+            "${CASE_DIR}"/system/fluid/fvSolution
+    fi
+fi
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating plots"
+    gnuplot -p displacement.gnuplot &> /dev/null
+    gnuplot -p fsiConvergence.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+```
+
+As can be seen above, the `Allrun` script can be run with different values for
+the first argument `$1` passed to the script. Running the script without any
+argument (i.e., `./Allrun`) uses the FSI coupling approach 1 (Aitken's) or 2
+(IQNILS), depending on the value of `fluidSolidInterface` in `constant/fsiProperties`;
+for example, `fluidSolidInterface    IQNILS;`. The weakly compressible fluid
+model (approaches 3 and 4) can be used by running the `Allrun` script with the
+argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`. Once again,
+switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled via the
+`fluidSolidInterface` setting in `constant/fsiProperties`. Finally, the
+Robin-Neumann coupling approach (approach 5) can be used by executing the
+`Allrun` script as `./Allrun robin` for approach 5. Examining the `U` and `p`
+files in `0/fluid.robin/` shows that the Robin approach uses the custom
+conditions `elasticWallVelocity` and `elasticWallPressure` at the interface.
+
+The `Allrun` script updates the case with links to the correct files to be used
+by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
+generate the meshes in the solid and fluid domains, followed by running the
+`solids4Foam` solver. Subsequently, if `gnuplot` is installed, two figures will
+be generated in the case directory:
+
+- `axialDisplacement.pdf`: this plots the axial displacement of point A vs time.
+- `fsiConvergence.pdf`: this plots the number of FSI iterations per time step.
 
 The tutorial case for approach 6, which uses preCICE, is located at
 `solids4foam/tutorials/fluidSolidInteraction-preCICE/3dTube`; once again, the
