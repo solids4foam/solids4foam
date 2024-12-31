@@ -255,13 +255,16 @@ iterations per time step. In the figures, the approaches are designated as:
   an incompressible fluid model using preCICE.
 
 ![Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s](./images/axial-displacement-deltaT1e-4.png)
-**Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s**
+
+Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s
 
 ![Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s](./images/radial-displacement-deltaT1e-4.png)
-**Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s**
+
+Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s
 
 ![Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s](./images/coupling-iterations-deltaT1e-4.png)
-**Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s**
+
+Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s
 
 The predictions from all approaches agree closely. Examining the number of FSI
 iterations per time step, both implementations (solids4foam and preCICE) of
@@ -276,14 +279,17 @@ To observe the effect of the time step size, the cases were re-run with a
 a smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial
 displacement, axial displacement and the number of iterations.
 
-!Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s[](./images/axial-displacement-deltaT2.5e-5.png)
-**Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s**
+![Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s](./images/axial-displacement-deltaT2.5e-5.png)
+
+Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s
 
 ![Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s](./images/radial-displacement-deltaT2.5e-5.png)
-**Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s**
+
+Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s
 
 ![Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s](./images/coupling-iterations-deltaT2.5e-5.png)
-**Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s**
+
+Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s
 
 Unlike the larger time step, the Robin-Neumann approach now requires the least
 number of iterations per time step (exactly 4 for every time step). The weakly
@@ -314,18 +320,21 @@ approaches.
 
 ![Figure 8: The effect of the time step size when using the first-order `Euler`
 time scheme](./images/radial-displacement-euler.png)
-**Figure 8: The effect of the time step size when using the first-order `Euler`
-time scheme**
+
+Figure 8: The effect of the time step size when using the first-order `Euler`
+time scheme
 
 ![Figure 9: The effect of the time step size when using the second-order
 `backward` time scheme](./images/radial-displacement-backward.png)
-**Figure 9: The effect of the time step size when using the second-order
-`backward` time scheme**
+
+Figure 9: The effect of the time step size when using the second-order
+`backward` time scheme
 
 ![Figure 10: Comparing the first-order `Euler` and second-order `backward`
 schemes as the time step size is reduced](./images/radial-displacement-time-schemes.png)
-**Figure 10: Comparing the first-order `Euler` and second-order `backward`
-schemes as the time step size is reduced**
+
+Figure 10: Comparing the first-order `Euler` and second-order `backward`
+schemes as the time step size is reduced
 
 Table 1 gives the total clock time for each model when running these models in
 serial. Surprisingly, the fastest model is the backward method with the smallest
