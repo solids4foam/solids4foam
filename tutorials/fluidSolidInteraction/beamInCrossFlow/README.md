@@ -18,13 +18,13 @@ You can find the files for this tutorial under
 
 ![Case geometry and mesh](images/fs_over_1.PNG)
 
-Case geometry and mesh
+### Figure 1: Case geometry and mesh
 
 This case consists of a thick elastic plate attached to the bottom surface of a
-rectangular channel (see the figure above). Due to symmetry, only half of the
-spatial domain is considered. An incompressible viscous fluid with a density of
-1000 kg/m3 and kinematic viscosity of 0.001 m2/s enters the channel from the
-left-hand side with a parabolic velocity profile.
+rectangular channel (Figure 1). Due to symmetry, only half of the spatial domain
+is considered. An incompressible viscous fluid with a density of 1000 kg/m3 and
+kinematic viscosity of 0.001 m2/s enters the channel from the left-hand side
+with a parabolic velocity profile.
 
 This case can be analysed in two forms:
 
@@ -45,6 +45,13 @@ This case can be analysed in two forms:
   simulation continues until the beam reaches steady-state. The purpose of these
   changes is to demonstrate large solid displacements and fluid mesh motion.
 
+```note
+The `beamInCrossFlow` case in solids4foam is set up in the modified form;
+however, it is straight-forward to return the case to its original form by
+setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
+and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+```
+
 The fluid is described by incompressible Newtonian isothermal laminar flow,
 where the Navier-Stokes governing equations take the form:
 
@@ -56,7 +63,7 @@ $$
 \frac{\partial \boldsymbol{v}}{\partial t}
 + \nabla \cdot (\boldsymbol{v} \boldsymbol{v})
 = \nu \nabla^2 \boldsymbol{v}
-- \frac{1}{\rho} \nabla \textcolor{red}{p}
+- \frac{1}{\rho} \nabla p
 + \boldsymbol{f_b}
 $$
 
@@ -124,24 +131,24 @@ The incoming flow imparts pressure and viscous forces on the plate, causing it
 to bend. Following some initial transient effects, the flow and beam reach a
 steady-state. In the modified form of the case, with an increased peak inlet
 velocity of 0.3 m/s and reduced Young’s modulus of 10 kPa, displacement of point
-A is pexected to be (0.01463, 0.005, −0.000447) m at steady state. Further
+A is expected to be (0.01463, 0.005, −0.000447) m at steady state. Further
 details of the case can be found in
 [Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković (2018) OpenFOAM Finite
 Volume Solver for Fluid-Solid Interaction](https://hrcak.srce.hr/206941);
-in particular, see Fig. 28 therein. The figure below shows the displacement
-field in the beam, the fluid velocity streamlines, and the fluid pressure on the
-channel ground, wall and outlet.
+in particular, see Fig. 28 therein. Figure 2 shows the displacement field in the
+beam, the fluid velocity streamlines, and the fluid pressure on the channel
+ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
 
-Expected results
+### Figure 2: Beam displacement, fluid wall pressure, and velocity streamlines
 
 ---
 
 ## Running the Case
 
 The tutorial case can be run using the included `Allrun` script, i.e.
-`> ./Allrun`. In this case, the `Allrun` script is
+`./Allrun`. The `Allrun` script is shown below:
 
 ```bash
 #!/bin/bash
@@ -200,19 +207,20 @@ Remember that a tutorial case can be cleaned and reset using the included
 
 ## Analysing the Results
 
-In the ParaView, both the solid and fluid regions are loaded by default. The
-_Extract Block_ filter in ParaView can be used to extract the solid region, and
-a second instance of the _Extract Block_ filter for the fluid region. In that
-way, the fluid region can be coloured by a fluid field (e.g. `p` or `U`) and the
-solid region by a solid field (e.g. `D` or `sigmaEq`). As an alternative to
-using the _Extract Block_ filter, two instances of the case can be opened (File
--> Open -> case.foam), where one opens the “fluid/internalMesh” and the other
-opens the “solid/internalMesh”.
+In the ParaView (Figure 3), both the solid and fluid regions are loaded by
+default. The _Extract Block_ filter in ParaView can be used to extract the solid
+region, and a second instance of the _Extract Block_ filter for the fluid region.
+In that way, the fluid region can be coloured by a fluid field (e.g. `p` or `U`)
+and the solid region by a solid field (e.g. `D` or `sigmaEq`). As an alternative
+to using the _Extract Block_ filter, two instances of the case can be opened
+(_File -> Open -> case.foam_), where one opens the “fluid/internalMesh” and the
+other opens the “solid/internalMesh”. In Figure 3, a third instance of the
+_Extract Block_ filter is used to display fluid domain bottom, left and outlet
+boundaries.
 
 ![Diagram of ParaView interface showing the beam in cross flow problem](images/fs_run_1.PNG)
 
-**Displacement of the beam, pressure on the fluid walls, and streamlines
-coloured by velocity**
+### Figure 3: Beam displacement, fluid wall pressure, and velocity streamlines
 
 ---
 

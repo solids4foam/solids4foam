@@ -25,7 +25,7 @@ This case consists of a pressure pulse applied in a thick-walled elastic tube
 
 ![Figure 1: Wave propagation in an elastic pipe](images/3dTube.png)
 
-Figure 1: Wave propagation in an elastic pipe
+### Figure 1: Wave propagation in an elastic pipe
 
 The fluid is assumed incompressible, Newtonian and isothermal, with a density of
 1000.0 kg/m3 and kinematic viscosity of 3e-6 m2/s. A pressure wave, with a peak
@@ -212,10 +212,12 @@ conditions `elasticWallVelocity` and `elasticWallPressure` at the interface.
 The `Allrun` script updates the case with links to the correct files to be used
 by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
 generate the meshes in the solid and fluid domains, followed by running the
-`solids4Foam` solver. Subsequently, if `gnuplot` is installed, two figures will
+`solids4Foam` solver. Subsequently, if `gnuplot` is installed, three figures will
 be generated in the case directory:
 
 - `axialDisplacement.pdf`: this plots the axial displacement of point A vs time.
+- `radialDisplacement.pdf`: this plots the radial displacement of point A vs
+  time.
 - `fsiConvergence.pdf`: this plots the number of FSI iterations per time step.
 
 The tutorial case for approach 6, which uses preCICE, is located at
@@ -229,6 +231,42 @@ Remember that a tutorial case can be cleaned and reset using the included
 
 ---
 
+## Analysing the Results
+
+As in the `beamInCrossFlow` tutorial, the case can be opened in ParaView (Figure
+2) by creating an empty `case.foam` file in the case directory (e.g.,
+`touch case.foam`) and opening it in ParaView (e.g., _File -> Open ->
+case.foam_). The _Extract Block_ ParaView filter can be used to extract the solid
+region, and a second instance of the _Extract Block_ filter can extract the fluid
+region. In that way, the fluid region can be coloured by a fluid field (e.g. `p`
+or `U`) and the solid region by a solid field (e.g. `D` or `sigmaEq`). In Figure
+2, multiple instances of the _Reflect_ filter are used to display the entire
+fluid domain (rather than one quarter of it) and three quarters of the solid
+domain.
+
+![Diagram of ParaView interface showing the 3-D tube problem](images/3dTube_paraview.png)
+
+### Figure 2: The solid displacement and fluid pressure in ParaView
+
+As noted above, if `gnuplot` is installed, the files `axialDisplacement.pdf`,
+`radialDisplacement.pdf` and `fsiConvergence.pdf` will be available in the case
+directory. You can open these figures using a PDF viewer, e.g.
+`evince axialDisplacement.pdf` in Linux or `open axialDisplacement.pdf` in macOS.
+The `axialDisplacement.pdf` (Figure 3) figure plots the axial displacement of
+point A (see Figure 1) vs time, while `radialDisplacement.pdf` plots the radial
+displacement of point A. The `fsiConvergence.pdf` (Figure 4) file plots the
+number of FSI iterations per time step.
+
+![Axial displacement](images/axialDisplacement.pdf)
+
+### Figure 3: `axialDisplacement.pdf`
+
+![FSI convergence](images/fsiConvergence.pdf)
+
+### Figure 4: `fsiConvergence.pdf`
+
+---
+
 ## Expected Results
 
 This case has been proposed as a benchmark for FSI problems. The solution for
@@ -238,8 +276,8 @@ point A's (see Figure 1) axial and radial displacement is available in:
 ### Large Time Step
 
 Initially, we compare the solutions using a relatively large time step size of
-1e-4 s. Figure 2 shows the radial displacement at point A vs time, Figure 3
-shows the axial displacement at point A vs time, and Figure 4 shows the
+1e-4 s. Figure 5 shows the radial displacement at point A vs time, Figure 6
+shows the axial displacement at point A vs time, and Figure 7 shows the
 iterations per time step. In the figures, the approaches are designated as:
 
 - DNF-Aitken: Dirichlet-Neumann formulation with Aitken's acceleration and an
@@ -254,17 +292,17 @@ iterations per time step. In the figures, the approaches are designated as:
 - preCICE-DN-IQNILS: Dirichlet-Neumann formulation with IQNILS acceleration and
   an incompressible fluid model using preCICE.
 
-![Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s](./images/axial-displacement-deltaT1e-4.png)
+![Axial displacement at point A vs time with deltaT = 1e-4 s](./images/axial-displacement-deltaT1e-4.png)
 
-Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s
+### Figure 5: Axial displacement at point A vs time with deltaT = 1e-4 s
 
-![Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s](./images/radial-displacement-deltaT1e-4.png)
+![Radial displacement at point A vs time with deltaT = 1e-4 s](./images/radial-displacement-deltaT1e-4.png)
 
-Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s
+### Figure 6: Radial displacement at point A vs time with deltaT = 1e-4 s
 
-![Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s](./images/coupling-iterations-deltaT1e-4.png)
+![Number of FSI iterations per time-step with deltaT = 1e-4 s](./images/coupling-iterations-deltaT1e-4.png)
 
-Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s
+### Figure 7: Number of FSI iterations per time-step with deltaT = 1e-4 s
 
 The predictions from all approaches agree closely. Examining the number of FSI
 iterations per time step, both implementations (solids4foam and preCICE) of
@@ -276,20 +314,20 @@ Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
 ### Small Time Step
 
 To observe the effect of the time step size, the cases were re-run with a
-a smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial
+a smaller time step of 2.5e-5 s, where Figures 8, 9 and 10 show the radial
 displacement, axial displacement and the number of iterations.
 
-![Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s](./images/axial-displacement-deltaT2.5e-5.png)
+![Axial displacement at point A vs time with deltaT = 2.5e-5 s](./images/axial-displacement-deltaT2.5e-5.png)
 
-Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s
+### Figure 8: Axial displacement at point A vs time with deltaT = 2.5e-5 s
 
-![Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s](./images/radial-displacement-deltaT2.5e-5.png)
+![Radial displacement at point A vs time with deltaT = 2.5e-5 s](./images/radial-displacement-deltaT2.5e-5.png)
 
-Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s
+### Figure 9: Radial displacement at point A vs time with deltaT = 2.5e-5 s
 
-![Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s](./images/coupling-iterations-deltaT2.5e-5.png)
+![Number of FSI iterations per time-step with deltaT = 2.5e-5 s](./images/coupling-iterations-deltaT2.5e-5.png)
 
-Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s
+### Figure 10: Number of FSI iterations per time-step with deltaT = 2.5e-5 s
 
 Unlike the larger time step, the Robin-Neumann approach now requires the least
 number of iterations per time step (exactly 4 for every time step). The weakly
@@ -309,32 +347,29 @@ the Robin approach diverges or becomes uncompetitive.
 Finally, we demonstrate the effect of the time scheme by comparing the
 first-order `Euler` and second-order `backward` time schemes, where both the
 solid and fluid use the same time schemes. For this, we re-run the case with
-five time step sizes: 8e-4, 4e-4, 2e-4, 1e-4 and 5e-5 s. Figure 8 shows the
-first-order Euler radial displacement results. Figure 9 shows the second-order
-backward results and Figure 10 compares both. The second-order scheme shows
+five time step sizes: 8e-4, 4e-4, 2e-4, 1e-4 and 5e-5 s. Figure 11 shows the
+first-order Euler radial displacement results. Figure 12 shows the second-order
+backward results and Figure 13 compares both. The second-order scheme shows
 small time discretisation errors for each time step and is seen to converge more
 quickly as the time step size is reduced, as expected. The results were
 generated using the weakly compressible fluid model and Aitken's coupling;
 however, the same behaviour is expected with the other modelling and coupling
 approaches.
 
-![Figure 8: The effect of the time step size when using the first-order `Euler`
+![The effect of the time step size when using the first-order `Euler`
 time scheme](./images/radial-displacement-euler.png)
 
-Figure 8: The effect of the time step size when using the first-order `Euler`
-time scheme
+### Figure 11: Time step effects when using the first-order `Euler` scheme
 
-![Figure 9: The effect of the time step size when using the second-order
+![The effect of the time step size when using the second-order
 `backward` time scheme](./images/radial-displacement-backward.png)
 
-Figure 9: The effect of the time step size when using the second-order
-`backward` time scheme
+### Figure 12: Time step effects when using the second-order `backward` scheme
 
-![Figure 10: Comparing the first-order `Euler` and second-order `backward`
+![Comparing the first-order `Euler` and second-order `backward`
 schemes as the time step size is reduced](./images/radial-displacement-time-schemes.png)
 
-Figure 10: Comparing the first-order `Euler` and second-order `backward`
-schemes as the time step size is reduced
+### Figure 13: Comparing the `Euler` and `backward` schemes
 
 Table 1 gives the total clock time for each model when running these models in
 serial. Surprisingly, the fastest model is the backward method with the smallest
@@ -366,3 +401,10 @@ The results and gnuplot scripts used to generate the figures above are available
 in the
 [solids4foam tutorials benchmark data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data)
 repository.
+
+## What next?
+
+If you are interested in more tutorial cases, check out the cases described in
+the [more tutorials](https://www.solids4foam.com/tutorials/more-tutorials/)
+section. In addition, the [documentation](https://www.solids4foam.com/documentation/)
+section contains further implementation and theory details.
