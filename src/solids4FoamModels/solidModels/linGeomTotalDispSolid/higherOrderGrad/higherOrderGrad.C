@@ -824,10 +824,11 @@ void higherOrderGrad::calcQRCoeffs() const
 
         // Find max distance in this stencil
         scalar maxDist = 0.0;
+        const vector& curC = CI[cellI];
         forAll(curStencil, cI)
         {
             const label neiCellID = curStencil[cI];
-            const scalar d = mag(CI[neiCellID] - CI[cellI]);
+            const scalar d = mag(CI[neiCellID] - curC);
             if (d > maxDist)
             {
                 maxDist = d;
@@ -847,7 +848,9 @@ void higherOrderGrad::calcQRCoeffs() const
         {
             FatalErrorInFunction
                 << "Interpolation stencil needs to be bigger than the "
-                << "number of elements in Taylor order!"
+                << "number of elements in Taylor order!" << nl
+                << "Stencil size = " << Nn << ", Taylor elements = " << Np << nl
+                << "Cell centre = " << curC
                 << exit(FatalError);
         }
 
@@ -1021,6 +1024,13 @@ void higherOrderGrad::calcQRCoeffs() const
 
        QRInterpCoeffs[cellI].shrink();
        QRGradCoeffs[cellI].shrink();
+    }
+
+    if (calcConditionNumber_)
+    {
+        Info<< "Writing " << conditionNumber().name() << " to time = "
+            << mesh.time().value() << endl;
+        conditionNumber().write();
     }
 
     //if (debug)
@@ -1591,7 +1601,7 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     forAll(QRGradCoeffs, faceI)
     {
         List<DynamicList<vector>>& facePointsGC = QRGradCoeffs[faceI];
-        facePointsGC.setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
+        facePointsGC.setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
     }
 
     // Refernces for brevity and efficiency
@@ -1678,7 +1688,9 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
         {
             FatalErrorInFunction
                 << "Interpolation stencil needs to be bigger than the "
-                << "number of elements in Taylor order!"
+                << "number of elements in Taylor order!" << nl
+                << "Stencil size = " << Nn << ", Taylor elements = " << Np << nl
+                << "Face centre = " << curCf
                 << exit(FatalError);
         }
 
@@ -2356,8 +2368,8 @@ void higherOrderGrad::calcGaussPointsAndWeights() const
         List<point>& fGP = faceGP[i];
         List<scalar>& fGPW = faceGPW[i];
 
-        fGP.setSize(mesh.faces()[i].size() * triQuadraturePtsNb_);
-        fGPW.setSize(mesh.faces()[i].size() * triQuadraturePtsNb_);
+        fGP.setSize(mesh.faces()[i].size()*triQuadraturePtsNb_);
+        fGPW.setSize(mesh.faces()[i].size()*triQuadraturePtsNb_);
     }
 
     // 1. Stage - decompose faces into triangles. Store triangle points
@@ -2501,7 +2513,7 @@ const List<DynamicList<vector>>& higherOrderGrad::QRGradFaceCoeffs() const
 
 
 const List<List<DynamicList<vector>>>&
-higherOrderGrad::QRGradFaceGPCoeffs()const
+higherOrderGrad::QRGradFaceGPCoeffs() const
 {
     if (!QRGradFaceGPCoeffsPtr_)
     {
@@ -2610,7 +2622,8 @@ void higherOrderGrad::makeConditionNumber() const
                IOobject::AUTO_WRITE
            ),
            mesh_,
-           dimensionedScalar("0", dimless, Zero)
+           dimensionedScalar("0", dimless, Zero),
+           "zeroGradient"
         )
     );
 }
@@ -2630,7 +2643,7 @@ higherOrderGrad::higherOrderGrad
     N_(readInt(dict.lookup("N"))),
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
-    triQuadraturePtsNb_(readInt(dict.lookup("triGaussPointsNb"))),
+    triQuadraturePtsNb_(dict.lookupOrDefault<label>("triGaussPointsNb", 1)),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
     globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
@@ -2674,7 +2687,7 @@ higherOrderGrad::~higherOrderGrad()
 tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D) const
 {
     // For testing
-    auto test =  fGradGaussPoints(D);
+    //auto test =  fGradGaussPoints(D);
 
     if (useQRDecomposition_)
     {
@@ -2824,7 +2837,7 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
         List<tensor>& faceGradGP = gradDGP[i];
 
         const label nbOfTriangles = mesh.faces()[i].size();
-        const label nbOfGaussPoints = nbOfTriangles * triQuadraturePtsNb_;
+        const label nbOfGaussPoints = nbOfTriangles*triQuadraturePtsNb_;
 
         faceGradGP.setSize(nbOfGaussPoints);
     }
@@ -2841,7 +2854,8 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
     const vectorField& DI = D;
     const List<labelList>& stencils = globalFaceStencils();
 
-    const List<List<DynamicList<vector>>>& pointQRGradCoeffs = QRGradFaceGPCoeffs();
+    const List<List<DynamicList<vector>>>& pointQRGradCoeffs =
+        QRGradFaceGPCoeffs();
 
     // Collect DI for off-processor cells in the stencils
     Map<vector> globalDI;
