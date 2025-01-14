@@ -39,6 +39,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(p, iF),
     nonOrthogonalCorrections_(true),
+    useUndeformedArea_(false),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -68,6 +69,10 @@ solidTractionFvPatchVectorField
     nonOrthogonalCorrections_
     (
         dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
+    ),
+    useUndeformedArea_
+    (
+        dict.lookupOrDefault<Switch>("useUndeformedArea", false)
     ),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
@@ -227,6 +232,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf, p, iF, mapper),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
 #ifdef OPENFOAM_ORG
     traction_(mapper(pvf.traction_)),
     pressure_(mapper(pvf.pressure_)),
@@ -254,6 +260,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
@@ -277,6 +284,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf, iF),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
@@ -494,6 +502,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
     os.writeKeyword("nonOrthogonalCorrections")
         << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+    os.writeKeyword("useUndeformedArea")
+        << useUndeformedArea_ << token::END_STATEMENT << nl;
 
     if (tractionFieldPtr_.valid())
     {
