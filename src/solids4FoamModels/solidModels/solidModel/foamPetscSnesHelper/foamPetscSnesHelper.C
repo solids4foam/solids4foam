@@ -493,7 +493,7 @@ void foamPetscSnesHelper::mapSolutionPetscToFoam()
 }
 
 
-void foamPetscSnesHelper::solve()
+int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 {
     if (!initialised_)
     {
@@ -527,7 +527,11 @@ void foamPetscSnesHelper::solve()
             << " PETSc SNES convergence reason: "
             << SNESConvergedReasons[reason] << endl;
 
-        if (stopOnPetscError_)
+        if (returnOnSnesError)
+        {
+            return reason;
+        }
+        else if (stopOnPetscError_)
         {
             FatalErrorIn
             (
@@ -538,6 +542,8 @@ void foamPetscSnesHelper::solve()
                 << abort(FatalError);
         }
     }
+
+    return 0;
 }
 
 
