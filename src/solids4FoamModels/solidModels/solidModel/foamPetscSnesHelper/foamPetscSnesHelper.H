@@ -214,7 +214,10 @@ public:
 
             //- Call the PETSc SNES solve function and check its convergence
             //  Give a warning or fatal error if convergence was not reached
-            void solve();
+            //  If returnOnSnesError = true, a PETSc error code is returned;
+            //  otherwise, a fatal error is thrown within this function when
+            //  the SNES solver fails
+            int solve(const bool returnOnSnesError = false);
 };
 
 
