@@ -93,23 +93,39 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
     const labelUList& neighbour = mesh_.neighbour();
 
     const volVectorField& C = mesh.C();
-    const surfaceScalarField& w = mesh.weights();
-    const surfaceScalarField& magSf = mesh.magSf();
+    //const surfaceScalarField& w = mesh.weights();
+    //const surfaceScalarField& magSf = mesh.magSf();
 
+    // Exponent in the inverse distance weight for the least squares system
+    // Weights are calculated as 1/d^q, i.e. q = 0: unweighted least squares
+    // Syrakos et al, 2023, doi.org/10.1016/j.matcom.2022.09.008 showed q = 3 to
+    // work best for cell-centre gradients
+    const scalar q = 3;
 
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh_.nCells(), Zero);
 
     forAll(owner, facei)
     {
-        label own = owner[facei];
-        label nei = neighbour[facei];
+        const label own = owner[facei];
+        const label nei = neighbour[facei];
 
-        vector d = C[nei] - C[own];
-        symmTensor wdd = (magSf[facei]/magSqr(d))*sqr(d);
+        const vector d = C[nei] - C[own];
 
-        dd[own] += (1 - w[facei])*wdd;
-        dd[nei] += w[facei]*wdd;
+        // Weight
+        const scalar v = 1.0/pow(mag(d), q);
+
+        const symmTensor wdd = v*sqr(d);
+
+        dd[own] += wdd;
+        dd[nei] += wdd;
+
+        // Original OpenFOAM approach where the weights are magSf/magSqr(d)
+        // symmTensor wdd = (magSf[facei]/magSqr(d))*sqr(d);
+
+        // Original OpenFOAM approach using face weights
+        // dd[own] += (1 - w[facei])*wdd;
+        // dd[nei] += w[facei]*wdd;
     }
 
 
@@ -118,19 +134,19 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
     forAll(pVectorsBf, patchi)
     {
-        const fvsPatchScalarField& pw = w.boundaryField()[patchi];
-        const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchi];
+        // const fvsPatchScalarField& pw = w.boundaryField()[patchi];
+        // const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchi];
 
-        const fvPatch& p = pw.patch();
+        const fvPatch& p = pVectorsBf[patchi].patch();
         const labelUList& faceCells = p.patch().faceCells();
         const vectorField& Cf = p.Cf();
 
         // Build the d-vectors
         // In OF.com/OF.org, p.delta are the orthogonal components of the real d
         // vectors, so we need to build them ourselves
-        //vectorField pd(p.delta());
+        // vectorField pd(p.delta());
 
-        if (pw.coupled())
+        if (p.coupled())
         {
             // Coupled d vectors
             const vectorField pd(p.delta());
@@ -138,9 +154,13 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                dd[faceCells[patchFacei]] +=
-                    ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))*sqr(d);
+                dd[faceCells[patchFacei]] += v*sqr(d);
+
+                // Original OpenFOAM version
+                // dd[faceCells[patchFacei]] +=
+                //     ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))*sqr(d);
             }
         }
         else if
@@ -166,9 +186,9 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                         C[faceCells[patchFacei]]
                     )
                   - C[faceCells[patchFacei]];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                dd[faceCells[patchFacei]] +=
-                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+                dd[faceCells[patchFacei]] += v*sqr(d);
             }
         }
         else if (useBoundaryFaceValues_[patchi])
@@ -182,9 +202,9 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                dd[faceCells[patchFacei]] +=
-                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+                dd[faceCells[patchFacei]] += v*sqr(d);
             }
         }
     }
@@ -195,24 +215,29 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
     // Revisit all faces and calculate the pVectors_ and nVectors_ vectors
     forAll(owner, facei)
     {
-        label own = owner[facei];
-        label nei = neighbour[facei];
+        const label own = owner[facei];
+        const label nei = neighbour[facei];
+        const vector d = C[nei] - C[own];
+        const scalar v = 1.0/pow(mag(d), q);
 
-        vector d = C[nei] - C[own];
-        scalar magSfByMagSqrd = magSf[facei]/magSqr(d);
+        pVectors_[facei] = v*(invDd[own] & d);
+        nVectors_[facei] = -v*(invDd[nei] & d);
 
-        pVectors_[facei] = (1 - w[facei])*magSfByMagSqrd*(invDd[own] & d);
-        nVectors_[facei] = -w[facei]*magSfByMagSqrd*(invDd[nei] & d);
+        // Original OpenFOAM version
+        // scalar magSfByMagSqrd = magSf[facei]/magSqr(d);
+
+        // pVectors_[facei] = (1 - w[facei])*magSfByMagSqrd*(invDd[own] & d);
+        // nVectors_[facei] = -w[facei]*magSfByMagSqrd*(invDd[nei] & d);
     }
 
     forAll(pVectorsBf, patchi)
     {
         fvsPatchVectorField& patchLsP = pVectorsBf[patchi];
 
-        const fvsPatchScalarField& pw = w.boundaryField()[patchi];
-        const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchi];
+        //const fvsPatchScalarField& pw = w.boundaryField()[patchi];
+        //const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchi];
 
-        const fvPatch& p = pw.patch();
+        const fvPatch& p = pVectorsBf[patchi].patch();
         const labelUList& faceCells = p.faceCells();
         const vectorField& Cf = p.Cf();
 
@@ -221,7 +246,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         // vectors, so we need to build them ourselves
         //vectorField pd(p.delta());
 
-        if (pw.coupled())
+        if (p.coupled())
         {
             // Coupled d vectors
             const vectorField pd(p.delta());
@@ -229,10 +254,14 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                patchLsP[patchFacei] =
-                    ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))
-                   *(invDd[faceCells[patchFacei]] & d);
+                patchLsP[patchFacei] = v*(invDd[faceCells[patchFacei]] & d);
+
+                // Original OpenFOAM version
+                // patchLsP[patchFacei] =
+                //     ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))
+                //    *(invDd[faceCells[patchFacei]] & d);
             }
         }
         else if
@@ -257,10 +286,14 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                         C[faceCells[patchFacei]]
                     )
                   - C[faceCells[patchFacei]];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                patchLsP[patchFacei] =
-                    pMagSf[patchFacei]*(1.0/magSqr(d))
-                   *(invDd[faceCells[patchFacei]] & d);
+                patchLsP[patchFacei] = v*(invDd[faceCells[patchFacei]] & d);
+
+                // Original OpenFOAM version
+                // patchLsP[patchFacei] =
+                //     pMagSf[patchFacei]*(1.0/magSqr(d))
+                //    *(invDd[faceCells[patchFacei]] & d);
             }
         }
         else if (useBoundaryFaceValues_[patchi])
@@ -274,10 +307,9 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
+                const scalar v = 1.0/pow(mag(d), q);
 
-                patchLsP[patchFacei] =
-                    pMagSf[patchFacei]*(1.0/magSqr(d))
-                   *(invDd[faceCells[patchFacei]] & d);
+                patchLsP[patchFacei] = v*(invDd[faceCells[patchFacei]] & d);
             }
         }
     }
