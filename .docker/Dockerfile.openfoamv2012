@@ -18,7 +18,7 @@ COPY . /usr/lib/solids4foam
 # Compile solids4Foam
 RUN source /usr/lib/openfoam/openfoam2012/etc/bashrc && \
     cd /usr/lib/solids4foam && \
-    ./Allwmake
+    ./Allwmake -j -s
 
 # Clean log files
 RUN cd /usr/lib/solids4foam && \

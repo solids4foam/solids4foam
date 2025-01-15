@@ -44,13 +44,21 @@ then
         "pointBoundaryMesh.C" \
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
-    
+
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
     replaceFile \
         "foam-extend-4.1" \
         "EulerDdtScheme.C" \
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+
+    # This fixes consistent Rhie-Chow interpolation
+    # for Euler scheme
+    replaceFile \
+        "foam-extend-4.1" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
         "$FOAM_SRC/finiteVolume"
 
     # Fix time index storage in the storeOldTimes function

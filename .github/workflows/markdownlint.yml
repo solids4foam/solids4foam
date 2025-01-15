@@ -1,0 +1,23 @@
+# Check formatting of markdown files
+name: Markdown Lint
+
+on:
+  push:
+    branches: [ "master", "development" ]
+  pull_request:
+    branches: [ "master", "development" ]
+  workflow_dispatch:
+
+jobs:
+  markdown-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run MarkdownLint
+        uses: DavidAnson/markdownlint-cli2-action@v18.0.0
+        with:
+          globs: "ThirdParty/**/*.md,optionalFixes/**/*.md,tutorials/**/*.md,applications/**/*.md,CONTRIBUTING.md/**/*.md,CONTRIBUTORS.md/**/*.md,README.md/**/*.md,etc/**/*.md,src/**/*.md"
+          separator: ','
