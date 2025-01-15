@@ -22,8 +22,6 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
-#include "explicitSolidTractionTractionFvPatchVectorField.H"
-#include "explicitSolidTractionLinearMomentumFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
     #include "polyTopoChange.H"
@@ -1764,21 +1762,6 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
-    else if (tractionPatch.type() == explicitSolidTractionTractionFvPatchVectorField::typeName)
-    {
-        explicitSolidTractionTractionFvPatchVectorField& patchTraction =
-            refCast<explicitSolidTractionTractionFvPatchVectorField>(tractionPatch);
-
-        patchTraction.traction() = traction;
-
-    }
-    else if (tractionPatch.type() == explicitSolidTractionLinearMomentumFvPatchVectorField::typeName)
-    {
-        explicitSolidTractionLinearMomentumFvPatchVectorField& patchLinearMomentum =
-            refCast<explicitSolidTractionLinearMomentumFvPatchVectorField>(tractionPatch);
-
-        patchLinearMomentum.traction() = traction;
-    }
 
 #ifdef FOAMEXTEND
     else if
@@ -1827,25 +1810,11 @@ void Foam::solidModel::setTraction
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
     );
 
-    if(type_ == "explicitGodunovCC")
-    {
-
-        volVectorField& lm_b = mesh().lookupObjectRef<volVectorField>("lm_b");
-        volVectorField& t_b = mesh().lookupObjectRef<volVectorField>("t_b");
-
-        setTraction(lm_b.boundaryFieldRef()[patchID], patchTraction);
-        setTraction(t_b.boundaryFieldRef()[patchID], patchTraction);
-    }
-    else
-    {
-
 #ifdef OPENFOAM_NOT_EXTEND
-        setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
+    setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
 #else
-        setTraction(solutionD().boundaryField()[patchID], patchTraction);
+    setTraction(solutionD().boundaryField()[patchID], patchTraction);
 #endif
-    }
-
 
 }
 

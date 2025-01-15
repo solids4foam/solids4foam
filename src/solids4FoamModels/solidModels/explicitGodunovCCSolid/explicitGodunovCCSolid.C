@@ -19,6 +19,8 @@ License
 
 #include "explicitGodunovCCSolid.H"
 #include "addToRunTimeSelectionTable.H"
+#include "explicitSolidTractionTractionFvPatchVectorField.H"
+#include "explicitSolidTractionLinearMomentumFvPatchVectorField.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -572,7 +574,7 @@ bool explicitGodunovCCSolid::evolve()
         );
 
         // Update the stress field based on the latest D field
-        sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
+        sigma() =  symm((1.0/J_)*(P_ & F_.T()));
 
         // Increment of point displacement
         pointDD() = pointD() - pointD().oldTime();
@@ -592,6 +594,70 @@ tmp<vectorField> explicitGodunovCCSolid::tractionBoundarySnGrad
 ) const
 {
         Info << "tractionBoundarySnGrad is not implimented";
+}
+
+
+
+void explicitGodunovCCSolid::setTraction
+(
+    fvPatchVectorField& tractionPatch,
+    const vectorField& traction
+)
+{
+    if (tractionPatch.type() == explicitSolidTractionTractionFvPatchVectorField::typeName)
+    {
+        explicitSolidTractionTractionFvPatchVectorField& patchTraction =
+            refCast<explicitSolidTractionTractionFvPatchVectorField>(tractionPatch);
+
+        patchTraction.traction() = traction;
+
+    }
+    else if (tractionPatch.type() == explicitSolidTractionLinearMomentumFvPatchVectorField::typeName)
+    {
+        explicitSolidTractionLinearMomentumFvPatchVectorField& patchLinearMomentum =
+            refCast<explicitSolidTractionLinearMomentumFvPatchVectorField>(tractionPatch);
+
+        patchLinearMomentum.traction() = traction;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidModel::setTraction\n"
+            "(\n"
+            "    fvPatchVectorField& tractionPatch,\n"
+            "    const vectorField& traction\n"
+            ")"
+        )   << "Boundary condition "
+            << tractionPatch.type()
+            << " for patch " << tractionPatch.patch().name()
+            << " should instead be type "
+            << explicitSolidTractionTractionFvPatchVectorField::typeName
+            << " or "
+            << explicitSolidTractionLinearMomentumFvPatchVectorField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void explicitGodunovCCSolid::setTraction
+(
+    const label interfaceI,
+    const label patchID,
+    const vectorField& faceZoneTraction
+)
+{
+    const vectorField patchTraction
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
+    );
+
+    volVectorField& lm_b = mesh().lookupObjectRef<volVectorField>("lm_b");
+    volVectorField& t_b = mesh().lookupObjectRef<volVectorField>("t_b");
+
+    setTraction(lm_b.boundaryFieldRef()[patchID], patchTraction);
+    setTraction(t_b.boundaryFieldRef()[patchID], patchTraction);
+
 }
 
 

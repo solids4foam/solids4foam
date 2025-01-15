@@ -337,6 +337,21 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
+
+            //- Set traction at specified patch
+            virtual void setTraction
+            (
+                fvPatchVectorField& tractionPatch,
+                const vectorField& traction
+            );
+
+            //- Set traction at specified patch
+            virtual void setTraction
+            (
+                const label interfaceI,
+                const label patchID,
+                const vectorField& faceZoneTraction
+            );
 };
 
 
