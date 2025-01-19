@@ -119,6 +119,9 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
     Info<< "Evolving solid solver using an implicit segregated approach"
         << endl;
 
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
     if (predictor_ && newTimeStep())
     {
         predict();
