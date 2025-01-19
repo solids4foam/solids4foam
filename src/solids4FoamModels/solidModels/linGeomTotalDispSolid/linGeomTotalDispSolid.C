@@ -138,11 +138,29 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
         Info<< "Solving the momentum equation for D" << endl;
 
+        // Unit normal vectors at the faces
+        const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
         // Momentum equation loop
         do
         {
             // Store fields for under-relaxation and residual calculation
             D().storePrevIter();
+
+            // Calculate raction vectors at the faces
+            surfaceVectorField traction(n & fvc::interpolate(sigma()));
+
+            // Add stabilisation to the traction
+            // We add this before enforcing the traction condition as the stabilisation
+            // is set to zero on traction boundaries
+            // To-do: add a stabilisation traction function to momentumStabilisation
+            const scalar scaleFactor =
+                readScalar(stabilisation().dict().lookup("scaleFactor"));
+            const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+            traction += scaleFactor*impKf_*(fvc::snGrad(D()) - (n & gradDf));
+
+            // Enforce traction boundary conditions
+            enforceTractionBoundaries(traction, D(), n);
 
             // Linear momentum equation total displacement form
             fvVectorMatrix DEqn
@@ -150,9 +168,8 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 rho()*fvm::d2dt2(D())
              == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-              + fvc::div(sigma(), "div(sigma)")
+              + fvc::div(mesh().magSf()*traction)
               + rho()*g()
-              + stabilisation().stabilisation(D(), gradD(), impK_)
               + fvOptions()(ds_, D())
             );
 
@@ -493,7 +510,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh().gradScheme("grad(" + D().name() +')')
     );
 
-    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    if
+    (
+        solutionAlg() == solutionAlgorithm::PETSC_SNES
+     || solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED
+    )
     {
         if (gradDScheme != "leastSquaresS4f")
         {
@@ -504,7 +525,12 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                    [
                        solidModel::solutionAlgorithm::PETSC_SNES
                    ]
-                << " solution algorithm" << abort(FatalError);
+                << " and "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " solution algorithms" << abort(FatalError);
         }
 
         // Set extrapolateValue to true for solidTraction boundaries
@@ -531,26 +557,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 tracPatch.extrapolateValue() = true;
             }
         }
-    }
-    else if (solutionAlg() != solutionAlgorithm::EXPLICIT)
-    {
-        if (gradDScheme == "leastSquaresS4f")
-        {
-            FatalErrorIn(type() + "::" + type())
-                << "The `leastSquaresS4f` gradScheme should only be used for "
-                << "`grad(D)` when using the "
-                << solidModel::solutionAlgorithmNames_
-                   [
-                       solidModel::solutionAlgorithm::PETSC_SNES
-                   ]
-                << " and "
-                << solidModel::solutionAlgorithmNames_
-                   [
-                       solidModel::solutionAlgorithm::PETSC_SNES
-                   ]
-                << " solution algorithms" << abort(FatalError);
-        }
-
     }
 }
 
