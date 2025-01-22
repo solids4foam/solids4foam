@@ -27,7 +27,6 @@ License
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -128,6 +127,10 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
     do
     {
         int iCorr = 0;
+        scalar currentResidualNorm = 0;
+        scalar initialResidualNorm = 0;
+        scalar deltaXNorm = 0;
+        scalar xNorm = 0;
 #ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfD;
         SolverPerformance<vector>::debug = 0;
@@ -188,6 +191,16 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Solve the linear system
             solverPerfD = DEqn.solve();
 
+            // Norm of the solution correction
+            deltaXNorm =
+                gSum
+                (
+                    mag(D().primitiveField() - D().prevIter().primitiveField())
+                );
+
+            // Norm of the solution
+            xNorm = gSum(mag(D().primitiveField()));
+
             // Fixed or adaptive field under-relaxation
             relaxField(D(), iCorr);
 
@@ -214,22 +227,39 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
             // Calculate the stress using run-time selectable mechanical law
             mechanical().correct(sigma());
+
+            // Current residual
+            currentResidualNorm = mag(solverPerfD.initialResidual());
+
+            // Initial residual
+            if (iCorr == 0)
+            {
+                initialResidualNorm = currentResidualNorm;
+            }
         }
         while
         (
-            !converged
+            !checkConvergence
             (
-                iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
-                mag(solverPerfD.initialResidual()),
-                cmptMax(solverPerfD.nIterations()),
-#else
-                solverPerfD.initialResidual(),
-                solverPerfD.nIterations(),
-#endif
-                D()
+                currentResidualNorm,
+                initialResidualNorm,
+                deltaXNorm,
+                xNorm,
+                ++iCorr,
+                nCorr(),
+                solidModelDict().lookupOrDefault<scalar>("rTol", 1e-8),
+                solidModelDict().lookupOrDefault<scalar>("aTol", 1e-50),
+                solidModelDict().lookupOrDefault<scalar>("sTol", 1e-8),
+                solidModelDict().lookupOrDefault<scalar>("divTol", 1e4),
+                solidModelDict().lookupOrDefault<label>
+                (
+                    "writeResidualFrequency", 1
+                ),
+                solidModelDict().lookupOrDefault<Switch>
+                (
+                    "writeConvergedReason", true
+                )
             )
-         && ++iCorr < nCorr()
         );
 
         // Interpolate cell displacements to vertices
