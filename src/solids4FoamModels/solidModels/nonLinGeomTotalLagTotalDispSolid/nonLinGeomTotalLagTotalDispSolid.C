@@ -156,6 +156,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     Info<< "Evolving solid solver using an implicit segregated approach"
         << endl;
 
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
     if (predictor_ && newTimeStep())
     {
         predict();
@@ -173,11 +176,41 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     Info<< "Solving the total Lagrangian form of the momentum equation for D"
         << endl;
 
+    // Undeformed unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
     // Momentum equation loop
     do
     {
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
+
+        // Calculate deformed area vectors and normals
+        const surfaceVectorField SfCurrent
+        (
+            fvc::interpolate(J_*Finv_.T()) & mesh().Sf()
+        );
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+        // Traction vectors at the faces
+        surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(D()) - (n & gradDf));
+
+        // Calculate the force at the faces
+        surfaceVectorField force(magSfCurrent*traction);
+
+        // Enforce traction boundary conditions
+        // enforceTractionBoundaries(traction, D, nCurrent);
+        enforceTractionBoundaries(force, D(), nCurrent, magSfCurrent);
 
         // Momentum equation total displacement total Lagrangian form
         fvVectorMatrix DEqn
@@ -185,9 +218,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
             rho()*fvm::d2dt2(D())
          == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
+          + fvc::div(force)
           + rho()*g()
-          + stabilisation().stabilisation(D(), gradD(), impK_)
         );
 
         // Under-relax the linear system
