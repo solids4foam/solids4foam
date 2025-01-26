@@ -38,14 +38,14 @@ fi
 
 # Check if the build succeeded
 echo "Checking if the installation was a success:"
-N_ERRORS_1=$(find . -name log.Allwmake | xargs grep "\ Error\ " | wc -l)
-N_ERRORS_2=$(find . -name log.Allwmake | xargs grep "\ Stop." | wc -l)
+N_ERRORS_1=$(find . -name log.Allwmake | xargs grep " Error " | wc -l)
+N_ERRORS_2=$(find . -name log.Allwmake | xargs grep " Stop." | wc -l)
 if [[ $N_ERRORS_1 -gt 0 ]] || [[ $N_ERRORS_2 -gt 0 ]]
 then
     echo "** BUILD ERROR **"
     echo "There were build errors in the following logs:"
-    echo $(find . -name log.Allwmake | xargs grep -l "\ Error\ ")
-    echo $(find . -name log.Allwmake | xargs grep -l "\ Stop.")
+    echo $(find . -name log.Allwmake | xargs grep -l " Error ")
+    echo $(find . -name log.Allwmake | xargs grep -l " Stop.")
     echo; echo "Please examine these logs for additional details"; echo
     exit 1
 else
