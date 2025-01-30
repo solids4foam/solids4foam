@@ -482,25 +482,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().storePrevIter();
     mechanical().grad(D(), gradD());
 
-    if (solidModelDict().lookupOrDefault<Switch>("higherOrderGrad", false))
-    {
-        // Include fixedValue patches should in the least squares stencils
-        boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
-        forAll(includePatchInStencils, patchI)
-        {
-            if
-            (
-                isA<fixedDisplacementFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                includePatchInStencils[patchI] = true;
-            }
-        }
-    }
-
     if (predictor_)
     {
         // Check ddt scheme for D is not steadyState
