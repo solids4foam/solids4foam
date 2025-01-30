@@ -173,7 +173,7 @@ void Foam::AMIInterpolationS4F::normaliseWeights
 
     // Normalise the weights
     wghtSum.setSize(wght.size(), 0.0);
-    label nLowWeight = 0;
+    //label nLowWeight = 0;
 
     forAll(wght, facei)
     {
@@ -196,10 +196,10 @@ void Foam::AMIInterpolationS4F::normaliseWeights
             }
 
             wghtSum[facei] = t;
-            if (t < lowWeightTol)
-            {
-                ++nLowWeight;
-            }
+            // if (t < lowWeightTol)
+            // {
+            //     ++nLowWeight;
+            // }
         }
         else
         {

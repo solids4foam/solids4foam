@@ -217,14 +217,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             DD() = D() - D().oldTime();
 
             // Update gradient of displacement
-            if (hoGradPtr_)
-            {
-                gradD() = hoGradPtr_->grad(D());
-            }
-            else
-            {
-                mechanical().grad(D(), gradD());
-            }
+            mechanical().grad(D(), gradD());
 
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
@@ -477,8 +470,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         ),
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
-    ),
-    hoGradPtr_()
+    )
 {
     DisRequired();
 
@@ -507,16 +499,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 includePatchInStencils[patchI] = true;
             }
         }
-
-        hoGradPtr_.set
-        (
-            new higherOrderGrad
-            (
-                mesh(),
-                includePatchInStencils,
-                solidModelDict().subDict("higherOrderGradCoeffs")
-            )
-        );
     }
 
     if (predictor_)
@@ -712,15 +694,7 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     const_cast<volVectorField&>(D).correctBoundaryConditions();
 
     // Update gradient of displacement
-    if (hoGradPtr_)
-    {
-        gradD() = hoGradPtr_->grad(D);
-        //const surfaceTensorField gradDf(hoGradPtr_->fGrad(D));
-    }
-    else
-    {
-        mechanical().grad(D, gradD());
-    }
+    mechanical().grad(D, gradD());
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
