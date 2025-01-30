@@ -54,6 +54,7 @@ SourceFiles
 #include "Enum.H"
 #include "twoDPointCorrector.H"
 #include "fvOptions.H"
+#include "checkConvergence.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

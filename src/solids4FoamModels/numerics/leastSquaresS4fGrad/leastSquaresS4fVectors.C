@@ -99,7 +99,6 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh_.nCells(), Zero);
-
     forAll(owner, facei)
     {
         label own = owner[facei];

@@ -16,10 +16,35 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Perturn by 30% of the local minimum edge length in the X and Y directions
+scaleFactor (0.3 0.3 0);
+
+// Gaussian or uniform random distribution
+Gaussian    no;
+
+// Seed for random number generator
 seed        1;
 
-scaleFactor (5e-3 5e-3 0);
+// Minimum cosine to find feature edges
+// Points on feature edges are not moved
+minCos      0.7;
 
-Gaussian    no;
+// Names of patches which should not be perturbed
+fixedPatches
+(
+    // Add patch names here
+);
+
+// Optional: maximum number of corrections iterations
+// Defaults to 1000
+//maxIter 1000;
+
+// Optional: local motion rescale factor for applying corrections
+// Defaults to 0.8
+//beta 0.8;
+
+// Optional: local minimum allow cell volume relative to the initial volume
+// Defaults to 0.1
+//minCellVol 0.1;
 
 // ************************************************************************* //

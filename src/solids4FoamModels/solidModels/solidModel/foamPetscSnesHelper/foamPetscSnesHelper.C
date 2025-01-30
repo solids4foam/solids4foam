@@ -153,7 +153,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     }
     else
     {
-        Foam::Info<< "    Initialising the matrix" << Foam::endl;
+        Foam::Info<< "    Initialising the matrix..." << Foam::flush;
 
         // Set the block size
         CHKERRQ(MatSetBlockSize(B, blockSize));
@@ -221,6 +221,8 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
 
         // Raise an error if mallocs are required during matrix assembly
         MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+
+        Foam::Info<< "done" << Foam::endl;
     }
 
     // Insert OpenFOAM matrix into PETSc matrix
