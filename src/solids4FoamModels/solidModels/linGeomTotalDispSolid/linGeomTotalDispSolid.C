@@ -194,13 +194,20 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
             // Norm of the solution correction
             deltaXNorm =
-                gSum
+                sqrt
                 (
-                    mag(D().primitiveField() - D().prevIter().primitiveField())
+                    gSum
+                    (
+                        magSqr
+                        (
+                            D().primitiveField()
+                          - D().prevIter().primitiveField()
+                        )
+                    )
                 );
 
             // Norm of the solution
-            xNorm = gSum(mag(D().primitiveField()));
+            xNorm = sqrt(gSum(magSqr(D().primitiveField())));
 
             // Store the initial residual
             if (iCorr == 0)
