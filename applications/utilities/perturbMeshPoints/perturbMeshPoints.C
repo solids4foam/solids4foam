@@ -437,8 +437,7 @@ int main(int argc, char *argv[])
         // Move the mesh
         Info<< "Applying the perturbation to the points" << endl;
         mesh.movePoints(newPoints);
-        mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
-        mesh.moving(false);
+        mesh.clearOut();
 
         // Check for negative or small cell volumes
         const scalarField& VI = mesh.V();
