@@ -24,7 +24,6 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
-#include "fixedDisplacementFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
