@@ -224,6 +224,12 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
           + rho()*g()
         );
 
+        // Add damping
+        if (dampingCoeff().value() > SMALL)
+        {
+            DEqn += dampingCoeff()*rho()*fvm::ddt(D());
+        }
+
         // Under-relax the linear system
         DEqn.relax();
 
@@ -233,18 +239,29 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Solve the linear system and store the residual
         currentResidualNorm = mag(DEqn.solve().initialResidual());
 
+        // Norm of the solution correction
+        deltaXNorm =
+            sqrt
+            (
+                gSum
+                (
+                    magSqr
+                    (
+                        D().primitiveField() - D().prevIter().primitiveField()
+                    )
+                )
+            );
+
+        // Norm of the solution
+        xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+
         // Store the initial residual
         if (iCorr == 0)
         {
             initialResidualNorm = currentResidualNorm;
+            Info<< "Initial Residual Norm = " << initialResidualNorm << nl
+                << "Initial Solution Norm = " << xNorm << endl;
         }
-
-        // Norm of the solution correction
-        deltaXNorm =
-            gSum(mag(D().primitiveField() - D().prevIter().primitiveField()));
-
-        // Norm of the solution
-        xNorm = gSum(mag(D().primitiveField()));
 
         // Fixed or adaptive field under-relaxation
         relaxField(D(), iCorr);
