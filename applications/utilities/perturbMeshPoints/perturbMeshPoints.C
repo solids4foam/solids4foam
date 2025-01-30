@@ -310,6 +310,8 @@ int main(int argc, char *argv[])
 
         minEdgeLength[pI] = minLen;
     }
+    Info<< "Minimum edge lengths: " << min(minEdgeLength)
+        << "->" << max(minEdgeLength) << endl;
 
     // Store the original minEdgeLength
     const scalarField oldMinEdgeLength(minEdgeLength);
@@ -436,6 +438,7 @@ int main(int argc, char *argv[])
         Info<< "Applying the perturbation to the points" << endl;
         mesh.movePoints(newPoints);
         mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
+        mesh.moving(false);
 
         // Check for negative or small cell volumes
         const scalarField& VI = mesh.V();
