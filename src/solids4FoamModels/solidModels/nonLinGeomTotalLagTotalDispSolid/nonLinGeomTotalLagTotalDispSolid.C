@@ -156,22 +156,30 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     Info<< "Evolving solid solver using an implicit segregated approach"
         << endl;
 
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
     if (predictor_ && newTimeStep())
     {
         predict();
     }
 
     int iCorr = 0;
+    scalar currentResidualNorm = 0;
+    scalar initialResidualNorm = 0;
+    scalar deltaXNorm = 0;
+    scalar xNorm = 0;
 #ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<vector> solverPerfD;
     SolverPerformance<vector>::debug = 0;
 #else
-    lduSolverPerformance solverPerfD;
     blockLduMatrix::debug = 0;
 #endif
 
     Info<< "Solving the total Lagrangian form of the momentum equation for D"
         << endl;
+
+    // Undeformed unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
 
     // Momentum equation loop
     do
@@ -179,16 +187,48 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
 
+        // Calculate deformed area vectors and normals
+        const surfaceVectorField SfCurrent
+        (
+            fvc::interpolate(J_*Finv_.T()) & mesh().Sf()
+        );
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+        // Traction vectors at the faces
+        surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(D()) - (n & gradDf));
+
+        // Calculate the force at the faces
+        surfaceVectorField force(magSfCurrent*traction);
+
+        // Enforce traction boundary conditions
+        // enforceTractionBoundaries(traction, D, nCurrent);
+        enforceTractionBoundaries(force, D(), nCurrent, magSfCurrent);
+
         // Momentum equation total displacement total Lagrangian form
         fvVectorMatrix DEqn
         (
             rho()*fvm::d2dt2(D())
          == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
+          + fvc::div(force)
           + rho()*g()
-          + stabilisation().stabilisation(D(), gradD(), impK_)
         );
+
+        // Add damping
+        if (dampingCoeff().value() > SMALL)
+        {
+            DEqn += dampingCoeff()*rho()*fvm::ddt(D());
+        }
 
         // Under-relax the linear system
         DEqn.relax();
@@ -196,8 +236,32 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Enforce any cell displacements
         solidModel::setCellDisps(DEqn);
 
-        // Solve the linear system
-        solverPerfD = DEqn.solve();
+        // Solve the linear system and store the residual
+        currentResidualNorm = mag(DEqn.solve().initialResidual());
+
+        // Norm of the solution correction
+        deltaXNorm =
+            sqrt
+            (
+                gSum
+                (
+                    magSqr
+                    (
+                        D().primitiveField() - D().prevIter().primitiveField()
+                    )
+                )
+            );
+
+        // Norm of the solution
+        xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+
+        // Store the initial residual
+        if (iCorr == 0)
+        {
+            initialResidualNorm = currentResidualNorm;
+            Info<< "Initial Residual Norm = " << initialResidualNorm << nl
+                << "Initial Solution Norm = " << xNorm << endl;
+        }
 
         // Fixed or adaptive field under-relaxation
         relaxField(D(), iCorr);
@@ -230,18 +294,32 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     }
     while
     (
-       !converged
+        !checkConvergence
         (
-            iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
-            mag(solverPerfD.initialResidual()),
-            cmptMax(solverPerfD.nIterations()),
-#else
-            solverPerfD.initialResidual(),
-            solverPerfD.nIterations(),
-#endif
-            D()
-        ) && ++iCorr < nCorr()
+            currentResidualNorm,
+            initialResidualNorm,
+            deltaXNorm,
+            xNorm,
+            ++iCorr,
+            nCorr(),
+            solidModelDict().lookupOrDefault<scalar>
+            (
+                "rTol",
+                solutionTol()
+            ),
+            solidModelDict().lookupOrDefault<scalar>("aTol", 1e-50),
+            solidModelDict().lookupOrDefault<scalar>
+            (
+                "sTol",
+                solutionTol()
+            ),
+            solidModelDict().lookupOrDefault<scalar>("divTol", 1e4),
+            infoFrequency(),
+            solidModelDict().lookupOrDefault<Switch>
+            (
+                "writeConvergedReason", true
+            )
+        )
     );
 
     // Interpolate cell displacements to vertices

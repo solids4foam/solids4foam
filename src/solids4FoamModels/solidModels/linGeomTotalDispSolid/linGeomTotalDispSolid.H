@@ -42,6 +42,7 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "foamPetscSnesHelper.H"
+#include "higherOrderGrad.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -87,6 +88,9 @@ class linGeomTotalDispSolid
 
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
+
+        //- Higher order gradient calculator
+        autoPtr<higherOrderGrad> hoGradPtr_;
 
 
     // Private Member Functions

@@ -2,6 +2,7 @@ physicsModel/physicsModel.C
 
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
+solidModels/solidModel/checkConvergence.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
@@ -10,6 +11,8 @@ solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSo
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
+solidModels/linGeomTotalDispSolid/higherOrderGrad/higherOrderGrad.C
+solidModels/linGeomTotalDispSolid/higherOrderGrad/fvcSurfaceIntegrateQuadrature.C
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
@@ -234,5 +237,6 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
+numerics/triangleQuadrature/triangleQuadrature.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
