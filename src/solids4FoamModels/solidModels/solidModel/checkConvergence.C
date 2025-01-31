@@ -28,19 +28,64 @@ namespace Foam
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
+convergenceParameters readConvergenceParameters(const dictionary& dict)
+{
+    convergenceParameters p;
+    p.rTol_ = dict.lookupOrDefault<scalar>("rTol", 1e-6);
+    p.aTol_ = dict.lookupOrDefault<scalar>("aTol", 1e-50);
+    p.sTol_ = dict.lookupOrDefault<scalar>("sTol", 1e-10);
+    p.divTol_ = dict.lookupOrDefault<scalar>("divTol", 1e4);
+    p.maxIterations_ = dict.lookupOrDefault<label>("nCorrectors", 10000);
+    p.writeResidualFrequency_ =
+        dict.lookupOrDefault<label>("infoFrequency", 100);
+    p.writeConvergedReason_ =
+        dict.lookupOrDefault<Switch>("writeConvergedReason", true);
+
+    return p;
+}
+
+
 bool checkConvergence
 (
     const scalar currentResidualNorm,
     const scalar initialResidualNorm,
     const scalar deltaXNorm,
     const scalar xNorm,
-    const int iteration,
-    const int maxIterations,
+    const label iteration,
+    const convergenceParameters& param
+)
+{
+    return checkConvergence
+    (
+        currentResidualNorm,
+        initialResidualNorm,
+        deltaXNorm,
+        xNorm,
+        iteration,
+        param.maxIterations_,
+        param.rTol_,
+        param.aTol_,
+        param.sTol_,
+        param.divTol_,
+        param.writeResidualFrequency_,
+        param.writeConvergedReason_
+    );
+}
+
+
+bool checkConvergence
+(
+    const scalar currentResidualNorm,
+    const scalar initialResidualNorm,
+    const scalar deltaXNorm,
+    const scalar xNorm,
+    const label iteration,
+    const label maxIterations,
     const scalar rtol,
     const scalar atol,
     const scalar stol,
     const scalar divtol,
-    const int writeResidualFrequency,
+    const label writeResidualFrequency,
     const bool writeConvergedReason
 )
 {

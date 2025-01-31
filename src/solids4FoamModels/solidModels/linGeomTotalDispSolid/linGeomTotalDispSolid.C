@@ -125,6 +125,12 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         predict();
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector>::debug = 0;
+#else
+    blockLduMatrix::debug = 0;
+#endif
+
     // Mesh update loop
     do
     {
@@ -133,11 +139,8 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         scalar initialResidualNorm = 0;
         scalar deltaXNorm = 0;
         scalar xNorm = 0;
-#ifdef OPENFOAM_NOT_EXTEND
-        SolverPerformance<vector>::debug = 0;
-#else
-        blockLduMatrix::debug = 0;
-#endif
+        const convergenceParameters convParam =
+            readConvergenceParameters(solidModelDict());
 
         Info<< "Solving the momentum equation for D" << endl;
 
@@ -245,24 +248,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 deltaXNorm,
                 xNorm,
                 ++iCorr,
-                nCorr(),
-                solidModelDict().lookupOrDefault<scalar>
-                (
-                    "rTol",
-                    solutionTol()
-                ),
-                solidModelDict().lookupOrDefault<scalar>("aTol", 1e-50),
-                solidModelDict().lookupOrDefault<scalar>
-                (
-                    "sTol",
-                    solutionTol()
-                ),
-                solidModelDict().lookupOrDefault<scalar>("divTol", 1e4),
-                infoFrequency(),
-                solidModelDict().lookupOrDefault<Switch>
-                (
-                    "writeConvergedReason", true
-                )
+                convParam
             )
         );
 
