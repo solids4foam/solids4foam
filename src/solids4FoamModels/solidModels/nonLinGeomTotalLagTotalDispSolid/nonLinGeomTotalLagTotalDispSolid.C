@@ -164,16 +164,19 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         predict();
     }
 
-    int iCorr = 0;
-    scalar currentResidualNorm = 0;
-    scalar initialResidualNorm = 0;
-    scalar deltaXNorm = 0;
-    scalar xNorm = 0;
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 0;
 #else
     blockLduMatrix::debug = 0;
 #endif
+
+    int iCorr = 0;
+    scalar currentResidualNorm = 0;
+    scalar initialResidualNorm = 0;
+    scalar deltaXNorm = 0;
+    scalar xNorm = 0;
+    const convergenceParameters convParam =
+        readConvergenceParameters(solidModelDict());
 
     Info<< "Solving the total Lagrangian form of the momentum equation for D"
         << endl;
@@ -301,24 +304,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
             deltaXNorm,
             xNorm,
             ++iCorr,
-            nCorr(),
-            solidModelDict().lookupOrDefault<scalar>
-            (
-                "rTol",
-                solutionTol()
-            ),
-            solidModelDict().lookupOrDefault<scalar>("aTol", 1e-50),
-            solidModelDict().lookupOrDefault<scalar>
-            (
-                "sTol",
-                solutionTol()
-            ),
-            solidModelDict().lookupOrDefault<scalar>("divTol", 1e4),
-            infoFrequency(),
-            solidModelDict().lookupOrDefault<Switch>
-            (
-                "writeConvergedReason", true
-            )
+            convParam
         )
     );
 
