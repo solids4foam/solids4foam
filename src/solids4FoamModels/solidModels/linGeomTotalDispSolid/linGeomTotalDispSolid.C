@@ -25,6 +25,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "minEdgeLength.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -131,138 +132,208 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
     blockLduMatrix::debug = 0;
 #endif
 
+    const convergenceParameters convParam =
+        readConvergenceParameters(solidModelDict());
+
     // Mesh update loop
     do
     {
-        int iCorr = 0;
-        scalar currentResidualNorm = 0;
-        scalar initialResidualNorm = 0;
-        scalar deltaXNorm = 0;
-        scalar xNorm = 0;
-        const convergenceParameters convParam =
-            readConvergenceParameters(solidModelDict());
-
         Info<< "Solving the momentum equation for D" << endl;
 
         // Unit normal vectors at the faces
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
 
-        // Momentum equation loop
+        // Set initial pseudo time step based on Courant number
+        const scalar initCoNo = 100;
+        const dimensionedScalar minRho = min(rho());
+        dimensionedScalar pseudoDeltaT
+        (
+            "pseudoDeltaT",
+            dimTime,
+            initCoNo*minRho.value()*sqr(minEdgeLength(mesh()))
+            /(6*gMax(impKf_.primitiveField()))
+        );
+        const dimensionedScalar rT("rT", dimless/dimTime, 1.0);
+
+        // Set the target number of outer iterations per pseudo time step
+        label nTarget = 100;
+
+        // Initialise the number of iterations as nTarget
+        label nIter = nTarget;
+
+        // Set the rate at which the pseudo time step changes
+        const scalar nIterExpon = 0.5;
+
+        // Store the pseudo old time D field
+        volVectorField DOldPseudo("DOldPseudo", D());
+
+        // Pseudo time step counter
+        label iPseudo = 0;
+
+        // Store initial residual at the start of the time step for convergence
+        // checking
+        scalar initialPseudoResidualNorm = 0;
+        scalar initialResidualNorm = 0;
+
+        // Pseudo time step loop
         do
         {
-            // Store fields for under-relaxation and residual calculation
-            D().storePrevIter();
+            int iCorr = 0;
+            scalar currentResidualNorm = 0;
+            initialResidualNorm = 0;
+            scalar deltaXNorm = 0;
+            scalar xNorm = 0;
 
-            // Calculate raction vectors at the faces
-            surfaceVectorField traction(n & fvc::interpolate(sigma()));
+            // Update the pseudo time step
+            pseudoDeltaT *= Foam::pow(scalar(nTarget)/nIter, nIterExpon);
+            Info<< nl << "Pseudo iter = " << iPseudo
+                << ", pseduoDeltaT = " << pseudoDeltaT.value() << endl;
 
-            // Add stabilisation to the traction
-            // We add this before enforcing the traction condition as the stabilisation
-            // is set to zero on traction boundaries
-            // To-do: add a stabilisation traction function to momentumStabilisation
-            const scalar scaleFactor =
-                readScalar(stabilisation().dict().lookup("scaleFactor"));
-            const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-            traction += scaleFactor*impKf_*(fvc::snGrad(D()) - (n & gradDf));
+            // Update the pseudo old time D field
+            DOldPseudo = volVectorField("DOldPseudo", D());
 
-            // Enforce traction boundary conditions
-            enforceTractionBoundaries(traction, D(), n);
-
-            // Linear momentum equation total displacement form
-            fvVectorMatrix DEqn
-            (
-                rho()*fvm::d2dt2(D())
-             == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-              - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-              + fvc::div(mesh().magSf()*traction)
-              + rho()*g()
-              + fvOptions()(ds_, D())
-            );
-
-            // Add damping
-            if (dampingCoeff().value() > SMALL)
+            // Momentum equation loop
+            do
             {
-                DEqn += dampingCoeff()*rho()*fvm::ddt(D());
-            }
+                // Store fields for under-relaxation and residual calculation
+                D().storePrevIter();
 
-            // Under-relaxation the linear system
-            DEqn.relax();
+                // Calculate raction vectors at the faces
+                surfaceVectorField traction(n & fvc::interpolate(sigma()));
 
-            // Enforce any cell displacements
-            solidModel::setCellDisps(DEqn);
+                // Add stabilisation to the traction
+                // We add this before enforcing the traction condition as the stabilisation
+                // is set to zero on traction boundaries
+                // To-do: add a stabilisation traction function to momentumStabilisation
+                const scalar scaleFactor =
+                    readScalar(stabilisation().dict().lookup("scaleFactor"));
+                const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+                traction += scaleFactor*impKf_*(fvc::snGrad(D()) - (n & gradDf));
 
-            // Solve the linear system and store the residual
-            currentResidualNorm = mag(DEqn.solve().initialResidual());
+                // Enforce traction boundary conditions
+                enforceTractionBoundaries(traction, D(), n);
 
-            // Norm of the solution correction
-            deltaXNorm =
-                sqrt
+                // Linear momentum equation total displacement form
+                fvVectorMatrix DEqn
                 (
-                    gSum
-                    (
-                        magSqr
-                        (
-                            D().primitiveField()
-                          - D().prevIter().primitiveField()
-                        )
-                    )
+                    rho()*fvm::d2dt2(D())
+                 == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+                  - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+                  + fvc::div(mesh().magSf()*traction)
+                  + rho()*g()
+                  + fvOptions()(ds_, D())
                 );
 
-            // Norm of the solution
-            xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+                // Add damping
+                if (dampingCoeff().value() > SMALL)
+                {
+                    DEqn += dampingCoeff()*rho()*fvm::ddt(D());
+                }
 
-            // Store the initial residual
-            if (iCorr == 0)
-            {
-                initialResidualNorm = currentResidualNorm;
-                Info<< "Initial Residual Norm = " << initialResidualNorm << nl
-                    << "Initial Solution Norm = " << xNorm << endl;
+                // Add pseudo time term
+                DEqn += fvm::Sp(rT*minRho/pseudoDeltaT, D());
+                DEqn -= (rT*minRho/pseudoDeltaT)*DOldPseudo;
+
+                // Under-relaxation the linear system
+                DEqn.relax();
+
+                // Enforce any cell displacements
+                solidModel::setCellDisps(DEqn);
+
+                // Solve the linear system and store the residual
+                currentResidualNorm = mag(DEqn.solve().initialResidual());
+
+                // Norm of the solution correction
+                deltaXNorm =
+                    sqrt
+                    (
+                        gSum
+                        (
+                            magSqr
+                            (
+                                D().primitiveField()
+                              - D().prevIter().primitiveField()
+                            )
+                        )
+                    );
+
+                // Norm of the solution
+                xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+
+                // Store the initial residual
+                if (iCorr == 0)
+                {
+                    initialResidualNorm = currentResidualNorm;
+                    Info<< "Initial Residual Norm = " << initialResidualNorm << nl
+                        << "Initial Solution Norm = " << xNorm << endl;
+
+                    // Store initial pseudo residual
+                    if (iPseudo == 0)
+                    {
+                        initialPseudoResidualNorm = currentResidualNorm;
+                    }
+                }
+
+                // Fixed or adaptive field under-relaxation
+                relaxField(D(), iCorr);
+
+                // Update increment of displacement
+                DD() = D() - D().oldTime();
+
+                // Update gradient of displacement
+                mechanical().grad(D(), gradD());
+
+                // Update gradient of displacement increment
+                gradDD() = gradD() - gradD().oldTime();
+
+                // Update the momentum equation inverse diagonal field
+                // This may be used by the mechanical law when calculating the
+                // hydrostatic pressure
+                const volScalarField DEqnA("DEqnA", DEqn.A());
+
+                // Calculate the stress using run-time selectable mechanical law
+                mechanical().correct(sigma());
             }
+            while
+            (
+                !checkConvergence
+                (
+                    currentResidualNorm,
+                    initialResidualNorm,
+                    deltaXNorm,
+                    xNorm,
+                    ++iCorr,
+                    convParam
+                )
+            );
 
-            // Fixed or adaptive field under-relaxation
-            relaxField(D(), iCorr);
+            // Interpolate cell displacements to vertices
+            mechanical().interpolate(D(), gradD(), pointD());
 
-            // Update increment of displacement
+            // Increment of displacement
             DD() = D() - D().oldTime();
 
-            // Update gradient of displacement
-            mechanical().grad(D(), gradD());
+            // Increment of point displacement
+            pointDD() = pointD() - pointD().oldTime();
 
-            // Update gradient of displacement increment
-            gradDD() = gradD() - gradD().oldTime();
+            // Velocity
+            U() = fvc::ddt(D());
 
-            // Update the momentum equation inverse diagonal field
-            // This may be used by the mechanical law when calculating the
-            // hydrostatic pressure
-            const volScalarField DEqnA("DEqnA", DEqn.A());
-
-            // Calculate the stress using run-time selectable mechanical law
-            mechanical().correct(sigma());
+            // Update nIter
+            nIter = iCorr;
         }
         while
         (
             !checkConvergence
             (
-                currentResidualNorm,
                 initialResidualNorm,
-                deltaXNorm,
-                xNorm,
-                ++iCorr,
+                initialPseudoResidualNorm,
+                GREAT, // deltaXNorm: not used
+                SMALL, // xNorm: not used
+                ++iPseudo,
                 convParam
             )
         );
-
-        // Interpolate cell displacements to vertices
-        mechanical().interpolate(D(), gradD(), pointD());
-
-        // Increment of displacement
-        DD() = D() - D().oldTime();
-
-        // Increment of point displacement
-        pointDD() = pointD() - pointD().oldTime();
-
-        // Velocity
-        U() = fvc::ddt(D());
     }
     while (solidModel::mesh().update());
 
