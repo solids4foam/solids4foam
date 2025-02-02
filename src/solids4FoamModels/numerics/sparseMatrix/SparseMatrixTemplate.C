@@ -40,6 +40,20 @@ Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate
     data_(mat.data())
 {}
 
+
+template<class Type>
+Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate
+(
+    const tmp<SparseMatrixTemplate>& tmat
+)
+:
+    refCount(),
+    data_(std::move(tmat.ref().data()))
+{
+    tmat.clear();
+}
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 template<class Type>

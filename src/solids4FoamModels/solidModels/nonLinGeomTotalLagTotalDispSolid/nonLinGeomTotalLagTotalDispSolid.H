@@ -176,25 +176,19 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
-            //- Calculate the momentum equation residual
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            virtual tmp<vectorField> residualMomentum
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector
+            virtual label formResidual
             (
-                const volVectorField& D
+                PetscScalar *f,        // Residual
+                const PetscScalar *x   // Solution
             );
 
-            //- Calculate the Jacobian for the momentum equation
-            //  This Jacobian is the derivative of residualMomentum with respect
-            //  to the solution vector (D)
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            //  This can also be an approximation of the true Jacobian, e.g. a
-            //  compact molecule Laplacian
-            //  We initially adopt this approach for testin
-            virtual tmp<sparseMatrix> JacobianMomentum
+            //- Form the Jacobian of the governing equation
+            virtual label formJacobian
             (
-                const volVectorField& D
+                Mat jac,              // Jacobian
+                const PetscScalar *x  // Solution
             );
 
             //- Traction boundary surface normal gradient

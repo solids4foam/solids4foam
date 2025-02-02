@@ -53,6 +53,7 @@ SourceFiles
 #include "globalIndex.H"
 #include "volFields.H"
 #include "sparseMatrix.H"
+#include "fvMatrices.H"
 
 
 // * * * * * * * * * * * * * * External Structs  * * * * * * * * * * * * * * //
@@ -180,25 +181,51 @@ public:
 
         // Edit
 
-            //- Calculate the momentum equation residual
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            virtual tmp<vectorField> residualMomentum
+            //- Calculate the residual of the governing equations
+            //  A non-zero return value indicates an error
+            virtual label formResidual
             (
-                const volVectorField& D
+                PetscScalar *f,        // Residual
+                const PetscScalar *x   // Solution
             ) = 0;
 
-            //- Calculate the Jacobian for the momentum equation
-            //  This Jacobian is the derivative of residualMomentum with respect
-            //  to the solution vector (D)
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            //  This can also be an approximation of the true Jacobian, e.g. a
-            //  compact molecule Laplacian
-            virtual tmp<sparseMatrix> JacobianMomentum
+            //- Form the Jacobian
+            //  This Jacobian is the derivative of residual with respect
+            //  to the solution vector. This can also be an approximation of
+            //  the true Jacobian, e.g. a compact molecule Laplacian. A non-zero
+            //  return value indicates an error
+            virtual label formJacobian
             (
-                const volVectorField& D
+                Mat jac,              // Jacobian
+                const PetscScalar *x  // Solution
             ) = 0;
+
+            //- Insert an fvMatrix into a PETSc matrix
+            //  Currently only implemented for fvVectorMatrix
+            //  A non-zero return value indicates an error
+            label insertFvMatrixIntoPETScMatrix
+            (
+                const fvVectorMatrix& fvM,
+                Mat jac
+            ) const;
+
+            //- Extract vectorField vf from array x
+            //  For twoD, x is assumed to contain the x and y components of vf
+            void extractField
+            (
+                vectorField& vf,
+                const PetscScalar *x,
+                const bool twoD
+            ) const;
+
+            //- Insert array x into vectorField vf
+            //  For twoD, x is assumed to contain the x and y components of vf
+            void insertField
+            (
+                PetscScalar *x,
+                const vectorField& vf,
+                const bool twoD
+            ) const;
 
             //- Map the Foam solution volVectorField to the PETSc solution Vec
             //  Note that PETSc defines a Vec as a pointer to a struct type

@@ -20,7 +20,8 @@ License
 #ifdef USE_PETSC
 
 #include "foamPetscSnesHelper.H"
-
+#include "SparseMatrixTemplate.H"
+#include "processorFvPatch.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -40,51 +41,16 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     CHKERRQ(VecGetArrayRead(x, &xx));
     CHKERRQ(VecGetArray(f, &ff));
 
-    // Map the solution to an OpenFOAM field
-    const bool twoD = user->solMod_.twoD();
-    const int blockSize = twoD ? 2 : 3;
-    Foam::volVectorField& D = user->solMod_.solution();
-    Foam::vectorField& DI = D;
-
-    {
-        int index = 0;
-        forAll(DI, localCellI)
-        {
-            DI[localCellI][Foam::vector::X] = xx[index++];
-            DI[localCellI][Foam::vector::Y] = xx[index++];
-
-            if (!twoD)
-            {
-                DI[localCellI][Foam::vector::Z] = xx[index++];
-            }
-        }
-    }
-
-    // Restore the solution vector
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
-
-    // Enforce the D boundary conditions and sync processor boundaries
-    D.correctBoundaryConditions();
-
     // Compute the residual
-    const Foam::vectorField res(user->solMod_.residualMomentum(D));
-
-    // Map the data to f
-    forAll(res, localBlockRowI)
+    if (user->solMod_.formResidual(ff, xx) != 0)
     {
-        const Foam::vector& resI = res[localBlockRowI];
-        const int blockRowI = localBlockRowI;
-
-        ff[blockRowI*blockSize] = resI.x();
-        ff[blockRowI*blockSize + 1] = resI.y();
-
-        if (!twoD)
-        {
-            ff[blockRowI*blockSize + 2] = resI.z();
-        }
+        Foam::FatalError
+            << "formResidual(ff, xx) returned an error code!"
+            << Foam::abort(Foam::FatalError);
     }
 
-    // Restore the source vector
+    // Restore the solution and residual vectors
+    CHKERRQ(VecRestoreArrayRead(x, &xx));
     CHKERRQ(VecRestoreArray(f, &ff));
 
     return 0;
@@ -108,33 +74,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
     const bool twoD = user->solMod_.twoD();
     const int blockSize = twoD ? 2 : 3;
-    Foam::volVectorField& D = user->solMod_.solution();
-    Foam::vectorField& DI = D;
-
-    {
-        int index = 0;
-        forAll(DI, localCellI)
-        {
-            DI[localCellI][Foam::vector::X] = xx[index++];
-            DI[localCellI][Foam::vector::Y] = xx[index++];
-
-            if (!twoD)
-            {
-                DI[localCellI][Foam::vector::Z] = xx[index++];
-            }
-        }
-    }
-
-    // Enforce boundary conditions
-    D.correctBoundaryConditions();
-
-    // Restore solution vector
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
-
-
-    // Compute Jacobian in OpenFOAM format
-    Foam::sparseMatrix matrix;
-    matrix += user->solMod_.JacobianMomentum(D)();
 
     // Initialise the matrix if it has yet to be allocated; otherwise zero all
     // entries
@@ -142,8 +81,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     MatGetInfo(B, MAT_LOCAL, &info);
     // PetscInt rstart, rend;
     // MatGetOwnershipRange(B, &rstart, &rend);
-    // Foam::Pout<< "rstart = " << rstart
-    //     << ", rend = " << rend << Foam::endl;
     if (info.nz_used)
     {
         // Zero the matrix but do not reallocate the space
@@ -162,6 +99,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
         const int blockn = user->solMod_.globalCells().localSize();
 
         // Count the number of non-zeros in the matrix
+        // Note: we assume a compact stencil, i.e. face only face neighbours
 
         // Number of on-processor non-zeros per row
         int* d_nnz = (int*)malloc(blockn*sizeof(int));
@@ -225,60 +163,16 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
         Foam::Info<< "done" << Foam::endl;
     }
 
-    // Insert OpenFOAM matrix into PETSc matrix
-    // Note: the sparseMatrix object contains global indices, which we use when
-    // inserting coefficients
-    const Foam::sparseMatrixData& data = matrix.data();
-    PetscScalar values2d[4];
-    PetscScalar values3d[9];
-    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    // Populate the Jacobian => implemented by the solid model
+    if (user->solMod_.formJacobian(B, xx) != 0)
     {
-        const Foam::tensor& coeff = iter();
-        const Foam::label globalBlockRowI = iter.key()[0];
-        const Foam::label globalBlockColI = iter.key()[1];
-
-        if (twoD)
-        {
-            // Prepare values
-            values2d[0] = coeff.xx();
-            values2d[1] = coeff.xy();
-            values2d[2] = coeff.yx();
-            values2d[3] = coeff.yy();
-
-            // Insert tensor coefficient
-            CHKERRQ
-            (
-                MatSetValuesBlocked
-                (
-                    B, 1, &globalBlockRowI, 1, &globalBlockColI, values2d,
-                    ADD_VALUES
-                )
-            );
-        }
-        else // 3-D
-        {
-            // Prepare values
-            values3d[0] = coeff.xx();
-            values3d[1] = coeff.xy();
-            values3d[2] = coeff.xz();
-            values3d[3] = coeff.yx();
-            values3d[4] = coeff.yy();
-            values3d[5] = coeff.yz();
-            values3d[6] = coeff.zx();
-            values3d[7] = coeff.zy();
-            values3d[8] = coeff.zz();
-
-            // Insert tensor coefficient
-            CHKERRQ
-            (
-                MatSetValuesBlocked
-                (
-                    B, 1, &globalBlockRowI, 1, &globalBlockColI, values3d,
-                    ADD_VALUES
-                )
-            );
-        }
+        Foam::FatalError
+            << "formJacobian(B, xx) returned an error code!"
+            << Foam::abort(Foam::FatalError);
     }
+
+    // Restore solution vector
+    CHKERRQ(VecRestoreArrayRead(x, &xx));
 
     // Complete matrix assembly
     CHKERRQ(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));
@@ -302,10 +196,6 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
-
-
-// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
-
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -415,6 +305,251 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+label foamPetscSnesHelper::insertFvMatrixIntoPETScMatrix
+(
+    const fvVectorMatrix& fvM,
+    Mat jac
+) const
+{
+    // Initialise block coeff
+    const int blockSize = twoD_ ? 2 : 3;
+    const label nCoeffCmpts = blockSize*blockSize;
+    PetscScalar values[nCoeffCmpts];
+    for (int i = 0; i < nCoeffCmpts; ++i)
+    {
+        values[i] = 0;
+    }
+
+    // Insert the diagonal
+    {
+        const vectorField diag(fvM.DD());
+        forAll(diag, blockRowI)
+        {
+            values[0] = diag[blockRowI][vector::X];
+            values[4] = diag[blockRowI][vector::Y];
+            values[8] = diag[blockRowI][vector::Z];
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+
+            // Insert block coefficient
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+            );
+        }
+    }
+
+    // Insert the off-diagonal
+    const fvMesh& mesh = fvM.psi().mesh();
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& upper = fvM.upper();
+        forAll(own, faceI)
+        {
+            values[0] = upper[faceI];
+            values[4] = upper[faceI];
+            values[8] = upper[faceI];
+
+            const label blockRowI = own[faceI];
+            const label blockColI = nei[faceI];
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+            const label globalBlockColI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+
+            // Insert block coefficients
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    ADD_VALUES
+                );
+            );
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+            );
+        }
+    }
+
+    // Collect the global cell indices from neighbours at processor boundaries
+    // These are used to insert the off-processor coefficients
+    // First, send the data
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (mesh.boundaryMesh()[patchI].type() == "processor")
+        {
+            // Take a copy of the faceCells (local IDs) and convert them to
+            // global IDs
+            labelList globalFaceCells(mesh.boundary()[patchI].faceCells());
+            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+
+            // Send global IDs to the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
+            procPatch.send
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+    // Next, receive the data
+    PtrList<labelList> neiProcGlobalIDs(mesh.boundaryMesh().size());
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        if (fp.type() == "processor")
+        {
+            neiProcGlobalIDs.set(patchI, new labelList(fp.size()));
+            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
+
+            // Receive global IDs from the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+
+    // Insert the off-processor coefficients
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        if (fp.type() == "processor")
+        {
+            const vectorField& intCoeffs = fvM.internalCoeffs()[patchI];
+            const vectorField& neiCoeffs = fvM.boundaryCoeffs()[patchI];
+            const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(fp, faceI)
+            {
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal
+                    (
+                        faceCells[faceI]
+                    );
+
+                // On-proc diagonal coefficient
+                {
+                    values[0] = intCoeffs[faceI][vector::X];
+                    values[4] = intCoeffs[faceI][vector::Y];
+                    values[8] = intCoeffs[faceI][vector::Z];
+
+                    CHKERRQ
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                            ADD_VALUES
+                        );
+                    );
+                }
+
+                // Off-proc off-diagonal coefficient
+                {
+                    // Take care: we need to flip the sign
+                    values[0] = -neiCoeffs[faceI][vector::X];
+                    values[4] = -neiCoeffs[faceI][vector::Y];
+                    values[8] = -neiCoeffs[faceI][vector::Z];
+
+                    const label globalBlockColI = neiGlobalFaceCells[faceI];
+
+                    CHKERRQ
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                            ADD_VALUES
+                        );
+                    );
+                }
+            }
+        }
+        else if (fp.coupled()) // coupled but not a processor boundary
+        {
+            FatalErrorInFunction
+                << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        // else non-coupled boundary contributions have already been added to
+        // the diagonal
+    }
+
+    return 0;
+}
+
+
+void foamPetscSnesHelper::extractField
+(
+    vectorField& vf,
+    const PetscScalar *x,
+    const bool twoD
+) const
+{
+    label index = 0;
+    if (twoD)
+    {
+        forAll(vf, cellI)
+        {
+            vf[cellI][vector::X] = x[index++];
+            vf[cellI][vector::Y] = x[index++];
+        }
+    }
+    else
+    {
+        forAll(vf, cellI)
+        {
+            vf[cellI][vector::X] = x[index++];
+            vf[cellI][vector::Y] = x[index++];
+            vf[cellI][vector::Z] = x[index++];
+        }
+    }
+}
+
+
+void foamPetscSnesHelper::insertField
+(
+    PetscScalar *x,
+    const vectorField& vf,
+    const bool twoD
+) const
+{
+    label index = 0;
+    if (twoD)
+    {
+        forAll(vf, cellI)
+        {
+            x[index++] = vf[cellI][vector::X];
+            x[index++] = vf[cellI][vector::Y];
+        }
+    }
+    else
+    {
+        forAll(vf, cellI)
+        {
+            x[index++] = vf[cellI][vector::X];
+            x[index++] = vf[cellI][vector::Y];
+            x[index++] = vf[cellI][vector::Z];
+        }
+    }
+}
 
 
 void foamPetscSnesHelper::mapSolutionFoamToPetsc()

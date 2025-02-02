@@ -557,17 +557,19 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 }
 
 
-tmp<vectorField> nonLinGeomUpdatedLagSolid::residualMomentum
+label nonLinGeomUpdatedLagSolid::formResidual
 (
-    const volVectorField& DD
+    PetscScalar *f,
+    const PetscScalar *x
 )
 {
-    // Prepare result
-    tmp<vectorField> tresidual(new vectorField(DD.size(), vector::zero));
-    vectorField& residual = tresidual.ref();
+    // Copy x into the DD field
+    volVectorField& DD = const_cast<volVectorField&>(this->DD());
+    vectorField& DDI = DD;
+    extractField(DDI, x, solidModel::twoD());
 
     // Enforce the boundary conditions
-    const_cast<volVectorField&>(DD).correctBoundaryConditions();
+    DD.correctBoundaryConditions();
 
     // Update total displacement
     D() = D().oldTime() + DD;
@@ -627,35 +629,42 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::residualMomentum
     // F = div(sigma) + rho*g
     //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
     // where, here, we roll the stabilisationTerm into the div(sigma)
-    residual =
+    vectorField residual
+    (
         fvc::div(magSfCurrent*traction)
       + rho()
        *(
            g() - fvc::d2dt2(D()) - dampingCoeff()*fvc::ddt(D())
-        );
+        )
+    );
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
 
-    return tresidual;
+    // Add optional fvOptions, e.g. MMS body force
+    // Note that "source()" is already multiplied by the volumes
+    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+
+    // Copy the residual into the f field
+    insertField(f, residual, solidModel::twoD());
+
+    return 0;
 }
 
 
-tmp<sparseMatrix> nonLinGeomUpdatedLagSolid::JacobianMomentum
+label nonLinGeomUpdatedLagSolid::formJacobian
 (
-    const volVectorField& DD
+    Mat jac,
+    const PetscScalar *x
 )
 {
-    // Count the number of non-zeros for a Laplacian discretisation
-    // This equals the sum of one plus the number of internal faces for each,
-    // which can be calculated as nCells + 2*nInternalFaces
-    // Multiply by the blockSize since we will form the block matrix
-    const int blockSize = solidModel::twoD() ? 2 : 3;
-    const label numNonZeros =
-        blockSize*returnReduce
-        (
-            mesh().nCells() + 2.0*mesh().nInternalFaces(), sumOp<label>()
-        );
+    // Copy x into the DD field
+    volVectorField& DD = const_cast<volVectorField&>(this->DD());
+    vectorField& DDI = DD;
+    extractField(DDI, x, solidModel::twoD());
+
+    // Enforce the boundary conditions
+    DD.correctBoundaryConditions();
 
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
@@ -672,159 +681,10 @@ tmp<sparseMatrix> nonLinGeomUpdatedLagSolid::JacobianMomentum
     // Optional: under-relaxation of the linear system
     approxJ.relax();
 
-    // Convert fvMatrix matrix to sparseMatrix
-    // To-do: move the code below to a function
+    // Convert fvMatrix matrix to PETSc matrix
+    insertFvMatrixIntoPETScMatrix(approxJ, jac);
 
-    // Initialise matrix
-    tmp<sparseMatrix> tmatrix(new sparseMatrix(numNonZeros));
-    sparseMatrix& matrix = tmatrix.ref();
-
-    // Insert the diagonal
-    {
-        const vectorField diag(approxJ.DD());
-        forAll(diag, blockRowI)
-        {
-            const tensor coeff
-            (
-                diag[blockRowI][vector::X], 0, 0,
-                0, diag[blockRowI][vector::Y], 0,
-                0,  0, diag[blockRowI][vector::Z]
-            );
-
-            const label globalBlockRowI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
-
-            matrix(globalBlockRowI, globalBlockRowI) = coeff;
-        }
-    }
-
-    // Insert the off-diagonal
-    {
-        const labelUList& own = mesh().owner();
-        const labelUList& nei = mesh().neighbour();
-        const scalarField& upper = approxJ.upper();
-        forAll(own, faceI)
-        {
-            const tensor coeff(upper[faceI]*I);
-
-            const label blockRowI = own[faceI];
-            const label blockColI = nei[faceI];
-
-            const label globalBlockRowI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
-            const label globalBlockColI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
-
-            matrix(globalBlockRowI, globalBlockColI) = coeff;
-            matrix(globalBlockColI, globalBlockRowI) = coeff;
-        }
-    }
-
-    // Collect the global cell indices from neighbours at processor boundaries
-    // These are used to insert the off-processor coefficients
-    // First, send the data
-    forAll(DD.boundaryField(), patchI)
-    {
-        const fvPatchField<vector>& pD = DD.boundaryField()[patchI];
-        if (pD.type() == "processor")
-        {
-            // Take a copy of the faceCells (local IDs) and convert them to
-            // global IDs
-            labelList globalFaceCells(mesh().boundary()[patchI].faceCells());
-            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
-
-            // Send global IDs to the neighbour proc
-            const processorFvPatch& procPatch =
-                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
-            procPatch.send
-            (
-                Pstream::commsTypes::blocking, globalFaceCells
-            );
-        }
-    }
-    // Next, receive the data
-    PtrList<labelList> neiProcGlobalIDs(DD.boundaryField().size());
-    forAll(DD.boundaryField(), patchI)
-    {
-        const fvPatchField<vector>& pD = DD.boundaryField()[patchI];
-        if (pD.type() == "processor")
-        {
-            neiProcGlobalIDs.set(patchI, new labelList(pD.size()));
-            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
-
-            // Receive global IDs from the neighbour proc
-            const processorFvPatch& procPatch =
-                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
-            procPatch.receive
-            (
-                Pstream::commsTypes::blocking, globalFaceCells
-            );
-        }
-    }
-
-    // Insert the off-processor coefficients
-    forAll(DD.boundaryField(), patchI)
-    {
-        const fvPatchField<vector>& pD = DD.boundaryField()[patchI];
-
-        if (pD.type() == "processor")
-        {
-            const vectorField& intCoeffs = approxJ.internalCoeffs()[patchI];
-            const vectorField& neiCoeffs = approxJ.boundaryCoeffs()[patchI];
-            const unallocLabelList& faceCells =
-                mesh().boundary()[patchI].faceCells();
-            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
-
-            forAll(pD, faceI)
-            {
-                const label globalBlockRowI =
-                    foamPetscSnesHelper::globalCells().toGlobal
-                    (
-                        faceCells[faceI]
-                    );
-
-                // On-proc diagonal coefficient
-                {
-                    const tensor coeff
-                    (
-                        intCoeffs[faceI][vector::X], 0, 0,
-                        0, intCoeffs[faceI][vector::Y], 0,
-                        0, 0, intCoeffs[faceI][vector::Z]
-                    );
-
-                    matrix(globalBlockRowI, globalBlockRowI) += coeff;
-                }
-
-                // Off-proc off-diagonal coefficient
-                {
-                    // Take care: we need to flip the sign
-                    const tensor coeff
-                    (
-                        -neiCoeffs[faceI][vector::X], 0, 0,
-                        0, -neiCoeffs[faceI][vector::Y], 0,
-                        0, 0, -neiCoeffs[faceI][vector::Z]
-                    );
-
-                    const label globalBlockColI = neiGlobalFaceCells[faceI];
-
-                    matrix(globalBlockRowI, globalBlockColI) += coeff;
-                }
-            }
-        }
-        else if (pD.coupled()) // coupled but not a processor boundary
-        {
-            FatalErrorIn
-            (
-                "tmp<sparseMatrix> "
-                "nonLinGeomUpdatedLagSolid::JacobianMomentum"
-            )   << "Coupled boundaries (except processors) not implemented"
-                << abort(FatalError);
-        }
-        // else non-coupled boundary contributions have already been added to
-        // the diagonal
-    }
-
-    return tmatrix;
+    return 0;
 }
 
 
