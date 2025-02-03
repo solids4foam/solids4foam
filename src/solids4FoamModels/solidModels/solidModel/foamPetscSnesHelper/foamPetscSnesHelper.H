@@ -39,6 +39,7 @@ Author
 
 SourceFiles
     foamPetscSnesHelper.C
+    foamPetscSnesHelperTemplates.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -209,22 +210,53 @@ public:
                 Mat jac
             ) const;
 
-            //- Extract vectorField vf from array x
-            //  For twoD, x is assumed to contain the x and y components of vf
-            void extractField
+            //- Extracts a subset of components from a raw scalar array 'x' into
+            //  the OpenFOAM field 'vf'. 'x' is organized in blocks of
+            //  'xBlockSize' scalars per element, and extraction starts at
+            //  'offset'. For each element in 'vf', the function copies the
+            //  first pTraits<Type>::nComponents scalars, assuming that 'vf' is
+            //  stored contiguously.
+            //  Parameters:
+            //    x          - Pointer to the raw scalar array.
+            //    vf         - The OpenFOAM field (e.g., Field<scalar>,
+            //                 Field<vector>, Field<tensor>) to populate.
+            //    xBlockSize - Block size (number of scalars per element) in the
+            //                 array 'x'.
+            //    offset     - Starting index within each block in 'x' to begin
+            //                 copying.
+            template <class Type>
+            void extractFieldComponents
             (
-                vectorField& vf,
                 const PetscScalar *x,
-                const bool twoD
+                Field<Type>& vf,
+                const label xBlockSize,
+                const label offset
             ) const;
 
-            //- Insert array x into vectorField vf
-            //  For twoD, x is assumed to contain the x and y components of vf
-            void insertField
+            //- Inserts a subset of components from the OpenFOAM field 'vf' into
+            //  a raw scalar array 'x'. The array 'x' is organized in blocks of
+            //  'xBlockSize' scalars per element, and insertion begins at the
+            //  specified 'offset'. For each element in 'vf', the function
+            //  copies the first pTraits<Type>::nComponents scalars (e.g., for a
+            //  vector, the x, y, z components), assuming that 'vf' is stored
+            //  contiguously.
+            //  Parameters:
+            //    vf         - The OpenFOAM field (e.g., Field<scalar>,
+            //                 Field<vector>, Field<tensor>) from which the
+            //                 components are extracted.
+            //    x          - Pointer to the raw scalar array where the
+            //                 components will be inserted.
+            //    xBlockSize - Block size (number of scalars per element) in the
+            //                 array 'x'.
+            //    offset     - Starting index within each block in 'x' where
+            //                 insertion of the components begins.
+            template <class Type>
+            void insertFieldComponents
             (
+                const Field<Type>& vf,
                 PetscScalar *x,
-                const vectorField& vf,
-                const bool twoD
+                const label xBlockSize,
+                const label offset
             ) const;
 
             //- Map the Foam solution volVectorField to the PETSc solution Vec
@@ -251,6 +283,12 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+#   include "foamPetscSnesHelperTemplates.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -496,62 +496,6 @@ label foamPetscSnesHelper::insertFvMatrixIntoPETScMatrix
 }
 
 
-void foamPetscSnesHelper::extractField
-(
-    vectorField& vf,
-    const PetscScalar *x,
-    const bool twoD
-) const
-{
-    label index = 0;
-    if (twoD)
-    {
-        forAll(vf, cellI)
-        {
-            vf[cellI][vector::X] = x[index++];
-            vf[cellI][vector::Y] = x[index++];
-        }
-    }
-    else
-    {
-        forAll(vf, cellI)
-        {
-            vf[cellI][vector::X] = x[index++];
-            vf[cellI][vector::Y] = x[index++];
-            vf[cellI][vector::Z] = x[index++];
-        }
-    }
-}
-
-
-void foamPetscSnesHelper::insertField
-(
-    PetscScalar *x,
-    const vectorField& vf,
-    const bool twoD
-) const
-{
-    label index = 0;
-    if (twoD)
-    {
-        forAll(vf, cellI)
-        {
-            x[index++] = vf[cellI][vector::X];
-            x[index++] = vf[cellI][vector::Y];
-        }
-    }
-    else
-    {
-        forAll(vf, cellI)
-        {
-            x[index++] = vf[cellI][vector::X];
-            x[index++] = vf[cellI][vector::Y];
-            x[index++] = vf[cellI][vector::Z];
-        }
-    }
-}
-
-
 void foamPetscSnesHelper::mapSolutionFoamToPetsc()
 {
     if (!initialised_)

@@ -663,7 +663,13 @@ label linGeomTotalDispSolid::formResidual
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
-    extractField(DI, x, solidModel::twoD());
+    foamPetscSnesHelper::extractFieldComponents<vector>
+    (
+        x,
+        DI,
+        solidModel::twoD() ? 2 : 3, // Block size of x
+        0                           // Location of first DI component
+    );
 
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
@@ -713,7 +719,13 @@ label linGeomTotalDispSolid::formResidual
     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
 
     // Copy the residual into the f field
-    insertField(f, residual, solidModel::twoD());
+    foamPetscSnesHelper::insertFieldComponents<vector>
+    (
+        residual,
+        f,
+        solidModel::twoD() ? 2 : 3, // Block size of x
+        0                           // Location of first component
+    );
 
     return 0;
 }
@@ -728,7 +740,13 @@ label linGeomTotalDispSolid::formJacobian
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
-    extractField(DI, x, solidModel::twoD());
+    foamPetscSnesHelper::extractFieldComponents<vector>
+    (
+        x,
+        DI,
+        solidModel::twoD() ? 2 : 3, // Block size of x
+        0                           // Location of first DI component
+    );
 
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
