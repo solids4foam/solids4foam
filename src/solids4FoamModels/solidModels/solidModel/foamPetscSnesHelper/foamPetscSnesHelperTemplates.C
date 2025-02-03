@@ -20,6 +20,7 @@ License
 #ifdef USE_PETSC
 
 #include "foamPetscSnesHelper.H"
+#include "processorFvPatch.H"
 
 namespace Foam
 {
@@ -28,7 +29,272 @@ namespace Foam
 
 
 template <class Type>
-void foamPetscSnesHelper::extractFieldComponents
+label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+(
+    const fvMatrix<Type>& fvM,
+    Mat jac,
+    const label rowOffset,
+    const label colOffset
+) const
+{
+    // Initialise block coeff
+    const label nCoeffCmpts = blockSize_*blockSize_;
+    PetscScalar values[nCoeffCmpts];
+    for (int i = 0; i < nCoeffCmpts; ++i)
+    {
+        values[i] = 0;
+    }
+
+    // Get the number of components per field element from the traits (e.g.,
+    // 1 for scalar, 3 for vector, etc.)
+    const label vfBlockSize = pTraits<Type>::nComponents;
+
+    // Insert the diagonal
+    {
+        // Retrieve the matrix diagonal
+        const Field<Type> diag(fvM.DD());
+
+        // Insert the coeffs
+        forAll(diag, blockRowI)
+        {
+            // Obtain a pointer to the underlying scalar data in
+            // diag[blockRowI] (assumes contiguous storage)
+            const scalar* curDiagPtr =
+                reinterpret_cast<const scalar*>(diag[blockRowI].begin());
+
+            // Construct the diag block coefficient
+            for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+            {
+                for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                {
+                    if (cmptI == cmptJ)
+                    {
+                        values
+                        [
+                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                        ] = curDiagPtr[cmptI];
+                    }
+                }
+            }
+
+            // Get the global row index
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+
+            // Insert block coefficient
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+            );
+        }
+    }
+
+    // Insert the off-diagonal
+    const fvMesh& mesh = fvM.psi().mesh();
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& upper = fvM.upper();
+
+        forAll(own, faceI)
+        {
+            // Construct the upper block coefficient
+            const scalar upperScalarCoeff = upper[faceI];
+            for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+            {
+                for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                {
+                    if (cmptI == cmptJ)
+                    {
+                        values
+                        [
+                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                        ] = upperScalarCoeff;
+                    }
+                }
+            }
+
+            const label blockRowI = own[faceI];
+            const label blockColI = nei[faceI];
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+            const label globalBlockColI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+
+            // Insert block coefficients
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    ADD_VALUES
+                );
+            );
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+            );
+        }
+    }
+
+    // Collect the global cell indices from neighbours at processor boundaries
+    // These are used to insert the off-processor coefficients
+    // First, send the data
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (mesh.boundaryMesh()[patchI].type() == "processor")
+        {
+            // Take a copy of the faceCells (local IDs) and convert them to
+            // global IDs
+            labelList globalFaceCells(mesh.boundary()[patchI].faceCells());
+            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+
+            // Send global IDs to the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
+            procPatch.send
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+
+    // Next, receive the data
+    PtrList<labelList> neiProcGlobalIDs(mesh.boundaryMesh().size());
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        if (fp.type() == "processor")
+        {
+            neiProcGlobalIDs.set(patchI, new labelList(fp.size()));
+            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
+
+            // Receive global IDs from the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+
+    // Insert the off-processor coefficients
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        if (fp.type() == "processor")
+        {
+            const vectorField& intCoeffs = fvM.internalCoeffs()[patchI];
+            const vectorField& neiCoeffs = fvM.boundaryCoeffs()[patchI];
+            const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(fp, faceI)
+            {
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal
+                    (
+                        faceCells[faceI]
+                    );
+
+                // On-proc diagonal coefficient
+                {
+                    // Obtain a pointer to the underlying scalar data in
+                    // intCoeffs[faceI] (assumes contiguous storage)
+                    const scalar* curIntCoeffsPtr =
+                        reinterpret_cast<const scalar*>
+                        (
+                            intCoeffs[faceI].begin()
+                        );
+
+                    for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+                    {
+                        for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                        {
+                            if (cmptI == cmptJ)
+                            {
+                                values
+                                [
+                                    (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                                ] = curIntCoeffsPtr[cmptI];
+                            }
+                        }
+                    }
+
+                    CHKERRQ
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                            ADD_VALUES
+                        );
+                    );
+                }
+
+                // Off-proc off-diagonal coefficient
+                {
+                    // Obtain a pointer to the underlying scalar data in
+                    // neiCoeffs[faceI] (assumes contiguous storage)
+                    const scalar* curNeiCoeffsPtr =
+                        reinterpret_cast<const scalar*>
+                        (
+                            neiCoeffs[faceI].begin()
+                        );
+
+                    for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+                    {
+                        for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                        {
+                            if (cmptI == cmptJ)
+                            {
+                                // Take care: we need to flip the sign
+                                values
+                                [
+                                    (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                                ] = -curNeiCoeffsPtr[cmptI];
+                            }
+                        }
+                    }
+
+                    const label globalBlockColI = neiGlobalFaceCells[faceI];
+
+                    CHKERRQ
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                            ADD_VALUES
+                        );
+                    );
+                }
+            }
+        }
+        else if (fp.coupled()) // coupled but not a processor boundary
+        {
+            FatalErrorInFunction
+                << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        // else non-coupled boundary contributions have already been added to
+        // the diagonal
+    }
+
+    return 0;
+}
+
+
+template <class Type>
+void foamPetscSnesHelper::ExtractFieldComponents
 (
     const PetscScalar *x,
     Field<Type>& vf,
@@ -57,7 +323,7 @@ void foamPetscSnesHelper::extractFieldComponents
 
 
 template <class Type>
-void foamPetscSnesHelper::insertFieldComponents
+void foamPetscSnesHelper::InsertFieldComponents
 (
     const Field<Type>& vf,
     PetscScalar *x,

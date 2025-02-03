@@ -566,7 +566,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Copy x into the DD field
     volVectorField& DD = const_cast<volVectorField&>(this->DD());
     vectorField& DDI = DD;
-    foamPetscSnesHelper::extractFieldComponents<vector>
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         x,
         DDI,
@@ -652,7 +652,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
 
     // Copy the residual into the f field
-    foamPetscSnesHelper::insertFieldComponents<vector>
+    foamPetscSnesHelper::InsertFieldComponents<vector>
     (
         residual,
         f,
@@ -673,7 +673,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
     // Copy x into the DD field
     volVectorField& DD = const_cast<volVectorField&>(this->DD());
     vectorField& DDI = DD;
-    foamPetscSnesHelper::extractFieldComponents<vector>
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         x,
         DDI,
@@ -700,7 +700,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
     approxJ.relax();
 
     // Convert fvMatrix matrix to PETSc matrix
-    insertFvMatrixIntoPETScMatrix(approxJ, jac);
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix(approxJ, jac, 0, 0);
 
     return 0;
 }

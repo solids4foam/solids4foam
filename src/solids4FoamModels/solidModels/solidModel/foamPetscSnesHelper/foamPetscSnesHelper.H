@@ -105,6 +105,11 @@ class foamPetscSnesHelper
         //  cell indices
         globalIndex globalCells_;
 
+        //- Block size of the solution
+        //  The solution 'x' is organized in blocks of 'blockSize' scalars per
+        //  element
+        const label blockSize_;
+
         //- Is this a 2-D case? If so, it is assumed that Z is the empty
         //  direction
         const Switch twoD_;
@@ -201,13 +206,18 @@ public:
                 const PetscScalar *x  // Solution
             ) = 0;
 
-            //- Insert an fvMatrix into a PETSc matrix
-            //  Currently only implemented for fvVectorMatrix
-            //  A non-zero return value indicates an error
-            label insertFvMatrixIntoPETScMatrix
+            //- Inserts the OpenFOAM fvMatrix 'fvM' into the PETSc matrix 'jac'.
+            //  Converts the finite volume matrix into block coefficients using
+            //  the specified row and column offsets (rowOffset, colOffset)
+            //  within each block.
+            //  A non-zero return value indicates an error.
+            template <class Type>
+            label InsertFvMatrixIntoPETScMatrix
             (
-                const fvVectorMatrix& fvM,
-                Mat jac
+                const fvMatrix<Type>& fvM,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset
             ) const;
 
             //- Extracts a subset of components from a raw scalar array 'x' into
@@ -225,7 +235,7 @@ public:
             //    offset     - Starting index within each block in 'x' to begin
             //                 copying.
             template <class Type>
-            void extractFieldComponents
+            void ExtractFieldComponents
             (
                 const PetscScalar *x,
                 Field<Type>& vf,
@@ -251,7 +261,7 @@ public:
             //    offset     - Starting index within each block in 'x' where
             //                 insertion of the components begins.
             template <class Type>
-            void insertFieldComponents
+            void InsertFieldComponents
             (
                 const Field<Type>& vf,
                 PetscScalar *x,
