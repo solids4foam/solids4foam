@@ -323,6 +323,28 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
 
 template <class Type>
+void foamPetscSnesHelper::ExtractFieldComponents
+(
+    const Vec x,
+    Field<Type>& vf,
+    const label xBlockSize,
+    const label offset
+) const
+{
+    // Access the x data
+    const PetscScalar *xx;
+    VecGetArrayRead(x, &xx);
+
+    // Insert vf into xx
+    ExtractFieldComponents(xx, vf, xBlockSize, offset);
+
+    // Restore the x vector
+    VecRestoreArrayRead(x, &xx);
+
+}
+
+
+template <class Type>
 void foamPetscSnesHelper::InsertFieldComponents
 (
     const Field<Type>& vf,
@@ -348,6 +370,29 @@ void foamPetscSnesHelper::InsertFieldComponents
         }
     }
 }
+
+
+template <class Type>
+void foamPetscSnesHelper::InsertFieldComponents
+(
+    const Field<Type>& vf,
+    Vec x,
+    const label xBlockSize,
+    const label offset
+) const
+{
+    // Access the x data
+    PetscScalar *xx;
+    VecGetArray(x, &xx);
+
+    // Insert vf into xx
+    InsertFieldComponents(vf, xx, xBlockSize, offset);
+
+    // Restore the x vector
+    VecRestoreArray(x, &xx);
+
+}
+
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

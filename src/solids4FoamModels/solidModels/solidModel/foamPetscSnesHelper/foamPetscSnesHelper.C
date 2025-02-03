@@ -72,8 +72,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
 
     // Map the solution to an OpenFOAM field
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
-    const bool twoD = user->solMod_.twoD();
-    const int blockSize = twoD ? 2 : 3;
+    const int blockSize = user->solMod_.blockSize();
 
     // Initialise the matrix if it has yet to be allocated; otherwise zero all
     // entries
@@ -115,7 +114,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
         }
 
         // Take a reference to the mesh
-        const Foam::fvMesh& mesh = user->solMod_.solution().mesh();
+        const Foam::fvMesh& mesh = user->solMod_.fmesh();
 
         // Count neighbours sharing an internal face
         const Foam::labelUList& own = mesh.owner();
@@ -203,17 +202,16 @@ defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 foamPetscSnesHelper::foamPetscSnesHelper
 (
     fileName optionsFile,
-    volVectorField& solution,
-    const Switch twoD,
+    const fvMesh& mesh,
+    const label blockSize,
     const Switch stopOnPetscError,
     const Switch initialise
 )
 :
     initialised_(initialise),
-    solution_(solution),
-    globalCells_(solution.mesh().nCells()),
-    blockSize_(twoD ? 2 : 3),
-    twoD_(twoD),
+    mesh_(mesh),
+    globalCells_(mesh.nCells()),
+    blockSize_(blockSize),
     stopOnPetscError_(stopOnPetscError),
     snesPtr_(),
     xPtr_(),
@@ -243,16 +241,13 @@ foamPetscSnesHelper::foamPetscSnesHelper
         // Set the residual function
         SNESSetFunction(snes, NULL, formResidualFoamPetscSnesHelper, &user);
 
-        // Coefficient block size, e.g. 2x2 in 2-D, 3x3 in 3-D
-        const int blockSize = twoD_ ? 2 : 3;
-
         // Global system size
         const int blockN = globalCells_.size();
-        const int N = blockSize*blockN;
+        const int N = blockSize_*blockN;
 
         // Local (this processor) system size
         const int blockn = globalCells_.localSize();
-        const int n = blockSize*blockn;
+        const int n = blockSize_*blockn;
 
         // Create the Jacobian matrix
         APtr_.set(new Mat());
@@ -275,7 +270,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
         Vec& x = xPtr_();
         VecCreate(PETSC_COMM_WORLD, &x);
         VecSetSizes(x, n, N);
-        VecSetBlockSize(x, blockSize);
+        VecSetBlockSize(x, blockSize_);
         VecSetType(x, VECMPI);
         PetscObjectSetName((PetscObject) x, "Solution");
         VecSetFromOptions(x);
@@ -306,84 +301,6 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void foamPetscSnesHelper::mapSolutionFoamToPetsc()
-{
-    if (!initialised_)
-    {
-        FatalErrorIn("void foamPetscSnesHelper::mapSolutionFoamToPetsc()")
-            << "This function cannot be called because the foamPetscSnesHelper "
-            << "object was not initialised during construction"
-            << abort(FatalError);
-    }
-
-    // Take a reference to the PETSc solution vector
-    Vec& x = xPtr_();
-
-    // Take a reference to the Foam solution field
-    const volVectorField& f = solution_;
-
-    PetscScalar *xx;
-    VecGetArray(x, &xx);
-
-    const vectorField& fI = f;
-
-    int index = 0;
-
-    forAll(fI, i)
-    {
-        xx[index++] = fI[i][vector::X];
-        xx[index++] = fI[i][vector::Y];
-
-        if (!twoD_)
-        {
-            xx[index++] = fI[i][vector::Z];
-        }
-    }
-
-    VecRestoreArray(x, &xx);
-}
-
-
-void foamPetscSnesHelper::mapSolutionPetscToFoam()
-{
-    if (!initialised_)
-    {
-        FatalErrorIn("void foamPetscSnesHelper::mapSolutionPetscToFoam()")
-            << "This function cannot be called because the foamPetscSnesHelper "
-            << "object was not initialised during construction"
-            << abort(FatalError);
-    }
-
-    // Take a reference to the PETSc solution vector
-    const Vec& x = xPtr_();
-
-    // Take a reference to the Foam solution field
-    volVectorField& f = solution_;
-
-    const PetscScalar *xx;
-    VecGetArrayRead(x, &xx);
-
-    vectorField& fI = f;
-
-    int index = 0;
-
-    forAll(fI, i)
-    {
-        fI[i].x() = xx[index++];
-        fI[i].y() = xx[index++];
-
-        if (!twoD_)
-        {
-            fI[i].z() = xx[index++];
-        }
-    }
-
-    f.correctBoundaryConditions();
-
-    VecRestoreArrayRead(x, &xx);
-}
 
 
 int foamPetscSnesHelper::solve(const bool returnOnSnesError)

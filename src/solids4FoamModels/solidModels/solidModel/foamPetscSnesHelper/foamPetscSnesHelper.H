@@ -99,7 +99,9 @@ class foamPetscSnesHelper
         const Switch initialised_;
 
         //- Reference to the solution field
-        volVectorField& solution_;
+        //volVectorField& solution_;
+        //- Const reference to the mesh
+        const fvMesh& mesh_;
 
         //- Helper object for converting between local (on processor) and global
         //  cell indices
@@ -109,10 +111,6 @@ class foamPetscSnesHelper
         //  The solution 'x' is organized in blocks of 'blockSize' scalars per
         //  element
         const label blockSize_;
-
-        //- Is this a 2-D case? If so, it is assumed that Z is the empty
-        //  direction
-        const Switch twoD_;
 
         //- Flag to set whether the solver stops when PETSs SNES returns an
         //  error
@@ -151,8 +149,8 @@ public:
         foamPetscSnesHelper
         (
             fileName optionsFile,       // PETSc options file address
-            volVectorField& solution,   // The solution field
-            const Switch twoD,          // Is this a 2-D model?
+            const fvMesh& mesh,         // Mesh
+            const label blockSize,      // Number of scalar unknowns per cell
             const Switch stopOnPetscError = true,
             const Switch initialise = true // Will PETSc be used?
         );
@@ -166,10 +164,16 @@ public:
 
         // Access
 
-            //- Non-const access to the solution field
-            volVectorField& solution()
+            //- Non-const access to the mesh
+            const fvMesh& fmesh()
             {
-                return solution_;
+                return mesh_;
+            }
+
+            //- Non-const access to the PETSc solution vector
+            Vec solution()
+            {
+                return xPtr_.ref();
             }
 
             //- Const access to the global index object
@@ -178,10 +182,10 @@ public:
                 return globalCells_;
             }
 
-            //- Const access to the twoD flag
-            const Switch& twoD() const
+            //- Return the blockSize
+            label blockSize() const
             {
-                return twoD_;
+                return blockSize_;
             }
 
 
@@ -243,6 +247,17 @@ public:
                 const label offset
             ) const;
 
+            //- Same as above, but takes a PETSc "Vec x" instead of a raw
+            //  PetscScalar array pointer
+            template <class Type>
+            void ExtractFieldComponents
+            (
+                const Vec x,
+                Field<Type>& vf,
+                const label xBlockSize,
+                const label offset
+            ) const;
+
             //- Inserts a subset of components from the OpenFOAM field 'vf' into
             //  a raw scalar array 'x'. The array 'x' is organized in blocks of
             //  'xBlockSize' scalars per element, and insertion begins at the
@@ -269,17 +284,16 @@ public:
                 const label offset
             ) const;
 
-            //- Map the Foam solution volVectorField to the PETSc solution Vec
-            //  Note that PETSc defines a Vec as a pointer to a struct type
-            //  It is assumed that the size of x is 3*f.size() for 3-D and
-            //  2*f.size() for 2-D
-            void mapSolutionFoamToPetsc();
-
-            //- Map the PETSc solution Vec to the Foam solution volVectorField
-            //  Note that PETSc defines a Vec as a pointer to a struct type
-            //  It is assumed that the size of x is 3*f.size() for 3-D and
-            //  2*f.size() for 2-D
-            void mapSolutionPetscToFoam();
+            //- Same as above, but takes a PETSc "Vec x" instead of a raw
+            //  PetscScalar array pointer
+            template <class Type>
+            void InsertFieldComponents
+            (
+                const Field<Type>& vf,
+                Vec x,
+                const label xBlockSize,
+                const label offset
+            ) const;
 
             //- Call the PETSc SNES solve function and check its convergence
             //  Give a warning or fatal error if convergence was not reached

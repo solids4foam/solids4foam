@@ -261,10 +261,10 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
 
 bool nonLinGeomUpdatedLagSolid::evolveSnes()
 {
-    Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
+    Info<< "Solving the momentum equation for DD using PETSc SNES" << endl;
 
     // Update D boundary conditions
-    D().correctBoundaryConditions();
+    DD().correctBoundaryConditions();
 
     // Solution predictor
     if (predictor_ && newTimeStep())
@@ -274,16 +274,28 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         // Use the segregated solver as a predictor
         //evolveImplicitSegregated();
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::mapSolutionFoamToPetsc();
+        // Map the DD field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<vector>
+        (
+            DD().primitiveFieldRef(),
+            foamPetscSnesHelper::solution(),
+            solidModel::twoD() ? 2 : 3, // Block size of x
+            0                           // Location of first component
+        );
     }
 
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
 
     // Retrieve the solution
-    // Map the PETSc solution to the D field
-    foamPetscSnesHelper::mapSolutionPetscToFoam();
+    // Map the PETSc solution to the DD field
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        foamPetscSnesHelper::solution(),
+        DD().primitiveFieldRef(),
+        solidModel::twoD() ? 2 : 3, // Block size of x
+        0                           // Location of first component
+    );
 
     // Total displacement
     D() = D().oldTime() + DD();
@@ -323,8 +335,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        DD(),
-        solidModel::twoD(),
+        mesh(),
+        solidModel::twoD() ? 2 : 3,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),

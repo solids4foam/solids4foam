@@ -346,7 +346,13 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         //evolveImplicitSegregated();
 
         // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::mapSolutionFoamToPetsc();
+        foamPetscSnesHelper::InsertFieldComponents<vector>
+        (
+            D().primitiveFieldRef(),
+            foamPetscSnesHelper::solution(),
+            solidModel::twoD() ? 2 : 3, // Block size of x
+            0                           // Location of first component
+        );
     }
 
     // Solve the nonlinear system and check the convergence
@@ -354,7 +360,13 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     // Retrieve the solution
     // Map the PETSc solution to the D field
-    foamPetscSnesHelper::mapSolutionPetscToFoam();
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        foamPetscSnesHelper::solution(),
+        D().primitiveFieldRef(),
+        solidModel::twoD() ? 2 : 3, // Block size of x
+        0                           // Location of first component
+    );
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
@@ -394,8 +406,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        D(),
-        solidModel::twoD(),
+        mesh(),
+        solidModel::twoD() ? 2 : 3,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
