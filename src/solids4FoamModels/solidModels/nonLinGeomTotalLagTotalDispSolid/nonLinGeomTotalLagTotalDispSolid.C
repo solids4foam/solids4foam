@@ -616,8 +616,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     (
         x,
         DI,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first DI component
+        0,                          // Location of first DI component
+        solidModel::twoD() ? 2 : 3  // Number of components to extract
     );
 
     // Enforce the boundary conditions
@@ -701,8 +701,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     (
         residual,
         f,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first component
+        0,                          // Location of first DI component
+        solidModel::twoD() ? 2 : 3  // Number of components to extract
     );
 
     return 0;
@@ -722,8 +722,8 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     (
         x,
         DI,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first DI component
+        0,                          // Location of first DI component
+        solidModel::twoD() ? 2 : 3  // Number of components to extract
     );
 
     // Enforce the boundary conditions
@@ -745,7 +745,10 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     approxJ.relax();
 
     // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix(approxJ, jac, 0, 0);
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+    (
+        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+    );
 
     return 0;
 }

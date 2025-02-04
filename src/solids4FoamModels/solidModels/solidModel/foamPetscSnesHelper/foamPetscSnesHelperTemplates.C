@@ -34,20 +34,18 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     const fvMatrix<Type>& fvM,
     Mat jac,
     const label rowOffset,
-    const label colOffset
+    const label colOffset,
+    const label nScalarEqns
 ) const
 {
     // Initialise block coeff
     const label nCoeffCmpts = blockSize_*blockSize_;
     PetscScalar values[nCoeffCmpts];
-    for (int i = 0; i < nCoeffCmpts; ++i)
-    {
-        values[i] = 0;
-    }
+    std::memset(values, 0, sizeof(values));
 
     // Get the number of components per field element from the traits (e.g.,
     // 1 for scalar, 3 for vector, etc.)
-    const label vfBlockSize = pTraits<Type>::nComponents;
+    //const label vfBlockSize = pTraits<Type>::nComponents;
 
     // Insert the diagonal
     {
@@ -63,9 +61,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                 reinterpret_cast<const scalar*>(diag[blockRowI].begin());
 
             // Construct the diag block coefficient
-            for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+            for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
             {
-                for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
                 {
                     if (cmptI == cmptJ)
                     {
@@ -104,9 +102,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         {
             // Construct the upper block coefficient
             const scalar upperScalarCoeff = upper[faceI];
-            for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+            for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
             {
-                for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
                 {
                     if (cmptI == cmptJ)
                     {
@@ -217,9 +215,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                             intCoeffs[faceI].begin()
                         );
 
-                    for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+                    for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                     {
-                        for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                        for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
                         {
                             if (cmptI == cmptJ)
                             {
@@ -251,9 +249,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                             neiCoeffs[faceI].begin()
                         );
 
-                    for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+                    for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                     {
-                        for (label cmptJ = 0; cmptJ < vfBlockSize; ++cmptJ)
+                        for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
                         {
                             if (cmptI == cmptJ)
                             {
@@ -298,8 +296,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
 (
     const PetscScalar *x,
     Field<Type>& vf,
-    const label xBlockSize,
-    const label offset
+    const label offset,
+    const label nScalarEqns
 ) const
 {
     // Obtain a pointer to the underlying scalar array in vf
@@ -307,16 +305,16 @@ void foamPetscSnesHelper::ExtractFieldComponents
     // (vx1, vy1, vz1, vx2, vy2, vz2, ..., vxN, vyN, vzN)
     scalar* vfPtr = reinterpret_cast<scalar*>(vf.begin());
 
-    // Get the number of components per field element from the traits, e.g. 1
-    // for a scalar, 3 for a vector, 6 for a symmTensor
+    // Get the number of components per field element from the traits (e.g.,
+    // 1 for scalar, 3 for vector, etc.)
     const label vfBlockSize = pTraits<Type>::nComponents;
 
     // Loop over each element in vf and copy the appropriate components from x
     forAll(vf, blockI)
     {
-        for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
         {
-            vfPtr[blockI*vfBlockSize + cmptI] = x[offset + blockI*xBlockSize + cmptI];
+            vfPtr[blockI*vfBlockSize + cmptI] = x[offset + blockI*blockSize_ + cmptI];
         }
     }
 }
@@ -327,8 +325,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
 (
     const Vec x,
     Field<Type>& vf,
-    const label xBlockSize,
-    const label offset
+    const label offset,
+    const label nScalarEqns
 ) const
 {
     // Access the x data
@@ -336,7 +334,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
     VecGetArrayRead(x, &xx);
 
     // Insert vf into xx
-    ExtractFieldComponents(xx, vf, xBlockSize, offset);
+    ExtractFieldComponents(xx, vf, offset, nScalarEqns);
 
     // Restore the x vector
     VecRestoreArrayRead(x, &xx);
@@ -349,24 +347,24 @@ void foamPetscSnesHelper::InsertFieldComponents
 (
     const Field<Type>& vf,
     PetscScalar *x,
-    const label xBlockSize,
-    const label offset
+    const label offset,
+    const label nScalarEqns
 ) const
 {
     // Obtain a pointer to the underlying scalar data in vf (assumes contiguous
     // storage)
     const scalar* vfPtr = reinterpret_cast<const scalar*>(vf.begin());
 
-    // Get the number of components per field element from the traits (e.g., 1
-    // for scalar, 3 for vector, etc.)
+    // Get the number of components per field element from the traits (e.g.,
+    // 1 for scalar, 3 for vector, etc.)
     const label vfBlockSize = pTraits<Type>::nComponents;
 
     // Loop over each element in vf and copy its components into the corresponding position in x
     forAll(vf, blockI)
     {
-        for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
         {
-            x[offset + blockI*xBlockSize + cmptI] = vfPtr[blockI*vfBlockSize + cmptI];
+            x[offset + blockI*blockSize_ + cmptI] = vfPtr[blockI*vfBlockSize + cmptI];
         }
     }
 }
@@ -377,8 +375,8 @@ void foamPetscSnesHelper::InsertFieldComponents
 (
     const Field<Type>& vf,
     Vec x,
-    const label xBlockSize,
-    const label offset
+    const label offset,
+    const label nScalarEqns
 ) const
 {
     // Access the x data
@@ -386,7 +384,7 @@ void foamPetscSnesHelper::InsertFieldComponents
     VecGetArray(x, &xx);
 
     // Insert vf into xx
-    InsertFieldComponents(vf, xx, xBlockSize, offset);
+    InsertFieldComponents(vf, xx, offset, nScalarEqns);
 
     // Restore the x vector
     VecRestoreArray(x, &xx);
