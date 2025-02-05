@@ -151,6 +151,7 @@ public:
             fileName optionsFile,       // PETSc options file address
             const fvMesh& mesh,         // Mesh
             const label blockSize,      // Number of scalar unknowns per cell
+            const labelListList& fieldDefs, // Indicate which rows are different fields
             const Switch stopOnPetscError = true,
             const Switch initialise = true // Will PETSc be used?
         );

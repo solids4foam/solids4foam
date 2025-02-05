@@ -293,8 +293,8 @@ bool linGeomTotalDispSolid::evolveSnes()
         (
             D().primitiveFieldRef(),
             foamPetscSnesHelper::solution(),
-            solidModel::twoD() ? 2 : 3, // Block size of x
-            0                           // Location of first component
+            blockSize_,
+            0
         );
     }
 
@@ -307,9 +307,22 @@ bool linGeomTotalDispSolid::evolveSnes()
     (
         foamPetscSnesHelper::solution(),
         D().primitiveFieldRef(),
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first component
+        blockSize_,
+        0
     );
+
+    if (solvePressure_)
+    {
+        // Map the PETSc solution to the p field
+        // p is located in the 4th component
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            foamPetscSnesHelper::solution(),
+            p().primitiveFieldRef(),
+            blockSize_,
+            3
+        );
+    }
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
@@ -439,7 +452,16 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
             )
         ),
         mesh(),
-        solidModel::twoD() ? 2 : 3,
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false) // looked twice?
+      ? label(solidModel::twoD() ? 3 : 4)
+      : label(solidModel::twoD() ? 2 : 3),
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+      ? (
+            solidModel::twoD()
+          ? labelListList({ {0, 1}, {2} }) // 0-1: momentum. 2: pressure
+          : labelListList({ {0, 1, 2}, {3} }) // 0-2: momentum. 3: pressure
+        )
+      : labelListList({}), // No need to assign fields
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -460,6 +482,17 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    solvePressure_
+    (
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+    ),
+    pPtr_(),
+    blockSize_
+    (
+        solvePressure_
+      ? label(solidModel::twoD() ? 3 : 4)
+      : label(solidModel::twoD() ? 2 : 3)
+    ),
     ds_
     (
         IOobject
@@ -483,6 +516,25 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    Info<< "solvePressure = " << solvePressure_ << endl;
+
+    if (solvePressure_)
+    {
+        if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
+        {
+            FatalErrorInFunction
+                << "The solution algorithm must be "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " when solvePressure is enabled" << abort(FatalError);
+        }
+
+        // Ensure p is created
+        p();
+    }
 
     if (predictor_)
     {
@@ -562,6 +614,33 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+volScalarField& linGeomTotalDispSolid::p()
+{
+    if (!pPtr_)
+    {
+        pPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "p",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0),
+                "zeroGradient"
+            )
+        );
+    }
+
+    return pPtr_.ref();
+}
 
 
 void linGeomTotalDispSolid::setDeltaT(Time& runTime)
@@ -673,16 +752,21 @@ label linGeomTotalDispSolid::formResidual
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        DI,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first DI component
-    );
+    foamPetscSnesHelper::ExtractFieldComponents<vector>(x, DI, blockSize_, 0);
 
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
+
+    // Copy x into the p field
+    volScalarField& p = const_cast<volScalarField&>(this->p());
+    scalarField& pI = p;
+    foamPetscSnesHelper::ExtractFieldComponents<scalar>
+    (
+        x, pI, blockSize_, blockSize_ - 1
+    );
+
+    // Enforce the boundary conditions
+    p.correctBoundaryConditions();
 
     // Update gradient of displacement
     mechanical().grad(D, gradD());
@@ -691,7 +775,8 @@ label linGeomTotalDispSolid::formResidual
     mechanical().correct(sigma());
 
     // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+    const fvMesh& mesh = this->mesh();
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     // Traction vectors at the faces
     surfaceVectorField traction(n & fvc::interpolate(sigma()));
@@ -714,7 +799,7 @@ label linGeomTotalDispSolid::formResidual
     // where, here, we roll the stabilisationTerm into the div(sigma)
     vectorField residual
     (
-        fvc::div(mesh().magSf()*traction)
+        fvc::div(mesh.magSf()*traction)
       + rho()
        *(
             g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
@@ -722,7 +807,7 @@ label linGeomTotalDispSolid::formResidual
     );
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
-    residual *= mesh().V();
+    residual *= mesh.V();
 
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
@@ -731,11 +816,45 @@ label linGeomTotalDispSolid::formResidual
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
     (
-        residual,
-        f,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first component
+        residual, f, blockSize_, 0
     );
+
+    if (solvePressure_)
+    {
+        // Calculate pressure equation residual
+        // Res = p/k + div(D) - gamma*laplacian(p) + gamma*div(grad(p))
+        // where
+        //   - k: bulk modulus
+        //   - gamma: controls the amount of smoothing
+
+        const dimensionedScalar val("val", dimPressure, 1e6);
+        const dimensionedScalar pressureSmoothingCoeff
+        (
+            solidModelDict().lookup("pressureSmoothingCoeff")
+        );
+        scalarField pressureResidual
+        (
+          //   p/mechanical().bulkModulus()
+          // + tr(gradD())
+          // // + fvc::div(D)
+          - p
+          + fvc::laplacian(pressureSmoothingCoeff, p, "laplacian(Dp,p)")
+          //- mechanical().bulkModulus()*tr(gradD())
+          + val
+        );
+
+        // Make residual extensive
+        pressureResidual *= mesh.V();
+
+        // Copy the pressureResidual into the f field as the 4th equation
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pressureResidual, f, blockSize_, blockSize_ - 1
+        );
+
+        // Info<< "D = " << sqrt(gSum(magSqr(residual))) << ", "
+        //     << "P = " << sqrt(gSum(magSqr(pressureResidual))) << endl;
+    }
 
     return 0;
 }
@@ -750,16 +869,21 @@ label linGeomTotalDispSolid::formJacobian
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        DI,
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first DI component
-    );
+    foamPetscSnesHelper::ExtractFieldComponents<vector>(x, DI, blockSize_, 0); // FIX: store nDCmpts
 
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
+
+    // Copy x into the p field
+    volScalarField& p = const_cast<volScalarField&>(this->p());
+    scalarField& pI = p;
+    foamPetscSnesHelper::ExtractFieldComponents<scalar>
+    (
+        x, pI, blockSize_, blockSize_ - 1
+    );
+
+    // Enforce the boundary conditions
+    p.correctBoundaryConditions();
 
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
@@ -778,6 +902,70 @@ label linGeomTotalDispSolid::formJacobian
 
     // Convert fvMatrix matrix to PETSc matrix
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix(approxJ, jac, 0, 0);
+
+    if (solvePressure_)
+    {
+        // Calculate pressure equation matrix
+        const dimensionedScalar one("one", dimless, 1);
+        //const volScalarField rKappa(1.0/mechanical().bulkModulus());
+        const dimensionedScalar pressureSmoothingCoeff
+        (
+            solidModelDict().lookup("pressureSmoothingCoeff")
+        );
+        fvScalarMatrix approxPressureJ
+        (
+            //- fvm::Sp(rKappa, p)
+          - fvm::Sp(one, p)
+          + fvc::laplacian(pressureSmoothingCoeff, p, "laplacian(Dp,p)")
+        );
+
+        // Insert the pressure equation
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+        (
+            approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1 // Store pRow
+        );
+
+        // Calculate D-in-p equation coeffs coming from tr(grad(D)) == div(D)
+        // To begin with, we will use div(D) as it is easier to implement
+        // \int_Vol div(D) dVol \approx \sum_f Gamma \cdot D_f,
+        // where Df = w*Down + (1 - w)*Dnei
+        /*
+        const fvMesh& mesh = this->mesh();
+        const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
+        for (label cmptI = 0; cmptI < 3; ++cmptI)
+        {
+            if (solidModel::twoD() && cmptI == 2)
+            {
+                break;
+            }
+
+            fvScalarMatrix divDCoeffs(p, dimArea*dimPressure);
+
+            const vectorField& Sf = mesh.Sf();
+            const scalarField& w = mesh.weights();
+
+            scalarField& upper = divDCoeffs.upper();
+            scalarField& lower = divDCoeffs.lower();
+
+            // lower = -w*Sf.component(cmptI)*k.primitiveField();
+            // upper = lower + Sf.component(cmptI)*k.primitiveField();
+            lower = w*Sf.component(cmptI)*k.primitiveField();
+            upper = -lower - Sf.component(cmptI)*k.primitiveField();
+            //lower = -w*Sf.component(cmptI);
+            //upper = lower + Sf.component(cmptI);
+
+            divDCoeffs.negSumDiag();
+
+            // Insert component coeffs
+            // blockSize - 1: is the last row
+            // cmptI is the 1st column for Dx, 2nd for Dy, 3rd for Dz
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                approxPressureJ, jac, blockSize_ - 1, cmptI
+            );
+        }
+        */
+    }
 
     return 0;
 }

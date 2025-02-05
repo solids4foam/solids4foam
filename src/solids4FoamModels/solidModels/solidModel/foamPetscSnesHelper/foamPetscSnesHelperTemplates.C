@@ -49,7 +49,11 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     // 1 for scalar, 3 for vector, etc.)
     const label vfBlockSize = pTraits<Type>::nComponents;
 
+    // Take a reference to the mesh
+    const fvMesh& mesh = fvM.psi().mesh();
+
     // Insert the diagonal
+    if (fvM.hasDiag())
     {
         // Retrieve the matrix diagonal
         const Field<Type> diag(fvM.DD());
@@ -60,7 +64,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             // Obtain a pointer to the underlying scalar data in
             // diag[blockRowI] (assumes contiguous storage)
             const scalar* curDiagPtr =
-                reinterpret_cast<const scalar*>(diag[blockRowI].begin());
+                //reinterpret_cast<const scalar*>(diag[blockRowI].begin());
+                reinterpret_cast<const scalar*>(&diag[blockRowI]);
 
             // Construct the diag block coefficient
             for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
@@ -94,7 +99,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     }
 
     // Insert the off-diagonal
-    const fvMesh& mesh = fvM.psi().mesh();
+    if (fvM.hasUpper())
     {
         const labelUList& own = mesh.owner();
         const labelUList& nei = mesh.neighbour();
@@ -194,8 +199,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         const fvPatch& fp = mesh.boundary()[patchI];
         if (fp.type() == "processor")
         {
-            const vectorField& intCoeffs = fvM.internalCoeffs()[patchI];
-            const vectorField& neiCoeffs = fvM.boundaryCoeffs()[patchI];
+            const Field<Type>& intCoeffs = fvM.internalCoeffs()[patchI];
+            const Field<Type>& neiCoeffs = fvM.boundaryCoeffs()[patchI];
             const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
             const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
 
@@ -214,7 +219,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     const scalar* curIntCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (
-                            intCoeffs[faceI].begin()
+                            // intCoeffs[faceI].begin()
+                            &intCoeffs[faceI]
                         );
 
                     for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)
@@ -248,7 +254,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     const scalar* curNeiCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (
-                            neiCoeffs[faceI].begin()
+                            // neiCoeffs[faceI].begin()
+                            &neiCoeffs[faceI]
                         );
 
                     for (label cmptI = 0; cmptI < vfBlockSize; ++cmptI)

@@ -204,6 +204,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
     fileName optionsFile,
     const fvMesh& mesh,
     const label blockSize,
+    const labelListList& fieldDefs,
     const Switch stopOnPetscError,
     const Switch initialise
 )
@@ -275,6 +276,84 @@ foamPetscSnesHelper::foamPetscSnesHelper
         PetscObjectSetName((PetscObject) x, "Solution");
         VecSetFromOptions(x);
         VecZeroEntries(x);
+
+        // Set up the fieldsplit index sets if fieldDefs is non-empty.
+        // After setting the fieldsplit index sets, SNES/KSP will use them via
+        // the PC.
+        // We assume the ordering of the global vector is in blocks:
+        // For each cell, the entries are:
+        //     global_index = cell*blockSize_ + local_index,
+        // where local_index runs from 0 to blockSize_-1.
+        // The user provides fieldDefs such as, e.g.
+        //     fieldDefs = { {0,1,2}, {3} }
+        // to indicate that indices 0-2 in each block belong to field 0
+        // (momentum) and index 3 belongs to field 1 (pressure).
+        if (fieldDefs.size() > 0)
+        {
+            // Get the KSP from SNES, then retrieve the PC
+            KSP ksp;
+            SNESGetKSP(snes, &ksp);
+            PC pc;
+            KSPGetPC(ksp, &pc);
+
+            // Obtain the local ownership range of the solution vector
+            PetscInt rstart, rend;
+            VecGetOwnershipRange(x, &rstart, &rend);
+            // Determine which cells (blocks) belong locally
+            const PetscInt localCellStart = rstart/blockSize_;
+            const PetscInt localCellEnd = rend/blockSize_;
+
+            // Loop over each field as defined in fieldDefs.
+            for
+            (
+                label fieldIndex = 0;
+                fieldIndex < fieldDefs.size();
+                ++fieldIndex
+            )
+            {
+                // Get the list of local indices for this field.
+                const labelList& field = fieldDefs[fieldIndex];
+
+                // Create an empty OpenFOAM List for the PETSc indices.
+                DynamicList<PetscInt> indices(rend - rstart);
+
+                // Loop over each locally owned cell
+                for
+                (
+                    PetscInt cell = localCellStart; cell < localCellEnd; ++cell
+                )
+                {
+                    // For each degree-of-freedom in this field...
+                    for (label j = 0; j < field.size(); j++)
+                    {
+                        PetscInt idx = cell*blockSize_ + field[j];
+
+                        // Only add the index if it is within our local ownership
+                        if (idx >= rstart && idx < rend)
+                        {
+                            indices.append(idx);
+                        }
+                    }
+                }
+
+                // Create a PETSc index set from the indices.
+                // Note: indices.begin() returns a pointer to the first element
+                IS is;
+                ISCreateGeneral
+                (
+                    PETSC_COMM_WORLD,
+                    indices.size(),
+                    indices.begin(),
+                    PETSC_COPY_VALUES,
+                    &is
+                );
+
+                // Build a field name, "field0", "field1", etc.
+                std::string fieldName = "field" + std::to_string(fieldIndex);
+                PCFieldSplitSetIS(pc, fieldName.c_str(), is);
+                ISDestroy(&is);
+            }
+        }
     }
 }
 
