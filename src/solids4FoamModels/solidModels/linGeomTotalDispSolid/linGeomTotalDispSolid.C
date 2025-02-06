@@ -311,6 +311,8 @@ bool linGeomTotalDispSolid::evolveSnes()
         0
     );
 
+    D().correctBoundaryConditions();
+
     if (solvePressure_)
     {
         // Map the PETSc solution to the p field
@@ -320,8 +322,10 @@ bool linGeomTotalDispSolid::evolveSnes()
             foamPetscSnesHelper::solution(),
             p().primitiveFieldRef(),
             blockSize_,
-            3
+            blockSize_ - 1
         );
+
+        p().correctBoundaryConditions();
     }
 
     // Interpolate cell displacements to vertices
@@ -508,6 +512,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     )
 {
     DisRequired();
+    Info<< "blockSize = " << blockSize_ << endl;
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
@@ -749,6 +754,8 @@ label linGeomTotalDispSolid::formResidual
     const PetscScalar *x
 )
 {
+    const fvMesh& mesh = this->mesh();
+
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
@@ -757,16 +764,19 @@ label linGeomTotalDispSolid::formResidual
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Copy x into the p field
-    volScalarField& p = const_cast<volScalarField&>(this->p());
-    scalarField& pI = p;
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        x, pI, blockSize_, blockSize_ - 1
-    );
+    if (solvePressure_)
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_, blockSize_ - 1
+        );
 
-    // Enforce the boundary conditions
-    p.correctBoundaryConditions();
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+    }
 
     // Update gradient of displacement
     mechanical().grad(D, gradD());
@@ -775,7 +785,6 @@ label linGeomTotalDispSolid::formResidual
     mechanical().correct(sigma());
 
     // Unit normal vectors at the faces
-    const fvMesh& mesh = this->mesh();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     // Traction vectors at the faces
@@ -821,30 +830,32 @@ label linGeomTotalDispSolid::formResidual
 
     if (solvePressure_)
     {
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+
         // Calculate pressure equation residual
         // Res = p/k + div(D) - gamma*laplacian(p) + gamma*div(grad(p))
         // where
         //   - k: bulk modulus
         //   - gamma: controls the amount of smoothing
 
-        const dimensionedScalar val("val", dimPressure, 1e6);
         const dimensionedScalar pressureSmoothingCoeff
         (
             solidModelDict().lookup("pressureSmoothingCoeff")
         );
         scalarField pressureResidual
         (
-          //   p/mechanical().bulkModulus()
-          // + tr(gradD())
-          // // + fvc::div(D)
           - p
           + fvc::laplacian(pressureSmoothingCoeff, p, "laplacian(Dp,p)")
-          //- mechanical().bulkModulus()*tr(gradD())
-          + val
+          - fvc::div(pressureSmoothingCoeff*fvc::grad(p))
+          - mechanical().bulkModulus()*tr(gradD())
+          //- mechanical().bulkModulus()*fvc::div(D)
         );
 
         // Make residual extensive
         pressureResidual *= mesh.V();
+
+        // TESTING: scale
+        //pressureResidual *= 1e6;
 
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -852,8 +863,8 @@ label linGeomTotalDispSolid::formResidual
             pressureResidual, f, blockSize_, blockSize_ - 1
         );
 
-        // Info<< "D = " << sqrt(gSum(magSqr(residual))) << ", "
-        //     << "P = " << sqrt(gSum(magSqr(pressureResidual))) << endl;
+        Info<< "D = " << sqrt(gSum(magSqr(residual))) << ", "
+            << "P = " << sqrt(gSum(magSqr(pressureResidual))) << endl;
     }
 
     return 0;
@@ -874,16 +885,19 @@ label linGeomTotalDispSolid::formJacobian
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Copy x into the p field
-    volScalarField& p = const_cast<volScalarField&>(this->p());
-    scalarField& pI = p;
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        x, pI, blockSize_, blockSize_ - 1
-    );
+    if (solvePressure_)
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_, blockSize_ - 1
+        );
 
-    // Enforce the boundary conditions
-    p.correctBoundaryConditions();
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+    }
 
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
@@ -905,6 +919,8 @@ label linGeomTotalDispSolid::formJacobian
 
     if (solvePressure_)
     {
+        const volScalarField& p = this->p();
+
         // Calculate pressure equation matrix
         const dimensionedScalar one("one", dimless, 1);
         //const volScalarField rKappa(1.0/mechanical().bulkModulus());
@@ -912,11 +928,12 @@ label linGeomTotalDispSolid::formJacobian
         (
             solidModelDict().lookup("pressureSmoothingCoeff")
         );
+        // TESTING scale
         fvScalarMatrix approxPressureJ
         (
             //- fvm::Sp(rKappa, p)
           - fvm::Sp(one, p)
-          + fvc::laplacian(pressureSmoothingCoeff, p, "laplacian(Dp,p)")
+          + fvm::laplacian(pressureSmoothingCoeff, p, "laplacian(Dp,p)")
         );
 
         // Insert the pressure equation
@@ -929,7 +946,6 @@ label linGeomTotalDispSolid::formJacobian
         // To begin with, we will use div(D) as it is easier to implement
         // \int_Vol div(D) dVol \approx \sum_f Gamma \cdot D_f,
         // where Df = w*Down + (1 - w)*Dnei
-        /*
         const fvMesh& mesh = this->mesh();
         const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
         for (label cmptI = 0; cmptI < 3; ++cmptI)
@@ -964,7 +980,6 @@ label linGeomTotalDispSolid::formJacobian
                 approxPressureJ, jac, blockSize_ - 1, cmptI
             );
         }
-        */
     }
 
     return 0;
