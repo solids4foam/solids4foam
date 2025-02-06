@@ -192,12 +192,6 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Solve the linear system and store the residual
             currentResidualNorm = mag(DEqn.solve().initialResidual());
 
-            // Store the initial residual
-            if (iCorr == 0)
-            {
-                initialResidualNorm = currentResidualNorm;
-            }
-
             // Norm of the solution correction
             deltaXNorm =
                 gSum
@@ -207,6 +201,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
             // Norm of the solution
             xNorm = gSum(mag(D().primitiveField()));
+
+            // Store the initial residual
+            if (iCorr == 0)
+            {
+                initialResidualNorm = currentResidualNorm;
+                Info<< "Initial Residual Norm = " << initialResidualNorm << nl
+                    << "Initial Solution Norm = " << xNorm << endl;
+            }
 
             // Fixed or adaptive field under-relaxation
             relaxField(D(), iCorr);
