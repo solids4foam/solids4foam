@@ -279,6 +279,9 @@ public:
 
     // Member Functions
 
+            //- Return number of Gauss points per triangle
+            label triQuadraturePtsNb() const {return triQuadraturePtsNb_;};
+
         // Edit
 
             //- Calculate the gradient of a volVectorField

@@ -476,7 +476,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     ),
-    hoGradPtr_()
+    hoGradPtr_(),
+    sigmaGPfPtr_()
 {
     DisRequired();
 
@@ -515,6 +516,23 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 solidModelDict().subDict("higherOrderGradCoeffs")
             )
         );
+
+        sigmaGPfPtr_.set
+        (
+            new List<List<symmTensor>>(mesh().nFaces())
+        );
+
+        List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
+
+        forAll(sigmaGPf, i)
+        {
+            List<symmTensor>& faceSigmaGP = sigmaGPf[i];
+
+            const label nbOfTriangles = mesh().faces()[i].size() ;
+            const label nbOfGaussPoints = nbOfTriangles*hoGradPtr_->triQuadraturePtsNb();
+
+            faceSigmaGP.setSize(nbOfGaussPoints);
+        }
     }
 
     if (predictor_)
@@ -728,6 +746,27 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
 
     // Traction vectors at the faces
     surfaceVectorField traction(n & fvc::interpolate(sigma()));
+
+    // TESTING
+    // Here we will calculate displacement gradient at Gauss points and call
+    // mechanical law to calculate sigma from it. To check implementation
+    // we can compare traction at Gauss points with traction at face centre
+    // from standard discretisation.
+    const List<List<tensor>> gradDGPf = hoGradPtr_->fGradGaussPoints(D);
+
+    List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
+
+    mechanical().correct(gradDGPf, sigmaGPf);
+
+    // forAll(sigmaGPf, faceI)
+    // {
+    //     Info<<"Traction at gauss points: " << endl;
+    //     forAll(sigmaGPf[faceI], gpI)
+    //     {
+    //         Info<< (sigmaGPf[faceI][gpI] & n[faceI]) << endl;;
+    //     }
+    //     Info<<"Traction at face centre: " << traction[faceI] << nl << endl;
+    // }
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation

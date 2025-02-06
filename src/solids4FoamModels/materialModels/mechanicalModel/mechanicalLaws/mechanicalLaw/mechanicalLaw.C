@@ -1648,6 +1648,22 @@ void Foam::mechanicalLaw::correct
 }
 
 
+void Foam::mechanicalLaw::correct
+(
+    const List<List<tensor>>& gradDGPf,
+    List<List<symmTensor>>& sigmaGPf
+)
+{
+    notImplemented
+    (
+        type() + "::correct( const List<List<tensor>>& gradDGPf, "
+        "List<List<symmTensor>>& sigmaGPf)\n"
+        "The correct function is not implemented\n"
+        " for the " + type() + " mechanical law"
+    );
+}
+
+
 Foam::scalar Foam::mechanicalLaw::residual()
 {
     // Default to zero; this can be overwritten by any derived mechanical law
