@@ -553,6 +553,29 @@ void Foam::mechanicalModel::correct
 }
 
 
+void Foam::mechanicalModel::correct
+(
+   const List<List<tensor>>& gradDGPf,
+   List<List<symmTensor>>& sigmaGPf
+)
+{
+    PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        laws[0].correct(gradDGPf, sigmaGPf);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::correct(...): not implemented for more than "
+            "one material"
+        );
+    }
+}
+
+
 void Foam::mechanicalModel::mapGradToSubMeshes(const volTensorField& gradD)
 {
     const PtrList<mechanicalLaw>& laws = *this;

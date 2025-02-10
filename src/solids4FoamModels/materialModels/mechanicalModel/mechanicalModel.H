@@ -171,6 +171,12 @@ public:
                 pointSymmTensorField& sigma, const pointTensorField& gradD
             );
 
+            void correct
+            (
+                const List<List<tensor>>& gradDGPf,
+                List<List<symmTensor>>& sigmaGPf
+            );
+
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);
 

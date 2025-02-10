@@ -92,6 +92,10 @@ class linGeomTotalDispSolid
         //- Higher order gradient calculator
         autoPtr<higherOrderGrad> hoGradPtr_;
 
+        //- Sigma at Gauss Points, this should live in solidModel. Added
+        //  here just for testing purpose.
+        mutable autoPtr<List<List<symmTensor>>> sigmaGPfPtr_;
+
 
     // Private Member Functions
 

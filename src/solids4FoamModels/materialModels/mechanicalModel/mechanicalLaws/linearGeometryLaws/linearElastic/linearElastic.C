@@ -398,5 +398,25 @@ void Foam::linearElastic::correct
     }
 }
 
+// TESTING
+void Foam::linearElastic::correct
+(
+    const List<List<tensor>>& gradDGPf,
+    List<List<symmTensor>>& sigmaGPf
+)
+{
+    forAll(sigmaGPf, faceI)
+    {
+        const List<symmTensor>& faceSigmaGP = sigmaGPf[faceI];
+
+        forAll(faceSigmaGP, gpI)
+        {
+            const symmTensor epsilon = symm(gradDGPf[faceI][gpI]);
+
+            sigmaGPf[faceI][gpI] =
+                (2.0*mu_*epsilon + lambda_*tr(epsilon)*symmTensor::I).value();
+        }
+    }
+}
 
 // ************************************************************************* //

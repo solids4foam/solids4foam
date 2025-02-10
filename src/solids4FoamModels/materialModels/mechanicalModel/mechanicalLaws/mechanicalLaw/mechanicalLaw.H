@@ -546,6 +546,14 @@ public:
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
 
+        // TESTING
+        // Added for high order stress calculation at Gauss points
+        virtual void correct
+        (
+            const List<List<tensor>>& gradDGPf,
+            List<List<symmTensor>>& sigmaGPf
+        );
+
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
         virtual scalar residual();

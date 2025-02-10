@@ -153,6 +153,14 @@ public:
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
+
+        // TESTING
+        //- Calculate the stress at Gauss points given the displacemen gradient
+        virtual void correct
+        (
+            const List<List<tensor>>& gradDGPf,
+            List<List<symmTensor>>& sigmaGPf
+        );
 };
 
 
