@@ -1360,6 +1360,7 @@ void higherOrderGrad::calcGlobalQRFaceCoeffs() const
 
     const List<labelList>& stencils = globalFaceStencils();
 
+
     forAll(stencils, faceI)
     {
         const labelList& curStencil = stencils[faceI];
@@ -2840,6 +2841,11 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
         const label nbOfGaussPoints = nbOfTriangles*triQuadraturePtsNb_;
 
         faceGradGP.setSize(nbOfGaussPoints);
+
+        forAll(faceGradGP, gradI)
+        {
+            gradDGP[i][gradI]=tensor::zero;
+        }
     }
 
     // Gauss point locations on each face
@@ -2886,7 +2892,6 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                     {
                         gradDGP[faceI][pointI] +=
                            pointQRGradCoeffs[faceI][pointI][cI]*DI[neiLocalCellI];
-
                     }
                     else
                     {
