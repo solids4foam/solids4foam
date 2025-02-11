@@ -20,6 +20,7 @@ License
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
+#include "../../numerics/fvc/fvcDivGaussPoints.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
@@ -750,7 +751,6 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     surfaceVectorField traction(n & fvc::interpolate(sigma()));
 
     // TESTING
-    //------------------------------------------------------------------------//
     // Here we will calculate displacement gradient at Gauss points and call
     // mechanical law to calculate sigma from it.
     const List<List<tensor>> gradDGPf = hoGradPtr_->fGradGaussPoints(D);
@@ -761,8 +761,6 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     // Gradient at Gauss points should be stored in solidModel but for
     // testing this is fine.
     mechanical().correct(gradDGPf, sigmaGPf);
-
-    //------------------------------------------------------------------------//
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
@@ -780,12 +778,28 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     // F = div(sigma) + rho*g
     //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
     // where, here, we roll the stabilisationTerm into the div(sigma)
-    residual =
-        fvc::div(mesh().magSf()*traction)
-      + rho()
-       *(
-            g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
-        );
+
+
+    // TESTING
+    // Calculate div using high order integration
+    if (hoGradPtr_)
+    {
+        // residual =
+        //     fvc::divGaussPoints(sigmaGPf, gpW)
+        //   + rho()
+        //    *(
+        //         g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+        //     );
+    }
+    else
+    {
+        residual =
+            fvc::div(mesh().magSf()*traction)
+          + rho()
+           *(
+                g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+            );
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
