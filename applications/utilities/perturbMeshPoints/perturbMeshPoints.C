@@ -54,7 +54,7 @@ Author
 #include "Random.H"
 #include "twoDPointCorrector.H"
 #include "unitConversion.H"
-#ifdef OPENFOAMM_NOT_EXTEND
+#ifdef OPENFOAM_NOT_EXTEND
     #include "primitiveMeshTools.H"
 #endif
 
