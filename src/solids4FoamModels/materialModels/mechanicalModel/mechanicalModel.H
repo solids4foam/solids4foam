@@ -171,6 +171,8 @@ public:
                 pointSymmTensorField& sigma, const pointTensorField& gradD
             );
 
+            //- TESTING, grad at gauss points (gradDGPf)  should be stored
+            //  in solidModel.C
             void correct
             (
                 const List<List<tensor>>& gradDGPf,

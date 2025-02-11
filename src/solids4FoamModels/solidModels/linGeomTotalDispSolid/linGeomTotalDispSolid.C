@@ -750,25 +750,19 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     surfaceVectorField traction(n & fvc::interpolate(sigma()));
 
     // TESTING
+    //------------------------------------------------------------------------//
     // Here we will calculate displacement gradient at Gauss points and call
-    // mechanical law to calculate sigma from it. To check implementation
-    // we can compare traction at Gauss points with traction at face centre
-    // from standard discretisation.
+    // mechanical law to calculate sigma from it.
     const List<List<tensor>> gradDGPf = hoGradPtr_->fGradGaussPoints(D);
 
     List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
 
+    // Correct sigma field at Gauss points.
+    // Gradient at Gauss points should be stored in solidModel but for
+    // testing this is fine.
     mechanical().correct(gradDGPf, sigmaGPf);
 
-    // forAll(sigmaGPf, faceI)
-    // {
-    //     Info<<"Traction at gauss points: " << endl;
-    //     forAll(sigmaGPf[faceI], gpI)
-    //     {
-    //         Info<< (sigmaGPf[faceI][gpI] & n[faceI]) << endl;;
-    //     }
-    //     Info<<"Traction at face centre: " << traction[faceI] << nl << endl;
-    // }
+    //------------------------------------------------------------------------//
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
