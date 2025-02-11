@@ -45,11 +45,13 @@ namespace fvc
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 divGaussPoints
 (
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+    const List<List<symmTensor>>& sigmaGP,
+    const List<List<scalar>>>& gpW
 )
 {
     return tmp<GeometricField<Type, fvPatchField, volMesh>>
@@ -57,244 +59,262 @@ divGaussPoints
         new GeometricField<Type, fvPatchField, volMesh>
         (
             "divGaussPoints("+ssf.name()+')',
-            fvc::surfaceIntegrate(ssf)
+            fvc::surfaceGaussQuadIntegrate(sigamGP, gpW)
         )
     );
 }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints(fvc::divGaussPoints(tssf()));
-    tssf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+// )
+// {
+//     return tmp<GeometricField<Type, fvPatchField, volMesh>>
+//     (
+//         new GeometricField<Type, fvPatchField, volMesh>
+//         (
+//             "divGaussPoints("+ssf.name()+')',
+//             fvc::surfaceIntegrate(ssf)
+//         )
+//     );
+// }
 
 
-template<class Type>
-tmp
-<
-    GeometricField
-    <
-        typename innerProduct<vector, Type>::type, fvPatchField, volMesh
-    >
->
-divGaussPoints
-(
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
-)
-{
-    return fv::divGaussPointsScheme<Type>::New
-    (
-        vf.mesh(), vf.mesh().divScheme(name)
-    ).ref().fvcDivGaussPoints(vf);
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints(fvc::divGaussPoints(tssf()));
+//     tssf.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp
-<
-    GeometricField
-    <
-        typename innerProduct<vector, Type>::type, fvPatchField, volMesh
-    >
->
-divGaussPoints
-(
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvvf,
-    const word& name
-)
-{
-    typedef typename innerProduct<vector, Type>::type DivGaussPointsType;
-    tmp<GeometricField<DivGaussPointsType, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(tvvf(), name)
-    );
-    tvvf.clear();
-    return DivGaussPoints;
-}
-
-template<class Type>
-tmp
-<
-    GeometricField
-    <
-        typename innerProduct<vector, Type>::type, fvPatchField, volMesh
-    >
->
-divGaussPoints
-(
-    const GeometricField<Type, fvPatchField, volMesh>& vf
-)
-{
-    return fvc::divGaussPoints(vf, "divGaussPoints("+vf.name()+')');
-}
+// template<class Type>
+// tmp
+// <
+//     GeometricField
+//     <
+//         typename innerProduct<vector, Type>::type, fvPatchField, volMesh
+//     >
+// >
+// divGaussPoints
+// (
+//     const GeometricField<Type, fvPatchField, volMesh>& vf,
+//     const word& name
+// )
+// {
+//     return fv::divGaussPointsScheme<Type>::New
+//     (
+//         vf.mesh(), vf.mesh().divScheme(name)
+//     ).ref().fvcDivGaussPoints(vf);
+// }
 
 
-template<class Type>
-tmp
-<
-    GeometricField
-    <
-        typename innerProduct<vector, Type>::type, fvPatchField, volMesh
-    >
->
-divGaussPoints
-(
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvvf
-)
-{
-    typedef typename innerProduct<vector, Type>::type DivGaussPointsType;
-    tmp<GeometricField<DivGaussPointsType, fvPatchField, volMesh>> DivGaussPoints(fvc::divGaussPoints(tvvf()));
-    tvvf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp
+// <
+//     GeometricField
+//     <
+//         typename innerProduct<vector, Type>::type, fvPatchField, volMesh
+//     >
+// >
+// divGaussPoints
+// (
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvvf,
+//     const word& name
+// )
+// {
+//     typedef typename innerProduct<vector, Type>::type DivGaussPointsType;
+//     tmp<GeometricField<DivGaussPointsType, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(tvvf(), name)
+//     );
+//     tvvf.clear();
+//     return DivGaussPoints;
+// }
+
+// template<class Type>
+// tmp
+// <
+//     GeometricField
+//     <
+//         typename innerProduct<vector, Type>::type, fvPatchField, volMesh
+//     >
+// >
+// divGaussPoints
+// (
+//     const GeometricField<Type, fvPatchField, volMesh>& vf
+// )
+// {
+//     return fvc::divGaussPoints(vf, "divGaussPoints("+vf.name()+')');
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const surfaceScalarField& flux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
-)
-{
-    return fv::convectionScheme<Type>::New
-    (
-        vf.mesh(),
-        flux,
-        vf.mesh().divGaussPointsScheme(name)
-    ).ref().fvcDivGaussPoints(flux, vf);
-}
+// template<class Type>
+// tmp
+// <
+//     GeometricField
+//     <
+//         typename innerProduct<vector, Type>::type, fvPatchField, volMesh
+//     >
+// >
+// divGaussPoints
+// (
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvvf
+// )
+// {
+//     typedef typename innerProduct<vector, Type>::type DivGaussPointsType;
+//     tmp<GeometricField<DivGaussPointsType, fvPatchField, volMesh>> DivGaussPoints(fvc::divGaussPoints(tvvf()));
+//     tvvf.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const tmp<surfaceScalarField>& tflux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(tflux(), vf, name)
-    );
-    tflux.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const surfaceScalarField& flux,
+//     const GeometricField<Type, fvPatchField, volMesh>& vf,
+//     const word& name
+// )
+// {
+//     return fv::convectionScheme<Type>::New
+//     (
+//         vf.mesh(),
+//         flux,
+//         vf.mesh().divGaussPointsScheme(name)
+//     ).ref().fvcDivGaussPoints(flux, vf);
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const surfaceScalarField& flux,
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf,
-    const word& name
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(flux, tvf(), name)
-    );
-    tvf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const tmp<surfaceScalarField>& tflux,
+//     const GeometricField<Type, fvPatchField, volMesh>& vf,
+//     const word& name
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(tflux(), vf, name)
+//     );
+//     tflux.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const tmp<surfaceScalarField>& tflux,
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf,
-    const word& name
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(tflux(), tvf(), name)
-    );
-    tflux.clear();
-    tvf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const surfaceScalarField& flux,
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf,
+//     const word& name
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(flux, tvf(), name)
+//     );
+//     tvf.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const surfaceScalarField& flux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
-)
-{
-    return fvc::divGaussPoints
-    (
-        flux, vf, "divGaussPoints("+flux.name()+','+vf.name()+')'
-    );
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const tmp<surfaceScalarField>& tflux,
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf,
+//     const word& name
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(tflux(), tvf(), name)
+//     );
+//     tflux.clear();
+//     tvf.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const tmp<surfaceScalarField>& tflux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(tflux(), vf)
-    );
-    tflux.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const surfaceScalarField& flux,
+//     const GeometricField<Type, fvPatchField, volMesh>& vf
+// )
+// {
+//     return fvc::divGaussPoints
+//     (
+//         flux, vf, "divGaussPoints("+flux.name()+','+vf.name()+')'
+//     );
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const surfaceScalarField& flux,
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(flux, tvf())
-    );
-    tvf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const tmp<surfaceScalarField>& tflux,
+//     const GeometricField<Type, fvPatchField, volMesh>& vf
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(tflux(), vf)
+//     );
+//     tflux.clear();
+//     return DivGaussPoints;
+// }
 
 
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-divGaussPoints
-(
-    const tmp<surfaceScalarField>& tflux,
-    const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf
-)
-{
-    tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
-    (
-        fvc::divGaussPoints(tflux(), tvf())
-    );
-    tflux.clear();
-    tvf.clear();
-    return DivGaussPoints;
-}
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const surfaceScalarField& flux,
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(flux, tvf())
+//     );
+//     tvf.clear();
+//     return DivGaussPoints;
+// }
+
+
+// template<class Type>
+// tmp<GeometricField<Type, fvPatchField, volMesh>>
+// divGaussPoints
+// (
+//     const tmp<surfaceScalarField>& tflux,
+//     const tmp<GeometricField<Type, fvPatchField, volMesh>>& tvf
+// )
+// {
+//     tmp<GeometricField<Type, fvPatchField, volMesh>> DivGaussPoints
+//     (
+//         fvc::divGaussPoints(tflux(), tvf())
+//     );
+//     tflux.clear();
+//     tvf.clear();
+//     return DivGaussPoints;
+// }
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

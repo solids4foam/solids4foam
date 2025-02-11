@@ -784,12 +784,12 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     // Calculate div using high order integration
     if (hoGradPtr_)
     {
-        // residual =
-        //     fvc::divGaussPoints(sigmaGPf, gpW)
-        //   + rho()
-        //    *(
-        //         g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
-        //     );
+        residual =
+            fvc::divGaussPoints(sigmaGPf, hoGradPtr_->faceGaussPointsWeight())
+          + rho()
+           *(
+                g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+            );
     }
     else
     {

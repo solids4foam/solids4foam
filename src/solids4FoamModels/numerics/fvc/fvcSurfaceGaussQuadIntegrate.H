@@ -50,25 +50,34 @@ namespace Foam
 
 namespace fvc
 {
-    template<class Type>
-    void surfaceGaussQuadIntegrate
-    (
-        Field<Type>&,
-        const GeometricField<Type, fvsPatchField, surfaceMesh>&
-    );
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>>
-    surfaceGaussQuadIntegrate
-    (
-        const GeometricField<Type, fvsPatchField, surfaceMesh>&
-    );
 
     template<class Type>
     tmp<GeometricField<Type, fvPatchField, volMesh>>
     surfaceGaussQuadIntegrate
     (
-        const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>&
+        const List<List<symmTensor>>& sigmaGP,
+        const List<List<scalar>>>& gpW
     );
+
+    // template<class Type>
+    // void surfaceGaussQuadIntegrate
+    // (
+    //     Field<Type>&,
+    //     const GeometricField<Type, fvsPatchField, surfaceMesh>&
+    // );
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>>
+    // surfaceGaussQuadIntegrate
+    // (
+    //     const GeometricField<Type, fvsPatchField, surfaceMesh>&
+    // );
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>>
+    // surfaceGaussQuadIntegrate
+    // (
+    //     const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>&
+    // );
 }
 
 

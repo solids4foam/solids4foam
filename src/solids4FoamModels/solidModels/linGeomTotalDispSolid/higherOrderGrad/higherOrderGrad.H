@@ -229,9 +229,6 @@ class higherOrderGrad
         //- Return the face Gauss points
         const List<List<point>>& faceGaussPoints() const;
 
-        //- Return the face Gauss points weights
-        const List<List<scalar>>& faceGaussPointsWeight() const;
-
         //- Return the condition number field
         volScalarField& conditionNumber() const;
 
@@ -281,6 +278,9 @@ public:
 
             //- Return number of Gauss points per triangle
             label triQuadraturePtsNb() const {return triQuadraturePtsNb_;};
+
+            //- Return the face Gauss points weights
+            const List<List<scalar>>& faceGaussPointsWeight() const;
 
         // Edit
 

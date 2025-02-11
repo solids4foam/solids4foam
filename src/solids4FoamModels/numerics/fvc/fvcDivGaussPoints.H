@@ -55,120 +55,130 @@ namespace fvc
     template<class Type>
     tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
     (
-        const GeometricField<Type, fvsPatchField, surfaceMesh>&
+        const List<List<symmTensor>>& sigmaGP,
+        const List<List<scalar>>>& gpW
     );
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>&
-    );
+    // We can add other functionalities later when we determine what to
+    // do with Gauss point weights
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const GeometricField<Type, fvsPatchField, surfaceMesh>&
+    // );
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>&
+    // );
 
 
-    template<class Type>
-    tmp
-    <
-        GeometricField
-        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    > divGaussPoints
-    (
-        const GeometricField<Type, fvPatchField, volMesh>&,
-        const word& name
-    );
+    // template<class Type>
+    // tmp
+    // <
+    //     GeometricField
+    //     <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
+    // > divGaussPoints
+    // (
+    //     const GeometricField<Type, fvPatchField, volMesh>&,
+    //     const word& name
+    // );
 
-    template<class Type>
-    tmp
-    <
-        GeometricField
-        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    > divGaussPoints
-    (
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
-        const word& name
-    );
-
-
-    template<class Type>
-    tmp
-    <
-        GeometricField
-        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    > divGaussPoints
-    (
-        const GeometricField<Type, fvPatchField, volMesh>&
-    );
-
-    template<class Type>
-    tmp
-    <
-        GeometricField
-        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    > divGaussPoints
-    (
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&
-    );
+    // template<class Type>
+    // tmp
+    // <
+    //     GeometricField
+    //     <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
+    // > divGaussPoints
+    // (
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
+    //     const word& name
+    // );
 
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const surfaceScalarField&,
-        const GeometricField<Type, fvPatchField, volMesh>&,
-        const word& name
-    );
+    // template<class Type>
+    // tmp
+    // <
+    //     GeometricField
+    //     <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
+    // > divGaussPoints
+    // (
+    //     const GeometricField<Type, fvPatchField, volMesh>&
+    // );
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const tmp<surfaceScalarField>&,
-        const GeometricField<Type, fvPatchField, volMesh>&,
-        const word& name
-    );
-
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const surfaceScalarField&,
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
-        const word& name
-    );
-
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const tmp<surfaceScalarField>&,
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
-        const word& name
-    );
+    // template<class Type>
+    // tmp
+    // <
+    //     GeometricField
+    //     <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
+    // > divGaussPoints
+    // (
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&
+    // );
 
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const surfaceScalarField&,
-        const GeometricField<Type, fvPatchField, volMesh>&
-    );
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const surfaceScalarField&,
+    //     const GeometricField<Type, fvPatchField, volMesh>&,
+    //     const word& name
+    // );
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const tmp<surfaceScalarField>&,
-        const GeometricField<Type, fvPatchField, volMesh>&
-    );
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const tmp<surfaceScalarField>&,
+    //     const GeometricField<Type, fvPatchField, volMesh>&,
+    //     const word& name
+    // );
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const surfaceScalarField&,
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&
-    );
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const surfaceScalarField&,
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
+    //     const word& name
+    // );
 
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
-    (
-        const tmp<surfaceScalarField>&,
-        const tmp<GeometricField<Type, fvPatchField, volMesh>>&
-    );
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const tmp<surfaceScalarField>&,
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&,
+    //     const word& name
+    // );
+
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const surfaceScalarField&,
+    //     const GeometricField<Type, fvPatchField, volMesh>&
+    // );
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const tmp<surfaceScalarField>&,
+    //     const GeometricField<Type, fvPatchField, volMesh>&
+    // );
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const surfaceScalarField&,
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&
+    // );
+
+    // template<class Type>
+    // tmp<GeometricField<Type, fvPatchField, volMesh>> divGaussPoints
+    // (
+    //     const tmp<surfaceScalarField>&,
+    //     const tmp<GeometricField<Type, fvPatchField, volMesh>>&
+    // );
 }
 
 
