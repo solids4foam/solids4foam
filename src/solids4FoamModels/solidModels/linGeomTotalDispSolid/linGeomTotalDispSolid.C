@@ -25,6 +25,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "leastSquaresS4fVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -828,6 +829,12 @@ label linGeomTotalDispSolid::formResidual
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
+    // Update gradient of displacement
+    mechanical().grad(D, gradD());
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
     if (solvePressure_)
     {
         // Copy x into the p field
@@ -840,13 +847,10 @@ label linGeomTotalDispSolid::formResidual
 
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
+
+        // Replace the pressure component of stress
+        sigma() = dev(sigma()) - p*I;
     }
-
-    // Update gradient of displacement
-    mechanical().grad(D, gradD());
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
 
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -903,7 +907,7 @@ label linGeomTotalDispSolid::formResidual
         // Res = p/k + div(D) - gamma*laplacian(p) + gamma*div(grad(p))
         // where
         //   - k: bulk modulus
-        //   - gamma: controls the amount of smoothing
+        //   - gamma: "pDiffusivity" controls the amount of smoothing
         
         scalarField pressureResidual
         (
@@ -916,9 +920,6 @@ label linGeomTotalDispSolid::formResidual
 
         // Make residual extensive
         pressureResidual *= mesh.V();
-
-        // TESTING: scale
-        //pressureResidual *= 1e6;
 
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -972,6 +973,7 @@ label linGeomTotalDispSolid::formJacobian
     }
 
     // Calculate a segregated approximation of the Jacobian
+    // To-do: impK should be 2*mu for pressure approach
     fvVectorMatrix approxJ
     (
         fvm::laplacian(impKf_, D, "laplacian(DD,D)")
@@ -1047,6 +1049,100 @@ label linGeomTotalDispSolid::formJacobian
             (
                 divDCoeffs, jac, blockSize_ - 1, cmptI, 1
             );
+        }
+
+        // Calculate p-in-D equation: -grad(p) == -div(p*I)
+        {
+            // Get reference to least square vectors
+            const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+            const leastSquaresS4fVectors& lsv =
+                leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+
+            const surfaceVectorField& ownLs = lsv.pVectors();
+            const surfaceVectorField& neiLs = lsv.nVectors();
+
+            const labelUList& own = mesh.owner();
+            const labelUList& nei = mesh.neighbour();
+
+            const scalarField& VI = mesh.V();
+
+            // Initialise the components
+            const label nCoeffCmpts = blockSize_*blockSize_;
+            const label nScalarEqns = solidModel::twoD() ? 2 : 3;
+            const label cmptJ = solidModel::twoD() ? 3 : 4;
+            PetscScalar values[nCoeffCmpts];
+            std::memset(values, 0, sizeof(values));
+
+            forAll(own, faceI)
+            {
+                const label ownFaceI = own[faceI];
+                const label neiFaceI = nei[faceI];
+                // const label blockRowI = own[faceI];
+                // const label blockColI = nei[faceI];
+
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal(ownFaceI);
+                const label globalBlockColI =
+                    foamPetscSnesHelper::globalCells().toGlobal(neiFaceI);
+
+                // Explicit gradient
+                // Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
+                // lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
+                // lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
+
+                // Set only the p-in-D equation terms => first 3 (or 2 in 2-D)
+                // rows of the final column
+
+                // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + cmptJ] =
+                        -VI[ownFaceI]*ownLs[faceI][cmptI];
+                }
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+
+                // mat(ownFaceI, neIFaceI) += VI[ownFaceI]*ownLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + cmptJ] =
+                        VI[ownFaceI]*ownLs[faceI][cmptI];
+                }
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    ADD_VALUES
+                );
+
+                //mat(neIFaceI, neIFaceI) += VI[neiFaceI]*neiLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + cmptJ] =
+                        VI[neiFaceI]*neiLs[faceI][cmptI];
+                }
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                    ADD_VALUES
+                );
+
+                //mat(neIFaceI, ownFaceI) -= VI[neiFaceI]*neiLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + cmptJ] =
+                        -VI[neiFaceI]*neiLs[faceI][cmptI];
+                }
+                MatSetValuesBlocked
+                (
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    ADD_VALUES
+                );
+            }
+
+            // Todo: boundaries
         }
     }
 
