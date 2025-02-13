@@ -215,6 +215,9 @@ public:
             //  Converts the finite volume matrix into block coefficients using
             //  the specified row and column offsets (rowOffset, colOffset)
             //  within each block.
+            //  nScalarEqns indicates the number of scalar equations to add, e.g.
+            //  3 for a 3-D vector equation, 2 for 2-D vector equation, 1 for a
+            //  scalar equation
             //  A non-zero return value indicates an error.
             template <class Type>
             label InsertFvMatrixIntoPETScMatrix
@@ -222,12 +225,13 @@ public:
                 const fvMatrix<Type>& fvM,
                 Mat jac,
                 const label rowOffset,
-                const label colOffset
+                const label colOffset,
+                const label nScalarEqns
             ) const;
 
             //- Extracts a subset of components from a raw scalar array 'x' into
             //  the OpenFOAM field 'vf'. 'x' is organized in blocks of
-            //  'xBlockSize' scalars per element, and extraction starts at
+            //  'blockSize_' scalars per element, and extraction starts at
             //  'offset'. For each element in 'vf', the function copies the
             //  first pTraits<Type>::nComponents scalars, assuming that 'vf' is
             //  stored contiguously.
@@ -235,17 +239,17 @@ public:
             //    x          - Pointer to the raw scalar array.
             //    vf         - The OpenFOAM field (e.g., Field<scalar>,
             //                 Field<vector>, Field<tensor>) to populate.
-            //    xBlockSize - Block size (number of scalars per element) in the
-            //                 array 'x'.
             //    offset     - Starting index within each block in 'x' to begin
             //                 copying.
+            //    nScalarEqns- Number of components to extract, e.g. 3 for a 3-D
+            //                 vector
             template <class Type>
             void ExtractFieldComponents
             (
                 const PetscScalar *x,
                 Field<Type>& vf,
-                const label xBlockSize,
-                const label offset
+                const label offset,
+                const label nScalarEqns
             ) const;
 
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
@@ -255,13 +259,13 @@ public:
             (
                 const Vec x,
                 Field<Type>& vf,
-                const label xBlockSize,
-                const label offset
+                const label offset,
+                const label nScalarEqns
             ) const;
 
             //- Inserts a subset of components from the OpenFOAM field 'vf' into
             //  a raw scalar array 'x'. The array 'x' is organized in blocks of
-            //  'xBlockSize' scalars per element, and insertion begins at the
+            //  'blockSize_' scalars per element, and insertion begins at the
             //  specified 'offset'. For each element in 'vf', the function
             //  copies the first pTraits<Type>::nComponents scalars (e.g., for a
             //  vector, the x, y, z components), assuming that 'vf' is stored
@@ -272,17 +276,17 @@ public:
             //                 components are extracted.
             //    x          - Pointer to the raw scalar array where the
             //                 components will be inserted.
-            //    xBlockSize - Block size (number of scalars per element) in the
-            //                 array 'x'.
             //    offset     - Starting index within each block in 'x' where
             //                 insertion of the components begins.
+            //    nScalarEqns- Number of components to extract, e.g. 3 for a 3-D
+            //                 vector
             template <class Type>
             void InsertFieldComponents
             (
                 const Field<Type>& vf,
                 PetscScalar *x,
-                const label xBlockSize,
-                const label offset
+                const label offset,
+                const label nScalarEqns
             ) const;
 
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
@@ -292,8 +296,8 @@ public:
             (
                 const Field<Type>& vf,
                 Vec x,
-                const label xBlockSize,
-                const label offset
+                const label offset,
+                const label nScalarEqns
             ) const;
 
             //- Call the PETSc SNES solve function and check its convergence
