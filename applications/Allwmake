@@ -1,11 +1,11 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
-targetType=""
-optAll="all"
 # Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
+optAll="all"
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
     optAll="-all"
 fi
 
