@@ -341,9 +341,6 @@ bool linGeomTotalDispSolid::evolveSnes()
     // Velocity
     U() = fvc::ddt(D());
 
-    volScalarField pExp("pExp", -mechanical().bulkModulus()*tr(gradD()));
-    pExp.write();
-
     return true;
 }
 
@@ -448,9 +445,9 @@ void linGeomTotalDispSolid::makePDiffusivity() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    const dimensionedScalar pressureSmoothingCoeff
+    const scalar pressureSmoothingCoeff
     (
-        solidModelDict().lookup("pressureSmoothingCoeff")
+        readScalar(solidModelDict().lookup("pressureSmoothingCoeff"))
     );
 
     fvVectorMatrix approxJ
@@ -479,7 +476,7 @@ void linGeomTotalDispSolid::makePDiffusivity() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            pressureSmoothingCoeff/fvc::interpolate(approxJ.A())
+            -pressureSmoothingCoeff*impKf_/fvc::interpolate(approxJ.A())
         )
     );
 }
@@ -908,7 +905,7 @@ label linGeomTotalDispSolid::formResidual
         // where
         //   - k: bulk modulus
         //   - gamma: "pDiffusivity" controls the amount of smoothing
-        
+
         scalarField pressureResidual
         (
           - p
@@ -924,10 +921,7 @@ label linGeomTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual,
-            f,
-            solidModel::twoD() ? 2 : 3, // Location of first DI component
-            1                           // Number of components to insert
+            pressureResidual, f, blockSize_ - 1, 1
         );
 
         // Info<< "D = " << sqrt(gSum(magSqr(residual))) << ", "
@@ -1052,6 +1046,7 @@ label linGeomTotalDispSolid::formJacobian
         }
 
         // Calculate p-in-D equation: -grad(p) == -div(p*I)
+        //if (false)
         {
             // Get reference to least square vectors
             const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
