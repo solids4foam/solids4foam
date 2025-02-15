@@ -128,8 +128,28 @@ class foamPetscSnesHelper
         //- PETSc user context
         autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
 
+        //- Global cell IDs for the neighbouring processor patch cells
+        mutable PtrList<labelList> neiProcGlobalIDs_;
+
+        //- Cell volumes for the neighbouring processor patch cells
+        mutable PtrList<scalarField> neiProcVolumes_;
+
+        //- Least squares vectors for the neighbouring processor patch cells
+        mutable PtrList<vectorField> neiProcLs_;
 
     // Private Member Functions
+
+        //- Make the neighbour processor patch fields
+        void makeNeiProcFields() const;
+
+        //- Return a reference to neiProcGlobalIDs
+        const PtrList<labelList>& neiProcGlobalIDs() const;
+
+        //- Return a reference to neiProcGlobalIDs
+        const PtrList<scalarField>& neiProcVolumes() const;
+
+        //- Return a reference to neiProcLs_
+        const PtrList<vectorField>& neiProcLs() const;
 
         //- Disallow default bitwise copy construct
         foamPetscSnesHelper(const foamPetscSnesHelper&);

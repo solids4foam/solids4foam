@@ -149,47 +149,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         }
     }
 
-    // Collect the global cell indices from neighbours at processor boundaries
-    // These are used to insert the off-processor coefficients
-    // First, send the data
-    forAll(mesh.boundaryMesh(), patchI)
-    {
-        if (mesh.boundaryMesh()[patchI].type() == "processor")
-        {
-            // Take a copy of the faceCells (local IDs) and convert them to
-            // global IDs
-            labelList globalFaceCells(mesh.boundary()[patchI].faceCells());
-            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
-
-            // Send global IDs to the neighbour proc
-            const processorFvPatch& procPatch =
-                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
-            procPatch.send
-            (
-                Pstream::commsTypes::blocking, globalFaceCells
-            );
-        }
-    }
-
-    // Next, receive the data
-    PtrList<labelList> neiProcGlobalIDs(mesh.boundaryMesh().size());
-    forAll(mesh.boundaryMesh(), patchI)
-    {
-        const fvPatch& fp = mesh.boundary()[patchI];
-        if (fp.type() == "processor")
-        {
-            neiProcGlobalIDs.set(patchI, new labelList(fp.size()));
-            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
-
-            // Receive global IDs from the neighbour proc
-            const processorFvPatch& procPatch =
-                refCast<const processorFvPatch>(mesh.boundary()[patchI]);
-            procPatch.receive
-            (
-                Pstream::commsTypes::blocking, globalFaceCells
-            );
-        }
-    }
+    // Get the global IDs of the neighbour cells across processor patches
+    const PtrList<labelList>& neiProcGlobalIDs = this->neiProcGlobalIDs();
 
     // Insert the off-processor coefficients
     forAll(mesh.boundaryMesh(), patchI)

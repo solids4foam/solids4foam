@@ -23,6 +23,8 @@ License
 #include "SparseMatrixTemplate.H"
 #include "processorFvPatch.H"
 #include "leastSquaresS4fVectors.H"
+#include "symmetryFvPatchFields.H"
+#include "symmetryPlaneFvPatchFields.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -200,120 +202,149 @@ defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
 
-label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
-(
-    Mat jac,
-    const label rowOffset,
-    const label colOffset,
-    const label nScalarEqns
-) const
+void foamPetscSnesHelper::makeNeiProcFields() const
 {
-    // Get reference to least square vectors
+    if
+    (
+        neiProcGlobalIDs_.size() != 0
+     || neiProcVolumes_.size() != 0
+     || neiProcLs_.size() != 0
+    )
+    {
+        FatalErrorInFunction
+            << "Pointers already set!" << abort(FatalError);
+    }
+
     const fvMesh& mesh = mesh_;
-    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
-    const leastSquaresS4fVectors& lsv =
-        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
 
-    const surfaceVectorField& ownLs = lsv.pVectors();
-    const surfaceVectorField& neiLs = lsv.nVectors();
+    neiProcGlobalIDs_.setSize(mesh.boundaryMesh().size());
+    neiProcVolumes_.setSize(mesh.boundaryMesh().size());
+    neiProcLs_.setSize(mesh.boundaryMesh().size());
 
-    const labelUList& own = mesh.owner();
-    const labelUList& nei = mesh.neighbour();
+    PtrList<labelList>& neiProcGlobalIDs = neiProcGlobalIDs_;
+    PtrList<scalarField>& neiProcVolumes = neiProcVolumes_;
+    PtrList<vectorField>& neiProcLs = neiProcLs_;
 
     const scalarField& VI = mesh.V();
 
-    // Initialise the block coefficient
-    const label nCoeffCmpts = blockSize_*blockSize_;
-    PetscScalar values[nCoeffCmpts];
-    std::memset(values, 0, sizeof(values));
+    // Get reference to least square vectors
+    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    const leastSquaresS4fVectors& lsv =
+        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+    const surfaceVectorField& ownLs = lsv.pVectors();
 
-    forAll(own, faceI)
+    // Send the data
+    forAll(mesh.boundary(), patchI)
     {
-        // Local block row ID
-        const label ownFaceI = own[faceI];
+        const fvPatch& fp = mesh.boundary()[patchI];
 
-        // Local block column ID
-        const label neiFaceI = nei[faceI];
-
-        // Global block row ID
-        const label globalBlockRowI =
-            foamPetscSnesHelper::globalCells().toGlobal(ownFaceI);
-
-        // Global block column ID
-        const label globalBlockColI =
-            foamPetscSnesHelper::globalCells().toGlobal(neiFaceI);
-
-        // Explicit gradient
-        // Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
-        // lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
-        // lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
-
-        // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        if (fp.type() == "processor")
         {
-            values[cmptI*blockSize_ + colOffset] =
-                -VI[ownFaceI]*ownLs[faceI][cmptI];
-        }
-        CHKERRQ
-        (
-            MatSetValuesBlocked
-            (
-                jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
-                ADD_VALUES
-            )
-        );
+            // Take a copy of the faceCells (local IDs) and convert them to
+            // global IDs
+            labelList globalFaceCells(fp.faceCells());
+            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
 
-        // mat(ownFaceI, neIFaceI) += VI[ownFaceI]*ownLs[faceI];
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-        {
-            values[cmptI*blockSize_ + colOffset] =
-                VI[ownFaceI]*ownLs[faceI][cmptI];
-        }
-        CHKERRQ
-        (
-            MatSetValuesBlocked
+            // Send global IDs to the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(fp);
+            procPatch.send
             (
-                jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
-                ADD_VALUES
-            )
-        );
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
 
-        //mat(neIFaceI, neIFaceI) += VI[neiFaceI]*neiLs[faceI];
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-        {
-            values[cmptI*blockSize_ + colOffset] =
-                VI[neiFaceI]*neiLs[faceI][cmptI];
-        }
-        CHKERRQ
-        (
-            MatSetValuesBlocked
-            (
-                jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
-                ADD_VALUES
-            )
-        );
+            // Construct a list of the volumes of cells at the patch
+            scalarField patchVols(fp.size());
+            const labelUList& faceCells = fp.faceCells();
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                patchVols[faceI] = VI[cellID];
+            }
 
-        //mat(neIFaceI, ownFaceI) -= VI[neiFaceI]*neiLs[faceI];
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-        {
-            values[cmptI*blockSize_ + colOffset] =
-                -VI[neiFaceI]*neiLs[faceI][cmptI];
-        }
-        CHKERRQ
-        (
-            MatSetValuesBlocked
+            // Send patch cell volumes to the neighbour proc
+            procPatch.send
             (
-                jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
-                ADD_VALUES
-            )
-        );
+                Pstream::commsTypes::blocking, patchVols
+            );
+
+            // Send patch least squares vectors to the neighbour proc
+            const vectorField& patchLs = ownLs.boundaryField()[patchI];
+            procPatch.send
+            (
+                Pstream::commsTypes::blocking, patchLs
+            );
+        }
     }
 
-    // Todo: boundaries
+    // Receive the data
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+
+        if (fp.type() == "processor")
+        {
+            neiProcGlobalIDs.set(patchI, new labelList(fp.size()));
+            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
+
+            // Receive global IDs from the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(fp);
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+
+            // Receive patch cell volmes from the neighbour proc
+            neiProcVolumes.set(patchI, new scalarField(fp.size()));
+            scalarField& patchNeiVols = neiProcVolumes_[patchI];
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, patchNeiVols
+            );
+
+            // Receive patch least squares vectors from the neighbour proc
+            neiProcLs.set(patchI, new vectorField(fp.size()));
+            vectorField& patchNeiLs = neiProcLs_[patchI];
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, patchNeiLs
+            );
+        }
+    }
+}
 
 
-    // No error
-    return 0;
+const PtrList<labelList>& foamPetscSnesHelper::neiProcGlobalIDs() const
+{
+    if (neiProcGlobalIDs_.size() == 0)
+    {
+        makeNeiProcFields();
+    }
+
+    return neiProcGlobalIDs_;
+}
+
+
+const PtrList<scalarField>& foamPetscSnesHelper::neiProcVolumes() const
+{
+    if (neiProcVolumes_.size() == 0)
+    {
+        makeNeiProcFields();
+    }
+
+    return neiProcVolumes_;
+}
+
+
+const PtrList<vectorField>& foamPetscSnesHelper::neiProcLs() const
+{
+    if (neiProcLs_.size() == 0)
+    {
+        makeNeiProcFields();
+    }
+
+    return neiProcLs_;
 }
 
 
@@ -337,7 +368,10 @@ foamPetscSnesHelper::foamPetscSnesHelper
     snesPtr_(),
     xPtr_(),
     APtr_(),
-    snesUserPtr_()
+    snesUserPtr_(),
+    neiProcGlobalIDs_(),
+    neiProcVolumes_(),
+    neiProcLs_()
 {
     if (initialise)
     {
@@ -500,6 +534,282 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+(
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const label nScalarEqns
+) const
+{
+    // Get reference to least square vectors
+    const fvMesh& mesh = mesh_;
+    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    const leastSquaresS4fVectors& lsv =
+        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+    // WarningInFunction
+    //     << "Do we need a different set of lsvectors?" << endl;
+
+    const surfaceVectorField& ownLs = lsv.pVectors();
+    const surfaceVectorField& neiLs = lsv.nVectors();
+
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+
+    const scalarField& VI = mesh.V();
+
+    // Initialise the block coefficient
+    const label nCoeffCmpts = blockSize_*blockSize_;
+    PetscScalar values[nCoeffCmpts];
+    std::memset(values, 0, sizeof(values));
+
+    forAll(own, faceI)
+    {
+        // Local block row ID
+        const label ownFaceI = own[faceI];
+
+        // Local block column ID
+        const label neiFaceI = nei[faceI];
+
+        // Global block row ID
+        const label globalBlockRowI =
+            foamPetscSnesHelper::globalCells().toGlobal(ownFaceI);
+
+        // Global block column ID
+        const label globalBlockColI =
+            foamPetscSnesHelper::globalCells().toGlobal(neiFaceI);
+
+        // Explicit gradient
+        // Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
+        // lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
+        // lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
+
+        // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                -VI[ownFaceI]*ownLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                ADD_VALUES
+            )
+        );
+
+        // mat(ownFaceI, neIFaceI) += VI[ownFaceI]*ownLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                VI[ownFaceI]*ownLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                ADD_VALUES
+            )
+        );
+
+        //mat(neIFaceI, neIFaceI) += VI[neiFaceI]*neiLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                VI[neiFaceI]*neiLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                ADD_VALUES
+            )
+        );
+
+        //mat(neIFaceI, ownFaceI) -= VI[neiFaceI]*neiLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                -VI[neiFaceI]*neiLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                ADD_VALUES
+            )
+        );
+    }
+
+    // Boundary face contributions
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchI];
+        const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
+        const fvPatch& fp = mesh.boundary()[patchI];
+
+        if (fp.type() == "processor")
+        {
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs()[patchI];
+            const scalarField& patchNeiVols = neiProcVolumes()[patchI];
+            const vectorField& patchNeiLs = neiProcLs()[patchI];
+
+            forAll(fp, patchFaceI)
+            {
+                // Local block row ID
+                const label ownCellID = faceCells[patchFaceI];
+
+                // Global block row ID
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal(ownCellID);
+
+                // On-proc diagonal coefficient
+                // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + colOffset] =
+                        -VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
+                }
+                CHKERRQ
+                (
+                    MatSetValuesBlocked
+                    (
+                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                        ADD_VALUES
+                    );
+                );
+
+                // Neighbour global cell ID
+                const label globalBlockColI = neiGlobalFaceCells[patchFaceI];
+
+                // Off-proc off-diagonal coefficient
+                // mat(ownFaceI, neiFaceI) += VI[ownFaceI]*neiLs[faceI];
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + colOffset] =
+                        patchNeiVols[patchFaceI]*patchNeiLs[patchFaceI][cmptI];
+                }
+                CHKERRQ
+                (
+                    MatSetValuesBlocked
+                    (
+                        jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                        ADD_VALUES
+                    );
+                );
+            }
+        }
+        else if (fp.coupled()) // coupled but not processor
+        {
+            FatalErrorInFunction
+                << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(fp) || isA<symmetryPlanePolyPatch>(fp)
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const vectorField nHat(fp.nf());
+            forAll(faceCells, patchFaceI)
+            {
+                // Explicit calculation
+                // lsGrad[faceCells[patchFaceI]] +=
+                //      patchOwnLs[patchFaceI]
+                //     *(
+                //         transform
+                //         (
+                //             I - 2.0*sqr(nHat[patchFaceI]),
+                //             vsf[faceCells[patchFaceI]]
+                //         )
+                //       - vsf[faceCells[patchFaceI]]
+                //     );
+
+                // Subtract "patchOwnLs[patchFaceI] & 2*sqr(nHat[patchFaceI])"
+                // from (faceCells[patchFaceI], faceCells[patchFaceI])
+
+                // Local block row ID
+                const label ownCellID = faceCells[patchFaceI];
+
+                // Global block row ID
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal(ownCellID);
+
+                // mat(ownCellID, ownCellID) -=
+                //     VI[ownCellID]*patchOwnLs[patchFaceI]
+                //   & 2*sqr(nHat[patchFaceI])
+                const vector coeff
+                (
+                    -VI[ownCellID]*patchOwnLs[patchFaceI]
+                   & (2.0*sqr(nHat[patchFaceI]) )
+                );
+                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                {
+                    values[cmptI*blockSize_ + colOffset] = coeff[cmptI];
+                }
+                CHKERRQ
+                (
+                    MatSetValuesBlocked
+                    (
+                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                        ADD_VALUES
+                    )
+                );
+            }
+        }
+        else
+        {
+            if (useBoundaryFaceValues[patchI])
+            {
+                forAll(faceCells, patchFaceI)
+                {
+                    // Explicit calculation
+                    // lsGrad[faceCells[patchFaceI]] +=
+                    //      patchOwnLs[patchFaceI]
+                    //     *(patchVsf[patchFaceI] - vsf[faceCells[patchFaceI]]);
+
+                    // Subtract patchOwnLs[patchFaceI] from (faceCellI, faceCellI)
+                    // Nothing else to do as patch value is a known value
+
+                    // Local block row ID
+                    const label ownCellID = faceCells[patchFaceI];
+
+                    // Global block row ID
+                    const label globalBlockRowI =
+                        foamPetscSnesHelper::globalCells().toGlobal(ownCellID);
+
+                    // mat(ownCellID, ownCellID) -=
+                    //     VI[ownCellID]*patchOwnLs[patchFaceI];
+                    for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+                    {
+                        values[cmptI*blockSize_ + colOffset] =
+                            -VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
+                    }
+                    CHKERRQ
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                            ADD_VALUES
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    return 0;
+}
 
 
 int foamPetscSnesHelper::solve(const bool returnOnSnesError)
