@@ -22,6 +22,7 @@ License
 #include "foamPetscSnesHelper.H"
 #include "SparseMatrixTemplate.H"
 #include "processorFvPatch.H"
+#include "leastSquaresS4fVectors.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -195,6 +196,125 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
+
+
+// * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
+
+label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+(
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const label nScalarEqns
+) const
+{
+    // Get reference to least square vectors
+    const fvMesh& mesh = mesh_;
+    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    const leastSquaresS4fVectors& lsv =
+        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+
+    const surfaceVectorField& ownLs = lsv.pVectors();
+    const surfaceVectorField& neiLs = lsv.nVectors();
+
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+
+    const scalarField& VI = mesh.V();
+
+    // Initialise the block coefficient
+    const label nCoeffCmpts = blockSize_*blockSize_;
+    PetscScalar values[nCoeffCmpts];
+    std::memset(values, 0, sizeof(values));
+
+    forAll(own, faceI)
+    {
+        // Local block row ID
+        const label ownFaceI = own[faceI];
+
+        // Local block column ID
+        const label neiFaceI = nei[faceI];
+
+        // Global block row ID
+        const label globalBlockRowI =
+            foamPetscSnesHelper::globalCells().toGlobal(ownFaceI);
+
+        // Global block column ID
+        const label globalBlockColI =
+            foamPetscSnesHelper::globalCells().toGlobal(neiFaceI);
+
+        // Explicit gradient
+        // Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
+        // lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
+        // lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
+
+        // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                -VI[ownFaceI]*ownLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                ADD_VALUES
+            )
+        );
+
+        // mat(ownFaceI, neIFaceI) += VI[ownFaceI]*ownLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                VI[ownFaceI]*ownLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                ADD_VALUES
+            )
+        );
+
+        //mat(neIFaceI, neIFaceI) += VI[neiFaceI]*neiLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                VI[neiFaceI]*neiLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                ADD_VALUES
+            )
+        );
+
+        //mat(neIFaceI, ownFaceI) -= VI[neiFaceI]*neiLs[faceI];
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            values[cmptI*blockSize_ + colOffset] =
+                -VI[neiFaceI]*neiLs[faceI][cmptI];
+        }
+        CHKERRQ
+        (
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                ADD_VALUES
+            )
+        );
+    }
+
+    // Todo: boundaries
+
+
+    // No error
+    return 0;
+}
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //

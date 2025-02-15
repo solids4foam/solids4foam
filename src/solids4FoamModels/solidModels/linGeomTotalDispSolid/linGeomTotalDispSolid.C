@@ -25,7 +25,6 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
-#include "leastSquaresS4fVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -938,9 +937,6 @@ label linGeomTotalDispSolid::formResidual
         (
             pressureResidual, f, blockSize_ - 1, 1
         );
-
-        // Info<< "D = " << sqrt(gSum(magSqr(residual))) << ", "
-        //     << "P = " << sqrt(gSum(magSqr(pressureResidual))) << endl;
     }
 
     return 0;
@@ -1069,100 +1065,16 @@ label linGeomTotalDispSolid::formJacobian
             );
         }
 
-        // Calculate p-in-D equation: -grad(p) == -div(p*I)
-        //if (false)
-        {
-            // Get reference to least square vectors
-            const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
-            const leastSquaresS4fVectors& lsv =
-                leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+        // Insert p-in-D term
+        // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation
+        foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+        (
+            jac,
+            0,                         // row offset
+            blockSize_ - 1,            // column offset
+            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        );
 
-            const surfaceVectorField& ownLs = lsv.pVectors();
-            const surfaceVectorField& neiLs = lsv.nVectors();
-
-            const labelUList& own = mesh.owner();
-            const labelUList& nei = mesh.neighbour();
-
-            const scalarField& VI = mesh.V();
-
-            // Initialise the components
-            const label nCoeffCmpts = blockSize_*blockSize_;
-            const label nScalarEqns = solidModel::twoD() ? 2 : 3;
-            const label cmptJ = solidModel::twoD() ? 3 : 4;
-            PetscScalar values[nCoeffCmpts];
-            std::memset(values, 0, sizeof(values));
-
-            forAll(own, faceI)
-            {
-                const label ownFaceI = own[faceI];
-                const label neiFaceI = nei[faceI];
-                // const label blockRowI = own[faceI];
-                // const label blockColI = nei[faceI];
-
-                const label globalBlockRowI =
-                    foamPetscSnesHelper::globalCells().toGlobal(ownFaceI);
-                const label globalBlockColI =
-                    foamPetscSnesHelper::globalCells().toGlobal(neiFaceI);
-
-                // Explicit gradient
-                // Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
-                // lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
-                // lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
-
-                // Set only the p-in-D equation terms => first 3 (or 2 in 2-D)
-                // rows of the final column
-
-                // mat(ownFaceI, ownFaceI) -= VI[ownFaceI]*ownLs[faceI];
-                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-                {
-                    values[cmptI*blockSize_ + cmptJ] =
-                        -VI[ownFaceI]*ownLs[faceI][cmptI];
-                }
-                MatSetValuesBlocked
-                (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
-                    ADD_VALUES
-                );
-
-                // mat(ownFaceI, neIFaceI) += VI[ownFaceI]*ownLs[faceI];
-                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-                {
-                    values[cmptI*blockSize_ + cmptJ] =
-                        VI[ownFaceI]*ownLs[faceI][cmptI];
-                }
-                MatSetValuesBlocked
-                (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
-                    ADD_VALUES
-                );
-
-                //mat(neIFaceI, neIFaceI) += VI[neiFaceI]*neiLs[faceI];
-                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-                {
-                    values[cmptI*blockSize_ + cmptJ] =
-                        VI[neiFaceI]*neiLs[faceI][cmptI];
-                }
-                MatSetValuesBlocked
-                (
-                    jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
-                    ADD_VALUES
-                );
-
-                //mat(neIFaceI, ownFaceI) -= VI[neiFaceI]*neiLs[faceI];
-                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-                {
-                    values[cmptI*blockSize_ + cmptJ] =
-                        -VI[neiFaceI]*neiLs[faceI][cmptI];
-                }
-                MatSetValuesBlocked
-                (
-                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
-                    ADD_VALUES
-                );
-            }
-
-            // Todo: boundaries
-        }
     }
 
     return 0;

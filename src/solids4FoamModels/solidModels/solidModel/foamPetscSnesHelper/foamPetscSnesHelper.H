@@ -229,6 +229,18 @@ public:
                 const label nScalarEqns
             ) const;
 
+            //- Inserts least squares gradient into a PETSc matrix at location
+            //  (rowOffset, colOffset) within the block
+            //  Only implemented for the gradient of a scalar, e.g. grad(p)
+            //  Note that the -grad(p) is insert, not grad(p)
+            label InsertFvmGradIntoPETScMatrix
+            (
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns
+            ) const;
+
             //- Extracts a subset of components from a raw scalar array 'x' into
             //  the OpenFOAM field 'vf'. 'x' is organized in blocks of
             //  'blockSize_' scalars per element, and extraction starts at
