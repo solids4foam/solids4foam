@@ -198,6 +198,36 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::linearElastic::shearModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "shearModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
     if (nu_.value() == 0.5)

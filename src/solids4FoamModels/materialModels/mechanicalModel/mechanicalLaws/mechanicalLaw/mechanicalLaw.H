@@ -534,6 +534,15 @@ public:
             return rho();
         }
 
+        //- Return shear modulus
+        virtual tmp<volScalarField> shearModulus() const
+        {
+            notImplemented("shearModulus() const");
+
+            // Keep compiler happy
+            return rho();
+        }
+
         //- Calculate the volField stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 

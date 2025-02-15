@@ -524,8 +524,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_
+    (
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+      ? 2.0*mechanical().shearModulus()
+      : mechanical().impK()
+    ),
+    impKf_(fvc::interpolate(impK_)), //mechanical().impKf()),
     rImpK_(1.0/impK_),
     pDiffusivityPtr_(),
     A_
@@ -568,7 +573,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     )
 {
     DisRequired();
-    Info<< "blockSize = " << blockSize_ << endl;
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
@@ -906,13 +910,24 @@ label linGeomTotalDispSolid::formResidual
         //   - k: bulk modulus
         //   - gamma: "pDiffusivity" controls the amount of smoothing
 
+        // scalarField pressureResidual
+        // (
+        //   - p
+        //   + fvc::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
+        //   - fvc::div(pDiffusivity()*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+        //   - mechanical().bulkModulus()*tr(gradD())
+        //   //- mechanical().bulkModulus()*fvc::div(D)
+        // );
+
+        // Divided by bulkModulus form
+        const volScalarField kappa("kappa", mechanical().bulkModulus());
+        const surfaceScalarField kappaf(fvc::interpolate(kappa));
         scalarField pressureResidual
         (
-          - p
-          + fvc::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
-          - fvc::div(pDiffusivity()*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
-          - mechanical().bulkModulus()*tr(gradD())
-          //- mechanical().bulkModulus()*fvc::div(D)
+          - p/kappa
+          + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+          - fvc::div((pDiffusivity()/kappaf)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+          - tr(gradD())
         );
 
         // Make residual extensive
@@ -992,15 +1007,22 @@ label linGeomTotalDispSolid::formJacobian
     {
         const volScalarField& p = this->p();
 
+        const volScalarField kappa("kappa", mechanical().bulkModulus());
+        //const volScalarField rKappa(1.0/mechanical().bulkModulus());
+        const volScalarField rKappa(1.0/kappa);
+        const surfaceScalarField kappaf(fvc::interpolate(kappa));
         {
             // Calculate pressure equation matrix
             const dimensionedScalar one("one", dimless, 1);
-            //const volScalarField rKappa(1.0/mechanical().bulkModulus());
+            // fvScalarMatrix approxPressureJ
+            // (
+            //   - fvm::Sp(one, p)
+            //   + fvm::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
+            // );
             fvScalarMatrix approxPressureJ
             (
-                //- fvm::Sp(rKappa, p)
-              - fvm::Sp(one, p)
-              + fvm::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
+              - fvm::Sp(rKappa, p)
+              + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
             );
 
             // Insert the pressure equation
@@ -1015,7 +1037,7 @@ label linGeomTotalDispSolid::formJacobian
         // \int_Vol div(D) dVol \approx \sum_f Gamma \cdot D_f,
         // where Df = w*Down + (1 - w)*Dnei
         const fvMesh& mesh = this->mesh();
-        const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
+        //const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
         for (label cmptI = 0; cmptI < 3; ++cmptI)
         {
             if (solidModel::twoD() && cmptI == 2)
@@ -1031,8 +1053,10 @@ label linGeomTotalDispSolid::formJacobian
             scalarField& upper = divDCoeffs.upper();
             scalarField& lower = divDCoeffs.lower();
 
-            lower = -w*Sf.component(cmptI)*k.primitiveField();
-            upper = lower + Sf.component(cmptI)*k.primitiveField();
+            // lower = -w*Sf.component(cmptI)*k.primitiveField();
+            // upper = lower + Sf.component(cmptI)*k.primitiveField();
+            lower = -w*Sf.component(cmptI);
+            upper = lower + Sf.component(cmptI);
 
             divDCoeffs.negSumDiag();
 

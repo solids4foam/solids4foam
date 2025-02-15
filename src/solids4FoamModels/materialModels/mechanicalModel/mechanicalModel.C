@@ -475,6 +475,64 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::shearModulus() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        return laws[0].shearModulus();
+    }
+    else
+    {
+        // Accumulate data for all fields
+        tmp<volScalarField> tresult
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "shearModulusLaw",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0),
+                calculatedFvPatchScalarField::typeName
+            )
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        volScalarField& result = tresult.ref();
+#else
+        volScalarField& result = tresult();
+#endif
+
+        // Accumulated subMesh fields and then map to the base mesh
+        PtrList<volScalarField> shearModulii(laws.size());
+
+        forAll(laws, lawI)
+        {
+            shearModulii.set
+            (
+                lawI,
+                new volScalarField(laws[lawI].shearModulus())
+            );
+        }
+
+        // Map subMesh fields to the base mesh
+        solSubMeshes().mapSubMeshVolFields<scalar>(shearModulii, result);
+
+        // Clear subMesh fields
+        shearModulii.clear();
+
+        return tresult;
+    }
+}
+
+
 void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;
