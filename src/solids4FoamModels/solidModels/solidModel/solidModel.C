@@ -537,6 +537,34 @@ Foam::volVectorField& Foam::solidModel::rhoD2dt2D() const
     return rhoD2dt2DPtr_();
 }
 
+
+Foam::volScalarField& Foam::solidModel::p()
+{
+    if (!pPtr_)
+    {
+        pPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "p",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0),
+                "zeroGradient"
+            )
+        );
+    }
+
+    return pPtr_.ref();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -836,7 +864,12 @@ Foam::solidModel::solidModel
     ),
     rhoD2dt2DPtr_(),
     twoDCorrector_(mesh()),
-    twoD_(mesh().nGeometricD() == 2)
+    twoD_(mesh().nGeometricD() == 2),
+    solvePressure_
+    (
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+    ),
+    pPtr_()
 #ifdef OPENFOAM_COM
     ,
     fvOptions_(fv::options::New(meshPtr_()))

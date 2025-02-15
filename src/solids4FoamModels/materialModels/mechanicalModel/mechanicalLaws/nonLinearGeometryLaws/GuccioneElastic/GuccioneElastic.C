@@ -664,6 +664,27 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::bulkModulus() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::shearModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_
+        )
+    );
+}
+
+
 void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field

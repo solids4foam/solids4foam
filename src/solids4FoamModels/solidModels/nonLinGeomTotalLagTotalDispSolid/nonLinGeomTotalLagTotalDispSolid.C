@@ -388,6 +388,62 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 }
 
 
+void nonLinGeomTotalLagTotalDispSolid::makePDiffusivity() const
+{
+    if (pDiffusivityPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    const scalar pressureSmoothingCoeff
+    (
+        readScalar(solidModelDict().lookup("pressureSmoothingCoeff"))
+    );
+
+    fvVectorMatrix approxJ
+    (
+        fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+      - rho()*fvm::d2dt2(D())
+    );
+
+    if (dampingCoeff().value() > SMALL)
+    {
+        approxJ -= dampingCoeff()*rho()*fvm::ddt(D());
+    }
+
+    // Optional: under-relaxation of the linear system
+    approxJ.relax();
+
+    pDiffusivityPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "pDiffusivity",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            -pressureSmoothingCoeff*impKf_/fvc::interpolate(approxJ.A())
+        )
+    );
+}
+
+
+const surfaceScalarField& nonLinGeomTotalLagTotalDispSolid::pDiffusivity() const
+{
+    if (pDiffusivityPtr_.empty())
+    {
+        makePDiffusivity();
+    }
+
+    return pDiffusivityPtr_.ref();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
@@ -407,7 +463,16 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             )
         ),
         mesh(),
-        solidModel::twoD() ? 2 : 3,
+        solvePressure()
+      ? label(solidModel::twoD() ? 3 : 4)
+      : label(solidModel::twoD() ? 2 : 3),
+        solvePressure()
+      ? (
+            solidModel::twoD()
+          ? labelListList({ {0, 1}, {2} })    // 0-1: momentum. 2: pressure
+          : labelListList({ {0, 1, 2}, {3} }) // 0-2: momentum. 3: pressure
+        )
+      : labelListList({}), // No need to assign fields
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -460,15 +525,46 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         ),
         fvc::d2dt2(D())
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_
+    (
+        solvePressure()
+      ? 2.0*mechanical().shearModulus()
+      : mechanical().impK()
+    ),
+    impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+    pDiffusivityPtr_(),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    blockSize_
+    (
+        solvePressure()
+      ? label(solidModel::twoD() ? 3 : 4)
+      : label(solidModel::twoD() ? 2 : 3)
+    )
 {
     DisRequired();
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
+
+    Info<< "solvePressure = " << solvePressure() << endl;
+
+    if (solvePressure())
+    {
+        if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
+        {
+            FatalErrorInFunction
+                << "The solution algorithm must be "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " when solvePressure is enabled" << abort(FatalError);
+        }
+
+        // Ensure p is created
+        p();
+    }
 
     if (predictor_)
     {
@@ -609,6 +705,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     const PetscScalar *x
 )
 {
+    const fvMesh& mesh = this->mesh();
+
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
@@ -644,11 +742,28 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
+    if (solvePressure())
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_ - 1, 1
+        );
+
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+
+        // Replace the pressure component of stress
+        sigma() = dev(sigma()) - p*I;
+    }
+
     // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const surfaceVectorField SfCurrent
     (
-        fvc::interpolate(J_*Finv_.T()) & mesh().Sf()
+        fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
     );
     const surfaceScalarField magSfCurrent(mag(SfCurrent));
     const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
@@ -690,7 +805,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     );
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
-    residual *= mesh().V();
+    residual *= mesh.V();
 
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
@@ -704,6 +819,36 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         0,                          // Location of first DI component
         solidModel::twoD() ? 2 : 3  // Number of components to extract
     );
+
+    if (solvePressure())
+    {
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+
+        // Divided by bulkModulus form
+        const volScalarField kappa("kappa", mechanical().bulkModulus());
+        const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        scalarField pressureResidual
+        (
+          - p/kappa
+          + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+          - fvc::div
+            (
+                (pDiffusivity()/kappaf)*mesh.Sf()
+              & fvc::interpolate(fvc::grad(p))
+            )
+          - 0.5*(pow(J_, 2.0) - 1.0)
+        //- tr(gradD())
+        );
+
+        // Make residual extensive
+        pressureResidual *= mesh.V();
+
+        // Copy the pressureResidual into the f field as the final equation
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pressureResidual, f, blockSize_ - 1, 1
+        );
+    }
 
     return 0;
 }
@@ -729,6 +874,20 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
+    if (solvePressure())
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_, 1
+        );
+
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+    }
+
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
     (
@@ -749,6 +908,80 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     (
         approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
     );
+
+    if (solvePressure())
+    {
+        const volScalarField& p = this->p();
+
+        const volScalarField kappa("kappa", mechanical().bulkModulus());
+        //const volScalarField rKappa(1.0/mechanical().bulkModulus());
+        const volScalarField rKappa(1.0/kappa);
+        const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        {
+            // Calculate pressure equation matrix
+            const dimensionedScalar one("one", dimless, 1);
+            fvScalarMatrix approxPressureJ
+            (
+              - fvm::Sp(rKappa, p)
+              + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+            );
+
+            // Insert the pressure equation
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+            );
+        }
+
+        // Calculate D-in-p equation coeffs coming from tr(grad(D)) == div(D)
+        // To begin with, we will use div(D) as it is easier to implement
+        // \int_Vol div(D) dVol \approx \sum_f Gamma \cdot D_f,
+        // where Df = w*Down + (1 - w)*Dnei
+        const fvMesh& mesh = this->mesh();
+        //const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
+        for (label cmptI = 0; cmptI < 3; ++cmptI)
+        {
+            if (solidModel::twoD() && cmptI == 2)
+            {
+                break;
+            }
+
+            fvScalarMatrix divDCoeffs(p, dimArea*dimPressure);
+
+            const vectorField& Sf = mesh.Sf();
+            const scalarField& w = mesh.weights();
+
+            scalarField& upper = divDCoeffs.upper();
+            scalarField& lower = divDCoeffs.lower();
+
+            // lower = -w*Sf.component(cmptI)*k.primitiveField();
+            // upper = lower + Sf.component(cmptI)*k.primitiveField();
+            lower = -w*Sf.component(cmptI);
+            upper = lower + Sf.component(cmptI);
+
+            divDCoeffs.negSumDiag();
+
+            // Insert component coeffs
+            // blockSize - 1: is the last row
+            // cmptI is the 1st column for Dx, 2nd for Dy, 3rd for Dz
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                divDCoeffs, jac, blockSize_ - 1, cmptI, 1
+            );
+        }
+
+        // Insert p-in-D term
+        // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation
+        foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+        (
+            p,
+            jac,
+            0,                         // row offset
+            blockSize_ - 1,            // column offset
+            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        );
+
+    }
 
     return 0;
 }

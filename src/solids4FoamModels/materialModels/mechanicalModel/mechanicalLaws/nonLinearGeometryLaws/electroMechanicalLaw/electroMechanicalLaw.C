@@ -95,6 +95,12 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::bulkModulus() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
+{
+    return passiveMechLawPtr_->shearModulus();
+}
+
+
 void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
 {
     // Calculate passive stress

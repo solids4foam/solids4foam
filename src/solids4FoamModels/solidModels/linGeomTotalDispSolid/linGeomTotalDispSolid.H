@@ -89,13 +89,6 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
-        //- Solve pressure as an independent unknown
-        const Switch solvePressure_;
-
-        //- Pressure
-        //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
-        autoPtr<volScalarField> pPtr_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -184,9 +177,6 @@ public:
                 // This model solves for D
                 return D();
             }
-
-            //- Non-const access to the pressure
-            volScalarField& p();
 
 
         // Edit

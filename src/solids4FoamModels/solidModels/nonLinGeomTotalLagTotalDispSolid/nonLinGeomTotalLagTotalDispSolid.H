@@ -89,8 +89,15 @@ class nonLinGeomTotalLagTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Diffusivity for the pressure equation
+        //  This controls the amount of smoothing in the pressure equation
+        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
+
+        //- Number of unknowns per cell, used by PETSc SNES solver
+        const label blockSize_;
 
     // Private Member Functions
 
@@ -116,6 +123,12 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
+
+        // Make the pDiffusivity field
+        void makePDiffusivity() const;
+
+        // Return a const reference to the pDiffusivity field
+        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid

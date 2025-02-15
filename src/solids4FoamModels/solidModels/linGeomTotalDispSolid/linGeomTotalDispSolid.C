@@ -313,7 +313,7 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     D().correctBoundaryConditions();
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         // Map the PETSc solution to the p field
         // p is located in the 4th component
@@ -510,13 +510,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
             )
         ),
         mesh(),
-        solidModelDict().lookupOrDefault<Switch>("solvePressure", false) // looked twice?
+        solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3),
-        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+        solvePressure()
       ? (
             solidModel::twoD()
-          ? labelListList({ {0, 1}, {2} }) // 0-1: momentum. 2: pressure
+          ? labelListList({ {0, 1}, {2} })    // 0-1: momentum. 2: pressure
           : labelListList({ {0, 1, 2}, {3} }) // 0-2: momentum. 3: pressure
         )
       : labelListList({}), // No need to assign fields
@@ -525,11 +525,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     ),
     impK_
     (
-        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+        solvePressure()
       ? 2.0*mechanical().shearModulus()
       : mechanical().impK()
     ),
-    impKf_(fvc::interpolate(impK_)), //mechanical().impKf()),
+    impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     pDiffusivityPtr_(),
     A_
@@ -546,14 +546,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
-    solvePressure_
-    (
-        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
-    ),
-    pPtr_(),
     blockSize_
     (
-        solvePressure_
+        solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
@@ -581,9 +576,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().storePrevIter();
     mechanical().grad(D(), gradD());
 
-    Info<< "solvePressure = " << solvePressure_ << endl;
+    Info<< "solvePressure = " << solvePressure() << endl;
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
         {
@@ -678,33 +673,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-volScalarField& linGeomTotalDispSolid::p()
-{
-    if (!pPtr_)
-    {
-        pPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "p",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::AUTO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimPressure, 0.0),
-                "zeroGradient"
-            )
-        );
-    }
-
-    return pPtr_.ref();
-}
 
 
 void linGeomTotalDispSolid::setDeltaT(Time& runTime)
@@ -835,7 +803,7 @@ label linGeomTotalDispSolid::formResidual
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         // Copy x into the p field
         volScalarField& p = const_cast<volScalarField&>(this->p());
@@ -899,7 +867,7 @@ label linGeomTotalDispSolid::formResidual
         solidModel::twoD() ? 2 : 3  // Number of components to insert
     );
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         volScalarField& p = const_cast<volScalarField&>(this->p());
 
@@ -963,7 +931,7 @@ label linGeomTotalDispSolid::formJacobian
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         // Copy x into the p field
         volScalarField& p = const_cast<volScalarField&>(this->p());
@@ -978,7 +946,6 @@ label linGeomTotalDispSolid::formJacobian
     }
 
     // Calculate a segregated approximation of the Jacobian
-    // To-do: impK should be 2*mu for pressure approach
     fvVectorMatrix approxJ
     (
         fvm::laplacian(impKf_, D, "laplacian(DD,D)")
@@ -999,7 +966,7 @@ label linGeomTotalDispSolid::formJacobian
         approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
     );
 
-    if (solvePressure_)
+    if (solvePressure())
     {
         const volScalarField& p = this->p();
 
@@ -1075,7 +1042,6 @@ label linGeomTotalDispSolid::formJacobian
             blockSize_ - 1,            // column offset
             solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
         );
-
     }
 
     return 0;

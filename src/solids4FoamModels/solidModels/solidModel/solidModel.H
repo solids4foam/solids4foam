@@ -249,6 +249,13 @@ private:
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
 
+        //- Flag indicating that the pressure equation should be solved
+        const Switch solvePressure_;
+
+        //- Pressure
+        //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
+        autoPtr<volScalarField> pPtr_;
+
 #ifdef OPENFOAM_COM
         //- fvOptions
         fv::options& fvOptions_;
@@ -386,6 +393,15 @@ protected:
 
         //- Return non-const access to rhoD2dt2D
         volVectorField& rhoD2dt2D() const;
+
+        //- Return maxIterReached
+        const Switch& solvePressure() const
+        {
+            return solvePressure_;
+        }
+
+        //- Non-const access to the pressure
+        volScalarField& p();
 
         //- Return non-const access to fvOptions
         fv::options& fvOptions()

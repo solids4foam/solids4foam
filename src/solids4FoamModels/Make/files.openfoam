@@ -14,7 +14,7 @@ solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
 /*solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C*/
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
-/*solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C*/
+solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
