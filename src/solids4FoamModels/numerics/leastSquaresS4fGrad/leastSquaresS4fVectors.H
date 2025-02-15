@@ -96,6 +96,12 @@ public:
             return nVectors_;
         }
 
+        //- Return a const-access to the boundary face values for patches
+        const boolList& useBoundaryFaceValues() const
+        {
+            return useBoundaryFaceValues_;
+        }
+
         //- Delete the least square vectors when the mesh moves
         virtual bool movePoints();
 };

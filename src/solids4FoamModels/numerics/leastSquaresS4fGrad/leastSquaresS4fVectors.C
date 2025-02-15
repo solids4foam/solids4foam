@@ -69,8 +69,6 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         dimensionedVector(dimless/dimLength, Zero)
     )
 {
-    InfoInFunction
-        << "Constructing new LS vecs!" << endl;
     calcLeastSquaresVectors();
 }
 

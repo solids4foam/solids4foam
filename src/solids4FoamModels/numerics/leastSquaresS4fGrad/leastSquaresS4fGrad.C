@@ -77,7 +77,7 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     {
         if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
         {
-            useBoundaryFaceValues = false;
+            useBoundaryFaceValues[patchI] = false;
         }
     }
 

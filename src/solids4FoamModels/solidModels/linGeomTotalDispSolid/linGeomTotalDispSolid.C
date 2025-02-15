@@ -1069,6 +1069,7 @@ label linGeomTotalDispSolid::formJacobian
         // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation
         foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
+            p,
             jac,
             0,                         // row offset
             blockSize_ - 1,            // column offset

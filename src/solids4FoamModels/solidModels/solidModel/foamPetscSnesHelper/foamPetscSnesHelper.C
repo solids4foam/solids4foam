@@ -22,7 +22,6 @@ License
 #include "foamPetscSnesHelper.H"
 #include "SparseMatrixTemplate.H"
 #include "processorFvPatch.H"
-#include "leastSquaresS4fVectors.H"
 #include "symmetryFvPatchFields.H"
 #include "symmetryPlaneFvPatchFields.H"
 
@@ -347,6 +346,41 @@ const PtrList<vectorField>& foamPetscSnesHelper::neiProcLs() const
     return neiProcLs_;
 }
 
+void foamPetscSnesHelper::makeLsVectors(const volScalarField& p) const
+{
+    if (lsVectorsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    // Use patch values if a patch fixes the value
+    boolList useBoundaryFaceValues(mesh_.boundary().size(), false);
+    forAll(mesh_.boundary(), patchI)
+    {
+        if (p.boundaryField()[patchI].fixesValue())
+        {
+            useBoundaryFaceValues[patchI] = true;
+        }
+    }
+
+    lsVectorsPtr_.set(new leastSquaresS4fVectors(mesh_, useBoundaryFaceValues));
+}
+
+
+const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
+(
+    const volScalarField& p
+) const
+{
+    if (lsVectorsPtr_.empty())
+    {
+        makeLsVectors(p);
+    }
+
+    return lsVectorsPtr_.ref();
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -538,6 +572,7 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
 label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 (
+    const volScalarField& p,
     Mat jac,
     const label rowOffset,
     const label colOffset,
@@ -546,11 +581,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 {
     // Get reference to least square vectors
     const fvMesh& mesh = mesh_;
-    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
-    const leastSquaresS4fVectors& lsv =
-        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
-    // WarningInFunction
-    //     << "Do we need a different set of lsvectors?" << endl;
+    const leastSquaresS4fVectors& lsv = lsVectors(p);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();
@@ -653,6 +684,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchI];
         const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
         const fvPatch& fp = mesh.boundary()[patchI];
+        const boolList& useBoundaryFaceValues = lsv.useBoundaryFaceValues();
 
         if (fp.type() == "processor")
         {
