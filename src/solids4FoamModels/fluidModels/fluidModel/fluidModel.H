@@ -143,6 +143,9 @@ class fluidModel
         //- Cumulative continuity error
         scalar cumulativeContErr_;
 
+        //- Flag indicating if the case is 2-D or 3-D
+        const bool twoD_;
+
 #ifdef OPENFOAM_ORG
         //- fvModels
         fvModels& fvModels_;
@@ -249,6 +252,11 @@ protected:
             volVectorField& U
         ) const;
 
+        //- Is the model two-dimensional
+        const bool& twoD() const
+        {
+            return twoD_;
+        }
 
 public:
 

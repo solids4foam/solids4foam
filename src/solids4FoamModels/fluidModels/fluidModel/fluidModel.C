@@ -647,6 +647,7 @@ Foam::fluidModel::fluidModel
     UMax_("UMax", dimVelocity, 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
+    twoD_(mesh().nGeometricD() == 2),
 #ifdef OPENFOAM_ORG
     fvModels_(fvModels::New(mesh())),
     fvConstraints_(fvConstraints::New(mesh())),
