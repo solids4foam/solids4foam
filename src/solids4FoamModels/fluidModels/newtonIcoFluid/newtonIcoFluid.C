@@ -322,8 +322,6 @@ label newtonIcoFluid::formResidual
     // Take references
     //const Time& runTime = fluidModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
-    //volVectorField& U = this->U();
-    //volScalarField& p = this->p();
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
@@ -384,10 +382,6 @@ label newtonIcoFluid::formResidual
     // Enforce the boundary conditions
     p.correctBoundaryConditions();
 
-    // U.correctBoundaryConditions();
-    // p.correctBoundaryConditions();
-
-
     // Update the pressure BCs to ensure flux consistency
     // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
     // CHECK
@@ -406,10 +400,13 @@ label newtonIcoFluid::formResidual
     // The residual vector is defined as
     // F = div(sigma) - ddt(U) - div(phi*U)
     //   = div(dev(sigma)) - grad(p) - ddt(U) - div(phi*U)
+    //   = div(2*nuEff*symm(gradU)) - grad(p) - ddt(U) - div(phi*U)
+    //   = laplacian(nuEff,U) + div(nuEff*gradU.T())
+    //     - grad(p) - ddt(U) - div(phi*U)
     vectorField residual
     (
-        //fvc::div(turbulence_->devReff(U)) // which sign?
         fvc::laplacian(turbulence_->nuEff(), U)
+      + fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
       - fvc::grad(p)
       - fvc::ddt(U)
       - fvc::div(phi, U)
@@ -434,10 +431,10 @@ label newtonIcoFluid::formResidual
     scalarField pressureResidual
     (
         fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
-      // - fvc::div
-      //   (
-      //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
-      //   )
+      - fvc::div
+        (
+            (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+        )
       //- tr(fvc::grad(U)) // or - fvc::div(U)
       - fvc::div(U)
     );
@@ -498,11 +495,9 @@ label newtonIcoFluid::formJacobian
     // Calculate the segregated approximatoion of momentum equation Jacobian
     fvVectorMatrix UEqn
     (
-      // - turbulence_->divDevReff(U)
         fvm::laplacian(turbulence_->nuEff(), U)
       - fvm::ddt(U)
       - fvm::div(phi(), U, "jacobian-div(phi,U)")
-        //- 2.0*fvm::div(phi(), U, "jacobian-div(phi,U)")
     );
 
     UEqn.relax();
