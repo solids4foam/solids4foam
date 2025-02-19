@@ -270,6 +270,36 @@ public:
                 const bool flipSign = true
             ) const;
 
+            //- Insert linearisation of div(phi,U) into a PETSc matrix
+            //  where phi = Sf & Uf
+            //  An upwind discretisation is assumed
+            //  If "flipSign" is true, -div(phi,U) is inserted rather than
+            //  div(phi,U)
+            label InsertFvmDivPhiUIntoPETScMatrix
+            (
+                const volVectorField& U,
+                const surfaceScalarField& phi,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const bool flipSign = true
+            ) const;
+
+            //- Insert div(U) into the scalar p equation of a a PETSc matrix
+            //  If "flipSign" is true, -div(phi,U) is inserted rather than
+            //  div(phi,U)
+            label InsertFvmDivUIntoPETScMatrix
+            (
+                const volScalarField& p,
+                const volVectorField& U,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const bool flipSign = false
+            ) const;
+
             //- Extracts a subset of components from a raw scalar array 'x' into
             //  the OpenFOAM field 'vf'. 'x' is organized in blocks of
             //  'blockSize_' scalars per element, and extraction starts at
