@@ -635,6 +635,30 @@ Foam::solidModel::solidModel
     ),
     thermalPtr_(),
     mechanicalPtr_(),
+    useBoundaryFaceValuesD_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_D",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
+    useBoundaryFaceValuesp_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_p",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
     DDheader_("DD", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pointDheader_("pointD", runTime.timeName(), mesh(), IOobject::MUST_READ),
@@ -875,6 +899,29 @@ Foam::solidModel::solidModel
     fvOptions_(fv::options::New(meshPtr_()))
 #endif
 {
+    // Set the useBoundaryFaceValues fields
+    forAll(useBoundaryFaceValuesD_, patchI)
+    {
+        if (isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        {
+            useBoundaryFaceValuesD_[patchI] = false;
+        }
+        else
+        {
+            useBoundaryFaceValuesD_[patchI] = true;
+        }
+    }
+    if (pPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesp_, patchI)
+        {
+            if (pPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesp_[patchI] = true;
+            }
+        }
+    }
+
     // Force old time fields to be stored
     D_.oldTime().oldTime();
     DD_.oldTime().oldTime();

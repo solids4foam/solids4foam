@@ -55,6 +55,7 @@ SourceFiles
 #include "twoDPointCorrector.H"
 #include "fvOptions.H"
 #include "checkConvergence.H"
+#include "boolIOList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -110,6 +111,14 @@ private:
 
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  D field
+        boolIOList useBoundaryFaceValuesD_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  p field
+        boolIOList useBoundaryFaceValuesp_;
 
         //- Total displacement field header
         IOobject Dheader_;

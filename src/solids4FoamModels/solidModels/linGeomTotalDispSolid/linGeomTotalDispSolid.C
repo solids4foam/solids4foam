@@ -995,42 +995,16 @@ label linGeomTotalDispSolid::formJacobian
             );
         }
 
-        // Calculate D-in-p equation coeffs coming from tr(grad(D)) == div(D)
-        // To begin with, we will use div(D) as it is easier to implement
-        // \int_Vol div(D) dVol \approx \sum_f Gamma \cdot D_f,
-        // where Df = w*Down + (1 - w)*Dnei
-        const fvMesh& mesh = this->mesh();
-        //const surfaceScalarField k(fvc::interpolate(mechanical().bulkModulus()));
-        for (label cmptI = 0; cmptI < 3; ++cmptI)
-        {
-            if (solidModel::twoD() && cmptI == 2)
-            {
-                break;
-            }
-
-            fvScalarMatrix divDCoeffs(p, dimArea*dimPressure);
-
-            const vectorField& Sf = mesh.Sf();
-            const scalarField& w = mesh.weights();
-
-            scalarField& upper = divDCoeffs.upper();
-            scalarField& lower = divDCoeffs.lower();
-
-            // lower = -w*Sf.component(cmptI)*k.primitiveField();
-            // upper = lower + Sf.component(cmptI)*k.primitiveField();
-            lower = -w*Sf.component(cmptI);
-            upper = lower + Sf.component(cmptI);
-
-            divDCoeffs.negSumDiag();
-
-            // Insert component coeffs
-            // blockSize - 1: is the last row
-            // cmptI is the 1st column for Dx, 2nd for Dy, 3rd for Dz
-            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-            (
-                divDCoeffs, jac, blockSize_ - 1, cmptI, 1
-            );
-        }
+        // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
+        foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
+        (
+            p,
+            D,
+            jac,
+            blockSize_ - 1,            // row offset
+            0,                         // column offset
+            solidModel::twoD() ? 2 : 3 // number of scalar components of D
+        );
 
         // Insert p-in-D term
         // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation

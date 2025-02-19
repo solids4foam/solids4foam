@@ -43,13 +43,14 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
+#include "boolIOList.H"
 #ifdef OPENFOAM_COM
-        #include "gravityMeshObject.H"
+    #include "gravityMeshObject.H"
 #else
     #include "uniformDimensionedFields.H"
 #endif
 #include "globalPolyPatch.H"
-#if FOAMEXTEND
+#ifdef FOAMEXTEND
     #include "oversetMesh.H"
 #endif
 #ifdef OPENFOAM_ORG
@@ -97,6 +98,14 @@ class fluidModel
 #else
         const uniformDimensionedVectorField g_;
 #endif
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  U field
+        boolIOList useBoundaryFaceValuesU_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  p field
+        boolIOList useBoundaryFaceValuesp_;
 
         //- Velocity field header
         IOobject Uheader_;

@@ -543,6 +543,30 @@ Foam::fluidModel::fluidModel
         )
     ),
     g_(readG()),
+    useBoundaryFaceValuesU_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_U",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
+    useBoundaryFaceValuesp_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_p",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
     UPtr_
@@ -658,6 +682,28 @@ Foam::fluidModel::fluidModel
     fsiMeshUpdateChanged_(false),
     globalPatchesPtrList_()
 {
+    // Set the useBoundaryFaceValues fields
+    if (UPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesU_, patchI)
+        {
+            if (UPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesU_[patchI] = true;
+            }
+        }
+    }
+    if (pPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesp_, patchI)
+        {
+            if (pPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesp_[patchI] = true;
+            }
+        }
+    }
+
     if (!constructNull)
     {
         gradUPtr_() = fvc::grad(UPtr_());
