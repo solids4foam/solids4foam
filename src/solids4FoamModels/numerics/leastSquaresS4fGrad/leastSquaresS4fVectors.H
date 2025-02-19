@@ -73,9 +73,19 @@ public:
         //- Construct given an fvMesh and the useNeumannBoundaryFaceValues flag
         explicit leastSquaresS4fVectors
         (
-            const fvMesh&,
+            const fvMesh& mesh,
             const boolList& useBoundaryFaceValues
         );
+
+        //- Construct given the object name, fvMesh and the
+        //  useNeumannBoundaryFaceValues flag
+        leastSquaresS4fVectors
+        (
+            const word& objName,
+            const fvMesh& mesh,
+            const boolList& useBoundaryFaceValues
+        );
+
 
 
     //- Destructor

@@ -73,6 +73,51 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
 }
 
 
+Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
+(
+    const word& objName,
+    const fvMesh& mesh,
+    const boolList& useBoundaryFaceValues_
+)
+:
+    MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>
+    (
+        objName, mesh
+    ),
+    useBoundaryFaceValues_(useBoundaryFaceValues_),
+    pVectors_
+    (
+        IOobject
+        (
+            "LeastSquaresP",
+            mesh_.pointsInstance(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh_,
+        dimensionedVector(dimless/dimLength, Zero)
+    ),
+    nVectors_
+    (
+        IOobject
+        (
+            "LeastSquaresN",
+            mesh_.pointsInstance(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh_,
+        dimensionedVector(dimless/dimLength, Zero)
+    )
+{
+    calcLeastSquaresVectors();
+}
+
+
 // * * * * * * * * * * * * * * * * Destructor * * * * * * * * * * * * * * * //
 
 Foam::leastSquaresS4fVectors::~leastSquaresS4fVectors()

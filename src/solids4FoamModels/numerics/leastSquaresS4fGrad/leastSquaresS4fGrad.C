@@ -72,18 +72,38 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     // Prepare the useBoundaryFaceValues list for the least squares vector
     // We will set traction patches to false and displacement patches to true
+    // TESTING: how can I do this in a nice way?
+    // Option: useBoundaryFaceValues field is looked up and must be defined
+    // before grad is called -> avoids misuse, although mildly inconvenient
     boolList useBoundaryFaceValues(mesh.boundary().size(), true);
-    forAll(mesh.boundary(), patchI)
+    if (vsf.name() == "D" || vsf.name() == "DD")
     {
-        if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
+        forAll(mesh.boundary(), patchI)
         {
-            useBoundaryFaceValues[patchI] = false;
+            if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
+            {
+                useBoundaryFaceValues[patchI] = false;
+            }
+        }
+    }
+    else
+    {
+        useBoundaryFaceValues = false;
+        forAll(mesh.boundary(), patchI)
+        {
+            if (vsf.boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValues[patchI] = true;
+            }
         }
     }
 
     // Get reference to least square vectors
     const leastSquaresS4fVectors& lsv =
-        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+        leastSquaresS4fVectors::New
+        (
+            "leastSquaresVectors" + vsf.name(), mesh, useBoundaryFaceValues
+        );
 
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();

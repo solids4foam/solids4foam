@@ -96,8 +96,10 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         }
     }
 
-    // Insert the off-diagonal
-    if (fvM.hasUpper())
+    // Insert the upper off-diagonal
+    const bool hasUpper = fvM.hasUpper();
+    const bool hasLower = fvM.hasLower();
+    if (hasUpper)
     {
         const labelUList& own = mesh.owner();
         const labelUList& nei = mesh.neighbour();
@@ -129,15 +131,67 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             const label globalBlockColI =
                 foamPetscSnesHelper::globalCells().toGlobal(blockColI);
 
-            // Insert block coefficients
-            CHKERRQ
-            (
-                MatSetValuesBlocked
+            if (hasUpper)
+            {
+                // Insert upper block coeff
+                CHKERRQ
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
-                    ADD_VALUES
+                    MatSetValuesBlocked
+                    (
+                        jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                        ADD_VALUES
+                    );
                 );
-            );
+            }
+
+            if (!hasLower) // symmetric matrix: use the upper coeff
+            {
+                // Insert symmetric lower block coeff
+                CHKERRQ
+                (
+                    MatSetValuesBlocked
+                    (
+                        jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                        ADD_VALUES
+                    );
+                );
+            }
+        }
+    }
+
+    if (hasLower)
+    {
+        const labelUList& own = mesh.owner();
+        const labelUList& nei = mesh.neighbour();
+        const scalarField& lower = fvM.lower();
+
+        forAll(own, faceI)
+        {
+            // Construct the lower block coefficient
+            const scalar lowerScalarCoeff = lower[faceI];
+            for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+            {
+                for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+                {
+                    if (cmptI == cmptJ)
+                    {
+                        values
+                        [
+                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                        ] = lowerScalarCoeff;
+                    }
+                }
+            }
+
+            const label blockRowI = own[faceI];
+            const label blockColI = nei[faceI];
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+            const label globalBlockColI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+
+            // Insert lower coeff
             CHKERRQ
             (
                 MatSetValuesBlocked

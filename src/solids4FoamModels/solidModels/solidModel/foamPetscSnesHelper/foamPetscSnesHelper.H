@@ -135,13 +135,10 @@ class foamPetscSnesHelper
         //- Cell volumes for the neighbouring processor patch cells
         mutable PtrList<scalarField> neiProcVolumes_;
 
-        //- Least squares vectors for the neighbouring processor patch cells
-        mutable PtrList<vectorField> neiProcLs_;
-
         //- Least squares vectors
         //  Note: these are different than the ones used for the displacement
         //  field as different boundary patch face values may be included
-        mutable autoPtr<leastSquaresS4fVectors> lsVectorsPtr_;
+        // mutable autoPtr<leastSquaresS4fVectors> lsVectorsPtr_;
 
 
     // Private Member Functions
@@ -155,11 +152,8 @@ class foamPetscSnesHelper
         //- Return a reference to neiProcGlobalIDs
         const PtrList<scalarField>& neiProcVolumes() const;
 
-        //- Return a reference to neiProcLs_
-        const PtrList<vectorField>& neiProcLs() const;
-
         //- Make least squares vectors
-        void makeLsVectors(const volScalarField& p) const;
+        // void makeLsVectors(const volScalarField& p) const;
 
         //- Return a reference to the least squares vectors
         const leastSquaresS4fVectors& lsVectors(const volScalarField& p) const;
@@ -265,14 +259,15 @@ public:
             //- Inserts least squares gradient into a PETSc matrix at location
             //  (rowOffset, colOffset) within the block
             //  Only implemented for the gradient of a scalar, e.g. grad(p)
-            //  Note that the -grad(p) is insert, not grad(p)
+            //  If "flipSign" is true, -grad(p) is inserted rather than grad(p)
             label InsertFvmGradIntoPETScMatrix
             (
                 const volScalarField& p,
                 Mat jac,
                 const label rowOffset,
                 const label colOffset,
-                const label nScalarEqns
+                const label nScalarEqns,
+                const bool flipSign = true
             ) const;
 
             //- Extracts a subset of components from a raw scalar array 'x' into
