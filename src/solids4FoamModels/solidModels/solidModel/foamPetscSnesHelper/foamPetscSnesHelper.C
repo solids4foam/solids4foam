@@ -26,6 +26,7 @@ License
 #include "symmetryPlaneFvPatchFields.H"
 #include "leastSquaresVectors.H"
 #include "fvm.H"
+#include "IFstream.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -74,95 +75,48 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     const PetscScalar *xx;
     CHKERRQ(VecGetArrayRead(x, &xx));
 
-    // Map the solution to an OpenFOAM field
+    // Access the OpenFOAM data
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
-    const int blockSize = user->solMod_.blockSize();
+
+    // Check if the matrix is a nested matrix
+    PetscBool isNest;
+    PetscObjectTypeCompare((PetscObject)B, MATNEST, &isNest);
+
+    // Lookup the matrix info
+    MatInfo info;
+    if (isNest)
+    {
+        // For a nested matrix, we will only check the top left sub-matrix - if
+        // it is initialised we will assume all sub-matrices are initialised
+        Mat sub;
+        MatNestGetSubMat(B, 0, 0, &sub);
+        MatGetInfo(sub, MAT_LOCAL, &info);
+    }
+    else
+    {
+        MatGetInfo(B, MAT_LOCAL, &info);
+    }
 
     // Initialise the matrix if it has yet to be allocated; otherwise zero all
     // entries
-    MatInfo info;
-    MatGetInfo(B, MAT_LOCAL, &info);
-    // PetscInt rstart, rend;
-    // MatGetOwnershipRange(B, &rstart, &rend);
     if (info.nz_used)
     {
         // Zero the matrix but do not reallocate the space
         // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
         // re-building the matrix
+        // For a nested matrix, this will zero all sub-matrices
         CHKERRQ(MatZeroEntries(B));
     }
     else
     {
+        // Set the non-zero structure of the matrix B
         Foam::Info<< "    Initialising the matrix..." << Foam::flush;
-
-        // Set the block size
-        CHKERRQ(MatSetBlockSize(B, blockSize));
-
-        // Number of vector unknowns on this processor
-        const int blockn = user->solMod_.globalCells().localSize();
-
-        // Count the number of non-zeros in the matrix
-        // Note: we assume a compact stencil, i.e. face only face neighbours
-
-        // Number of on-processor non-zeros per row
-        int* d_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Number of off-processor non-zeros per row
-        int* o_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Initialise d_nnz and o_nnz to zero
-        for (int i = 0; i < blockn; ++i)
+        if (user->solMod_.initialiseJacobian(B) != 0)
         {
-            d_nnz[i] = 1; // count diagonal cell
-            o_nnz[i] = 0;
+            Foam::FatalError
+                << "initialiseJacobian(B) returned an error code!"
+                << Foam::abort(Foam::FatalError);
         }
-
-        // Take a reference to the mesh
-        const Foam::fvMesh& mesh = user->solMod_.fmesh();
-
-        // Count neighbours sharing an internal face
-        const Foam::labelUList& own = mesh.owner();
-        const Foam::labelUList& nei = mesh.neighbour();
-        forAll(own, faceI)
-        {
-            const Foam::label ownCellID = own[faceI];
-            const Foam::label neiCellID = nei[faceI];
-            d_nnz[ownCellID]++;
-            d_nnz[neiCellID]++;
-        }
-
-        // Count off-processor neighbour cells
-        forAll(mesh.boundary(), patchI)
-        {
-            if (mesh.boundary()[patchI].type() == "processor")
-            {
-                const Foam::labelUList& faceCells =
-                    mesh.boundary()[patchI].faceCells();
-
-                forAll(faceCells, fcI)
-                {
-                    const Foam::label cellID = faceCells[fcI];
-                    o_nnz[cellID]++;
-                }
-            }
-            else if (mesh.boundary()[patchI].coupled())
-            {
-                // Other coupled boundaries are not implemented
-                Foam::FatalError
-                    << "Coupled boundary are not implemented, except for"
-                    << " processor boundaries" << Foam::abort(Foam::FatalError);
-            }
-        }
-
-        // Allocate parallel matrix
-        //CHKERRQ(MatMPIAIJSetPreallocation(B, 0, d_nnz, 0, o_nnz));
-        // Allocate parallel matrix with the same conservative stencil per node
-        //CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
-        CHKERRQ(MatMPIBAIJSetPreallocation(B, blockSize, 0, d_nnz, 0, o_nnz));
-
-        // Raise an error if mallocs are required during matrix assembly
-        MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
-
         Foam::Info<< "done" << Foam::endl;
     }
 
@@ -191,6 +145,87 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
 }
 
 
+
+Foam::label Foam::initialiseJacobian
+(
+    Mat jac,
+    const fvMesh& mesh,
+    const label blockSize
+)
+{
+    // Set the block size
+    CHKERRQ(MatSetBlockSize(jac, blockSize));
+
+    // Number of vector unknowns on this processor
+    //const int blockn = user->solMod_.globalCells().localSize();
+    const int blockn = mesh.nCells();
+
+    // Count the number of non-zeros in the matrix
+    // Note: we assume a compact stencil, i.e. face only face neighbours
+
+    // Number of on-processor non-zeros per row
+    int* d_nnz = (int*)malloc(blockn*sizeof(int));
+
+    // Number of off-processor non-zeros per row
+    int* o_nnz = (int*)malloc(blockn*sizeof(int));
+
+    // Initialise d_nnz and o_nnz to zero
+    for (int i = 0; i < blockn; ++i)
+    {
+        d_nnz[i] = 1; // count diagonal cell
+        o_nnz[i] = 0;
+    }
+
+    // Take a reference to the mesh
+    //const Foam::fvMesh& mesh = user->solMod_.fmesh();
+
+    // Count neighbours sharing an internal face
+    const Foam::labelUList& own = mesh.owner();
+    const Foam::labelUList& nei = mesh.neighbour();
+    forAll(own, faceI)
+    {
+        const Foam::label ownCellID = own[faceI];
+        const Foam::label neiCellID = nei[faceI];
+        d_nnz[ownCellID]++;
+        d_nnz[neiCellID]++;
+    }
+
+    // Count off-processor neighbour cells
+    forAll(mesh.boundary(), patchI)
+    {
+        if (mesh.boundary()[patchI].type() == "processor")
+        {
+            const Foam::labelUList& faceCells =
+                mesh.boundary()[patchI].faceCells();
+
+            forAll(faceCells, fcI)
+            {
+                const Foam::label cellID = faceCells[fcI];
+                o_nnz[cellID]++;
+            }
+        }
+        else if (mesh.boundary()[patchI].coupled())
+        {
+            // Other coupled boundaries are not implemented
+            Foam::FatalError
+                << "Coupled boundary are not implemented, except for"
+                << " processor boundaries" << Foam::abort(Foam::FatalError);
+        }
+    }
+
+    // Allocate parallel matrix
+    //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
+    // Allocate parallel matrix with the same conservative stencil per node
+    //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
+    CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize, 0, d_nnz, 0, o_nnz));
+
+    // Raise an error if mallocs are required during matrix assembly
+    MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+
+    return 0;
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
@@ -204,7 +239,7 @@ defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
 
-void foamPetscSnesHelper::makeNeiProcFields() const
+void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
 {
     if
     (
@@ -215,8 +250,6 @@ void foamPetscSnesHelper::makeNeiProcFields() const
         FatalErrorInFunction
             << "Pointers already set!" << abort(FatalError);
     }
-
-    const fvMesh& mesh = mesh_;
 
     neiProcGlobalIDs_.setSize(mesh.boundaryMesh().size());
     neiProcVolumes_.setSize(mesh.boundaryMesh().size());
@@ -293,22 +326,28 @@ void foamPetscSnesHelper::makeNeiProcFields() const
 }
 
 
-const PtrList<labelList>& foamPetscSnesHelper::neiProcGlobalIDs() const
+const PtrList<labelList>& foamPetscSnesHelper::neiProcGlobalIDs
+(
+    const fvMesh& mesh
+) const
 {
     if (neiProcGlobalIDs_.size() == 0)
     {
-        makeNeiProcFields();
+        makeNeiProcFields(mesh);
     }
 
     return neiProcGlobalIDs_;
 }
 
 
-const PtrList<scalarField>& foamPetscSnesHelper::neiProcVolumes() const
+const PtrList<scalarField>& foamPetscSnesHelper::neiProcVolumes
+(
+    const fvMesh& mesh
+) const
 {
     if (neiProcVolumes_.size() == 0)
     {
-        makeNeiProcFields();
+        makeNeiProcFields(mesh);
     }
 
     return neiProcVolumes_;
@@ -328,8 +367,8 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
         return p.mesh().lookupObject<leastSquaresS4fVectors>(lsName);
     }
 
-    boolList useBoundaryFaceValues(mesh_.boundary().size(), false);
-    forAll(mesh_.boundary(), patchI)
+    boolList useBoundaryFaceValues(p.mesh().boundary().size(), false);
+    forAll(p.mesh().boundary(), patchI)
     {
         if (p.boundaryField()[patchI].fixesValue())
         {
@@ -346,21 +385,42 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
 foamPetscSnesHelper::foamPetscSnesHelper
 (
     fileName optionsFile,
-    const fvMesh& mesh,
+    const label nBlocks,
     const label blockSize,
+    //const labelPairList& nBlocksAndBlockSize,
+    const labelListList& fieldDefs,
+    const Switch stopOnPetscError,
+    const Switch initialise
+)
+:
+    foamPetscSnesHelper // Delegate constructor
+    (
+        optionsFile,
+        labelPairList({{nBlocks, blockSize}}),
+        fieldDefs,
+        stopOnPetscError,
+        initialise
+    )
+{}
+
+
+foamPetscSnesHelper::foamPetscSnesHelper
+(
+    fileName optionsFile,
+    const labelPairList& nBlocksAndBlockSize,
     const labelListList& fieldDefs,
     const Switch stopOnPetscError,
     const Switch initialise
 )
 :
     initialised_(initialise),
-    mesh_(mesh),
-    globalCells_(mesh.nCells()),
-    blockSize_(blockSize),
+    globalCellsPtr_(),
     stopOnPetscError_(stopOnPetscError),
-    snesPtr_(),
-    xPtr_(),
-    APtr_(),
+    snes_(nullptr),
+    x_(nullptr),
+    A_(nullptr),
+    nRegions_(nBlocksAndBlockSize.size()),
+    subMatsPtr_(nullptr),
     snesUserPtr_(),
     neiProcGlobalIDs_(),
     neiProcVolumes_()
@@ -370,135 +430,276 @@ foamPetscSnesHelper::foamPetscSnesHelper
         // Expand the options file name
         optionsFile.expand();
 
+        // Check the options file exists
+        {
+            IFstream is(optionsFile);
+            if (!is.good())
+            {
+                FatalErrorInFunction
+                    << "Cannot find the PETSc options file: " << optionsFile
+                    << abort(FatalError);
+            }
+        }
+
         // Initialise PETSc with an options file
         PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
 
         // Create the PETSc SNES object
-        snesPtr_.set(new SNES());
-        SNES& snes = snesPtr_();
-        SNESCreate(PETSC_COMM_WORLD, &snes);
+        snes_ = SNES();
+        SNESCreate(PETSC_COMM_WORLD, &snes_);
 
         // Create user data context
         snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
         appCtxfoamPetscSnesHelper& user = snesUserPtr_();
 
         // Set the user context
-        SNESSetApplicationContext(snes, &user);
+        SNESSetApplicationContext(snes_, &user);
 
         // Set the residual function
-        SNESSetFunction(snes, NULL, formResidualFoamPetscSnesHelper, &user);
+        SNESSetFunction(snes_, NULL, formResidualFoamPetscSnesHelper, &user);
 
-        // Global system size
-        const int blockN = globalCells_.size();
-        const int N = blockSize_*blockN;
+        if (nBlocksAndBlockSize.size() == 0)
+        {
+            FatalErrorInFunction
+                << "nBlocksAndBlockSize should have a size greater than 0"
+                << abort(FatalError);
+        }
 
-        // Local (this processor) system size
-        const int blockn = globalCells_.localSize();
-        const int n = blockSize_*blockn;
+        // Count number of local blocks and local scalar equations
+        label blockn = 0;
+        label n = 0;
+        forAll(nBlocksAndBlockSize, regionI)
+        {
+            const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
+            const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
+            blockn += nBlocksRegionI;
+            n += nBlocksRegionI*blockSizeRegionI;
+        }
 
-        // Create the Jacobian matrix
-        APtr_.set(new Mat());
-        Mat& A = APtr_();
-        MatCreate(PETSC_COMM_WORLD, &A);
-        MatSetSizes(A, n, n, N, N);
-        MatSetFromOptions(A);
-        MatSetType(A, MATMPIAIJ);
-        //MatSetType(A, MATMPIBAIJ);
+        // Create globalCells object
+        globalCellsPtr_.set(new globalIndex(blockn));
+
+        // Global system size: total number of blocks across all processors
+        //const int blockN = globalCellsPtr_->size();
+
+        // Global system size: total number of scalar equation across all
+        // processors
+        const label N = returnReduce(n, sumOp<label>());
+
+        // If there is only one region, create a normal matrix.
+        if (nRegions_ == 1)
+        {
+            // Create the Jacobian matrix
+            A_ = Mat();
+            MatCreate(PETSC_COMM_WORLD, &A_);
+            MatSetSizes(A_, n, n, N, N);
+            //MatSetSizes(A, n, n, PETSC_DECIDE, PETSC_DECIDE);
+            MatSetFromOptions(A_);
+            MatSetType(A_, MATMPIAIJ);
+            //MatSetType(A, MATMPIBAIJ);
+        }
+        else
+        {
+            // We have more than one region; create a nest matrix.
+
+            // Create arrays (vectors) of IS objects for rows and columns.
+            // These will indicate where in the matrix the different regions are
+            // located
+            std::vector<IS> isRow(nRegions_), isCol(nRegions_);
+            label globalOffset = 0;
+            for (label r = 0; r < nRegions_; ++r)
+            {
+                const label nBlocks = nBlocksAndBlockSize[r].first();
+                const label blockSize = nBlocksAndBlockSize[r].second();
+                const label regionSize = nBlocks*blockSize;
+
+                // Create an IS that covers the indices for region r
+                ISCreateStride
+                (
+                    PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isRow[r]
+                );
+                ISCreateStride
+                (
+                    PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isCol[r]
+                );
+                globalOffset += regionSize;
+            }
+
+            // Create an array of submatrices.
+            // Each submatrix represents the coupling between region i and
+            // region j.
+            // For example, subMat[i*nRegions_ + i] might be the matrix for
+            // region i, while subMat[i*nRegions_ + j] (i != j) are the coupling
+            // matrices.
+            subMatsPtr_ = new Mat[nRegions_*nRegions_];
+            for (label i = 0; i < nRegions_; ++i)
+            {
+                for (label j = 0; j < nRegions_; ++j)
+                {
+                    // Info<< "region = " << i << " " << j << endl;
+
+                    // Create the submatrix for regions i and j.
+                    Mat subA;
+                    MatCreate(PETSC_COMM_WORLD, &subA);
+
+                    // Number of rows
+                    const label nRowBlocks = nBlocksAndBlockSize[i].first();
+                    const label rowBlockSize = nBlocksAndBlockSize[i].second();
+                    const label nRowsLocal = nRowBlocks*rowBlockSize;
+                    const label nRowsGlobal =
+                        returnReduce(nRowsLocal, sumOp<label>());
+                    // Info<< "nRowsLocal = " << nRowsLocal << nl
+                    //     << "nRowsGlobal = " << nRowsGlobal << endl;
+
+                    // Number of columns
+                    const label nColBlocks = nBlocksAndBlockSize[j].first();
+                    const label colBlockSize = nBlocksAndBlockSize[j].second();
+                    const label nColsLocal = nColBlocks*colBlockSize;
+                    const label nColsGlobal =
+                        returnReduce(nColsLocal, sumOp<label>());
+                    // Info<< "nColsLocal = " << nColsLocal << nl
+                    //     << "nColsGlobal = " << nColsGlobal << endl;
+
+                    MatSetSizes
+                    (
+                        subA,
+                        nRowsLocal,
+                        nColsLocal,
+                        nRowsGlobal,
+                        nColsGlobal
+                    );
+                    MatSetFromOptions(subA);
+                    MatSetType(subA, MATMPIAIJ);
+
+                    // Store subA in row-major order at index [i*nRegions_ + j]
+                    subMatsPtr_[i*nRegions_ + j] = subA;
+                }
+            }
+
+            // Create the nest matrix using the index sets and submatrices.
+            A_ = Mat();
+            MatCreateNest
+            (
+                PETSC_COMM_WORLD,
+                nRegions_,
+                isRow.data(),
+                nRegions_,
+                isCol.data(),
+                (Mat*)subMatsPtr_,
+                &A_
+            );
+
+            // Cleanup: destroy the IS objects.
+            for (label r = 0; r < nRegions_; ++r)
+            {
+                ISDestroy(&isRow[r]);
+                ISDestroy(&isCol[r]);
+            }
+        }
 
         // Set the Jacobian function
-        SNESSetJacobian(snes, A, A, formJacobianFoamPetscSnesHelper, &user);
+        SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user);
 
         // Set solver options
         // Uses default options, can be overridden by command line options
-        SNESSetFromOptions(snes);
+        SNESSetFromOptions(snes_);
 
         // Create the solution vector
-        xPtr_.set(new Vec());
-        Vec& x = xPtr_();
-        VecCreate(PETSC_COMM_WORLD, &x);
-        VecSetSizes(x, n, N);
-        VecSetBlockSize(x, blockSize_);
-        VecSetType(x, VECMPI);
-        PetscObjectSetName((PetscObject) x, "Solution");
-        VecSetFromOptions(x);
-        VecZeroEntries(x);
+        x_ = Vec();
+        VecCreate(PETSC_COMM_WORLD, &x_);
+        VecSetSizes(x_, n, N);
+        if (nBlocksAndBlockSize.size() == 1)
+        {
+            // Only set the Vec block size for one region
+            // Otherwise, it is not needed, as the Mat will be nested and get
+            // its block sizes from its sub-matrices
+            VecSetBlockSize(x_, nBlocksAndBlockSize[0].second());
+        }
+        VecSetType(x_, VECMPI);
+        PetscObjectSetName((PetscObject) x_, "Solution");
+        VecSetFromOptions(x_);
+        VecZeroEntries(x_);
 
+        // TO BE FIXED
         // Set up the fieldsplit index sets if fieldDefs is non-empty.
         // After setting the fieldsplit index sets, SNES/KSP will use them via
         // the PC.
         // We assume the ordering of the global vector is in blocks:
         // For each cell, the entries are:
-        //     global_index = cell*blockSize_ + local_index,
-        // where local_index runs from 0 to blockSize_-1.
+        //     global_index = cell*blockSize + local_index,
+        // where local_index runs from 0 to blockSize - 1.
         // The user provides fieldDefs such as, e.g.
         //     fieldDefs = { {0,1,2}, {3} }
         // to indicate that indices 0-2 in each block belong to field 0
         // (momentum) and index 3 belongs to field 1 (pressure).
         if (fieldDefs.size() > 0)
         {
-            // Get the KSP from SNES, then retrieve the PC
-            KSP ksp;
-            SNESGetKSP(snes, &ksp);
-            PC pc;
-            KSPGetPC(ksp, &pc);
+            WarningInFunction
+                << "fieldDefs not used: to be fixed!" << endl;
 
-            // Obtain the local ownership range of the solution vector
-            PetscInt rstart, rend;
-            VecGetOwnershipRange(x, &rstart, &rend);
-            // Determine which cells (blocks) belong locally
-            const PetscInt localCellStart = rstart/blockSize_;
-            const PetscInt localCellEnd = rend/blockSize_;
+            // // Get the KSP from SNES, then retrieve the PC
+            // KSP ksp;
+            // SNESGetKSP(snes_, &ksp);
+            // PC pc;
+            // KSPGetPC(ksp, &pc);
 
-            // Loop over each field as defined in fieldDefs.
-            for
-            (
-                label fieldIndex = 0;
-                fieldIndex < fieldDefs.size();
-                ++fieldIndex
-            )
-            {
-                // Get the list of local indices for this field.
-                const labelList& field = fieldDefs[fieldIndex];
+            // // Obtain the local ownership range of the solution vector
+            // PetscInt rstart, rend;
+            // VecGetOwnershipRange(x, &rstart, &rend);
+            // // Determine which cells (blocks) belong locally
+            // const PetscInt localCellStart = rstart/blockSize;
+            // const PetscInt localCellEnd = rend/blockSize;
 
-                // Create an empty OpenFOAM List for the PETSc indices.
-                DynamicList<PetscInt> indices(rend - rstart);
+            // // Loop over each field as defined in fieldDefs.
+            // for
+            // (
+            //     label fieldIndex = 0;
+            //     fieldIndex < fieldDefs.size();
+            //     ++fieldIndex
+            // )
+            // {
+            //     // Get the list of local indices for this field.
+            //     const labelList& field = fieldDefs[fieldIndex];
 
-                // Loop over each locally owned cell
-                for
-                (
-                    PetscInt cell = localCellStart; cell < localCellEnd; ++cell
-                )
-                {
-                    // For each degree-of-freedom in this field...
-                    for (label j = 0; j < field.size(); j++)
-                    {
-                        PetscInt idx = cell*blockSize_ + field[j];
+            //     // Create an empty OpenFOAM List for the PETSc indices.
+            //     DynamicList<PetscInt> indices(rend - rstart);
 
-                        // Only add the index if it is within our local ownership
-                        if (idx >= rstart && idx < rend)
-                        {
-                            indices.append(idx);
-                        }
-                    }
-                }
+            //     // Loop over each locally owned cell
+            //     for
+            //     (
+            //         PetscInt cell = localCellStart; cell < localCellEnd; ++cell
+            //     )
+            //     {
+            //         // For each degree-of-freedom in this field...
+            //         for (label j = 0; j < field.size(); j++)
+            //         {
+            //             PetscInt idx = cell*blockSize + field[j];
 
-                // Create a PETSc index set from the indices.
-                // Note: indices.begin() returns a pointer to the first element
-                IS is;
-                ISCreateGeneral
-                (
-                    PETSC_COMM_WORLD,
-                    indices.size(),
-                    indices.begin(),
-                    PETSC_COPY_VALUES,
-                    &is
-                );
+            //             // Only add the index if it is within our local ownership
+            //             if (idx >= rstart && idx < rend)
+            //             {
+            //                 indices.append(idx);
+            //             }
+            //         }
+            //     }
 
-                // Build a field name, "field0", "field1", etc.
-                std::string fieldName = "field" + std::to_string(fieldIndex);
-                PCFieldSplitSetIS(pc, fieldName.c_str(), is);
-                ISDestroy(&is);
-            }
+            //     // Create a PETSc index set from the indices.
+            //     // Note: indices.begin() returns a pointer to the first element
+            //     IS is;
+            //     ISCreateGeneral
+            //     (
+            //         PETSC_COMM_WORLD,
+            //         indices.size(),
+            //         indices.begin(),
+            //         PETSC_COPY_VALUES,
+            //         &is
+            //     );
+
+            //     // Build a field name, "field0", "field1", etc.
+            //     std::string fieldName = "field" + std::to_string(fieldIndex);
+            //     PCFieldSplitSetIS(pc, fieldName.c_str(), is);
+            //     ISDestroy(&is);
+            // }
         }
     }
 }
@@ -510,14 +711,25 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 {
     if (initialised_)
     {
-        SNESDestroy(&snesPtr_());
-        snesPtr_.clear();
+        SNESDestroy(&snes_);
 
-        VecDestroy(&xPtr_());
-        xPtr_.clear();
+        VecDestroy(&x_);
 
-        MatDestroy(&APtr_());
-        APtr_.clear();
+        // Check if A is a nested matrix
+        if (nRegions_ > 1)
+        {
+            // Destroy each submatrix
+            for (label idx = 0; idx < nRegions_*nRegions_; ++idx)
+            {
+                MatDestroy(&subMatsPtr_[idx]);
+            }
+
+            // Free the array of Mat handles
+            delete[] subMatsPtr_;
+            subMatsPtr_ = nullptr;
+        }
+
+        MatDestroy(&A_);
 
         snesUserPtr_.clear();
 
@@ -539,7 +751,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 ) const
 {
     // Get reference to least square vectors
-    const fvMesh& mesh = mesh_;
+    const fvMesh& mesh = p.mesh();
     const leastSquaresS4fVectors& lsv = lsVectors(p);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
@@ -552,8 +764,12 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalar sign = flipSign ? -1.0 : 1.0;
 
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
     // Initialise the block coefficient
-    const label nCoeffCmpts = blockSize_*blockSize_;
+    const label nCoeffCmpts = blockSize*blockSize;
     PetscScalar values[nCoeffCmpts];
     std::memset(values, 0, sizeof(values));
 
@@ -583,7 +799,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         // mat(ownCellID, ownCellID) -= VI[ownCellID]*ownLs[faceI];
         for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
         {
-            values[cmptI*blockSize_ + colOffset] =
+            values[cmptI*blockSize + colOffset] =
                 -sign*VI[ownCellID]*ownLs[faceI][cmptI];
         }
         CHKERRQ
@@ -617,7 +833,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         //mat(neIFaceI, neIFaceI) += VI[neiCellID]*neiLs[faceI];
         for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
         {
-            values[cmptI*blockSize_ + colOffset] =
+            values[cmptI*blockSize + colOffset] =
                 -sign*VI[neiCellID]*neiLs[faceI][cmptI];
         }
         CHKERRQ
@@ -656,8 +872,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         const fvPatch& fp = mesh.boundary()[patchI];
         if (fp.type() == "processor")
         {
-            const labelList& neiGlobalFaceCells = neiProcGlobalIDs()[patchI];
-            const scalarField& patchNeiVols = neiProcVolumes()[patchI];
+            const labelList& neiGlobalFaceCells =
+                neiProcGlobalIDs(mesh)[patchI];
+            const scalarField& patchNeiVols = neiProcVolumes(mesh)[patchI];
             const vectorField& patchNeiLs = neiLs.boundaryField()[patchI];
             // const vectorField patchNeiLs(... patchNeighbourField());
 
@@ -674,7 +891,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 // mat(ownCellID, ownCellID) -= VI[ownCellID]*ownLs[faceI];
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
-                    values[cmptI*blockSize_ + colOffset] =
+                    values[cmptI*blockSize + colOffset] =
                         -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                 }
                 CHKERRQ
@@ -693,7 +910,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 // mat(ownCellID, neiCellID) += VI[ownCellID]*neiLs[faceI];
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
-                    values[cmptI*blockSize_ + colOffset] =
+                    values[cmptI*blockSize + colOffset] =
                         patchNeiVols[patchFaceI]*patchNeiLs[patchFaceI][cmptI];
                 }
                 CHKERRQ
@@ -756,7 +973,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 );
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
-                    values[cmptI*blockSize_ + colOffset] = coeff[cmptI];
+                    values[cmptI*blockSize + colOffset] = coeff[cmptI];
                 }
                 CHKERRQ
                 (
@@ -793,7 +1010,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     //     VI[ownCellID]*patchOwnLs[patchFaceI];
                     for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                     {
-                        values[cmptI*blockSize_ + colOffset] =
+                        values[cmptI*blockSize + colOffset] =
                             -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                     }
                     CHKERRQ
@@ -825,7 +1042,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 ) const
 {
     // Take references for efficiency and brevity
-    const fvMesh& mesh = mesh_;
+    const fvMesh& mesh = U.mesh();
     const scalarField& phiI = phi;
     const vectorField& UI = U;
     const vectorField& SfI = mesh.Sf();
@@ -858,8 +1075,12 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     // coupled solver. So we will add the w*Sf*Up term here
     // Similary, for phi < 0, the neighbour coefficient is (1 - w)*Sf*Un
 
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
     // Prepare coeff array
-    const label nCoeffCmpts = blockSize_*blockSize_;
+    const label nCoeffCmpts = blockSize*blockSize;
     PetscScalar values[nCoeffCmpts];
     std::memset(values, 0, sizeof(values));
 
@@ -884,13 +1105,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add w*Sf*Up to owner eqn
             // coeff = sign*wI[faceI]*SfI[faceI]*UI[ownCellID];
             coeff = sign*wI[faceI]*UI[ownCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -906,13 +1127,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add (1 - w)*Sf*Up as nei to contribution to own eqn
             // coeff = sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
             coeff = sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -929,13 +1150,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Flip the sign
             // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
             coeff = -sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -952,13 +1173,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Flip the sign
             // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
             coeff = -sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -976,13 +1197,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add w*Sf*Un to owner diagonal
             // coeff = sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
             coeff = sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -998,13 +1219,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add w*Sf*Un as nei to contribution to own eqn
             // coeff = sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
             coeff = sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -1020,13 +1241,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add -(1 - w)*Sf*Un to neighbour diagonal
             // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[neiCellID];
             coeff = -sign*(1.0 - wI[faceI])*UI[neiCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -1042,13 +1263,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             // Add -w*Sf*Un as own to contribution to nei eqn
             // coeff = -sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
             coeff = -sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
-            for (label i = 0; i < (blockSize_ - 1); ++i)
+            for (label i = 0; i < (blockSize - 1); ++i)
             {
-                for (label j = 0; j < (blockSize_ - 1); ++j)
+                for (label j = 0; j < (blockSize - 1); ++j)
                 {
                     // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                     // the 4x4 (or 3x3 in 2-D) values matrix
-                    values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                    values[(i + rowOffset)*blockSize + j + colOffset] =
                         coeff[i*3 + j];
                 }
             }
@@ -1090,13 +1311,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 
                 // Add w*Sf*Up to owner eqn
                 coeff = sign*pw[faceI]*UI[ownCellID]*pSf[faceI];
-                for (label i = 0; i < (blockSize_ - 1); ++i)
+                for (label i = 0; i < (blockSize - 1); ++i)
                 {
-                    for (label j = 0; j < (blockSize_ - 1); ++j)
+                    for (label j = 0; j < (blockSize - 1); ++j)
                     {
                         // Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
                         // the 4x4 (or 3x3 in 2-D) values matrix
-                        values[(i + rowOffset)*blockSize_ + j + colOffset] =
+                        values[(i + rowOffset)*blockSize + j + colOffset] =
                             coeff[i*3 + j];
                     }
                 }
@@ -1128,7 +1349,7 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
 ) const
 {
     // Take references for efficiency and brevity
-    const fvMesh& mesh = mesh_;
+    const fvMesh& mesh = p.mesh();
     const scalar sign = flipSign ? -1 : 1;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
@@ -1212,18 +1433,12 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
             << abort(FatalError);
     }
 
-    // Take a reference to the SNES solver object
-    SNES& snes = snesPtr_();
-
-    // Take a reference to the solution vector
-    Vec& x = xPtr_();
-
     // Solve the nonlinear system
-    SNESSolve(snes, NULL, x);
+    SNESSolve(snes_, NULL, x_);
 
     // Check convergence
     SNESConvergedReason reason;
-    SNESGetConvergedReason(snes, &reason);
+    SNESGetConvergedReason(snes_, &reason);
 
     if (reason < 0)
     {

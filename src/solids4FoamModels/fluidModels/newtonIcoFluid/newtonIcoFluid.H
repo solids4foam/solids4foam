@@ -158,10 +158,26 @@ public:
                 const label patchID
             ) const;
 
+            //- Return a reference to the turbulence model
+            incompressible::turbulenceModel& turbulence()
+            {
+                if (turbulence_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not set" << abort(FatalError);
+                }
+
+                return turbulence_.ref();
+            }
+
         // Edit
 
             //- Evolve the fluid model
             virtual bool evolve();
+
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the non-zero structure of the matrix
+            virtual label initialiseJacobian(Mat jac);
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector

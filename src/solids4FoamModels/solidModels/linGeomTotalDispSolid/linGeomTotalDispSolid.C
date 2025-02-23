@@ -293,8 +293,8 @@ bool linGeomTotalDispSolid::evolveSnes()
         (
             D().primitiveFieldRef(),
             foamPetscSnesHelper::solution(),
-            solidModel::twoD() ? 2 : 3, // Block size of x
-            0                           // Location of first component
+            0, // Location of first component
+            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
         );
     }
 
@@ -307,8 +307,8 @@ bool linGeomTotalDispSolid::evolveSnes()
     (
         foamPetscSnesHelper::solution(),
         D().primitiveFieldRef(),
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     D().correctBoundaryConditions();
@@ -321,8 +321,7 @@ bool linGeomTotalDispSolid::evolveSnes()
         (
             foamPetscSnesHelper::solution(),
             p().primitiveFieldRef(),
-            blockSize_ - 1, // Location of p component
-            1               // Number of components to extract
+            blockSize_ - 1 // Location of p component
         );
 
         p().correctBoundaryConditions();
@@ -509,7 +508,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh(),
+        mesh().nCells(),
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3),
@@ -775,6 +774,13 @@ bool linGeomTotalDispSolid::evolve()
 }
 
 
+label linGeomTotalDispSolid::initialiseJacobian(Mat jac)
+{
+    // Initialise based on compact stencil fvMesh
+    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
 label linGeomTotalDispSolid::formResidual
 (
     PetscScalar *f,
@@ -790,8 +796,9 @@ label linGeomTotalDispSolid::formResidual
     (
         x,
         DI,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -799,6 +806,9 @@ label linGeomTotalDispSolid::formResidual
 
     // Update gradient of displacement
     mechanical().grad(D, gradD());
+
+    // Enforce the boundary conditions again for any conditions that use gradD
+    D.correctBoundaryConditions();
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
@@ -810,7 +820,7 @@ label linGeomTotalDispSolid::formResidual
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, 1
+            x, pI, blockSize_ - 1, blockSize_
         );
 
         // Enforce the boundary conditions
@@ -863,8 +873,9 @@ label linGeomTotalDispSolid::formResidual
     (
         residual,
         f,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to insert
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     if (solvePressure())
@@ -903,7 +914,7 @@ label linGeomTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual, f, blockSize_ - 1, 1
+            pressureResidual, f, blockSize_ - 1, blockSize_
         );
     }
 
@@ -924,8 +935,9 @@ label linGeomTotalDispSolid::formJacobian
     (
         x,
         DI,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -938,7 +950,7 @@ label linGeomTotalDispSolid::formJacobian
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_, 1
+            x, pI, blockSize_ - 1, blockSize_
         );
 
         // Enforce the boundary conditions

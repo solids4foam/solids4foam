@@ -192,6 +192,10 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the non-zero structure of the matrix
+            virtual label initialiseJacobian(Mat jac);
+
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector
             virtual label formResidual

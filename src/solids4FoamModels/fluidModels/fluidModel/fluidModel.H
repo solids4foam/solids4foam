@@ -261,12 +261,6 @@ protected:
             volVectorField& U
         ) const;
 
-        //- Is the model two-dimensional
-        const bool& twoD() const
-        {
-            return twoD_;
-        }
-
 public:
 
     //- Runtime type information
@@ -334,6 +328,12 @@ public:
             const Time& runTime() const
             {
                 return meshPtr_().time();
+            }
+
+            //- Is the model two-dimensional
+            const bool& twoD() const
+            {
+                return twoD_;
             }
 
             //- Return non-const acess to the pimple control

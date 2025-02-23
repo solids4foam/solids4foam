@@ -74,6 +74,16 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
+
+    if (solvePressure())
+    {
+        // Predict p using the dp/dt field
+        p() = p().oldTime() + dpdtPtr_.ref()*runTime().deltaT();
+        // p() = p().oldTime() + dpdt*runTime().deltaT()
+        //     + 0.5*sqr(runTime().deltaT())*d2pdt2;
+
+        sigma() = dev(sigma()) - p()*I;
+    }
 }
 
 
@@ -350,8 +360,16 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         (
             D().primitiveFieldRef(),
             foamPetscSnesHelper::solution(),
-            solidModel::twoD() ? 2 : 3, // Block size of x
-            0                           // Location of first component
+            0, // Location of first component
+            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        );
+
+        // Map the p field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            p().primitiveFieldRef(),
+            foamPetscSnesHelper::solution(),
+            blockSize_ -1 // Location of first component
         );
     }
 
@@ -364,10 +382,29 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     (
         foamPetscSnesHelper::solution(),
         D().primitiveFieldRef(),
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first component
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
+    D().correctBoundaryConditions();
+
+    if (solvePressure())
+    {
+        // Map the PETSc solution to the p field
+        // p is located in the last ("blockSize - 1") component
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            foamPetscSnesHelper::solution(),
+            p().primitiveFieldRef(),
+            blockSize_ - 1 // Location of p component
+        );
+
+        p().correctBoundaryConditions();
+
+        // Update dpdt
+        dpdtPtr_.ref() = fvc::ddt(p());
+    }
+    
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
     pointD().correctBoundaryConditions();
@@ -462,7 +499,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh(),
+        mesh().nCells(),
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3),
@@ -534,6 +571,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     pDiffusivityPtr_(),
+    dpdtPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -548,7 +586,6 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     fvm::d2dt2(D());
 
     Info<< "solvePressure = " << solvePressure() << endl;
-
     if (solvePressure())
     {
         if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
@@ -562,8 +599,25 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 << " when solvePressure is enabled" << abort(FatalError);
         }
 
-        // Ensure p is created
-        p();
+        // Ensure p is created and the oldTime is stored
+        p().oldTime();
+
+        // Initialise dpdt field
+        dpdtPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "dpdt",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                fvc::ddt(p())
+            )
+        );
     }
 
     if (predictor_)
@@ -699,6 +753,13 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 }
 
 
+label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat jac)
+{
+    // Initialise based on compact stencil fvMesh
+    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
 label nonLinGeomTotalLagTotalDispSolid::formResidual
 (
     PetscScalar *f,
@@ -714,18 +775,22 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     (
         x,
         DI,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Increment of displacement
-    DD() = D - D.oldTime();
-
     // Update gradient of displacement
     mechanical().grad(D, gradD());
+
+    // Enforce the boundary conditions again for any conditions that use gradD
+    D.correctBoundaryConditions();
+
+    // Increment of displacement
+    DD() = D - D.oldTime();
 
     // Update gradient of displacement increment
     gradDD() = gradD() - gradD().oldTime();
@@ -749,7 +814,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, 1
+            x, pI, blockSize_ - 1, blockSize_
         );
 
         // Enforce the boundary conditions
@@ -816,8 +881,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     (
         residual,
         f,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     if (solvePressure())
@@ -846,7 +912,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual, f, blockSize_ - 1, 1
+            pressureResidual, f, blockSize_ - 1, blockSize_
         );
     }
 
@@ -867,8 +933,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     (
         x,
         DI,
-        0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -881,7 +948,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_, 1
+            x, pI, blockSize_ - 1, blockSize_
         );
 
         // Enforce the boundary conditions

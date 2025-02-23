@@ -335,7 +335,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh(),
+        mesh().nCells(),
         solidModel::twoD() ? 2 : 3,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
@@ -566,6 +566,13 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 
     // Keep compiler happy
     return true;
+}
+
+
+label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat jac)
+{
+    // Initialise based on compact stencil fvMesh
+    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 

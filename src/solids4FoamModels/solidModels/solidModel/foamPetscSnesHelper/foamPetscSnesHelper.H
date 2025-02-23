@@ -83,10 +83,21 @@ typedef struct appCtxfoamPetscSnesHelper
 } appCtxfoamPetscSnesHelper;
 
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * *  External Helper Functions  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+    //- Initialise Joacobian based on compact stencil of the given mesh with the
+    //  given blockSize (number of scalar equations per cell)
+    label initialiseJacobian
+    (
+        Mat jac,
+        const fvMesh& mesh,
+        const label blockSize
+    );
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 /*---------------------------------------------------------------------------*\
                      Class foamPetscSnesHelper Declaration
@@ -99,32 +110,31 @@ class foamPetscSnesHelper
         //- Was PETSc initialised?
         const Switch initialised_;
 
-        //- Reference to the solution field
-        //volVectorField& solution_;
-        //- Const reference to the mesh
-        const fvMesh& mesh_;
-
         //- Helper object for converting between local (on processor) and global
         //  cell indices
-        globalIndex globalCells_;
-
-        //- Block size of the solution
-        //  The solution 'x' is organized in blocks of 'blockSize' scalars per
-        //  element
-        const label blockSize_;
+        autoPtr<globalIndex> globalCellsPtr_;
 
         //- Flag to set whether the solver stops when PETSs SNES returns an
         //  error
         const Switch stopOnPetscError_;
 
         //- Pointer to the PETSc SNES object
-        autoPtr<SNES> snesPtr_;
+        //  Note that SNES is a pointer type
+        SNES snes_;
 
         //- Pointer to the PETSc solution vector
-        autoPtr<Vec> xPtr_;
+        //  Note that Vec is a pointer type
+        Vec x_;
 
         //- Pointer to the PETSc matrix
-        autoPtr<Mat> APtr_;
+        //  Note that Mat is a pointer type
+        Mat A_;
+
+        //- Number of regions (sub-matrices)
+        label nRegions_;
+
+        //- Pointer to sub-matrices, if A is a nested matrix
+        Mat* subMatsPtr_;
 
         //- PETSc user context
         autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
@@ -143,14 +153,14 @@ class foamPetscSnesHelper
 
     // Private Member Functions
 
-        //- Make the neighbour processor patch fields
-        void makeNeiProcFields() const;
+        //- Make the neighbour processor patch fields for the given mesh
+        void makeNeiProcFields(const fvMesh& mesh) const;
 
-        //- Return a reference to neiProcGlobalIDs
-        const PtrList<labelList>& neiProcGlobalIDs() const;
+        //- Return a reference to neiProcGlobalIDs for the given mesh
+        const PtrList<labelList>& neiProcGlobalIDs(const fvMesh& mesh) const;
 
-        //- Return a reference to neiProcGlobalIDs
-        const PtrList<scalarField>& neiProcVolumes() const;
+        //- Return a reference to neiProcGlobalIDs for the given mesh
+        const PtrList<scalarField>& neiProcVolumes(const fvMesh& mesh) const;
 
         //- Make least squares vectors
         // void makeLsVectors(const volScalarField& p) const;
@@ -172,15 +182,48 @@ public:
 
     // Constructors
 
-        //- Construct from components
+        //- Construct from nBlocks and blockSize 
+        //
+        //  Parameters:
+        //    optionsFile         - PETSc options file address
+        //    nBlocks             - Number of blocks (e.g., cells) on this
+        //                          processor
+        //    blockSize           - Number of scalar unknowns per block
+        //                          each sub matrix.
+        //                          e.g., {{nSolidCells,3}, {nFluidCells,4}}
+        //    fieldDefs           - Indicate which rows are different fields
+        //    stopOnPetscError    - Give a FatalError when PETSc returns an
+        //                          error
+        //    initialise          - Initialise PETSc
         foamPetscSnesHelper
         (
-            fileName optionsFile,       // PETSc options file address
-            const fvMesh& mesh,         // Mesh
-            const label blockSize,      // Number of scalar unknowns per cell
-            const labelListList& fieldDefs, // Indicate which rows are different fields
+            fileName optionsFile,
+            const label nBlocks,
+            const label blockSize,
+            const labelListList& fieldDefs,
             const Switch stopOnPetscError = true,
-            const Switch initialise = true // Will PETSc be used?
+            const Switch initialise = true
+        );
+
+        //- Construct from nBlocksAndBlockSize list
+        //
+        //  Parameters:
+        //    optionsFile         - PETSc options file address
+        //    nBlocksAndBlockSize - A list of (nBlocks, blockSize), allowing a
+        //                          nested matrix with different block sizes in
+        //                          each sub matrix.
+        //                          e.g., {{nSolidCells,3}, {nFluidCells,4}}
+        //    fieldDefs           - Indicate which rows are different fields
+        //    stopOnPetscError    - Give a FatalError when PETSc returns an
+        //                          error
+        //    initialise          - Initialise PETSc
+        foamPetscSnesHelper
+        (
+            fileName optionsFile,
+            const labelPairList& nBlocksAndBlockSize,
+            const labelListList& fieldDefs,
+            const Switch stopOnPetscError = true,
+            const Switch initialise = true
         );
 
     // Destructor
@@ -192,32 +235,24 @@ public:
 
         // Access
 
-            //- Non-const access to the mesh
-            const fvMesh& fmesh()
-            {
-                return mesh_;
-            }
-
             //- Non-const access to the PETSc solution vector
             Vec solution()
             {
-                return xPtr_.ref();
+                return x_;
             }
 
             //- Const access to the global index object
             const globalIndex& globalCells() const
             {
-                return globalCells_;
-            }
-
-            //- Return the blockSize
-            label blockSize() const
-            {
-                return blockSize_;
+                return globalCellsPtr_();
             }
 
 
         // Edit
+
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the non-zero structure of the matrix
+            virtual label initialiseJacobian(Mat jac) = 0;
 
             //- Calculate the residual of the governing equations
             //  A non-zero return value indicates an error
@@ -300,75 +335,92 @@ public:
                 const bool flipSign = false
             ) const;
 
-            //- Extracts a subset of components from a raw scalar array 'x' into
-            //  the OpenFOAM field 'vf'. 'x' is organized in blocks of
-            //  'blockSize_' scalars per element, and extraction starts at
-            //  'offset'. For each element in 'vf', the function copies the
-            //  first pTraits<Type>::nComponents scalars, assuming that 'vf' is
-            //  stored contiguously.
+            //- Extract a subset of components a raw scalar array 'x' into the
+            //  OpenFOAM field 'vf'. The array 'x' is organized in blocks of
+            //  'xBlockSize' scalars per block, and extraction begins at the
+            //  specified 'offset'. For each element in 'vf', the function
+            //  inserts  the components specified in 'compIndices'. If
+            //  'compIndices' is empty, it copies all available components
+            //  (i.e., the first pTraits<Type>::nComponents scalars), assuming
+            //  that 'vf' is stored contiguously.
+            //
             //  Parameters:
-            //    x          - Pointer to the raw scalar array.
-            //    vf         - The OpenFOAM field (e.g., Field<scalar>,
-            //                 Field<vector>, Field<tensor>) to populate.
-            //    offset     - Starting index within each block in 'x' to begin
-            //                 copying.
-            //    nScalarEqns- Number of components to extract, e.g. 3 for a 3-D
-            //                 vector
+            //    vf          - The OpenFOAM field (e.g., Field<scalar>,
+            //                  Field<vector>, Field<tensor>) into which the
+            //                  components will be inserted.
+            //    x           - Pointer to the raw scalar array from where the
+            //                  components will be extracted.
+            //    offset      - Starting index within each block in 'x' where
+            //                  extraction begins.
+            //    xBlockSize  - The total number of scalar values stored per
+            //                  block in 'x' (i.e., the stride).
+            //    compIndices - (Optional) List of component indices specifying
+            //                  which scalars from each element of 'vf' should
+            //                  be inserted. If empty, all components are copied.
             template <class Type>
             void ExtractFieldComponents
             (
                 const PetscScalar *x,
                 Field<Type>& vf,
                 const label offset,
-                const label nScalarEqns
+                const label xBlockSize,
+                const labelList& compIndices = labelList()
             ) const;
 
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
-            //  PetscScalar array pointer
+            //  PetscScalar array pointer. The xBlockSize is looked up
+            //  from "Vec x"
             template <class Type>
             void ExtractFieldComponents
             (
                 const Vec x,
                 Field<Type>& vf,
                 const label offset,
-                const label nScalarEqns
+                const labelList& compIndices = labelList()
             ) const;
 
             //- Inserts a subset of components from the OpenFOAM field 'vf' into
             //  a raw scalar array 'x'. The array 'x' is organized in blocks of
-            //  'blockSize_' scalars per element, and insertion begins at the
+            //  'blockSize' scalars per cell, and insertion begins at the
             //  specified 'offset'. For each element in 'vf', the function
-            //  copies the first pTraits<Type>::nComponents scalars (e.g., for a
-            //  vector, the x, y, z components), assuming that 'vf' is stored
-            //  contiguously.
+            //  copies the components specified in 'compIndices'. If
+            //  'compIndices' is empty, it copies all available components
+            //  (i.e., the first pTraits<Type>::nComponents scalars), assuming
+            //  that 'vf' is stored contiguously.
+            //
             //  Parameters:
-            //    vf         - The OpenFOAM field (e.g., Field<scalar>,
-            //                 Field<vector>, Field<tensor>) from which the
-            //                 components are extracted.
-            //    x          - Pointer to the raw scalar array where the
-            //                 components will be inserted.
-            //    offset     - Starting index within each block in 'x' where
-            //                 insertion of the components begins.
-            //    nScalarEqns- Number of components to extract, e.g. 3 for a 3-D
-            //                 vector
+            //    vf          - The OpenFOAM field (e.g., Field<scalar>,
+            //                  Field<vector>, Field<tensor>) from which the
+            //                  components are extracted.
+            //    x           - Pointer to the raw scalar array where the
+            //                  components will be inserted.
+            //    offset      - Starting index within each block in 'x' where
+            //                  insertion begins.
+            //    xBlockSize  - The total number of scalar values stored per
+            //                  block in 'x' (i.e., the stride).
+            //    compIndices - (Optional) List of component indices specifying
+            //                  which scalars from each element of 'vf' should
+            //                  be copied. If empty, all components are copied.
             template <class Type>
             void InsertFieldComponents
             (
                 const Field<Type>& vf,
                 PetscScalar *x,
                 const label offset,
-                const label nScalarEqns
+                const label xBlockSize,
+                const labelList& compIndices = labelList()
             ) const;
-
+    
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
-            //  PetscScalar array pointer
+            //  PetscScalar array pointer. The xBlockSize is looked up
+            //  from "Vec x"
             template <class Type>
             void InsertFieldComponents
             (
                 const Field<Type>& vf,
                 Vec x,
                 const label offset,
-                const label nScalarEqns
+                const labelList& compIndices = labelList()
             ) const;
 
             //- Call the PETSc SNES solve function and check its convergence

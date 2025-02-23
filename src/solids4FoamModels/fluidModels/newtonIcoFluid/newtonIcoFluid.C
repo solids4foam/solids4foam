@@ -120,7 +120,7 @@ newtonIcoFluid::newtonIcoFluid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh(),
+        mesh().nCells(),
         fluidModel::twoD() ? 3 : 4,
         fluidModel::twoD()
       ? labelListList({ {0, 1}, {2} })    // 0-1: momentum. 2: pressure
@@ -276,8 +276,8 @@ bool newtonIcoFluid::evolve()
     (
         foamPetscSnesHelper::solution(),
         U.primitiveFieldRef(),
-        0,                          // Location of first DI component
-        fluidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of U
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     U.correctBoundaryConditions();
@@ -293,8 +293,7 @@ bool newtonIcoFluid::evolve()
     (
         foamPetscSnesHelper::solution(),
         p.primitiveFieldRef(),
-        blockSize_ - 1, // Location of p component
-        1               // Number of components to extract
+        blockSize_ - 1 // Location of p component
     );
 
     p.correctBoundaryConditions();
@@ -310,6 +309,13 @@ bool newtonIcoFluid::evolve()
     turbulence_->correct();
 
     return 0;
+}
+
+
+label newtonIcoFluid::initialiseJacobian(Mat jac)
+{
+    // Initialise based on compact stencil fvMesh
+    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 
@@ -337,15 +343,15 @@ label newtonIcoFluid::formResidual
     (
         x,
         UI,
-        0,                          // Location of first UI component
-        fluidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first UI component
+        blockSize_, // Block size of x
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
     U.correctBoundaryConditions();
 
     // Update the flux
-    // CHECK!
     phi = fvc::interpolate(U) & mesh.Sf();
 
     // CHECK!
@@ -376,7 +382,7 @@ label newtonIcoFluid::formResidual
     scalarField& pI = p;
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
     (
-        x, pI, blockSize_ - 1, 1
+        x, pI, blockSize_ - 1, blockSize_
     );
 
     // Enforce the boundary conditions
@@ -420,8 +426,9 @@ label newtonIcoFluid::formResidual
     (
         residual,
         f,
-        0,                          // Location of first DI component
-        fluidModel::twoD() ? 2 : 3  // Number of components to insert
+        0, // Location of first component
+        blockSize_, // Block size of x
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Calculate pressure equation residual
@@ -445,7 +452,7 @@ label newtonIcoFluid::formResidual
     // Copy the pressureResidual into the f field as the final equation
     foamPetscSnesHelper::InsertFieldComponents<scalar>
     (
-        pressureResidual, f, blockSize_ - 1, 1
+        pressureResidual, f, blockSize_ - 1, blockSize_
     );
 
     return 0;
@@ -467,8 +474,9 @@ label newtonIcoFluid::formJacobian
     (
         x,
         UI,
-        0,                          // Location of first UI component
-        fluidModel::twoD() ? 2 : 3  // Number of components to extract
+        0, // Location of first component
+        blockSize_, // Block size of x
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -482,7 +490,7 @@ label newtonIcoFluid::formJacobian
     scalarField& pI = p;
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
     (
-        x, pI, blockSize_, 1
+        x, pI, blockSize_ - 1, blockSize_
     );
 
     // Enforce the boundary conditions

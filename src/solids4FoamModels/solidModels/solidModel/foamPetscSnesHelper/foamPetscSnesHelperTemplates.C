@@ -38,8 +38,12 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     const label nScalarEqns
 ) const
 {
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
     // Initialise block coeff
-    const label nCoeffCmpts = blockSize_*blockSize_;
+    const label nCoeffCmpts = blockSize*blockSize;
     PetscScalar values[nCoeffCmpts];
     std::memset(values, 0, sizeof(values));
 
@@ -74,7 +78,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     {
                         values
                         [
-                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                            (cmptI + rowOffset)*blockSize + cmptJ + colOffset
                         ] = curDiagPtr[cmptI];
                     }
                 }
@@ -117,7 +121,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     {
                         values
                         [
-                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                            (cmptI + rowOffset)*blockSize + cmptJ + colOffset
                         ] = upperScalarCoeff;
                     }
                 }
@@ -177,7 +181,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     {
                         values
                         [
-                            (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                            (cmptI + rowOffset)*blockSize + cmptJ + colOffset
                         ] = lowerScalarCoeff;
                     }
                 }
@@ -204,7 +208,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     }
 
     // Get the global IDs of the neighbour cells across processor patches
-    const PtrList<labelList>& neiProcGlobalIDs = this->neiProcGlobalIDs();
+    const PtrList<labelList>& neiProcGlobalIDs = this->neiProcGlobalIDs(mesh);
 
     // Insert the off-processor coefficients
     forAll(mesh.boundaryMesh(), patchI)
@@ -244,7 +248,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                             {
                                 values
                                 [
-                                    (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
                                 ] = curIntCoeffsPtr[cmptI];
                             }
                         }
@@ -280,7 +284,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                                 // Take care: we need to flip the sign
                                 values
                                 [
-                                    (cmptI + rowOffset)*blockSize_ + cmptJ + colOffset
+                                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
                                 ] = -curNeiCoeffsPtr[cmptI];
                             }
                         }
@@ -319,7 +323,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
     const PetscScalar *x,
     Field<Type>& vf,
     const label offset,
-    const label nScalarEqns
+    const label xBlockSize,
+    const labelList& compIndices
 ) const
 {
     // Obtain a pointer to the underlying scalar array in vf
@@ -331,12 +336,37 @@ void foamPetscSnesHelper::ExtractFieldComponents
     // 1 for scalar, 3 for vector, etc.)
     const label vfBlockSize = pTraits<Type>::nComponents;
 
-    // Loop over each element in vf and copy the appropriate components from x
-    forAll(vf, blockI)
+    // Decide which components to extract: if compIndices is empty, default to
+    // all components
+    labelList compList;
+    if (compIndices.size() == 0)
     {
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        compList.setSize(vfBlockSize);
+        for (label i = 0; i < vfBlockSize; ++i)
         {
-            vfPtr[blockI*vfBlockSize + cmptI] = x[offset + blockI*blockSize_ + cmptI];
+            compList[i] = i;  // Default: copy all components in order
+        }
+    }
+    else
+    {
+        compList = compIndices;
+    }
+
+    // The number of components to insert per block is determined by the size of
+    // compList
+    const label nCompToInsert = compList.size();
+
+    // Loop over each block in vf and copy the selected components in x into the
+    // appropriate positions in vf.
+    // The source index for cell 'cellI' is computed as:
+    //   offset + (cellI*blockSize) + local component index.
+    forAll(vf, cellI)
+    {
+        for (label compI = 0; compI < nCompToInsert; ++compI)
+        {
+            const label xIndex = offset + cellI*xBlockSize + compI;
+            const label vfIndex  = cellI*vfBlockSize + compList[compI];
+            vfPtr[vfIndex] = x[xIndex];
         }
     }
 }
@@ -348,19 +378,22 @@ void foamPetscSnesHelper::ExtractFieldComponents
     const Vec x,
     Field<Type>& vf,
     const label offset,
-    const label nScalarEqns
+    const labelList& compIndices
 ) const
 {
     // Access the x data
     const PetscScalar *xx;
     VecGetArrayRead(x, &xx);
 
+    // Lookup x block size
+    label xBlockSize;
+    VecGetBlockSize(x, &xBlockSize);
+
     // Insert vf into xx
-    ExtractFieldComponents(xx, vf, offset, nScalarEqns);
+    ExtractFieldComponents(xx, vf, offset, xBlockSize, compIndices);
 
     // Restore the x vector
     VecRestoreArrayRead(x, &xx);
-
 }
 
 
@@ -370,23 +403,49 @@ void foamPetscSnesHelper::InsertFieldComponents
     const Field<Type>& vf,
     PetscScalar *x,
     const label offset,
-    const label nScalarEqns
+    const label xBlockSize,
+    const labelList& compIndices
 ) const
 {
-    // Obtain a pointer to the underlying scalar data in vf (assumes contiguous
+    // Get a pointer to the underlying scalar data of vf (assumes contiguous
     // storage)
     const scalar* vfPtr = reinterpret_cast<const scalar*>(vf.begin());
 
-    // Get the number of components per field element from the traits (e.g.,
-    // 1 for scalar, 3 for vector, etc.)
+    // Determine the number of components per field element (e.g., 1 for
+    // scalar, 3 for vector, etc.)
     const label vfBlockSize = pTraits<Type>::nComponents;
 
-    // Loop over each element in vf and copy its components into the corresponding position in x
-    forAll(vf, blockI)
+    // Decide which components to extract: if compIndices is empty, default to
+    // all components
+    labelList compList;
+    if (compIndices.size() == 0)
     {
-        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        compList.setSize(vfBlockSize);
+        for (label i = 0; i < vfBlockSize; ++i)
         {
-            x[offset + blockI*blockSize_ + cmptI] = vfPtr[blockI*vfBlockSize + cmptI];
+            compList[i] = i;  // Default: copy all components in order
+        }
+    }
+    else
+    {
+        compList = compIndices;
+    }
+
+    // The number of components to insert per cell is determined by the size of
+    // compList
+    const label nCompToInsert = compList.size();
+
+    // Loop over each cell in vf and copy the selected components into the
+    // appropriate positions in x.
+    // The destination index for cell 'cellI' is computed as:
+    //   offset + (cellI*xBlockSize) + local component index.
+    forAll(vf, cellI)
+    {
+        for (label compI = 0; compI < nCompToInsert; ++compI)
+        {
+            const label xIndex = offset + cellI*xBlockSize + compI;
+            const label vfIndex  = cellI*vfBlockSize + compList[compI];
+            x[xIndex] = vfPtr[vfIndex];
         }
     }
 }
@@ -398,19 +457,22 @@ void foamPetscSnesHelper::InsertFieldComponents
     const Field<Type>& vf,
     Vec x,
     const label offset,
-    const label nScalarEqns
+    const labelList& compIndices
 ) const
 {
     // Access the x data
     PetscScalar *xx;
     VecGetArray(x, &xx);
 
+    // Lookup x block size
+    label xBlockSize;
+    VecGetBlockSize(x, &xBlockSize);
+
     // Insert vf into xx
-    InsertFieldComponents(vf, xx, offset, nScalarEqns);
+    InsertFieldComponents(vf, xx, offset, xBlockSize, compIndices);
 
     // Restore the x vector
     VecRestoreArray(x, &xx);
-
 }
 
 
