@@ -1,11 +1,10 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
-targetType=""
-
 # Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
 fi
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)

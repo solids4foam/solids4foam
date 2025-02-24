@@ -137,6 +137,12 @@ When using `addTinyPatch` the original mesh is overwritten!
   factor is a vector to allow different scalings in different directions; for
   example, for 2-D, the Z component should be set to 0.0.
 
+  If there are negative or small cell volumes after moving the points, the
+  local motion is reduced by the factor beta (defaults to 0.8) and the motion
+  is performed again. The maximum number of corrections iterations is set with
+  maxIter (defaults to 1000). A small volume is defined as the factor
+  minCellVol (defaults to 0.1) times the original cel volume.
+
   This utility is useful for creating distorted grids for testing
   discretisations.
 
@@ -170,6 +176,18 @@ When using `addTinyPatch` the original mesh is overwritten!
   (
       // Add patch names here
   );
+
+  // Optional: maximum number of corrections iterations
+  // Defaults to 1000
+  //maxIter 1000;
+
+  // Optional: local motion rescale factor for applying corrections
+  // Defaults to 0.8
+  //beta 0.8;
+
+  // Optional: local minimum allow cell volume relative to the initial volume
+  // Defaults to 0.1
+  //minCellVol 0.1;
   ```
 
   The `Gaussian` distribution can only be used in combination with
@@ -233,7 +251,7 @@ to `constant` before running the simulation!
   splitPatch
   ```
 
-![splitPatch: top patch before and after split](./images/splitPatch.png")
+![splitPatch: top patch before and after split](./images/splitPatch.png)
 **splitPatch: top patch before and after split**
 
   ```note

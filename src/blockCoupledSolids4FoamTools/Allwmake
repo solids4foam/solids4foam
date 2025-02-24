@@ -1,6 +1,12 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
+# Parse arguments for library compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
+fi
+
 if [ "$WM_PROJECT" = "foam" ]
 then
     if [[ ! -f Make/files ]]
@@ -24,4 +30,4 @@ else
     fi
 fi
 
-wmake $* libso
+wmake $targetType libso
