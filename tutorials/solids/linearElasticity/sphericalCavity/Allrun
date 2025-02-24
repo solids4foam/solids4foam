@@ -16,8 +16,7 @@ then
     mv 0 0.tmp
 
     # Create mesh with gmsh
-    MAX_CELL_SIZE=0.02
-    solids4Foam::runApplication gmsh -3 -clmax ${MAX_CELL_SIZE} -format msh2 sphericalCavity.geo
+    solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
     solids4Foam::runApplication gmshToFoam sphericalCavity.msh
     solids4Foam::runApplication polyDualMesh 30 -overwrite
     solids4Foam::runApplication combinePatchFaces 45 -overwrite
@@ -28,7 +27,7 @@ then
 else
     # Fail silently
     echo; echo "Gmsh is required to run this case: please install it"
-    exit 0        
+    exit 0
 fi
 
 # Run solver

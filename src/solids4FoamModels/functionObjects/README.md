@@ -12,36 +12,36 @@ Prepared by Ivan Batistić
 
 ## Section Aims
 
-- This document describes `solids4foam ` function objects which are not available within the standard `OpenFOAM` package;
+- This document describes `solids4foam` function objects which are not available within the standard `OpenFOAM` package;
 
 - Function objects are various post-processing functionalities that are executing during simulation run time;
 
 - Function objects are placed at the bottom of the `system/controlDict` file; for example:
 
-  ```c++
-  functions
-  {
-      forceDisp
-      {
-          type          solidForcesDisplacements;
-          historyPatch  cylinderFixed;
-      }
-      patchForce
-      {
-          type    			solidForces;
-          historyPatch  top;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        forceDisp
+        {
+            type          solidForcesDisplacements;
+            historyPatch  cylinderFixed;
+        }
+        patchForce
+        {
+            type       solidForces;
+            historyPatch  top;
+        }
+    }
+    ```
 
 ---
 
 ## `cantileverAnalyticalSolution`
 
 - **Function object purpose**  
-  To generate the analytical solution fields for the bending slender cantilever problem.
-  The analytical solution is taken from [[C.E. Augarde, A.J. Deeks, The use of Timoshenko’s exact solution for a  cantilever beam in adaptive analysis. Finite Elements in Analysis and Design, 44, 2008]](https://www.researchgate.net/publication/30053820_The_use_of_Timoshenko's_exact_solution_for_a_cantilever_beam_in_adaptive_analysis):  
-  
+    To generate the analytical solution fields for the bending slender cantilever problem.
+    The analytical solution is taken from [[C.E. Augarde, A.J. Deeks, The use of Timoshenko’s exact solution for a  cantilever beam in adaptive analysis. Finite Elements in Analysis and Design, 44, 2008]](https://www.researchgate.net/publication/30053820_The_use_of_Timoshenko's_exact_solution_for_a_cantilever_beam_in_adaptive_analysis):  
+
 $$
 \sigma_{xx} = \frac{P(L-x)y}{I}, \qquad \sigma_{yy}=0, \qquad \sigma_{xy}=-\frac{P}{2I}\left( \frac{D^2}{4}-y^2\right),
 $$
@@ -54,7 +54,8 @@ $$
 u_y = \frac{P}{6EI} \left(3\nu y^2(L-x)+(4+5\nu)\frac{D^2x}{4}+(3L-x)x^2  \right),
 $$
 
-​	where  $\nu$ is Poisson's ratio, $E$ is Young modulus, $I$ is the second moment of are of the cross-section, $P$ is applied load and $L$ is length of the beam.
+ where  $\nu$ is Poisson's ratio, $E$ is Young modulus, $I$ is the second moment of are of the cross-section, $P$ is applied load and $L$ is length of the beam.
+
 ```note
 Above analytical solution can be used only if the shearing forces on the ends are distributed according to the same parabolic law as the shearing stress $\tau_{xy}$ and the intensity of the normal forces at the built-in end is proportional to $y$.
 ```
@@ -63,124 +64,124 @@ Above analytical solution can be used only if the shearing forces on the ends ar
 The current version of the code assumes a rectangular cross-section with unit width and automatically calculates the second moment of inertia!
 ```
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      cantileverSolution
-      {
-          type    cantileverAnalyticalSolution;
-  
-          E      00e6;
-          nu      0.3;
-          L 	     10;
-          D		0.1;
-          P		1e5;
-          
-          //Optional
-          cellDisplacement true;
-          pointDisplacement true;
-          cellStress true;
-          pointStress true;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        cantileverSolution
+        {
+            type    cantileverAnalyticalSolution;
+    
+            E      00e6;
+            nu      0.3;
+            L       10;
+            D  0.1;
+            P  1e5;
+            
+            //Optional
+            cellDisplacement true;
+            pointDisplacement true;
+            cellStress true;
+            pointStress true;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `P` load applied in the minus $y$ direction at the other end of the beam;
-  -  `L`  length of the beam;
-  -  `D` depth of the beam;
-  -  `E` Young's modulus;
-  -  `nu` Poisson's ratio.
+  - `P` load applied in the minus $y$ direction at the other end of the beam;
+  - `L`  length of the beam;
+  - `D` depth of the beam;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `cellDisplacement`   write analytical solution for cell-centred displacement field; default is true;
   - `pointDisplacement`   write analytical solution for vertex-centred displacement field; default is true;
-  - `cellStress `    write analytical solution for cell-centred stress field; default is true;
-  - `pointStress `  write analytical solution for vertex-centred stress field; default is true;
+  - `cellStress`    write analytical solution for cell-centred stress field; default is true;
+  - `pointStress`  write analytical solution for vertex-centred stress field; default is true;
 
-- __Outputs__
+- **Outputs**
 
   - Analytical solution for the stress tensor field `analyticalStress` in time directories;
   - Analytical solution for the displacement field `analyticalD` in time directories.
   - `cellStressDifference` field; difference between analytical stress and calculated one: `analyticalStress-sigma`;
   - `DDiference` field; difference between analytical displacement and calculated one: `analyticalD-D`.
   - Log at the end of each time-step:
-    `Component: 1`  
-    `Norms: mean L1, mean L2, LInfL: 0.12 0.2 0.5 `  
-    `...`  
+      `Component: 1`  
+      `Norms: mean L1, mean L2, LInfL: 0.12 0.2 0.5`  
+      `...`  
 
-- __Tutorial case in which it is used:__  :  
-  `solids/linearElasticity/cantilever2d/vertexCentredCantilever2d`
+- **Tutorial case in which it is used:**  :  
+    `solids/linearElasticity/cantilever2d/vertexCentredCantilever2d`
 
 ---
 
 ## `contactPatchTestAnalyticalSolution`
 
 - **Function object purpose**  
-  To generate the analytical solution for contact patch test.
-  The analytical solution for the stress field is taken from [[ Crisfield MA. Re-visiting the contact patch test. Int J Numer Methods Eng. 2000]](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0207%2820000530%2948%3A3%3C435%3A%3AAID-NME891%3E3.0.CO%3B2-V):  
+    To generate the analytical solution for contact patch test.
+    The analytical solution for the stress field is taken from [[ Crisfield MA. Re-visiting the contact patch test. Int J Numer Methods Eng. 2000]](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0207%2820000530%2948%3A3%3C435%3A%3AAID-NME891%3E3.0.CO%3B2-V):  
 
 $$
   \sigma_{x} = \tau_{xy}=0\qquad \sigma_{y} = \dfrac{E}{1-\nu^2}\Delta \qquad \sigma_z = \nu \sigma_y.
 $$
 
-​	where $$E$$ is Young's modulus, $$\nu$$ Poisson's ratio and $$\Delta$$ prescribed displacement of upper block top surface. 
+ where $$E$$ is Young's modulus, $$\nu$$ Poisson's ratio and $$\Delta$$ prescribed displacement of upper block top surface.
 
 ```note
 To use this analytical solution, the bottom surface of the lower block must freely deform in the tangential direction. It can be fixed only in the case of zero Poisson's ratio.
 ```
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-  	analyticalSolution
-      {
-          type    contactPatchTestAnalyticalSolution;
-  
-          displacement   0.01;
-  
-          E       1e6;
-          nu      1e-15;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+     analyticalSolution
+        {
+            type    contactPatchTestAnalyticalSolution;
+    
+            displacement   0.01;
+    
+            E       1e6;
+            nu      1e-15;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `displacement` upper block prescribed vertical displacement;
-  -  `E` Young's modulus;
-  -  `nu` Poisson's ratio.
+  - `displacement` upper block prescribed vertical displacement;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Analytical solution for stress tensor field `analyticalStress` in time directories.
 
   - Scalar field of relative error named `relativeError` and defined as:
-    $$
-    e(\%)=\dfrac{\left| \sigma_y - \sigma_y^{analytical} \right|}{\left|\sigma_y^{analytical}\right|} \cdot 100.
-    $$
+      $$
+      e(\%)=\dfrac{\left| \sigma_y - \sigma_y^{analytical} \right|}{\left|\sigma_y^{analytical}\right|} \cdot 100.
+      $$
 
-- __Tutorial case in which it is used:__  
-  `solids/linearElasticity/contactPatchTest`  
+- **Tutorial case in which it is used:**  
+    `solids/linearElasticity/contactPatchTest`  
 
 ---
 
-##  `curvedCantileverAnalyticalSolution`
+## `curvedCantileverAnalyticalSolution`
 
 - **Function object purpose**  
-  To generate the analytical solution for a curved cantilever beam with end loading and traction-free inner and outer surface.
-  The analytical solution for the stress field is taken from [[ Sadd MH. Elasticity: Theory, Applications, and Numerics. Elsevier 2009]](https://www.sciencedirect.com/book/9780123744463/elasticity):  
-  
+    To generate the analytical solution for a curved cantilever beam with end loading and traction-free inner and outer surface.
+    The analytical solution for the stress field is taken from [[ Sadd MH. Elasticity: Theory, Applications, and Numerics. Elsevier 2009]](https://www.sciencedirect.com/book/9780123744463/elasticity):  
+
 $$
 N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right)
 $$
@@ -197,53 +198,53 @@ $$
 \tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta),
 $$
 
-​	where $a$ is beam inner radius, $b$ is beam outer radius and $P$ is applied shear force.
+ where $a$ is beam inner radius, $b$ is beam outer radius and $P$ is applied shear force.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      analyticalSolution
-      {
-          type    curvedCantileverAnalyticalSolution;
-    
-          rInner  0.31;
-          rOuter  0.33;
-   
-          force   4;
-          E       100;
-          nu      0.3;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        analyticalSolution
+        {
+            type    curvedCantileverAnalyticalSolution;
+      
+            rInner  0.31;
+            rOuter  0.33;
+     
+            force   4;
+            E       100;
+            nu      0.3;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `rInner` inner beam radius;
-  -  `rOuter` outer beam radius;
-  -  `force` applied force in (N/m) at beam free end;
-  -  `E` Young's modulus;
-  -  `nu` Poisson's ratio.
+  - `rInner` inner beam radius;
+  - `rOuter` outer beam radius;
+  - `force` applied force in (N/m) at beam free end;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Analytical solution for stress tensor field `analyticalStress` in time directories.
 
-- __Tutorial case in which it is used:__  
-  `solids/linearElasticity/curvedCantilever`  
+- **Tutorial case in which it is used:**  
+    `solids/linearElasticity/curvedCantilever`  
 
-----
+---
 
 ## `hotCylinderAnalyticalSolution`
 
 - **Function object purpose**  
-  To generate the analytical solution (temperature and stress) fields for the case of a thermally-stressed pipe/cylinder.
-  The analytical solution is taken from [[ Timoshenko, Stephen. *Theory of elasticity*. Oxford, 1951.]](https://asmedigitalcollection.asme.org/appliedmechanics/article/37/3/888/427761/Theory-of-Elasticity-3rd-ed):  
+    To generate the analytical solution (temperature and stress) fields for the case of a thermally-stressed pipe/cylinder.
+    The analytical solution is taken from [[ Timoshenko, Stephen. *Theory of elasticity*. Oxford, 1951.]](https://asmedigitalcollection.asme.org/appliedmechanics/article/37/3/888/427761/Theory-of-Elasticity-3rd-ed):  
 
 $$
 \sigma_r = \frac{\alpha E \Delta T}{2(1-\nu)\ln\frac{b}{a}}\left( -\ln \frac{b}{r} - \frac{a^2}{(b^2-a^2)}\left( 1-\frac{b^2}{r^2} \right) \ln \frac{b}{a} \right),
@@ -257,61 +258,61 @@ $$
 T = \displaystyle{\frac{\Delta T}{\ln \frac{b}{a}} \ln \frac{b}{r}},
 $$
 
-​	where $a$ is pipe inner radius, $b$ is pipe outer radius,  $\nu$ is Poisson's ratio, $E$ is Young modulus, $\alpha$ is coefficient of linear thermal expansion and $\Delta T$ is 	temperature difference between inner and outer pipe surface.
+ where $a$ is pipe inner radius, $b$ is pipe outer radius,  $\nu$ is Poisson's ratio, $E$ is Young modulus, $\alpha$ is coefficient of linear thermal expansion and $\Delta T$ is  temperature difference between inner and outer pipe surface.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      analyticalHotCylinder
-      {
-          type    hotCylinderAnalyticalSolution;
-  
-          rInner  0.5;
-          rOuter  0.7;
-  
-          TInner  100;
-          TOuter  0;
-  
-          E       200e9;
-          nu      0.3;
-          alpha   1e-5;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        analyticalHotCylinder
+        {
+            type    hotCylinderAnalyticalSolution;
+    
+            rInner  0.5;
+            rOuter  0.7;
+    
+            TInner  100;
+            TOuter  0;
+    
+            E       200e9;
+            nu      0.3;
+            alpha   1e-5;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `rInner` inner pipe radius;
-  -  `rOuter` outer pipe radius;
-  -  `TInner` temperature on the inner pipe surface;
-  -  `TOuter` temperature on the outer pipe surface;
-  -  `E` Young's modulus;
-  -  `nu` Poisson's ratio;
-  -  `alpha` coefficient of linear thermal expansion.
+  - `rInner` inner pipe radius;
+  - `rOuter` outer pipe radius;
+  - `TInner` temperature on the inner pipe surface;
+  - `TOuter` temperature on the outer pipe surface;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio;
+  - `alpha` coefficient of linear thermal expansion.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Analytical solution for hoop stress field `analyticalHoopStress` in time directories.
   - Analytical solution for radial stress field `analyticalRadialStress` in time directories.
   - Analytical solution for temperature field `analyticalT` in time directories.
 
-- __Tutorial case in which it is used:__  
-  `solids/thermoelasticity/hotCylinder/hotCylinder`  
+- **Tutorial case in which it is used:**  
+    `solids/thermoelasticity/hotCylinder/hotCylinder`  
 
 ---
 
 ## `plateHoleAnalyticalSolution`
 
 - **Function object purpose**  
-  To generate the analytical solution fields for the "hole in a plate" case.
-  The analytical solution for the stress field is taken from [[ Timoshenko, Stephen. *Theory of elasticity*. Oxford, 1951.]](https://asmedigitalcollection.asme.org/appliedmechanics/article/37/3/888/427761/Theory-of-Elasticity-3rd-ed):  
-  
+    To generate the analytical solution fields for the "hole in a plate" case.
+    The analytical solution for the stress field is taken from [[ Timoshenko, Stephen. *Theory of elasticity*. Oxford, 1951.]](https://asmedigitalcollection.asme.org/appliedmechanics/article/37/3/888/427761/Theory-of-Elasticity-3rd-ed):  
+
 $$
 \sigma_r = \frac{T}{2}\left( 1-\frac{a^2}{r^2}\right) + \frac{T}{2} \left( 1+\frac{3a^4}{r^4} - \frac{4a^2}{r^2} \right)cos(2\theta),
 $$
@@ -324,7 +325,7 @@ $$
 \sigma_{r\theta} =  - \frac{T}{2} \left( 1-\frac{3a^4}{r^4} + \frac{2a^2}{r^2} \right)\sin(2\theta),
 $$
 
-​	same in cartesian coordinates:
+ same in cartesian coordinates:
 
 $$
 \sigma_{xx} = T \left( 1-\frac{a^2}{r^2}\left(\frac{3}{2}\cos(2\theta)+\cos(4\theta) \right) + \frac{3}{2}\frac{a^4}{r^4}\cos(4\theta) \right),
@@ -338,7 +339,7 @@ $$
 \sigma_{xy} =  T \left( -\frac{a^2}{r^2}\left(\frac{1}{2}\cos(2\theta)+\sin(4\theta) \right) + \frac{3}{2}\frac{a^4}{r^4}\sin(4\theta) \right).
 $$
 
-​	Displacement field in cartesian coordinates:
+ Displacement field in cartesian coordinates:
 
 $$
 u_x = \frac{Ta}{8\mu}\left( \frac{r}{a}(\kappa+1)\cos\theta+\frac{2a}{r}\left((1+\kappa)\cos(\theta)+\cos (3\theta)\right)-\frac{2a^3}{r^3}\cos(3\theta)  \right),
@@ -348,676 +349,678 @@ $$
 u_y = \frac{Ta}{8\mu}\left( \frac{r}{a}(\kappa-3)\sin\theta+\frac{2a}{r}\left((1-\kappa)\sin(\theta)+\sin (3\theta)\right)-\frac{2a^3}{r^3}\sin(3\theta)  \right),
 $$
 
-​	where $$a$$ is hole radius, $$T$$ is far field traction in $$x$$ direction, $$\nu$$ is Poisson's ratio, $$\mu$$ is shear modulus and $$\kappa$$ parameter is equal to $$3-4\nu$$.
+ where $$a$$ is hole radius, $$T$$ is far field traction in $$x$$ direction, $$\nu$$ is Poisson's ratio, $$\mu$$ is shear modulus and $$\kappa$$ parameter is equal to $$3-4\nu$$.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      plateHoleSolution
-      {
-          type    plateHoleAnalyticalSolution;
-    
-          holeRadius  1;
-          farFieldTractionX  1e6;
-   
-          E       100;
-          nu      0.3;
-          
-          //Optional
-          cellDisplacement true;
-          pointDisplacement true;
-          cellStress true;
-          pointStress true;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        plateHoleSolution
+        {
+            type    plateHoleAnalyticalSolution;
+      
+            holeRadius  1;
+            farFieldTractionX  1e6;
+     
+            E       100;
+            nu      0.3;
+            
+            //Optional
+            cellDisplacement true;
+            pointDisplacement true;
+            cellStress true;
+            pointStress true;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `holeRadius` radius of the hole centred on the origin;
-  -  `farFieldTractionX`  far-field traction in the $x$ direction;
-  -  `E` Young's modulus;
-  -  `nu` Poisson's ratio.
+  - `holeRadius` radius of the hole centred on the origin;
+  - `farFieldTractionX`  far-field traction in the $x$ direction;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `cellDisplacement`   write analytical solution for cell-centred displacement field; default is true;
   - `pointDisplacement`   write analytical solution for vertex-centred displacement field; default is true;
-  - `cellStress `    write analytical solution for cell-centred stress field; default is true;
-  - `pointStress `  write analytical solution for vertex-centred stress field; default is true;
+  - `cellStress`    write analytical solution for cell-centred stress field; default is true;
+  - `pointStress`  write analytical solution for vertex-centred stress field; default is true;
 
-- __Outputs__
+- **Outputs**
 
   - Analytical solution for stress tensor field `analyticalStress` in time directories;
   - Analytical solution for the displacement field `analyticalD` in time directories.
 
-- __Tutorial case in which it is used:__  
-  None.
+- **Tutorial case in which it is used:**  
+    None.
 
 ---
 
 ## `fsiConvergenceData`
 
-- **Function object purpose**    
-  Reports the number of outer correctors required at each time-step to reach convergence of the FSI coupling.
+- **Function object purpose**
+    Reports the number of outer correctors required at each time-step to reach convergence of the FSI coupling.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      fsiConvData
-      {
-          type fsiConvergenceData;     
-          //Optional
-          region fluid;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        fsiConvData
+        {
+            type fsiConvergenceData;     
+            //Optional
+            region fluid;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  None
+  - None
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `region` name;  the default value is set to `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/fsiConvergenceData.dat` ;
 
-  - Output file format:
+    - Output file format:
 
-    ```
-    # Time nFsiCorrectors
-    0 15
-    1 12
-    ...
-    ```
+        ```plaintext
+        # Time nFsiCorrectors
+        0 15
+        1 12
+        ...
+        ```
 
-- __Tutorial case in which it is used:__  
-  `fluidSolidInteraction/heatTransfer/flowOverHeatedPlate`   
-  `fluidSolidInteraction/heatTransfer/thermalCavity`   
+- **Tutorial case in which it is used:**  
+    `fluidSolidInteraction/heatTransfer/flowOverHeatedPlate`
+    `fluidSolidInteraction/heatTransfer/thermalCavity`
 
 ---
 
 ## `hydrostaticPressure`
 
 - **Function object purpose**  
-  Outputs the hydrostatic component of the stress tensor field
-  
-  $$
-  \sigma_h=  -\frac{1}{3}\text{tr}( \mathbf{\sigma}).
-  $$
-  
+    Outputs the hydrostatic component of the stress tensor field
 
-  where $$\mathbf{\sigma}$$ is stress tensor.
+    $$
+    \sigma_h=  -\frac{1}{3}\text{tr}( \mathbf{\sigma}).
+    $$
 
-- __Example of usage__
+    where $$\mathbf{\sigma}$$ is stress tensor.
 
-  ```c++
-  functions
-  {
-      meanStress
-      {
-          type    hydrostaticPressure;
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        meanStress
+        {
+            type    hydrostaticPressure;
+        }
+    }
+    ```
 
-  -  None.
-
-- __Optional arguments__
+- **Arguments**
 
   - None.
 
-- __Outputs__
+- **Optional arguments**
+
+  - None.
+
+- **Outputs**
 
   - Scalar field `hydrostaticPressure` in time directories;
 
   - Log at the end of each time-step:
 
-    ```
-    Hydrostatic pressure: min = 150, max = 500
-    ```
+      ```plaintext
+      Hydrostatic pressure: min = 150, max = 500
+      ```
 
-- __Tutorial case in which it is used:__  
-  `None`
+- **Tutorial case in which it is used:**  
+    `None`
 
 ---
 
 ## `principalStresses`
 
 - **Function object purpose**  
-  Calculate and write principal stress fields. It assumed that the stress tensor is called `sigma` or `sigmaCauchy`. Three vector fields are created: `sigmaMax`, `sigmaMid`, `sigmaMin`. `sigmaMax` is the most positive/tensile principal stress multiplied by the corresponding principal direction; `sigmaMid` is the middle principal stress multiplied by the corresponding principal direction; `sigmaMin` is the most negative/compressive principal stress multiplied by the corresponding principal direction.
+    Calculate and write principal stress fields. It assumed that the stress tensor is called `sigma` or `sigmaCauchy`. Three vector fields are created: `sigmaMax`, `sigmaMid`, `sigmaMin`. `sigmaMax` is the most positive/tensile principal stress multiplied by the corresponding principal direction; `sigmaMid` is the middle principal stress multiplied by the corresponding principal direction; `sigmaMin` is the most negative/compressive principal stress multiplied by the corresponding principal direction.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      principalStresses1
-      {
-          type principalStresses;
-  
-          // Optional
-          compressionPositive   true;
-          region    region0;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        principalStresses1
+        {
+            type principalStresses;
+    
+            // Optional
+            compressionPositive   true;
+            region    region0;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  None.
+  - None.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `region` name;  the default value is set to `region0`.
   - `compressionPositive` specify if compression is considered positive; default is `false`.
 
-- __Outputs__
+- **Outputs**
 
-  -  `sigmaMinDir`  vector field in time directories;
+  - `sigmaMinDir`  vector field in time directories;
   - `sigmaMin`  scalar field in time directories;
-  -  `sigmaMaxDir`  vector field in time directories;
+  - `sigmaMaxDir`  vector field in time directories;
   - `sigmaMax`  scalar field in time directories;
-  -  `sigmaMidDir`  vector field in time directories;
+  - `sigmaMidDir`  vector field in time directories;
   - `sigmaMid`  scalar field in time directories;
   - `sigmaDIff` field; difference between `sigmaMax` and `sigmaMin` fields.
 
-- __Tutorial case in which it is used:__  
-  None
+- **Tutorial case in which it is used:**  
+    None
 
 ---
 
 ## `solidDisplacements`
 
 - **Function object purpose**  
-  Reports the minimum and maximum values of displacement components together with the arithmetic average value of the displacement.
+    Reports the minimum and maximum values of displacement components together with the arithmetic average value of the displacement.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      patchDisplacements
-      {
-          type    solidDisplacements;
-          historyPatch     top;
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        patchDisplacements
+        {
+            type    solidDisplacements;
+            historyPatch     top;
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
+  ```note
+  The non-existing patch name will not stop the simulation.
+  ```
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidDisplacements<historyPatch>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time minX minY minZ maxX maxY maxZ avX avY avZ
-    1 1 1 1 3 4 5 1.2 2 4
-    2 1 1 1 3 3 2 1 3 5
-    ...
-    ```
+      ```c++
+      # Time minX minY minZ maxX maxY maxZ avX avY avZ
+      1 1 1 1 3 4 5 1.2 2 4
+      2 1 1 1 3 3 2 1 3 5
+      ...
+      ```
 
-- __Tutorial case in which it is used:__  
-  `solids/hyperelasticity/longWall`  
-  `solids/elastoplasticity/neckingBar`  
+- **Tutorial case in which it is used:**  
+    `solids/hyperelasticity/longWall`  
+    `solids/elastoplasticity/neckingBar`  
 
 ## `solidForces`
 
 - **Function object purpose**  
-  Reports the overall force $$\mathbf{f}$$  and normal force $$f_n$$ for specified patch:
-  
-  $$
-  \mathbf{f} = \sum_{N_f} \mathbf{n}_f \cdot \boldsymbol{\sigma}_f, \qquad {f}_n = \mathbf{f} \cdot \mathbf{n}_f,
-  $$
-  
-  where $$\mathbf{n}_f$$ is outward unit normal vector, $$\boldsymbol{\sigma}$$ is Cauchy stress and $$N_f$$ is number of faces on specified patch. Subscript $f$ is used to denote face centre value.  In the case of TL formulation, the current boundary unit normal vector $$\mathbf{n}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{n}_f$$.
+    Reports the overall force $$\mathbf{f}$$  and normal force $$f_n$$ for specified patch:
 
-- __Example of usage__
+    $$
+    \mathbf{f} = \sum_{N_f} \mathbf{n}_f \cdot \boldsymbol{\sigma}_f, \qquad {f}_n = \mathbf{f} \cdot \mathbf{n}_f,
+    $$
 
-  ```c++
-  functions
-  {
-      patchForce
-      {
-          type    solidForces;
-          historyPatch     top;
-      }
-  }
-  ```
+    where $$\mathbf{n}_f$$ is outward unit normal vector, $$\boldsymbol{\sigma}$$ is Cauchy stress and $$N_f$$ is number of faces on specified patch. Subscript $f$ is used to denote face centre value.  In the case of TL formulation, the current boundary unit normal vector $$\mathbf{n}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{n}_f$$.
 
-- __Arguments__
+- **Example of usage**
+
+    ```c++
+    functions
+    {
+        patchForce
+        {
+            type    solidForces;
+            historyPatch     top;
+        }
+    }
+    ```
+
+- **Arguments**
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
 
-- __Optional arguments__
+  ```note
+  The non-existing patch name will not stop the simulation.
+  ```
+
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidForces<historyPatch>.dat`;
 
   - Output file format:
 
-    ```c++
-    # Time forceX forceY forceZ normalForce
-    1 40 40 50 48
-    2 40 60 70 45
-    ...
-    ```
+      ```c++
+      # Time forceX forceY forceZ normalForce
+      1 40 40 50 48
+      2 40 60 70 45
+      ...
+      ```
 
-- __Tutorial case in which it is used:__  
-  `solids/linearElasticity/punch`   
-  `solids/linearElasticity/plateHole`   
-  `solids/elastoplasticity/pipeCrush`   
-  `solids/elastoplasticity/uniaxialTension`   
-  `solids/elastoplasticity/impactBar`    
-  `solids/elastoplasticity/simpleShear`   
-  `solids/elastoplasticity/perforatedPlate`   
-  `solids/elastoplasticity/cylinderCrush`   
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`   
-  `solids/hyperelasticity/plateHoleTotalLag`   
-  `solids/hyperelasticity/cylinderCrush`   
-  `fluidSolidInteraction/3dTube`    
-  `fluidSolidInteraction/3dTubeRobin`   
-  `fluidSolidInteraction-preCICE/3dTube`   
+- **Tutorial case in which it is used:**  
+    `solids/linearElasticity/punch`
+    `solids/linearElasticity/plateHole`
+    `solids/elastoplasticity/pipeCrush`
+    `solids/elastoplasticity/uniaxialTension`
+    `solids/elastoplasticity/impactBar`
+    `solids/elastoplasticity/simpleShear`
+    `solids/elastoplasticity/perforatedPlate`
+    `solids/elastoplasticity/cylinderCrush`
+    `solids/abaqusUMATs/plateHoleTotalDispUMAT`
+    `solids/hyperelasticity/plateHoleTotalLag`
+    `solids/hyperelasticity/cylinderCrush`
+    `fluidSolidInteraction/3dTube`
+    `fluidSolidInteraction/3dTubeRobin`
+    `fluidSolidInteraction-preCICE/3dTube`
 
 ## `solidForcesDisplacements`
 
 - **Function object purpose**  
-  Reports the overall force $$f$$ vs arithmetic average displacement $$\bar{\mathbf{u}}$$ for specified patch:
-  
-  $$
-  \mathbf{f} = \sum_{N_f} \mathbf{n}_f \cdot \boldsymbol{\sigma}_f,
-  $$
+    Reports the overall force $$f$$ vs arithmetic average displacement $$\bar{\mathbf{u}}$$ for specified patch:
 
-  $$
-  \bar{\mathbf{u}} = \frac{1}{N_f} \left( \sum_{N_f} \mathbf{u}_f \right),
-  $$
+    $$
+    \mathbf{f} = \sum_{N_f} \mathbf{n}_f \cdot \boldsymbol{\sigma}_f,
+    $$
 
-  where $$\mathbf{n}_f$$ is outward unit normal vector, $$\boldsymbol{\sigma}$$ is Cauchy stress, $\mathbf{u}$ is displacement vector and $$N_f$$ is number of faces on specified patch. Subscript $$f$$ is used to denote face centre value.  In the case of TL formulation, the current boundary unit normal vector $$\mathbf{n}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{n}_f$$.
+    $$
+    \bar{\mathbf{u}} = \frac{1}{N_f} \left( \sum_{N_f} \mathbf{u}_f \right),
+    $$
 
-- __Example of usage__
+    where $$\mathbf{n}_f$$ is outward unit normal vector, $$\boldsymbol{\sigma}$$ is Cauchy stress, $\mathbf{u}$ is displacement vector and $$N_f$$ is number of faces on specified patch. Subscript $$f$$ is used to denote face centre value.  In the case of TL formulation, the current boundary unit normal vector $$\mathbf{n}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{n}_f$$.
 
-  ```c++
-  functions
-  {
-      patchForceDisplacements
-      {
-          type    solidForcesDisplacements;
-          historyPatch     top;
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        patchForceDisplacements
+        {
+            type    solidForcesDisplacements;
+            historyPatch     top;
+        }
+    }
+    ```
+
+- **Arguments**
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
 
-- __Optional arguments__
+  ```note
+  The non-existing patch name will not stop the simulation.
+  ```
+
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidForcesDisplacements<historyPatch>.dat`;
 
   - Output file format:
 
-    ```c++
-    # Time dispX dispY dispZ forceX forceY forceZ
-    1 0.1 0.1 0.1 40 40 50
-    2 0.1 0.2 0.2 40 60 70
-    ...
-    ```
+      ```c++
+      # Time dispX dispY dispZ forceX forceY forceZ
+      1 0.1 0.1 0.1 40 40 50
+      2 0.1 0.2 0.2 40 60 70
+      ...
+      ```
 
-- __Tutorial case in which it is used:__  
-  `solids/linearElasticity/punch`  
-  `solids/linearElasticity/plateHole`  
-  `solids/elastoplasticity/pipeCrush`  
-  `solids/elastoplasticity/perforatedPlate`  
-  `solids/elastoplasticity/cylinderCrush`  
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
-  `solids/hyperelasticity/plateHoleTotalLag`  
+- **Tutorial case in which it is used:**  
+    `solids/linearElasticity/punch`  
+    `solids/linearElasticity/plateHole`  
+    `solids/elastoplasticity/pipeCrush`  
+    `solids/elastoplasticity/perforatedPlate`  
+    `solids/elastoplasticity/cylinderCrush`  
+    `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
+    `solids/hyperelasticity/plateHoleTotalLag`  
 
 ---
 
 ## `solidKineticEnergy`
 
 - **Function object purpose**  
-  Reports the kinetic energy $E_k$ of a solid:
-  
-  $$
-  E_k = \displaystyle{\frac{1}{2} \sum_{N_P} \rho_P \;( \mathbf{v}_P \cdot \mathbf{v}_P) \; V_p},
-  $$
-  
-  where $$\rho$$ is density, $$\mathbf{v}$$ is velocity, $$N_P$$ is number of cells and $$V$$ is volume. Subscript $$P$$ is used to denote cell centre value.
+    Reports the kinetic energy $E_k$ of a solid:
 
-- __Example of usage__
+    $$
+    E_k = \displaystyle{\frac{1}{2} \sum_{N_P} \rho_P \;( \mathbf{v}_P \cdot \mathbf{v}_P) \; V_p},
+    $$
 
-  ```c++
-  functions
-  {
-      kineticEnergy
-      {
-          type    solidKineticEnergy;
-      }
-  }
-  ```
+    where $$\rho$$ is density, $$\mathbf{v}$$ is velocity, $$N_P$$ is number of cells and $$V$$ is volume. Subscript $$P$$ is used to denote cell centre value.
 
-- __Arguments__
+- **Example of usage**
 
-  -  None.
+    ```c++
+    functions
+    {
+        kineticEnergy
+        {
+            type    solidKineticEnergy;
+        }
+    }
+    ```
 
-- __Optional arguments__
+- **Arguments**
 
   - None.
 
-- __Outputs__
+- **Optional arguments**
+
+  - None.
+
+- **Outputs**
 
   - Output file: `postProcessing/0/solidKineticEnergy.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time kineticEnergy
-    1 0.10
-    2 0.11
-    ...
-    ```
+      ```c++
+      # Time kineticEnergy
+      1 0.10
+      2 0.11
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `None`
+- **Tutorial case in which it is used:**
+    `None`
 
 ---
 
 ## `solidPointDisplacement`
 
 - **Function object purpose**  
-  Reports displacement vector value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The displacement field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
+    Reports displacement vector value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The displacement field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
 
-- __Example of usage__
-  ```c++
-  functions
-  {
-      pointDisp
-      {
-          type    solidPointDisplacement;
-          point   (105e-6 50e-6 0);
-          // Optional
-          region  "solid";
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        pointDisp
+        {
+            type    solidPointDisplacement;
+            point   (105e-6 50e-6 0);
+            // Optional
+            region  "solid";
+        }
+    }
+    ```
 
-  -  `point`  - monitoring point vector.
+- **Arguments**
 
-- __Optional arguments__
+  - `point`  - monitoring point vector.
+
+- **Optional arguments**
 
   - `region` name;  in the case of structural analysis, the default value is set to `solid` otherwise it is `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidPointDisplacement_<functionObjectName>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time Dx Dy Dz magD
-    1 0.10 0.20 0.10 0.24494897
-    2 0.11 0.20 0.22 0.26551836
-    ...
-    ```
+      ```c++
+      # Time Dx Dy Dz magD
+      1 0.10 0.20 0.10 0.24494897
+      2 0.11 0.20 0.22 0.26551836
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `solids/hyperelasticity/cylinderCrush`  
-  `solids/hyperelasticity/cylindricalPressureVessel`   
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
-  `solids/elastoplasticity/perforatedPlate`  
-  `solids/elastoplasticity/cooksMembrane`  
-  `solids/viscoelasticity/viscoTube`  
-  `solids/linearElasticity/cooksMembrane`  
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
-  `solids/linearElasticity/wobblyNewton`
-  `solids/linearElasticity/plateHole`    
-  `fluidSolidInteraction/beamInCrossFlow`
-  `fluidSolidInteraction/HronTurekFsi3`  
-  `fluidSolidInteraction/3dTubeRobin`  
+- **Tutorial case in which it is used:**
+    `solids/hyperelasticity/cylinderCrush`  
+    `solids/hyperelasticity/cylindricalPressureVessel`
+    `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
+    `solids/elastoplasticity/perforatedPlate`  
+    `solids/elastoplasticity/cooksMembrane`  
+    `solids/viscoelasticity/viscoTube`  
+    `solids/linearElasticity/cooksMembrane`  
+    `solids/abaqusUMATs/plateHoleTotalDispUMAT`  
+    `solids/linearElasticity/wobblyNewton`
+    `solids/linearElasticity/plateHole`
+    `fluidSolidInteraction/beamInCrossFlow`
+    `fluidSolidInteraction/HronTurekFsi3`  
+    `fluidSolidInteraction/3dTubeRobin`  
 
 ---
 
 ## `solidPointDisplacementAlongLine`
 
 - **Function object purpose**  
-  Reports  reports displacement value along a line specified by the user. The displacement field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
+    Reports  reports displacement value along a line specified by the user. The displacement field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      pointStress
-      {
-          type    solidPointDisplacementAlongLine;
-          startPoint   (0 0 0);
-          endPoint	 (2 0 0);
-  
-          // Optional
-          minDist  1e-5;
-          region  "solid";
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        pointStress
+        {
+            type    solidPointDisplacementAlongLine;
+            startPoint   (0 0 0);
+            endPoint  (2 0 0);
+    
+            // Optional
+            minDist  1e-5;
+            region  "solid";
+        }
+    }
+    ```
 
 ```warning
 This function object is currently only implemented for serial run!
 ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `startPoint`  line start point;
-  -  `endPoint`  line end point.
+  - `startPoint`  line start point;
+  - `endPoint`  line end point.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `minDist` maximum distance at which mesh point will be included in line plot;
   - `region` name;  in the case of structural analysis, the default value is set to `solid` otherwise it is `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidPointDisplacementAlongLine<functionObjectName>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # PointID PointCoord Dx Dy Dz mag
-    152 (0.2 0.3 0.5) 0.1 0.2 0.1 0.2449
-    258 (0.4 0.3 0.5) 0.1 0.2 0.2 0.3
-    ...
-    ```
+      ```c++
+      # PointID PointCoord Dx Dy Dz mag
+      152 (0.2 0.3 0.5) 0.1 0.2 0.1 0.2449
+      258 (0.4 0.3 0.5) 0.1 0.2 0.2 0.3
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  None.  
+- **Tutorial case in which it is used:**
+    None.  
 
 ## `solidPointStress`
 
 - **Function object purpose**  
-  Reports stress value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The stress field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
+    Reports stress value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The stress field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      pointStress
-      {
-          type    solidPointStress;
-          point   (0.0075 0 0);
-          // Optional
-          region  "solid";
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        pointStress
+        {
+            type    solidPointStress;
+            point   (0.0075 0 0);
+            // Optional
+            region  "solid";
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `point`  - monitoring point vector.
+  - `point`  - monitoring point vector.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `region` name;  in the case of structural analysis, the default value is set to `solid` otherwise it is `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidPointStress_<functionObjectName>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time XX XY XZ YY YZ ZZ
-    1 1e6 1e6 1e6 1e6 2e6 3e6 
-    2 1e6 3e6 2e6 2e6 2e6 3e6
-    ...
-    ```
+      ```c++
+      # Time XX XY XZ YY YZ ZZ
+      1 1e6 1e6 1e6 1e6 2e6 3e6 
+      2 1e6 3e6 2e6 2e6 2e6 3e6
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `solids/viscoelasticity/viscoTube`  
+- **Tutorial case in which it is used:**
+    `solids/viscoelasticity/viscoTube`  
 
 ---
 
 ## `solidPointTemperature`
 
 - **Function object purpose**  
-  Reports temperature value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The temperature field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
+    Reports temperature value at closest mesh point to the specified point. The closest mesh point is determined using Euclidean distance. The temperature field (defined at cell centres) is interpolated to mesh points using the least squares interpolation.
 
-- __Example of usage__
+- **Example of usage**
 
-  ```c++
-  functions
-  {
-      pointTemp
-      {
-          type    solidPointTemperature;
-          point   (105e-6 50e-6 0);
-          // Optional
-          region  "solid";
-      }
-  }
-  ```
+    ```c++
+    functions
+    {
+        pointTemp
+        {
+            type    solidPointTemperature;
+            point   (105e-6 50e-6 0);
+            // Optional
+            region  "solid";
+        }
+    }
+    ```
 
-- __Arguments__
+- **Arguments**
 
-  -  `point`  - monitoring point vector.
+  - `point`  - monitoring point vector.
 
-- __Optional arguments__
+- **Optional arguments**
 
   - `region` name;  in the case of structural analysis, the default value is set to `solid` otherwise it is `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/solidPointTemperature_<functionObjectName>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time value
-    1 225
-    2 226
-    ...
-    ```
+      ```c++
+      # Time value
+      1 225
+      2 226
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `None`  
+- **Tutorial case in which it is used:**
+    `None`  
 
 ---
 
 ## `solidPotentialEnergy`
 
 - **Function object purpose**  
-  Reports the potential energy of a solid:
-  
-  $$
-  h_P = \frac{\mathbf{g}}{|\mathbf{g}|} \cdot (\mathbf{r}_P+\mathbf{u}_P-\mathbf{r}_{ref}),
-  $$
+    Reports the potential energy of a solid:
 
-  $$
-  E_p = \sum_{N_P} \rho_P \: |\mathbf{g}| \: h_P V_P ,
-  $$
+    $$
+    h_P = \frac{\mathbf{g}}{|\mathbf{g}|} \cdot (\mathbf{r}_P+\mathbf{u}_P-\mathbf{r}_{ref}),
+    $$
 
-  where $$\rho$$ is density, $$\mathbf{u}$$ is displacement, $$N_P$$ is number of cells, $$g$$ is gravity, $$V$$ is volume, $$\mathbf{r}_{ref}$$ is reference point with zero potential energy  and $$\mathbf{r}_P$$ is positional vector of cell centroid. Subscript $$P$$ is used to denote cell centre value.
+    $$
+    E_p = \sum_{N_P} \rho_P \: |\mathbf{g}| \: h_P V_P ,
+    $$
 
-- __Example of usage__
+    where $$\rho$$ is density, $$\mathbf{u}$$ is displacement, $$N_P$$ is number of cells, $$g$$ is gravity, $$V$$ is volume, $$\mathbf{r}_{ref}$$ is reference point with zero potential energy  and $$\mathbf{r}_P$$ is positional vector of cell centroid. Subscript $$P$$ is used to denote cell centre value.
 
-  ```c++
-  functions
-  {
-      potentialEnergy
-      {
-          type    solidPotentialEnergy;
-          referencePoint   (10 50 0);
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        potentialEnergy
+        {
+            type    solidPotentialEnergy;
+            referencePoint   (10 50 0);
+        }
+    }
+    ```
+
+- **Arguments**
 
   - `referencePoint` is a coordinate at which the potential energy is zero.
 
-    ```note
-    The value for the uniform gravity field $g$ is specified at `constant/g`!
-    ```
+  ```note
+  The value for the uniform gravity field $g$ is specified at `constant/g`!
+  ```
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidPotentialEnergy.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time potentialEnergy
-    1 500
-    2 520
-    ...
-    ```
+      ```c++
+      # Time potentialEnergy
+      1 500
+      2 520
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `None`
+- **Tutorial case in which it is used:**
+    `None`
 
 ```warning
 `solidPotentialEnergy` is currently implemented only for linear geometry solid models!
@@ -1028,90 +1031,90 @@ This function object is currently only implemented for serial run!
 ## `solidStresses`
 
 - **Function object purpose**  
-  Reports the arithmetic average stress on the patch of a solid:
-  
-  $$
-  \bar{\boldsymbol{\sigma}} = \frac{1}{N_f} \left( \sum_{N_f} \boldsymbol{\sigma}_f \right)
-  $$
-  
-  where subscript $$f$$ is used to denote patch face centre value,  $$\boldsymbol{\sigma}$$ is Cauchy stress tensor and $$N_f$$ is overall number of patch faces
+    Reports the arithmetic average stress on the patch of a solid:
 
-- __Example of usage__
+    $$
+    \bar{\boldsymbol{\sigma}} = \frac{1}{N_f} \left( \sum_{N_f} \boldsymbol{\sigma}_f \right)
+    $$
 
-  ```c++
-  functions
-  {
-      topStress
-      {
-         type         solidStresses;
-         historyPatch top;
-      }
-  }
-  ```
+    where subscript $$f$$ is used to denote patch face centre value,  $$\boldsymbol{\sigma}$$ is Cauchy stress tensor and $$N_f$$ is overall number of patch faces
 
-- __Arguments__
+- **Example of usage**
+
+    ```c++
+    functions
+    {
+        topStress
+        {
+           type         solidStresses;
+           historyPatch top;
+        }
+    }
+    ```
+
+- **Arguments**
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
+  ```note
+  The non-existing patch name will not stop the simulation.
+  ```
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidStresses<historyPatch>.dat` ;
 
   - Output file format:
 
-    ```c++
-    # Time XX XY XZ YY YZ ZZ
-    1 1e6 1e6 1e6 1e6 2e6 3e6 
-    2 1e6 3e6 2e6 2e6 2e6 3e6
-    ...
-    ```
+      ```c++
+      # Time XX XY XZ YY YZ ZZ
+      1 1e6 1e6 1e6 1e6 2e6 3e6 
+      2 1e6 3e6 2e6 2e6 2e6 3e6
+      ...
+      ```
 
-- __Tutorial case in which it is used:__    
-  `solids/elastoplasticity/cylinderExpansion`
-  `solids/hyperelasticity/longWall`
+- **Tutorial case in which it is used:**
+    `solids/elastoplasticity/cylinderExpansion`
+    `solids/hyperelasticity/longWall`
 
 ---
 
 ## `solidTorque`
 
 - **Function object purpose**  
-  Reports torque on the specified patch about the given axis:
-  
-  $$
-  \mathbf{r}_m = (\mathbf{r}_f - \mathbf{r}_{pa}) - \mathbf{a}(\mathbf{a} \cdot (\mathbf{r}_f - \mathbf{r}_{pa})),
-  $$
+    Reports torque on the specified patch about the given axis:
 
-  $$
-  \text{Torque} = \sum_{N_f} \mathbf{a} \cdot (\mathbf{r}_m \times (\mathbf{S}_f \cdot \boldsymbol{\sigma})),
-  $$
+    $$
+    \mathbf{r}_m = (\mathbf{r}_f - \mathbf{r}_{pa}) - \mathbf{a}(\mathbf{a} \cdot (\mathbf{r}_f - \mathbf{r}_{pa})),
+    $$
 
-  where $$\mathbf{r}_{pa}$$ is point on axis, $$\mathbf{a}$$ is axis direction, $$\mathbf{r}_f$$ is face centre vector, $$\mathbf{S}_f$$ boundary face area vector, $$\boldsymbol{\sigma}_f$$ Cauchy stress vector and $$N_f$$ number of boundary patch faces. In the case of TL formulation, the current boundary face area vector $$\mathbf{S}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{S}_f$$.
+    $$
+    \text{Torque} = \sum_{N_f} \mathbf{a} \cdot (\mathbf{r}_m \times (\mathbf{S}_f \cdot \boldsymbol{\sigma})),
+    $$
 
-- __Example of usage__
+    where $$\mathbf{r}_{pa}$$ is point on axis, $$\mathbf{a}$$ is axis direction, $$\mathbf{r}_f$$ is face centre vector, $$\mathbf{S}_f$$ boundary face area vector, $$\boldsymbol{\sigma}_f$$ Cauchy stress vector and $$N_f$$ number of boundary patch faces. In the case of TL formulation, the current boundary face area vector $$\mathbf{S}_f$$ is calculated using total deformation gradient and its Jacobian $$J \: \mathbf{F}_{inv}^T \cdot \mathbf{S}_f$$.
 
-  ```c++
-  functions
-  {
-      patchTorque
-      {
-          type    solidTorque;
-          
-          historyPatch     right;
-          pointOnAxis      (0 0 0);
-          axisDirection    (0 0 1);
-      }
-  }
-  ```
-  
-- __Arguments__
+- **Example of usage**
+
+    ```c++
+    functions
+    {
+        patchTorque
+        {
+            type    solidTorque;
+            
+            historyPatch     right;
+            pointOnAxis      (0 0 0);
+            axisDirection    (0 0 1);
+        }
+    }
+    ```
+
+- **Arguments**
 
   - `pointOnAxis` - point on axis;
 
@@ -1119,181 +1122,275 @@ This function object is currently only implemented for serial run!
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
+      ```note
+      The non-existing patch name will not stop the simulation.
+      ```
 
-- __Optional arguments__
+- **Optional arguments**
 
   - None
 
-- __Outputs__
+- **Outputs**
 
   - Output file: `postProcessing/0/solidTorque<historyPatch>.dat` ;
 
   - Output file format:
-    ```c++
-    # Time torqueX torqueY torqueZ
-    1 10 12 13
-    2 12 13 13
-    ...
-    ```
 
-- __Tutorial case in which it is used:__  
-  `None`
+      ```c++
+      # Time torqueX torqueY torqueZ
+      1 10 12 13
+      2 12 13 13
+      ...
+      ```
+
+- **Tutorial case in which it is used:**  
+    `None`
 
 ---
+
+## `sphericalCavityAnalyticalSolution`
+
+- **Function object purpose**  
+    To generate the analytical solution fields for the "sphericalCavity" case.  
+
+    The analytical expressions for the stress distributions around the cavity, first derived by [Southwell and Gough](https://www.tandfonline.com/doi/abs/10.1080/14786442608633614):
+
+    $$
+    \sigma_{rr} =
+    \frac{T}{14 - 10\nu} \frac{a^3}{R^3}
+    \left[ 9 - 15\nu - 12 \frac{a^2}{R^2}  - \frac{r^2}{R^2} \left( 72 - 15\nu - 105 \frac{a^2}{R^2} \right) + 15 \frac{r^4}{R^4} \left( 5 - 7 \frac{a^2}{R^2} \right) \right],
+    $$
+
+    $$
+    \sigma_{\theta\theta} =
+    \frac{T}{14 - 10\nu} \frac{a^3}{R^3}
+    \left[ 9 - 15\nu - 12 \frac{a^2}{R^2}  - 15 \frac{r^2}{R^2} \left( 1 - 2\nu - \frac{a^2}{R^2} \right) \right],
+    $$
+
+    $$
+    \sigma_{zz} =
+    T \left[ 1 - \frac{1}{14 - 10\nu} \frac{a^3}{R^3} \left\{ 38 - 10\nu - 24 \frac{a^2}{R^2}
+    - \frac{r^2}{R^2} \left( 117 - 15\nu - 120 \frac{a^2}{R^2} \right)
+    + 15 \frac{r^4}{R^4} \left( 5 - 7 \frac{a^2}{R^2} \right) \right\} \right],
+    $$
+
+    $$
+    \sigma_{zr} =
+    \frac{T}{14 - 10\nu} \frac{a^3 z r}{R^5}
+    \left[ -3(19 - 5\nu) + 60 \frac{a^2}{R^2} + 15 \frac{r^2}{R^2} \left( 5 - 7 \frac{a^2}{R^2} \right)  \right].
+    $$
+
+    where $a$ is the hole radius, $T$ is the distant stress applied in the $z$ direction, $\nu$ is the Poisson's ratio, $r^2 = x^2 + y^2$ is the cylinderical radial coordinate, $R^2 = r^2 + z^2$ is the spherical radial coodinate, and $x$, $y$, $z$ are the Cartesian coordinates.
+
+    The displacement distributions were later derived by [Goodier](https://asmedigitalcollection.asme.org/appliedmechanics/article-abstract/1/2/39/1112122/Concentration-of-Stress-Around-Spherical-and?redirectedFrom=fulltext):
+    $$
+    u_r = -\frac{A}{r^2} - \frac{3B}{r^4} + \left[ \frac{5-4\nu}{1-2\nu} \frac{C}{r^2}-9\frac{B}{r^4} \right]\cos (2\theta),
+    $$
+
+    $$
+    \\
+    u_{\theta} = - \left[ \frac{2C}{r^2} + 6\frac{B}{r^4}  \right]\sin(2\theta),
+    $$
+
+    where the constants $A$, $B$ and $C$ are defined as follows:
+    $$
+    \frac{A}{a^3} = -\frac{T}{8\mu}\frac{13-10\nu}{7-5\nu}, \qquad
+    \frac{B}{a^5} = -\frac{T}{8\mu}\frac{1}{7-5\nu}, \qquad
+    \frac{C}{a^3} = -\frac{T}{8\mu}\frac{5(1-2\nu)}{7-5\nu}.
+    $$
+    and $\mu$ is the shear modulus.
+
+- **Example of usage**
+
+    ```c++
+    functions
+    {
+        cavityAnalytical
+        {
+            type sphericalCavityAnalyticalSolution;
+            
+            farFieldTractionZ 1e6;
+            cavityRadius 0.2;
+            E 200e9;
+            nu 0.3;
+    
+            // Optional
+            cellDisplacement yes;
+            pointDisplacement no;
+            cellStress yes;
+            pointStress no;
+        }
+    }
+    ```
+
+- **Arguments**
+
+  - `cavityRadius` radius of the cavity centred on the origin;
+  - `farFieldTractionZ`  far-field traction in the $z$ direction;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
+
+- **Optional arguments**
+
+  - `cellDisplacement`   write analytical solution for cell-centred displacement field; default is true;
+  - `pointDisplacement`   write analytical solution for vertex-centred displacement field; default is true;
+  - `cellStress`    write analytical solution for cell-centred stress field; default is true;
+  - `pointStress`  write analytical solution for vertex-centred stress field; default is true;
+
+- **Outputs**
+
+  - Analytical solution for stress tensor `analyticalCellStress`, equivalnet stress `analyticalCellStressEq` and displacement  field `analyticalD`, written in time directories;
+  - Difference in displacement field `DDifference` and stress field `cellStressDifference,` written in time directories.
+
+- **Tutorial case in which it is used:**  
+    `solids/linearElasticity/sphericalCavity`
 
 ## `solidTractions`
 
 - **Function object purpose**  
-  Writes boundary traction as a vector field:
-  
-  $$
-  \text{Updated Lagrangian (UL):} \qquad \mathbf{t}_b =  \mathbf{n}_b \cdot \boldsymbol{\sigma}
-  $$
+    Writes boundary traction as a vector field:
 
-  $$
-  \text{Total Lagrangian (TL):} \qquad \mathbf{t}_b =  \frac{\textbf{F}_{inv}^T \cdot \textbf{n}_b}{|\textbf{F}_{inv}^T \cdot \textbf{n}_b|} \cdot \boldsymbol{\sigma}
-  $$
+    $$
+    \text{Updated Lagrangian (UL):} \qquad \mathbf{t}_b =  \mathbf{n}_b \cdot \boldsymbol{\sigma}
+    $$
 
-  $$
-  \text{Small strain approach:} \qquad \mathbf{t}_b =  \mathbf{n}_b \cdot \boldsymbol{\sigma}
-  $$
+    $$
+    \text{Total Lagrangian (TL):} \qquad \mathbf{t}_b =  \frac{\textbf{F}_{inv}^T \cdot \textbf{n}_b}{|\textbf{F}_{inv}^T \cdot \textbf{n}_b|} \cdot \boldsymbol{\sigma}
+    $$
 
-  where $$\boldsymbol{\sigma}$$ is Cauchy stress tensor, $$\mathbf{n}_b$$ boundary outward unit vector and $$\mathbf{F}_{inv}$$ inverse of total deformation gradient. Note that in case of UL formulation boundary normal $$\mathbf{n}_b$$ is in current configuration while in the case of TL approach it is in initial configuration.
+    $$
+    \text{Small strain approach:} \qquad \mathbf{t}_b =  \mathbf{n}_b \cdot \boldsymbol{\sigma}
+    $$
 
-- __Example of usage__
+    where $$\boldsymbol{\sigma}$$ is Cauchy stress tensor, $$\mathbf{n}_b$$ boundary outward unit vector and $$\mathbf{F}_{inv}$$ inverse of total deformation gradient. Note that in case of UL formulation boundary normal $$\mathbf{n}_b$$ is in current configuration while in the case of TL approach it is in initial configuration.
 
-  ```c++
-  functions
-  {
-      patchTractions
-      {
-          type    solidTractions;
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        patchTractions
+        {
+            type    solidTractions;
+        }
+    }
+    ```
 
-  -  None.
-
-- __Optional arguments__
+- **Arguments**
 
   - None.
 
-- __Outputs__
+- **Optional arguments**
+
+  - None.
+
+- **Outputs**
 
   - Vector field `traction` in time directories;
 
-- __Tutorial case in which it is used:__  
-  `None`
+- **Tutorial case in which it is used:**  
+    `None`
 
 ---
 
 ## `stressTriaxiality`
 
 - **Function object purpose**  
-  Outputs the stress triaxiality field (mean i.e. hydrostatic stress divided by equivalent stress):
-  
-  $$
-  \sigma_h=  -\frac{1}{3}\text{tr}( \mathbf{\boldsymbol{\sigma}}).
-  $$
+    Outputs the stress triaxiality field (mean i.e. hydrostatic stress divided by equivalent stress):
 
-  $$
-  T.F. = \frac{-\sigma_h}{\sigma_{eq}}
-  $$
+    $$
+    \sigma_h=  -\frac{1}{3}\text{tr}( \mathbf{\boldsymbol{\sigma}}).
+    $$
 
-  where $$T.F$$ is triaxiality factor, $$\boldsymbol{\sigma}$$ is Cauchy stress and $$\mathbf{\sigma}_{eq}$$ is Von Mises equivalent stress.
+    $$
+    T.F. = \frac{-\sigma_h}{\sigma_{eq}}
+    $$
 
-- __Example of usage__
+    where $$T.F$$ is triaxiality factor, $$\boldsymbol{\sigma}$$ is Cauchy stress and $$\mathbf{\sigma}_{eq}$$ is Von Mises equivalent stress.
 
-  ```c++
-  functions
-  {
-      triaxility
-      {
-          type    stressTriaxility;
-          // Optional
-          region  "region0";
-      }
-  }
-  ```
+- **Example of usage**
 
-- __Arguments__
+    ```c++
+    functions
+    {
+        triaxility
+        {
+            type    stressTriaxility;
+            // Optional
+            region  "region0";
+        }
+    }
+    ```
 
-  -  None.
+- **Arguments**
 
-- __Optional arguments__
+  - None.
+
+- **Optional arguments**
 
   - `region` name;  the default value is set to `region0`.
 
-- __Outputs__
+- **Outputs**
 
   - Scalar field `stressTriaxiality` in time directories;
 
   - Log at the end of each time-step:
 
-    ```
-    Stress triaxiality: min = 0.2, max = 0.4
-    ```
+      ```plaintext
+      Stress triaxiality: min = 0.2, max = 0.4
+      ```
 
-- __Tutorial case in which it is used:__    
-  `None`
+- **Tutorial case in which it is used:**
+    `None`
 
 ---
 
 ## `transformStressToCylindrical`
 
 - **Function object purpose**  
-  Transform stress tensor to cylindrical coordinate system:
-  $$
-  \sigma_{transformed} =   \mathbf{R} \cdot \sigma \cdot \mathbf{R}^{T},
-  $$
+    Transform stress tensor to cylindrical coordinate system:
+    $$
+    \sigma_{transformed} =   \mathbf{R} \cdot \sigma \cdot \mathbf{R}^{T},
+    $$
 
-  
+    where $$\mathbf{R}$$ is rotation tensor.
 
-  where $$\mathbf{R}$$ is rotation tensor.
+- **Example of usage**
 
-- __Example of usage__
+    ```c++
+    functions
+    {
+        transformStressToCylindrical
+        {
+            type        transformStressToCylindrical;
+    
+            origin      (0 0 0);
+            axis        (0 0 1);
+        }
+    }
+    ```
 
-  ```c++
-  functions
-  {
-      transformStressToCylindrical
-      {
-          type        transformStressToCylindrical;
-  
-          origin      (0 0 0);
-          axis        (0 0 1);
-      }
-  }
-  ```
+- **Arguments**
 
-- __Arguments__
+  - `origin` - origin point;
+  - `axis` - axis vector, does not require to be normalised;
 
-  -  `origin` - origin point;
-  -  `axis` - axis vector, does not require to be normalised;
-
-- __Optional arguments__
+- **Optional arguments**
 
   - None.
 
-- __Outputs__
+- **Outputs**
 
   - Transformed sigma stress field named  `sigma:Transformed` in time directories;
+  $$
+    \boldsymbol{\sigma}  = \left[\begin{array}{ccc}\sigma_{xx} & \sigma_{xy} & \sigma_{xz} \\  & \sigma_{yy} & \sigma_{yx} \\  &  & \sigma_{zz}\end{array}\right]\equiv\left[\begin{array}{ccc}\sigma_{R R} & \sigma_{R \theta} & \sigma_{R \phi} \\  & \sigma_{\theta \theta} & \sigma_{\theta \phi} \\  &  & \sigma_{\phi \phi}\end{array}\right]
+  $$
 
-    When visualizing in Paraview, keep in mind that the stress components in the cylindrical coordinate system will have the same names as the ones from the Cartesian coordinate system.
+  ```note
+  When visualizing in Paraview, keep in mind that the stress components in the cylindrical coordinate system will have the same names as the ones from the Cartesian coordinate system.
+  ```
 
-    $$\boldsymbol{\sigma}  = \left[\begin{array}{ccc}\sigma_{xx} & \sigma_{xy} & \sigma_{xz} \\  & \sigma_{yy} & \sigma_{yx} \\  &  & \sigma_{zz}\end{array}\right]\equiv\left[\begin{array}{ccc}\sigma_{R R} & \sigma_{R \theta} & \sigma_{R \phi} \\  & \sigma_{\theta \theta} & \sigma_{\theta \phi} \\  &  & \sigma_{\phi \phi}\end{array}\right]$$
-
-    
-
-- __Tutorial case in which it is used:__    
-  `solids/linearElasticity/pressurisedCylinder`    
-  `solids/thermoelasticity/hotCylinder/hotCylinder`  
-  `solids/multiMaterial/layeredPipe`    
-
----
-
+- **Tutorial case in which it is used:**
+    `solids/linearElasticity/pressurisedCylinder`
+    `solids/thermoelasticity/hotCylinder/hotCylinder`  
+    `solids/multiMaterial/layeredPipe`
