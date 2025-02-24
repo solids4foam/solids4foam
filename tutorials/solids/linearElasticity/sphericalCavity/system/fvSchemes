@@ -42,8 +42,7 @@ divSchemes
 
 laplacianSchemes
 {
-    //default                 Gauss linear corrected;
-    default                 Gauss linear skewCorrected;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
