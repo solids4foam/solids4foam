@@ -227,7 +227,7 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
         // Set the block size: this corresponds to the row size for a
         // rectangular matrix
         CHKERRQ(MatSetBlockSizes(jac, fluidBlockSize, solidBlockSize));
-        
+
         // Number of blocks: number of faces at the interface
         const label blockn = interfaceMap.zoneBToZoneAFaceMap().size();
 
@@ -280,7 +280,7 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
         // Set the block size: this corresponds to the row size for a
         // rectangular matrix
         CHKERRQ(MatSetBlockSizes(jac, solidBlockSize, fluidBlockSize));
-        
+
         // Number of blocks: number of faces at the interface
         const label blockn = interfaceMap.zoneAToZoneBFaceMap().size();
 
@@ -336,15 +336,115 @@ label newtonCouplingInterface::formResidual
     const PetscScalar *x
 )
 {
-    // TODO
-    WarningInFunction
-        << "I need to map the traction from the fluid to the solid!"
-        << endl;
-    // notImplemented("I need to map the traction from the fluid to the solid");
+    // Approach
+    // 1. Update the fluid velocity and pressure fields and calculate the
+    //     traction at the fluid interface
+    // 2. Map the fluid interface traction to the solid interface
+    // 3. Update the solid residual, which now has the correct interface
+    //    traction
+    // 4. Map the solid interface velocity to the fluid interface
+    // 5. Update the fluid residual, which now has the correct interface
+    //    velocity
+
+    // Block sizes
+    const label fluidBlockSize = fluid().twoD() ? 3 : 4;
+    // const label solidBlockSize = solid().twoD() ? 2 : 3;
+
+    // Currently limited to one interface: it should be straight-forward to add
+    // a loop over multiple interface => todo
+    if (fluidSolidInterface::fluidPatchIndices().size() != 1)
+    {
+        FatalError
+            << "Only one interface patch is currently allowed"
+            << abort(FatalError);
+    }
+
+    // 1. Update the fluid velocity and pressure fields and calculate the
+    //     traction at the fluid interface
+    {
+        // Take references
+        volVectorField& U = fluid().U();
+        volScalarField& p = fluid().p();
+
+        // Retrieve the solution
+        // Map the PETSc solution to the U field
+        foamPetscSnesHelper::ExtractFieldComponents<vector>
+        (
+            x,
+            U.primitiveFieldRef(),
+            0, // Location of U
+            fluidBlockSize,
+            fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
+        );
+
+        U.correctBoundaryConditions();
+
+        // Map the PETSc solution to the p field
+        // p is located in the final component
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x,
+            p.primitiveFieldRef(),
+            fluidBlockSize - 1, // Location of p component
+            fluidBlockSize
+        );
+
+        p.correctBoundaryConditions();
+
+        // Fluid interface traction
+        const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+        const vectorField fluidNf(fluidMesh().boundary()[fluidPatchID].nf());
+        const vectorField fluidTraction
+        (
+            fluid().patchViscousForce(fluidPatchID)
+          - fluid().patchPressureForce(fluidPatchID)*fluidNf
+        );
+
+        // Lookup the interface map from the fluid faces to the solid faces
+        const interfaceToInterfaceMappings::
+            directMapInterfaceToInterfaceMapping& interfaceMap =
+            refCast
+            <
+                const interfaceToInterfaceMappings::
+                directMapInterfaceToInterfaceMapping
+            >
+            (
+                interfaceToInterfaceList()[0]
+            );
+
+        // The face map gives the solid face ID for each fluid face
+        const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+
+        // Calculate the solid interface traction
+        // Flip the sign as the solid normals point in the opposite direction to
+        // the fluid normals
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        vectorField solidTraction(solidMesh().boundary()[solidPatchID].size());
+        forAll(fluidTraction, fluidFaceI)
+        {
+            solidTraction[fluidFaceMap[fluidFaceI]] =
+                -fluidTraction[fluidFaceI];
+        }
+
+        // Lookup the displacement interface traction patch and set the traction
+        fvPatchVectorField& solidPatchD =
+            solid().D().boundaryFieldRef()[solidPatchID];
+        if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
+        {
+            FatalErrorInFunction
+                << "The solidinterface patch must be of type 'solidTraction'"
+                << abort(FatalError);
+        }
+
+        solidTractionFvPatchVectorField& solidTractionPatch =
+            refCast<solidTractionFvPatchVectorField>(solidPatchD);
+
+        solidTractionPatch.traction() = solidTraction;
+    }
+
 
     // Calculate the solid residual first
     // The first solid scalar equation is at row fluidMesh.nCells*fluidBlockSize
-    const label fluidBlockSize = fluid().twoD() ? 3 : 4;
     const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
     refCast<foamPetscSnesHelper>(solid()).formResidual
     (
@@ -355,13 +455,6 @@ label newtonCouplingInterface::formResidual
     // velocity
     // Note: it is assumed the solid.U is dD/dt even for steady-state cases
     {
-        if (fluidSolidInterface::fluidPatchIndices().size() != 1)
-        {
-            FatalError
-                << "Only one interface patch is currently allowed"
-                << abort(FatalError);
-        }
-
         // Lookup the interface map from the fluid faces to the solid faces
         const interfaceToInterfaceMappings::
             directMapInterfaceToInterfaceMapping& interfaceMap =
@@ -679,9 +772,9 @@ label newtonCouplingInterface::formJacobian
         const vectorField& solidPatchSf = solidPatch.Sf();
 
         // Initialise the block coefficient
-        const label nCoeffCmpts = solidBlockSize*fluidBlockSize;
-        PetscScalar values[nCoeffCmpts];
-        std::memset(values, 0, sizeof(values));
+        // const label nCoeffCmpts = solidBlockSize*fluidBlockSize;
+        // PetscScalar values[nCoeffCmpts];
+        // std::memset(values, 0, sizeof(values));
 
         forAll(solidPatch, solidFaceI)
         {
@@ -716,11 +809,13 @@ label newtonCouplingInterface::formJacobian
             // coefficients manually
 
             // Calculate the scalar global row ID (not the block row ID)
+            // The column corresponds to the pressure equation in the fluid cell
             label globalRowI = globalBlockRowI*solidBlockSize;
-            label globalColI = globalBlockColI*fluidBlockSize;
+            const label globalColI =
+                globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
 
             // Manually insert the 3 scalar coefficients (2 in 2-D)
-            PetscScalar value = solidPatchSf[solidFaceI][vector::X];
+            PetscScalar value = -solidPatchSf[solidFaceI][vector::X];
             CHKERRQ
             (
                 MatSetValues
@@ -730,8 +825,8 @@ label newtonCouplingInterface::formJacobian
             );
 
             globalRowI++;
-            globalColI++;
-            value = solidPatchSf[solidFaceI][vector::Y];
+            //globalColI++;
+            value = -solidPatchSf[solidFaceI][vector::Y];
             CHKERRQ
             (
                 MatSetValues
@@ -743,8 +838,8 @@ label newtonCouplingInterface::formJacobian
             if (solidBlockSize > 2)
             {
                 globalRowI++;
-                globalColI++;
-                value = solidPatchSf[solidFaceI][vector::Z];
+                //globalColI++;
+                value = -solidPatchSf[solidFaceI][vector::Z];
                 CHKERRQ
                 (
                     MatSetValues
@@ -753,7 +848,6 @@ label newtonCouplingInterface::formJacobian
                     )
                 );
             }
-
         }
     }
 

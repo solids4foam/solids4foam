@@ -733,7 +733,10 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
         snesUserPtr_.clear();
 
-        PetscFinalize();
+        WarningInFunction
+            << "Find a neat solution to finalise PETSc only once"
+                << endl;
+        //PetscFinalize();
     }
 }
 

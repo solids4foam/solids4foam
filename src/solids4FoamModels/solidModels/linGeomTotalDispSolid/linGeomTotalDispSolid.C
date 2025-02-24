@@ -810,6 +810,9 @@ label linGeomTotalDispSolid::formResidual
     // Enforce the boundary conditions again for any conditions that use gradD
     D.correctBoundaryConditions();
 
+    // Update velocity
+    U() = fvc::ddt(D);
+
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
