@@ -47,9 +47,9 @@ This case can be analysed in two forms:
 
 ```note
 The `beamInCrossFlow` case in solids4foam is set up in the modified form;
-however, it is straight-forward to return the case to its original form by
-setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
-and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+ however, it is straight-forward to return the case to its original form by
+ setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
+ and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
 ```
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
