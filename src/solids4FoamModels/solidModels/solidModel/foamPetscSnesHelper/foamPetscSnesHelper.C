@@ -222,6 +222,10 @@ Foam::label Foam::initialiseJacobian
     // Raise an error if mallocs are required during matrix assembly
     MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
 
+    // Free memory
+    free(d_nnz);
+    free(o_nnz);
+
     return 0;
 }
 
@@ -548,8 +552,6 @@ foamPetscSnesHelper::foamPetscSnesHelper
                     const label nRowsLocal = nRowBlocks*rowBlockSize;
                     const label nRowsGlobal =
                         returnReduce(nRowsLocal, sumOp<label>());
-                    // Info<< "nRowsLocal = " << nRowsLocal << nl
-                    //     << "nRowsGlobal = " << nRowsGlobal << endl;
 
                     // Number of columns
                     const label nColBlocks = nBlocksAndBlockSize[j].first();
@@ -557,8 +559,13 @@ foamPetscSnesHelper::foamPetscSnesHelper
                     const label nColsLocal = nColBlocks*colBlockSize;
                     const label nColsGlobal =
                         returnReduce(nColsLocal, sumOp<label>());
-                    // Info<< "nColsLocal = " << nColsLocal << nl
-                    //     << "nColsGlobal = " << nColsGlobal << endl;
+
+                    if (debug)
+                    {
+                        Info<< "subMat(" << i << "," << j << ") " << nl
+                            << "nRowsLocal = " << nRowsLocal << nl
+                            << "nColsLocal = " << nColsLocal << endl;
+                    }
 
                     MatSetSizes
                     (
@@ -914,7 +921,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =
-                        patchNeiVols[patchFaceI]*patchNeiLs[patchFaceI][cmptI];
+                        sign*patchNeiVols[patchFaceI]
+                       *patchNeiLs[patchFaceI][cmptI];
                 }
                 CHKERRQ
                 (
@@ -934,59 +942,12 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         }
         else if
         (
-            isA<symmetryPolyPatch>(fp) || isA<symmetryPlanePolyPatch>(fp)
+            isA<symmetryPolyPatch>(fp.patch())
+         || isA<symmetryPlanePolyPatch>(fp.patch())
         )
         {
-            // Treat symmetry planes consistently with internal faces
-            // Use the mirrored face-cell values rather than the patch face
-            // values
-            // See https://doi.org/10.1080/10407790.2022.2105073
-            const vectorField nHat(fp.nf());
-            forAll(faceCells, patchFaceI)
-            {
-                // Explicit calculation
-                // lsGrad[faceCells[patchFaceI]] +=
-                //      patchOwnLs[patchFaceI]
-                //     *(
-                //         transform
-                //         (
-                //             I - 2.0*sqr(nHat[patchFaceI]),
-                //             vsf[faceCells[patchFaceI]]
-                //         )
-                //       - vsf[faceCells[patchFaceI]]
-                //     );
-
-                // Subtract "patchOwnLs[patchFaceI] & 2*sqr(nHat[patchFaceI])"
-                // from (faceCells[patchFaceI], faceCells[patchFaceI])
-
-                // Local block row ID
-                const label ownCellID = faceCells[patchFaceI];
-
-                // Global block row ID
-                const label globalBlockRowI =
-                    foamPetscSnesHelper::globalCells().toGlobal(ownCellID);
-
-                // mat(ownCellID, ownCellID) -=
-                //     VI[ownCellID]*patchOwnLs[patchFaceI]
-                //   & 2*sqr(nHat[patchFaceI])
-                const vector coeff
-                (
-                    -sign*VI[ownCellID]*patchOwnLs[patchFaceI]
-                   & (2.0*sqr(nHat[patchFaceI]) )
-                );
-                for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
-                {
-                    values[cmptI*blockSize + colOffset] = coeff[cmptI];
-                }
-                CHKERRQ
-                (
-                    MatSetValuesBlocked
-                    (
-                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
-                        ADD_VALUES
-                    )
-                );
-            }
+            // The delta in scalar p across the symmetry is zero by definition
+            // so the symmetry plane does not contribution coefficients
         }
         else
         {

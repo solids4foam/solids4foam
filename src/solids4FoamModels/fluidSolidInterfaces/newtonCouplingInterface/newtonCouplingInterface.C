@@ -97,7 +97,7 @@ bool newtonCouplingInterface::evolve()
     volVectorField& D = solid().D();
 
     const label fluidBlockSize = fluid().twoD() ? 3 : 4;
-    const label solidBlockSize = solid().twoD() ? 2 : 4;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
 
     WarningInFunction
         << "Todo: map U/p/D to x" << endl;
@@ -175,29 +175,39 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
 
     // Set fluid and solid block sizes
     const label fluidBlockSize = fluid().twoD() ? 3 : 4;
-    const label solidBlockSize = solid().twoD() ? 2 : 4;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
 
     // We will initialise the four sub-matrices:
     //  - Afluid: fluid
     //  - Asolid: solid
-    //  - Asif: solid-in-fluid-coupling
-    //  - Afis: fluid-in-solid coupling
+    //  - Asf: solid-in-fluid-coupling
+    //  - Afs: fluid-in-solid coupling
 
     // Initialise Afluid based on compact stencil fvMesh
     {
+        if (debug)
+        {
+            Info<< "Initialising Afluid" << endl;
+        }
+
         Mat Afluid = subMats[0][0];
         Foam::initialiseJacobian(Afluid, fluid().mesh(), fluidBlockSize);
     }
 
     // Initialise Asolid based on compact stencil fvMesh
     {
+        if (debug)
+        {
+            Info<< "Initialising Asolid" << endl;
+        }
+
         Mat Asolid = subMats[1][1];
         Foam::initialiseJacobian(Asolid, solid().mesh(), solidBlockSize);
     }
 
     // Initially we assume a conformal FSI interface, where each fluid cell
     // shares a face with a solid cell. So we assume the number of blocks in
-    // the Asif (and Afis) matrix is equal to the number of cells at the
+    // the Asf (and Afs) matrix is equal to the number of cells at the
     // interface
 
     // Initially, we only allow one FSI interface
@@ -222,26 +232,50 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
 
     // Initialise solid-in-fluid-coupling matrix
     {
-        Mat Asif = subMats[0][1];
-
-        // Set the block size: this corresponds to the row size for a
-        // rectangular matrix
-        CHKERRQ(MatSetBlockSizes(jac, fluidBlockSize, solidBlockSize));
-
-        // Number of blocks: number of faces at the interface
-        const label blockn = interfaceMap.zoneBToZoneAFaceMap().size();
-
-        // Number of on-processor non-zeros blocks per row
-        int* d_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Number of off-processor non-zeros per row
-        int* o_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Initialise d_nnz to 1 and o_nnz to zero
-        for (int i = 0; i < blockn; ++i)
+        if (debug)
         {
-            d_nnz[i] = 1;
-            o_nnz[i] = 0;
+            Info<< "Initialising Asf" << endl;
+        }
+
+        Mat Asf = subMats[0][1];
+
+        // CAREFUL: we are setting non-zeros her based on the scalar rows, not
+        // the block rows
+
+        // Set matrix type to AIJ (since BAIJ does not support non-square
+        // blocks)
+        CHKERRQ(MatSetType(Asf, MATMPIAIJ));
+
+        // Total number of scalar rows in the fluid region
+        const label scalarRowN = fluidMesh().nCells()*fluidBlockSize;
+
+        // Allocate per-scalar-row nonzeros, initialised to 0
+        std::vector<int> d_nnz(scalarRowN, 0);
+        std::vector<int> o_nnz(scalarRowN, 0);
+
+        // Set non-zeros for each interface fluid cells
+        const labelList& fluidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+        const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+        const labelList& fluidFaceCells =
+            fluidMesh().boundary()[fluidPatchID].faceCells();
+        forAll(fluidFaceMap, fluidFaceI)
+        {
+            const label fluidCellID = fluidFaceCells[fluidFaceI];
+
+            // Calculate the row index for this cells first scalar equation
+            label rowI = fluidCellID*fluidBlockSize;
+
+            // Set the number of non-zeros to be the number of solid equations
+            // e.g., The x-momentum equation could have a coefficient for the
+            // solid x/y/z displacement
+            d_nnz[rowI++] = solidBlockSize;
+            d_nnz[rowI++] = solidBlockSize;
+            d_nnz[rowI++] = solidBlockSize;
+
+            if (fluidBlockSize > 3)
+            {
+                d_nnz[rowI++] = solidBlockSize;
+            }
         }
 
         // Parallel: we need to decide how to deal with this, e.g. do we allow
@@ -253,48 +287,70 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
                 << "Currently, serial runs are allowed in "
                 << typeName << abort(FatalError);
         }
-        // // Count off-processor neighbour cells: todo
-        // forAll(mesh.boundary(), patchI)
-        // {
-        //     if (mesh.boundary()[patchI].type() == "processor")
-        //     {
-        //         // Todo
-        //     }
-        // }
 
-        // Allocate parallel matrix
-        // Use row block size (assumes square matrix)
+        for (PetscInt i = 0; i < scalarRowN; i++)
+        {
+            if (d_nnz[i] != 0 && d_nnz[i] != 3 && d_nnz[i] != 4)
+            {
+                PetscPrintf(PETSC_COMM_WORLD, "%D %D %D - ", i, d_nnz[i], o_nnz[i]);
+            }
+        }
+
+        // Allocate parallel matrix using AIJ
         CHKERRQ
         (
-            MatMPIBAIJSetPreallocation(Asif, fluidBlockSize, 0, d_nnz, 0, o_nnz)
+            MatMPIAIJSetPreallocation(Asf, 0, d_nnz.data(), 0, o_nnz.data())
         );
 
         // Raise an error if mallocs are required during matrix assembly
-        MatSetOption(Asif, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+        CHKERRQ(MatSetOption(Asf, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
     }
 
-    // Initialise fluid-in-solid-coupling matrix
+
     {
-        Mat Afis = subMats[1][0];
-
-        // Set the block size: this corresponds to the row size for a
-        // rectangular matrix
-        CHKERRQ(MatSetBlockSizes(jac, solidBlockSize, fluidBlockSize));
-
-        // Number of blocks: number of faces at the interface
-        const label blockn = interfaceMap.zoneAToZoneBFaceMap().size();
-
-        // Number of on-processor non-zeros blocks per row
-        int* d_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Number of off-processor non-zeros per row
-        int* o_nnz = (int*)malloc(blockn*sizeof(int));
-
-        // Initialise d_nnz to 1 and o_nnz to zero
-        for (int i = 0; i < blockn; ++i)
+        if (debug)
         {
-            d_nnz[i] = 1;
-            o_nnz[i] = 0;
+            Info<< "Initialising Afs" << endl;
+        }
+
+        Mat Afs = subMats[1][0];
+
+        // CAREFUL: we are setting non-zeros her based on the scalar rows, not
+        // the block rows
+
+        // Set matrix type to AIJ (since BAIJ does not support non-square
+        // blocks)
+        CHKERRQ(MatSetType(Afs, MATMPIAIJ));
+
+        // Total number of scalar rows in the solid region
+        const label scalarRowN = solidMesh().nCells()*solidBlockSize;
+
+        // Allocate per-scalar-row nonzeros, initialised to 0
+        std::vector<int> d_nnz(scalarRowN, 0);
+        std::vector<int> o_nnz(scalarRowN, 0);
+
+        // Set non-zeros for each interface solid cells
+        const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        const labelList& solidFaceCells =
+            solidMesh().boundary()[solidPatchID].faceCells();
+        forAll(solidFaceMap, solidFaceI)
+        {
+            const label solidCellID = solidFaceCells[solidFaceI];
+
+            // Calculate the row index for this cells first scalar equation
+            label rowI = solidCellID*solidBlockSize;
+
+            // Set the number of non-zeros to be the number of fluid equations
+            // e.g., The x-momentum equation could have a coefficient for the
+            // fluid x/y/z velocity and fluid pressure
+            d_nnz[rowI++] = fluidBlockSize;
+            d_nnz[rowI++] = fluidBlockSize;
+
+            if (solidBlockSize > 2)
+            {
+                d_nnz[rowI++] = fluidBlockSize;
+            }
         }
 
         // Parallel: we need to decide how to deal with this, e.g. do we allow
@@ -306,25 +362,33 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
                 << "Currently, serial runs are allowed in "
                 << typeName << abort(FatalError);
         }
-        // // Count off-processor neighbour cells: todo
-        // forAll(mesh.boundary(), patchI)
-        // {
-        //     if (mesh.boundary()[patchI].type() == "processor")
-        //     {
-        //         // Todo
-        //     }
-        // }
 
-        // Allocate parallel matrix
-        // Use row block size (assumes square matrix)
+        for (PetscInt i = 0; i < scalarRowN; i++)
+        {
+            if (d_nnz[i] != 0 && d_nnz[i] != 3 && d_nnz[i] != 4)
+            {
+                PetscPrintf(PETSC_COMM_WORLD, "%D %D %D - ", i, d_nnz[i], o_nnz[i]);
+            }
+        }
+
+        // Allocate parallel matrix using AIJ
         CHKERRQ
         (
-            MatMPIBAIJSetPreallocation(Afis, solidBlockSize, 0, d_nnz, 0, o_nnz)
+            MatMPIAIJSetPreallocation(Afs, 0, d_nnz.data(), 0, o_nnz.data())
         );
 
         // Raise an error if mallocs are required during matrix assembly
-        MatSetOption(Afis, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+        CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
     }
+
+    if (debug)
+    {
+        Info<< "End of newtonCouplingInterface::initialiseJacobian" << endl;
+    }
+
+    PetscInt rGlobal, cGlobal;
+    MatGetSize(jac, &rGlobal, &cGlobal);
+    PetscPrintf(PETSC_COMM_WORLD, "\nJacobian Matrix Global Size: %D x %D\n", rGlobal, cGlobal);
 
     return 0;
 }
@@ -376,6 +440,13 @@ label newtonCouplingInterface::formResidual
             fluidBlockSize,
             fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
         );
+
+        U.correctBoundaryConditions();
+
+        const_cast<volTensorField&>
+        (
+            fluidMesh().lookupObject<volTensorField>("grad(U)")
+        ) = fvc::grad(U);
 
         U.correctBoundaryConditions();
 
@@ -487,10 +558,25 @@ label newtonCouplingInterface::formResidual
             solid().U().boundaryField()[solidPatchID];
 
         // Map the solid interface velocity to the fluid interface
+        const labelList& solidFaceCells =
+            solidMesh().boundary()[solidPatchID].faceCells();
+        const vectorField& solidUI = solid().U();
+        // const vectorField& solidDI = solid().D();
+        // const vectorField& solidD0I = solid().D().oldTime();
+        // const scalar deltaT = runTime().deltaTValue();
         forAll(fluidPatchU, fluidFaceI)
         {
-            fluidPatchU[fluidFaceI] = solidPatchU[fluidFaceMap[fluidFaceI]];
+            const label solidFaceID = fluidFaceMap[fluidFaceI];
+            //fluidPatchU[fluidFaceI] = solidPatchU[solidFaceID];
+            // fluidPatchU[fluidFaceI] = solidUI[solidFaceCells[fluidFaceMap[fluidFaceI]]];
+            const label solidCellID = solidFaceCells[solidFaceID];
+            fluidPatchU[fluidFaceI] = solidUI[solidCellID];
+            //     (solidDI[solidCellID] - solidD0I[solidCellID])/deltaT;
+            // fluidPatchU[fluidFaceI][0] = solidDI[solidCellID][0]/deltaT;
+            //fluidPatchU[fluidFaceI][1] = solidDI[solidCellID][1]/deltaT;
         }
+
+        fluid().phi() = fvc::interpolate(fluid().U()) & fluidMesh().Sf();
     }
 
     // Then, calculate the fluid residual
@@ -511,8 +597,11 @@ label newtonCouplingInterface::formJacobian
     // We will assembly the four sub-matrices:
     //  - Afluid: fluid
     //  - Asolid: solid
-    //  - Asif: solid-in-fluid-coupling
-    //  - Afis: fluid-in-solid coupling
+    //  - Asf: solid-in-fluid-coupling
+    //  - Afs: fluid-in-solid coupling
+
+    // Zero entries
+    MatZeroEntries(jac);
 
     // Get access to the two sub-matrices
     PetscInt nr, nc;
@@ -528,6 +617,11 @@ label newtonCouplingInterface::formJacobian
 
     // Assemble the fluid matrix
     {
+        if (debug)
+        {
+            Info<< "Forming Afluid" << endl;
+        }
+
         // Mat Afluid;
         // MatNestGetSubMat(jac, 0, 0, Afluid);
         Mat Afluid = subMats[0][0];
@@ -545,6 +639,11 @@ label newtonCouplingInterface::formJacobian
 
     // Assemble the solid matrix
     {
+        if (debug)
+        {
+            Info<< "Forming Asolid" << endl;
+        }
+
         Mat Asolid = subMats[1][1];
 
         if (!isA<foamPetscSnesHelper>(solid()))
@@ -560,13 +659,18 @@ label newtonCouplingInterface::formJacobian
 
     // Set fluid and solid block sizes
     const label fluidBlockSize = fluid().twoD() ? 3 : 4;
-    const label solidBlockSize = solid().twoD() ? 2 : 4;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
 
     // const label nFluidCells = fluidMesh().nCells();
 
     // Assemble the solid-in-fluid coupling matrix
     {
-        Mat Asif = subMats[0][1];
+        if (debug)
+        {
+            Info<< "Forming Asf" << endl;
+        }
+
+        Mat Asf = subMats[0][1];
 
         // The fluid interface is a prescribed velocity (fixedValue) condition
         // where we assume the fluid wall velocity is equal to the velocity of
@@ -606,9 +710,7 @@ label newtonCouplingInterface::formJacobian
         const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
         const labelList& solidFaceCells = solidPatch.faceCells();
 
-        // Lookup the fluid patch boundary gradient coefficients
-        // These are the coefficients to be multiplied by the prescribed patch
-        // velocity
+        // Lookup the fluid patch
         const fvPatchVectorField& fluidPatchU =
             fluid().U().boundaryField()[fluidPatchID];
         if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
@@ -617,13 +719,15 @@ label newtonCouplingInterface::formJacobian
                 << "The fluid interface patch must be of type 'fixedValue'"
                 << abort(FatalError);
         }
-        //const vectorField fluidPatchCoeffs(fluidPatchU.gradientBoundaryCoeffs());
+
         if (!isA<fluidModels::newtonIcoFluid>(fluid()))
         {
             FatalErrorInFunction
                 << "Currently, the fluid model must be of type 'newtonIcoFluid'"
                 << abort(FatalError);
         }
+
+        // Patch viscosity
         const scalarField fluidPatchNuEff
         (
             refCast<fluidModels::newtonIcoFluid>
@@ -631,15 +735,25 @@ label newtonCouplingInterface::formJacobian
                 fluid()
             ).turbulence().nuEff(fluidPatchID)
         );
-        const vectorField fluidPatchCoeffs
+
+        // Fluid interface area vectors
+        const vectorField& fluidPatchSf = fluidPatch.Sf();
+
+        // First we will insert the contribution to the fluid momentum equation
+        // coming from the diffusion term
+        // The known fluid boundary face value is now replaced by the adjacent
+        // solid cell velocity
+        // Diffusion coefficient is nu*|Sf|/(|n & d|*dt), where dt comes
+        // from converting the solid displacement to velocity
+        const scalar deltaT = solid().time().deltaTValue();
+        const scalarField fluidPatchCoeffs
         (
-            fluidPatch.Sf()*fluidPatch.deltaCoeffs()*fluidPatchNuEff
+            fluidPatch.magSf()*fluidPatch.deltaCoeffs()*fluidPatchNuEff/deltaT
         );
 
-        // Initialise the block coefficient
-        // const label nCoeffCmpts = fluidBlockSize*solidBlockSize;
-        // PetscScalar values[nCoeffCmpts];
-        // std::memset(values, 0, sizeof(values));
+        // Second we will insert the contribution to the fluid continuity
+        // (pressure) equation, where the div(U) term should use the adjacent
+        // solid cell velocity instead of the known boundary face velocity
 
         forAll(fluidPatch, fluidFaceI)
         {
@@ -649,7 +763,7 @@ label newtonCouplingInterface::formJacobian
             const label fluidCellID = fluidFaceCells[fluidFaceI];
             const label solidCellID = solidFaceCells[solidFaceID];
 
-            // We will add a coefficient at block row "fluidCellID" and block
+            // We will add coefficients at block row "fluidCellID" and block
             // column "solidCellID"
             // Note that the nested monolithic matrix takes care of offsetting
             // the rows/columns when the submatrices are inserted into the
@@ -677,24 +791,25 @@ label newtonCouplingInterface::formJacobian
             label globalRowI = globalBlockRowI*fluidBlockSize;
             label globalColI = globalBlockColI*solidBlockSize;
 
+            // Momentum coefficient for this face
+            PetscScalar value = fluidPatchCoeffs[fluidFaceI];
+
             // Manually insert the 3 scalar coefficients (2 in 2-D)
-            PetscScalar value = fluidPatchCoeffs[fluidFaceI][vector::X];
             CHKERRQ
             (
                 MatSetValues
                 (
-                    Asif, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
 
             globalRowI++;
             globalColI++;
-            value = fluidPatchCoeffs[fluidFaceI][vector::Y];
             CHKERRQ
             (
                 MatSetValues
                 (
-                    Asif, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
 
@@ -702,12 +817,49 @@ label newtonCouplingInterface::formJacobian
             {
                 globalRowI++;
                 globalColI++;
-                value = fluidPatchCoeffs[fluidFaceI][vector::Z];
                 CHKERRQ
                 (
                     MatSetValues
                     (
-                        Asif, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                        Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    )
+                );
+            }
+
+            // Secondly we will insert the contributions for the pressure
+            // equation
+
+            // Manually insert the 3 scalar coefficients (2 in 2-D)
+            value = -fluidPatchSf[fluidFaceI][vector::X]/deltaT;
+            globalRowI++; // pressure equation
+            globalColI = globalBlockColI*solidBlockSize; // x solid displacement
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+
+            value = -fluidPatchSf[fluidFaceI][vector::Y]/deltaT;
+            globalColI++; // y solid displacement
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+
+            if (fluidBlockSize > 3)
+            {
+                value = -fluidPatchSf[fluidFaceI][vector::Z]/deltaT;
+                globalColI++; // y solid displacement
+                CHKERRQ
+                (
+                    MatSetValues
+                    (
+                        Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                     )
                 );
             }
@@ -716,7 +868,12 @@ label newtonCouplingInterface::formJacobian
 
     // Assemble the fluid-in-solid coupling matrix
     {
-        Mat Afis = subMats[1][0];
+        if (debug)
+        {
+            Info<< "Forming Afs" << endl;
+        }
+
+        Mat Afs = subMats[1][0];
 
         // The solid interface is a prescribed traction condition, where we
         // approximate the traction on the fluid side of the interface using a
@@ -771,11 +928,6 @@ label newtonCouplingInterface::formJacobian
         }
         const vectorField& solidPatchSf = solidPatch.Sf();
 
-        // Initialise the block coefficient
-        // const label nCoeffCmpts = solidBlockSize*fluidBlockSize;
-        // PetscScalar values[nCoeffCmpts];
-        // std::memset(values, 0, sizeof(values));
-
         forAll(solidPatch, solidFaceI)
         {
             const label fluidFaceID = solidFaceMap[solidFaceI];
@@ -820,7 +972,7 @@ label newtonCouplingInterface::formJacobian
             (
                 MatSetValues
                 (
-                    Afis, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
 
@@ -831,7 +983,7 @@ label newtonCouplingInterface::formJacobian
             (
                 MatSetValues
                 (
-                    Afis, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
 
@@ -844,11 +996,16 @@ label newtonCouplingInterface::formJacobian
                 (
                     MatSetValues
                     (
-                        Afis, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                        Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                     )
                 );
             }
         }
+    }
+
+    if (debug)
+    {
+        Info<< "End of newtonCouplingInterface::formJacobian" << endl;
     }
 
     return 0;

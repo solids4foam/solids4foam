@@ -106,10 +106,10 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     forAll(own, facei)
     {
-        label ownFacei = own[facei];
-        label neiFacei = nei[facei];
+        const label ownFacei = own[facei];
+        const label neiFacei = nei[facei];
 
-        Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
+        const Type deltaVsf = vsf[neiFacei] - vsf[ownFacei];
 
         lsGrad[ownFacei] += ownLs[facei]*deltaVsf;
         lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
@@ -132,9 +132,10 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
             forAll(neiVsf, patchFacei)
             {
-                lsGrad[faceCells[patchFacei]] +=
+                const label cellID = faceCells[patchFacei];
+                lsGrad[cellID] +=
                     patchOwnLs[patchFacei]
-                   *(neiVsf[patchFacei] - vsf[faceCells[patchFacei]]);
+                   *(neiVsf[patchFacei] - vsf[cellID]);
             }
         }
         else if
@@ -151,15 +152,16 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
             const vectorField nHat(patchVsf.patch().nf());
             forAll(patchVsf, patchFacei)
             {
-                lsGrad[faceCells[patchFacei]] +=
+                const label cellID = faceCells[patchFacei];
+                lsGrad[cellID] +=
                      patchOwnLs[patchFacei]
                     *(
                         transform
                         (
                             I - 2.0*sqr(nHat[patchFacei]),
-                            vsf[faceCells[patchFacei]]
+                            vsf[cellID]
                         )
-                      - vsf[faceCells[patchFacei]]
+                      - vsf[cellID]
                     );
             }
         }
@@ -171,14 +173,14 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
                     vsf.boundaryField()[patchi];
                 forAll(patchVsf, patchFacei)
                 {
-                    lsGrad[faceCells[patchFacei]] +=
+                    const label cellID = faceCells[patchFacei];
+                    lsGrad[cellID] +=
                          patchOwnLs[patchFacei]
-                        *(patchVsf[patchFacei] - vsf[faceCells[patchFacei]]);
+                        *(patchVsf[patchFacei] - vsf[cellID]);
                 }
             }
         }
     }
-
 
     lsGrad.correctBoundaryConditions();
 

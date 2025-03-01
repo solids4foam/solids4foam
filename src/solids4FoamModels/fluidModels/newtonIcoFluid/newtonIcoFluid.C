@@ -409,10 +409,14 @@ label newtonIcoFluid::formResidual
     //   = div(2*nuEff*symm(gradU)) - grad(p) - ddt(U) - div(phi*U)
     //   = laplacian(nuEff,U) + div(nuEff*gradU.T())
     //     - grad(p) - ddt(U) - div(phi*U)
+    //
+    // Check: do we want to include div(gradU.T).. it makes the stencil
+    // larger and should be zero anyway, although it may increase accuracy
+    // To be checked ...
     vectorField residual
     (
         fvc::laplacian(turbulence_->nuEff(), U)
-      + fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
+        //+ fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
       - fvc::grad(p)
       - fvc::ddt(U)
       - fvc::div(phi, U)
@@ -442,8 +446,8 @@ label newtonIcoFluid::formResidual
         (
             (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
         )
-      - tr(fvc::grad(U))
-        //- fvc::div(U)
+      // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
+      - fvc::div(U)
     );
 
     // Make residual extensive

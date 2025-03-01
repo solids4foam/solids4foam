@@ -211,8 +211,10 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                     )
                   - C[faceCells[patchFacei]];
 
+                // Multiply by 0.5 to be consistent with the internal field
+                // where we multiply by the interpolation weight
                 dd[faceCells[patchFacei]] +=
-                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+                    0.5*(pMagSf[patchFacei]/magSqr(d))*sqr(d);
             }
         }
         else if (useBoundaryFaceValues_[patchi])
@@ -302,8 +304,10 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                     )
                   - C[faceCells[patchFacei]];
 
+                // Multiply by 0.5 to be consistent with the internal field
+                // where we multiply by the interpolation weight
                 patchLsP[patchFacei] =
-                    pMagSf[patchFacei]*(1.0/magSqr(d))
+                    0.5*pMagSf[patchFacei]*(1.0/magSqr(d))
                    *(invDd[faceCells[patchFacei]] & d);
             }
         }
