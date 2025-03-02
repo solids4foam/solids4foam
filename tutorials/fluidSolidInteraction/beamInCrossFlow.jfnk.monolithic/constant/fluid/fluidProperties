@@ -1,0 +1,35 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidModel newtonIcoFluid;
+
+newtonIcoFluidCoeffs
+{
+    pressureSmoothingCoeff 1e-1;
+
+    // PETSc options file used by PETScSNES
+    //optionsFile petscOptions.pcsplit;
+    optionsFile petscOptions.lu;
+    //optionsFile petscOptions.hypre;
+    //optionsFile petscOptions.ilu;
+    //optionsFile petscOptions.newton;
+
+    //stopOnPetscError no;
+}
+
+// ************************************************************************* //

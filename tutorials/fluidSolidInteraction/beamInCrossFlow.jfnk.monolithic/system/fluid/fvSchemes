@@ -1,0 +1,81 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    // default Euler;
+    default backward;
+    //default steadyState;
+}
+
+gradSchemes
+{
+    default none;
+    grad(U) leastSquaresS4f;
+    grad(p) leastSquaresS4f;
+    //cellLimited leastSquaresS4f;
+}
+
+divSchemes
+{
+    default none;
+    // div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
+
+    // div(phi,U) Gauss upwind;
+    //div(phi,U) Gauss linear;
+    div(phi,U)      bounded Gauss linearUpwind grad(U);
+    //div(phi,U)          Gauss upwind;
+    jacobian-div(phi,U) Gauss upwind;
+
+    div((nuEff*dev2(T(grad(U))))) Gauss linear;
+    // div((nuEff*dev(T(grad(U))))) Gauss linear;
+    div(devRhoReff) Gauss linear;
+
+    div(U) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default none;
+    laplacian(nuEff,U) Gauss linear corrected;
+    //laplacian((1|A(U)),p) Gauss linear corrected;
+    //laplacian(diffusivity,cellMotionU) Gauss linear corrected;
+
+    laplacian(rAU,p) Gauss linear corrected;
+    jacobian-laplacian(rAU,p) Gauss linear corrected;
+    laplacian(1,Phi) Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default linear;
+    //interpolate(U) skewCorrected linear;
+}
+
+snGradSchemes
+{
+    default corrected;
+}
+
+fluxRequired
+{
+    default no;
+    p;
+}
+
+// ************************************************************************* //
