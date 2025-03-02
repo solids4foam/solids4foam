@@ -55,8 +55,16 @@ class newtonCouplingInterface
 {
     // Private data
 
-        //- My data
-        // const scalar relaxationFactor_;
+        //- Scale factor for the solid equations to preserve the condition
+        //  number of the monlithic system
+        //  We default this to be the reciprocal of the solid's shear modulus
+        const scalar solidSystemScaleFactor_;
+
+        //- Flag to enable fluid-to-solid coupling
+        const Switch fluidToSolidCoupling_;
+
+        //- Flag to enable solid-to-fluid coupling
+        const Switch solidToFluidCoupling_;
 
 
     // Private Member Functions

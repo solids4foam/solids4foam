@@ -346,17 +346,6 @@ Foam::thermalModel& Foam::solidModel::thermal()
 }
 
 
-Foam::mechanicalModel& Foam::solidModel::mechanical()
-{
-    if (mechanicalPtr_.empty())
-    {
-        makeMechanicalModel();
-    }
-
-    return mechanicalPtr_();
-}
-
-
 bool Foam::solidModel::newTimeStep() const
 {
     if (curTimeIndex_ != runTime().timeIndex())
@@ -1045,6 +1034,17 @@ const Foam::thermalModel& Foam::solidModel::thermal() const
     }
 
     return thermalPtr_();
+}
+
+
+Foam::mechanicalModel& Foam::solidModel::mechanical()
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
 }
 
 

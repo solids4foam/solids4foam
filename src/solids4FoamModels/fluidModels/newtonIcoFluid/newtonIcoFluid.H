@@ -170,6 +170,13 @@ public:
                 return turbulence_.ref();
             }
 
+            //- Reference to the fluid density
+            const dimensionedScalar& rho() const
+            {
+                return rho_;
+            }
+
+
         // Edit
 
             //- Evolve the fluid model

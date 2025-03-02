@@ -331,9 +331,6 @@ protected:
         //- Return non-const reference to the thermal model
         thermalModel& thermal();
 
-        //- Return non-const reference to the mechanical model
-        mechanicalModel& mechanical();
-
         //- Return non-const reference to the density
         volScalarField& rho();
 
@@ -519,6 +516,9 @@ public:
 
             //- Return const reference to the thermal model
             const thermalModel& thermal() const;
+
+            //- Return non-const reference to the mechanical model
+            mechanicalModel& mechanical();
 
             //- Return const reference to the mechanical model
             const mechanicalModel& mechanical() const;

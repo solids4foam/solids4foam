@@ -75,7 +75,17 @@ newtonCouplingInterface::newtonCouplingInterface
         labelListList(),
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true // Will PETSc be used
-    )
+    ),
+    solidSystemScaleFactor_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidSystemScaleFactor",
+            gAverage(1.0/solid().mechanical().shearModulus()().primitiveField())
+        )
+    ),
+    fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
+    solidToFluidCoupling_(fsiProperties().lookup("solidToFluidCoupling"))
 {}
 
 
@@ -99,8 +109,8 @@ bool newtonCouplingInterface::evolve()
     const label fluidBlockSize = fluid().twoD() ? 3 : 4;
     const label solidBlockSize = solid().twoD() ? 2 : 3;
 
-    WarningInFunction
-        << "Todo: map U/p/D to x" << endl;
+    // WarningInFunction
+    //     << "Todo: Add linear predictor" << endl;
 
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
@@ -154,6 +164,18 @@ bool newtonCouplingInterface::evolve()
 
     // Restore the x vector
     VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
+
+    // Interpolate cell displacements to vertices
+    solid().mechanical().interpolate(solid().D(), solid().gradD(), solid().pointD());
+
+    // Increment of displacement
+    solid().DD() = solid().D() - solid().D().oldTime();
+
+    // Increment of point displacement
+    solid().pointDD() = solid().pointD() - solid().pointD().oldTime();
+
+    // Velocity
+    solid().U() = fvc::ddt(solid().D());
 
     return 0;
 }
@@ -386,9 +408,9 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
         Info<< "End of newtonCouplingInterface::initialiseJacobian" << endl;
     }
 
-    PetscInt rGlobal, cGlobal;
-    MatGetSize(jac, &rGlobal, &cGlobal);
-    PetscPrintf(PETSC_COMM_WORLD, "\nJacobian Matrix Global Size: %D x %D\n", rGlobal, cGlobal);
+    // PetscInt rGlobal, cGlobal;
+    // MatGetSize(jac, &rGlobal, &cGlobal);
+    // PetscPrintf(PETSC_COMM_WORLD, "\nJacobian Matrix Global Size: %D x %D\n", rGlobal, cGlobal);
 
     return 0;
 }
@@ -412,7 +434,7 @@ label newtonCouplingInterface::formResidual
 
     // Block sizes
     const label fluidBlockSize = fluid().twoD() ? 3 : 4;
-    // const label solidBlockSize = solid().twoD() ? 2 : 3;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
 
     // Currently limited to one interface: it should be straight-forward to add
     // a loop over multiple interface => todo
@@ -462,55 +484,67 @@ label newtonCouplingInterface::formResidual
 
         p.correctBoundaryConditions();
 
-        // Fluid interface traction
-        const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-        const vectorField fluidNf(fluidMesh().boundary()[fluidPatchID].nf());
-        const vectorField fluidTraction
-        (
-            fluid().patchViscousForce(fluidPatchID)
-          - fluid().patchPressureForce(fluidPatchID)*fluidNf
-        );
-
-        // Lookup the interface map from the fluid faces to the solid faces
-        const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping& interfaceMap =
-            refCast
-            <
-                const interfaceToInterfaceMappings::
-                directMapInterfaceToInterfaceMapping
-            >
+        if (fluidToSolidCoupling_)
+        {
+            // Fluid interface traction
+            const label fluidPatchID =
+                fluidSolidInterface::fluidPatchIndices()[0];
+            const vectorField fluidNf
             (
-                interfaceToInterfaceList()[0]
+                fluidMesh().boundary()[fluidPatchID].nf()
+            );
+            const vectorField fluidTraction
+            (
+                fluid().patchViscousForce(fluidPatchID)
+              - fluid().patchPressureForce(fluidPatchID)*fluidNf
             );
 
-        // The face map gives the solid face ID for each fluid face
-        const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+            // Lookup the interface map from the fluid faces to the solid faces
+            const interfaceToInterfaceMappings::
+                directMapInterfaceToInterfaceMapping& interfaceMap =
+                refCast
+                <
+                    const interfaceToInterfaceMappings::
+                    directMapInterfaceToInterfaceMapping
+                >
+                (
+                    interfaceToInterfaceList()[0]
+                );
 
-        // Calculate the solid interface traction
-        // Flip the sign as the solid normals point in the opposite direction to
-        // the fluid normals
-        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-        vectorField solidTraction(solidMesh().boundary()[solidPatchID].size());
-        forAll(fluidTraction, fluidFaceI)
-        {
-            solidTraction[fluidFaceMap[fluidFaceI]] =
-                -fluidTraction[fluidFaceI];
+            // The face map gives the solid face ID for each fluid face
+            const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+
+            // Calculate the solid interface traction
+            // Flip the sign as the solid normals point in the opposite direction to
+            // the fluid normals
+            const label solidPatchID =
+                fluidSolidInterface::solidPatchIndices()[0];
+            vectorField solidTraction
+            (
+                solidMesh().boundary()[solidPatchID].size()
+            );
+            forAll(fluidTraction, fluidFaceI)
+            {
+                solidTraction[fluidFaceMap[fluidFaceI]] =
+                    -fluidTraction[fluidFaceI];
+            }
+
+            // Lookup the displacement interface traction patch and set the traction
+            fvPatchVectorField& solidPatchD =
+                solid().D().boundaryFieldRef()[solidPatchID];
+            if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
+            {
+                FatalErrorInFunction
+                    << "The solidinterface patch must be of type "
+                    << "'solidTraction'"
+                    << abort(FatalError);
+            }
+
+            solidTractionFvPatchVectorField& solidTractionPatch =
+                refCast<solidTractionFvPatchVectorField>(solidPatchD);
+
+            solidTractionPatch.traction() = solidTraction;
         }
-
-        // Lookup the displacement interface traction patch and set the traction
-        fvPatchVectorField& solidPatchD =
-            solid().D().boundaryFieldRef()[solidPatchID];
-        if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
-        {
-            FatalErrorInFunction
-                << "The solidinterface patch must be of type 'solidTraction'"
-                << abort(FatalError);
-        }
-
-        solidTractionFvPatchVectorField& solidTractionPatch =
-            refCast<solidTractionFvPatchVectorField>(solidPatchD);
-
-        solidTractionPatch.traction() = solidTraction;
     }
 
 
@@ -522,9 +556,21 @@ label newtonCouplingInterface::formResidual
         &f[solidFirstEqnID], &x[solidFirstEqnID]
     );
 
+    {
+        // Scale the solid residual to preserve the condition number of the
+        // monolithic system
+        const label solidSystemEnd =
+            solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
+        for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
+        {
+            f[i] *= solidSystemScaleFactor_;
+        }
+    }
+
     // We update the velocity at the fluid interface with the solid interface
     // velocity
     // Note: it is assumed the solid.U is dD/dt even for steady-state cases
+    if (solidToFluidCoupling_)
     {
         // Lookup the interface map from the fluid faces to the solid faces
         const interfaceToInterfaceMappings::
@@ -664,6 +710,7 @@ label newtonCouplingInterface::formJacobian
     // const label nFluidCells = fluidMesh().nCells();
 
     // Assemble the solid-in-fluid coupling matrix
+    if (solidToFluidCoupling_)
     {
         if (debug)
         {
@@ -867,6 +914,7 @@ label newtonCouplingInterface::formJacobian
     }
 
     // Assemble the fluid-in-solid coupling matrix
+    if (fluidToSolidCoupling_)
     {
         if (debug)
         {
@@ -916,8 +964,12 @@ label newtonCouplingInterface::formJacobian
         const labelList& solidFaceCells = solidPatch.faceCells();
 
         // The approximate force on the solid interface is the solid face area
-        // vector multiplied by the adjacent fluid cell centre pressure. So the
-        // coefficient is the solid face area vector
+        // vector multiplied by the adjacent fluid cell centre pressure. We also
+        // need to multiply by the fluid density, if the kinematic pressure is
+        // used. So the coefficient is the solid face area vector times the
+        // fluid density
+        // To-do: determine on the fly whether kinematic or dynamic pressure is
+        // used
         const fvPatchVectorField& solidPatchD =
             solid().D().boundaryField()[solidPatchID];
         if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
@@ -926,7 +978,12 @@ label newtonCouplingInterface::formJacobian
                 << "The solid interface patch must be of type 'solidTraction'"
                 << abort(FatalError);
         }
-        const vectorField& solidPatchSf = solidPatch.Sf();
+        // Todo: add rho() to the fluidModel base class
+        const vectorField patchCoeffs
+        (
+            solidPatch.Sf()
+           *refCast<fluidModels::newtonIcoFluid>(fluid()).rho().value()
+        );
 
         forAll(solidPatch, solidFaceI)
         {
@@ -967,7 +1024,7 @@ label newtonCouplingInterface::formJacobian
                 globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
 
             // Manually insert the 3 scalar coefficients (2 in 2-D)
-            PetscScalar value = -solidPatchSf[solidFaceI][vector::X];
+            PetscScalar value = -patchCoeffs[solidFaceI][vector::X];
             CHKERRQ
             (
                 MatSetValues
@@ -978,7 +1035,7 @@ label newtonCouplingInterface::formJacobian
 
             globalRowI++;
             //globalColI++;
-            value = -solidPatchSf[solidFaceI][vector::Y];
+            value = -patchCoeffs[solidFaceI][vector::Y];
             CHKERRQ
             (
                 MatSetValues
@@ -991,7 +1048,7 @@ label newtonCouplingInterface::formJacobian
             {
                 globalRowI++;
                 //globalColI++;
-                value = -solidPatchSf[solidFaceI][vector::Z];
+                value = -patchCoeffs[solidFaceI][vector::Z];
                 CHKERRQ
                 (
                     MatSetValues
@@ -1001,6 +1058,19 @@ label newtonCouplingInterface::formJacobian
                 );
             }
         }
+    }
+
+    {
+        // Scale the solid matrix to preserve the condition number of the
+        // monolithic system
+
+        // We must assembly the matrix before we can use MatScale
+        // Complete matrix assembly
+        CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
+        CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
+
+        MatScale(subMats[1][1], solidSystemScaleFactor_);
+        MatScale(subMats[1][0], solidSystemScaleFactor_);
     }
 
     if (debug)
