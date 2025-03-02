@@ -604,22 +604,19 @@ label newtonCouplingInterface::formResidual
             solid().U().boundaryField()[solidPatchID];
 
         // Map the solid interface velocity to the fluid interface
-        const labelList& solidFaceCells =
-            solidMesh().boundary()[solidPatchID].faceCells();
-        const vectorField& solidUI = solid().U();
-        // const vectorField& solidDI = solid().D();
-        // const vectorField& solidD0I = solid().D().oldTime();
-        // const scalar deltaT = runTime().deltaTValue();
+        // const labelList& solidFaceCells =
+        //     solidMesh().boundary()[solidPatchID].faceCells();
+        // const vectorField& solidUI = solid().U();
         forAll(fluidPatchU, fluidFaceI)
         {
             const label solidFaceID = fluidFaceMap[fluidFaceI];
-            //fluidPatchU[fluidFaceI] = solidPatchU[solidFaceID];
-            // fluidPatchU[fluidFaceI] = solidUI[solidFaceCells[fluidFaceMap[fluidFaceI]]];
-            const label solidCellID = solidFaceCells[solidFaceID];
-            fluidPatchU[fluidFaceI] = solidUI[solidCellID];
-            //     (solidDI[solidCellID] - solidD0I[solidCellID])/deltaT;
-            // fluidPatchU[fluidFaceI][0] = solidDI[solidCellID][0]/deltaT;
-            //fluidPatchU[fluidFaceI][1] = solidDI[solidCellID][1]/deltaT;
+
+            // Extrapolated patch value (larger stencil)
+            fluidPatchU[fluidFaceI] = solidPatchU[solidFaceID];
+
+            // Adjacent cell value
+            // const label solidCellID = solidFaceCells[solidFaceID];
+            // fluidPatchU[fluidFaceI] = solidUI[solidCellID];
         }
 
         fluid().phi() = fvc::interpolate(fluid().U()) & fluidMesh().Sf();
