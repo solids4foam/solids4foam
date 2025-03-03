@@ -31,11 +31,19 @@ bibliography: paper.bib
 `solids4foam` is a toolbox designed for conducting solid mechanics and fluid-solid interaction simulations within the widely-used OpenFOAM software [@OpenFOAM.com; @OpenFOAM.org; @foam-extend]. The toolbox has a comprehensive set of features, including advanced algorithms for fluid-solid and thermo-fluid-solid coupling, a variety of solid material models, non-trivial solid boundary conditions, and numerous discretisation and solution methods for solid mechanics.
 
 
+The solids4foam toolbox is one of the most comprehensive solid mechanics and fluid-solid interaction toolboxes available within OpenFOAM, having evolved from the `solidMechanics` and `extend-bazaar/FluidSolidInteraction` toolboxes of the foam-extend community [@foam-extend].
+Several other OpenFOAM-based toolboxes provide capabilities for solid mechanics and fluid-solid interaction, including `FOAM-FSI` [@Mehl2016], `miniGeotechFoam` [@Tang2015], `explicitSolidDynamics` [@Haider2019, @Haider2017, @Haider2018], as well as more specialised solvers such as the membrane fluid-solid interaction solver [@Wagner2022], a coupled actuator line and finite element analysis tool [@Schmitt2022], and a modular multiphysics framework [@St-Onge2023].
+However, many of these toolboxes are no longer actively maintained and lack the broad range of solid mechanics and fluid-solid interaction features required for general-purpose simulations. Beyond OpenFOAM-based solutions, preCICE [@Chourdakis2023] provides an alternative approach by coupling OpenFOAM with widely-used finite element solvers such as deal.II [@Arndt2021], CalculiX [@Dhondt2004], FEniCS [@Logg2012], and Code_Aster [@codeAster], enabling flexible multiphysics simulations.
+While solids4foam is among the first general finite volume-based toolboxes for solid mechanics and fluid-solid interaction, established finite element-based codes such as FEniCS [@Logg2012] and deal.II [@Arndt2021] offer comparable functionality but differ in their numerical methodology.
+Furthermore, domain-specific fluid-solid interaction solvers, such as SimVascular [@Zhu2022] and Ambit [@Hirschvogel2024] for cardiovascular simulations or turtlefluid-solid interaction [@Bergersen2020] for general monolithic fluid-solid interaction problems, provide specialised solutions for particular applications.
+Despite these alternatives, `solids4foam` remains a uniquely positioned toolbox within OpenFOAM, offering a well-maintained and feature-rich platform for solid mechanics and fluid-solid interaction simulations based on the finite volume method.
+
+
 # Statement of Need
 
 The `solids4foam` toolbox addresses four primary needs within the OpenFOAM community:
 
-1. The need to perform fluid-solid interactions using OpenFOAM.
+1. The need to perform fluid-solid interactions within OpenFOAM.
 2. The need to solve complex solid mechanics problems directly within OpenFOAM.
 3. The necessity for a modular approach to coupling various solid and fluid processes in OpenFOAM.
 4. The demand for an extendable framework to facilitate research into innovative finite volume methods for solid mechanics.
@@ -45,7 +53,6 @@ The design of `solids4foam` adheres to four guiding principles:
 1. **Usability:** If you can use OpenFOAM, you can use `solids4foam`.
 2. **Compatibility:** Supports the three main OpenFOAM forks: OpenFOAM.com, OpenFOAM.org, and foam-extend.
 3. **Ease of Installation:** The toolbox is easy to install and requires minimal additional dependencies beyond OpenFOAM.
-4. **Code Quality:** Emphasis on code design and style, closely following the [OpenFOAM coding style guide](https://openfoam.org/dev/coding-style-guide).
 
 
 # Features
@@ -99,6 +106,9 @@ The `solids4foam-v2.1` release includes the following features:
 ## Tutorials
 
 - A suite of example cases and benchmark problems to demonstrate functionality and verify performance
+
+# Software compares to other commonly-used packages
+
 
 
 # Acknowledgements
