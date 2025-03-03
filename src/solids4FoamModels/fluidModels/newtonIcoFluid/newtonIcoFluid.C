@@ -121,10 +121,6 @@ newtonIcoFluid::newtonIcoFluid
             )
         ),
         mesh().nCells(),
-        fluidModel::twoD() ? 3 : 4,
-        fluidModel::twoD()
-      ? labelListList({ {0, 1}, {2} })    // 0-1: momentum. 2: pressure
-      : labelListList({ {0, 1, 2}, {3} }), // 0-2: momentum. 3: pressure
         fluidProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true
     ),
@@ -312,10 +308,17 @@ bool newtonIcoFluid::evolve()
 }
 
 
-label newtonIcoFluid::initialiseJacobian(Mat jac)
+label newtonIcoFluid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
     return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
+label newtonIcoFluid::initialiseSolution(Vec& x)
+{
+    // Initialise based on mesh.nCells()
+    return Foam::initialiseSolution(x, mesh(), blockSize_);
 }
 
 

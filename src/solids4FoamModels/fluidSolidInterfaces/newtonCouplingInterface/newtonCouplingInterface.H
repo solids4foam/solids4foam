@@ -66,6 +66,13 @@ class newtonCouplingInterface
         //- Flag to enable solid-to-fluid coupling
         const Switch solidToFluidCoupling_;
 
+        //- Number of sub-regions: 2 for fluid+solid, 3 for
+        //  fluid+meshMotion+solid
+        const label nRegions_;
+
+        //- Pointer to sub-matrices
+        Mat* subMatsPtr_;
+
 
     // Private Member Functions
 
@@ -95,7 +102,17 @@ public:
     // Destructor
 
         virtual ~newtonCouplingInterface()
-        {}
+        {
+            // Destroy each submatrix
+            for (label i = 0; i < nRegions_*nRegions_; ++i)
+            {
+                MatDestroy(&subMatsPtr_[i]);
+            }
+
+            // Free the array of Mat handles
+            delete[] subMatsPtr_;
+            subMatsPtr_ = nullptr;
+        }
 
 
     // Member Functions
@@ -106,8 +123,13 @@ public:
             virtual bool evolve();
 
             //- Initialise the Jacobian matrix
-            //  This procedure should set the non-zero structure of the matrix
-            virtual label initialiseJacobian(Mat jac);
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x);
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector

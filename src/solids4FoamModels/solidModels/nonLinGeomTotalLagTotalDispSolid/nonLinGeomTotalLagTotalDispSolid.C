@@ -500,16 +500,6 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             )
         ),
         mesh().nCells(),
-        solvePressure()
-      ? label(solidModel::twoD() ? 3 : 4)
-      : label(solidModel::twoD() ? 2 : 3),
-        solvePressure()
-      ? (
-            solidModel::twoD()
-          ? labelListList({ {0, 1}, {2} })    // 0-1: momentum. 2: pressure
-          : labelListList({ {0, 1, 2}, {3} }) // 0-2: momentum. 3: pressure
-        )
-      : labelListList({}), // No need to assign fields
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -753,10 +743,17 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 }
 
 
-label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat jac)
+label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
     return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
+label nonLinGeomTotalLagTotalDispSolid::initialiseSolution(Vec& x)
+{
+    // Initialise based on mesh.nCells()
+    return Foam::initialiseSolution(x, mesh(), blockSize_);
 }
 
 

@@ -59,20 +59,7 @@ newtonCouplingInterface::newtonCouplingInterface
                 "optionsFile", "petscOptions"
             )
         ),
-        labelPairList
-        (
-            {
-                {
-                    fluid().mesh().nCells(),
-                    fluid().twoD() ? 3 : 4 // Number of unknowns per block
-                },
-                {
-                    solid().mesh().nCells(),
-                    solid().twoD() ? 2 : 3 // Number of unknowns per block
-                }
-            }
-        ),
-        labelListList(),
+        fluid().mesh().nCells() + solid().mesh().nCells(),
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true // Will PETSc be used
     ),
@@ -85,7 +72,9 @@ newtonCouplingInterface::newtonCouplingInterface
         )
     ),
     fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
-    solidToFluidCoupling_(fsiProperties().lookup("solidToFluidCoupling"))
+    solidToFluidCoupling_(fsiProperties().lookup("solidToFluidCoupling")),
+    nRegions_(2),
+    subMatsPtr_(nullptr)
 {}
 
 
@@ -181,23 +170,9 @@ bool newtonCouplingInterface::evolve()
 }
 
 
-label newtonCouplingInterface::initialiseJacobian(Mat jac)
+label newtonCouplingInterface::initialiseJacobian(Mat& jac)
 {
-    // Get access to the two sub-matrices
-    PetscInt nr, nc;
-    Mat **subMats;
-    CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
-
-    if (nr != 2 || nc != 2)
-    {
-        FatalErrorInFunction
-            << "The matrix has the wrong number of sub matrices: "
-            << "nr = " << nr << ", nc = " << nc << abort(FatalError);
-    }
-
-    // Set fluid and solid block sizes
-    const label fluidBlockSize = fluid().twoD() ? 3 : 4;
-    const label solidBlockSize = solid().twoD() ? 2 : 3;
+    // Create a nest matrix.
 
     // We will initialise the four sub-matrices:
     //  - Afluid: fluid
@@ -205,26 +180,149 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
     //  - Asf: solid-in-fluid-coupling
     //  - Afs: fluid-in-solid coupling
 
+    if (nRegions_ != 2)
+    {
+        FatalErrorInFunction
+            << "nRegions must be 2!" << abort(FatalError);
+    }
+
+    // Set fluid and solid block sizes
+    const label fluidBlockSize = fluid().twoD() ? 3 : 4;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
+
+    // For brevity and convenience, we will store the size and blockSize of the
+    // regions in a labelPairList
+    const labelPairList nBlocksAndBlockSize
+    (
+        {
+            {fluidMesh().nCells(), fluidBlockSize},
+            {solidMesh().nCells(), solidBlockSize}
+        }
+    );
+
+    // Create arrays (vectors) of IS objects for rows and columns.
+    // These will indicate where in the matrix the different regions are
+    // located
+    std::vector<IS> isRow(nRegions_), isCol(nRegions_);
+    label globalOffset = 0;
+    for (label r = 0; r < nRegions_; ++r)
+    {
+        const label nBlocks = nBlocksAndBlockSize[r].first();
+        const label blockSize = nBlocksAndBlockSize[r].second();
+        const label regionSize = nBlocks*blockSize;
+
+        // Create an IS that covers the indices for region r
+        ISCreateStride
+        (
+            PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isRow[r]
+        );
+        ISCreateStride
+        (
+            PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isCol[r]
+        );
+        globalOffset += regionSize;
+    }
+
+    // Create an array of submatrices.
+    // Each submatrix represents the coupling between region i and
+    // region j.
+    // For example, subMat[i*nRegions_ + i] might be the matrix for
+    // region i, while subMat[i*nRegions_ + j] (i != j) are the coupling
+    // matrices.
+    subMatsPtr_ = new Mat[nRegions_*nRegions_];
+    for (label i = 0; i < nRegions_; ++i)
+    {
+        for (label j = 0; j < nRegions_; ++j)
+        {
+            // Create the submatrix for regions i and j.
+            Mat subA;
+            MatCreate(PETSC_COMM_WORLD, &subA);
+
+            // Number of rows
+            const label nRowBlocks = nBlocksAndBlockSize[i].first();
+            const label rowBlockSize = nBlocksAndBlockSize[i].second();
+            const label nRowsLocal = nRowBlocks*rowBlockSize;
+            const label nRowsGlobal =
+                returnReduce(nRowsLocal, sumOp<label>());
+
+            // Number of columns
+            const label nColBlocks = nBlocksAndBlockSize[j].first();
+            const label colBlockSize = nBlocksAndBlockSize[j].second();
+            const label nColsLocal = nColBlocks*colBlockSize;
+            const label nColsGlobal =
+                returnReduce(nColsLocal, sumOp<label>());
+
+            if (debug)
+            {
+                Info<< "subMat(" << i << "," << j << ") " << nl
+                    << "nRowsLocal = " << nRowsLocal << nl
+                    << "nColsLocal = " << nColsLocal << endl;
+            }
+
+            MatSetSizes
+            (
+                subA,
+                nRowsLocal,
+                nColsLocal,
+                nRowsGlobal,
+                nColsGlobal
+            );
+            MatSetFromOptions(subA);
+            MatSetType(subA, MATMPIAIJ);
+
+            // Store subA in row-major order at index [i*nRegions_ + j]
+            subMatsPtr_[i*nRegions_ + j] = subA;
+        }
+    }
+
+    // Create the nest matrix using the index sets and submatrices.
+    jac = Mat();
+    MatCreateNest
+    (
+        PETSC_COMM_WORLD,
+        nRegions_,
+        isRow.data(),
+        nRegions_,
+        isCol.data(),
+        (Mat*)subMatsPtr_,
+        &jac
+    );
+
+    // Cleanup IS objects.
+    for (label r = 0; r < nRegions_; ++r)
+    {
+        ISDestroy(&isRow[r]);
+        ISDestroy(&isCol[r]);
+    }
+
+
+    // Get access to the sub-matrices
+    PetscInt nr, nc;
+    Mat **subMats;
+    CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
+
     // Initialise Afluid based on compact stencil fvMesh
     {
         if (debug)
         {
-            Info<< "Initialising Afluid" << endl;
+            InfoInFunction
+                << "Initialising Afluid" << endl;
         }
 
         Mat Afluid = subMats[0][0];
-        Foam::initialiseJacobian(Afluid, fluid().mesh(), fluidBlockSize);
+        Foam::initialiseJacobian(Afluid, fluid().mesh(), fluidBlockSize, false);
     }
 
     // Initialise Asolid based on compact stencil fvMesh
     {
         if (debug)
         {
-            Info<< "Initialising Asolid" << endl;
+            InfoInFunction
+                << "Initialising Asolid" << endl;
         }
 
         Mat Asolid = subMats[1][1];
-        Foam::initialiseJacobian(Asolid, solid().mesh(), solidBlockSize);
+        Foam::initialiseJacobian(Asolid, solid().mesh(), solidBlockSize, false);
     }
 
     // Initially we assume a conformal FSI interface, where each fluid cell
@@ -256,12 +354,13 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
     {
         if (debug)
         {
-            Info<< "Initialising Asf" << endl;
+            InfoInFunction
+                << "Initialising Asf" << endl;
         }
 
         Mat Asf = subMats[0][1];
 
-        // CAREFUL: we are setting non-zeros her based on the scalar rows, not
+        // CAREFUL: we are setting non-zeros here based on the scalar rows, not
         // the block rows
 
         // Set matrix type to AIJ (since BAIJ does not support non-square
@@ -310,14 +409,6 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
                 << typeName << abort(FatalError);
         }
 
-        for (PetscInt i = 0; i < scalarRowN; i++)
-        {
-            if (d_nnz[i] != 0 && d_nnz[i] != 3 && d_nnz[i] != 4)
-            {
-                PetscPrintf(PETSC_COMM_WORLD, "%D %D %D - ", i, d_nnz[i], o_nnz[i]);
-            }
-        }
-
         // Allocate parallel matrix using AIJ
         CHKERRQ
         (
@@ -332,7 +423,8 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
     {
         if (debug)
         {
-            Info<< "Initialising Afs" << endl;
+            InfoInFunction
+                << "Initialising Afs" << endl;
         }
 
         Mat Afs = subMats[1][0];
@@ -385,14 +477,6 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
                 << typeName << abort(FatalError);
         }
 
-        for (PetscInt i = 0; i < scalarRowN; i++)
-        {
-            if (d_nnz[i] != 0 && d_nnz[i] != 3 && d_nnz[i] != 4)
-            {
-                PetscPrintf(PETSC_COMM_WORLD, "%D %D %D - ", i, d_nnz[i], o_nnz[i]);
-            }
-        }
-
         // Allocate parallel matrix using AIJ
         CHKERRQ
         (
@@ -405,12 +489,52 @@ label newtonCouplingInterface::initialiseJacobian(Mat jac)
 
     if (debug)
     {
-        Info<< "End of newtonCouplingInterface::initialiseJacobian" << endl;
+        InfoInFunction
+            << "End" << endl;
     }
 
-    // PetscInt rGlobal, cGlobal;
-    // MatGetSize(jac, &rGlobal, &cGlobal);
-    // PetscPrintf(PETSC_COMM_WORLD, "\nJacobian Matrix Global Size: %D x %D\n", rGlobal, cGlobal);
+    return 0;
+}
+
+
+label newtonCouplingInterface::initialiseSolution(Vec& x)
+{
+    // Set fluid and solid block sizes
+    const label fluidBlockSize = fluid().twoD() ? 3 : 4;
+    const label solidBlockSize = solid().twoD() ? 2 : 3;
+
+    // For brevity and convenience, we will store the size and blockSize of the
+    // regions in a labelPairList
+    const labelPairList nBlocksAndBlockSize
+    (
+        {
+            {fluidMesh().nCells(), fluidBlockSize},
+            {solidMesh().nCells(), solidBlockSize}
+        }
+    );
+
+    // Count number of local blocks and local scalar equations
+    label n = 0;
+    forAll(nBlocksAndBlockSize, regionI)
+    {
+        const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
+        const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
+        n += nBlocksRegionI*blockSizeRegionI;
+    }
+
+    // Global system size: total number of scalar equation across all
+    // processors
+    const label N = returnReduce(n, sumOp<label>());
+
+    // Create solution vector
+    x = Vec();
+    CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
+    CHKERRQ(VecSetSizes(x, n, N));
+    CHKERRQ(VecSetType(x, VECMPI));
+    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
+    CHKERRQ(VecSetFromOptions(x));
+    CHKERRQ(VecZeroEntries(x));
+
 
     return 0;
 }

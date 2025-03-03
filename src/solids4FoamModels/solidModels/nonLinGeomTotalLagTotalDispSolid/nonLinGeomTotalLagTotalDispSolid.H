@@ -194,8 +194,13 @@ public:
             virtual bool evolve();
 
             //- Initialise the Jacobian matrix
-            //  This procedure should set the non-zero structure of the matrix
-            virtual label initialiseJacobian(Mat jac);
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x);
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector

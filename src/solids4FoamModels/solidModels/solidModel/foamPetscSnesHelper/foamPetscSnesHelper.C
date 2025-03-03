@@ -71,6 +71,10 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     void *ctx     // user context
 )
 {
+    // Note
+    // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
+    // re-building the matrix
+
     // Get pointer to solution data
     const PetscScalar *xx;
     CHKERRQ(VecGetArrayRead(x, &xx));
@@ -78,47 +82,9 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     // Access the OpenFOAM data
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
-    // Check if the matrix is a nested matrix
-    PetscBool isNest;
-    PetscObjectTypeCompare((PetscObject)B, MATNEST, &isNest);
-
-    // Lookup the matrix info
-    MatInfo info;
-    if (isNest)
-    {
-        // For a nested matrix, we will only check the top left sub-matrix - if
-        // it is initialised we will assume all sub-matrices are initialised
-        Mat sub;
-        MatNestGetSubMat(B, 0, 0, &sub);
-        MatGetInfo(sub, MAT_LOCAL, &info);
-    }
-    else
-    {
-        MatGetInfo(B, MAT_LOCAL, &info);
-    }
-
-    // Initialise the matrix if it has yet to be allocated; otherwise zero all
-    // entries
-    if (info.nz_used)
-    {
-        // Zero the matrix but do not reallocate the space
-        // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
-        // re-building the matrix
-        // For a nested matrix, this will zero all sub-matrices
-        CHKERRQ(MatZeroEntries(B));
-    }
-    else
-    {
-        // Set the non-zero structure of the matrix B
-        Foam::Info<< "    Initialising the matrix..." << Foam::flush;
-        if (user->solMod_.initialiseJacobian(B) != 0)
-        {
-            Foam::FatalError
-                << "initialiseJacobian(B) returned an error code!"
-                << Foam::abort(Foam::FatalError);
-        }
-        Foam::Info<< "done" << Foam::endl;
-    }
+    // Zero the matrix but do not reallocate the space
+    // For a nested matrix, this will zero all sub-matrices
+    CHKERRQ(MatZeroEntries(B));
 
     // Populate the Jacobian => implemented by the solid model
     if (user->solMod_.formJacobian(B, xx) != 0)
@@ -148,17 +114,31 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
 
 Foam::label Foam::initialiseJacobian
 (
-    Mat jac,
+    Mat& jac,
     const fvMesh& mesh,
-    const label blockSize
+    const label blockSize,
+    const bool createMat
 )
 {
+    // Count number of local blocks and local scalar equations
+    const label blockn = mesh.nCells();
+    const label n = blockn*blockSize;
+
+    // Global system size: total number of scalar equation across all
+    // processors
+    const label N = returnReduce(n, sumOp<label>());
+
+    // // Set the Jacobian matrix size
+    if (createMat)
+    {
+        MatCreate(PETSC_COMM_WORLD, &jac);
+        MatSetFromOptions(jac);
+        MatSetSizes(jac, n, n, N, N);
+        MatSetType(jac, MATMPIAIJ);
+    }
+
     // Set the block size
     CHKERRQ(MatSetBlockSize(jac, blockSize));
-
-    // Number of vector unknowns on this processor
-    //const int blockn = user->solMod_.globalCells().localSize();
-    const int blockn = mesh.nCells();
 
     // Count the number of non-zeros in the matrix
     // Note: we assume a compact stencil, i.e. face only face neighbours
@@ -225,6 +205,39 @@ Foam::label Foam::initialiseJacobian
     // Free memory
     free(d_nnz);
     free(o_nnz);
+
+    return 0;
+}
+
+
+Foam::label Foam::initialiseSolution
+(
+    Vec& x,
+    const fvMesh& mesh,
+    const label blockSize,
+    const bool createVec
+)
+{
+    if (createVec)
+    {
+        // Count number of local blocks and local scalar equations
+        const label blockn = mesh.nCells();
+        const label n = blockn*blockSize;
+
+        // Global system size: total number of scalar equation across all
+        // processors
+        const label N = returnReduce(n, sumOp<label>());
+
+        x = Vec();
+        CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
+        CHKERRQ(VecSetSizes(x, n, N));
+        CHKERRQ(VecSetType(x, VECMPI));
+    }
+
+    CHKERRQ(VecSetBlockSize(x, blockSize));
+    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
+    CHKERRQ(VecSetFromOptions(x));
+    CHKERRQ(VecZeroEntries(x));
 
     return 0;
 }
@@ -384,48 +397,72 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
 }
 
 
+label foamPetscSnesHelper::initialiseSnes()
+{
+    if (snes_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    // Create the PETSc SNES object
+    snes_ = SNES();
+    CHKERRQ(SNESCreate(PETSC_COMM_WORLD, &snes_));
+
+    // Create user data context
+    snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
+    appCtxfoamPetscSnesHelper& user = snesUserPtr_();
+
+    // Set the user context
+    CHKERRQ(SNESSetApplicationContext(snes_, &user));
+
+    // Set the residual function
+    CHKERRQ
+    (
+        SNESSetFunction(snes_, NULL, formResidualFoamPetscSnesHelper, &user)
+    );
+
+    // The derived class initialises A
+    CHKERRQ(initialiseJacobian(A_));
+
+    // Set the Jacobian function
+    CHKERRQ
+    (
+        SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user)
+    );
+
+    // Set solver options
+    // Uses default options, can be overridden by command line options
+    CHKERRQ(SNESSetFromOptions(snes_));
+
+    // The derived class initialises the solution vector
+    CHKERRQ(initialiseSolution(x_));
+
+    return 0;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-foamPetscSnesHelper::foamPetscSnesHelper
-(
-    fileName optionsFile,
-    const label nBlocks,
-    const label blockSize,
-    //const labelPairList& nBlocksAndBlockSize,
-    const labelListList& fieldDefs,
-    const Switch stopOnPetscError,
-    const Switch initialise
-)
-:
-    foamPetscSnesHelper // Delegate constructor
-    (
-        optionsFile,
-        labelPairList({{nBlocks, blockSize}}),
-        fieldDefs,
-        stopOnPetscError,
-        initialise
-    )
-{}
-
 
 foamPetscSnesHelper::foamPetscSnesHelper
 (
     fileName optionsFile,
-    const labelPairList& nBlocksAndBlockSize,
-    const labelListList& fieldDefs,
+    const label nLocalBlocks,
     const Switch stopOnPetscError,
     const Switch initialise
 )
 :
     initialised_(initialise),
-    globalCellsPtr_(),
     stopOnPetscError_(stopOnPetscError),
     snes_(nullptr),
     x_(nullptr),
     A_(nullptr),
-    nRegions_(nBlocksAndBlockSize.size()),
-    subMatsPtr_(nullptr),
     snesUserPtr_(),
+    globalCellsPtr_
+    (
+        nLocalBlocks >= 0 ? new globalIndex(nLocalBlocks) : nullptr
+    ),
     neiProcGlobalIDs_(),
     neiProcVolumes_()
 {
@@ -435,279 +472,16 @@ foamPetscSnesHelper::foamPetscSnesHelper
         optionsFile.expand();
 
         // Check the options file exists
+        IFstream is(optionsFile);
+        if (!is.good())
         {
-            IFstream is(optionsFile);
-            if (!is.good())
-            {
-                FatalErrorInFunction
-                    << "Cannot find the PETSc options file: " << optionsFile
-                    << abort(FatalError);
-            }
+            FatalErrorInFunction
+                << "Cannot find the PETSc options file: " << optionsFile
+                << abort(FatalError);
         }
 
         // Initialise PETSc with an options file
         PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
-
-        // Create the PETSc SNES object
-        snes_ = SNES();
-        SNESCreate(PETSC_COMM_WORLD, &snes_);
-
-        // Create user data context
-        snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
-        appCtxfoamPetscSnesHelper& user = snesUserPtr_();
-
-        // Set the user context
-        SNESSetApplicationContext(snes_, &user);
-
-        // Set the residual function
-        SNESSetFunction(snes_, NULL, formResidualFoamPetscSnesHelper, &user);
-
-        if (nBlocksAndBlockSize.size() == 0)
-        {
-            FatalErrorInFunction
-                << "nBlocksAndBlockSize should have a size greater than 0"
-                << abort(FatalError);
-        }
-
-        // Count number of local blocks and local scalar equations
-        label blockn = 0;
-        label n = 0;
-        forAll(nBlocksAndBlockSize, regionI)
-        {
-            const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
-            const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
-            blockn += nBlocksRegionI;
-            n += nBlocksRegionI*blockSizeRegionI;
-        }
-
-        // Create globalCells object
-        globalCellsPtr_.set(new globalIndex(blockn));
-
-        // Global system size: total number of blocks across all processors
-        //const int blockN = globalCellsPtr_->size();
-
-        // Global system size: total number of scalar equation across all
-        // processors
-        const label N = returnReduce(n, sumOp<label>());
-
-        // If there is only one region, create a normal matrix.
-        if (nRegions_ == 1)
-        {
-            // Create the Jacobian matrix
-            A_ = Mat();
-            MatCreate(PETSC_COMM_WORLD, &A_);
-            MatSetSizes(A_, n, n, N, N);
-            //MatSetSizes(A, n, n, PETSC_DECIDE, PETSC_DECIDE);
-            MatSetFromOptions(A_);
-            MatSetType(A_, MATMPIAIJ);
-            //MatSetType(A, MATMPIBAIJ);
-        }
-        else
-        {
-            // We have more than one region; create a nest matrix.
-
-            // Create arrays (vectors) of IS objects for rows and columns.
-            // These will indicate where in the matrix the different regions are
-            // located
-            std::vector<IS> isRow(nRegions_), isCol(nRegions_);
-            label globalOffset = 0;
-            for (label r = 0; r < nRegions_; ++r)
-            {
-                const label nBlocks = nBlocksAndBlockSize[r].first();
-                const label blockSize = nBlocksAndBlockSize[r].second();
-                const label regionSize = nBlocks*blockSize;
-
-                // Create an IS that covers the indices for region r
-                ISCreateStride
-                (
-                    PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isRow[r]
-                );
-                ISCreateStride
-                (
-                    PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isCol[r]
-                );
-                globalOffset += regionSize;
-            }
-
-            // Create an array of submatrices.
-            // Each submatrix represents the coupling between region i and
-            // region j.
-            // For example, subMat[i*nRegions_ + i] might be the matrix for
-            // region i, while subMat[i*nRegions_ + j] (i != j) are the coupling
-            // matrices.
-            subMatsPtr_ = new Mat[nRegions_*nRegions_];
-            for (label i = 0; i < nRegions_; ++i)
-            {
-                for (label j = 0; j < nRegions_; ++j)
-                {
-                    // Info<< "region = " << i << " " << j << endl;
-
-                    // Create the submatrix for regions i and j.
-                    Mat subA;
-                    MatCreate(PETSC_COMM_WORLD, &subA);
-
-                    // Number of rows
-                    const label nRowBlocks = nBlocksAndBlockSize[i].first();
-                    const label rowBlockSize = nBlocksAndBlockSize[i].second();
-                    const label nRowsLocal = nRowBlocks*rowBlockSize;
-                    const label nRowsGlobal =
-                        returnReduce(nRowsLocal, sumOp<label>());
-
-                    // Number of columns
-                    const label nColBlocks = nBlocksAndBlockSize[j].first();
-                    const label colBlockSize = nBlocksAndBlockSize[j].second();
-                    const label nColsLocal = nColBlocks*colBlockSize;
-                    const label nColsGlobal =
-                        returnReduce(nColsLocal, sumOp<label>());
-
-                    if (debug)
-                    {
-                        Info<< "subMat(" << i << "," << j << ") " << nl
-                            << "nRowsLocal = " << nRowsLocal << nl
-                            << "nColsLocal = " << nColsLocal << endl;
-                    }
-
-                    MatSetSizes
-                    (
-                        subA,
-                        nRowsLocal,
-                        nColsLocal,
-                        nRowsGlobal,
-                        nColsGlobal
-                    );
-                    MatSetFromOptions(subA);
-                    MatSetType(subA, MATMPIAIJ);
-
-                    // Store subA in row-major order at index [i*nRegions_ + j]
-                    subMatsPtr_[i*nRegions_ + j] = subA;
-                }
-            }
-
-            // Create the nest matrix using the index sets and submatrices.
-            A_ = Mat();
-            MatCreateNest
-            (
-                PETSC_COMM_WORLD,
-                nRegions_,
-                isRow.data(),
-                nRegions_,
-                isCol.data(),
-                (Mat*)subMatsPtr_,
-                &A_
-            );
-
-            // Cleanup: destroy the IS objects.
-            for (label r = 0; r < nRegions_; ++r)
-            {
-                ISDestroy(&isRow[r]);
-                ISDestroy(&isCol[r]);
-            }
-        }
-
-        // Set the Jacobian function
-        SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user);
-
-        // Set solver options
-        // Uses default options, can be overridden by command line options
-        SNESSetFromOptions(snes_);
-
-        // Create the solution vector
-        x_ = Vec();
-        VecCreate(PETSC_COMM_WORLD, &x_);
-        VecSetSizes(x_, n, N);
-        if (nBlocksAndBlockSize.size() == 1)
-        {
-            // Only set the Vec block size for one region
-            // Otherwise, it is not needed, as the Mat will be nested and get
-            // its block sizes from its sub-matrices
-            VecSetBlockSize(x_, nBlocksAndBlockSize[0].second());
-        }
-        VecSetType(x_, VECMPI);
-        PetscObjectSetName((PetscObject) x_, "Solution");
-        VecSetFromOptions(x_);
-        VecZeroEntries(x_);
-
-        // TO BE FIXED
-        // Set up the fieldsplit index sets if fieldDefs is non-empty.
-        // After setting the fieldsplit index sets, SNES/KSP will use them via
-        // the PC.
-        // We assume the ordering of the global vector is in blocks:
-        // For each cell, the entries are:
-        //     global_index = cell*blockSize + local_index,
-        // where local_index runs from 0 to blockSize - 1.
-        // The user provides fieldDefs such as, e.g.
-        //     fieldDefs = { {0,1,2}, {3} }
-        // to indicate that indices 0-2 in each block belong to field 0
-        // (momentum) and index 3 belongs to field 1 (pressure).
-        if (fieldDefs.size() > 0)
-        {
-            WarningInFunction
-                << "fieldDefs not used: to be fixed!" << endl;
-
-            // // Get the KSP from SNES, then retrieve the PC
-            // KSP ksp;
-            // SNESGetKSP(snes_, &ksp);
-            // PC pc;
-            // KSPGetPC(ksp, &pc);
-
-            // // Obtain the local ownership range of the solution vector
-            // PetscInt rstart, rend;
-            // VecGetOwnershipRange(x, &rstart, &rend);
-            // // Determine which cells (blocks) belong locally
-            // const PetscInt localCellStart = rstart/blockSize;
-            // const PetscInt localCellEnd = rend/blockSize;
-
-            // // Loop over each field as defined in fieldDefs.
-            // for
-            // (
-            //     label fieldIndex = 0;
-            //     fieldIndex < fieldDefs.size();
-            //     ++fieldIndex
-            // )
-            // {
-            //     // Get the list of local indices for this field.
-            //     const labelList& field = fieldDefs[fieldIndex];
-
-            //     // Create an empty OpenFOAM List for the PETSc indices.
-            //     DynamicList<PetscInt> indices(rend - rstart);
-
-            //     // Loop over each locally owned cell
-            //     for
-            //     (
-            //         PetscInt cell = localCellStart; cell < localCellEnd; ++cell
-            //     )
-            //     {
-            //         // For each degree-of-freedom in this field...
-            //         for (label j = 0; j < field.size(); j++)
-            //         {
-            //             PetscInt idx = cell*blockSize + field[j];
-
-            //             // Only add the index if it is within our local ownership
-            //             if (idx >= rstart && idx < rend)
-            //             {
-            //                 indices.append(idx);
-            //             }
-            //         }
-            //     }
-
-            //     // Create a PETSc index set from the indices.
-            //     // Note: indices.begin() returns a pointer to the first element
-            //     IS is;
-            //     ISCreateGeneral
-            //     (
-            //         PETSC_COMM_WORLD,
-            //         indices.size(),
-            //         indices.begin(),
-            //         PETSC_COPY_VALUES,
-            //         &is
-            //     );
-
-            //     // Build a field name, "field0", "field1", etc.
-            //     std::string fieldName = "field" + std::to_string(fieldIndex);
-            //     PCFieldSplitSetIS(pc, fieldName.c_str(), is);
-            //     ISDestroy(&is);
-            // }
-        }
     }
 }
 
@@ -722,27 +496,13 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
         VecDestroy(&x_);
 
-        // Check if A is a nested matrix
-        if (nRegions_ > 1)
-        {
-            // Destroy each submatrix
-            for (label idx = 0; idx < nRegions_*nRegions_; ++idx)
-            {
-                MatDestroy(&subMatsPtr_[idx]);
-            }
-
-            // Free the array of Mat handles
-            delete[] subMatsPtr_;
-            subMatsPtr_ = nullptr;
-        }
-
         MatDestroy(&A_);
 
         snesUserPtr_.clear();
 
         WarningInFunction
             << "Find a neat solution to finalise PETSc only once"
-                << endl;
+            << endl;
         //PetscFinalize();
     }
 }
@@ -1395,6 +1155,16 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
             << "This function cannot be called because the foamPetscSnesHelper "
             << "object was not initialised during construction"
             << abort(FatalError);
+    }
+
+    // Initialise the SNES object
+    if (!snes_)
+    {
+        if (initialiseSnes() != 0)
+        {
+            FatalErrorInFunction
+                << "initialiseSnes failed" << abort(FatalError);
+        }
     }
 
     // Solve the nonlinear system

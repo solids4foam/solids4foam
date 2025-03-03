@@ -336,7 +336,6 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             )
         ),
         mesh().nCells(),
-        solidModel::twoD() ? 2 : 3,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -569,10 +568,17 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 }
 
 
-label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat jac)
+label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
     return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
+label nonLinGeomUpdatedLagSolid::initialiseSolution(Vec& x)
+{
+    // Initialise based on mesh.nCells()
+    return Foam::initialiseSolution(x, mesh(), blockSize_);
 }
 
 

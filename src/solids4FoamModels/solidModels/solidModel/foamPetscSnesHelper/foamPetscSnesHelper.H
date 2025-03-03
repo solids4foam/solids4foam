@@ -92,9 +92,20 @@ namespace Foam
     //  given blockSize (number of scalar equations per cell)
     label initialiseJacobian
     (
-        Mat jac,
+        Mat& jac,
         const fvMesh& mesh,
-        const label blockSize
+        const label blockSize,
+        const bool createMat = true  // MatCreate or similar should be called
+    );
+
+    //- Initialise the solution vector based on the given mesh and
+    //  blockSize (number of scalar equations per cell)
+    label initialiseSolution
+    (
+        Vec& x,
+        const fvMesh& mesh,
+        const label blockSize,
+        const bool createVec = true  // VecCreate or similar should be called
     );
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -109,10 +120,6 @@ class foamPetscSnesHelper
 
         //- Was PETSc initialised?
         const Switch initialised_;
-
-        //- Helper object for converting between local (on processor) and global
-        //  cell indices
-        autoPtr<globalIndex> globalCellsPtr_;
 
         //- Flag to set whether the solver stops when PETSs SNES returns an
         //  error
@@ -130,25 +137,18 @@ class foamPetscSnesHelper
         //  Note that Mat is a pointer type
         Mat A_;
 
-        //- Number of regions (sub-matrices)
-        label nRegions_;
-
-        //- Pointer to sub-matrices, if A is a nested matrix
-        Mat* subMatsPtr_;
-
         //- PETSc user context
         autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
+
+        //- Helper object for converting between local (on processor) and global
+        //  cell indices
+        autoPtr<globalIndex> globalCellsPtr_;
 
         //- Global cell IDs for the neighbouring processor patch cells
         mutable PtrList<labelList> neiProcGlobalIDs_;
 
         //- Cell volumes for the neighbouring processor patch cells
         mutable PtrList<scalarField> neiProcVolumes_;
-
-        //- Least squares vectors
-        //  Note: these are different than the ones used for the displacement
-        //  field as different boundary patch face values may be included
-        // mutable autoPtr<leastSquaresS4fVectors> lsVectorsPtr_;
 
 
     // Private Member Functions
@@ -162,11 +162,11 @@ class foamPetscSnesHelper
         //- Return a reference to neiProcGlobalIDs for the given mesh
         const PtrList<scalarField>& neiProcVolumes(const fvMesh& mesh) const;
 
-        //- Make least squares vectors
-        // void makeLsVectors(const volScalarField& p) const;
-
         //- Return a reference to the least squares vectors
         const leastSquaresS4fVectors& lsVectors(const volScalarField& p) const;
+
+        //- Initialise the snes object
+        virtual label initialiseSnes();
 
         //- Disallow default bitwise copy construct
         foamPetscSnesHelper(const foamPetscSnesHelper&);
@@ -182,49 +182,23 @@ public:
 
     // Constructors
 
-        //- Construct from nBlocks and blockSize 
+        //- Construct from nBlocks and blockSize
         //
         //  Parameters:
         //    optionsFile         - PETSc options file address
-        //    nBlocks             - Number of blocks (e.g., cells) on this
-        //                          processor
-        //    blockSize           - Number of scalar unknowns per block
-        //                          each sub matrix.
-        //                          e.g., {{nSolidCells,3}, {nFluidCells,4}}
-        //    fieldDefs           - Indicate which rows are different fields
-        //    stopOnPetscError    - Give a FatalError when PETSc returns an
-        //                          error
-        //    initialise          - Initialise PETSc
+        //    nLocalBlocks        - Optional: Number of blocks (e.g., cells) on
+        //                          this processor
+        //    stopOnPetscError    - Optional: Give a FatalError when PETSc
+        //                          returns an error
+        //    initialise          - Optional: Initialise PETSc
         foamPetscSnesHelper
         (
             fileName optionsFile,
-            const label nBlocks,
-            const label blockSize,
-            const labelListList& fieldDefs,
+            const label nLocalBlocks = -1,
             const Switch stopOnPetscError = true,
             const Switch initialise = true
         );
 
-        //- Construct from nBlocksAndBlockSize list
-        //
-        //  Parameters:
-        //    optionsFile         - PETSc options file address
-        //    nBlocksAndBlockSize - A list of (nBlocks, blockSize), allowing a
-        //                          nested matrix with different block sizes in
-        //                          each sub matrix.
-        //                          e.g., {{nSolidCells,3}, {nFluidCells,4}}
-        //    fieldDefs           - Indicate which rows are different fields
-        //    stopOnPetscError    - Give a FatalError when PETSc returns an
-        //                          error
-        //    initialise          - Initialise PETSc
-        foamPetscSnesHelper
-        (
-            fileName optionsFile,
-            const labelPairList& nBlocksAndBlockSize,
-            const labelListList& fieldDefs,
-            const Switch stopOnPetscError = true,
-            const Switch initialise = true
-        );
 
     // Destructor
 
@@ -238,6 +212,16 @@ public:
             //- Non-const access to the PETSc solution vector
             Vec solution()
             {
+                if (!x_)
+                {
+                    // Initialise snes object
+                    if (initialiseSnes() != 0)
+                    {
+                        FatalErrorInFunction
+                        << "initialiseSnes failed" << abort(FatalError);
+                    }
+                }
+
                 return x_;
             }
 
@@ -251,8 +235,15 @@ public:
         // Edit
 
             //- Initialise the Jacobian matrix
-            //  This procedure should set the non-zero structure of the matrix
-            virtual label initialiseJacobian(Mat jac) = 0;
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            //  We pass a reference ot the matrix pointer so the pointer can be
+            //  assigned
+            virtual label initialiseJacobian(Mat& jac) = 0;
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x) = 0;
 
             //- Calculate the residual of the governing equations
             //  A non-zero return value indicates an error
@@ -410,7 +401,7 @@ public:
                 const label xBlockSize,
                 const labelList& compIndices = labelList()
             ) const;
-    
+
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
             //  PetscScalar array pointer. The xBlockSize is looked up
             //  from "Vec x"
