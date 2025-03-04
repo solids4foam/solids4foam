@@ -57,7 +57,7 @@ class newtonCouplingInterface
 
         // Pointer to the fluid mesh motion solver
         // We will use a modified solid solver for this
-        autoPtr<solidModel> meshMotionPtr_;
+        mutable autoPtr<solidModel> meshMotionPtr_;
 
         //- Scale factor for the solid equations to preserve the condition
         //  number of the monlithic system
@@ -79,6 +79,17 @@ class newtonCouplingInterface
 
 
     // Private Member Functions
+
+        //- Make the fluid mesh motion solver
+        void makeMeshMotion() const;
+
+        //- Return the fluid mesh motion solver
+        solidModel& meshMotion();
+
+        //- Update mesh motion interface displacement
+        //  This maps the current solid displacement interface field to the
+        //  mesh motion displacement field. Both D and pointD are mapped
+        void updateMeshMotionInterfaceDisplacement();
 
         //- Disallow default bitwise copy construct
         newtonCouplingInterface(const newtonCouplingInterface&);
