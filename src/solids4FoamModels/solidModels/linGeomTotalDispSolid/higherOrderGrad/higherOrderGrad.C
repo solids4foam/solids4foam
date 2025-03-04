@@ -1606,8 +1606,10 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     }
 
     // Refernces for brevity and efficiency
-    const vectorField& CI = mesh.C();
-    const vectorField& CfI = mesh.Cf();
+//    const vectorField& CI = mesh.C();
+//    const vectorField& CfI = mesh.Cf();
+    const vectorField& CI = mesh.faceCentres();
+    const vectorField& CfI = mesh.faceAreas();
 
     // Collect CI for off-processor cells in the stencils
     Map<vector> globalCI;
@@ -2423,21 +2425,26 @@ void higherOrderGrad::calcGaussPointsAndWeights() const
     {
         const List<triPoints>& fT = faceTri[faceI];
 
+        const scalar& faceArea = mag(mesh.faceAreas()[faceI]);
+
         forAll(fT, tI)
         {
             const triPoints& tp = fT[tI];
 
+            const scalar triArea = tp.mag();
+
+            const scalar scaleW = triArea/faceArea;
+
             // Get triangle Gauss points and weights
             const triangleQuadrature tq(tp, triQuadraturePtsNb_);
-
             const List<point>& triangleGP = tq.gaussPoints();
             const List<scalar>& triangleGPweights = tq.weights();
 
-            forAll(tp ,i)
+            forAll(triangleGP, i)
             {
                 const label pos = tI*triQuadraturePtsNb_ + i;
                 faceGP[faceI][pos] = triangleGP[i];
-                faceGPW[faceI][pos] = triangleGPweights[i];
+                faceGPW[faceI][pos] = scaleW*triangleGPweights[i];
             }
         }
     }
@@ -2644,7 +2651,7 @@ higherOrderGrad::higherOrderGrad
     N_(readInt(dict.lookup("N"))),
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
-    triQuadraturePtsNb_(dict.lookupOrDefault<label>("triGaussPointsNb", 1)),
+    triQuadraturePtsNb_(readInt(dict.lookup("triGaussPointsNb", 1))),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
     globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
@@ -2687,9 +2694,6 @@ higherOrderGrad::~higherOrderGrad()
 
 tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D) const
 {
-    // For testing
-    //auto test =  fGradGaussPoints(D);
-
     if (useQRDecomposition_)
     {
         if (useGlobalStencils_)
@@ -2825,9 +2829,16 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
     const volVectorField& D
 ) const
 {
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
     const fvMesh& mesh = mesh_;
 
-    //const pointField& pts = mesh.points();
+    // Gauss point locations on each face
+    const List<List<point>>& faceGP = faceGaussPoints();
 
     // Prepare the return field
     autoPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
@@ -2836,20 +2847,15 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
     forAll(gradDGP, i)
     {
         List<tensor>& faceGradGP = gradDGP[i];
+        const List<point>& faceGaussPts = faceGP[i];
 
-        const label nbOfTriangles = mesh.faces()[i].size();
-        const label nbOfGaussPoints = nbOfTriangles*triQuadraturePtsNb_;
-
-        faceGradGP.setSize(nbOfGaussPoints);
+        faceGradGP.setSize(faceGaussPts.size());
 
         forAll(faceGradGP, gradI)
         {
             gradDGP[i][gradI]=tensor::zero;
         }
     }
-
-    // Gauss point locations on each face
-    const List<List<point>>& faceGP = faceGaussPoints();
 
     // Gauss point weights
     //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
@@ -2943,6 +2949,12 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                 }
             }
         }
+    }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
     }
 
     return tgradDGP;

@@ -20,7 +20,6 @@ License
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
-#include "../../numerics/fvc/fvcDivGaussPoints.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
@@ -45,6 +44,80 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate
+(
+    const List<List<symmTensor>>& sigmaGP
+)
+{
+    Info<<"tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate" << endl;
+    tmp<surfaceVectorField> tsf
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "surfaceIntegrateQuadrature(traction)",
+                 mesh().time().timeName(),
+                 mesh(),
+                 IOobject::NO_READ,
+                 IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimPressure, vector::zero)
+        )
+    );
+
+    surfaceVectorField& tf = tsf.ref();
+
+    const List<List<scalar>>& gpW = hoGradPtr_->faceGaussPointsWeight();
+
+    const labelList& faceOwner = mesh().faceOwner();
+    const labelList& faceNeighbour = mesh().faceNeighbour();
+
+    // Unit normal vectors at the faces
+   // const vectorField n(mesh().faceAreaNormals());
+
+    // What if faces are not planar? Should each triangle have corresponding
+    // unit normal?
+
+    forAll(faceOwner, faceI)
+    {
+        // Sigma at the Gauss quadrature points on the face
+        const List<symmTensor>& gaussQuadStress = sigmaGP[faceI];
+
+        // Gauss quadrature weights on the face
+        const List<scalar>& gaussQuadW = gpW[faceI];
+
+        const vector& faceNormal =
+            mesh().faceAreas()[faceI]/mag(mesh().faceAreas()[faceI]);
+
+        // Add forces to the owner and neighbour cells
+        forAll(gaussQuadStress, pI)
+        {
+            // Force contribution for this quadrature point
+            const vector contrib = faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
+
+            // Add to the owner cell
+            const label ownCellID = faceOwner[faceI];
+            tf[ownCellID] += contrib;
+
+            // Add to the neighbour cell, if there is one
+            if (mesh().isInternalFace(faceI))
+            {
+                const label neiCellID = faceNeighbour[faceI];
+                tf[neiCellID] -= contrib;
+            }
+            // else
+            // {
+            //     // Do nothing as processor boundaries already take care
+            //     // of their own cells
+            // }
+        }
+    }
+
+    return tsf;
+};
 
 
 void linGeomTotalDispSolid::predict()
@@ -466,6 +539,10 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    hoGradInt_
+    (
+        solidModelDict().lookupOrDefault<Switch>("higherOrderIntegration", false)
+    ),
     ds_
     (
         IOobject
@@ -491,6 +568,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    if (hoGradInt_ && !solidModelDict().get<Switch>("higherOrderGrad"))
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "In case of Gauss integration, higherOrderGrad switch should be"
+            << "set to true" << abort(FatalError);
+    }
 
     if (solidModelDict().lookupOrDefault<Switch>("higherOrderGrad", false))
     {
@@ -612,6 +696,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
             }
         }
     }
+    Info<<"Constructor ended" <<__FILE__ << " " << __LINE__ << endl;
 }
 
 
@@ -741,51 +826,24 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
         mechanical().grad(D, gradD());
     }
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
-
-    // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
-
-    // Traction vectors at the faces
-    surfaceVectorField traction(n & fvc::interpolate(sigma()));
-
-    // TESTING
-    // Here we will calculate displacement gradient at Gauss points and call
-    // mechanical law to calculate sigma from it.
-    const List<List<tensor>> gradDGPf = hoGradPtr_->fGradGaussPoints(D);
-
-    List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
-
-    // Correct sigma field at Gauss points.
-    // Gradient at Gauss points should be stored in solidModel but for
-    // testing this is fine.
-    mechanical().correct(gradDGPf, sigmaGPf);
-
-    // Add stabilisation to the traction
-    // We add this before enforcing the traction condition as the stabilisation
-    // is set to zero on traction boundaries
-    // To-do: add a stabilisation traction function to momentumStabilisation
-    const scalar scaleFactor =
-        readScalar(stabilisation().dict().lookup("scaleFactor"));
-    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-    traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
-
-    // Enforce traction boundary conditions
-    enforceTractionBoundaries(traction, D, n);
-
-    // The residual vector is defined as
-    // F = div(sigma) + rho*g
-    //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
-    // where, here, we roll the stabilisationTerm into the div(sigma)
-
-
     // TESTING
     // Calculate div using high order integration
-    if (hoGradPtr_)
+    if (hoGradInt_)
     {
+        // Here we will calculate displacement gradient at Gauss points and call
+        // mechanical law to calculate sigma from it.
+        // Gradient at Gauss points should be stored in solidModel but for
+        // testing this is fine.
+        autoPtr<List<List<tensor>>> gradDGPfPtr = hoGradPtr_->fGradGaussPoints(D);
+        const List<List<tensor>>& gradDGPf = gradDGPfPtr.ref();
+
+        List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
+
+        mechanical().correct(gradDGPf, sigmaGPf);
+        //Info<<sigmaGPf<<endl;
+
         residual =
-            fvc::divGaussPoints(sigmaGPf, hoGradPtr_->faceGaussPointsWeight())
+            fvc::div(mesh().magSf()*this->GaussIntegrate(sigmaGPf))
           + rho()
            *(
                 g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
@@ -793,6 +851,31 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     }
     else
     {
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+
+        // Unit normal vectors at the faces
+        const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
+        // Traction vectors at the faces
+        surfaceVectorField traction(n & fvc::interpolate(sigma()));
+
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+
+        // Enforce traction boundary conditions
+        enforceTractionBoundaries(traction, D, n);
+
+        // The residual vector is defined as
+        // F = div(sigma) + rho*g
+        //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
+        // where, here, we roll the stabilisationTerm into the div(sigma)
+
         residual =
             fvc::div(mesh().magSf()*traction)
           + rho()
