@@ -63,6 +63,7 @@ newtonCouplingInterface::newtonCouplingInterface
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true // Will PETSc be used
     ),
+    meshMotionPtr_(),
     solidSystemScaleFactor_
     (
         fsiProperties().lookupOrDefault<scalar>
@@ -75,7 +76,10 @@ newtonCouplingInterface::newtonCouplingInterface
     solidToFluidCoupling_(fsiProperties().lookup("solidToFluidCoupling")),
     nRegions_(2),
     subMatsPtr_(nullptr)
-{}
+{
+    // Create the fluid mesh motion solver
+    meshMotionPtr_ = solidModel::New(runTime, "meshMotionFluid");
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -165,6 +169,107 @@ bool newtonCouplingInterface::evolve()
 
     // Velocity
     solid().U() = fvc::ddt(solid().D());
+
+
+
+
+    // Test mesh motion solver
+
+    // Map solid interface motion to the mesh motion interface
+    {
+        // Lookup the interface map from the fluid faces to the solid faces
+        const interfaceToInterfaceMappings::
+            directMapInterfaceToInterfaceMapping& interfaceMap =
+            refCast
+            <
+                const interfaceToInterfaceMappings::
+                directMapInterfaceToInterfaceMapping
+            >
+            (
+                interfaceToInterfaceList()[0]
+            );
+
+        // The face map gives the solid face ID for each fluid face
+        const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+
+        // Lookup the fluid mesh interface patch
+        const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+
+        // Lookup the mesh motion displacement field
+        fvPatchVectorField& motionPatchD =
+            meshMotionPtr_->D().boundaryFieldRef()[fluidPatchID];
+        if (!isA<fixedValueFvPatchVectorField>(motionPatchD))
+        {
+            FatalErrorInFunction
+                << "The meshMotionFluid interface patch must be of type "
+                << "'fixedValue'" << abort(FatalError);
+        }
+
+        // Lookup the solid interface patch
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        const fvPatchVectorField& solidPatchD =
+            solid().D().boundaryField()[solidPatchID];
+
+        // Map the solid interface displacement to the motion interface
+        forAll(motionPatchD, fluidFaceI)
+        {
+            const label solidFaceID = fluidFaceMap[fluidFaceI];
+
+            // Extrapolated patch value (larger stencil)
+            motionPatchD[fluidFaceI] = solidPatchD[solidFaceID];
+        }
+
+        if (interfaceToInterfaceList().size() != 1)
+        {
+            FatalErrorInFunction
+                << "Only one interface allowed" << abort(FatalError);
+        }
+
+        // Take references to zones
+        const standAlonePatch& fluidZone =
+            fluid().globalPatches()[0].globalPatch();
+        const standAlonePatch& solidZone =
+            solid().globalPatches()[0].globalPatch();
+
+        // Get the solid interface patch pointD field
+        const vectorField solidPatchPointD
+        (
+            solid().pointD().boundaryField()[solidPatchID].patchInternalField()
+        );
+
+        // Solid point zone pointD
+        const vectorField solidZonePointD
+        (
+            solid().globalPatches()[0].patchPointToGlobal(solidPatchPointD)
+        );
+
+        // Prepare the fluid mesh interface pointD field
+        vectorField fluidZonePointD(fluidZone.nPoints(), vector::zero);
+
+        // Transfer the point displacements
+        interfaceToInterfaceList()[0].transferPointsZoneToZone
+        (
+            solidZone,
+            fluidZone,
+            solidZonePointD,
+            fluidZonePointD
+        );
+
+        // Map the zone field to the patch
+        const vectorField meshPatchPointD
+        (
+            fluid().globalPatches()[0].globalPointToPatch(fluidZonePointD)
+        );
+
+        // Set the mesh interface pointD
+        // Use "==" to reassign fixedValue
+        meshMotionPtr_->pointD().boundaryFieldRef()[fluidPatchID] ==
+            meshPatchPointD;
+    }
+
+    // Solve mesh motion
+    Info<< nl << "Solving mesh motion" << endl;
+    meshMotionPtr_->evolve();
 
     return 0;
 }

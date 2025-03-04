@@ -55,6 +55,10 @@ class newtonCouplingInterface
 {
     // Private data
 
+        // Pointer to the fluid mesh motion solver
+        // We will use a modified solid solver for this
+        autoPtr<solidModel> meshMotionPtr_;
+
         //- Scale factor for the solid equations to preserve the condition
         //  number of the monlithic system
         //  We default this to be the reciprocal of the solid's shear modulus

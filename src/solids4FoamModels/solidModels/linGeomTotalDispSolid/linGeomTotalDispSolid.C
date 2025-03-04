@@ -329,6 +329,7 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
+    pointD().correctBoundaryConditions();
 
     // Increment of displacement
     DD() = D() - D().oldTime();
