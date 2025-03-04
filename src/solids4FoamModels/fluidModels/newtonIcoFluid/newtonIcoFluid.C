@@ -49,6 +49,7 @@ addToRunTimeSelectionTable(fluidModel, newtonIcoFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
+
 void newtonIcoFluid::makeRAUf() const
 {
     if (rAUfPtr_.valid())
@@ -263,7 +264,40 @@ bool newtonIcoFluid::evolve()
     //     // Todo
     // }
 
+    // Update the mesh
+    mesh.controlledUpdate();
+
+    // Update the flux
+    phi = fvc::interpolate(U) & mesh.Sf();
+
+    // If the mesh moved, update the flux and make it relative to the mesh
+    // motion
+    if (mesh.changing())
+    {
+        // MRF not added yet
+        // MRF.update();
+
+        // if (correctPhi)
+        {
+            // Calculate absolute flux
+            // from the mapped surface velocity
+            // phi = mesh.Sf() & Uf();
+
+            // Enable: needed for inlet/outlet?
+            // #include "correctPhi.esi.H"
+
+            // Make the flux relative to the mesh motion
+            fvc::makeRelative(phi, U);
+        }
+
+        // if (checkMeshCourantNo)
+        // {
+        //     #include "meshCourantNo.H"
+        // }
+    }
+
     // Solve the nonlinear system and check the convergence
+    Info<< "Solving the fluid for U and p" << endl;
     foamPetscSnesHelper::solve();
 
     // Retrieve the solution
@@ -278,11 +312,6 @@ bool newtonIcoFluid::evolve()
 
     U.correctBoundaryConditions();
 
-    // Update the flux
-    // CHECK
-    // Make relative?
-    phi = fvc::interpolate(U) & mesh.Sf();
-
     // Map the PETSc solution to the p field
     // p is located in the final component
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
@@ -295,10 +324,19 @@ bool newtonIcoFluid::evolve()
     p.correctBoundaryConditions();
 
     // Correct Uf if the mesh is moving
-    fvc::correctUf(Uf, U, phi);
+    //fvc::correctUf(Uf, U, phi);
 
-    // Make the fluxes relative to the mesh motion
-    fvc::makeRelative(phi, U);
+    // Update the flux
+    phi = mesh.Sf() & Uf();
+
+    if (mesh.changing())
+    {
+        // Enable: needed for inlet/outlet?
+        // #include "correctPhi.esi.H"
+
+        // Make the flux relative to the mesh motion
+        fvc::makeRelative(phi, U);
+    }
 
     // Correct transport and turbulence models
     laminarTransport_.correct();
@@ -334,10 +372,10 @@ label newtonIcoFluid::formResidual
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
-    // autoPtr<surfaceVectorField>& Uf = Uf_;
+    //autoPtr<surfaceVectorField>& Uf = Uf_;
     //scalar& cumulativeContErr = cumulativeContErr_;
     //const bool correctPhi = correctPhi_;
-    //const bool checkMeshCourantNo = checkMeshCourantNo_;
+    // const bool checkMeshCourantNo = checkMeshCourantNo_;
     //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
     // Copy x into the U field
@@ -357,29 +395,28 @@ label newtonIcoFluid::formResidual
     // Update the flux
     phi = fvc::interpolate(U) & mesh.Sf();
 
-    // CHECK!
-    // if (mesh.changing())
-    // {
-    //     // MRF not added yet
-    //     // MRF.update();
+    if (mesh.changing())
+    {
+        // MRF not added yet
+        // MRF.update();
 
-    //     if (correctPhi)
-    //     {
-    //         // Calculate absolute flux
-    //         // from the mapped surface velocity
-    //         phi = mesh.Sf() & Uf();
+        // if (correctPhi)
+        {
+            // Calculate absolute flux
+            // from the mapped surface velocity
+            // phi = mesh.Sf() & Uf();
 
-    //         #include "correctPhi.esi.H"
+            // #include "correctPhi.esi.H"
 
-    //         // Make the flux relative to the mesh motion
-    //         fvc::makeRelative(phi, U);
-    //     }
+            // Make the flux relative to the mesh motion
+            fvc::makeRelative(phi, U);
+        }
 
-    //     if (checkMeshCourantNo)
-    //     {
-    //         #include "meshCourantNo.H"
-    //     }
-    // }
+        // if (checkMeshCourantNo)
+        // {
+        //     #include "meshCourantNo.H"
+        // }
+    }
 
     // Copy x into the p field
     scalarField& pI = p;
@@ -491,6 +528,12 @@ label newtonIcoFluid::formJacobian
 
     // Update the flux
     phi() = fvc::interpolate(U) & mesh.Sf();
+
+    if (mesh.changing())
+    {
+        // Make the flux relative to the mesh motion
+        fvc::makeRelative(phi(), U);
+    }
 
     // Copy x into the p field
     volScalarField& p = const_cast<volScalarField&>(this->p());
