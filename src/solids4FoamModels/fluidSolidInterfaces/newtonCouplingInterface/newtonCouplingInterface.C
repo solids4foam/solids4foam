@@ -294,8 +294,6 @@ bool newtonCouplingInterface::evolve()
     // Update the mesh motion interface
     Info<< nl << "Solving mesh motion" << endl;
     updateMeshMotionInterfaceDisplacement();
-
-    // Solve mesh motion
     meshMotion().evolve();
 
     return 0;

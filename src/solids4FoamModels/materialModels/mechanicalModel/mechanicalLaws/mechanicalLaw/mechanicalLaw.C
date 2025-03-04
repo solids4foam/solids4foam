@@ -161,7 +161,11 @@ void Foam::mechanicalLaw::makeSigma0() const
     }
 
     // Check if a single
-    if (mesh() == baseMesh())
+    if
+    (
+        mesh() == baseMesh()
+    || !baseMesh().foundObject<mechanicalModel>("mechanicalProperties")
+    )
     {
         sigma0Ptr_.set
         (
@@ -1531,7 +1535,12 @@ Foam::mechanicalLaw::mechanicalLaw
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called
     // region0.
-    if (mesh.time().foundObject<fvMesh>("solid"))
+    // Alternatively, the user can specify the region name
+    if (dict_.found("regionName"))
+    {
+        baseMeshRegionName_ = word(dict_.lookup("regionName"));
+    }
+    else if (mesh.time().foundObject<fvMesh>("solid"))
     {
         baseMeshRegionName_ = "solid";
     }

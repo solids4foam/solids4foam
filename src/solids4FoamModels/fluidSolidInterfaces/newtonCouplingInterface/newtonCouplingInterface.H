@@ -56,7 +56,7 @@ class newtonCouplingInterface
     // Private data
 
         // Pointer to the fluid mesh motion solver
-        // We will use a modified solid solver for this
+        // We will use a solid solver for this
         mutable autoPtr<solidModel> meshMotionPtr_;
 
         //- Scale factor for the solid equations to preserve the condition

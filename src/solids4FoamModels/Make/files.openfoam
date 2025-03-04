@@ -33,6 +33,7 @@ fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
 fluidModels/vertexCentredFluid/vertexCentredFluid.C
+fluidModels/fluidModel/meshMotionSolidModel/meshMotionSolidModelFvMotionSolver.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
