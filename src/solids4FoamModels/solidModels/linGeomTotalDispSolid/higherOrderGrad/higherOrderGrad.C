@@ -21,6 +21,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
+#include "fixedValueFvPatchFields.H"
 #include "processorPolyPatch.H"
 
 #include "triangle.H"
@@ -1330,6 +1331,8 @@ void higherOrderGrad::calcGlobalQRFaceCoeffs() const
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
     const vectorField& CfI = mesh.Cf();
+    FatalErrorInFunction << "Cf() should be replaced with faceCentres - check"
+                   << abort(FatalError);
 
     // Collect CI for off-processor cells in the stencils
     Map<vector> globalCI;
@@ -1359,7 +1362,6 @@ void higherOrderGrad::calcGlobalQRFaceCoeffs() const
     List<DynamicList<scalar>> cz(mesh.nFaces());
 
     const List<labelList>& stencils = globalFaceStencils();
-
 
     forAll(stencils, faceI)
     {
@@ -1606,8 +1608,6 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     }
 
     // Refernces for brevity and efficiency
-//    const vectorField& CI = mesh.C();
-//    const vectorField& CfI = mesh.Cf();
     const vectorField& CI = mesh.faceCentres();
     const vectorField& CfI = mesh.faceAreas();
 
@@ -1683,8 +1683,18 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
             maxDist = max(maxDist, d);
         }
 
+        // We need to extend stencil for ghost point at boundary
+        bool ghostPoint = false;
+        if (!mesh.isInternalFace(faceI))
+        {
+            const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+            const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+            ghostPoint = isA<fixedValueFvPatchVectorField>(pp);
+        }
+
         // Number of neighbours in stencil
-        const label Nn = curStencil.size();
+        const label Nn = curStencil.size() + (ghostPoint ? 1 : 0);
 
         // Check to avoid Eigen error
         if (Nn < Np)
@@ -1745,6 +1755,18 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
                        pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
                       /factorialDenominator;
                 }
+
+                // Add ghost point manually in second from last iteration
+                // and skip last iteration for ghostPoint
+                if (ghostPoint && cI == Nn-2)
+                {
+                    Q(0,Nn-1) = 1.0;
+                    for (label p = 1; p < Np; ++p)
+                    {
+                        Q(p, cI) = 0.0;
+                    }
+                    break;
+                }
             }
 
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
@@ -1778,6 +1800,14 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
                     )/(1 - exp(sqrK));
 
                 W.diagonal()[cI] = w;
+
+                // Add ghost point manually in second from last iteration
+                // and skip last iteration for ghostPoint
+                if (ghostPoint && cI == Nn-2)
+                {
+                    W.diagonal()[Nn-1] = 1.0;
+                    break;
+                }
             }
 
             // Now when we have W and Q, next step is QR decomposition
@@ -1846,7 +1876,18 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     forAll(QRGradCoeffs, faceI)
     {
        const labelList& curStencil = stencils[faceI];
-       const label Nn = curStencil.size();
+
+        // We need to extend stencil for ghost point at boundary
+       bool ghostPoint = false;
+       if (!mesh.isInternalFace(faceI))
+       {
+           const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+           const polyPatch& pp = mesh.boundaryMesh()[patchID];
+           ghostPoint = isA<fixedValueFvPatchVectorField>(pp);
+       }
+
+       // Number of neighbours in stencil
+       const label Nn = curStencil.size() + (ghostPoint ? 1 : 0);
 
        const List<point>& fGP = faceGP[faceI];
 
@@ -2911,6 +2952,16 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                         // stencils
                         if (!isA<emptyPolyPatch>(pp))
                         {
+                            // In case of fixed value boundaries we have ghost
+                            // point (boundary value) in stencil
+                            if (isA<fixedValueFvPatchVectorField>(D.boundaryField()[patchID]) && cI == Nn-2)
+                            {
+                                const label localFaceI = faceI - pp.start();
+                                gradDGP[faceI][pointI] +=
+                                    pointQRGradCoeffs[faceI][pointI][cI]*D.boundaryField()[patchID][localFaceI];
+                                break;
+                            }
+
                             // I'm doing same as for internal face. I do not
                             // have field, so i do not have boundaryField
                             //const label localFaceI = faceI - pp.start();
@@ -2939,6 +2990,16 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                         // stencils
                         if (!isA<emptyPolyPatch>(pp))
                         {
+                            // In case of fixed value boundaries we have ghost
+                            // point (boundary value) in stencil
+                            if (isA<fixedValueFvPatchVectorField>(pp) && cI == Nn-2)
+                            {
+                                const label localFaceI = faceI - pp.start();
+                                gradDGP[faceI][pointI] +=
+                                    pointQRGradCoeffs[faceI][pointI][cI]*D.boundaryField()[patchID][localFaceI];
+                                break;
+                            }
+
                             // I'm doing same as for internal face. I do not
                             // have field, so i do not have boundaryField
                             //const label localFaceI = faceI - pp.start();

@@ -50,14 +50,13 @@ tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate
     const List<List<symmTensor>>& sigmaGP
 )
 {
-    Info<<"tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate" << endl;
     tmp<surfaceVectorField> tsf
     (
         new surfaceVectorField
         (
             IOobject
             (
-                "surfaceIntegrateQuadrature(traction)",
+                "surfaceGaussIntegrate(traction)",
                  mesh().time().timeName(),
                  mesh(),
                  IOobject::NO_READ,
@@ -72,16 +71,7 @@ tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate
 
     const List<List<scalar>>& gpW = hoGradPtr_->faceGaussPointsWeight();
 
-    const labelList& faceOwner = mesh().faceOwner();
-    const labelList& faceNeighbour = mesh().faceNeighbour();
-
-    // Unit normal vectors at the faces
-   // const vectorField n(mesh().faceAreaNormals());
-
-    // What if faces are not planar? Should each triangle have corresponding
-    // unit normal?
-
-    forAll(faceOwner, faceI)
+    forAll (tf, faceI)
     {
         // Sigma at the Gauss quadrature points on the face
         const List<symmTensor>& gaussQuadStress = sigmaGP[faceI];
@@ -92,30 +82,45 @@ tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate
         const vector& faceNormal =
             mesh().faceAreas()[faceI]/mag(mesh().faceAreas()[faceI]);
 
-        // Add forces to the owner and neighbour cells
         forAll(gaussQuadStress, pI)
         {
-            // Force contribution for this quadrature point
-            const vector contrib = faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
-
-            // Add to the owner cell
-            const label ownCellID = faceOwner[faceI];
-            tf[ownCellID] += contrib;
-
-            // Add to the neighbour cell, if there is one
-            if (mesh().isInternalFace(faceI))
-            {
-                const label neiCellID = faceNeighbour[faceI];
-                tf[neiCellID] -= contrib;
-            }
-            // else
-            // {
-            //     // Do nothing as processor boundaries already take care
-            //     // of their own cells
-            // }
+            // Add traction contribution of this quadrature point
+            tf[faceI] += faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
         }
     }
 
+    forAll (tf.boundaryField(), patchI)
+    {
+        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        forAll(tfPatch, faceI)
+        {
+            const label globalFaceID = mesh().boundaryMesh()[patchI].start() + faceI;
+
+            // Sigma at the Gauss quadrature points on the face
+            const List<symmTensor>& gaussQuadStress = sigmaGP[globalFaceID];
+
+            // Gauss quadrature weights on the face
+            const List<scalar>& gaussQuadW = gpW[globalFaceID];
+
+            const vector& faceNormal =
+                mesh().faceAreas()[globalFaceID]/mag(mesh().faceAreas()[globalFaceID]);
+
+            forAll(gaussQuadStress, pI)
+            {
+                // Add traction contribution of this quadrature point
+                tfPatch[faceI] += faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
+            }
+        }
+    }
+
+
+    // Unit normal vectors at the faces
+   // const vectorField n(mesh().faceAreaNormals());
+
+    // What if faces are not planar? Should each triangle have corresponding
+    // unit normal?
+
+    //Info<<tf<<endl;
     return tsf;
 };
 
@@ -389,7 +394,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     foamPetscSnesHelper::mapSolutionPetscToFoam();
 
     // TEST
-
+Info<<D()<<endl;
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
 
@@ -835,12 +840,13 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
         // Gradient at Gauss points should be stored in solidModel but for
         // testing this is fine.
         autoPtr<List<List<tensor>>> gradDGPfPtr = hoGradPtr_->fGradGaussPoints(D);
-        const List<List<tensor>>& gradDGPf = gradDGPfPtr.ref();
 
+        // Reference to sigma and gradient fields at Gauss points
+        const List<List<tensor>>& gradDGPf = gradDGPfPtr.ref();
         List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
 
+        // Calcualte sigma at Gauss Points
         mechanical().correct(gradDGPf, sigmaGPf);
-        //Info<<sigmaGPf<<endl;
 
         residual =
             fvc::div(mesh().magSf()*this->GaussIntegrate(sigmaGPf))
