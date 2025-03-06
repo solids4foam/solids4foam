@@ -394,7 +394,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     foamPetscSnesHelper::mapSolutionPetscToFoam();
 
     // TEST
-Info<<D()<<endl;
+
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
 
