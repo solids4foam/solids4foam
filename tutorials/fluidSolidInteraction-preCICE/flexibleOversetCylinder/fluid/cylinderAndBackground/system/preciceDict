@@ -19,12 +19,12 @@ interfaces
     mesh              Fluid-Mesh;
     patches           (walls);
     locations         faceCenters;
-    
+
     readData
     (
       Displacement
     );
-    
+
     writeData
     (
       Force
