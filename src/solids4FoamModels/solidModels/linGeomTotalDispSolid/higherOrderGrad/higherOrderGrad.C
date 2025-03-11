@@ -2984,9 +2984,6 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                 }
                 else // global cell in the stencil
                 {
-                    FatalErrorInFunction
-                        << "implementation not finished" << exit(FatalError);
-
                     if (mesh.isInternalFace(faceI))
                     {
                         gradDGP[faceI][pointI] +=
@@ -3008,16 +3005,17 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                             // have field, so i do not have boundaryField
                             //const label localFaceI = faceI - pp.start();
                             gradDGP[faceI][pointI] +=
-                               pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
+                                pointQRGradCoeffs[faceI][pointI][cI]*DI[neiGlobalCellI];
 
                             // In case of fixed value boundaries we have ghost
                             // point (boundary value) in stencil
-                            if (isA<fixedValueFvPatchVectorField>(pp) && cI == Nn-2)
+                            if (ghostPoint && cI == Nn-2)
                             {
-                                const label localFaceI = faceI - pp.start();
-                                gradDGP[faceI][pointI] +=
+                               const label localFaceI = faceI - pp.start();
+
+                               gradDGP[faceI][pointI] +=
                                     pointQRGradCoeffs[faceI][pointI][Nn-1]*D.boundaryField()[patchID][localFaceI];
-                                break;
+                               break;
                             }
                         }
                     }
