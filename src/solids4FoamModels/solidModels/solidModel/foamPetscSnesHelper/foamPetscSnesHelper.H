@@ -121,6 +121,10 @@ class foamPetscSnesHelper
         //- Was PETSc initialised?
         const Switch initialised_;
 
+        //- Store the options file
+        //  We re-set the options file before each call to solve
+        PetscOptions options_;
+
         //- Flag to set whether the solver stops when PETSs SNES returns an
         //  error
         const Switch stopOnPetscError_;
@@ -361,6 +365,9 @@ public:
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
             //  PetscScalar array pointer. The xBlockSize is looked up
             //  from "Vec x"
+            //  Do NOT use this function if x has a non-constant block size
+            //  Use the version of this function above, where the block size
+            //  is explicitly passed
             template <class Type>
             void ExtractFieldComponents
             (
@@ -405,6 +412,9 @@ public:
             //- Same as above, but takes a PETSc "Vec x" instead of a raw
             //  PetscScalar array pointer. The xBlockSize is looked up
             //  from "Vec x"
+            //  Do NOT use this function if x has a non-constant block size
+            //  Use the version of this function above, where the block size
+            //  is explicitly passed
             template <class Type>
             void InsertFieldComponents
             (

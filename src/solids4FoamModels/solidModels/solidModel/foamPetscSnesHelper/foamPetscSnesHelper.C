@@ -149,7 +149,7 @@ Foam::label Foam::initialiseJacobian
     // Number of off-processor non-zeros per row
     int* o_nnz = (int*)malloc(blockn*sizeof(int));
 
-    // Initialise d_nnz and o_nnz to zero
+    // Initialise d_nnz to one and o_nnz to zero
     for (int i = 0; i < blockn; ++i)
     {
         d_nnz[i] = 1; // count diagonal cell
@@ -454,6 +454,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
 )
 :
     initialised_(initialise),
+    options_(nullptr),
     stopOnPetscError_(stopOnPetscError),
     snes_(nullptr),
     x_(nullptr),
@@ -480,8 +481,18 @@ foamPetscSnesHelper::foamPetscSnesHelper
                 << abort(FatalError);
         }
 
-        // Initialise PETSc with an options file
+        // Initialise PETSc with an options file, but we will need to reset it
+        // before each call to snes.solve as PETSc actively uses only one
+        // options database and there may be several objects using PETSc, e.g.
+        // solid solver, fluid solver, mesh motion
         PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
+
+        // Create and store the options database
+        PetscOptionsCreate(&options_);
+        PetscOptionsInsertFile
+        (
+            PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
+        );
     }
 }
 
@@ -492,12 +503,10 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 {
     if (initialised_)
     {
+        PetscOptionsDestroy(&options_);
         SNESDestroy(&snes_);
-
         VecDestroy(&x_);
-
         MatDestroy(&A_);
-
         snesUserPtr_.clear();
 
         WarningInFunction
@@ -1166,6 +1175,11 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
                 << "initialiseSnes failed" << abort(FatalError);
         }
     }
+
+    // Ensure the correct options database is used
+    PetscOptionsPush(options_);
+    SNESSetFromOptions(snes_);
+    PetscOptionsPop();
 
     // Solve the nonlinear system
     SNESSolve(snes_, NULL, x_);

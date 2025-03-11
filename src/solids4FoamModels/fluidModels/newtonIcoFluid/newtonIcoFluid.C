@@ -29,10 +29,8 @@ License
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "EulerDdtScheme.H"
-#include "backwardDdtScheme.H"
-#include "thermalRobinFvPatchScalarField.H"
-
+// #include "EulerDdtScheme.H"
+// #include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -156,37 +154,37 @@ newtonIcoFluid::newtonIcoFluid
 
     U().oldTime().oldTime();
 
-    if (mesh().dynamic())
-    {
-        Info<< "Constructing face velocity Uf\n" << endl;
+    // if (mesh().dynamic())
+    // {
+    //     Info<< "Constructing face velocity Uf\n" << endl;
 
-        Uf_.reset
-        (
-            new surfaceVectorField
-            (
-                IOobject
-                (
-                    "Uf",
-                    runTime.timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::AUTO_WRITE
-                ),
-                fvc::interpolate(U())
-            )
-        );
+        // Uf_.reset
+        // (
+        //     new surfaceVectorField
+        //     (
+        //         IOobject
+        //         (
+        //             "Uf",
+        //             runTime.timeName(),
+        //             mesh(),
+        //             IOobject::READ_IF_PRESENT,
+        //             IOobject::AUTO_WRITE
+        //         ),
+        //         fvc::interpolate(U())
+        //     )
+        // );
 
-        Uf_().oldTime();
+        // Uf_().oldTime();
 
-        if
-        (
-            word(mesh().ddtScheme("ddt(" + U().name() +')'))
-         == fv::backwardDdtScheme<vector>::typeName
-        )
-        {
-            Uf_().oldTime().oldTime();
-        }
-    }
+        // if
+        // (
+        //     word(mesh().ddtScheme("ddt(" + U().name() +')'))
+        //  == fv::backwardDdtScheme<vector>::typeName
+        // )
+        // {
+        //     Uf_().oldTime().oldTime();
+        // }
+    // }
 
     const fvMesh& mesh = this->mesh();
     const surfaceScalarField& phi = this->phi();
@@ -235,7 +233,7 @@ bool newtonIcoFluid::evolve()
     volVectorField& U = this->U();
     volScalarField& p = this->p();
     surfaceScalarField& phi = this->phi();
-    autoPtr<surfaceVectorField>& Uf = Uf_;
+    // autoPtr<surfaceVectorField>& Uf = Uf_;
     //scalar& cumulativeContErr = cumulativeContErr_;
     //const bool correctPhi = correctPhi_;
     //const bool checkMeshCourantNo = checkMeshCourantNo_;
@@ -274,39 +272,26 @@ bool newtonIcoFluid::evolve()
     // motion
     if (mesh.changing())
     {
-        // MRF not added yet
-        // MRF.update();
-
-        // if (correctPhi)
-        {
-            // Calculate absolute flux
-            // from the mapped surface velocity
-            // phi = mesh.Sf() & Uf();
-
-            // Enable: needed for inlet/outlet?
-            // #include "correctPhi.esi.H"
-
-            // Make the flux relative to the mesh motion
-            fvc::makeRelative(phi, U);
-        }
-
-        // if (checkMeshCourantNo)
-        // {
-        //     #include "meshCourantNo.H"
-        // }
+        // Make the flux relative to the mesh motion
+        fvc::makeRelative(phi, U);
     }
 
     // Solve the nonlinear system and check the convergence
     Info<< "Solving the fluid for U and p" << endl;
     foamPetscSnesHelper::solve();
 
+    // Access the raw solution data
+    const PetscScalar *xx;
+    VecGetArrayRead(foamPetscSnesHelper::solution(), &xx);
+
     // Retrieve the solution
     // Map the PETSc solution to the U field
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
-        foamPetscSnesHelper::solution(),
+        xx,
         U.primitiveFieldRef(),
         0, // Location of U
+        blockSize_,
         fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -316,9 +301,10 @@ bool newtonIcoFluid::evolve()
     // p is located in the final component
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
     (
-        foamPetscSnesHelper::solution(),
+        xx,
         p.primitiveFieldRef(),
-        blockSize_ - 1 // Location of p component
+        blockSize_ - 1, // Location of p component
+        blockSize_
     );
 
     p.correctBoundaryConditions();
@@ -327,7 +313,8 @@ bool newtonIcoFluid::evolve()
     //fvc::correctUf(Uf, U, phi);
 
     // Update the flux
-    phi = mesh.Sf() & Uf();
+    //phi = mesh.Sf() & Uf();
+    phi = mesh.Sf() & fvc::interpolate(U);
 
     if (mesh.changing())
     {
@@ -366,6 +353,12 @@ label newtonIcoFluid::formResidual
     const PetscScalar *x
 )
 {
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
     // Take references
     //const Time& runTime = fluidModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
@@ -397,25 +390,8 @@ label newtonIcoFluid::formResidual
 
     if (mesh.changing())
     {
-        // MRF not added yet
-        // MRF.update();
-
-        // if (correctPhi)
-        {
-            // Calculate absolute flux
-            // from the mapped surface velocity
-            // phi = mesh.Sf() & Uf();
-
-            // #include "correctPhi.esi.H"
-
-            // Make the flux relative to the mesh motion
-            fvc::makeRelative(phi, U);
-        }
-
-        // if (checkMeshCourantNo)
-        // {
-        //     #include "meshCourantNo.H"
-        // }
+        // Make the flux relative to the mesh motion
+        fvc::makeRelative(phi, U);
     }
 
     // Copy x into the p field
@@ -487,7 +463,8 @@ label newtonIcoFluid::formResidual
             (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
         )
       // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
-      - fvc::div(U)
+      - fvc::div(phi)
+      // - fvc::div(U)
     );
 
     // Make residual extensive
@@ -509,6 +486,12 @@ label newtonIcoFluid::formJacobian
     const PetscScalar *x
 )
 {
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
     const fvMesh& mesh = this->mesh();
 
     // Copy x into the U field
@@ -560,6 +543,11 @@ label newtonIcoFluid::formJacobian
 
     UEqn.relax();
 
+    if (debug)
+    {
+        Info<< "Inserting U equation in Afluid" << endl;
+    }
+
     // Convert fvMatrix matrix to PETSc matrix
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     (
@@ -583,6 +571,11 @@ label newtonIcoFluid::formJacobian
     (
         fvm::laplacian(rAUf(), p, "jacobian-laplacian(rAU,p)")
     );
+
+    if (debug)
+    {
+        Info<< "Inserting p equation in Afluid" << endl;
+    }
 
     // Insert the pressure equation
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
@@ -611,6 +604,11 @@ label newtonIcoFluid::formJacobian
         blockSize_ - 1,            // column offset
         fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
     );
+
+    if (debug)
+    {
+        Info<< "End" << endl;
+    }
 
     return 0;
 }

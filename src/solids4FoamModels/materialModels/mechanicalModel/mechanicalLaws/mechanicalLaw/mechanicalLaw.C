@@ -1558,7 +1558,9 @@ Foam::mechanicalLaw::mechanicalLaw
             "    const fvMesh& mesh,\n"
             "    dictionary& dict\n"
             ")"
-        ) << "solid region name not found" << abort(FatalError);
+        )   << "solid region name not found. Maybe you meant to specify the "
+            << "region name in the mechanical law dict? " << nl
+            << "e.g. 'regionName      meshMotionFluid;'" << abort(FatalError);
     }
 
     if (solvePressureEqn_)

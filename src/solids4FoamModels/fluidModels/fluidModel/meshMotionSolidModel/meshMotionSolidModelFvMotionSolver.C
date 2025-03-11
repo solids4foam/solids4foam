@@ -77,12 +77,12 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
             const_cast<Time&>(fvMesh_.time()),
             word(coeffDict().lookup("regionName"))
         )
-    )
+    ),
+    solveEquations_(true)
 {}
 
 
-Foam::meshMotionSolidModelFvMotionSolver::
-meshMotionSolidModelFvMotionSolver
+Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 (
     const polyMesh& mesh,
     const IOdictionary& dict,
@@ -99,15 +99,13 @@ meshMotionSolidModelFvMotionSolver
             const_cast<Time&>(fvMesh_.time()),
             word(coeffDict().lookup("regionName"))
         )
-    )
+    ),
+    solveEquations_(true)
 {
     // Update pointD
     modelPtr_->pointD().primitiveFieldRef() =
         pointDisplacement.primitiveField();
     modelPtr_->pointD().correctBoundaryConditions();
-
-    FatalError
-        << "stop " << __LINE__ << abort(FatalError);
 }
 
 
@@ -146,7 +144,10 @@ void Foam::meshMotionSolidModelFvMotionSolver::solve()
     movePoints(fvMesh_.points());
 
     // Evolve the solid model
-    modelPtr_->evolve();
+    if (solveEquations_)
+    {
+        modelPtr_->evolve();
+    }
 }
 
 

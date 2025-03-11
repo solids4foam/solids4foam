@@ -55,9 +55,10 @@ class newtonCouplingInterface
 {
     // Private data
 
-        // Pointer to the fluid mesh motion solver
-        // We will use a solid solver for this
-        mutable autoPtr<solidModel> meshMotionPtr_;
+        //- Scale factor for the mesh motion equations to preserve the condition
+        //  number of the monlithic system
+        //  We default this to be the reciprocal of the motion's shear modulus
+        const scalar motionSystemScaleFactor_;
 
         //- Scale factor for the solid equations to preserve the condition
         //  number of the monlithic system
@@ -70,8 +71,14 @@ class newtonCouplingInterface
         //- Flag to enable solid-to-fluid coupling
         const Switch solidToFluidCoupling_;
 
+        //- Flag to enable mesh-to-fluid coupling
+        const Switch meshToFluidCoupling_;
+
+        //- Flag to enable solid-to-mesh coupling
+        const Switch solidToMeshCoupling_;
+
         //- Number of sub-regions: 2 for fluid+solid, 3 for
-        //  fluid+meshMotion+solid
+        //  fluid + meshMotion + solid
         const label nRegions_;
 
         //- Pointer to sub-matrices
@@ -80,11 +87,100 @@ class newtonCouplingInterface
 
     // Private Member Functions
 
-        //- Make the fluid mesh motion solver
-        void makeMeshMotion() const;
+        //- Return a reference to the mesh motion solver
+        foamPetscSnesHelper& motion();
 
-        //- Return the fluid mesh motion solver
-        solidModel& meshMotion();
+        //- Return a reference to the mesh motion solver cast as a solid
+        //  model
+        solidModel& motionSolid();
+
+        //- Initialise the Afm Jacobian matrix
+        //  This represents the mesh motion coupling in the fluid equations
+        label initialiseAfm
+        (
+            Mat Afm,
+            const fvMesh& fluidMesh,
+            const label fluidBlockSize,
+            const label motionBlockSize,
+            const bool twoD
+        ) const;
+
+        //- Initialise the Afs Jacobian matrix
+        //  This represents the solid coupling in the fluid equations
+        label initialiseAfs
+        (
+            Mat Afs,
+            const fvMesh& fluidMesh,
+            const label fluidBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        ) const;
+
+        //- Initialise the Ams Jacobian matrix
+        //  This represents the solid coupling in the mesh motion equations
+        label initialiseAms
+        (
+            Mat Ams,
+            const fvMesh& fluidMesh, // same as motion mesh
+            const label motioBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        ) const;
+
+        //- Initialise the Asf Jacobian matrix
+        //  This represents the fluid coupling in the solid equations
+        label initialiseAsf
+        (
+            Mat Afs,
+            const fvMesh& solidMesh,
+            const label fluidBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        ) const;
+
+        //- Insert Afm matrix coefficients
+        //  This represents how the mesh motion affects the fluid equations
+        //  This does NOT zero the entries first
+        label formAfm
+        (
+            Mat Afm,
+            const label fluidBlockSize,
+            const label motionBlockSize,
+            const bool twoD
+        );
+
+        //- Insert Afs matrix coefficients
+        //  This represents how the solid affects the fluid equations
+        //  This does NOT zero the entries first
+        label formAfs
+        (
+            Mat Afs,
+            const label fluidBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        );
+
+        //- Insert Ams matrix coefficients
+        //  This represents how the solid affects the mesh motion equations
+        //  This does NOT zero the entries first
+        label formAms
+        (
+            Mat Ams,
+            const label solidBlockSize,
+            const label motionBlockSize,
+            const bool twoD
+        );
+
+        //- Insert Asf matrix coefficients
+        //  This represents how the fluid affects the solid equations
+        //  This does NOT zero the entries first
+        label formAsf
+        (
+            Mat Asf,
+            const label fluidBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        );
 
         //- Update mesh motion interface displacement
         //  This maps the current solid displacement interface field to the

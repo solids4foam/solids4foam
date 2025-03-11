@@ -143,6 +143,28 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
     );
 }
 
+
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::shearModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "mu",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_
+        )
+    );
+}
+
+
 #ifdef OPENFOAM_COM
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::neoHookeanElastic::materialTangentField() const

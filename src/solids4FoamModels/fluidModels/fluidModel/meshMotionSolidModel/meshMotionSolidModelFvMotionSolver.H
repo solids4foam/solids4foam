@@ -67,6 +67,11 @@ class meshMotionSolidModelFvMotionSolver
         //- Solid model
         mutable autoPtr<solidModel> modelPtr_;
 
+        //- Flag to indicate that the model should solve its equations
+        //  If this is false, it is assumed that the modelPtr_->pointD() field
+        //  is updated by external functions
+        mutable bool solveEquations_;
+
 
     // Private Member Functions
 
@@ -110,6 +115,18 @@ public:
 
 
     // Member Functions
+
+        //- Access to the solid model
+        const solidModel& model() const
+        {
+            return modelPtr_();
+        }
+
+        //- Access to the solveEquations flag
+        bool& solveEquations() const
+        {
+            return solveEquations_;
+        }
 
         //- Return point location obtained from the current motion field
         virtual tmp<pointField> curPoints() const;

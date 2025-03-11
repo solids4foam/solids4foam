@@ -38,6 +38,7 @@ SourceFiles
 #include "turbulentTransportModel.H"
 #include "CorrectPhi.H"
 #include "foamPetscSnesHelper.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -47,7 +48,7 @@ namespace Foam
 namespace fluidModels
 {
 
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                         Class newtonIcoFluid Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -94,6 +95,7 @@ class newtonIcoFluid
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
+
 
     // Private Member Functions
 
