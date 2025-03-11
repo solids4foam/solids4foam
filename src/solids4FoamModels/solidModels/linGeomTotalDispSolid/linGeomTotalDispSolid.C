@@ -821,41 +821,50 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     const_cast<volVectorField&>(D).correctBoundaryConditions();
 
     // Update gradient of displacement
-    if (hoGradPtr_)
-    {
-        gradD() = hoGradPtr_->grad(D);
-        //const surfaceTensorField gradDf(hoGradPtr_->fGrad(D));
-    }
-    else
-    {
+    // if (hoGradPtr_)
+    // {
+    //     gradD() = hoGradPtr_->grad(D);
+    //     //const surfaceTensorField gradDf(hoGradPtr_->fGrad(D));
+    // }
+    // else
+    // {
         mechanical().grad(D, gradD());
-    }
+    // }
 
     // TESTING
-    // Calculate div using high order integration
-    if (hoGradInt_)
-    {
+    // Calculate residual using high order integration
+//    if (hoGradInt_)
+//    {
         // Here we will calculate displacement gradient at Gauss points and call
         // mechanical law to calculate sigma from it.
         // Gradient at Gauss points should be stored in solidModel but for
         // testing this is fine.
-        autoPtr<List<List<tensor>>> gradDGPfPtr = hoGradPtr_->fGradGaussPoints(D);
+        autoPtr<List<List<tensor>>> gradDGPfPtr =
+            hoGradPtr_->fGradGaussPoints(D);
 
         // Reference to sigma and gradient fields at Gauss points
         const List<List<tensor>>& gradDGPf = gradDGPfPtr.ref();
         List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
 
-        // Calcualte sigma at Gauss Points
+        forAll(gradDGPf, faceI)
+        {
+            if (faceI > 160 && faceI < 192)
+            {
+                Info<< "FaceI: " <<faceI << "->" <<gradDGPf[faceI] << endl;
+            }
+        }
+
+        // // Calcualte sigma at Gauss Points
         mechanical().correct(gradDGPf, sigmaGPf);
 
-        residual =
-            fvc::div(mesh().magSf()*this->GaussIntegrate(sigmaGPf))
-          + rho()
-           *(
-                g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
-            );
-    }
-    else
+    //     residual =
+    //         fvc::div(mesh().magSf()*this->GaussIntegrate(sigmaGPf))
+    //       + rho()
+    //        *(
+    //             g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+    //         );
+    // }
+//    else
     {
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
