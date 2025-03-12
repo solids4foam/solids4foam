@@ -171,6 +171,14 @@ public:
                 pointSymmTensorField& sigma, const pointTensorField& gradD
             );
 
+            //- TESTING, grad at gauss points (gradDGPf)  should be stored
+            //  in solidModel.C
+            void correct
+            (
+                const List<List<tensor>>& gradDGPf,
+                List<List<symmTensor>>& sigmaGPf
+            );
+
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);
 

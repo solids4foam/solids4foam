@@ -86,14 +86,29 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Use high order integration for residual calculation
+        const Switch hoGradInt_;
+
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
 
         //- Higher order gradient calculator
         autoPtr<higherOrderGrad> hoGradPtr_;
 
+        //- Sigma at Gauss Points, this should live in solidModel. Added
+        //  here just for testing purpose.
+        mutable autoPtr<List<List<symmTensor>>> sigmaGPfPtr_;
+
 
     // Private Member Functions
+
+        // TESTING
+        //- This should be placed in fvc folder as template.
+        //  With this trick we can use standard fvc::div approach
+        tmp<surfaceVectorField>  GaussIntegrate
+        (
+            const List<List<symmTensor>>& sigmaGP
+        );
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps

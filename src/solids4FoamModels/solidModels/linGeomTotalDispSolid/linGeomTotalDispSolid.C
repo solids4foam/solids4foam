@@ -45,6 +45,82 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
+tmp<surfaceVectorField> linGeomTotalDispSolid::GaussIntegrate
+(
+    const List<List<symmTensor>>& sigmaGP
+)
+{
+    tmp<surfaceVectorField> tsf
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "surfaceGaussIntegrate(traction)",
+                 mesh().time().timeName(),
+                 mesh(),
+                 IOobject::NO_READ,
+                 IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimPressure, vector::zero)
+        )
+    );
+
+    surfaceVectorField& tf = tsf.ref();
+
+    const List<List<scalar>>& gpW = hoGradPtr_->faceGaussPointsWeight();
+
+    forAll (tf, faceI)
+    {
+        // Sigma at the Gauss quadrature points on the face
+        const List<symmTensor>& gaussQuadStress = sigmaGP[faceI];
+
+        // Gauss quadrature weights on the face
+        const List<scalar>& gaussQuadW = gpW[faceI];
+
+        const vector& faceNormal =
+            mesh().faceAreas()[faceI]/mag(mesh().faceAreas()[faceI]);
+
+        forAll(gaussQuadStress, pI)
+        {
+            // Add traction contribution of this quadrature point
+            tf[faceI] += faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
+        }
+    }
+
+    forAll (tf.boundaryField(), patchI)
+    {
+        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        forAll(tfPatch, faceI)
+        {
+            const label globalFaceID = mesh().boundaryMesh()[patchI].start() + faceI;
+
+            // Sigma at the Gauss quadrature points on the face
+            const List<symmTensor>& gaussQuadStress = sigmaGP[globalFaceID];
+
+            // Gauss quadrature weights on the face
+            const List<scalar>& gaussQuadW = gpW[globalFaceID];
+
+            const vector& faceNormal =
+                mesh().faceAreas()[globalFaceID]/mag(mesh().faceAreas()[globalFaceID]);
+
+            forAll(gaussQuadStress, pI)
+            {
+                // Add traction contribution of this quadrature point
+                tfPatch[faceI] += faceNormal & (gaussQuadStress[pI] * gaussQuadW[pI]);
+            }
+        }
+    }
+
+    // Unit normal vectors at the faces
+    // const vectorField n(mesh().faceAreaNormals());
+    // What if faces are not planar? Should each triangle have corresponding
+    // unit normal?
+
+    return tsf;
+};
+
 
 void linGeomTotalDispSolid::predict()
 {
@@ -465,6 +541,10 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    hoGradInt_
+    (
+        solidModelDict().lookupOrDefault<Switch>("higherOrderIntegration", false)
+    ),
     ds_
     (
         IOobject
@@ -478,7 +558,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     ),
-    hoGradPtr_()
+    hoGradPtr_(),
+    sigmaGPfPtr_()
 {
     DisRequired();
 
@@ -489,6 +570,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    if (hoGradInt_ && !solidModelDict().get<Switch>("higherOrderGrad"))
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "In case of Gauss integration, higherOrderGrad switch should be"
+            << "set to true" << abort(FatalError);
+    }
 
     if (solidModelDict().lookupOrDefault<Switch>("higherOrderGrad", false))
     {
@@ -517,6 +605,23 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 solidModelDict().subDict("higherOrderGradCoeffs")
             )
         );
+
+        sigmaGPfPtr_.set
+        (
+            new List<List<symmTensor>>(mesh().nFaces())
+        );
+
+        List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
+
+        forAll(sigmaGPf, i)
+        {
+            List<symmTensor>& faceSigmaGP = sigmaGPf[i];
+
+            const label nbOfTriangles = mesh().faces()[i].size() ;
+            const label nbOfGaussPoints = nbOfTriangles*hoGradPtr_->triQuadraturePtsNb();
+
+            faceSigmaGP.setSize(nbOfGaussPoints);
+        }
     }
 
     if (predictor_)
@@ -728,8 +833,44 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh().Sf()/mesh().magSf());
 
-    // Traction vectors at the faces
-    surfaceVectorField traction(n & fvc::interpolate(sigma()));
+    // Traction vectors at the faces.
+    surfaceVectorField traction
+    (
+        IOobject
+        (
+            "traction",
+             mesh().time().timeName(),  // or runTime.timeName()
+             mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("0", dimPressure, vector::zero)
+    );
+
+    if (hoGradInt_)
+    {
+        // Here we will calculate displacement gradient at Gauss points and call
+        // mechanical law to calculate sigma from it.
+        // Gradient at Gauss points should be stored in solidModel but for
+        // testing this is fine.
+        autoPtr<List<List<tensor>>> gradDGPfPtr =
+            hoGradPtr_->fGradGaussPoints(D);
+
+        // Reference to sigma and gradient fields at Gauss points
+        const List<List<tensor>>& gradDGPf = gradDGPfPtr.ref();
+        List<List<symmTensor>>& sigmaGPf = sigmaGPfPtr_.ref();
+
+        // Calcualte sigma at Gauss Points
+        // This should be mechanical().correct(sigma());
+        mechanical().correct(gradDGPf, sigmaGPf);
+
+        traction = this->GaussIntegrate(sigmaGPf);
+    }
+    else
+    {
+        traction = n & fvc::interpolate(sigma());
+    }
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
