@@ -327,6 +327,9 @@ bool linGeomTotalDispSolid::evolveSnes()
         p().correctBoundaryConditions();
     }
 
+    // Update gradient of displacement
+    mechanical().grad(D(), gradD());
+
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
     pointD().correctBoundaryConditions();

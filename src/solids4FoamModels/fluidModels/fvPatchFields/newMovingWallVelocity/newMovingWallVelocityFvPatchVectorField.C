@@ -140,8 +140,6 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 
 void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 {
-//     Info << "newMovingWallVelocityFvPatchVectorField::updateCoeffs" << endl;
-
     if (updated())
     {
         return;
@@ -159,7 +157,6 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
     vectorField Up(p.size(), vector::zero);
 
-    //const pointField& oldPoints = mesh.oldPoints();
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
@@ -185,7 +182,6 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
         {
             oldoldFc_ = oldFc_;
             oldFc_ = Fc_;
-            // Fc_ = pp.faceCentres();
 
             myTimeIndex_ = mesh.time().timeIndex();
         }
@@ -207,25 +203,15 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
             deltaT0 = GREAT;
         }
 
-        //Set coefficients based on deltaT and deltaT0
+        // Set coefficients based on deltaT and deltaT0
         scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
         scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-//         scalar coefft0  = coefft + coefft00;
-
-//         Up = (coefft*Fc_ - coefft0*oldFc_ + coefft00*oldoldFc_)
-//            /mesh.time().deltaT().value();
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
           - coefft00*(oldFc_ - oldoldFc_)/deltaT;
-
-//         Info << max(mag(Up)) << endl;
     }
     else // Euler
     {
-//         Info << "void newMovingWallVelocityFvPatchVectorField::updateCoeffs() - "
-//             << "Euler"
-//             << endl;
-
         if (myTimeIndex_ < mesh.time().timeIndex())
         {
             oldoldFc_ = oldFc_;
@@ -243,8 +229,11 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
         Up = (Fc_ - oldFc_)/mesh.time().deltaT().value();
     }
 
-    scalarField phip =
-        p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
+    scalarField phip(p.size(), 0);
+    if (mesh.moving())
+    {
+        phip = p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
+    }
 
     const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();

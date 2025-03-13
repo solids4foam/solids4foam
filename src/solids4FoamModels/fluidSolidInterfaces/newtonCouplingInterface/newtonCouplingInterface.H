@@ -182,6 +182,9 @@ class newtonCouplingInterface
             const bool twoD
         );
 
+        //- Map the velocity from the solid to the fluid interface
+        void mapInterfaceSolidUToFluidU();
+
         //- Update mesh motion interface displacement
         //  This maps the current solid displacement interface field to the
         //  mesh motion displacement field. Both D and pointD are mapped
