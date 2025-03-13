@@ -405,16 +405,26 @@ void Foam::linearElastic::correct
     List<List<symmTensor>>& sigmaGPf
 )
 {
+    // Initialise eps outside loop
+    symmTensor epsilon = symmTensor::zero;
+
+    // Get mu and lambda values
+    const scalar mu = mu_.value();
+    const scalar lambda = lambda_.value();
+
     forAll(sigmaGPf, faceI)
     {
-        const List<symmTensor>& faceSigmaGP = sigmaGPf[faceI];
+        List<symmTensor>& faceSigmaGP = sigmaGPf[faceI];
+        const List<tensor>& faceGradDGP = gradDGPf[faceI];
 
         forAll(faceSigmaGP, gpI)
         {
-            const symmTensor epsilon = symm(gradDGPf[faceI][gpI]);
+            // const symmTensor epsilon = symm(gradDGPf[faceI][gpI]);
+            epsilon = symm(faceGradDGP[gpI]);
 
-            sigmaGPf[faceI][gpI] =
-                (2.0*mu_*epsilon + lambda_*tr(epsilon)*symmTensor::I).value();
+            // sigmaGPf[faceI][gpI] =
+                // (2.0*mu_*epsilon + lambda_*tr(epsilon)*symmTensor::I).value();
+            faceSigmaGP[gpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
         }
     }
 }
