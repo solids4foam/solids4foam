@@ -16,13 +16,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel    linearGeometryTotalDisplacement;
+solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-linearGeometryTotalDisplacementCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
-    // solvePressure yes;
-    // pressureSmoothingCoeff 1e2;
-
     // Solution algorithm
     //solutionAlgorithm implicitSegregated;
     solutionAlgorithm PETScSNES;

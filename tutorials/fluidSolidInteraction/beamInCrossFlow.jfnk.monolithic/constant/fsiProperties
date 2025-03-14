@@ -32,6 +32,8 @@ NewtonMonolithicCoeffs
     //stopOnPetscError no;
     fluidToSolidCoupling yes;
     solidToFluidCoupling yes;
+    meshToFluidCoupling  yes;
+    solidToMeshCoupling  yes;
 
     //solidSystemScaleFactor 1e-12;
 

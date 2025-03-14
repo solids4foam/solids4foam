@@ -16,12 +16,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dynamicFvMesh staticFvMesh;
+//dynamicFvMesh staticFvMesh;
 
-// dynamicFvMesh dynamicMotionSolverFvMesh;
-
-// "solver|motionSolver" velocityLaplacian;
-
-// diffusivity quadratic inverseDistance (interface);
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+solver          solids4foamSolidModel;
+solids4foamSolidModelCoeffs
+{
+    regionName      meshMotionFluid;
+}
 
 // ************************************************************************* //

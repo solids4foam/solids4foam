@@ -24,21 +24,37 @@ boundaryField
 {
     interface
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            fixedValue;
         value           uniform (0 0 0);
     }
     bottom
     {
-       type            fixedDisplacement;
-       value           uniform (0 0 0);
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    left
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
     }
     symmetry
     {
-       type            solidSymmetry;
-       patchType       symmetry;
-       value           uniform (0 0 0);
+        type            symmetry;
     }
 }
 

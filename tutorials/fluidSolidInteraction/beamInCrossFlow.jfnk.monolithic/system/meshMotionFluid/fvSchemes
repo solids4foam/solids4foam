@@ -11,35 +11,48 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
-
-internalField   uniform (0 0 0);
-
-boundaryField
+d2dt2Schemes
 {
-    interface
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    bottom
-    {
-       type            fixedDisplacement;
-       value           uniform (0 0 0);
-    }
-    symmetry
-    {
-       type            solidSymmetry;
-       patchType       symmetry;
-       value           uniform (0 0 0);
-    }
+    default                 steadyState;
+    //default                 Euler;
+    //default                 backward;
+}
+
+ddtSchemes
+{
+    // default                 backward;
+    default                 Euler;
+}
+
+gradSchemes
+{
+    default                 leastSquaresS4f;
+}
+
+divSchemes
+{
+    default                 none; //Gauss linear;
+}
+
+laplacianSchemes
+{
+    default                 Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default                 corrected;
+}
+
+interpolationSchemes
+{
+    default                 linear;
 }
 
 // ************************************************************************* //

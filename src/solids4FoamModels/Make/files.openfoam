@@ -60,6 +60,7 @@ $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 
 linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
+$(linGeomLaws)/diffusionElastic/diffusionElastic.C
 $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C

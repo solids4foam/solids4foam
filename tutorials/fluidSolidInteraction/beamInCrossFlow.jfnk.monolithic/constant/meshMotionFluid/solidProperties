@@ -11,34 +11,35 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+solidModel    linearGeometryTotalDisplacement;
+//solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-internalField   uniform (0 0 0);
-
-boundaryField
+"linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
 {
-    interface
+    // solvePressure yes;
+    // pressureSmoothingCoeff 1e2;
+
+    // Solution algorithm
+    //solutionAlgorithm implicitSegregated;
+    solutionAlgorithm PETScSNES;
+    //solutionAlgorithm explicit;
+
+    // PETSc options file used by PETScSNES
+    // optionsFile petscOptions.hypre;
+    optionsFile petscOptions.meshMotion.lu;
+
+    // Predictor D at the start of a new time step using U and A
+    //predictor yes;
+
+    stabilisation
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    bottom
-    {
-       type            fixedDisplacement;
-       value           uniform (0 0 0);
-    }
-    symmetry
-    {
-       type            solidSymmetry;
-       patchType       symmetry;
-       value           uniform (0 0 0);
+        type    RhieChow;
+        scaleFactor 1.0;
     }
 }
 
