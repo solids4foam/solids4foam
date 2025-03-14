@@ -1466,6 +1466,10 @@ void newtonCouplingInterface::updateMeshMotionInterfaceDisplacement()
     // Use "==" to reassign fixedValue
     motionSolid().pointD().boundaryFieldRef()[fluidPatchID] ==
         meshPatchPointD;
+
+    // Correct boundary conditions to enforce the new patch values on the
+    // internal field
+    motionSolid().pointD().correctBoundaryConditions();
 }
 
 
