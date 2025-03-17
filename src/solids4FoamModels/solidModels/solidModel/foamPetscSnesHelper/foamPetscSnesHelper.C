@@ -904,8 +904,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 
             // Add -(1 - w)*Sf*Up as the own contribution to the nei eqn
             // Flip the sign
-            // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
-            coeff = -sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
+            coeff = -sign*(wI[faceI])*UI[ownCellID]*SfI[faceI];
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
