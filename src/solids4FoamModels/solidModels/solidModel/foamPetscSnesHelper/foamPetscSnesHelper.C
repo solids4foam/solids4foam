@@ -1031,7 +1031,13 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         {
             notImplemented("div(phi,U) additional term for processors");
         }
-        else if (patch.type() != "empty" && !pU.fixesValue())
+        else if
+        (
+            patch.type() != "empty"
+         && !isA<symmetryFvPatchField<vector>>(pU)
+         && !isA<symmetryPlaneFvPatchField<vector>>(pU)
+         && !pU.fixesValue()
+        )
         {
             forAll(fc, faceI)
             {
@@ -1176,13 +1182,15 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
         }
     }
 
-    // Ensure the correct options database is used
+    // Load the correct options database
     PetscOptionsPush(options_);
     SNESSetFromOptions(snes_);
-    PetscOptionsPop();
 
     // Solve the nonlinear system
     SNESSolve(snes_, NULL, x_);
+
+    // Un-load the options file
+    PetscOptionsPop();
 
     // Check convergence
     SNESConvergedReason reason;
