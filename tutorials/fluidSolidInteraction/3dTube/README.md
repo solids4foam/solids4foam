@@ -226,7 +226,7 @@ The tutorial case for approach 6, which uses preCICE, is located at
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
-`Allrun` script, i.e. `./Allclean`.
+ `Allrun` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -305,11 +305,17 @@ iterations per time step. In the figures, the approaches are designated as:
 ### Figure 7: Number of FSI iterations per time-step with deltaT = 1e-4 s
 
 The predictions from all approaches agree closely. Examining the number of FSI
-iterations per time step, both implementations (solids4foam and preCICE) of
-Dirichlet-Neumann coupling with IQN-ILS acceleration is seen to require the
-the fewest number of iterations. The weakly compressible approach is the next best
-performing approach, while the incompressible Aitken's-accelerated
-Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
+ iterations per time step, both implementations (solids4foam and preCICE) of
+ Dirichlet-Neumann coupling with IQN-ILS acceleration is seen to require the
+ the fewest number of iterations. The weakly compressible approach is the next
+ best performing approach, while the incompressible Aitken's-accelerated
+ Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
+ The reason that the solids4foam and preCICE IQN-ILS implementations show
+ different numbers of iterations may be attributed to differences in the coupling
+ configurations and implementation; for example, the preCICE IQN-ILS is
+ configured in this case to use the results from the previous 15 time steps,
+ whereas solids4foam here uses results from two time steps; in addition,
+ implementations of the residual convergence checks are different.
 
 ### Small Time Step
 
