@@ -22,7 +22,7 @@ fluidSolidInterface thermal;
     fluidPatch interface;
 
     predictTemperatureAndHeatFlux true;
-    
+
     relaxationFactor 1;
 
     interfaceDeformationLimit 0;

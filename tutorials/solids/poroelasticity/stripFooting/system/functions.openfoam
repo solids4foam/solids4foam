@@ -8,8 +8,8 @@ functions
         outputControl  outputTime;
         outputInterval 1;
         probeLocations
-        (    
-            (0.01 0.05 9.98)       
+        (
+            (0.01 0.05 9.98)
         );
         fields
         (

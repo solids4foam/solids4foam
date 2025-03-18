@@ -47,9 +47,9 @@ This case can be analysed in two forms:
 
 ```note
 The `beamInCrossFlow` case in solids4foam is set up in the modified form;
-however, it is straight-forward to return the case to its original form by
-setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
-and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+ however, it is straight-forward to return the case to its original form by
+ setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
+ and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
 ```
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
@@ -341,45 +341,45 @@ domain
 
 ```tip
 **Solution 1**: some of the solidModels use a non-moving mesh formulation so, by
-default, some solids may not move at all when shown in ParaView. To show the
-solid domain deformation/motion in ParaView, select the solid case and use the
-“Warp By Vector” filter with the displacement (`D` or `pointD`) field. If there
-is still a gap between the fluid and solid, see Solution 2 below.
+ default, some solids may not move at all when shown in ParaView. To show the
+ solid domain deformation/motion in ParaView, select the solid case and use the
+ “Warp By Vector” filter with the displacement (`D` or `pointD`) field. If there
+ is still a gap between the fluid and solid, see Solution 2 below.
 ```
 
 ```tip
 **Solution 2**: if the FSI loop does not converge then the FSI interface
-constraints (see below) may not be strictly enforced; examine the “fsi residual”
-in the log file and check if the maximum number of FSI iterations is being
-reached. If the FSI method is not converging to the required tolerance, then
-increases the maximum number of FSI correctors and/or decrease the initial
-relaxation factor (in fsiProperties). In addition, you can try a different FSI
-coupling procedure. If the FSI loop is converging but there is still a gap
-between the fluid and solid, see the next points on the following slide.
+ constraints (see below) may not be strictly enforced; examine the “fsi residual”
+ in the log file and check if the maximum number of FSI iterations is being
+ reached. If the FSI method is not converging to the required tolerance, then
+ increases the maximum number of FSI correctors and/or decrease the initial
+ relaxation factor (in fsiProperties). In addition, you can try a different FSI
+ coupling procedure. If the FSI loop is converging but there is still a gap
+ between the fluid and solid, see the next points on the following slide.
 ```
 
 ```tip
 **Solution 3**: if the FSI loop is converging but there is still a gap between
-the fluid and solid, then try increase the FSI solution tolerance (in
-`fsiProperties`); you may also need to increase the maximum number of FSI
-correctors to achieve a tighter tolerance. If this still does not help, see
-Solution 4 below.
+ the fluid and solid, then try increase the FSI solution tolerance (in
+ `fsiProperties`); you may also need to increase the maximum number of FSI
+ correctors to achieve a tighter tolerance. If this still does not help, see
+ Solution 4 below.
 ```
 
 ```tip
 **Solution 4**: try create a conformal fluid-to-solid interface i.e. make the
-fluid interface patch mesh exactly the same as the solid interface patch mesh.
+ fluid interface patch mesh exactly the same as the solid interface patch mesh.
 ```
 
 ```tip
 **Solution 5**: if the FSI method is still struggling to converge, try make the
-problem “easier” by setting the solid to be temporarily stiffer and denser (in
-mechanicalProperties) by e.g. multiple orders of magnitude. If the problem works
-with the artificially stiff/dense solid, then slowly decrease the solid
-properties towards the real ones until you find the point at which the FSI
-methods breaks; then try decreasing the starting FSI relaxation factor and/or
-maximum number of FSI correctors and/or FSI coupling algorithm to determine the
-critical/optimal algorithm variables.
+ problem “easier” by setting the solid to be temporarily stiffer and denser (in
+ mechanicalProperties) by e.g. multiple orders of magnitude. If the problem works
+ with the artificially stiff/dense solid, then slowly decrease the solid
+ properties towards the real ones until you find the point at which the FSI
+ methods breaks; then try decreasing the starting FSI relaxation factor and/or
+ maximum number of FSI correctors and/or FSI coupling algorithm to determine the
+ critical/optimal algorithm variables.
 ```
 
 #### Problem 2
@@ -388,42 +388,42 @@ The solid model is not converging
 
 ```tip
 **Solution 1**: try use a lower under-relaxation factor in the solid fvSolution
-relaxationFactors sub-dict; use a value of 0.1-1.0 for the `D` or `DD` fields
-and/or 0.9-1.0 for the `D` or `DD` equations.
+ relaxationFactors sub-dict; use a value of 0.1-1.0 for the `D` or `DD` fields
+ and/or 0.9-1.0 for the `D` or `DD` equations.
 ```
 
 ```tip
 **Solution 2**: try a different (more robust) solid model e.g. linear geometry
-solid models, such as `linGeomTotalDispSolid` and
-`coupledUnsLinGeomLinearElasticSolid`, tend to converge better than the
-non-linear geometry models.
+ solid models, such as `linGeomTotalDispSolid` and
+ `coupledUnsLinGeomLinearElasticSolid`, tend to converge better than the
+ non-linear geometry models.
 ```
 
 #### General Tips
 
 ```tip
-Perform independent analyses on the solid and fluid domains separately, before
-enabling FSI coupling, to ensure all fluid and solid properties, meshes, schemes,
-etc. are reasonable.
+ Perform independent analyses on the solid and fluid domains separately, before
+ enabling FSI coupling, to ensure all fluid and solid properties, meshes, schemes,
+ etc. are reasonable.
 ```
 
 ```tip
-If you are having convergence issues, try prepare a more simple - but
-representative - version of your case and make sure that works: it may provide
-understanding of critical settings.
+ If you are having convergence issues, try prepare a more simple - but
+ representative - version of your case and make sure that works: it may provide
+ understanding of critical settings.
 ```
 
 ```tip
-If you are having convergence issues, try use a conformal mesh at the fluid-to-
-solid interface.
+ If you are having convergence issues, try use a conformal mesh at the fluid-to-
+ solid interface.
 ```
 
 ```tip
 **Tip**: if you are having convergence issues, try a different (more robust)
-fluid model and/or a different (more robust) solid model; the pUCoupledFoam
-fluidModel tends to converge well and the linear geometry solid models (e.g.
-`linGeomTotalDispSolid` or `coupledUnsLinGeomLinearElasticSolid`) tend to
-converge better than the non-linear geometry models
+ fluid model and/or a different (more robust) solid model; the pUCoupledFoam
+ fluidModel tends to converge well and the linear geometry solid models (e.g.
+ `linGeomTotalDispSolid` or `coupledUnsLinGeomLinearElasticSolid`) tend to
+ converge better than the non-linear geometry models
 ```
 
 ---
@@ -433,9 +433,9 @@ converge better than the non-linear geometry models
 #### `fluidSolidInterface`
 
 For the `cylinderInChannel` test case, we have selected a “fluidSolidInterface”
-analysis in the `physicsProperties` dictionary: this means a
-`fluidSolidInterface` class will be selected; then, we specify the actual
-`fluidSolidInterface` class to be the `AitkenCouplingInterface` class.
+ analysis in the `physicsProperties` dictionary: this means a
+ `fluidSolidInterface` class will be selected; then, we specify the actual
+ `fluidSolidInterface` class to be the `AitkenCouplingInterface` class.
 
 The code for the `AitkenCouplingInterface` class is located at:
 

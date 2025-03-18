@@ -26,7 +26,7 @@ boundaryField
     left
     {
         type            fixedValue;
-        value           uniform 283;        
+        value           uniform 283;
     }
 
     right
@@ -36,10 +36,10 @@ boundaryField
         // Apply dirichlet bc
         // dirichlet true;
         // neumann false;
- 
+
         lambda lambdaEff;
-        
-        value           uniform 283;        
+
+        value           uniform 283;
     }
 
     bottom

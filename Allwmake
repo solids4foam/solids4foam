@@ -16,6 +16,12 @@ else
     fi
 fi
 
+# Parse arguments for library compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
+fi
+
 # Download ThirdParty software
 (cd ThirdParty && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
