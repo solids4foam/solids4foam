@@ -257,11 +257,11 @@ point A (see Figure 1) vs time, while `radialDisplacement.pdf` plots the radial
 displacement of point A. The `fsiConvergence.pdf` (Figure 4) file plots the
 number of FSI iterations per time step.
 
-![Axial displacement](images/axialDisplacement.pdf)
+![Axial displacement](images/axialDisplacement.png)
 
 ### Figure 3: `axialDisplacement.pdf`
 
-![FSI convergence](images/fsiConvergence.pdf)
+![FSI convergence](images/fsiConvergence.png)
 
 ### Figure 4: `fsiConvergence.pdf`
 
