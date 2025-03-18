@@ -1,5 +1,5 @@
 ---
-title: 'solids4foam-v2.1: A toolbox for performing solid mechanics and fluid-solid interaction simulations in OpenFOAM'
+title: 'solids4foam: A toolbox for performing solid mechanics and fluid-solid interaction simulations in OpenFOAM'
 tags:
   - C++
   - computational mechanics
