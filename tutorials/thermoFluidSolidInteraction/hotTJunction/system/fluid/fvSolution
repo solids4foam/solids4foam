@@ -85,10 +85,10 @@ PIMPLE
     nOuterCorrectors 20;
     nCorrectors 3;
     nNonOrthogonalCorrectors 1;
-    
+
     pRefPoint        (-0.02 0.02 0);
     pRefValue        0;
-    
+
     residualControl
     {
         U
@@ -114,7 +114,7 @@ relaxationFactors
     {
         p    0.9;
         pFinal    0.9;
-        
+
         T 1;
         TFinal 1;
     }

@@ -29,7 +29,7 @@ then
     else
         echo "postProcessing/0/solidStressesinner.dat not found:"
         echo "    plot.pdf not created"
-    fi        
+    fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi

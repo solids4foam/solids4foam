@@ -59,7 +59,7 @@ patches
     )
     patch left
     (
-	(2 5 11 8)	
+	(2 5 11 8)
     )
     empty back
     (
@@ -69,7 +69,7 @@ patches
     empty front
     (
 	(0 1 7 6)
-	(1 2 8 7)	
+	(1 2 8 7)
     )
     symmetryPlane  right
     (

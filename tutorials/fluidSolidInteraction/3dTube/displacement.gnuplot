@@ -14,9 +14,9 @@ set yrange [-0.1:0.1]
 plot \
     "postProcessing/0/solidPointDisplacement_displacement.dat" u 1:(1000*$4)\
     w l lc "red" lw 0.5 lt 1 t "Axial displacement"
-    
-# Radial displacement  
-  
+
+# Radial displacement
+
 set output "radialDisplacement.pdf"
 set title "3dTube: Radial Displacement at Point A"
 set ylabel "Radial Displacement [mm]"

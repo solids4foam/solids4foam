@@ -20,7 +20,7 @@ then
     # Comment timeVaryingUniformFixedValue
     sed -i '/timeVaryingUniformFixedValue/s/^/\/\//g' 0/fluid/U
 
-    # Uncomment 
+    # Uncomment
     sed -i '/scaledFixedValue/s/^\/\///g' 0/fluid/U
 fi
 

@@ -60,7 +60,7 @@ then
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
-    
+
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
     checkAndReport \
