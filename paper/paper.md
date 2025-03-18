@@ -77,7 +77,7 @@ To ensure realistic constraints and interactions, solids4foam includes a variety
 
 ## Fluid Models
 
-To enable fluid-solid interaction simulations, `solids4foam` integrates with ported versions of the OpenFOAM’s fluid solvers. The toolbox supports incompressible flows, including PIMPLE and PIMPLE-overset methods, as well as multiphase flows using the volume-of-fluid approach. For applications requiring compressibility effects, it also includes a weakly compressible fluid solver [@Oliveira2022], expanding the scope of problems that can be addressed.
+To enable fluid-solid interaction simulations, `solids4foam` integrates with ported versions of the OpenFOAM’s fluid solvers. The toolbox supports incompressible flows, including PIMPLE and PIMPLE-overset methods, as well as multiphase flows using the volume-of-fluid approach. For applications requiring compressibility effects, it also includes a weakly compressible fluid solver [@Oliveira2022], expanding the scope of problems that can be addressed. In addition, `solids4foam` supports coupling via preCICE (see the example in the [tutorials guide](https://www.solids4foam.com/tutorials/)); that is, `solids4foam` can be used as a solid solver in a preCICE-coupled simulation, allowing coupling with a broader range of OpenFOAM and non-OpenFOAM fluid models, potentially with additional physics.
 
 ## Function Objects
 
