@@ -51,7 +51,7 @@ The `solids4foam` toolbox addresses four primary needs within the OpenFOAM commu
 The design of `solids4foam` adheres to four guiding principles:
 
 1. **Usability:** If you can use OpenFOAM, you can use `solids4foam`.
-2. **Compatibility:** Supports the three main OpenFOAM forks: OpenFOAM.com, OpenFOAM.org, and foam-extend.
+2. **Compatibility:** Supports the three main OpenFOAM variants: OpenFOAM.com, OpenFOAM.org, and foam-extend.
 3. **Ease of Installation:** The toolbox is easy to install and requires minimal additional dependencies beyond OpenFOAM.
 
 
@@ -85,7 +85,7 @@ The toolbox provides several function objects for post-processing and in-situ an
 
 ## Utilities and Scripts
 
-`solids4foam` includes a collection of utilities and scripts to enhance usability and compatibility across different OpenFOAM forks. These utilities ensure smooth interoperability between OpenFOAM versions, simplifying installation and execution. Additionally, solids4foam provides mesh conversion tools to facilitate OpenFOAM-to-Abaqus and Abaqus-to-OpenFOAM mesh transformations, enabling seamless integration with external finite element solvers.
+`solids4foam` includes a collection of utilities and scripts to enhance usability and compatibility across different OpenFOAM variants. These utilities ensure smooth interoperability between OpenFOAM versions, simplifying installation and execution. Additionally, solids4foam provides mesh conversion tools to facilitate OpenFOAM-to-Abaqus and Abaqus-to-OpenFOAM mesh transformations, enabling seamless integration with external finite element solvers.
 
 ## Tutorials
 
