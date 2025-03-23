@@ -219,6 +219,9 @@ class newtonCouplingInterface
         //  mesh motion displacement field. Both D and pointD are mapped
         void mapInterfaceSolidUToMeshMotionD();
 
+        //- Predict the solution field at the start of a new time step
+        void predict();
+
         //- Disallow default bitwise copy construct
         newtonCouplingInterface(const newtonCouplingInterface&);
 

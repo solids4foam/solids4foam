@@ -108,6 +108,9 @@ class fluidSolidInterface
         //- Predictor on/off
         const Switch predictor_;
 
+        //- Current time step index
+        mutable label curTimeIndex_;
+
         //- Interface deformation limit
         const scalar interfaceDeformationLimit_;
 
@@ -185,6 +188,10 @@ protected:
 
         //- Update the coupled switch based on the couplingStartTime
         bool updateCoupled();
+
+        //- Is it a new time step? This function return true the first time
+        //  it is called in a time step
+        bool newTimeStep() const;
 
         //- Return sub-dictionary
         dictionary& fsiProperties()

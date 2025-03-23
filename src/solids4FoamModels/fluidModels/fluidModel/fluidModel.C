@@ -654,6 +654,40 @@ Foam::fluidModel::fluidModel
             fvc::interpolate(U()) & mesh().Sf()
         )
     ),
+    APtr_
+    (
+        constructNull
+      ? nullptr
+      : new volVectorField
+        (
+            IOobject
+            (
+                "A",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::ddt(UPtr_())
+        )
+    ),
+    dpdtPtr_
+    (
+        constructNull
+      ? nullptr
+      : new volScalarField
+        (
+            IOobject
+            (
+                "dpdt",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::ddt(pPtr_())
+        )
+    ),
     adjustTimeStep_
     (
         runTime.controlDict().lookupOrDefault<Switch>("adjustTimeStep", false)

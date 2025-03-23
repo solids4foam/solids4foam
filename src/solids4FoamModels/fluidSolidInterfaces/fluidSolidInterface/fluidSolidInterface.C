@@ -68,6 +68,18 @@ bool Foam::fluidSolidInterface::updateCoupled()
 }
 
 
+bool Foam::fluidSolidInterface::newTimeStep() const
+{
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+        return true;
+    }
+
+    return false;
+}
+
+
 void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
 {
     if (interfaceToInterfaceList_.size())
@@ -303,6 +315,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
         fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
     predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
+    curTimeIndex_(-1),
     interfaceDeformationLimit_
     (
         fsiProperties_.lookupOrAddDefault<scalar>

@@ -128,6 +128,12 @@ class fluidModel
         //- Flux field
         autoPtr<surfaceScalarField> phiPtr_;
 
+        //- Acceleration field
+        autoPtr<volVectorField> APtr_;
+
+        //- Rate of change of pressure field
+        autoPtr<volScalarField> dpdtPtr_;
+
         //- Adjustable time-step switch
         const Switch adjustTimeStep_;
 
@@ -415,6 +421,30 @@ public:
             virtual surfaceScalarField& phi()
             {
                 return phiPtr_();
+            }
+
+            //- Return const acceleration field
+            virtual const volVectorField& A() const
+            {
+                return APtr_();
+            }
+
+            //- Return acceleration field
+            virtual volVectorField& A()
+            {
+                return APtr_();
+            }
+
+            //- Return const acceleration field
+            virtual const volScalarField& dpdt() const
+            {
+                return dpdtPtr_();
+            }
+
+            //- Return const acceleration field
+            virtual volScalarField& dpdt()
+            {
+                return dpdtPtr_();
             }
 
 #ifdef OPENFOAM_ORG

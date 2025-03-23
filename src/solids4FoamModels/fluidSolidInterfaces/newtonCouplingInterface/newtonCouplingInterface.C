@@ -1623,6 +1623,79 @@ void newtonCouplingInterface::mapInterfaceSolidUToMeshMotionD()
 }
 
 
+void newtonCouplingInterface::predict()
+{
+    if (nRegions_ != 2)
+    {
+        notImplemented("Only implemented for nRegions = 2");
+    }
+
+    Info<< "Linear predictor" << endl;
+
+    // Predict solution using previous time steps
+
+    fluid().U() =
+        fluid().U().oldTime() + fluid().A()*runTime().deltaT();
+
+    fluid().p() =
+        fluid().p().oldTime() + fluid().dpdt()*runTime().deltaT();
+
+    solid().D() =
+        solid().D().oldTime() + solid().U()*runTime().deltaT();
+    // solid().D() =
+    //     solid().D().oldTime() + solid().U()*runTime().deltaT()
+    //   + 0.5*sqr(runTime().deltaT())*solid().A();
+
+    // Insert the OpenFOAM fields into the PETSc solution vector
+
+    // Set twoD flag
+    const bool twoD = fluid().twoD();
+
+    // Set fluid and solid block sizes
+    const label fluidBlockSize = twoD ? 3 : 4;
+    const label solidBlockSize = twoD ? 2 : 3;
+
+    // The scalar row at which the solid equations start
+    const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // Access the raw solution data
+    PetscScalar *xx;
+    VecGetArray(foamPetscSnesHelper::solution(), &xx);
+
+    // Insert the fluid velocity
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        fluid().U().primitiveFieldRef(),
+        xx,
+        0, // Location of U
+        fluidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Insert the fluid pressure
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        fluid().p().primitiveFieldRef(),
+        xx,
+        fluidBlockSize - 1, // Location of p component
+        fluidBlockSize
+    );
+
+    // Insert the displacement
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        solid().D().primitiveFieldRef(),
+        &xx[solidFirstEqnID],
+        0, // Location of first component
+        solidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Restore the solution vector
+    VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 newtonCouplingInterface::newtonCouplingInterface
@@ -1727,6 +1800,31 @@ newtonCouplingInterface::newtonCouplingInterface
             << exit(FatalError);
     }
 
+    if (predictor())
+    {
+        // Check ddt schemes are not steadyState
+        wordList solDdtScheme(3);
+        solDdtScheme[0] =
+            word(fluidMesh().ddtScheme("ddt(" + fluid().U().name() +')'));
+        solDdtScheme[1] =
+            word(fluidMesh().ddtScheme("ddt(" + fluid().p().name() +')'));
+        solDdtScheme[2] =
+            word(solidMesh().ddtScheme("ddt(" + solid().D().name() +')'));
+
+        forAll(solDdtScheme, i)
+        {
+            if (solDdtScheme[i] == "steadyState")
+            {
+                FatalErrorIn(type() + "::" + type())
+                    << "If predictor is turned on, then the ddtScheme should "
+                    << "not be 'steadyState'!" << nl
+                    << "Set the predictor to 'off' in fsiProperties or change"
+                    << " the ddtSchemes to something other than 'steadyState'"
+                    << exit(FatalError);
+            }
+        }
+    }
+
     Info<< "fluidToSolidCoupling: " << fluidToSolidCoupling_ << nl
         << "solidToFluidCoupling: " << solidToFluidCoupling_ << nl
         << "meshToFluidCoupling: " << meshToFluidCoupling_ << nl
@@ -1755,9 +1853,11 @@ bool newtonCouplingInterface::evolve()
         updateCoupled();
     }
 
-    // WarningInFunction
-    //     << "Todo: Add linear predictor" << endl;
-    // Apply prediction to x directly
+    // Solution predictor
+    if (predictor() && newTimeStep())
+    {
+        predict();
+    }
 
     // Set twoD flag
     const bool twoD = fluid().twoD();
@@ -2015,6 +2115,12 @@ bool newtonCouplingInterface::evolve()
         FatalErrorInFunction
             << "nRegions must be 2 or 3!" << abort(FatalError);
     }
+
+    // Update fluid velocity acceleration
+    fluid().A() = fvc::ddt(fluid().U());
+
+    // Update fluid rate of change of pressure
+    fluid().dpdt() = fvc::ddt(fluid().p());
 
     return 0;
 }
