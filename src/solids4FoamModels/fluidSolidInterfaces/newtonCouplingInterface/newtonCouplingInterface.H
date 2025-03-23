@@ -77,6 +77,16 @@ class newtonCouplingInterface
         //- Flag to enable solid-to-mesh coupling
         const Switch solidToMeshCoupling_;
 
+        //- Flag to extrapolate the displacement at the solid interface
+        //  Alternatively, the adjacenet cell centre displacement is used
+        //  This affects the residual calculation, whereas the Jacobian always
+        //  uses the adjacenet cell centre displacement
+        const Switch extrapolateSolidInterfaceDisplacement_;
+
+        //- Pass the viscous stress from the fluid to the solid
+        //  Defaults to yes
+        const Switch passViscousStress_;
+
         //- Number of sub-regions: 2 for fluid+solid, 3 for
         //  fluid + meshMotion + solid
         const label nRegions_;
@@ -185,10 +195,10 @@ class newtonCouplingInterface
         //- Map the velocity from the solid to the fluid interface
         void mapInterfaceSolidUToFluidU();
 
-        //- Update mesh motion interface displacement
+        //- Map the displacement from the solid to the mesh motion interface
         //  This maps the current solid displacement interface field to the
         //  mesh motion displacement field. Both D and pointD are mapped
-        void updateMeshMotionInterfaceDisplacement();
+        void mapInterfaceSolidUToMeshMotionD();
 
         //- Disallow default bitwise copy construct
         newtonCouplingInterface(const newtonCouplingInterface&);

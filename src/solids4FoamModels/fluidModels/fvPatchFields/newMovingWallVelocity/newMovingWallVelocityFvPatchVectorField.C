@@ -216,8 +216,6 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
         {
             oldoldFc_ = oldFc_;
             oldFc_ = Fc_;
-
-//             Fc_ = pp.faceCentres();
             myTimeIndex_ = mesh.time().timeIndex();
         }
 
@@ -242,8 +240,6 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     Up += n*(Un - (n & Up));
 
     vectorField::operator=(Up);
-
-//     Info << "mwvuc " << max(mag(Up)) << ", " << average(mag(Up)) << endl;
 
     // Update acceleration
     if
