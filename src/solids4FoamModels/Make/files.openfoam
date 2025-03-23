@@ -8,6 +8,7 @@ solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
+solidModels/diffusionSolid/diffusionSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
