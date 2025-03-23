@@ -35,6 +35,7 @@ SourceFiles
 
 #include "fluidSolidInterface.H"
 #include "foamPetscSnesHelper.H"
+#include "labelPairHashes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -87,6 +88,12 @@ class newtonCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
+        //- Flag to indicate if the mesh motion should be included in the
+        //  monolithic system; if not, mesh motion is solved sequentially with
+        //  the monolithic fluid-solid system
+        //  Defaults to "off". Monolithic mesh motion is still work in progress
+        const Switch monolithicMeshMotion_;
+
         //- Number of sub-regions: 2 for fluid+solid, 3 for
         //  fluid + meshMotion + solid
         const label nRegions_;
@@ -103,6 +110,18 @@ class newtonCouplingInterface
         //- Return a reference to the mesh motion solver cast as a solid
         //  model
         solidModel& motionSolid();
+
+        //- Create the empty submatrices and nested matrix given the
+        //  corresponding solution lengths and block sizes
+        //  Note: we pass a reference to the subMats pointer to allow us to
+        //  change (e.g. allocate) the pointer
+        void createSubMatsAndMat
+        (
+            Mat& jac,
+            Mat*& subMatsPtr,
+            const labelPairList& nBlocksAndBlockSize,
+            const labelPairHashSet& nullSubMats = labelPairHashSet()
+        ) const;
 
         //- Initialise the Afm Jacobian matrix
         //  This represents the mesh motion coupling in the fluid equations

@@ -229,6 +229,12 @@ public:
                 return x_;
             }
 
+            //- Return a reference to the snes object
+            SNES& snes()
+            {
+                return snes_;
+            }
+
             //- Const access to the global index object
             const globalIndex& globalCells() const
             {

@@ -1197,10 +1197,8 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     if (reason < 0)
     {
-        WarningIn
-        (
-            "void foamPetscSnesHelper::checkConvergence(SNES snes) const"
-        )   << "PETSc SNES solver return error check disabled" << endl
+        WarningInFunction
+            << "PETSc SNES solver return error check disabled" << endl
             << "The SNES nonlinear solver did not converge." << nl
             << " PETSc SNES convergence error code: " << reason << nl
             << " PETSc SNES convergence reason: "
@@ -1212,10 +1210,8 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
         }
         else if (stopOnPetscError_)
         {
-            FatalErrorIn
-            (
-                "void foamPetscSnesHelper::checkConvergence(SNES snes) const"
-            )   << "Stopping because of the PETSc SNES error" << nl
+            FatalErrorInFunction
+                << "Stopping because of the PETSc SNES error" << nl
                 << "Set `stopOnPetscError` to `false` to continue on PETSc "
                 << "SNES errors"
                 << abort(FatalError);
