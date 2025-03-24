@@ -259,7 +259,11 @@ Foam::squarePlateAnalyticalSolution::squarePlateAnalyticalSolution
     h_(readScalar(dict.lookup("h"))),
     boundaryConditions_
     (
+#ifdef OPENFOAM_NOT_EXTEND
         dict.get<word>("boundaryConditions")
+#else
+        dict.lookup("boundaryConditions")
+#endif
     ),
     cellDisplacement_
     (
