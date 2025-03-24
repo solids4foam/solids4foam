@@ -30,6 +30,16 @@ jobs:
         if [[ $(git status --porcelain) ]]; then
           git add -A
           git commit -m "chore: remove trailing whitespace [automated]"
+
+          # Detect if this is a fork or the primary repository
+          if [[ "${{ github.event_name }}" == "pull_request" ]]
+          then
+            # Fork case (Pull Request)
+            FORK_REPO="https://github.com/${{ github.actor }}/$(basename -s .git $(git remote get-url origin)).git"
+            git remote set-url origin "$FORK_REPO"
+          fi
+
+          # Push to the correct branch
           git push origin "$(git rev-parse --abbrev-ref HEAD)"
         else
           echo "No trailing whitespace found."
