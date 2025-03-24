@@ -31,12 +31,13 @@ jobs:
           git add -A
           git commit -m "chore: remove trailing whitespace [automated]"
 
-          # Detect if this is a fork or the primary repository
-          if [[ "${{ github.event_name }}" == "pull_request" ]]
-          then
-            # Fork case (Pull Request)
-            FORK_REPO="https://github.com/${{ github.actor }}/$(basename -s .git $(git remote get-url origin)).git"
-            git remote set-url origin "$FORK_REPO"
+          # Detect if this is a pull request from a fork
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Extract the fork's repository name from PR metadata
+            FORK_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+
+            # Authenticate using PAT and set the correct remote
+            git remote set-url origin "https://x-access-token:${{ secrets.PAT }}@github.com/$FORK_REPO.git"
           fi
 
           # Push to the correct branch
