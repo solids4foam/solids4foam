@@ -928,7 +928,7 @@ equal to $$3-4\nu$$.
           type    solidPointDisplacementAlongLine;
           startPoint   (0 0 0);
           endPoint  (2 0 0);
-
+  
           // Optional
           minDist  1e-5;
           region  "solid";
@@ -1319,6 +1319,89 @@ This function object is currently only implemented for serial run!
 
 ---
 
+## `squarePlateAnalyticalSolution/`
+
+- **Function object purpose**
+  To generate the analytical solution fields for the thin square plate problem.
+  The analytical solution is taken from:
+  [Timoshenko, S., & Woinowsky-Krieger, S., Theory of plates and shells. 1959.](https://www.cap-recifal.com/ccs_files/articles/cuveaqua1_denisio/Timoshenko_-_Theory_of_plates_and_shells.pdf)
+
+$$
+w = \frac{4\,p\,a^4}{\pi^5 D}
+\sum_{m = 1,3,5,\dots}
+\frac{(-1)^{\frac{m-1}{2}}}{m^5} \,
+\cos\!\biggl(\frac{m\pi x}{a}\biggr)
+\Biggl[
+  1
+  - \frac{\alpha_m \,\tanh(\alpha_m) \;+\; 2\,\cosh\!\bigl(\dfrac{m\pi y}{a}\bigr)}{2\,\cosh(\alpha_m)}
+  \;+\;
+  \frac{1}{2\,\cosh(\alpha_m)}\,\frac{m \pi y}{a}\,\sinh\!\bigl(\dfrac{m\pi y}{a}\bigr)
+\Biggr].
+$$
+
+ where $p$ is the applied pressure, $D$ is the plate bending stiffness, $a$ is
+ the plate length (in the $x$-direction) and $\alpha_m=\pi m b/(2a)$.
+
+```note
+The analytical solution field is available only when all edges are (simply) supported.
+For a clamped plate, only the maximum deflection is printed.
+The analytical solution assumes the origin is at the centre of the plate.
+```
+
+- **Example of usage**
+
+  ```c++
+  functions
+  {
+      cantileverSolution
+      {
+          type    cantileverAnalyticalSolution;
+
+          a    10;
+          b    10;
+          h    0.1;
+          p    1000;
+          E    2e11;
+          nu   0.3;
+
+          //Optional
+          cellDisplacement true;
+          pointDisplacement true;
+      }
+  }
+  ```
+
+- **Arguments**
+
+  - `P` Applied transverse pressure;
+  - `a` Length of the plate (in x direction);
+  - `b` Width of the plate (in y direction);
+  - `h` Depth of the plate;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
+
+- **Optional arguments**
+
+  - `cellDisplacement` write the analytical solution for cell-centred displacement
+    field; default is true;
+  - `pointDisplacement` write the analytical solution for vertex-centred
+    displacement field; default is true;
+
+- **Outputs**
+
+  - Analytical solution for the displacement field `analyticalD` in time
+    directories.
+  - `DDiference` field; difference between analytical displacement (deflection)
+    and calculated one: `analyticalD-D`.
+  - Log at the end of each time-step:
+    `Norms: mean L1, mean L2, LInfL: 0.12 0.2 0.5`
+    `...`
+
+- **Tutorial case in which it is used:** :
+  `solids/beamsPlatesShells/squarePlate`
+
+---
+
 ## `stressTriaxiality`
 
 - **Function object purpose**
@@ -1370,87 +1453,6 @@ This function object is currently only implemented for serial run!
 
 - **Tutorial case in which it is used:**
   `None`
-
-## `squarePlateAnalyticalSolution/`
-
-- **Function object purpose**
-  To generate the analytical solution fields for the thin square plate problem.
-  The analytical solution is taken from:
-  [Timoshenko, S., & Woinowsky-Krieger, S., Theory of plates and shells. 1959.](https://www.cap-recifal.com/ccs_files/articles/cuveaqua1_denisio/Timoshenko_-_Theory_of_plates_and_shells.pdf)
-
-$$
-w = \frac{4\,p\,a^4}{\pi^5 D}
-\sum_{m = 1,3,5,\dots}
-\frac{(-1)^{\frac{m-1}{2}}}{m^5} \,
-\cos\!\biggl(\frac{m\pi x}{a}\biggr)
-\Biggl[
-  1
-  - \frac{\alpha_m \,\tanh(\alpha_m) \;+\; 2\,\cosh\!\bigl(\dfrac{m\pi y}{a}\bigr)}{2\,\cosh(\alpha_m)}
-  \;+\;
-  \frac{1}{2\,\cosh(\alpha_m)}\,\frac{m \pi y}{a}\,\sinh\!\bigl(\dfrac{m\pi y}{a}\bigr)
-\Biggr].
-$$
-
- where $p$ is applied pressure, $D$ is plate bending stiffness, $a$ a is the plate
- length (in the $x$-direction) and $\alpha_m=\pi m b/(2a)$.
-
-```note
-The analytical solution field is available only when all edges are (simply) supported.
-For a clamped plate, only the maximum deflection is printed.
-The analytical solution assumes the origin is at the centre of the plate.
-```
-
-- **Example of usage**
-
-  ```c++
-  functions
-  {
-      cantileverSolution
-      {
-          type    cantileverAnalyticalSolution;
-
-          a    10;
-          b    10;
-          h    0.1;
-          p    1000;
-          E    2e11;
-          nu    0.3;
-
-          //Optional
-          cellDisplacement true;
-          pointDisplacement true;
-      }
-  }
-  ```
-
-- **Arguments**
-
-  - `P` Applied transverse pressure;
-  - `a` Length of the plate (in x direction);
-  - `b` Width of the plate (in y direction);
-  - `h` depth of the plate;
-  - `E` Young's modulus;
-  - `nu` Poisson's ratio.
-
-- **Optional arguments**
-
-  - `cellDisplacement` write analytical solution for cell-centred displacement
-    field; default is true;
-  - `pointDisplacement` write analytical solution for vertex-centred
-    displacement field; default is true;
-
-- **Outputs**
-
-  - Analytical solution for the displacement field `analyticalD` in time
-    directories.
-  - `DDiference` field; difference between analytical displacement (deflection)
-    and calculated one: `analyticalD-D`.
-  - Log at the end of each time-step:
-    `Norms: mean L1, mean L2, LInfL: 0.12 0.2 0.5`
-    `...`
-
-- **Tutorial case in which it is used:** :
-  `solids/beamsPlatesShells/squarePlate`
 
 ---
 
