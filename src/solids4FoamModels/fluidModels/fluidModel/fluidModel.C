@@ -666,7 +666,7 @@ Foam::fluidModel::fluidModel
                 runTime.timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
+                IOobject::NO_WRITE
             ),
             fvc::ddt(UPtr_())
         )
@@ -683,7 +683,7 @@ Foam::fluidModel::fluidModel
                 runTime.timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
+                IOobject::NO_WRITE
             ),
             fvc::ddt(pPtr_())
         )

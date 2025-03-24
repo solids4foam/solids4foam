@@ -1634,12 +1634,17 @@ void newtonCouplingInterface::predict()
 
     // Predict solution using previous time steps
 
+    // Velocity
     fluid().U() =
         fluid().U().oldTime() + fluid().A()*runTime().deltaT();
 
-    fluid().p() =
-        fluid().p().oldTime() + fluid().dpdt()*runTime().deltaT();
+    // Pressure
+    // Predicting pressure seems to cause instabilities, where the pressure
+    // jumps from positive to negative
+    // fluid().p() =
+    //     fluid().p().oldTime() + fluid().dpdt()*runTime().deltaT();
 
+    // Displacement
     solid().D() =
         solid().D().oldTime() + solid().U()*runTime().deltaT();
     // solid().D() =
@@ -1838,6 +1843,51 @@ newtonCouplingInterface::newtonCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void newtonCouplingInterface::setDeltaT(Time& runTime)
+{
+    if
+    (
+        runTime.controlDict().getOrDefault("adjustTimeStep", false)
+     && runTime.timeIndex() > 0
+    )
+    {
+        // Adjust the time step based on the number of outer (Newton) iterations
+        // required by the PETSc SNES solver
+        // We will aim to keep the number of iterations within the range of
+        // minTargetNIter to maxTargetNIter
+
+        const scalar maxDeltaT =
+            runTime.controlDict().get<scalar>("maxDeltaT");
+        const scalar minDeltaT =
+            runTime.controlDict().get<scalar>("minDeltaT");
+
+        const int minTargetNIter =
+            runTime.controlDict().getOrDefault<int>("minTargetNIter", 3);
+        const int maxTargetNIter =
+            runTime.controlDict().getOrDefault<int>("maxTargetNIter", 6);
+
+        PetscInt numIter;
+        SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
+
+        scalar newDeltaT = runTime.deltaTValue();
+
+        if (numIter > maxTargetNIter)
+        {
+            newDeltaT = max(0.5*newDeltaT, minDeltaT);
+        }
+        else if (numIter < minTargetNIter)
+        {
+            newDeltaT = min(1.5*newDeltaT, maxDeltaT);
+        }
+
+        Info<< "Old time step = " << runTime.deltaTValue() << nl
+            << "New time step = " << newDeltaT << nl << endl;
+
+        runTime.setDeltaT(newDeltaT);
+    }
+}
+
+
 bool newtonCouplingInterface::evolve()
 {
     // Steps
@@ -1868,6 +1918,9 @@ bool newtonCouplingInterface::evolve()
 
     if (nRegions_ == 2)
     {
+        Info<< "Solving the fluid-solid equations for U, p and D using PETSc "
+            << "SNES" << endl;
+
         // The scalar row at which the solid equations start
         const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
 

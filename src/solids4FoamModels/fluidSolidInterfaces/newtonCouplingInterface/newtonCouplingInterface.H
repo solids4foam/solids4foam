@@ -265,6 +265,9 @@ public:
 
         // Edit
 
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
+
             //- Evolve the interface
             virtual bool evolve();
 
