@@ -30,7 +30,7 @@ jobs:
         if [[ $(git status --porcelain) ]]; then
           git add -A
           git commit -m "chore: remove trailing whitespace [automated]"
-          git push
+          git push origin "$(git rev-parse --abbrev-ref HEAD)"
         else
           echo "No trailing whitespace found."
         fi
