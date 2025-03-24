@@ -1,5 +1,5 @@
 # Removing trailing whitespace from all files
-name: Remove trailing whitespace
+name: Check for trailing whitespace
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  trim-whitespace:
+  check-whitespace:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,29 +19,13 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Remove trailing whitespace
+    - name: Check for trailing whitespace
       run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git grep -I -l '[[:blank:]]\+$' | xargs -r sed -i 's/[[:blank:]]\+$//'
-
-    - name: Commit and push changes if needed
-      run: |
-        if [[ $(git status --porcelain) ]]; then
-          git add -A
-          git commit -m "chore: remove trailing whitespace [automated]"
-
-          # Detect if this is a pull request from a fork
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Extract the fork's repository name from PR metadata
-            FORK_REPO="${{ github.event.pull_request.head.repo.full_name }}"
-
-            # Authenticate using PAT and set the correct remote
-            git remote set-url origin "https://x-access-token:${{ secrets.PAT }}@github.com/$FORK_REPO.git"
-          fi
-
-          # Push to the correct branch
-          git push origin "$(git rev-parse --abbrev-ref HEAD)"
+        # Find files with trailing whitespace
+        if git grep -I -n '[[:blank:]]\+$'
+        then
+          echo "❌ Trailing whitespace found in the files above. Please fix them manually."
+          exit 1
         else
-          echo "No trailing whitespace found."
+          echo "✅ No trailing whitespace found."
         fi
