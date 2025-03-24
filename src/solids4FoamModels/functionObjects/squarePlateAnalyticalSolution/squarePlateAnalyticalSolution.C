@@ -17,11 +17,12 @@ License
 
 \*----------------------------------------------------------------------------*/
 
+#ifndef OPENFOAM_ORG
+
 #include "squarePlateAnalyticalSolution.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "areaFields.H"
 #include "squarePlateStressDisplacement.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -326,5 +327,7 @@ bool Foam::squarePlateAnalyticalSolution::write()
     return false;
 }
 #endif
+
+#endif // #ifndef OPENFOAM_ORG
 
 // ************************************************************************* //
