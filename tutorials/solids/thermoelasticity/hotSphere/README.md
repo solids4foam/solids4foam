@@ -113,7 +113,7 @@ running the `solids4Foam` solver.
 
 ```tip
 A tutorial case can be cleaned and reset using the included `Allrun` script,
-i.e. `> ./Allclean`.
+ i.e. `./Allclean`.
 ```
 
 ---
@@ -205,9 +205,9 @@ outside
 
 ```note
 `pressure` here is referring to the normal component of the boundary traction
-vector; in general, this is not the same as the hydrostatic pressure. The total
-applied traction is: `appliedTraction = traction - n*pressure` where `n` is the
-boundary unit normal field.
+ vector; in general, this is not the same as the hydrostatic pressure. The total
+ applied traction is: `appliedTraction = traction - n*pressure` where `n` is the
+ boundary unit normal field.
 ```
 
 A time-varying traction condition is given on the inner wall:
@@ -303,9 +303,9 @@ mechanical approach is taken.
 
 ```tip
 A **linear geometry** approach is also known as a “small strain” or “small
-strain/rotation” approach and means that we assume the cell geometry (volumes,
-face areas, etc.) to be **independent of the displacement field**. This
-assumption is typically OK when the deformation is “small”.
+ strain/rotation” approach and means that we assume the cell geometry (volumes,
+ face areas, etc.) to be **independent of the displacement field**. This
+ assumption is typically OK when the deformation is “small”.
 ```
 
 - `nCorrectors`: this is the maximum number of outer correctors per time-step.

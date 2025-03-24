@@ -30,10 +30,10 @@ format to `OpenFOAM` format, whereas
 to the `foam-extend` format. No changes are applied if the case format matches
 the format of the current `OpenFOAM`/`foam-extend` version.
 
-- **Function purpose**  
+- **Function purpose**
   Converts a case from `foam-extend` format to `OpenFOAM` format and vice versa.
 
-- **Function arguments**  
+- **Function arguments**
   Path to case directory (most often `.` is used, referring to the current
   directory)
 
@@ -425,11 +425,11 @@ located.
 
 ## `solids4foam::caseOnlyRunsWithFoamExtend()`
 
-- **Function purpose**  
+- **Function purpose**
   This function gives an error if the `foam-extend` version is not
   sourced/loaded.
 
-- **Function arguments**  
+- **Function arguments**
   None
 
 - **Example of usage**
@@ -447,11 +447,11 @@ located.
 
 ## `solids4foam::caseDoesNotRunWithFoamExtend()`
 
-- **Function purpose**  
+- **Function purpose**
   This function gives an error if the [OpenFOAM.com](OpenFOAM.com) or
   [OpenFOAM.org](OpenFOAM.org) version is not sourced/loaded.
 
-- **Function arguments**  
+- **Function arguments**
   None
 
 - **Example of usage**
@@ -475,11 +475,11 @@ are `U`, `T`, `D`, `pointD`, `DD`, `pointDD`. The compressed version of these
 files with `.gz` extension is also checked. The function also works when the
 case is decomposed.
 
-- **Function purpose**  
+- **Function purpose**
   Remove empty time directories that are inadvertently created when running FSI
   cases with preCICE.
 
-- **Function arguments**  
+- **Function arguments**
   None
 
 - **Example of usage**
@@ -508,7 +508,7 @@ written to `errorCommandLog.txt` file.
 - **Function purpose** This function is designed to handle and report errors in
   a script.
 
-- **Function arguments** "error message" - stored to `error.txt`  
+- **Function arguments** "error message" - stored to `error.txt`
   optional parameter - name of the log file which will be stored to
   `errorCommandLog.txt`
 
@@ -568,13 +568,13 @@ written to `errorCommandLog.txt` file.
 - **Function purpose** This function is designed to run `OpenFOAM` and
   `solids4foam` applications with additional logging and error handling.
 
-- **Function options**  
-  `-a` = append (append to an existing log file)  
-  `-o` = overwrite (overwrite existing log file)  
-  `-s` = suffix (adding suffix to the log file)  
+- **Function options**
+  `-a` = append (append to an existing log file)
+  `-o` = overwrite (overwrite existing log file)
+  `-s` = suffix (adding suffix to the log file)
   `-decomposeParDict <locationOfAlternativeDecomposeParDict>` Alternative option
   for `decomposeParDict` dictionary location
-- **Function arguments**  
+- **Function arguments**
   `<appName>` Name of the executable (command to run)
 
   _Note_: Parameters which are added **after** the executable will be passed on
@@ -633,7 +633,7 @@ In case the option `-s` is activated, the name of the log file is
 ## `solids4foam::runParallel()`
 
 This function has the same functionalities and options as
-`solids4Foam::runApplication` function described previously.  
+`solids4Foam::runApplication` function described previously.
 The difference is that the executable is run in parallel using MPI.
 
 `mpirun -n nProcs executable -parallel >> log.executable`

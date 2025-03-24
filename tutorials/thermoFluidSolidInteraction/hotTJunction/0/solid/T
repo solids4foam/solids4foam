@@ -30,9 +30,9 @@ boundaryField
         // Apply neumann bc
         // dirichlet false;
         // neumann true;
-        
+
         lambda k;
-        
+
         value           $internalField;
     }
 
@@ -47,7 +47,7 @@ boundaryField
         type            zeroGradient;
         value           $internalField;
     }
-    
+
     frontAndBack
     {
         type            empty;

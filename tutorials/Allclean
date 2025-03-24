@@ -25,9 +25,8 @@
 # Script
 #     Allclean
 #
-# Description
-#
 #------------------------------------------------------------------------------
+
 
 echo "Cleaning backup files"
 find . -type f \( -name "*~" -o -name "*.bak" \) -exec rm {} \;
@@ -38,6 +37,6 @@ rm testLoopReport > /dev/null 2>&1
 
 echo ""
 
-foamCleanTutorials cases
+foamCleanTutorials -self
 
 # ----------------------------------------------------------------- end-of-file
