@@ -6,7 +6,7 @@ sort: 5
 
 ---
 
-Prepared by Ivan Batistić
+Prepared by Ivan Batistić with edits by Philip Cardiff
 
 ---
 
