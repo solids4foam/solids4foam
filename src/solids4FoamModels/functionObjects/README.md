@@ -928,7 +928,7 @@ equal to $$3-4\nu$$.
           type    solidPointDisplacementAlongLine;
           startPoint   (0 0 0);
           endPoint  (2 0 0);
-  
+
           // Optional
           minDist  1e-5;
           region  "solid";
