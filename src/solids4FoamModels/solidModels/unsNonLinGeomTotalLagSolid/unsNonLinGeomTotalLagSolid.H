@@ -107,7 +107,14 @@ class unsNonLinGeomTotalLagSolid
         //- Relative tolerance
         const scalar relativeTol_;
 
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
+
     // Private Member Functions
+
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
 
         //- Return the displacement residual
         scalar residual(const volVectorField& D) const;
