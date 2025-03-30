@@ -233,6 +233,7 @@ void Foam::solidSubMeshes::calcSubMeshSigma() const
                 "sigma", subMeshes[matI].subMesh()
             )
         );
+        subMeshSigma_[matI].writeOpt()=IOobject::NO_WRITE;
     }
 }
 
@@ -267,6 +268,7 @@ void Foam::solidSubMeshes::calcSubMeshSigmaf() const
                 "sigmaf", subMeshes[matI].subMesh()
             )
         );
+        subMeshSigmaf_[matI].writeOpt()=IOobject::NO_WRITE;
     }
 }
 

@@ -359,6 +359,13 @@ public:
                 GeometricField<Type, fvPatchField, volMesh>& baseMeshField
             ) const;
 
+            template<class Type>
+            tmp< GeometricField<Type, fvPatchField, volMesh> >
+            mapPartialSubMeshVolFields
+            (
+                const word fieldName
+            ) const;
+
             //- Map a surfaceField from the subMesh to the base mesh
             template<class Type>
             void mapSubMeshSurfaceFields

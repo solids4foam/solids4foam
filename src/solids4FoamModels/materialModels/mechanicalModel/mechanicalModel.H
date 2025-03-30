@@ -52,6 +52,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "hashedWordList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -85,11 +86,24 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
+        //- List with the names of all internal state variables
+        //  Key = datatypes (volScalarField, etc.)
+        //  Values = hashed wordLists of names of internal vars
+        mutable HashTable<hashedWordList> internalVariables_;
+
+        //- Flag to see if internal variables got read
+        bool gotInternalVariables_;
+
+        //- Which datatypes will be considered internal state variables
+        static const hashedWordList internalVariableTypes;
 
     // Private Member Functions
 
         //- Make material sub-meshes
         void makeSolSubMeshes() const;
+
+        //- Get the internal variable names
+        bool getInternalVariables();
 
         //- Clear out demand driven data
         void clearOut();
@@ -239,6 +253,9 @@ public:
             //- Set restart: some mechanical laws may change the writeOpt of
             //  fields accordingly
             void setRestart();
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 
             //- Write current state of 'materialProperties' dictionary to disk
             void writeDict();
