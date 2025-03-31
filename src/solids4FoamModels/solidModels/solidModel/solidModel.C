@@ -40,30 +40,47 @@ namespace Foam
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 
-const Enum<solidModel::solutionAlgorithm> solidModel::solutionAlgorithmNames_
-({
-    {
-        solidModel::solutionAlgorithm::PETSC_SNES,
-        "PETScSNES"
-    },
-    {
-        solidModel::solutionAlgorithm::IMPLICIT_COUPLED,
-        "implicitCoupled"
-    },
-    {
-        solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED,
-        "implicitSegregated"
-    },
-    {
-        solidModel::solutionAlgorithm::EXPLICIT,
-        "explicit"
-    },
-});
-
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAM_COM
+    const Enum<solidModel::solutionAlgorithm>
+    solidModel::solutionAlgorithmNames_
+    ({
+        {
+            solidModel::solutionAlgorithm::PETSC_SNES,
+            "PETScSNES"
+        },
+        {
+            solidModel::solutionAlgorithm::IMPLICIT_COUPLED,
+            "implicitCoupled"
+        },
+        {
+            solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED,
+            "implicitSegregated"
+        },
+        {
+            solidModel::solutionAlgorithm::EXPLICIT,
+            "explicit"
+        },
+    });
+#else
     typedef meshFaceZones faceZoneMesh;
+
+    template<>
+    const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
+    {
+     	"PETScSNES",
+        "implicitCoupled",
+	"implicitSegregated",
+        "explicit"
+    };
 #endif
 }
+
+
+#ifndef OPENFOAM_COM
+const Foam::NamedEnum<Foam::solidModel::solutionAlgorithm, 4>
+    Foam::solidModel::solutionAlgorithmNames_;
+#endif
+
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -602,7 +619,11 @@ Foam::solidModel::solidModel
     solutionAlgorithm_
     (
         solidModelDict().found("solutionAlgorithm")
+#ifdef OPENFOAM_COM
       ? solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
+#else
+      ? solutionAlgorithmNames_.read(solidModelDict().lookup("solutionAlgorithm"))
+#endif
       : solutionAlgorithm::IMPLICIT_SEGREGATED
     ),
     thermalPtr_(),

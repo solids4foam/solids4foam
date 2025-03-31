@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
     }
 
     // Create random number generator
-    Random rnd(seed);
+    autoPtr<Random> rndPtr(new Random(seed));
 
     // Store original points
     const pointField oldPoints = mesh.points();
@@ -369,6 +369,9 @@ int main(int argc, char *argv[])
     do
     {
         Info<< "Iteration = " << iter << endl;
+
+        // Take a reference to the random number generator
+        Random& rnd = rndPtr();
 
         // Calculate new points
         pointField newPoints(oldPoints);
@@ -581,7 +584,12 @@ int main(int argc, char *argv[])
                     Info<< "Resetting the random number generator seed" << endl;
 
                     // Change the seed for the random number generator
+#ifdef OPENFOAM_COM
                     rnd.reset(seed + 1);
+#else
+                    rndPtr.clear();
+                    rndPtr.set(new Random(seed + 1));
+#endif
 
                     // Reset minEdgeLength
                     minEdgeLength = oldMinEdgeLength;

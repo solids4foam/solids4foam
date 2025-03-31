@@ -381,6 +381,10 @@ void Foam::meshDual::simpleMarkFeatures
         featureFaceSet.insert(faceI);
     }
 
+#ifdef OPENFOAM_ORG
+    typedef meshFaceZones faceZoneMesh;
+#endif
+
     // B. face zones.
     const faceZoneMesh& faceZones = mesh.faceZones();
 

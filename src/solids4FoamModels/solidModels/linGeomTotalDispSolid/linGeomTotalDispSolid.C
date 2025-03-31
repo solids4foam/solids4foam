@@ -176,7 +176,9 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(mesh().magSf()*traction)
               + rho()*g()
+#ifdef OPENFOAM_COM
               + fvOptions()(ds_, D())
+#endif
             );
 
             // Add damping
@@ -724,9 +726,11 @@ label linGeomTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
 
+#ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>

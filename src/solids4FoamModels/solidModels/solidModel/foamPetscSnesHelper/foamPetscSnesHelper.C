@@ -20,7 +20,6 @@ License
 #ifdef USE_PETSC
 
 #include "foamPetscSnesHelper.H"
-#include "SparseMatrixTemplate.H"
 #include "processorFvPatch.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //

@@ -51,10 +51,15 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
-#include "Enum.H"
 #include "twoDPointCorrector.H"
-#include "fvOptions.H"
 #include "checkConvergence.H"
+
+#ifdef OPENFOAM_COM
+    #include "Enum.H"
+    #include "fvOptions.H"
+#else
+    #include "NamedEnum.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,8 +87,11 @@ public:
         };
 
         //- Solution algorithm names
+#ifdef OPENFOAM_COM
         static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
-
+#else
+        static const NamedEnum<solutionAlgorithm, 4> solutionAlgorithmNames_;
+#endif
 
 private:
 
@@ -387,11 +395,13 @@ protected:
         //- Return non-const access to rhoD2dt2D
         volVectorField& rhoD2dt2D() const;
 
+#ifdef OPENFOAM_COM
         //- Return non-const access to fvOptions
         fv::options& fvOptions()
         {
             return fvOptions_;
         }
+#endif
 
 public:
 

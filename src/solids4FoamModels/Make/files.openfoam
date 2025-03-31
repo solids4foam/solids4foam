@@ -232,8 +232,5 @@ numerics/multiplyCoeff/multiplyCoeff.C
 numerics/multiplyCoeff/multiplyCoeffRectMat.C
 numerics/multiplyCoeff/multiplyCoeffExtended.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
-numerics/sparseMatrix/sparseMatrix.C
-numerics/sparseMatrix/SparseMatrixTemplates.C
-numerics/sparseMatrix/sparseMatrixTools.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
