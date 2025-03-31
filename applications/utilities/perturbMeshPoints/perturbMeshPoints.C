@@ -53,8 +53,11 @@ Author
 #include "argList.H"
 #include "Random.H"
 #include "twoDPointCorrector.H"
-#include "primitiveMeshTools.H"
 #include "unitConversion.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "primitiveMeshTools.H"
+#endif
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -205,6 +208,7 @@ void calcFeatures
 // Modified form OpenFOAM-v2312 primitiveMeshCheck.C
 label numSevereNonOrthoFaces(const fvMesh& mesh)
 {
+#ifdef OPENFOAM_NOT_EXTEND
     // Calculate the mesh orthogonality
     tmp<scalarField> tortho = primitiveMeshTools::faceOrthogonality
     (
@@ -230,6 +234,10 @@ label numSevereNonOrthoFaces(const fvMesh& mesh)
     }
 
     return severeNonOrth;
+#else
+    // Checks not performed for foam extend
+    return 0;
+#endif
 }
 
 

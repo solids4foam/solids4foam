@@ -1,17 +1,13 @@
 physicsModel/physicsModel.C
 
 solidModels/solidModel/solidModel.C
-
 solidModels/solidModel/lookupSolidModel.C
+solidModels/solidModel/checkConvergence.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
-solidModels/solidModel/dualMeshToMeshMap.C
+solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
 
-solidModels/coupledLinGeomPressureDisplacementSolid/coupledLinGeomPressureDisplacementSolid.C
-solidModels/coupledNonLinGeomPressureDisplacementSolid/coupledNonLinGeomPressureDisplacementSolid.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
-solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
-solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
 solidModels/kirchhoffPlateSolid/clampedMoment/clampedMomentFaPatchScalarField.C
 solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatchScalarField.C
@@ -230,6 +226,9 @@ numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
+numerics/meshDual/meshDual.C
+numerics/meshDual/dualMeshToMeshMap.C
+numerics/meshDual/meshDualiser.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
 numerics/fvc/fvcCellLimitedGrad.C
@@ -248,7 +247,6 @@ numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
 
 numerics/deltaVectors/deltaVectors.C
-numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 

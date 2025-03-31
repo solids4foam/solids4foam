@@ -62,8 +62,6 @@ namespace Foam
         },
     });
 #else
-    typedef meshFaceZones faceZoneMesh;
-
     template<>
     const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
     {
@@ -72,6 +70,10 @@ namespace Foam
 	"implicitSegregated",
         "explicit"
     };
+#endif
+
+#ifdef OPENFOAM_ORG
+    typedef meshFaceZones faceZoneMesh;
 #endif
 }
 

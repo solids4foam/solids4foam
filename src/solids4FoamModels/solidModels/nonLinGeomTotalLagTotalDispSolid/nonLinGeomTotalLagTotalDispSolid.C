@@ -88,6 +88,12 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
     // Enforce traction conditions
     forAll(D.boundaryField(), patchI)
     {
+#ifdef OPENFOAM_NOT_EXTEND
+        vectorField& forceP = force.boundaryFieldRef()[patchI];
+#else
+        vectorField& forceP = force.boundaryField()[patchI];
+#endif
+
         if
         (
             isA<solidTractionFvPatchVectorField>
@@ -111,20 +117,20 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                 const scalarField& magSfPatch =
                     D.mesh().boundary()[patchI].magSf();
 
-                force.boundaryFieldRef()[patchI] =
-                (
-                    tracPatch.traction() - nPatch*tracPatch.pressure()
-                )*magSfPatch;
+                forceP =
+                    (
+                        tracPatch.traction() - nPatch*tracPatch.pressure()
+                    )*magSfPatch;
             }
             else
             {
                 const scalarField& magSfCurrentPatch =
                     magSfCurrent.boundaryField()[patchI];
 
-                force.boundaryFieldRef()[patchI] =
-                (
-                    tracPatch.traction() - nPatch*tracPatch.pressure()
-                )*magSfCurrentPatch;
+                forceP =
+                    (
+                        tracPatch.traction() - nPatch*tracPatch.pressure()
+                    )*magSfCurrentPatch;
             }
         }
         else if
@@ -144,8 +150,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             // Set shear traction to zero
             // traction.boundaryFieldRef()[patchI] =
                 // sqr(nPatch) & traction.boundaryField()[patchI];
-            force.boundaryFieldRef()[patchI] =
-                sqr(nPatch) & force.boundaryField()[patchI];
+            forceP = sqr(nPatch) & force.boundaryField()[patchI];
         }
     }
 }
@@ -250,13 +255,21 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
                 (
                     magSqr
                     (
+#ifdef OPENFOAM_NOT_EXTEND
                         D().primitiveField() - D().prevIter().primitiveField()
+#else
+                        D().internalField() - D().prevIter().internalField()
+#endif
                     )
                 )
             );
 
         // Norm of the solution
+#ifdef OPENFOAM_NOT_EXTEND
         xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+#else
+        xNorm = sqrt(gSum(magSqr(D().internalField())));
+#endif
 
         // Store the initial residual
         if (iCorr == 0)
@@ -348,7 +361,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
+#ifdef OPENFOAM_NOT_EXTEND
             D().primitiveFieldRef(),
+#else
+            D().internalField(),
+#endif
             foamPetscSnesHelper::solution(),
             solidModel::twoD() ? 2 : 3, // Block size of x
             0                           // Location of first component
@@ -363,7 +380,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
+#ifdef OPENFOAM_NOT_EXTEND
         D().primitiveFieldRef(),
+#else
+        D().internalField(),
+#endif
         solidModel::twoD() ? 2 : 3, // Block size of x
         0                           // Location of first component
     );
@@ -510,7 +531,11 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     // Check the gradScheme
     const word gradDScheme
     (
+#ifdef OPENFOAM_NOT_EXTEND
         mesh().gradScheme("grad(" + D().name() +')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + D().name() +')')
+#endif
     );
 
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
@@ -545,7 +570,11 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
+#ifdef OPENFOAM_NOT_EXTEND
                         D().boundaryFieldRef()[patchI]
+#else
+                        D().boundaryField()[patchI]
+#endif
                     );
 
                 tracPatch.extrapolateValue() = true;
