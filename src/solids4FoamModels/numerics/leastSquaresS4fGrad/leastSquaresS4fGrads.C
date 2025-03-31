@@ -22,6 +22,19 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 makeFvGradScheme(leastSquaresS4fGrad)
+
+#else
+
+namespace Foam
+{
+namespace fv
+{
+    makeFvGradScheme(leastSquaresS4fGrad)
+}
+}
+#endif
 
 // ************************************************************************* //

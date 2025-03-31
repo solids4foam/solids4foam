@@ -24,7 +24,6 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "faCFD.H"
 #include "linearElastic.H"
-
 #include "BlockLduSystem.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

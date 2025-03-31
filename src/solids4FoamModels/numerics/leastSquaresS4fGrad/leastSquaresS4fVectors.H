@@ -44,7 +44,11 @@ namespace Foam
 
 class leastSquaresS4fVectors
 :
+#ifdef OPENFOAM_NOT_EXTEND
     public MeshObject<fvMesh, MoveableMeshObject, leastSquaresS4fVectors>
+#else
+    public MeshObject<fvMesh, leastSquaresS4fVectors>
+#endif
 {
     // Private data
 
@@ -52,14 +56,14 @@ class leastSquaresS4fVectors
         const boolList useBoundaryFaceValues_;
 
         //- Least-squares gradient vectors
-        surfaceVectorField pVectors_;
-        surfaceVectorField nVectors_;
+        mutable surfaceVectorField pVectors_;
+        mutable surfaceVectorField nVectors_;
 
 
     // Private Member Functions
 
         //- Construct Least-squares gradient vectors
-        void calcLeastSquaresVectors();
+        void calcLeastSquaresVectors() const;
 
 
 public:
@@ -97,7 +101,15 @@ public:
         }
 
         //- Delete the least square vectors when the mesh moves
+#ifdef OPENFOAM_NOT_EXTEND
         virtual bool movePoints();
+#else
+        virtual bool movePoints() const;
+
+        //- Update after topo change
+        //  Delete the least square vectors when mesh changes
+        virtual bool updateMesh(const mapPolyMesh&) const;
+#endif
 };
 
 

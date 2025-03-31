@@ -388,14 +388,22 @@ Foam::GuccioneElastic::GuccioneElastic
 {
     // Check f0 are unit vectors
 
+#ifdef OPENFOAM_NOT_EXTEND
     if (min(mag(mag(f0_.primitiveField()))) < SMALL)
+#else
+    if (min(mag(mag(f0_.internalField()))) < SMALL)
+#endif
     {
         FatalErrorIn("GuccioneElastic::GuccioneElastic()")
             << "At least one f0 vector has a length of zero!"
             << abort(FatalError);
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     if (min(mag(mag(f0f_.primitiveField()))) < SMALL)
+#else
+    if (min(mag(mag(f0f_.internalField()))) < SMALL)
+#endif
     {
         FatalErrorIn("GuccioneElastic::GuccioneElastic()")
             << "At least one f0f vector has a length of zero!"

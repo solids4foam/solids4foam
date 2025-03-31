@@ -19,11 +19,13 @@ solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
 solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
+solidModels/thermalSolid/thermalSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
+/*solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C*/
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
-solidModels/thermalSolid/thermalSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
@@ -31,6 +33,7 @@ fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
+/*fluidModels/vertexCentredFluid/vertexCentredFluid.C*/
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
@@ -39,8 +42,6 @@ fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C
-
-/*fluidSolidInterfaces/fvPatchFields/fsiInterfaceSolid/fsiInterfaceSolidFvPatchVectorField.C*/
 
 interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
 $(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C
@@ -69,7 +70,9 @@ $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
 $(nonLinGeomLaws)/isotropicFungElastic/isotropicFungElastic.C
+$(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
 $(nonLinGeomLaws)/GentElastic/GentElastic.C
+$(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
 $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
 $(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
@@ -87,21 +90,18 @@ $(thermalLaws)/constantThermal/constantThermal.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
-$(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
+$(solidFvPatchFields)/analyticalSphericalCavityTraction/analyticalSphericalCavityTractionFvPatchVectorField.C
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
-$(solidFvPatchFields)/extrapolatedPressureValue/extrapolatedPressureValueFvPatchScalarField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
-$(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
 $(solidFvPatchFields)/linearSpatialDisplacement/linearSpatialDisplacementFvPatchVectorField.C
-$(solidFvPatchFields)/linearDisplacement/linearDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
-$(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
+$(solidFvPatchFields)/solidForce/solidForceFvPatchVectorField.C
 $(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidRigidContact/triSurfaceMotion/triSurfaceMotion.C
@@ -118,8 +118,14 @@ $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
+$(pointPatchFields)/pointLinearSpatialDisplacement/linearSpatialDisplacementPointPatchVectorField.C
+/*$(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorField.C
+$(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorFieldCalcContact.C*/
+$(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
+$(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
+$(pointPatchFields)/pointFixedRotation/fixedRotationPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
@@ -134,6 +140,12 @@ $(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
 $(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
 $(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
 $(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
+
+/*pointContactModels = $(pointPatchFields)/pointSolidContact/pointContactModels
+pointNormalContactModels = $(pointContactModels)/pointNormalContactModels
+$(pointNormalContactModels)/pointNormalContactModel/pointNormalContactModel.C
+$(pointNormalContactModels)/pointNormalContactModel/newPointNormalContactModel.C
+$(pointNormalContactModels)/pointStandardPenalty/pointStandardPenalty.C*/
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
@@ -163,6 +175,8 @@ functionObjects/contactPatchTestAnalyticalSolution/contactPatchTestAnalyticalSol
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
+functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityAnalyticalSolution.C
+functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityStressDisplacement.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
@@ -170,8 +184,9 @@ functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
 functionObjects/solidKineticEnergy/solidKineticEnergy.C
 functionObjects/solidPointDisplacement/solidPointDisplacement.C
-functionObjects/solidPointTemperature/solidPointTemperature.C
+/*functionObjects/solidPointDisplacementAlongLine/solidPointDisplacementAlongLine.C*/
 functionObjects/solidPointStress/solidPointStress.C
+functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
@@ -181,22 +196,63 @@ functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.H
 
+numerics/amiZoneInterpolation/amiZoneInterpolation.C
+/*numerics/AMIInterpolationS4F/AMIInterpolationS4F.C
+numerics/AMIInterpolationS4F/AMIInterpolationS4FNew.C
+numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4F.C
+numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4FParallelOps.C
+numerics/AMIInterpolationS4F/faceAreaWeightAMIS4F/faceAreaWeightAMIS4F.C*/
+numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
+numerics/deltaVectors/deltaVectors.C
+numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
+numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
+numerics/fvc/fvcCellLimitedGrad.C
+numerics/globalPointIndices/globalPointIndices.C
+numerics/globalPolyPatch/globalPolyPatch.C
+numerics/interpolationTable/tableReaders/tableReaders.C
+numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
+numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
+numerics/leastSquaresS4fGrad/leastSquaresS4fGrads.C
+numerics/leastSquaresS4fGrad/leastSquaresS4fVectors.C
+numerics/logExpVolFields/eig3/eig3.C
+numerics/logExpVolFields/eig3Field.C
+numerics/logExpVolFields/expVolFields.C
+numerics/logExpVolFields/logVolFields.C
+numerics/mechanicalEnergies/mechanicalEnergies.C
+numerics/meshDual/meshDual.C
+numerics/meshDual/dualMeshToMeshMap.C
+numerics/meshDual/meshDualiser.C
+numerics/minEdgeLength/minEdgeLength.C
+/*numerics/multiplyCoeff/multiplyCoeff.C
+numerics/multiplyCoeff/multiplyCoeffRectMat.C
+numerics/multiplyCoeff/multiplyCoeffExtended.C*/
+numerics/newGGIInterpolation/newGGIInterpolationName.C
+numerics/newAMIInterpolation/newAMIInterpolationName.C
+numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/patchCorrectionVectors/patchCorrectionVectors.C
+numerics/pointFieldFunctions/pointFieldFunctions.C
+numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
+numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
+/*numerics/realEigenValues/realEigenValues.C
+numerics/rotation/RodriguesRotation.C
+numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
+numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
+numerics/vfvCellPoint/vfvcCellPoint.C
+numerics/vfvCellPoint/vfvmCellPoint.C*/
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
-
 dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneFvPatchVectorField.C
+dynamicFvMesh/crackerFvMesh/cohesivePolyPatch/cohesivePolyPatch.C
+dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
+dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
+dynamicFvMesh/crackerFvMesh/solidCohesive/solidCohesiveFvPatchVectorField.C
 
 simpleCohesiveZones = dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneLaws
 $(simpleCohesiveZones)/simpleCohesiveZoneLaw/simpleCohesiveZoneLaw.C
 $(simpleCohesiveZones)/Dugdale/DugdaleSimpleCohesiveZoneLaw.C
 $(simpleCohesiveZones)/linear/linearSimpleCohesiveZoneLaw.C
-
-dynamicFvMesh/crackerFvMesh/cohesivePolyPatch/cohesivePolyPatch.C
-dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
-dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
-
-dynamicFvMesh/crackerFvMesh/solidCohesive/solidCohesiveFvPatchVectorField.C
 
 cohesiveZoneModels = dynamicFvMesh/crackerFvMesh/solidCohesive/cohesiveZoneModels
 $(cohesiveZoneModels)/cohesiveZoneModel/cohesiveZoneModel.C
@@ -222,32 +278,5 @@ $(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
 $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
-numerics/amiZoneInterpolation/amiZoneInterpolation.C
-numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
-numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
-numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
-numerics/meshDual/meshDual.C
-numerics/meshDual/dualMeshToMeshMap.C
-numerics/meshDual/meshDualiser.C
-numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
-numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
-numerics/fvc/fvcCellLimitedGrad.C
-numerics/globalPointIndices/globalPointIndices.C
-numerics/globalPolyPatch/globalPolyPatch.C
-numerics/logExpVolFields/eig3/eig3.C
-numerics/logExpVolFields/eig3Field.C
-numerics/logExpVolFields/expVolFields.C
-numerics/logExpVolFields/logVolFields.C
-numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
-numerics/mechanicalEnergies/mechanicalEnergies.C
-numerics/newGGIInterpolation/newGGIInterpolationName.C
-numerics/newAMIInterpolation/newAMIInterpolationName.C
-numerics/newFvMeshSubset/newFvMeshSubset.C
-numerics/patchCorrectionVectors/patchCorrectionVectors.C
-numerics/pointFieldFunctions/pointFieldFunctions.C
-
-numerics/deltaVectors/deltaVectors.C
-numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
-numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

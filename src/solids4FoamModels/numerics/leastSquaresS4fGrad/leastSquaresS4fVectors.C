@@ -20,7 +20,9 @@ License
 #include "leastSquaresS4fVectors.H"
 #include "volFields.H"
 #include "symmetryPolyPatch.H"
-#include "symmetryPlanePolyPatch.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -38,35 +40,39 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
     const boolList& useBoundaryFaceValues_
 )
 :
+#ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>(mesh),
+#else
+    MeshObject<fvMesh, leastSquaresS4fVectors>(mesh),
+#endif
     useBoundaryFaceValues_(useBoundaryFaceValues_),
     pVectors_
     (
         IOobject
         (
             "LeastSquaresP",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
-        dimensionedVector(dimless/dimLength, Zero)
+        mesh,
+        dimensionedVector("0", dimless/dimLength, vector::zero)
     ),
     nVectors_
     (
         IOobject
         (
             "LeastSquaresN",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
-        dimensionedVector(dimless/dimLength, Zero)
+        mesh,
+        dimensionedVector("0", dimless/dimLength, vector::zero)
     )
 {
     calcLeastSquaresVectors();
@@ -81,16 +87,16 @@ Foam::leastSquaresS4fVectors::~leastSquaresS4fVectors()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
+void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 {
     DebugInFunction
         << "Calculating least square gradient vectors" << nl;
 
-    const fvMesh& mesh = mesh_;
+    const fvMesh& mesh = this->mesh();
 
     // Set local references to mesh data
-    const labelUList& owner = mesh_.owner();
-    const labelUList& neighbour = mesh_.neighbour();
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
 
     const volVectorField& C = mesh.C();
     const surfaceScalarField& w = mesh.weights();
@@ -98,7 +104,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
 
     // Set up temporary storage for the dd tensor (before inversion)
-    symmTensorField dd(mesh_.nCells(), Zero);
+    symmTensorField dd(mesh.nCells(), symmTensor::zero);
     forAll(owner, facei)
     {
         label own = owner[facei];
@@ -112,8 +118,13 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
     }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
     surfaceVectorField::Boundary& pVectorsBf =
         pVectors_.boundaryFieldRef();
+#else
+    surfaceVectorField::GeometricBoundaryField& pVectorsBf =
+        pVectors_.boundaryField();
+#endif
 
     forAll(pVectorsBf, patchi)
     {
@@ -145,7 +156,9 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         else if
         (
             isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+#endif
         )
         {
             // Treat symmetry planes consistently with internal faces
@@ -237,7 +250,9 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         else if
         (
             isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+#endif
         )
         {
             // Treat symmetry planes consistently with internal faces
@@ -286,11 +301,28 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 bool Foam::leastSquaresS4fVectors::movePoints()
 {
     calcLeastSquaresVectors();
     return true;
 }
 
+#else
+
+bool Foam::leastSquaresS4fVectors::movePoints() const
+{
+    calcLeastSquaresVectors();
+    return true;
+}
+
+bool Foam::leastSquaresS4fVectors::updateMesh(const mapPolyMesh&) const
+{
+    calcLeastSquaresVectors();
+    return true;
+}
+
+#endif // ifdef OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //
