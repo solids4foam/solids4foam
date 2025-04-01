@@ -89,4 +89,9 @@ DebugSwitches
     elasticWallPressure  1;
 }
 
+DebugSwitches
+{
+    elasticWallPressure  1;
+}
+
 // ************************************************************************* //

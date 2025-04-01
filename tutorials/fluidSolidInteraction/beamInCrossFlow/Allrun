@@ -9,6 +9,13 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+if (( "${WM_PROJECT_VERSION#v}" > 2012 ))
+then
+    echo; echo "This case currently does not run with this OpenFOAM verion";
+    echo
+    exit 0
+fi
+
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid

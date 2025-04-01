@@ -41,7 +41,22 @@ timeFormat      general;
 
 timePrecision   6;
 
-runTimeModifiable no;
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.5;
+
+maxDeltaT       1;
+
+functions
+{
+    fsiConvData
+    {
+        type fsiConvergenceData;        
+        region fluid;
+    }
+}
 
 adjustTimeStep  no;
 

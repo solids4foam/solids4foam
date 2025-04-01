@@ -22,7 +22,19 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    interface
+    left
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+    right
+    {
+        type            solidTraction;
+        traction        uniform ( 0 6250 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    topAndBottom
     {
         type            solidTraction;
         traction        uniform ( 0 0 0 );
@@ -39,5 +51,6 @@ boundaryField
         type            empty;
     }
 }
+
 
 // ************************************************************************* //
