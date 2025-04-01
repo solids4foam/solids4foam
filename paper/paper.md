@@ -13,7 +13,7 @@ authors:
     affiliation: 1
   - name: Ivan Batisti$\'{c}$
     orcid: 0000-0002-6104-0415
-    affiliation: 2
+    affiliation: 1, 2
   - name: $\v{Z}$eljko Tukovi$\'{c}$
     orcid: 0000-0001-8719-0983
     affiliation: 2
