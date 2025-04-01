@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2312                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       dictionary;
+    location    "constant/solid";
+    object      solidProperties.withDefaultValues;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel      nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+"nonLinearGeometryUpdatedLagrangianCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
+{
+    solutionAlgorithm implicitSegregated;
+    optionsFile     petscOptions.lu;
+    predictor       yes;
+    dampingCoeff    [ 0 0 -1 0 0 0 0 ] 0.1;
+    stabilisation
+    {
+        scaleFactor     1;
+    }
+    solutionTolerance 1e-06;
+    alternativeTolerance 1e-07;
+    materialTolerance 1e-05;
+    infoFrequency   100;
+    nCorrectors     10000;
+    minCorrectors   1;
+    writeResidualField false;
+    relaxationMethod fixed;
+    QuasiNewtonRestartFrequency 25;
+    restart         false;
+    residualFile    false;
+}
+
+
+// ************************************************************************* //

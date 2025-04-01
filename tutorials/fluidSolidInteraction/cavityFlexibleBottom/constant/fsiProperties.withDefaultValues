@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2312                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       Aitken;
+    location    "constant";
+    object      fsiProperties.withDefaultValues;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface Aitken;
+
+"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
+{
+    solidPatch      interface;
+    fluidPatch      interface;
+    relaxationFactor 0.1;
+    outerCorrTolerance 1e-05;
+    nOuterCorr      20;
+    coupled         no;
+    interfaceTransferMethod directMap;
+    couplingStartTime 10;
+    predictor       yes;
+    predictSolid    yes;
+    additionalMeshCorrection yes;
+    writeResidualsToFile yes;
+    interfaceDeformationLimit 0;
+    incrementalResiduals true;
+    interpolatorUpdateFrequency 0;
+    GGICoeffs
+    {
+    }
+    AMICoeffs
+    {
+    }
+    RBFCoeffs
+    {
+    }
+    directMapCoeffs
+    {
+    }
+    relaxationFactorMax 1;
+}
+
+
+// ************************************************************************* //
