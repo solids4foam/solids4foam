@@ -48,7 +48,7 @@ The `solids4foam` toolbox addresses four primary needs within the OpenFOAM commu
 3. The necessity for a modular approach to coupling various solid and fluid processes in OpenFOAM.
 4. The demand for an extendable framework to facilitate research into innovative finite volume methods for solid mechanics.
 
-The design of `solids4foam` adheres to four guiding principles:
+The design of `solids4foam` adheres to three guiding principles:
 
 1. **Usability:** If you can use OpenFOAM, you can use `solids4foam`.
 2. **Compatibility:** Supports the three main OpenFOAM variants: OpenFOAM.com, OpenFOAM.org, and foam-extend.
@@ -61,7 +61,7 @@ The solids4foam toolbox is designed with a modular architecture, allowing for a 
 
 ## Partitioned Fluid-Solid Interaction Coupling Methods
 
-`solids4foam` provides a range of partitioned coupling methods for fluid-solid interaction, including fixed under-relaxation, Aitken’s accelerated under-relaxation, interface-quasi-Newton coupling [@Degroote2009] based on a Dirichlet-Neumann formulation, as well as an added-mass Robin-Neumann formulation. Details of the implementation can be found in [@Cardiff2018a], [@Tukovic2018a], and [@Tukovic2018b]. Thermo-fluid-solid interaction coupling is also available [@solids4foamTFSI].
+`solids4foam` provides a range of partitioned coupling methods for fluid-solid interaction, including fixed under-relaxation, Aitken’s accelerated under-relaxation, interface-quasi-Newton coupling [@Degroote2009] based on a Dirichlet-Neumann formulation, as well as an added-mass Robin-Neumann formulation. Details of the implementation are given by @Cardiff2018a, @Tukovic2018a, and @Tukovic2018b. Thermo-fluid-solid interaction coupling is also available [@solids4foamTFSI].
 
 ## Finite Volume Solid Model Discretisations and Solution Algorithms
 
