@@ -25,6 +25,8 @@ jobs:
         if git grep -I -n '[[:blank:]]\+$'
         then
           echo "❌ Trailing whitespace found in the files above. Please fix them manually."
+          echo "You can remove whitespace with the command: "
+          echo "git grep --cached -I -l '[[:blank:]]\+$' | xargs sed -i '' -e 's/[[:space:]]\+$//'"
           exit 1
         else
           echo "✅ No trailing whitespace found."
