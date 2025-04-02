@@ -9,8 +9,7 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
-rm -rf case.foam
-rm 0/fluid/alpha1 0/fluid/alpha.water
+rm -rf case.foam displacement.pdf 0/fluid/alpha1 0/fluid/alpha.water
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
