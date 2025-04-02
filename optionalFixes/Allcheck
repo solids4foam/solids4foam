@@ -27,6 +27,7 @@ checkAndReport()
         echo
         echo "******** PLEASE FIX THIS ***********"
         echo "You should replace the file '${3}/${2}' with 'optionalFixes/${1}/${2}'"
+        echo "and re-build the library '${4}'."
         echo
         echo "You can do it by running the following commands:"
         echo "    cp optionalFixes/${1}/${2} ${3}/"
@@ -59,7 +60,7 @@ then
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
-    
+
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
     checkAndReport \

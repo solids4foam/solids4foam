@@ -23,7 +23,7 @@ ddtSchemes
 gradSchemes
 {
     default         Gauss linear;
-    
+
 }
 
 divSchemes

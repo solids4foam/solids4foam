@@ -96,6 +96,7 @@ $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(solidFvPatchFields)/linearSpatialDisplacement/linearSpatialDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
+$(solidFvPatchFields)/normalDisplacementZeroShear/normalDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
@@ -183,6 +184,8 @@ functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
+functionObjects/squarePlateAnalyticalSolution/squarePlateAnalyticalSolution.C
+functionObjects/squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
 functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C

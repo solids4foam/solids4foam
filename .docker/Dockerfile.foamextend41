@@ -12,7 +12,7 @@ MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
 # Change default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Add solids4Foam 
+# Add solids4Foam
 COPY . /home/dockeruser/solids4foam
 
 # Change ownership to dockeruser

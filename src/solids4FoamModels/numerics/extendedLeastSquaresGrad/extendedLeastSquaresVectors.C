@@ -145,7 +145,10 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
         const unallocLabelList& faceCells = p.faceCells();
 #endif
         // Better version of d-vectors: Zeljko Tukovic, 25/Apr/2010
-        vectorField pd(p.delta());
+        // vectorField pd(p.delta());
+        // Build true delta vectors (p.delta() is the normal component in
+        // COM/ORG)
+        vectorField pd(p.Cf() - p.Cn());
 
         forAll(pd, patchFaceI)
         {
@@ -243,7 +246,13 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
 
     forAll(lsP.boundaryField(), patchI)
     {
-        const vectorField pd(mesh().boundary()[patchI].delta());
+        // const vectorField pd(mesh().boundary()[patchI].delta());
+        // Build true delta vectors (p.delta() is the normal component in
+        // COM/ORG)
+        const vectorField pd
+        (
+            mesh().boundary()[patchI].Cf() - mesh().boundary()[patchI].Cn()
+        );
 
         fvsPatchVectorField& patchLsP = lsP.boundaryFieldRef()[patchI];
 

@@ -37,7 +37,7 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression uncompressed;
+writeCompression off;
 
 timeFormat      general;
 
@@ -55,7 +55,7 @@ functions
 {
     fsiConvData
     {
-        type fsiConvergenceData;        
+        type fsiConvergenceData;
         region fluid;
     }
 }

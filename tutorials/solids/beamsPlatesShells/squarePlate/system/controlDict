@@ -39,12 +39,30 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression uncompressed;
+writeCompression off;
 
 timeFormat      general;
 
 timePrecision   6;
 
 runTimeModifiable no;
+
+functions
+{
+    analyticalSolution
+    {
+        type    squarePlateAnalyticalSolution;
+
+        a    10; // Length of the plate (in x direction)
+        b    10; // Width of the plate (in y direction)
+        h    0.1; // Plate thickness
+        p    1000;  // Applied transverse pressure
+        E    2e11;  // Young's modulus
+        nu    0.3; // Poisson's ratio
+
+        //boundaryConditions allEdgesSupported;
+        boundaryConditions allEdgesClamped;
+    }
+}
 
 // ************************************************************************* //

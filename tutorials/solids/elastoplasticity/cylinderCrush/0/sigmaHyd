@@ -48,11 +48,11 @@ boundaryField
     }
     front
     {
-		type             	empty;	
+		type             	empty;
     }
     back
     {
-		type             	empty;	
+		type             	empty;
     }
 }
 

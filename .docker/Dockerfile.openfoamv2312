@@ -12,7 +12,7 @@ MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
 # Change default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Add solids4Foam 
+# Add solids4Foam
 COPY . /usr/lib/solids4foam
 
 # Make optional fixes for solids4foam
@@ -21,7 +21,7 @@ COPY optionalFixes/OpenFOAM-v2012/backwardDdtScheme.C /usr/lib/openfoam/openfoam
 # Compile solids4Foam
 RUN source /usr/lib/openfoam/openfoam2312/etc/bashrc && \
     cd /usr/lib/solids4foam && \
-    ./Allwmake
+    ./Allwmake -j -s
 
 # Clean log files
 RUN cd /usr/lib/solids4foam && \

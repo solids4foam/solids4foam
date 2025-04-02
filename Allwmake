@@ -10,10 +10,16 @@ then
     echo "Please source the OpenFOAM/FOAM bashrc first!"
     exit 1
 else
-    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312")
+    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312" "v2406")
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
         echo "Unsupported OpenFOAM version sourced!"
     fi
+fi
+
+# Parse arguments for library compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
 fi
 
 # Download ThirdParty software
@@ -25,8 +31,9 @@ N_FIXES=$(grep "PLEASE FIX THIS" optionalFixes/log.Allcheck | wc -l)
 if [[ $N_FIXES -gt 0 ]]
 then
     echo "** ERROR with optionalFixes **"
-    echo "Please make the file replacements described above, or skip these "
-    echo "checks by setting 'export S4F_NO_FILE_FIXES=1'"; echo
+    echo "Please make the file replacements described above and rebuild OpenFOAM,"
+    echo "or skip these checks by setting 'export S4F_NO_FILE_FIXES=1'."
+    echo "Read more details on https://www.solids4foam.com/installation/optionalFixes/"; echo
     exit 1
 fi
 
@@ -38,14 +45,14 @@ fi
 
 # Check if the build succeeded
 echo "Checking if the installation was a success:"
-N_ERRORS_1=$(find . -name log.Allwmake | xargs grep "\ Error\ " | wc -l)
-N_ERRORS_2=$(find . -name log.Allwmake | xargs grep "\ Stop." | wc -l)
+N_ERRORS_1=$(find . -name log.Allwmake | xargs grep " Error " | wc -l)
+N_ERRORS_2=$(find . -name log.Allwmake | xargs grep " Stop." | wc -l)
 if [[ $N_ERRORS_1 -gt 0 ]] || [[ $N_ERRORS_2 -gt 0 ]]
 then
     echo "** BUILD ERROR **"
     echo "There were build errors in the following logs:"
-    echo $(find . -name log.Allwmake | xargs grep -l "\ Error\ ")
-    echo $(find . -name log.Allwmake | xargs grep -l "\ Stop.")
+    echo $(find . -name log.Allwmake | xargs grep -l " Error ")
+    echo $(find . -name log.Allwmake | xargs grep -l " Stop.")
     echo; echo "Please examine these logs for additional details"; echo
     exit 1
 else

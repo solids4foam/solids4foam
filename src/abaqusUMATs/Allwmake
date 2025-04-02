@@ -1,8 +1,14 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
+# Parse arguments for library compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
+fi
+
 # Compile C++ wrapper class
-wmake libso
+wmake $targetType libso
 
 # Check gfortran is installed before compiling fortran sub-routines
 if ! command -v gfortran >/dev/null 2>&1
