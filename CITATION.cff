@@ -1,22 +1,24 @@
 cff-version: 1.2.0
-message: "If you use solids4foam in your research, please cite it as below."
+message: "If you use solids4foam in your research, please cite the following publication:"
 authors:
   - family-names: "Cardiff"
     given-names: "Philip"
     affiliation: "University College Dublin"
     orcid: "https://orcid.org/0000-0002-4824-427X"
+  - family-names: "Batistić"
+    given-names: "Ivan"
+    affiliation:
+      - "University of Zagreb"
+      - "University College Dublin"
+    orcid: "https://orcid.org/0000-0002-6104-0415"
   - family-names: "Tuković"
     given-names: "Željko"
     affiliation: "University of Zagreb"
     orcid: "https://orcid.org/0000-0001-8719-0983"
-  - family-names: "Batistić"
-    given-names: "Ivan"
-    affiliation: "University of Zagreb"
-    orcid: "https://orcid.org/0000-0002-6104-0415"
-title: "solids4foam: An open-source toolbox for solid and fluid-solid interaction simulations"
-version: "2.1"
-doi: "10.5281/zenodo.12626724"
-date-released: "2024-07-02"
+title: "solids4foam: A toolbox for performing solid mechanics and fluid-solid interaction simulations in OpenFOAM"
+version: "2.2"
+doi: "10.21105/joss.07407"
+date-released: "2025-04-02"
 license: "GPL-3.0-or-later"
 repository: "https://github.com/solids4foam/solids4foam"
 keywords:
@@ -24,3 +26,20 @@ keywords:
   - fluid-solid interaction
   - OpenFOAM
   - finite volume method
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Cardiff"
+      given-names: "P."
+    - family-names: "Batistić"
+      given-names: "I."
+    - family-names: "Tuković"
+      given-names: "Ž."
+  title: "solids4foam: A toolbox for performing solid mechanics and fluid-solid interaction simulations in OpenFOAM"
+  journal: "Journal of Open Source Software"
+  year: 2025
+  volume: 10
+  number: 108
+  pages: 7407
+  doi: "10.21105/joss.07407"
+  url: "https://doi.org/10.21105/joss.07407"
