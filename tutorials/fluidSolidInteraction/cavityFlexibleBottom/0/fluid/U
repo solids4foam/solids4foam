@@ -1,0 +1,129 @@
+
+/*--------------------------------*- C++ -*----------------------------------* \
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2312                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+      //type            fixedValue;
+      //value           uniform (1 0 0);
+      type            fixedProfile;
+    profile         polynomial
+    (
+        ((1.5 0 0)  (0 0 0))  // Coefficient for y^0 = 1 (constant term)
+        ((-6 0 0) (2 0 0))  // Coefficient for y^2 = -6
+    );
+    direction       (0 1 0);  // Profile varies along the y-direction
+    origin          0.5;        // Starting position of the profile in y
+    }
+
+    
+
+    walls
+    {
+        type            noSlip;
+    }
+    
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    defaultFaces
+    {
+        type            empty;
+    }
+
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //
+/*
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    inlet
+    {
+        type            paraboloidInletVelocity;
+        maxVelocity     0.3;
+        yWidth          0.2;
+        zWidth          0.4;
+        timeVaryingEndTime 1.0;
+        timeAtMaxVelocity 1.0;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    left
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    symmetry
+    {
+        type            symmetry;
+    }
+}*/
+
+// ************************************************************************* //

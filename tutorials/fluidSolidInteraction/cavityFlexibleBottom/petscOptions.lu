@@ -1,0 +1,57 @@
+# Nonlinear solver
+# The default line search may sometimes fail; in that case, switch to "basic"
+-snes_type newtonls
+-snes_linesearch_type basic
+#-snes_rtol 1e-6
+#-snes_stol 1e-6
+-snes_max_it 1000
+-snes_monitor
+-snes_converged_reason
+
+# Calculate the Jacobian using matrix-free finite differencing
+-snes_mf
+-snes_mf_operator
+
+# Linear solver
+# Increase the restart (directions) if it is struggling to converged
+-ksp_type lgmres
+#-ksp_gmres_restart 100
+#-ksp_rtol 1e-3
+#-ksp_monitor
+#-ksp_view
+-ksp_converged_reason
+
+# Preconditioner - LU
+# Good for small/medium cases but will require large amounts of memory for
+# larger models
+-pc_type bjacobi
+-sub_pc_type lu
+
+# Preconditioner - ILU
+# Less expensive than LU but not as good
+# Increasing the levels (fill-in) improves the preconditioning but is more
+# expensive
+#-pc_type asm
+#-sub_pc_type ilu
+#-sub_pc_factor_levels 1
+
+# Preconditioner - multigrid
+# Should perform better than LU for larger cases
+# -pc_type hypre
+# -pc_hypre_type boomeramg
+# -pc_hypre_boomeramg_max_iter 1
+# #-pc_hypre_boomeramg_strong_threshold 0.25
+# -pc_hypre_boomeramg_strong_threshold 0.7
+# -pc_hypre_boomeramg_grid_sweeps_up 1
+# -pc_hypre_boomeramg_grid_sweeps_down 1
+# -pc_hypre_boomeramg_agg_nl 1
+# -pc_hypre_boomeramg_agg_num_paths 1
+# -pc_hypre_boomeramg_max_levels 25
+# -pc_hypre_boomeramg_coarsen_type HMIS
+# -pc_hypre_boomeramg_interp_type ext+i
+# -pc_hypre_boomeramg_P_max 1
+# -pc_hypre_boomeramg_truncfactor 0.3
+
+# Construct the precondioner once and store it since it does not change
+-snes_lag_preconditioner_persists true
+-snes_lag_preconditioner -2

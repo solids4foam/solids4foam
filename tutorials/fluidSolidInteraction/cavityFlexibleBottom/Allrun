@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+#solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+solids4Foam::runApplication solids4Foam
+
+: << 'COMMENT'
+
+
+# Run solver
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+COMMENT
+
+
