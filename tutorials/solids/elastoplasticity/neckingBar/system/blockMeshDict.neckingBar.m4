@@ -43,7 +43,7 @@ define(lx, calc(0.35*l)) // x-coordinate where refined region ends
 
 // start of blockMeshDict
 
-convertToMeters 0.001;
+scale 0.001;
 
 vertices
 (

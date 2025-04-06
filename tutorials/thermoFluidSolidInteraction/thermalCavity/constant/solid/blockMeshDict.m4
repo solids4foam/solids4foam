@@ -56,7 +56,7 @@ m4_define(grading, 1 1 1)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-convertToMeters 1;
+scale 1;
 
 vertices
 (
