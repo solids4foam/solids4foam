@@ -4,7 +4,7 @@ functions
     {
         type                forces;
         region              fluid;
-        functionObjectLibs  ( "libforces.so" );
+        libs                ( "libforces.so" );
         writeControl        timeStep;
         writeInterval       1;
         patches             (interface);

@@ -3,7 +3,7 @@ functions
     probes
     {
         type           probes;
-        functionObjectLibs ("libsampling.so");
+        libs           ("libsampling.so");
         enabled        true;
         writeControl   outputTime;
         writeInterval  1;
