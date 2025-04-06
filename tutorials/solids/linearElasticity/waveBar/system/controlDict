@@ -56,8 +56,8 @@ functions
     probe
     {
         type           probes;
-        outputControl  timeStep;
-        outputInterval 1;
+        writeControl   timeStep;
+        writeInterval  1;
         fields         (D sigma);
         probeLocations ((0.1 0 0));
     }
