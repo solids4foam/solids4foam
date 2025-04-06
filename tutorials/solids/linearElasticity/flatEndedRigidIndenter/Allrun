@@ -19,6 +19,10 @@ then
     mv 0/polyMesh/* constant/polyMesh/
     rm -rf 0/polyMesh
 else
+    # In OpenFOAM-*, `basePoint` and `normalVector` have been deprecated in
+    # favor of `point` and `normal`
+    sed -i -E 's/base(Point)/\L\1/' system/mirrorMeshDict
+    sed -i -E 's/(normal)Vector/\1/' system/mirrorMeshDict
     solids4Foam::runApplication mirrorMesh -overwrite
 fi
 

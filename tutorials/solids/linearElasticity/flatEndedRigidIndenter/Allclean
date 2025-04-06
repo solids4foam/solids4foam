@@ -14,3 +14,10 @@ cleanCase
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
 
+if [[ "${WM_PROJECT}" == "OpenFOAM" ]]
+then
+    # Convert the new keywords, `point`, and `normal`, back to the old ones
+    # still used in foam-extend: `basePoint` and `normalVector`
+    sed -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
+    sed -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
+fi
