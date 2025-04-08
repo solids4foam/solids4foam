@@ -346,7 +346,7 @@ bool interFluid::evolve()
 
                 if (correctPhi)
                 {
-                    #include "correctPhi.foundation.H"
+                    #include "correctPhi.foundation.interFluid.H"
                 }
 
                 mixture.correct();

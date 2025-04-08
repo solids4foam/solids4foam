@@ -240,7 +240,7 @@ bool interFluid::evolve()
 
     if (correctPhi_ && meshChanged)
     {
-        #include "correctPhi.foamextend.H"
+        #include "correctPhi.foamextend.interFluid.H"
     }
 
     // Make the fluxes relative to the mesh motion
