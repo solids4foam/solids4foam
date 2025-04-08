@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "sparseMatrix.H"
 #include <vector>
 
@@ -269,5 +271,6 @@ Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator*
     return tresult;
 }
 
+#endif // ifdef OPENFOAM_COM
 
 // ************************************************************************* //

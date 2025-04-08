@@ -39,9 +39,11 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
 ) const
 {
     // Initialise block coeff
+    // const label nCoeffCmpts = blockSize_*blockSize_;
+    // PetscScalar values[nCoeffCmpts];
+    // std::memset(values, 0, sizeof(values));
     const label nCoeffCmpts = blockSize_*blockSize_;
-    PetscScalar values[nCoeffCmpts];
-    std::memset(values, 0, sizeof(values));
+    std::vector<PetscScalar> values(nCoeffCmpts, PetscScalar(0));
 
     // Get the number of components per field element from the traits (e.g.,
     // 1 for scalar, 3 for vector, etc.)
@@ -89,7 +91,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                    values.data(),
                     ADD_VALUES
                 );
             );
@@ -134,7 +137,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                    values.data(),
                     ADD_VALUES
                 );
             );
@@ -142,7 +146,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI,
+                    values.data(),
                     ADD_VALUES
                 );
             );
@@ -253,7 +258,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     (
                         MatSetValuesBlocked
                         (
-                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                            values.data(),
                             ADD_VALUES
                         );
                     );
@@ -295,7 +301,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     (
                         MatSetValuesBlocked
                         (
-                            jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                            jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                            values.data(),
                             ADD_VALUES
                         );
                     );
