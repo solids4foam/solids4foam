@@ -13,4 +13,3 @@ cleanCase
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
-

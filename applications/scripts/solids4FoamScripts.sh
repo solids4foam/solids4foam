@@ -47,6 +47,16 @@ function solids4Foam::convertCaseFormat()
         return 0
     fi
 
+    # GNU sed must be used
+    if sed --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed detected"
+    else
+        echo "Error: This script requires GNU sed. Please install it (e.g.,"
+        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
+        exit 1
+    fi
+
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
@@ -199,6 +209,21 @@ function solids4Foam::convertCaseFormat()
         sed -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
     fi
 
+    # 13. Replace mirrorMeshDict differences
+    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
+        echo "system/mirrorMeshDict with with 'point' and 'normal'"
+        sed -i -E 's/\bbasePoint\b/point/' system/mirrorMeshDict
+        sed -i -E 's/\bnormalVector\b/normal/' system/mirrorMeshDict
+    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
+        echo "system/solid/mirrorMeshDict with with 'point' and 'normal'"
+        sed -i -E 's/\bbasePoint\b/point/' system/solid/mirrorMeshDict
+        sed -i -E 's/\bnormalVector\b/normal/' system/solid/mirrorMeshDict
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -228,6 +253,16 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
     # Give sensible names to the argument
     CASE_DIR=$1
+
+    # GNU sed must be used
+    if sed --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed detected"
+    else
+        echo "Error: This script requires GNU sed. Please install it (e.g.,"
+        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
+        exit 1
+    fi
 
     # Un-do changes made in convertCaseFormat, if any
 
@@ -383,6 +418,21 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Updating plot.gnuplot"
         sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
+    fi
+
+    # 13. Replace mirrorMeshDict differences
+    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
+        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
+        sed -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
+        sed -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
+    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
+        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
+        sed -i -E 's/\bpoint\b/basePoint/' system/solid/mirrorMeshDict
+        sed -i -E 's/\b(normal)\b/\1Vector/' system/solid/mirrorMeshDict
     fi
 
     echo

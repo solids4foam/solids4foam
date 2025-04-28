@@ -34,5 +34,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: solids4foam/solids4foam-v2.1-${{ matrix.image.version }}:latest
+          tags: solids4foam/solids4foam-v2.2-${{ matrix.image.version }}:latest
           file: ${{ matrix.image.file }}

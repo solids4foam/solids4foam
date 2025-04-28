@@ -44,7 +44,7 @@ define(mr2, 1) // rigid wall
 
 // start of blockMeshDict
 
-convertToMeters 0.001;
+scale 0.001;
 
 vertices
 (
