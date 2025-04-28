@@ -55,7 +55,7 @@ bool Foam::fluidSolidInterface::updateCoupled()
         if (runTime().value() > (couplingStartTime_ - SMALL))
         {
             InfoIn("fluidSolidInterface::updateCoupled()")
-                << "Enabling fluid-solid coupling" << endl;
+                << "Enabling fluid-solid coupling" << nl << endl;
 
             // Enable coupling
             coupled_ = true;

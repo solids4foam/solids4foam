@@ -625,7 +625,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         );
 
         // lsGrad[neiCellID] -= neiLs[faceI]*(vsf[neiCellID] - vsf[ownCellID]);
-        //mat(neIFaceI, ownCellID) -= VI[neiCellID]*neiLs[faceI];
+        // mat(neIFaceI, ownCellID) -= VI[neiCellID]*neiLs[faceI];
         // Flip the sign of the values
         for (label i = 0; i < nCoeffCmpts; ++i)
         {
@@ -801,12 +801,35 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         );
     }
 
-    // Add additional term from div(phi,U) upwind linearisation
-    // (d/dU)(\sum phi*U = phi*I + w*Sf*Up
-    // for phi > 0, where phi = Sf*(w*Up + (1-w)*Un)
+    // The first-order upwind discretisation for cell P is
+    //     div(phi,U)_P = \sum phi*Uf
+    // where
+    //     Uf = Up     if phi > 0
+    //     Uf = Un     otherwise
+    // and
+    //     phi = Sf & [w*Up + (1 - w)*Un]
+    //
+    // The Newton linearisation of div(phi,U) for cell P is
+    //     \sum (d/dUp)(phi*Uf) = \sum phi*(dUf/dUp) + Uf*(dphi/dUp)
+    //
+    // Using the following
+    //     dUp/dUp = I
+    //     dUn/dUn = I
+    //     dphi/dUp = w*Sf
+    //     dphi/dUn = (1 - w)*Sf
+    // we can calculate the block coefficient for a face:
+    // if phi > 0
+    //     Uf = Up
+    //     (d/dUp)(phi*Up) = phi*I + w*Up*Sf        => diagonal
+    //     (d/dUn)(phi*Up) = (1 - w)*Up*Sf          => off-diagonal
+    // else
+    //     Uf = Un
+    //     (d/dUp)(phi*Un) = w*Un*Sf                => diagonal
+    //     (d/dUn)(phi*Un) = phi*I + (1 - w)*Un*Sf  => off-diagonal
+    //
     // The w*Sf*Up term is missing from fvm::div(phi(), U) as it requires a
     // coupled solver. So we will add the w*Sf*Up term here
-    // Similary, for phi < 0, the neighbour coefficient is (1 - w)*Sf*Un
+    // From the neighbours perspective, the coefficient is (1 - w)*Sf*Un
 
     // Get the blockSize
     label blockSize;
@@ -833,11 +856,16 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         const label globalBlockColI =
             foamPetscSnesHelper::globalCells().toGlobal(neiCellID);
 
+        // Take references for brevity, clarity and efficiency
+        const scalar w = wI[faceI];
+        const vector& Sf = SfI[faceI];
+        const vector& Up = UI[ownCellID];
+        const vector& Un = UI[neiCellID];
+
         if (phiI[faceI] > 0)
         {
-            // Add w*Sf*Up to owner eqn
-            // coeff = sign*wI[faceI]*SfI[faceI]*UI[ownCellID];
-            coeff = sign*wI[faceI]*UI[ownCellID]*SfI[faceI];
+            // Add w*Up*Sf to owner eqn
+            coeff = sign*w*Up*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -857,9 +885,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add (1 - w)*Sf*Up as nei to contribution to own eqn
-            // coeff = sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
-            coeff = sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
+            // Add (1 - w)*Up*Sf as nei to contribution to own eqn
+            coeff = sign*(1.0 - w)*Up*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -879,10 +906,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add -(1 - w)*Sf*Up to the neighbour diagonal
-            // Flip the sign
-            // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[ownCellID];
-            coeff = -sign*(1.0 - wI[faceI])*UI[ownCellID]*SfI[faceI];
+            // Add -(1 - w)*Up*Sf to the neighbour diagonal
+            // Flip the sign as Sf is opposite
+            coeff = -sign*(1.0 - w)*Up*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -902,9 +928,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add -(1 - w)*Sf*Up as the own contribution to the nei eqn
-            // Flip the sign
-            coeff = -sign*(wI[faceI])*UI[ownCellID]*SfI[faceI];
+            // Add -w*Up*Sf as the own contribution to the nei eqn
+            // Flip the sign as Sf is opposite
+            coeff = -sign*w*Up*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -926,9 +952,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         }
         else
         {
-            // Add w*Sf*Un to owner diagonal
-            // coeff = sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
-            coeff = sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
+            // Add w*Un*Sf to owner diagonal
+            coeff = sign*w*Un*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -948,9 +973,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add w*Sf*Un as nei to contribution to own eqn
-            // coeff = sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
-            coeff = sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
+            // Add (1 - w)*Un*Sf as nei to contribution to own eqn
+            // coeff = sign*w*Un*Sf;
+            coeff = sign*(1.0 - w)*Un*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -970,9 +995,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add -(1 - w)*Sf*Un to neighbour diagonal
-            // coeff = -sign*(1.0 - wI[faceI])*SfI[faceI]*UI[neiCellID];
-            coeff = -sign*(1.0 - wI[faceI])*UI[neiCellID]*SfI[faceI];
+            // Add -(1 - w)*Un*Sf to neighbour diagonal
+            // Flip the sign as Sf is opposite
+            coeff = -sign*(1.0 - w)*Un*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)
@@ -992,9 +1017,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 )
             );
 
-            // Add -w*Sf*Un as own to contribution to nei eqn
-            // coeff = -sign*wI[faceI]*SfI[faceI]*UI[neiCellID];
-            coeff = -sign*wI[faceI]*UI[neiCellID]*SfI[faceI];
+            // Add -w*Un*Sf as own to contribution to nei eqn
+            // Flip the sign as Sf is opposite
+            coeff = -sign*w*Un*Sf;
             for (label i = 0; i < (blockSize - 1); ++i)
             {
                 for (label j = 0; j < (blockSize - 1); ++j)

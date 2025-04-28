@@ -1005,17 +1005,51 @@ label newtonCouplingInterface::formAfs
     // Fluid interface area vectors
     const vectorField& fluidPatchSf = fluidPatch.Sf();
 
-    // First we will insert the contribution to the fluid momentum equation
-    // coming from the diffusion term
+    // Lookup the solid ddt scheme
+    const word solidDdtScheme =
+            word(solidMesh().ddtScheme("ddt(" + solid().D().name() +')'));
+
     // The known fluid boundary face value is now replaced by the adjacent
     // solid cell velocity
-    // Diffusion coefficient is nu*|Sf|/(|n & d|*dt), where dt comes
-    // from converting the solid displacement to velocity
-    const scalar deltaT = solid().time().deltaTValue();
-    const scalarField fluidPatchCoeffs
-    (
-        fluidPatch.magSf()*fluidPatch.deltaCoeffs()*fluidPatchNuEff/deltaT
-    );
+    scalarField fluidPatchDiffusionCoeffs(fluidPatch.size(), 0.0);
+    vectorField fluidPatchPressureCoeffs(fluidPatch.size(), vector::zero);
+    if (solidDdtScheme == "steadyState")
+    {
+        // Do nothing
+    }
+    else if (solidDdtScheme == "Euler")
+    {
+        // Diffusion coefficient is nu*|Sf|/(|n & d|*dt), where dt comes
+        // from converting the solid displacement to velocity
+        const scalar deltaT = solid().time().deltaTValue();
+        fluidPatchDiffusionCoeffs =
+            fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()/deltaT;
+
+        // Pressure coefficient from div(U)
+        fluidPatchPressureCoeffs = -fluidPatchSf/deltaT;
+    }
+    else if (solidDdtScheme == "backward")
+    {
+        // Diffusion coefficient is 3.0*nu*|Sf|/(|n & d|*2.0*dt), where (3/2)*dt
+        // comes from converting the solid displacement to velocity
+        const scalar deltaT = solid().time().deltaTValue();
+        fluidPatchDiffusionCoeffs =
+            3.0*fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()
+           /(2.0*deltaT);
+
+        // Pressure coefficient from div(U)
+        fluidPatchPressureCoeffs = -3.0*fluidPatchSf/(2.0*deltaT);
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solid ddtScheme " << solidDdtScheme << ": only "
+            << "steadyState, Euler and backward currently allowed"
+            << exit(FatalError);
+    }
+
+    // First we will insert the contribution to the fluid momentum equation
+    // coming from the diffusion term
 
     // Second we will insert the contribution to the fluid continuity
     // (pressure) equation, where the div(U) term should use the adjacent
@@ -1058,7 +1092,7 @@ label newtonCouplingInterface::formAfs
         label globalColI = globalBlockColI*solidBlockSize;
 
         // Momentum coefficient for this face
-        PetscScalar value = fluidPatchCoeffs[fluidFaceI];
+        PetscScalar value = fluidPatchDiffusionCoeffs[fluidFaceI];
 
         // Manually insert the 3 scalar coefficients (2 in 2-D)
         CHKERRQ
@@ -1096,7 +1130,9 @@ label newtonCouplingInterface::formAfs
         // equation
 
         // Manually insert the 3 scalar coefficients (2 in 2-D)
-        value = -fluidPatchSf[fluidFaceI][vector::X]/deltaT;
+        // value = -fluidPatchSf[fluidFaceI][vector::X]/deltaT;
+        value = fluidPatchPressureCoeffs[fluidFaceI][vector::X];
+
         globalRowI++; // pressure equation
         globalColI = globalBlockColI*solidBlockSize; // x solid displacement
         CHKERRQ
@@ -1107,7 +1143,8 @@ label newtonCouplingInterface::formAfs
             )
         );
 
-        value = -fluidPatchSf[fluidFaceI][vector::Y]/deltaT;
+        //value = -fluidPatchSf[fluidFaceI][vector::Y]/deltaT;
+        value = fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
         globalColI++; // y solid displacement
         CHKERRQ
         (
@@ -1119,7 +1156,8 @@ label newtonCouplingInterface::formAfs
 
         if (!twoD)
         {
-            value = -fluidPatchSf[fluidFaceI][vector::Z]/deltaT;
+            //value = -fluidPatchSf[fluidFaceI][vector::Z]/deltaT;
+            value = fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
             globalColI++; // y solid displacement
             CHKERRQ
             (
@@ -1204,7 +1242,7 @@ label newtonCouplingInterface::formAms
 
     // For the motion momentum equation, the known interface displacement is now
     // replaced by the adjacent solid cell displacement
-    // Diffusion coefficient is impK*|Sf|/(|n & d|)
+    // Diffusion coefficient is impK*|Sf|/(n & d)
     const scalarField motionPatchCoeffs
     (
         motionPatch.magSf()*motionPatch.deltaCoeffs()*motionPatchImpK
@@ -1304,7 +1342,7 @@ label newtonCouplingInterface::formAsf
     // compact stencil. For this approximate Jacobian, we assume the traction
     // on a fluid interface face is equal to the pressure at the centre of the
     // adjacent fluid cell. This approximatation is sufficiently
-    // accurate as a preconditioner for the matrix and will not affected the
+    // accurate as a preconditioner for the matrix and will not affect the
     // converged solution (which is entirely governed by formResidual)
 
     if (fluidSolidInterface::solidPatchIndices().size() != 1)
@@ -1630,6 +1668,11 @@ void newtonCouplingInterface::predict()
         notImplemented("Only implemented for nRegions = 2");
     }
 
+    if (runTime().timeIndex() == 0)
+    {
+        return;
+    }
+
     Info<< "Linear predictor" << endl;
 
     // Predict solution using previous time steps
@@ -1650,6 +1693,44 @@ void newtonCouplingInterface::predict()
     // solid().D() =
     //     solid().D().oldTime() + solid().U()*runTime().deltaT()
     //   + 0.5*sqr(runTime().deltaT())*solid().A();
+
+    // Mesh motion
+    motionSolid().D() =
+        motionSolid().D().oldTime() + motionSolid().U()*runTime().deltaT();
+
+    // Update the mesh motion interface
+    if (solidToMeshCoupling_)
+    {
+        mapInterfaceSolidUToMeshMotionD();
+
+        // We can solve the mesh motion or just move the mesh using the
+        // predicted motion
+
+        // Solve the mesh motion equations
+        //fluidMesh().update();
+
+        // Update gradient of displacement
+        motionSolid().mechanical().grad
+        (
+            motionSolid().D(), motionSolid().gradD()
+        );
+
+        // Interpolate cell displacements to vertices
+        motionSolid().mechanical().interpolate
+        (
+            motionSolid().D(), motionSolid().gradD(), motionSolid().pointD()
+        );
+
+        // Move the mesh
+        const vectorField& points0 =
+            refCast<const meshMotionSolidModelFvMotionSolver>
+            (
+                refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+            ).points0();
+        fluidMesh().movePoints(points0 + motionSolid().pointD());
+        fluid().U().correctBoundaryConditions();
+    }
+
 
     // Insert the OpenFOAM fields into the PETSc solution vector
 
@@ -2035,15 +2116,19 @@ bool newtonCouplingInterface::evolve()
                 initResidualNorm = residualNorm;
             }
 
-            Info<< "Mesh corrector loop residual norm = " << residualNorm
-                << ", solution delta norm = " << solutionDeltaNorm
-                << ", solution norm = " << solutionNorm << nl
+            Info<< "Mesh corrector loop" << nl
+                << "    Residual norm = " << residualNorm << nl
+                << "    Initial residual norm = " << initResidualNorm << nl
+                << "    Solution delta norm = " << solutionDeltaNorm << nl
+                << "    Solution norm = " << solutionNorm << nl
                 << endl;
 
             if (iMeshCorr == (nMeshCorr - 1))
             {
-                FatalErrorInFunction
-                    << "Max mesh correctors reached!" << exit(FatalError);
+                // FatalErrorInFunction
+                //     << "Max mesh correctors reached!" << exit(FatalError);
+                WarningInFunction
+                    << "Max mesh correctors reached!" << endl;
             }
         }
         while
@@ -2052,6 +2137,7 @@ bool newtonCouplingInterface::evolve()
          && residualNorm > meshCorrRelTol*initResidualNorm
          && solutionDeltaNorm > meshCorrSolTol*solutionNorm
          && residualNorm > meshCorrAbsTol
+         && coupled()
         );
     }
     else if (nRegions_ == 3)
