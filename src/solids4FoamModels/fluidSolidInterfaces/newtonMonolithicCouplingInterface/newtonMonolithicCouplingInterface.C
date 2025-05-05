@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "newtonCouplingInterface.H"
+#include "newtonMonolithicCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "fixedValueFvPatchFields.H"
@@ -37,17 +37,17 @@ namespace fluidSolidInterfaces
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(newtonCouplingInterface, 0);
+defineTypeNameAndDebug(newtonMonolithicCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    fluidSolidInterface, newtonCouplingInterface, dictionary
+    fluidSolidInterface, newtonMonolithicCouplingInterface, dictionary
 );
 
 
 // * * * * * * * * * * * Private Member Functions* * * * * * * * * * * * * * //
 
 
-foamPetscSnesHelper& newtonCouplingInterface::motion()
+foamPetscSnesHelper& newtonMonolithicCouplingInterface::motion()
 {
     // meshMotionSolidModelFvMotionSolver is the only currently supported
     // mesh motion solver
@@ -90,13 +90,13 @@ foamPetscSnesHelper& newtonCouplingInterface::motion()
 }
 
 
-solidModel& newtonCouplingInterface::motionSolid()
+solidModel& newtonMonolithicCouplingInterface::motionSolid()
 {
     return refCast<solidModel>(motion());
 }
 
 
-void newtonCouplingInterface::createSubMatsAndMat
+void newtonMonolithicCouplingInterface::createSubMatsAndMat
 (
     Mat& jac,
     Mat*& subMatsPtr,
@@ -210,7 +210,7 @@ void newtonCouplingInterface::createSubMatsAndMat
 }
 
 
-label newtonCouplingInterface::initialiseAfm
+label newtonMonolithicCouplingInterface::initialiseAfm
 (
     Mat Afm,
     const fvMesh& fluidMesh,
@@ -317,7 +317,7 @@ label newtonCouplingInterface::initialiseAfm
 }
 
 
-label newtonCouplingInterface::initialiseAfs
+label newtonMonolithicCouplingInterface::initialiseAfs
 (
     Mat Afs,
     const fvMesh& fluidMesh,
@@ -424,7 +424,7 @@ label newtonCouplingInterface::initialiseAfs
 }
 
 
-label newtonCouplingInterface::initialiseAms
+label newtonMonolithicCouplingInterface::initialiseAms
 (
     Mat Ams,
     const fvMesh& fluidMesh,
@@ -524,7 +524,7 @@ label newtonCouplingInterface::initialiseAms
 }
 
 
-label newtonCouplingInterface::initialiseAsf
+label newtonMonolithicCouplingInterface::initialiseAsf
 (
     Mat Asf,
     const fvMesh& solidMesh,
@@ -613,7 +613,7 @@ label newtonCouplingInterface::initialiseAsf
 }
 
 
-label newtonCouplingInterface::formAfm
+label newtonMonolithicCouplingInterface::formAfm
 (
     Mat Afm,
     const label fluidBlockSize,
@@ -924,7 +924,7 @@ label newtonCouplingInterface::formAfm
 }
 
 
-label newtonCouplingInterface::formAfs
+label newtonMonolithicCouplingInterface::formAfs
 (
     Mat Afs,
     const label fluidBlockSize,
@@ -1173,7 +1173,7 @@ label newtonCouplingInterface::formAfs
 }
 
 
-label newtonCouplingInterface::formAms
+label newtonMonolithicCouplingInterface::formAms
 (
     Mat Ams,
     const label solidBlockSize,
@@ -1324,7 +1324,7 @@ label newtonCouplingInterface::formAms
 }
 
 
-label newtonCouplingInterface::formAsf
+label newtonMonolithicCouplingInterface::formAsf
 (
     Mat Asf,
     const label fluidBlockSize,
@@ -1477,7 +1477,7 @@ label newtonCouplingInterface::formAsf
 }
 
 
-void newtonCouplingInterface::mapInterfaceSolidUToFluidU()
+void newtonMonolithicCouplingInterface::mapInterfaceSolidUToFluidU()
 {
     // Lookup the interface map from the fluid faces to the solid faces
     const interfaceToInterfaceMappings::
@@ -1543,7 +1543,7 @@ void newtonCouplingInterface::mapInterfaceSolidUToFluidU()
 }
 
 
-void newtonCouplingInterface::mapInterfaceSolidUToMeshMotionD()
+void newtonMonolithicCouplingInterface::mapInterfaceSolidUToMeshMotionD()
 {
     // Map solid interface motion to the mesh motion interface
 
@@ -1661,7 +1661,7 @@ void newtonCouplingInterface::mapInterfaceSolidUToMeshMotionD()
 }
 
 
-void newtonCouplingInterface::predict()
+void newtonMonolithicCouplingInterface::predict()
 {
     if (nRegions_ != 2)
     {
@@ -1784,7 +1784,7 @@ void newtonCouplingInterface::predict()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-newtonCouplingInterface::newtonCouplingInterface
+newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
 (
     Time& runTime,
     const word& region
@@ -1924,7 +1924,7 @@ newtonCouplingInterface::newtonCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void newtonCouplingInterface::setDeltaT(Time& runTime)
+void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
 {
     if
     (
@@ -1969,7 +1969,7 @@ void newtonCouplingInterface::setDeltaT(Time& runTime)
 }
 
 
-bool newtonCouplingInterface::evolve()
+bool newtonMonolithicCouplingInterface::evolve()
 {
     // Steps
     // 1. Optional: predict solution field using old-time fields
@@ -2265,7 +2265,7 @@ bool newtonCouplingInterface::evolve()
 }
 
 
-label newtonCouplingInterface::initialiseJacobian(Mat& jac)
+label newtonMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
 {
     // A fluid-solid interaction problem with a moving mesh (arbitrary
     // Lagrangian Eulerian) fluid can be expressed in Ax=b form, where the
@@ -2499,7 +2499,7 @@ label newtonCouplingInterface::initialiseJacobian(Mat& jac)
 }
 
 
-label newtonCouplingInterface::initialiseSolution(Vec& x)
+label newtonMonolithicCouplingInterface::initialiseSolution(Vec& x)
 {
     // Set twoD flag
     const bool twoD = fluid().twoD();
@@ -2582,7 +2582,7 @@ label newtonCouplingInterface::initialiseSolution(Vec& x)
 }
 
 
-label newtonCouplingInterface::formResidual
+label newtonMonolithicCouplingInterface::formResidual
 (
     PetscScalar *f,
     const PetscScalar *x
@@ -2992,7 +2992,7 @@ label newtonCouplingInterface::formResidual
 }
 
 
-label newtonCouplingInterface::formJacobian
+label newtonMonolithicCouplingInterface::formJacobian
 (
     Mat jac,
     const PetscScalar *x

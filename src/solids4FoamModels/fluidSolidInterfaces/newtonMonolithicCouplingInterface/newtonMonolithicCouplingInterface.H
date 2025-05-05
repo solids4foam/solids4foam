@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    newtonCouplingInterface
+    newtonMonolithicCouplingInterface
 
 Description
     Monolithic fluid-solid interaction solver with Newton-Raphson solution
@@ -26,12 +26,12 @@ Author
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    newtonCouplingInterface.C
+    newtonMonolithicCouplingInterface.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef newtonCouplingInterface_H
-#define newtonCouplingInterface_H
+#ifndef newtonMonolithicCouplingInterface_H
+#define newtonMonolithicCouplingInterface_H
 
 #include "fluidSolidInterface.H"
 #include "foamPetscSnesHelper.H"
@@ -46,10 +46,10 @@ namespace fluidSolidInterfaces
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class newtonCouplingInterface Declaration
+                        Class newtonMonolithicCouplingInterface Declaration
 \*---------------------------------------------------------------------------*/
 
-class newtonCouplingInterface
+class newtonMonolithicCouplingInterface
 :
     public fluidSolidInterface,
     public foamPetscSnesHelper
@@ -223,10 +223,10 @@ class newtonCouplingInterface
         void predict();
 
         //- Disallow default bitwise copy construct
-        newtonCouplingInterface(const newtonCouplingInterface&);
+        newtonMonolithicCouplingInterface(const newtonMonolithicCouplingInterface&);
 
         //- Disallow default bitwise assignment
-        void operator=(const newtonCouplingInterface&);
+        void operator=(const newtonMonolithicCouplingInterface&);
 
 
 public:
@@ -238,7 +238,7 @@ public:
     // Constructors
 
         //- Construct from components
-        newtonCouplingInterface
+        newtonMonolithicCouplingInterface
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -247,7 +247,7 @@ public:
 
     // Destructor
 
-        virtual ~newtonCouplingInterface()
+        virtual ~newtonMonolithicCouplingInterface()
         {
             // Destroy each submatrix
             for (label i = 0; i < nRegions_*nRegions_; ++i)
