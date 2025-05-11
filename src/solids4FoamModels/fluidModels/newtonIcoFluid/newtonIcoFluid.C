@@ -223,6 +223,39 @@ tmp<scalarField> newtonIcoFluid::patchPressureForce(const label patchID) const
 }
 
 
+tmp<vectorField> newtonIcoFluid::patchViscousForce
+(
+    const label patchID, const solidModel& motion
+) const
+{
+    tmp<vectorField> tvF
+    (
+        new vectorField(mesh().boundary()[patchID].size(), vector::zero)
+    );
+
+    const tensorField Fm(I + motion.gradD().T());
+    const scalarField Jm(det(Fm));
+    const tensorField invFm(inv(Fm));
+    const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
+    const vectorField& Sf = mesh().boundary()[patchID].Sf();
+    const vectorField deformedSf(Jm*invFm.T() & Sf);
+    const tensorField gradU
+    (
+        fvc::grad(U())().boundaryField()[patchID]
+    ); // do I need to calculate the whole field?
+    tvF.ref() = rho_.value()*deformedSf & (nuEff*invFm.T() & gradU);
+
+    // Deformed mesh
+    // tvF.ref() = rho_.value()
+    //    *(
+    //         mesh().boundary()[patchID].nf()
+    //       & (-turbulence_->devReff()().boundaryField()[patchID])
+    //     );
+
+    return tvF;
+}
+
+
 bool newtonIcoFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
@@ -455,6 +488,210 @@ label newtonIcoFluid::formResidual
     // Fp = stabilisation - div(U)
     //    = stabilisation - tr(grad(U))
     // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
+    scalarField pressureResidual
+    (
+        fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
+      - fvc::div
+        (
+            (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+        )
+      // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
+      - fvc::div(phi)
+      // - fvc::div(U)
+    );
+
+    // Make residual extensive
+    pressureResidual *= mesh.V();
+
+    // Copy the pressureResidual into the f field as the final equation
+    foamPetscSnesHelper::InsertFieldComponents<scalar>
+    (
+        pressureResidual, f, blockSize_ - 1, blockSize_
+    );
+
+    return 0;
+}
+
+
+label newtonIcoFluid::formResidual
+(
+    PetscScalar *f,
+    const PetscScalar *x,
+    const solidModel& motion
+)
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    // Take references
+    //const Time& runTime = fluidModel::runTime();
+    dynamicFvMesh& mesh = this->mesh();
+    volVectorField& U = const_cast<volVectorField&>(this->U());
+    volScalarField& p = const_cast<volScalarField&>(this->p());
+    surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
+
+    // Lookup the motion gradD and calculate the deformation gradient and its
+    // determinant
+    const volTensorField Fm(I + motion.gradD().T());
+    const volScalarField Jm(det(Fm));
+    const volTensorField invFm(inv(Fm));
+    const surfaceTensorField Fmf(fvc::interpolate(Fm));
+    const surfaceScalarField Jmf(det(Fmf));
+    const surfaceTensorField invFmf(inv(Fmf));
+
+    //autoPtr<surfaceVectorField>& Uf = Uf_;
+    //scalar& cumulativeContErr = cumulativeContErr_;
+    //const bool correctPhi = correctPhi_;
+    // const bool checkMeshCourantNo = checkMeshCourantNo_;
+    //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
+
+    // Copy x into the U field
+    vectorField& UI = U;
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        UI,
+        0, // Location of first UI component
+        blockSize_, // Block size of x
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Enforce the boundary conditions
+    U.correctBoundaryConditions();
+
+    // Calculate the gradient of velocity
+    const volTensorField gradU(fvc::grad(U));
+    const surfaceTensorField gradUf(fvc::interpolate(gradU));
+
+    // Calculate the deformed area vectors
+    const surfaceVectorField deformedSf(Jmf*invFmf.T() & mesh.Sf());
+
+    // Calculate the relative flux
+    //phi = fvc::interpolate(U) & mesh.Sf();
+    phi = deformedSf & (fvc::interpolate(U - motion.U()));
+
+    // See comment below
+    // if (mesh.changing())
+    // {
+    //     // Make the flux relative to the mesh motion
+    //     fvc::makeRelative(phi, U);
+    // }
+
+    const volScalarField nuEff(turbulence_->nuEff());
+    const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
+
+    // WIP
+    // Set the flux to zero on walls, including FSI interfaces
+    // makeRelative should do this but mat not work as expected
+    // But this solution may not be right for non-FSI cases, where the mesh is
+    // moved at the start of the time step
+    // Wait, this is not needed since U == motion.U() at FSI interfaces
+    // forAll(U.boundaryField(), patchI)
+    // {
+    //     if (mesh.boundaryMesh()[patchI].type() == "wall")
+    //     {
+    //         Info<< "Setting the flux to 0 on patch "
+    //             << mesh.boundaryMesh()[patchI].name() << endl;
+    //         phi.boundaryFieldRef()[patchI] = 0.0;
+    //     }
+    // }
+
+    // Copy x into the p field
+    scalarField& pI = p;
+    foamPetscSnesHelper::ExtractFieldComponents<scalar>
+    (
+        x, pI, blockSize_ - 1, blockSize_
+    );
+
+    // Enforce the boundary conditions
+    p.correctBoundaryConditions();
+
+    // Update the pressure BCs to ensure flux consistency
+    // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
+    // CHECK
+    //constrainPressure(p, U, phiHbyA, rAtU());
+
+    // Correct Uf if the mesh is moving
+    //fvc::correctUf(Uf, U, phi);
+
+    // Make the fluxes relative to the mesh motion
+    //fvc::makeRelative(phi, U);
+
+    // Correct the transport and turbulence models
+    // NOTE: these assume the fluid mesh is in the deformed configuration and may
+    // not be correct in the reference configuration
+    // DISABLED for now
+    // laminarTransport_.correct();
+    // turbulence_->correct();
+
+    // Deformed configuration
+    // The residual vector is defined as
+    // F = div(sigma) - ddt(U) - div(phi*U)
+    //   = div(dev(sigma)) - grad(p) - ddt(U) - div(phi*U)
+    //   = div(2*nuEff*symm(gradU)) - grad(p) - ddt(U) - div(phi*U)
+    //   = laplacian(nuEff,U) + div(nuEff*gradU.T())
+    //     - grad(p) - ddt(U) - div(phi*U)
+    //
+    // Check: do we want to include div(gradU.T).. it makes the stencil
+    // larger and should be zero anyway, although it may increase accuracy
+    // To be checked ...
+    // ... ignored below
+    //
+    // Reference configuration
+    // The residual vector is defined as
+    // F = div((Jmf*invFmf.T() & Sf) & (nuEff*invFmf.T() & gradUf))
+    //     - (Jm*invFm.T() & grad(p))
+    //     - Jm*ddt(U)
+    //     - div(phi*U)
+    //     + Du
+    //
+    // where phi is calculated in terms of the reference configuration
+    // quantities
+    // Check: div(phi,U) will use the reference mesh weights but we need the
+    // deformed configuration
+    // Du is the stabilisation term, where
+    // Du = alphaU*laplacian(nuEff,U) - alphaU*div(nuEff*gradU)
+    //
+
+    // Lookup the stabilisation scale factor
+    const scalar alphaU(readScalar(fluidProperties().lookup("alphaU")));
+
+    // Calculate the residual over the reference configuration
+    vectorField residual
+    (
+        fvc::div(deformedSf & (nuEfff*invFmf.T() & gradUf))
+      - (Jm*invFm.T() & fvc::grad(p))
+      - Jm*fvc::ddt(U)
+      - fvc::div(phi, U)
+      + alphaU*fvc::laplacian(nuEfff, U)
+      - alphaU*fvc::div(mesh.Sf() & nuEfff*gradUf)
+    );
+
+    // Make residual extensive as fvc operators are intensive (per unit volume)
+    residual *= mesh.V();
+
+    // Copy the residual into the f field
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        residual,
+        f,
+        0, // Location of first component
+        blockSize_, // Block size of x
+        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Deformed configuration
+    // Calculate pressure equation residual
+    // Fp = Dp - div(U) // or Dp - tr(grad(U))
+    // where the stabilisation Dp = laplacian(pD, p) - div(pD*grad(p))
+    //
+    // Reference configuration
+    // Fp = Dp - div((Jmf*invFmf.T() & Sf) & Uf)
+    //
+
     scalarField pressureResidual
     (
         fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")

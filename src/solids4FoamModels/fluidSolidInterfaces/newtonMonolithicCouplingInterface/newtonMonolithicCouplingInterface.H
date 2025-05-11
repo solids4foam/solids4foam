@@ -211,13 +211,12 @@ class newtonMonolithicCouplingInterface
             const bool twoD
         );
 
-        //- Map the velocity from the solid to the fluid interface
-        void mapInterfaceSolidUToFluidU();
+        //- Map the velocity from the mesh motion to the fluid interface
+        void mapInterfaceMotionUToFluidU();
 
-        //- Map the displacement from the solid to the mesh motion interface
-        //  This maps the current solid displacement interface field to the
-        //  mesh motion displacement field. Both D and pointD are mapped
-        void mapInterfaceSolidUToMeshMotionD();
+        //- Map the displacement and velocity from the solid to the mesh motion
+        //  interface. Three fields are mapped: D, U and pointD
+        void mapInterfaceSolidToMeshMotion();
 
         //- Predict the solution field at the start of a new time step
         void predict();

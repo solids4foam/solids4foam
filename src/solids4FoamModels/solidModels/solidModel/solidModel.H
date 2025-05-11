@@ -91,8 +91,12 @@ private:
 
     // Private data
 
-        //- Mesh
-        autoPtr<dynamicFvMesh> meshPtr_;
+        //- Flag to record whether the mesh was created (and is owned by this
+        //  class) or was looked up from meory
+        const bool meshWasCreated_;
+
+        //- Pointer to the mesh
+        dynamicFvMesh* meshPtr_;
 
         //- Dual mesh
         mutable autoPtr<meshDual> dualMeshPtr_;
@@ -138,7 +142,7 @@ private:
         volVectorField DD_;
 
         //- Velocity field
-        volVectorField U_;
+        mutable autoPtr<volVectorField> UPtr_;
 
         //- Point mesh
         const pointMesh& pMesh_;
@@ -285,6 +289,9 @@ private:
 
         //- Make the rho field
         void makeRho() const;
+
+        //- Make the U field
+        void makeU() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -466,13 +473,13 @@ public:
             //- Return mesh
             const dynamicFvMesh& mesh() const
             {
-                return meshPtr_();
+                return *meshPtr_;
             }
 
             //- Return non-const mesh
             dynamicFvMesh& mesh()
             {
-                return meshPtr_();
+                return *meshPtr_;
             }
 
             //- Return dualMesh
@@ -490,7 +497,7 @@ public:
             //- Return time
             const Time& runTime() const
             {
-                return meshPtr_().time();
+                return meshPtr_->time();
             }
 
             //- Return solid properties dictionary
@@ -551,13 +558,29 @@ public:
             //- Return non-const reference to U
             virtual volVectorField& U()
             {
-                return U_;
+                if (UPtr_.empty())
+                {
+                    makeU();
+                }
+
+                return UPtr_.ref();
             }
 
             //- Return const reference to U
             virtual const volVectorField& U() const
             {
-                return U_;
+                if (UPtr_.empty())
+                {
+                    makeU();
+                }
+
+                return UPtr_();
+            }
+
+            //- Return non-const reference to UPtr
+            virtual autoPtr<volVectorField>& UPtr()
+            {
+                return UPtr_;
             }
 
             //- Return non-const reference to pointD

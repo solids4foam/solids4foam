@@ -136,6 +136,29 @@ diffusionSolid::diffusionSolid
 {
     DisRequired();
 
+    // Rename U to Usolid to avoid a conflict with the fluid velocity
+    // Done below
+    // U().rename("Usolid");
+
+    // Create new U field with default boundary conditions to avoid a conflict
+    // with the fluid velocity being read in monolithic FSI cases
+    UPtr().reset
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "Usolid",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimLength/dimTime, vector::zero)
+        )
+    );
+
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
 

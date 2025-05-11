@@ -255,6 +255,33 @@ void Foam::solidModel::makeRho() const
 }
 
 
+void Foam::solidModel::makeU() const
+{
+    if (!UPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeU() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    UPtr_.set
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "U",
+                runTime().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimLength/dimTime, vector::zero)
+        )
+    );
+}
+
+
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 {
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -577,9 +604,12 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    meshWasCreated_(runTime.foundObject<dynamicFvMesh>(region) ? false : true),
     meshPtr_
     (
-        dynamicFvMesh::New
+        runTime.foundObject<dynamicFvMesh>(region)
+      ? &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
+      : dynamicFvMesh::New
         (
             IOobject
             (
@@ -588,7 +618,7 @@ Foam::solidModel::solidModel
                 runTime,
                 IOobject::MUST_READ
             )
-        )
+        ).ptr()
     ),
     dualMeshPtr_(),
     solidProperties_
@@ -677,20 +707,8 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("0", dimLength/dimTime, vector::zero)
-    ),
-    pMesh_(pointMesh::New(meshPtr_())),
+    UPtr_(),
+    pMesh_(pointMesh::New(*meshPtr_)),
     pointD_
     (
         IOobject
@@ -816,11 +834,11 @@ Foam::solidModel::solidModel
         (
             "aitkenAlpha",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedScalar("one", dimless, 1.0)
     ),
     aitkenResidual_
@@ -829,11 +847,11 @@ Foam::solidModel::solidModel
         (
             "aitkenResidual",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     QuasiNewtonRestartFreq_
@@ -849,11 +867,11 @@ Foam::solidModel::solidModel
         (
             "DRef",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     unrelaxedDRef_
@@ -862,11 +880,11 @@ Foam::solidModel::solidModel
         (
             "unrelaxedDRef",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     globalPatchesPtrList_(),
@@ -885,7 +903,7 @@ Foam::solidModel::solidModel
     pPtr_()
 #ifdef OPENFOAM_COM
     ,
-    fvOptions_(fv::options::New(meshPtr_()))
+    fvOptions_(fv::options::New(*meshPtr_))
 #endif
 {
     // Set the useBoundaryFaceValues fields
@@ -1011,6 +1029,11 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
+
+    if (meshWasCreated_)
+    {
+        free(meshPtr_);
+    }
 }
 
 

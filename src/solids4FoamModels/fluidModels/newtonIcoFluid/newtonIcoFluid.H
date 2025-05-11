@@ -160,6 +160,12 @@ public:
                 const label patchID
             ) const;
 
+            //- Patch viscous force (N/m2) integrated over the reference mesh
+            virtual tmp<vectorField> patchViscousForce
+            (
+                const label patchID, const solidModel& motion
+            ) const;
+
             //- Return a reference to the turbulence model
             incompressible::turbulenceModel& turbulence()
             {
@@ -199,6 +205,16 @@ public:
             (
                 PetscScalar *f,        // Residual
                 const PetscScalar *x   // Solution
+            );
+
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector, given a reference configuration (solid model
+            //  representing the fluid domain motion)
+            virtual label formResidual
+            (
+                PetscScalar *f,        // Residual
+                const PetscScalar *x,  // Solution
+                const solidModel& motion
             );
 
             //- Form the Jacobian of the governing equation
