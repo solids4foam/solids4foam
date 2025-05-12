@@ -239,11 +239,12 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
     const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
     const vectorField& Sf = mesh().boundary()[patchID].Sf();
     const vectorField deformedSf(Jm*invFm.T() & Sf);
+    const vectorField deformedNf(deformedSf/mag(deformedSf));
     const tensorField gradU
     (
         fvc::grad(U())().boundaryField()[patchID]
     ); // do I need to calculate the whole field?
-    tvF.ref() = rho_.value()*deformedSf & (nuEff*invFm.T() & gradU);
+    tvF.ref() = rho_.value()*deformedNf & (nuEff*invFm.T() & gradU);
 
     // Deformed mesh
     // tvF.ref() = rho_.value()

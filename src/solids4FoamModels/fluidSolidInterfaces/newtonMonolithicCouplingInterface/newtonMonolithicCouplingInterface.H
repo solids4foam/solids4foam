@@ -88,14 +88,7 @@ class newtonMonolithicCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
-        //- Flag to indicate if the mesh motion should be included in the
-        //  monolithic system; if not, mesh motion is solved sequentially with
-        //  the monolithic fluid-solid system
-        //  Defaults to "off". Monolithic mesh motion is still work in progress
-        const Switch monolithicMeshMotion_;
-
-        //- Number of sub-regions: 2 for fluid+solid, 3 for
-        //  fluid + meshMotion + solid
+        //- Number of sub-regions: 3 == fluid + meshMotion + solid
         const label nRegions_;
 
         //- Pointer to sub-matrices
@@ -134,17 +127,6 @@ class newtonMonolithicCouplingInterface
             const bool twoD
         ) const;
 
-        //- Initialise the Afs Jacobian matrix
-        //  This represents the solid coupling in the fluid equations
-        label initialiseAfs
-        (
-            Mat Afs,
-            const fvMesh& fluidMesh,
-            const label fluidBlockSize,
-            const label solidBlockSize,
-            const bool twoD
-        ) const;
-
         //- Initialise the Ams Jacobian matrix
         //  This represents the solid coupling in the mesh motion equations
         label initialiseAms
@@ -175,17 +157,6 @@ class newtonMonolithicCouplingInterface
             Mat Afm,
             const label fluidBlockSize,
             const label motionBlockSize,
-            const bool twoD
-        );
-
-        //- Insert Afs matrix coefficients
-        //  This represents how the solid affects the fluid equations
-        //  This does NOT zero the entries first
-        label formAfs
-        (
-            Mat Afs,
-            const label fluidBlockSize,
-            const label solidBlockSize,
             const bool twoD
         );
 

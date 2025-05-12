@@ -317,113 +317,6 @@ label newtonMonolithicCouplingInterface::initialiseAfm
 }
 
 
-label newtonMonolithicCouplingInterface::initialiseAfs
-(
-    Mat Afs,
-    const fvMesh& fluidMesh,
-    const label fluidBlockSize,
-    const label solidBlockSize,
-    const bool twoD
-) const
-{
-    // Initialise Afs solid-in-fluid-coupling matrix
-    if (debug)
-    {
-        InfoInFunction
-            << "Initialising Afs" << endl;
-    }
-
-    // Initially we assume a conformal FSI interface, where each fluid cell
-    // shares a face with a solid cell. So we assume the number of blocks in
-    // the Afs (and Asf) matrix is equal to the number of cells at the
-    // interface
-
-    // Initially, we only allow one FSI interface
-    if (interfaceToInterfaceList().size() != 1)
-    {
-        FatalErrorInFunction
-            << "Currently, only one interface is allowed when using "
-            << typeName << abort(FatalError);
-    }
-
-    // Allow only a direct map (conformal interface)
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
-
-    // CAREFUL: we are setting non-zeros here based on the scalar rows, not
-    // the block rows
-
-    // Set matrix type to AIJ (since BAIJ does not support non-square
-    // blocks)
-    CHKERRQ(MatSetType(Afs, MATMPIAIJ));
-
-    // Total number of scalar rows in the fluid region
-    const label scalarRowN = fluidMesh.nCells()*fluidBlockSize;
-
-    // Allocate per-scalar-row nonzeros, initialised to 0
-    std::vector<int> d_nnz(scalarRowN, 0);
-    std::vector<int> o_nnz(scalarRowN, 0);
-
-    // Set non-zeros for each interface fluid cells
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    const labelList& fluidFaceCells =
-        fluidMesh.boundary()[fluidPatchID].faceCells();
-    forAll(fluidFaceMap, fluidFaceI)
-    {
-        const label fluidCellID = fluidFaceCells[fluidFaceI];
-
-        // Calculate the row index for this cell's first scalar equation
-        const label rowI = fluidCellID*fluidBlockSize;
-
-        // Set the number of non-zeros to be the number of solid equations
-        // e.g., The x-momentum equation could have a coefficient for the
-        // solid x/y/z displacement
-
-        // Momentum equation
-        d_nnz[rowI] = 1;
-        d_nnz[rowI + 1] = 1;
-        if (!twoD)
-        {
-            d_nnz[rowI + 2] = 1;
-        }
-
-        // Pressure equation
-        d_nnz[rowI + fluidBlockSize - 1] = solidBlockSize;
-    }
-
-    // Parallel: we need to decide how to deal with this, e.g. do we allow
-    // the same general decompositions as in the partitioned approach
-    // For now, only allow serial
-    if (Pstream::parRun())
-    {
-        FatalErrorInFunction
-            << "Currently, serial runs are allowed in "
-            << typeName << abort(FatalError);
-    }
-
-    // Allocate parallel matrix using AIJ
-    CHKERRQ
-    (
-        MatMPIAIJSetPreallocation(Afs, 0, d_nnz.data(), 0, o_nnz.data())
-    );
-
-    // Raise an error if mallocs are required during matrix assembly
-    CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-    //CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
-
-    return 0;
-}
-
-
 label newtonMonolithicCouplingInterface::initialiseAms
 (
     Mat Ams,
@@ -621,11 +514,11 @@ label newtonMonolithicCouplingInterface::formAfm
     const bool twoD
 )
 {
-    // Next, we will manually insert to mesh-in-fluid coupling
-    // This represents how the fluid equations depend on the mesh motion
-    // The coupling in the momentum equation comes from the convection term
-    // where the mesh flux appears. The coupling in the continuity equation
-    // appears in the divergence of mesh motion
+    // We will include two forms of mesh-in-fluid coupling:
+    //   i.   The interface velocity equal the mesh motion interface velocity
+    //   ii.  The mesh flux in the advection term of the fluid momentum equation
+
+    // TODO: CHECK! I am adding pressure equation coeffs; do I need to?
 
     // Take references
     const scalarField& phiI = fluid().phi();
@@ -639,6 +532,217 @@ label newtonMonolithicCouplingInterface::formAfm
     // global cells object
     const globalIndex& globalCells =
         refCast<foamPetscSnesHelper>(fluid()).globalCells();
+
+
+    // Coupling i. The interface velocity equal the mesh motion interface
+    // velocity
+
+    // The fluid interface is a prescribed velocity (fixedValue) condition
+    // where we assume the fluid wall velocity is equal to the mesh velocity of
+    // the adjacent cell centre. This approximatation is sufficiently
+    // accurate as a preconditioner for the matrix and will not affected the
+    // converged solution (which is entirely governed by formResidual)
+
+    if (fluidSolidInterface::fluidPatchIndices().size() != 1)
+    {
+        FatalErrorInFunction
+            << "Only one interface patch is currently allowed"
+            << abort(FatalError);
+    }
+
+    // Lookup the fluid interface patch
+    // The mesh motion is the same patch as it is the same mesh
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
+    const labelList& fluidFaceCells = fluidPatch.faceCells();
+
+    // Lookup the fluid patch
+    const fvPatchVectorField& fluidPatchU =
+        fluid().U().boundaryField()[fluidPatchID];
+    if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
+    {
+        FatalErrorInFunction
+            << "The fluid interface patch must be of type 'fixedValue'"
+            << abort(FatalError);
+    }
+
+    if (!isA<fluidModels::newtonIcoFluid>(fluid()))
+    {
+        FatalErrorInFunction
+            << "Currently, the fluid model must be of type 'newtonIcoFluid'"
+            << abort(FatalError);
+    }
+
+    // Patch viscosity
+    const scalarField fluidPatchNuEff
+    (
+        refCast<fluidModels::newtonIcoFluid>
+        (
+            fluid()
+        ).turbulence().nuEff(fluidPatchID)
+    );
+
+    // Fluid interface area vectors
+    const vectorField& fluidPatchSf = fluidPatch.Sf();
+
+    // Lookup the motion ddt scheme
+    // NOTE: we should match the solid's ddt scheme, not the mesh motion ddt
+    // scheme
+    const word motionDdtScheme =
+        // word(fluidMesh().ddtScheme("ddt(" + motionSolid().D().name() +')'));
+        word(solidMesh().ddtScheme("ddt(" + solid().D().name() +')'));
+
+    // The known fluid boundary face value is now replaced by the adjacent
+    // motion cell velocity
+    scalarField fluidPatchDiffusionCoeffs(fluidPatch.size(), 0.0);
+    vectorField fluidPatchPressureCoeffs(fluidPatch.size(), vector::zero);
+    if (motionDdtScheme == "Euler")
+    {
+        // Diffusion coefficient is nu*|Sf|/(|n & d|*dt), where dt comes
+        // from converting the motion displacement to velocity
+        const scalar deltaT = motionSolid().time().deltaTValue();
+        fluidPatchDiffusionCoeffs =
+            fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()/deltaT;
+
+        // Pressure coefficient from div(U)
+        fluidPatchPressureCoeffs = -fluidPatchSf/deltaT;
+    }
+    else if (motionDdtScheme == "backward")
+    {
+        // Diffusion coefficient is 3.0*nu*|Sf|/(|n & d|*2.0*dt), where (3/2)*dt
+        // comes from converting the motion displacement to velocity
+        const scalar deltaT = motionSolid().time().deltaTValue();
+        fluidPatchDiffusionCoeffs =
+            3.0*fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()
+           /(2.0*deltaT);
+
+        // Pressure coefficient from div(U)
+        fluidPatchPressureCoeffs = -3.0*fluidPatchSf/(2.0*deltaT);
+    }
+    else
+    {
+        // steady-state does not really make sense as this would mean the fluid
+        // velocity at the interface would be zero... or maybe it is OK.. to
+        // check!
+        FatalErrorInFunction
+            << "Unknown motion ddtScheme " << motionDdtScheme << ": only "
+            << "Euler and backward currently allowed"
+            << exit(FatalError);
+    }
+
+    // First we will insert the contribution to the fluid momentum equation
+    // coming from the diffusion term
+
+    // Second we will insert the contribution to the fluid continuity
+    // (pressure) equation, where the div(U) term should use the adjacent
+    // solid cell velocity instead of the known boundary face velocity
+
+    forAll(fluidPatch, fluidFaceI)
+    {
+        // Fluid cell adjacent to the interface
+        const label fluidCellID = fluidFaceCells[fluidFaceI];
+
+        // To help readability
+        const label motionCellID = fluidCellID;
+
+        // We will add coefficients at block row "fluidCellID" and block
+        // column "motionCellID"
+        // Note that the nested monolithic matrix takes care of offsetting
+        // the rows/columns when the submatrices are inserted into the
+        // nested matrix
+
+        // Global block row ID of fluid matrix
+        const label globalBlockRowI = globalCells.toGlobal(fluidCellID);
+
+        // Global block column ID of motion matrix
+        const label globalBlockColI = globalCells.toGlobal(motionCellID);
+
+        // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
+        // square block coefficients, so we will insert the scalar
+        // coefficients manually
+
+        // Calculate the scalar global row ID (not the block row ID)
+        label globalRowI = globalBlockRowI*fluidBlockSize;
+        label globalColI = globalBlockColI*motionBlockSize;
+
+        // Momentum coefficient for this face
+        PetscScalar value = fluidPatchDiffusionCoeffs[fluidFaceI];
+
+        // Manually insert the 3 scalar coefficients (2 in 2-D)
+        CHKERRQ
+        (
+            MatSetValues
+            (
+                Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+            )
+        );
+
+        globalRowI++;
+        globalColI++;
+        CHKERRQ
+        (
+            MatSetValues
+            (
+                Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+            )
+        );
+
+        if (!twoD)
+        {
+            globalRowI++;
+            globalColI++;
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+        }
+
+        // Secondly we will insert the contributions for the pressure
+        // equation
+
+        // Manually insert the 3 scalar coefficients (2 in 2-D)
+        value = fluidPatchPressureCoeffs[fluidFaceI][vector::X];
+
+        globalRowI++; // pressure equation
+        globalColI = globalBlockColI*motionBlockSize; // x motion displacement
+        CHKERRQ
+        (
+            MatSetValues
+            (
+                Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+            )
+        );
+
+        value = fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
+        globalColI++; // z motion displacement
+        CHKERRQ
+        (
+            MatSetValues
+            (
+                Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+            )
+        );
+
+        if (!twoD)
+        {
+            value = fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
+            globalColI++; // z motion displacement
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Afm, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+        }
+    }
+    
+
+    // Coupling ii. The mesh flux in the advection term of the fluid momentum
+    // equation
 
     // We insert the momentum coupling first
     // For the momentum, we will assume the momentum is 1st order upwind
@@ -918,255 +1022,6 @@ label newtonMonolithicCouplingInterface::formAfm
         FatalErrorInFunction
             << "div(meshPhi) coeffs for parallel not yet implemented"
             << exit(FatalError);
-    }
-
-    return 0;
-}
-
-
-label newtonMonolithicCouplingInterface::formAfs
-(
-    Mat Afs,
-    const label fluidBlockSize,
-    const label solidBlockSize,
-    const bool twoD
-)
-{
-    if (debug)
-    {
-        InfoInFunction
-            << "Start" << endl;
-    }
-
-    // The fluid interface is a prescribed velocity (fixedValue) condition
-    // where we assume the fluid wall velocity is equal to the velocity of
-    // the adjacent solid cell centre. This approximatation is sufficiently
-    // accurate as a preconditioner for the matrix and will not affected the
-    // converged solution (which is entirely governed by formResidual)
-
-    if (fluidSolidInterface::fluidPatchIndices().size() != 1)
-    {
-        FatalError
-            << "Only one interface patch is currently allowed"
-            << abort(FatalError);
-    }
-
-    // Lookup the interface map from the fluid faces to the solid faces
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
-
-    // The face map gives the solid face ID for each fluid face
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-
-    // Lookup the fluid interface patch
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
-    const labelList& fluidFaceCells = fluidPatch.faceCells();
-
-    // Lookup the solid interface patch
-    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
-    const labelList& solidFaceCells = solidPatch.faceCells();
-
-    // Lookup the fluid patch
-    const fvPatchVectorField& fluidPatchU =
-        fluid().U().boundaryField()[fluidPatchID];
-    if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
-    {
-        FatalErrorInFunction
-            << "The fluid interface patch must be of type 'fixedValue'"
-            << abort(FatalError);
-    }
-
-    if (!isA<fluidModels::newtonIcoFluid>(fluid()))
-    {
-        FatalErrorInFunction
-            << "Currently, the fluid model must be of type 'newtonIcoFluid'"
-            << abort(FatalError);
-    }
-
-    // Patch viscosity
-    const scalarField fluidPatchNuEff
-    (
-        refCast<fluidModels::newtonIcoFluid>
-        (
-            fluid()
-        ).turbulence().nuEff(fluidPatchID)
-    );
-
-    // Fluid interface area vectors
-    const vectorField& fluidPatchSf = fluidPatch.Sf();
-
-    // Lookup the solid ddt scheme
-    const word solidDdtScheme =
-            word(solidMesh().ddtScheme("ddt(" + solid().D().name() +')'));
-
-    // The known fluid boundary face value is now replaced by the adjacent
-    // solid cell velocity
-    scalarField fluidPatchDiffusionCoeffs(fluidPatch.size(), 0.0);
-    vectorField fluidPatchPressureCoeffs(fluidPatch.size(), vector::zero);
-    if (solidDdtScheme == "steadyState")
-    {
-        // Do nothing
-    }
-    else if (solidDdtScheme == "Euler")
-    {
-        // Diffusion coefficient is nu*|Sf|/(|n & d|*dt), where dt comes
-        // from converting the solid displacement to velocity
-        const scalar deltaT = solid().time().deltaTValue();
-        fluidPatchDiffusionCoeffs =
-            fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()/deltaT;
-
-        // Pressure coefficient from div(U)
-        fluidPatchPressureCoeffs = -fluidPatchSf/deltaT;
-    }
-    else if (solidDdtScheme == "backward")
-    {
-        // Diffusion coefficient is 3.0*nu*|Sf|/(|n & d|*2.0*dt), where (3/2)*dt
-        // comes from converting the solid displacement to velocity
-        const scalar deltaT = solid().time().deltaTValue();
-        fluidPatchDiffusionCoeffs =
-            3.0*fluidPatchNuEff*fluidPatch.magSf()*fluidPatch.deltaCoeffs()
-           /(2.0*deltaT);
-
-        // Pressure coefficient from div(U)
-        fluidPatchPressureCoeffs = -3.0*fluidPatchSf/(2.0*deltaT);
-    }
-    else
-    {
-        FatalErrorInFunction
-            << "Unknown solid ddtScheme " << solidDdtScheme << ": only "
-            << "steadyState, Euler and backward currently allowed"
-            << exit(FatalError);
-    }
-
-    // First we will insert the contribution to the fluid momentum equation
-    // coming from the diffusion term
-
-    // Second we will insert the contribution to the fluid continuity
-    // (pressure) equation, where the div(U) term should use the adjacent
-    // solid cell velocity instead of the known boundary face velocity
-
-    forAll(fluidPatch, fluidFaceI)
-    {
-        const label solidFaceID = fluidFaceMap[fluidFaceI];
-
-        // Fluid and solid cells, which are coupled
-        const label fluidCellID = fluidFaceCells[fluidFaceI];
-        const label solidCellID = solidFaceCells[solidFaceID];
-
-        // We will add coefficients at block row "fluidCellID" and block
-        // column "solidCellID"
-        // Note that the nested monolithic matrix takes care of offsetting
-        // the rows/columns when the submatrices are inserted into the
-        // nested matrix
-
-        // Global block row ID of fluid matrix
-        const label globalBlockRowI =
-            refCast<foamPetscSnesHelper>(fluid()).globalCells().toGlobal
-            (
-                fluidCellID
-            );
-
-        // Global block column ID of solid matrix
-        const label globalBlockColI =
-            refCast<foamPetscSnesHelper>(solid()).globalCells().toGlobal
-            (
-                solidCellID
-            );
-
-        // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
-        // square block coefficients, so we will insert the scalar
-        // coefficients manually
-
-        // Calculate the scalar global row ID (not the block row ID)
-        label globalRowI = globalBlockRowI*fluidBlockSize;
-        label globalColI = globalBlockColI*solidBlockSize;
-
-        // Momentum coefficient for this face
-        PetscScalar value = fluidPatchDiffusionCoeffs[fluidFaceI];
-
-        // Manually insert the 3 scalar coefficients (2 in 2-D)
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        globalRowI++;
-        globalColI++;
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        if (!twoD)
-        {
-            globalRowI++;
-            globalColI++;
-            CHKERRQ
-            (
-                MatSetValues
-                (
-                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-                )
-            );
-        }
-
-        // Secondly we will insert the contributions for the pressure
-        // equation
-
-        // Manually insert the 3 scalar coefficients (2 in 2-D)
-        // value = -fluidPatchSf[fluidFaceI][vector::X]/deltaT;
-        value = fluidPatchPressureCoeffs[fluidFaceI][vector::X];
-
-        globalRowI++; // pressure equation
-        globalColI = globalBlockColI*solidBlockSize; // x solid displacement
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        //value = -fluidPatchSf[fluidFaceI][vector::Y]/deltaT;
-        value = fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
-        globalColI++; // y solid displacement
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        if (!twoD)
-        {
-            //value = -fluidPatchSf[fluidFaceI][vector::Z]/deltaT;
-            value = fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
-            globalColI++; // y solid displacement
-            CHKERRQ
-            (
-                MatSetValues
-                (
-                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-                )
-            );
-        }
     }
 
     return 0;
@@ -1835,18 +1690,9 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
         )
     ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
-    monolithicMeshMotion_(fsiProperties().lookup("monolithicMeshMotion")),
-    nRegions_(monolithicMeshMotion_ ? 3 : 2),
+    nRegions_(3),
     subMatsPtr_(nullptr)
 {
-    // if (monolithicMeshMotion_)
-    // {
-    //     FatalErrorInFunction
-    //         << "Monolithic mesh motion is still work in progress."
-    //         << " For now, monolithicMeshMotion must be 'off'"
-    //         << exit(FatalError);
-    // }
-
     if (solid().twoD() != fluid().twoD())
     {
         FatalErrorInFunction
@@ -1916,8 +1762,7 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
         << "solidToMeshCoupling: " << solidToMeshCoupling_ << nl
         << "extrapolateSolidInterfaceDisplacement: "
         << extrapolateSolidInterfaceDisplacement_ << nl
-        << "passViscousStress: " << passViscousStress_ << nl
-        << "monolithicMeshMotion: " << monolithicMeshMotion_ << endl;
+        << "passViscousStress: " << passViscousStress_ << endl;
 }
 
 
@@ -1996,288 +1841,137 @@ bool newtonMonolithicCouplingInterface::evolve()
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    if (nRegions_ == 2)
+    // Mesh motion block size
+    const label motionBlockSize = solidBlockSize;
+
+    // The scalar row at which the motion equations start
+    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // The scalar row at which the solid equations start
+    const label solidFirstEqnID =
+        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
+
+    // Solve the nonlinear system and check the convergence
+    foamPetscSnesHelper::solve();
+
+    // Access the raw solution data
+    const PetscScalar *xx;
+    VecGetArrayRead(foamPetscSnesHelper::solution(), &xx);
+
+    // Retrieve the fluid velocity
+    foamPetscSnesHelper::ExtractFieldComponents
+    (
+        xx,
+        fluid().U().primitiveFieldRef(),
+        0, // Location of U
+        fluidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+    fluid().U().correctBoundaryConditions();
+
+    // Retrieve the fluid pressure
+    foamPetscSnesHelper::ExtractFieldComponents
+    (
+        xx,
+        fluid().p().primitiveFieldRef(),
+        fluidBlockSize - 1, // Location of p component
+        fluidBlockSize
+    );
+    fluid().p().correctBoundaryConditions();
+
+    // Retrieve the fluid mesh motion
+    foamPetscSnesHelper::ExtractFieldComponents
+    (
+        &xx[motionFirstEqnID],
+        motionSolid().D().primitiveFieldRef(),
+        0, // Location of first component
+        motionBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+    motionSolid().D().correctBoundaryConditions();
+
+    // Retrieve the solid displacement
+    foamPetscSnesHelper::ExtractFieldComponents
+    (
+        &xx[solidFirstEqnID],
+        solid().D().primitiveFieldRef(),
+        0, // Location of first component
+        solidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+    solid().D().correctBoundaryConditions();
+
+    // Restore the x vector
+    VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
+
+    // Update gradient of displacement
+    solid().mechanical().grad(solid().D(), solid().gradD());
+    motionSolid().mechanical().grad(motionSolid().D(), motionSolid().gradD());
+
+    // Interpolate cell displacements to vertices
+    solid().mechanical().interpolate
+    (
+        solid().D(), solid().gradD(), solid().pointD()
+    );
+    solid().pointD().correctBoundaryConditions();
+    motionSolid().mechanical().interpolate
+    (
+        motionSolid().D(), motionSolid().gradD(), motionSolid().pointD()
+    );
+    motionSolid().pointD().correctBoundaryConditions();
+
+    // Increment of displacement
+    solid().DD() = solid().D() - solid().D().oldTime();
+
+    // Increment of point displacement
+    solid().pointDD() = solid().pointD() - solid().pointD().oldTime();
+
+    // Velocity
+    solid().U() = fvc::ddt(solid().D());
+    motionSolid().U() = fvc::ddt(motionSolid().D());
+
+    // Update the mesh motion interface
+    if (solidToMeshCoupling_)
     {
-        Info<< "Solving the fluid-solid equations for U, p and D using PETSc "
-            << "SNES" << endl;
-
-        // The scalar row at which the solid equations start
-        const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // fluid-solid + mesh motion loop
-        PetscReal initResidualNorm = 0;
-        scalar residualNorm = 0;
-        scalar solutionNorm = 0;
-        Vec solutionDelta;
-        scalar solutionDeltaNorm = 0;
-        label iMeshCorr = 1;
-        const label nMeshCorr(readInt(fsiProperties().lookup("nMeshCorr")));
-        const scalar meshCorrRelTol
-        (
-            readScalar(fsiProperties().lookup("meshCorrRelTol"))
-        );
-        const scalar meshCorrSolTol
-        (
-            readScalar(fsiProperties().lookup("meshCorrSolTol"))
-        );
-        const scalar meshCorrAbsTol
-        (
-            readScalar(fsiProperties().lookup("meshCorrAbsTol"))
-        );
-        do
-        {
-            Info<< "Time = " << runTime().value()
-                << ", Mesh loop corr = " << iMeshCorr << endl;
-
-            // Solve the monolithic fluid-solid system
-            foamPetscSnesHelper::solve();
-
-            // Access the raw solution data
-            const PetscScalar *xx;
-            VecGetArrayRead(foamPetscSnesHelper::solution(), &xx);
-
-            // Retrieve the fluid velocity
-            foamPetscSnesHelper::ExtractFieldComponents
-            (
-                xx,
-                fluid().U().primitiveFieldRef(),
-                0, // Location of U
-                fluidBlockSize,
-                twoD ? labelList({0,1}) : labelList({0,1,2})
-            );
-            fluid().U().correctBoundaryConditions();
-
-            // Retreive the fluid pressure
-            foamPetscSnesHelper::ExtractFieldComponents
-            (
-                xx,
-                fluid().p().primitiveFieldRef(),
-                fluidBlockSize - 1, // Location of p component
-                fluidBlockSize
-            );
-            fluid().p().correctBoundaryConditions();
-
-            // Extract the displacement, which starts at row fluid.nCells*fluidBlockSize
-            foamPetscSnesHelper::ExtractFieldComponents
-            (
-                &xx[solidFirstEqnID],
-                solid().D().primitiveFieldRef(),
-                0, // Location of first component
-                solidBlockSize,
-                twoD ? labelList({0,1}) : labelList({0,1,2})
-            );
-            solid().D().correctBoundaryConditions();
-
-            // Restore the solution vector
-            VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
-
-            // Update gradient of displacement
-            solid().mechanical().grad(solid().D(), solid().gradD());
-
-            // Interpolate cell displacements to vertices
-            solid().mechanical().interpolate(solid().D(), solid().gradD(), solid().pointD());
-
-            // Increment of displacement
-            solid().DD() = solid().D() - solid().D().oldTime();
-
-            // Increment of point displacement
-            solid().pointDD() = solid().pointD() - solid().pointD().oldTime();
-
-            // Velocity
-            solid().U() = fvc::ddt(solid().D());
-
-            // Update the mesh motion interface
-            if (solidToMeshCoupling_)
-            {
-                mapInterfaceSolidToMeshMotion();
-            }
-
-            // Update the fluid interface velocity
-            if (meshToFluidCoupling_)
-            {
-                mapInterfaceMotionUToFluidU();
-            }
-
-            // Solve the mesh motion equations
-            fluidMesh().update();
-
-            // Calculate the solution and correction (delta) norms
-            VecNorm(foamPetscSnesHelper::solution(), NORM_2, &solutionNorm);
-            SNESGetSolutionUpdate(foamPetscSnesHelper::snes(), &solutionDelta);
-            VecNorm(solutionDelta, NORM_2, &solutionDeltaNorm);
-
-            // Extract the residual
-            SNESGetFunctionNorm(foamPetscSnesHelper::snes(), &residualNorm);
-
-            // Record the initial residual and solution norms
-            if (iMeshCorr == 1)
-            {
-                initResidualNorm = residualNorm;
-            }
-
-            Info<< "Mesh corrector loop" << nl
-                << "    Residual norm = " << residualNorm << nl
-                << "    Initial residual norm = " << initResidualNorm << nl
-                << "    Solution delta norm = " << solutionDeltaNorm << nl
-                << "    Solution norm = " << solutionNorm << nl
-                << endl;
-
-            if (iMeshCorr == (nMeshCorr - 1))
-            {
-                // FatalErrorInFunction
-                //     << "Max mesh correctors reached!" << exit(FatalError);
-                WarningInFunction
-                    << "Max mesh correctors reached!" << endl;
-            }
-        }
-        while
-        (
-            iMeshCorr++ < nMeshCorr
-         && residualNorm > meshCorrRelTol*initResidualNorm
-         && solutionDeltaNorm > meshCorrSolTol*solutionNorm
-         && residualNorm > meshCorrAbsTol
-         && coupled()
-        );
+        mapInterfaceSolidToMeshMotion();
     }
-    else if (nRegions_ == 3)
+
+    // Update the fluid interface velocity
+    if (meshToFluidCoupling_)
     {
-        // Mesh motion block size
-        const label motionBlockSize = solidBlockSize;
-
-        // The scalar row at which the motion equations start
-        const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // The scalar row at which the solid equations start
-        const label solidFirstEqnID =
-            motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-
-        // Solve the nonlinear system and check the convergence
-        foamPetscSnesHelper::solve();
-
-        // Access the raw solution data
-        const PetscScalar *xx;
-        VecGetArrayRead(foamPetscSnesHelper::solution(), &xx);
-
-        // Retrieve the fluid velocity
-        foamPetscSnesHelper::ExtractFieldComponents
-        (
-            xx,
-            fluid().U().primitiveFieldRef(),
-            0, // Location of U
-            fluidBlockSize,
-            twoD ? labelList({0,1}) : labelList({0,1,2})
-        );
-        fluid().U().correctBoundaryConditions();
-
-        // Retrieve the fluid pressure
-        foamPetscSnesHelper::ExtractFieldComponents
-        (
-            xx,
-            fluid().p().primitiveFieldRef(),
-            fluidBlockSize - 1, // Location of p component
-            fluidBlockSize
-        );
-        fluid().p().correctBoundaryConditions();
-
-        // Retrieve the fluid mesh motion
-        foamPetscSnesHelper::ExtractFieldComponents
-        (
-            &xx[motionFirstEqnID],
-            motionSolid().D().primitiveFieldRef(),
-            0, // Location of first component
-            motionBlockSize,
-            twoD ? labelList({0,1}) : labelList({0,1,2})
-        );
-        motionSolid().D().correctBoundaryConditions();
-
-        // Retrieve the solid displacement
-        foamPetscSnesHelper::ExtractFieldComponents
-        (
-            &xx[solidFirstEqnID],
-            solid().D().primitiveFieldRef(),
-            0, // Location of first component
-            solidBlockSize,
-            twoD ? labelList({0,1}) : labelList({0,1,2})
-        );
-        solid().D().correctBoundaryConditions();
-
-        // Restore the x vector
-        VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
-
-        // Update gradient of displacement
-        solid().mechanical().grad(solid().D(), solid().gradD());
-        motionSolid().mechanical().grad(motionSolid().D(), motionSolid().gradD());
-
-        // Interpolate cell displacements to vertices
-        solid().mechanical().interpolate
-        (
-            solid().D(), solid().gradD(), solid().pointD()
-        );
-        solid().pointD().correctBoundaryConditions();
-        motionSolid().mechanical().interpolate
-        (
-            motionSolid().D(), motionSolid().gradD(), motionSolid().pointD()
-        );
-        motionSolid().pointD().correctBoundaryConditions();
-
-        // Increment of displacement
-        solid().DD() = solid().D() - solid().D().oldTime();
-
-        // Increment of point displacement
-        solid().pointDD() = solid().pointD() - solid().pointD().oldTime();
-
-        // Velocity
-        solid().U() = fvc::ddt(solid().D());
-        motionSolid().U() = fvc::ddt(motionSolid().D());
-
-        // Update the mesh motion interface
-        if (solidToMeshCoupling_)
-        {
-            mapInterfaceSolidToMeshMotion();
-        }
-
-        // Update the fluid interface velocity
-        if (meshToFluidCoupling_)
-        {
-            mapInterfaceMotionUToFluidU();
-        }
-
-        // Update phi
-        // Is there a neater way to do this? Maybe ask the fluid model...
-        {
-            const volTensorField Fm(I + motionSolid().gradD().T());
-            const volScalarField Jm(det(Fm));
-            const volTensorField invFm(inv(Fm));
-            const surfaceTensorField Fmf(fvc::interpolate(Fm));
-            const surfaceScalarField Jmf(det(Fmf));
-            const surfaceTensorField invFmf(inv(Fmf));
-            const surfaceVectorField deformedSf
-            (
-                Jmf*invFmf.T() & fluidMesh().Sf()
-            );
-            fluid().phi() =
-                deformedSf
-              & (fvc::interpolate(fluid().U() - motionSolid().U()));
-        }
-
-
-        // Move the fluid mesh
-        // if (meshToFluidCoupling_)
-        // {
-        //     const vectorField& points0 =
-        //         refCast<const meshMotionSolidModelFvMotionSolver>
-        //         (
-        //             refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
-        //         ).points0();
-        //     fluidMesh().movePoints(points0 + motionSolid().pointD());
-        //     fluid().U().correctBoundaryConditions();
-        // }
+        mapInterfaceMotionUToFluidU();
     }
-    else
+
+    // Update phi
+    // Is there a neater way to do this? Maybe ask the fluid model...
     {
-        FatalErrorInFunction
-            << "nRegions must be 2 or 3!" << abort(FatalError);
+        const volTensorField Fm(I + motionSolid().gradD().T());
+        const volScalarField Jm(det(Fm));
+        const volTensorField invFm(inv(Fm));
+        const surfaceTensorField Fmf(fvc::interpolate(Fm));
+        const surfaceScalarField Jmf(det(Fmf));
+        const surfaceTensorField invFmf(inv(Fmf));
+        const surfaceVectorField deformedSf
+        (
+            Jmf*invFmf.T() & fluidMesh().Sf()
+        );
+        fluid().phi() =
+            deformedSf
+          & (fvc::interpolate(fluid().U() - motionSolid().U()));
     }
+
+
+    // Move the fluid mesh
+    // if (meshToFluidCoupling_)
+    // {
+    //     const vectorField& points0 =
+    //         refCast<const meshMotionSolidModelFvMotionSolver>
+    //         (
+    //             refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+    //         ).points0();
+    //     fluidMesh().movePoints(points0 + motionSolid().pointD());
+    //     fluid().U().correctBoundaryConditions();
+    // }
 
     // Update fluid velocity acceleration
     fluid().A() = fvc::ddt(fluid().U());
@@ -2296,7 +1990,7 @@ label newtonMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     // matrix A is
     //
     //     *-----------------*
-    //     | Aff | Afm | Afs |
+    //     | Aff | Afm |  0  |
     //     |-----------------|
     //     |  0  | Amm | Ams |
     //     |-----------------|
@@ -2310,36 +2004,19 @@ label newtonMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     //
     // The off diagonal submatrices, which represent coupling between
     // equations, are
-    //  - Afm: mesh motion terms in the fluid equations
-    //  - Afs: solid terms in the fluid equations
+    //  - Afm: mesh motion terms in the fluid equations, including the
+    //         interface motion
     //  - Ams: solid terms (interface motion) in the mesh motion equation
     //  - Asf: fluid terms (pressure on interface) in solid equations
     //
     // Note
+    //  - Afs is empty as the fluid equation do not directly depend on the solid
+    //    displacement; instead, the solid interface motion indirectly comes from
+    //    the fluid mesh interface motion
     //  - Amf is empty as the the mesh motion does not directly
     //    depend on the fluid solution
     //  - Asm is empty as the solid equations do not depend on the fluid
     //    mesh motion
-
-    // The full matrix can be formed, although the mesh-to-fluid coupling (Afm)
-    // is not trivial to derive. As the coupling between the solid and fluid
-    // (given by Afs and Asf) is typically stronger than the mesh-to-fluid
-    // coupling (Afm), we can also solve a smaller fluid-solid monolithic system
-    // followed sequentially by the fluid mesh motion.
-    // We will consider both approaches here, starting with the sequential
-    // fluid-solid + mesh motion first (monolithicMeshMotion = "off") and later
-    // add the fluid-solid-mesh option (monolithicMeshMotion = "on"). The
-    // fluid-solid monolithic matrix takes the form:
-    //
-    //     *-----------*
-    //     | Aff | Afs |
-    //     |-----------|
-    //     | Asf | Ass |
-    //     *-----------*
-
-
-    // In both cases, we will create a nested matrix, where the overall
-    // monolithic matrix is formed by smaller sub-matrices, e.g., Aff, Ass, etc.
 
     // Set twoD flag
     const bool twoD = fluid().twoD();
@@ -2348,176 +2025,84 @@ label newtonMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    if (nRegions_ == 2)
-    {
-        // Our monolithic system matrix will take the form:
-        //
-        //     *-----------*
-        //     | Aff | Afs |
-        //     |-----------|
-        //     | Asf | Ass |
-        //     *-----------*
+    // Mesh motion block size
+    const label motionBlockSize = solidBlockSize;
 
-        // For brevity and convenience, we will store the size and blockSize of
-        // the regions in a labelPairList
-        const labelPairList nBlocksAndBlockSize
-        (
-            {
-                {fluidMesh().nCells(), fluidBlockSize},
-                {solidMesh().nCells(), solidBlockSize}
-            }
-        );
+    // For brevity and convenience, we will store the size and blockSize of the
+    // regions in a labelPairList
+    const labelPairList nBlocksAndBlockSize
+    (
+        {
+            {fluidMesh().nCells(), fluidBlockSize},
+            {fluidMesh().nCells(), motionBlockSize},
+            {solidMesh().nCells(), solidBlockSize}
+        }
+    );
 
-        // Create the empty submatrices
-        createSubMatsAndMat(jac, subMatsPtr_, nBlocksAndBlockSize);
+    // Create the empty submatrices and skip Afs, Amf and Asm, which will be set
+    // to null ptrs
+    labelPairHashSet nullSubMats;
+    nullSubMats.insert(labelPair(0, 2)); // Afs
+    nullSubMats.insert(labelPair(1, 0)); // Amf
+    nullSubMats.insert(labelPair(2, 1)); // Asm
+    createSubMatsAndMat(jac, subMatsPtr_, nBlocksAndBlockSize, nullSubMats);
 
-        // Get access to the sub-matrices
-        PetscInt nr, nc;
-        Mat **subMats;
-        CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
+    // Get access to the sub-matrices
+    PetscInt nr, nc;
+    Mat **subMats;
+    CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
 
-        // Initialise the diagonal submatrices:
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Ass: solid equations
+    // Initialise the diagonal submatrices:
+    //  - Aff: fluid equations (momentum and pressure)
+    //  - Amm: mesh motion equations in the fluid domain
+    //  - Ass: solid equations
 
-        // Aff
-        Foam::initialiseJacobian
-        (
-            subMats[0][0], fluid().mesh(), fluidBlockSize, false
-        );
-        PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
+    // Aff
+    Foam::initialiseJacobian
+    (
+        subMats[0][0], fluid().mesh(), fluidBlockSize, false
+    );
+    PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
 
-        // Ass
-        Foam::initialiseJacobian
-        (
-            subMats[1][1], solid().mesh(), solidBlockSize, false
-        );
-        PetscObjectSetName((PetscObject)subMats[1][1], "Ass");
+    // Amm
+    Foam::initialiseJacobian
+    (
+        subMats[1][1], fluid().mesh(), motionBlockSize, false
+    );
+    PetscObjectSetName((PetscObject)subMats[1][1], "Amm");
 
-        // Initialise the off diagonal submatrices:
-        //  - Afs: solid terms in the fluid equations
-        //  - Asf: fluid terms (pressure on interface) in solid equations
+    // Ass
+    Foam::initialiseJacobian
+    (
+        subMats[2][2], solid().mesh(), solidBlockSize, false
+    );
+    PetscObjectSetName((PetscObject)subMats[2][2], "Ass");
 
-        // Afs
-        initialiseAfs
-        (
-            subMats[0][1], fluidMesh(), fluidBlockSize, solidBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[0][1], "Afs");
+    // Initialise the four off diagonal submatrices:
+    //  - Afm: mesh motion terms in the fluid equations
+    //  - Ams: solid terms (interface motion) in the mesh motion equation
+    //  - Asf: fluid terms (pressure on interface) in solid equations
 
-        // Asf
-        initialiseAsf
-        (
-            subMats[1][0], solidMesh(), fluidBlockSize, solidBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[1][0], "Asf");
-    }
-    else if (nRegions_ == 3)
-    {
-        // Our monolithic system matrix will take the form:
-        //
-        //     *-----------------*
-        //     | Aff | Afm | Afs |
-        //     |-----------------|
-        //     |  0  | Amm | Ams |
-        //     |-----------------|
-        //     | Asf |  0  | Ass |
-        //     *-----------------*
-        //
-        // TODO: move the mesh motion equation to the end so the upper left
-        // fluid-solid system is the same as the nRegions=2 case
+    // Afm
+    initialiseAfm
+    (
+        subMats[0][1], fluidMesh(), fluidBlockSize, motionBlockSize, twoD
+    );
+    PetscObjectSetName((PetscObject)subMats[0][1], "Afm");
 
-        // Mesh motion block size
-        const label motionBlockSize = solidBlockSize;
+    // Ams
+    initialiseAms
+    (
+        subMats[1][2], fluidMesh(), motionBlockSize, solidBlockSize, twoD
+    );
+    PetscObjectSetName((PetscObject)subMats[1][2], "Ams");
 
-        // For brevity and convenience, we will store the size and blockSize of the
-        // regions in a labelPairList
-        const labelPairList nBlocksAndBlockSize
-        (
-            {
-                {fluidMesh().nCells(), fluidBlockSize},
-                {fluidMesh().nCells(), motionBlockSize},
-                {solidMesh().nCells(), solidBlockSize}
-            }
-        );
-
-        // Create the empty submatrices and skip Amf and Asm, which will be set
-        // to null ptrs
-        labelPairHashSet nullSubMats;
-        nullSubMats.insert(labelPair(1, 0)); // Amf
-        nullSubMats.insert(labelPair(2, 1)); // Asm
-        createSubMatsAndMat(jac, subMatsPtr_, nBlocksAndBlockSize, nullSubMats);
-
-        // Get access to the sub-matrices
-        PetscInt nr, nc;
-        Mat **subMats;
-        CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
-
-        // Initialise the diagonal submatrices:
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Amm: mesh motion equations in the fluid domain
-        //  - Ass: solid equations
-
-        // Aff
-        Foam::initialiseJacobian
-        (
-            subMats[0][0], fluid().mesh(), fluidBlockSize, false
-        );
-        PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
-
-        // Amm
-        Foam::initialiseJacobian
-        (
-            subMats[1][1], fluid().mesh(), motionBlockSize, false
-        );
-        PetscObjectSetName((PetscObject)subMats[1][1], "Amm");
-
-        // Ass
-        Foam::initialiseJacobian
-        (
-            subMats[2][2], solid().mesh(), solidBlockSize, false
-        );
-        PetscObjectSetName((PetscObject)subMats[2][2], "Ass");
-
-        // Initialise the four off diagonal submatrices:
-        //  - Afm: mesh motion terms in the fluid equations
-        //  - Afs: solid terms in the fluid equations
-        //  - Ams: solid terms (interface motion) in the mesh motion equation
-        //  - Asf: fluid terms (pressure on interface) in solid equations
-
-        // Afm
-        initialiseAfm
-        (
-            subMats[0][1], fluidMesh(), fluidBlockSize, motionBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[0][1], "Afm");
-
-        // Afs
-        initialiseAfs
-        (
-            subMats[0][2], fluidMesh(), fluidBlockSize, solidBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[0][2], "Afs");
-
-        // Ams
-        initialiseAms
-        (
-            subMats[1][2], fluidMesh(), motionBlockSize, solidBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[1][2], "Ams");
-
-        // Asf
-        initialiseAsf
-        (
-            subMats[2][0], solidMesh(), fluidBlockSize, solidBlockSize, twoD
-        );
-        PetscObjectSetName((PetscObject)subMats[2][0], "Asf");
-    }
-    else
-    {
-        FatalErrorInFunction
-            << "nRegions must be 2 or 3!" << abort(FatalError);
-    }
+    // Asf
+    initialiseAsf
+    (
+        subMats[2][0], solidMesh(), fluidBlockSize, solidBlockSize, twoD
+    );
+    PetscObjectSetName((PetscObject)subMats[2][0], "Asf");
 
     return 0;
 }
@@ -2532,66 +2117,35 @@ label newtonMonolithicCouplingInterface::initialiseSolution(Vec& x)
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
+    // Mesh motion block size
+    const label motionBlockSize = solidBlockSize;
+
     // Count the number of unknowns
     label n = 0;
     label N = 0;
-    if (nRegions_ == 2)
-    {
-        // For brevity and convenience, we will store the size and blockSize of the
-        // regions in a labelPairList
-        const labelPairList nBlocksAndBlockSize
-        (
-            {
-                {fluidMesh().nCells(), fluidBlockSize},
-                {solidMesh().nCells(), solidBlockSize}
-            }
-        );
 
-        // Count number of local blocks and local scalar equations
-        forAll(nBlocksAndBlockSize, regionI)
+    // For brevity and convenience, we will store the size and blockSize of the
+    // regions in a labelPairList
+    const labelPairList nBlocksAndBlockSize
+    (
         {
-            const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
-            const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
-            n += nBlocksRegionI*blockSizeRegionI;
+            {fluidMesh().nCells(), fluidBlockSize},
+            {fluidMesh().nCells(), motionBlockSize},
+            {solidMesh().nCells(), solidBlockSize}
         }
+    );
 
-        // Global system size: total number of scalar equation across all
-        // processors
-        N = returnReduce(n, sumOp<label>());
-    }
-    else if (nRegions_ == 3)
+    // Count number of local blocks and local scalar equations
+    forAll(nBlocksAndBlockSize, regionI)
     {
-        // Mesh motion block size
-        const label motionBlockSize = solidBlockSize;
-
-        // For brevity and convenience, we will store the size and blockSize of the
-        // regions in a labelPairList
-        const labelPairList nBlocksAndBlockSize
-        (
-            {
-                {fluidMesh().nCells(), fluidBlockSize},
-                {fluidMesh().nCells(), motionBlockSize},
-                {solidMesh().nCells(), solidBlockSize}
-            }
-        );
-
-        // Count number of local blocks and local scalar equations
-        forAll(nBlocksAndBlockSize, regionI)
-        {
-            const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
-            const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
-            n += nBlocksRegionI*blockSizeRegionI;
-        }
-
-        // Global system size: total number of scalar equation across all
-        // processors
-        N = returnReduce(n, sumOp<label>());
+        const label nBlocksRegionI = nBlocksAndBlockSize[regionI].first();
+        const label blockSizeRegionI = nBlocksAndBlockSize[regionI].second();
+        n += nBlocksRegionI*blockSizeRegionI;
     }
-    else
-    {
-        FatalErrorInFunction
-            << "nRegions must be 2 or 3!" << abort(FatalError);
-    }
+
+    // Global system size: total number of scalar equation across all
+    // processors
+    N = returnReduce(n, sumOp<label>());
 
     // Create solution vector
     x = Vec();
@@ -2619,452 +2173,297 @@ label newtonMonolithicCouplingInterface::formResidual
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    if (nRegions_ == 2)
+    // Considerations on the order of updating the fluid, solid, and mesh motion
+    // residuals
+    //  - solid depends on the fluid interface traction
+    //  - mesh motion depends on the solid interface displacement
+    //  - fluid depends on the entire mesh motion flux field
+    //
+    // Approach
+    // 1. Update the fluid velocity and pressure fields and calculate the
+    //    traction at the fluid interface
+    // 2. Map the fluid interface traction to the solid interface
+    // 3. Update the solid residual, which now has the correct interface
+    //    traction
+    // 4. Map the solid interface displacement to the mesh motion interface
+    // 5. Update the mesh motion residual, which now has the correct interface
+    //    displacement
+    // 6. Map the mesh motion interface velocity to the fluid interface
+    // 7. Update the fluid residual, which now has the correct interface
+    //    velocity and mesh motion deformation fields (Fm, Jm)
+    // 8. Apply scaling factor to solid and motion equations to preserve the
+    //    condition number of the monolithic system
+
+    const label motionBlockSize = solidBlockSize;
+
+    // The scalar row at which the motion equations start
+    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // The scalar row at which the solid equations start
+    const label solidFirstEqnID =
+        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
+
+    // Currently limited to one interface: it should be straight-forward to add
+    // a loop over multiple interface => todo
+    if (fluidSolidInterface::fluidPatchIndices().size() != 1)
     {
-        notImplemented("nRegions == 2");
-
-        // // Considerations on the order of updating the fluid and solid residuals
-        // //  - solid depends on the fluid interface traction
-        // //  - fluid depends on the solid interface velocity
-        // //
-        // // Approach
-        // // 1. Update the fluid velocity and pressure fields and calculate the
-        // //    traction at the fluid interface
-        // // 2. Map the fluid interface traction to the solid interface
-        // // 3. Update the solid residual, which now has the correct interface
-        // //    traction
-        // // 4. Map the solid interface velocity to the fluid interface
-        // // 5. Update the fluid residual, which now has the correct interface
-        // //    velocity
-        // // 6. Apply scaling factor to solid equations to preserve the
-        // //    condition number of the monolithic system
-
-        // // The scalar row at which the solid equations start
-        // const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // // Currently limited to one interface: it should be straight-forward to add
-        // // a loop over multiple interface => todo
-        // if (fluidSolidInterface::fluidPatchIndices().size() != 1)
-        // {
-        //     FatalErrorInFunction
-        //         << "Only one interface patch is currently allowed"
-        //         << abort(FatalError);
-        // }
-
-        // // 1. Update the fluid velocity and pressure fields and calculate the
-        // //    traction at the fluid interface
-        // {
-        //     // Take references
-        //     volVectorField& U = fluid().U();
-        //     volScalarField& p = fluid().p();
-
-        //     // Retrieve the solution
-        //     // Map the PETSc solution to the U field
-        //     foamPetscSnesHelper::ExtractFieldComponents<vector>
-        //     (
-        //         x,
-        //         U.primitiveFieldRef(),
-        //         0, // Location of U
-        //         fluidBlockSize,
-        //         fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
-        //     );
-
-        //     U.correctBoundaryConditions();
-
-        //     const_cast<volTensorField&>
-        //     (
-        //         fluidMesh().lookupObject<volTensorField>("grad(U)")
-        //     ) = fvc::grad(U);
-
-        //     U.correctBoundaryConditions();
-
-        //     // Map the PETSc solution to the p field
-        //     // p is located in the final component
-        //     foamPetscSnesHelper::ExtractFieldComponents<scalar>
-        //     (
-        //         x,
-        //         p.primitiveFieldRef(),
-        //         fluidBlockSize - 1, // Location of p component
-        //         fluidBlockSize
-        //     );
-
-        //     p.correctBoundaryConditions();
-        // }
-
-        // // 2. Map the fluid interface traction to the solid interface
-        // if (fluidToSolidCoupling_ && coupled())
-        // {
-        //     // Fluid interface traction
-        //     const label fluidPatchID =
-        //         fluidSolidInterface::fluidPatchIndices()[0];
-        //     const vectorField fluidNf
-        //     (
-        //         fluidMesh().boundary()[fluidPatchID].nf()
-        //     );
-        //     vectorField fluidTraction
-        //     (
-        //       - fluid().patchPressureForce(fluidPatchID)*fluidNf
-        //     );
-        //     if (passViscousStress_)
-        //     {
-        //         fluidTraction += fluid().patchViscousForce(fluidPatchID);
-        //     }
-
-        //     // Lookup the interface map from the fluid faces to the solid faces
-        //     const interfaceToInterfaceMappings::
-        //         directMapInterfaceToInterfaceMapping& interfaceMap =
-        //         refCast
-        //         <
-        //             const interfaceToInterfaceMappings::
-        //             directMapInterfaceToInterfaceMapping
-        //         >
-        //         (
-        //             interfaceToInterfaceList()[0]
-        //         );
-
-        //     // The face map gives the solid face ID for each fluid face
-        //     const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-
-        //     // Calculate the solid interface traction
-        //     // Flip the sign as the solid normals point in the opposite direction to
-        //     // the fluid normals
-        //     const label solidPatchID =
-        //         fluidSolidInterface::solidPatchIndices()[0];
-        //     vectorField solidTraction
-        //     (
-        //         solidMesh().boundary()[solidPatchID].size()
-        //     );
-        //     forAll(fluidTraction, fluidFaceI)
-        //     {
-        //         solidTraction[fluidFaceMap[fluidFaceI]] =
-        //             -fluidTraction[fluidFaceI];
-        //     }
-
-        //     // Lookup the displacement interface traction patch and set the traction
-        //     fvPatchVectorField& solidPatchD =
-        //         solid().D().boundaryFieldRef()[solidPatchID];
-        //     if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
-        //     {
-        //         FatalErrorInFunction
-        //             << "The solidinterface patch must be of type "
-        //             << "'solidTraction'"
-        //             << abort(FatalError);
-        //     }
-
-        //     solidTractionFvPatchVectorField& solidTractionPatch =
-        //         refCast<solidTractionFvPatchVectorField>(solidPatchD);
-
-        //     solidTractionPatch.traction() = solidTraction;
-        // }
-
-        // // 3. Update the solid residual, which now has the correct interface
-        // //    traction
-        // refCast<foamPetscSnesHelper>(solid()).formResidual
-        // (
-        //     &f[solidFirstEqnID], &x[solidFirstEqnID]
-        // );
-
-        // // 4. Map the solid interface velocity to the fluid interface
-        // // Note: it is assumed the solid.U() is dD/dt even for steady-state cases
-        // if (solidToFluidCoupling_ && coupled())
-        // {
-        //     mapInterfaceSolidUToFluidU();
-        // }
-
-        // // 5. Update the fluid residual, which now has the correct interface
-        // // velocity
-        // // Note that the fluid equations are first in the f (residual) and x
-        // // (solution) lists
-        // refCast<foamPetscSnesHelper>(fluid()).formResidual(f, x);
-
-        // // 6. Apply scaling factor to solid equations to preserve the
-        // // condition number of the monolithic system
-        // const label solidSystemEnd =
-        //     solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
-        // for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
-        // {
-        //     f[i] *= solidSystemScaleFactor_;
-        // }
+        FatalErrorInFunction
+            << "Only one interface patch is currently allowed"
+            << abort(FatalError);
     }
-    else if (nRegions_ == 3)
+
+    // 1. Update the fluid velocity and pressure fields and calculate the
+    //    traction at the fluid interface
     {
-        // Considerations on the order of updating the fluid, solid, and mesh motion
-        // residuals
-        //  - solid depends on the fluid interface traction
-        //  - mesh motion depends on the solid interface displacement
-        //  - fluid depends on the entire mesh motion flux field
-        //
-        // Approach
-        // 1. Update the fluid velocity and pressure fields and calculate the
-        //    traction at the fluid interface
-        // 2. Map the fluid interface traction to the solid interface
-        // 3. Update the solid residual, which now has the correct interface
-        //    traction
-        // 4. Map the solid interface displacement to the mesh motion interface
-        // 5. Update the mesh motion residual, which now has the correct interface
-        //    displacement
-        // 6. Map the mesh motion interface velocity to the fluid interface
-        // 7. Update the fluid residual, which now has the correct interface
-        //    velocity and mesh motion deformation fields (Fm, Jm)
-        // 8. Apply scaling factor to solid and motion equations to preserve the
-        //    condition number of the monolithic system
+        // Take references
+        volVectorField& U = fluid().U();
+        volScalarField& p = fluid().p();
 
-        const label motionBlockSize = solidBlockSize;
-
-        // The scalar row at which the motion equations start
-        const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // The scalar row at which the solid equations start
-        const label solidFirstEqnID =
-            motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-
-        // Currently limited to one interface: it should be straight-forward to add
-        // a loop over multiple interface => todo
-        if (fluidSolidInterface::fluidPatchIndices().size() != 1)
-        {
-            FatalErrorInFunction
-                << "Only one interface patch is currently allowed"
-                << abort(FatalError);
-        }
-
-        // 1. Update the fluid velocity and pressure fields and calculate the
-        //    traction at the fluid interface
-        {
-            // Take references
-            volVectorField& U = fluid().U();
-            volScalarField& p = fluid().p();
-
-            // Retrieve the solution
-            // Map the PETSc solution to the U field
-            foamPetscSnesHelper::ExtractFieldComponents<vector>
-            (
-                x,
-                U.primitiveFieldRef(),
-                0, // Location of U
-                fluidBlockSize,
-                fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
-            );
-
-            U.correctBoundaryConditions();
-
-            const_cast<volTensorField&>
-            (
-                fluidMesh().lookupObject<volTensorField>("grad(U)")
-            ) = fvc::grad(U);
-
-            U.correctBoundaryConditions();
-
-            // Map the PETSc solution to the p field
-            // p is located in the final component
-            foamPetscSnesHelper::ExtractFieldComponents<scalar>
-            (
-                x,
-                p.primitiveFieldRef(),
-                fluidBlockSize - 1, // Location of p component
-                fluidBlockSize
-            );
-
-            p.correctBoundaryConditions();
-        }
-
-        // Extract D field (needed for motion interface)
+        // Retrieve the solution
+        // Map the PETSc solution to the U field
         foamPetscSnesHelper::ExtractFieldComponents<vector>
         (
-            &x[solidFirstEqnID],
-            solid().D().primitiveFieldRef(),
+            x,
+            U.primitiveFieldRef(),
+            0, // Location of U
+            fluidBlockSize,
+            fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
+        );
+
+        U.correctBoundaryConditions();
+
+        const_cast<volTensorField&>
+        (
+            fluidMesh().lookupObject<volTensorField>("grad(U)")
+        ) = fvc::grad(U);
+
+        U.correctBoundaryConditions();
+
+        // Map the PETSc solution to the p field
+        // p is located in the final component
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x,
+            p.primitiveFieldRef(),
+            fluidBlockSize - 1, // Location of p component
+            fluidBlockSize
+        );
+
+        p.correctBoundaryConditions();
+    }
+
+    // Extract D field (needed for motion interface)
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        &x[solidFirstEqnID],
+        solid().D().primitiveFieldRef(),
+        0, // Location of first component
+        solidBlockSize, // Block size of x
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Enforce the boundary conditions
+    solid().D().correctBoundaryConditions();
+
+    // Update gradient of displacement
+    solid().mechanical().grad
+    (
+        solid().D(), solid().gradD()
+    );
+
+    // Map D to motionD
+    mapInterfaceSolidToMeshMotion();
+
+
+    // 2. Map the fluid interface traction to the solid interface
+    if (fluidToSolidCoupling_ && coupled())
+    {
+        // Fluid interface traction
+        const label fluidPatchID =
+            fluidSolidInterface::fluidPatchIndices()[0];
+
+        foamPetscSnesHelper::ExtractFieldComponents<vector>
+        (
+            &x[motionFirstEqnID],
+            motionSolid().D().primitiveFieldRef(),
             0, // Location of first component
             solidBlockSize, // Block size of x
             twoD ? labelList({0,1}) : labelList({0,1,2})
         );
 
         // Enforce the boundary conditions
-        solid().D().correctBoundaryConditions();
+        motionSolid().D().correctBoundaryConditions();
+
+        // Map D to motionD
+        mapInterfaceSolidToMeshMotion();
 
         // Update gradient of displacement
-        solid().mechanical().grad
+        motionSolid().mechanical().grad
         (
-            solid().D(), solid().gradD()
+            motionSolid().D(), motionSolid().gradD()
         );
 
         // Map D to motionD
         mapInterfaceSolidToMeshMotion();
 
-
-        // 2. Map the fluid interface traction to the solid interface
-        if (fluidToSolidCoupling_ && coupled())
+        const tensorField& gradD =
+            motionSolid().gradD().boundaryField()[fluidPatchID];
+        const tensorField Fm(I + gradD.T());
+        const scalarField Jm(det(Fm));
+        const tensorField invFm(inv(Fm));
+        const vectorField& Sf = fluidMesh().boundary()[fluidPatchID].Sf();
+        const vectorField deformedSf(Jm*invFm.T() & Sf);
+        // const tensorField gradU
+        // (
+        //     fvc::grad(fluid().U())().boundaryField()[patchID]
+        // ); // do I need to calculate the whole field?
+        // tvF.ref() = rho_.value()*deformedSf & (nuEff*invFm.T() & gradU);
+        const vectorField fluidNf
+        (
+            fluidMesh().boundary()[fluidPatchID].nf()
+        );
+        const vectorField fluidDeformedNf(deformedSf/mag(deformedSf));
+        vectorField fluidTraction
+        (
+          - fluid().patchPressureForce(fluidPatchID)*fluidDeformedNf
+          // - fluid().patchPressureForce(fluidPatchID)*fluidNf
+        );
+        if (passViscousStress_)
         {
-            // Fluid interface traction
-            const label fluidPatchID =
-                fluidSolidInterface::fluidPatchIndices()[0];
-
-            foamPetscSnesHelper::ExtractFieldComponents<vector>
+            const scalar rho = 1;
+            const scalar nuEff = 1;
+            tensorField gradU
             (
-                &x[motionFirstEqnID],
-                motionSolid().D().primitiveFieldRef(),
-                0, // Location of first component
-                solidBlockSize, // Block size of x
-                twoD ? labelList({0,1}) : labelList({0,1,2})
+                fvc::grad(fluid().U())().boundaryField()[fluidPatchID]
             );
-
-            // Enforce the boundary conditions
-            motionSolid().D().correctBoundaryConditions();
-
-            // Map D to motionD
-            mapInterfaceSolidToMeshMotion();
-
-            // Update gradient of displacement
-            motionSolid().mechanical().grad
-            (
-                motionSolid().D(), motionSolid().gradD()
-            );
-
-            // Map D to motionD
-            mapInterfaceSolidToMeshMotion();
-
-            const tensorField& gradD =
-                motionSolid().gradD().boundaryField()[fluidPatchID];
-            const tensorField Fm(I + gradD.T());
-            const scalarField Jm(det(Fm));
-            const tensorField invFm(inv(Fm));
-            const vectorField& Sf = fluidMesh().boundary()[fluidPatchID].Sf();
-            const vectorField deformedSf(Jm*invFm.T() & Sf);
-            // const tensorField gradU
-            // (
-            //     fvc::grad(fluid().U())().boundaryField()[patchID]
-            // ); // do I need to calculate the whole field?
-            // tvF.ref() = rho_.value()*deformedSf & (nuEff*invFm.T() & gradU);
-            const vectorField fluidNf
-            (
-                fluidMesh().boundary()[fluidPatchID].nf()
-            );
-            const vectorField fluidDeformedNf(deformedSf/mag(deformedSf));
-            vectorField fluidTraction
-            (
-              - fluid().patchPressureForce(fluidPatchID)*fluidDeformedNf
-              // - fluid().patchPressureForce(fluidPatchID)*fluidNf
-            );
-            if (passViscousStress_)
-            {
-                fluidTraction +=
-                    refCast<fluidModels::newtonIcoFluid>
-                    (
-                        fluid()
-                    ).patchViscousForce
-                    (
-                        fluidPatchID,
-                        motionSolid()
-                    );
-            }
-
-            // Lookup the interface map from the fluid faces to the solid faces
-            const interfaceToInterfaceMappings::
-                directMapInterfaceToInterfaceMapping& interfaceMap =
-                refCast
-                <
-                    const interfaceToInterfaceMappings::
-                    directMapInterfaceToInterfaceMapping
-                >
-                (
-                    interfaceToInterfaceList()[0]
+            gradU +=
+                fluidNf*fluid().U().boundaryField()[fluidPatchID].snGrad()
+              - ((I - sqr(fluidNf)) & gradU);
+            fluidTraction +=
+                // refCast<fluidModels::newtonIcoFluid>
+                // (
+                //     fluid()
+                // ).patchViscousForce
+                // (
+                //     fluidPatchID,
+                //     motionSolid()
+                // );
+                rho*nuEff*fluidDeformedNf
+              & (
+                  //gradU // not rotated!
+                  //invFm & gradU
+                  Jm*invFm.T() & gradU // why does this work?
+                  //invFm.T() & gradU // should be right
+                  //gradU & invFm.T()
+                  //gradU & invFm
                 );
+                //rho*fluidNf & (nuEff*invFm.T() & gradU);
+                //rho*nuEff*(fluidDeformedNf & (gradU & invFm));
+        }
 
-            // The face map gives the solid face ID for each fluid face
-            const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-
-            // Calculate the solid interface traction
-            // Flip the sign as the solid normals point in the opposite direction to
-            // the fluid normals
-            const label solidPatchID =
-                fluidSolidInterface::solidPatchIndices()[0];
-            vectorField solidTraction
+        // Lookup the interface map from the fluid faces to the solid faces
+        const interfaceToInterfaceMappings::
+            directMapInterfaceToInterfaceMapping& interfaceMap =
+            refCast
+            <
+                const interfaceToInterfaceMappings::
+                directMapInterfaceToInterfaceMapping
+            >
             (
-                solidMesh().boundary()[solidPatchID].size()
+                interfaceToInterfaceList()[0]
             );
-            forAll(fluidTraction, fluidFaceI)
-            {
-                solidTraction[fluidFaceMap[fluidFaceI]] =
-                    -fluidTraction[fluidFaceI];
-            }
 
-            // Lookup the displacement interface traction patch and set the traction
-            fvPatchVectorField& solidPatchD =
-                solid().D().boundaryFieldRef()[solidPatchID];
-            if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
-            {
-                FatalErrorInFunction
-                    << "The solidinterface patch must be of type "
-                    << "'solidTraction'"
-                    << abort(FatalError);
-            }
+        // The face map gives the solid face ID for each fluid face
+        const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
 
-            solidTractionFvPatchVectorField& solidTractionPatch =
-                refCast<solidTractionFvPatchVectorField>(solidPatchD);
-
-            solidTractionPatch.traction() = solidTraction;
-        }
-
-        // 3. Update the solid residual, which now has the correct interface
-        //    traction
-        refCast<foamPetscSnesHelper>(solid()).formResidual
+        // Calculate the solid interface traction
+        // Flip the sign as the solid normals point in the opposite direction to
+        // the fluid normals
+        const label solidPatchID =
+            fluidSolidInterface::solidPatchIndices()[0];
+        vectorField solidTraction
         (
-            &f[solidFirstEqnID], &x[solidFirstEqnID]
+            solidMesh().boundary()[solidPatchID].size()
         );
-
-        // 4. Map the solid interface displacement and velocity to the mesh
-        //    motion interface
-        if (solidToMeshCoupling_ && coupled())
+        forAll(fluidTraction, fluidFaceI)
         {
-            mapInterfaceSolidToMeshMotion();
+            solidTraction[fluidFaceMap[fluidFaceI]] =
+                -fluidTraction[fluidFaceI];
         }
 
-        // 5. Update the mesh motion residual, which now has the correct interface
-        //    displacement
-        refCast<foamPetscSnesHelper>(motionSolid()).formResidual
-        (
-            &f[motionFirstEqnID], &x[motionFirstEqnID]
-        );
-
-        // 6. Map the mesh motion interface velocity to the fluid interface
-        // Note: it is assumed the motion.U() is dDm/dt even for steady-state cases
-        if (meshToFluidCoupling_ && coupled())
+        // Lookup the displacement interface traction patch and set the traction
+        fvPatchVectorField& solidPatchD =
+            solid().D().boundaryFieldRef()[solidPatchID];
+        if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
         {
-            mapInterfaceMotionUToFluidU();
+            FatalErrorInFunction
+                << "The solidinterface patch must be of type "
+                << "'solidTraction'"
+                << abort(FatalError);
         }
 
-        // 7. Update the fluid residual, which now has the correct interface
-        //    velocity and mesh motion
-        // Note that the fluid equations are first in the f (residual) and x
-        // (solution) lists
-        //refCast<foamPetscSnesHelper>(fluid()).formResidual(f, x);
-        // The fluid residual should be calculated over the reference
-        // configuration
-        refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
-        (
-            f, x, motionSolid()
-        );
+        solidTractionFvPatchVectorField& solidTractionPatch =
+            refCast<solidTractionFvPatchVectorField>(solidPatchD);
 
-        // 8. Apply scaling factor to solid and motion equations to preserve the
-        // condition number of the monolithic system
-        // TODO: what about scaling the fluid equations?
-
-        const label solidSystemEnd =
-            solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
-        for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
-        {
-            f[i] *= solidSystemScaleFactor_;
-        }
-
-        const label motionSystemEnd =
-            motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-        for (int i = motionFirstEqnID; i < motionSystemEnd; ++i)
-        {
-            f[i] *= motionSystemScaleFactor_;
-        }
+        solidTractionPatch.traction() = solidTraction;
     }
-    else
+
+    // 3. Update the solid residual, which now has the correct interface
+    //    traction
+    refCast<foamPetscSnesHelper>(solid()).formResidual
+    (
+        &f[solidFirstEqnID], &x[solidFirstEqnID]
+    );
+
+    // 4. Map the solid interface displacement and velocity to the mesh
+    //    motion interface
+    if (solidToMeshCoupling_ && coupled())
     {
-        FatalErrorInFunction
-            << "nRegions must be 2 or 3!" << abort(FatalError);
+        mapInterfaceSolidToMeshMotion();
+    }
+
+    // 5. Update the mesh motion residual, which now has the correct interface
+    //    displacement
+    refCast<foamPetscSnesHelper>(motionSolid()).formResidual
+    (
+        &f[motionFirstEqnID], &x[motionFirstEqnID]
+    );
+
+    // 6. Map the mesh motion interface velocity to the fluid interface
+    // Note: it is assumed the motion.U() is dDm/dt even for steady-state cases
+    if (meshToFluidCoupling_ && coupled())
+    {
+        mapInterfaceMotionUToFluidU();
+    }
+
+    // 7. Update the fluid residual, which now has the correct interface
+    //    velocity and mesh motion
+    // Note that the fluid equations are first in the f (residual) and x
+    // (solution) lists
+    //refCast<foamPetscSnesHelper>(fluid()).formResidual(f, x);
+    // The fluid residual should be calculated over the reference
+    // configuration
+    refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
+    (
+        f, x, motionSolid()
+    );
+
+    // 8. Apply scaling factor to solid and motion equations to preserve the
+    // condition number of the monolithic system
+    // TODO: what about scaling the fluid equations?
+
+    const label solidSystemEnd =
+        solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
+    for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
+    {
+        f[i] *= solidSystemScaleFactor_;
+    }
+
+    const label motionSystemEnd =
+        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
+    for (int i = motionFirstEqnID; i < motionSystemEnd; ++i)
+    {
+        f[i] *= motionSystemScaleFactor_;
     }
 
     return 0;
@@ -3077,6 +2476,30 @@ label newtonMonolithicCouplingInterface::formJacobian
     const PetscScalar *x
 )
 {
+    // Our monolithic system matrix will take the form:
+    //
+    //     *-----------------*
+    //     | Aff | Afm |  0  |
+    //     |-----------------|
+    //     |  0  | Amm | Ams |
+    //     |-----------------|
+    //     | Asf |  0  | Ass |
+    //     *-----------------*
+    //
+
+    // We will assembly the six sub-matrices:
+
+    // Diagonal submatrices:
+    //  - Aff: fluid equations (momentum and pressure)
+    //  - Amm: mesh motion equations in the fluid domain
+    //  - Ass: solid equations
+    //
+    // Off-diagonal submatrices:
+    //  - Afm: mesh motion terms in the fluid equations: mesh flux in advection
+    //    term and interface motion
+    //  - Ams: solid terms (interface motion) in the mesh motion equation
+    //  - Asf: fluid terms (pressure on interface) in solid equations
+
     // Set twoD flag
     const bool twoD = fluid().twoD();
 
@@ -3084,226 +2507,107 @@ label newtonMonolithicCouplingInterface::formJacobian
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    if (nRegions_ == 2)
-    {
-        // We will assembly the four sub-matrices:
+    // Zero entries
+    MatZeroEntries(jac);
 
-        // Diagonal submatrices:
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Ass: solid equations
-        //
-        // Off-diagonal submatrices:
-        //  - Afs: solid terms in the fluid equations
-        //  - Asf: fluid terms (pressure on interface) in solid equations
+    // Get access to the sub-matrices
+    PetscInt nr, nc;
+    Mat **subMats;
+    CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
 
-        // Zero entries
-        MatZeroEntries(jac);
-
-        // Get access to the sub-matrices
-        PetscInt nr, nc;
-        Mat **subMats;
-        CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
-
-        if (nr != 2 || nc != 2)
-        {
-            FatalErrorInFunction
-                << "The matrix has the wrong number of sub matrices: "
-                << "nr = " << nr << ", nc = " << nc << abort(FatalError);
-        }
-
-        // The scalar row at which the solid equations start
-        const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // Form diagonal submatrices
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Amm: mesh motion equations in the fluid domain
-        //  - Ass: solid equations
-        //
-
-        // Aff
-        refCast<foamPetscSnesHelper>(fluid()).formJacobian
-        (
-            subMats[0][0], x
-        );
-
-        // Ass
-        refCast<foamPetscSnesHelper>(solid()).formJacobian
-        (
-            subMats[1][1], &x[solidFirstEqnID]
-        );
-
-        // Form off-diagonal submatrices:
-        //  - Afs: solid terms in the fluid equations
-        //  - Asf: fluid terms (pressure on interface) in solid equations
-
-        // Afs
-        if (solidToFluidCoupling_) // && coupled())
-        {
-            formAfs(subMats[0][1], fluidBlockSize, solidBlockSize, twoD);
-        }
-
-        // Asf
-        if (fluidToSolidCoupling_) // && coupled())
-        {
-            formAsf(subMats[1][0], fluidBlockSize, solidBlockSize, twoD);
-        }
-
-        // Scale the solid matrix to preserve the condition number of the
-        // monolithic system
-        // We must assembly the matrix before we can use MatScale
-        // Complete matrix assembly
-        CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
-        CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
-
-        // Asf
-        MatScale(subMats[1][0], solidSystemScaleFactor_);
-
-        // Ass
-        MatScale(subMats[1][1], solidSystemScaleFactor_);
-
-        // Zero coupling matrices if not coupled
-        // There is an issue with non-zeros if we do not insert the coefficients in
-        // the first step, so we do it and zero them if not coupled
-        // Todo: find a more elegant/efficient solution
-        if (!coupled())
-        {
-            MatZeroEntries(subMats[0][1]);
-            MatZeroEntries(subMats[1][0]);
-        }
-    }
-    else if (nRegions_ == 3)
-    {
-        // We will assembly the seven sub-matrices:
-
-        // Diagonal submatrices:
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Amm: mesh motion equations in the fluid domain
-        //  - Ass: solid equations
-        //
-        // Off-diagonal submatrices:
-        //  - Afm: mesh motion terms in the fluid equations
-        //  - Afs: solid terms in the fluid equations
-        //  - Ams: solid terms (interface motion) in the mesh motion equation
-        //  - Asf: fluid terms (pressure on interface) in solid equations
-
-        // Zero entries
-        MatZeroEntries(jac);
-
-        // Get access to the sub-matrices
-        PetscInt nr, nc;
-        Mat **subMats;
-        CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
-
-        if (nr != 3 || nc != 3)
-        {
-            FatalErrorInFunction
-                << "The matrix has the wrong number of sub matrices: "
-                << "nr = " << nr << ", nc = " << nc << abort(FatalError);
-        }
-
-        // Set the motion block size
-        const label motionBlockSize = solidBlockSize;
-
-        // The scalar row at which the motion equations start
-        const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-        // The scalar row at which the solid equations start
-        const label solidFirstEqnID =
-            motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-
-        // Form diagonal submatrices
-        //  - Aff: fluid equations (momentum and pressure)
-        //  - Amm: mesh motion equations in the fluid domain
-        //  - Ass: solid equations
-        //
-
-        // Aff
-        refCast<foamPetscSnesHelper>(fluid()).formJacobian
-        (
-            subMats[0][0], x
-        );
-
-        // Amm
-        refCast<foamPetscSnesHelper>(motionSolid()).formJacobian
-        (
-            subMats[1][1], &x[motionFirstEqnID]
-        );
-
-        // Ass
-        refCast<foamPetscSnesHelper>(solid()).formJacobian
-        (
-            subMats[2][2], &x[solidFirstEqnID]
-        );
-
-        // Form off-diagonal submatrices:
-        //  - Afm: mesh motion terms in the fluid equations
-        //  - Afs: solid terms in the fluid equations
-        //  - Ams: solid terms (interface motion) in the mesh motion equation
-        //  - Asf: fluid terms (pressure on interface) in solid equations
-
-        // Afm
-        if (meshToFluidCoupling_) // && coupled())
-        {
-            formAfm(subMats[0][1], fluidBlockSize, motionBlockSize, twoD);
-        }
-
-        // Afs
-        // TIDY UP!!!
-        if (solidToFluidCoupling_) // && coupled())
-        {
-            formAfs(subMats[0][2], fluidBlockSize, solidBlockSize, twoD);
-            // Coupled with mesh interface velocity not solid velocity!
-            //formAfs(subMats[0][1], fluidBlockSize, solidBlockSize, twoD);
-        }
-
-        // Ams
-        if (solidToMeshCoupling_) // && coupled())
-        {
-            formAms(subMats[1][2], solidBlockSize, motionBlockSize, twoD);
-        }
-
-        // Asf
-        if (fluidToSolidCoupling_) // && coupled())
-        {
-            formAsf(subMats[2][0], fluidBlockSize, solidBlockSize, twoD);
-        }
-
-
-        // Scale the solid matrix to preserve the condition number of the
-        // monolithic system
-        // We must assembly the matrix before we can use MatScale
-        // Complete matrix assembly
-        CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
-        CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
-
-        // Amm
-        MatScale(subMats[1][1], motionSystemScaleFactor_);
-
-        // Ams
-        MatScale(subMats[1][2], motionSystemScaleFactor_);
-
-        // Asf
-        MatScale(subMats[2][0], solidSystemScaleFactor_);
-
-        // Ass
-        MatScale(subMats[2][2], solidSystemScaleFactor_);
-
-        // Zero coupling matrices if not coupled
-        // There is an issue with non-zeros if we do not insert the coefficients in
-        // the first step, so we do it and zero them if not coupled
-        // Todo: find a more elegant/efficient solution
-        if (!coupled())
-        {
-            MatZeroEntries(subMats[0][1]);
-            MatZeroEntries(subMats[0][2]);
-            MatZeroEntries(subMats[1][2]);
-            MatZeroEntries(subMats[2][0]);
-        }
-    }
-    else
+    if (nr != 3 || nc != 3)
     {
         FatalErrorInFunction
-            << "nRegions must be 2 or 3!" << abort(FatalError);
+            << "The matrix has the wrong number of sub matrices: "
+            << "nr = " << nr << ", nc = " << nc << abort(FatalError);
+    }
+
+    // Set the motion block size
+    const label motionBlockSize = solidBlockSize;
+
+    // The scalar row at which the motion equations start
+    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // The scalar row at which the solid equations start
+    const label solidFirstEqnID =
+        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
+
+    // Form diagonal submatrices
+    //  - Aff: fluid equations (momentum and pressure)
+    //  - Amm: mesh motion equations in the fluid domain
+    //  - Ass: solid equations
+
+    // Aff
+    refCast<foamPetscSnesHelper>(fluid()).formJacobian
+    (
+        subMats[0][0], x
+    );
+
+    // Amm
+    refCast<foamPetscSnesHelper>(motionSolid()).formJacobian
+    (
+        subMats[1][1], &x[motionFirstEqnID]
+    );
+
+    // Ass
+    refCast<foamPetscSnesHelper>(solid()).formJacobian
+    (
+        subMats[2][2], &x[solidFirstEqnID]
+    );
+
+    // Form off-diagonal submatrices:
+    //  - Afm: mesh motion terms in the fluid equations
+    //  - Ams: solid terms (interface motion) in the mesh motion equation
+    //  - Asf: fluid terms (pressure on interface) in solid equations
+
+    // Afm
+    if (meshToFluidCoupling_) // && coupled())
+    {
+        formAfm(subMats[0][1], fluidBlockSize, motionBlockSize, twoD);
+    }
+
+    // Ams
+    if (solidToMeshCoupling_) // && coupled())
+    {
+        formAms(subMats[1][2], solidBlockSize, motionBlockSize, twoD);
+    }
+
+    // Asf
+    if (fluidToSolidCoupling_) // && coupled())
+    {
+        formAsf(subMats[2][0], fluidBlockSize, solidBlockSize, twoD);
+    }
+
+
+    // Scale the solid matrix to preserve the condition number of the
+    // monolithic system
+    // We must assembly the matrix before we can use MatScale
+    // Complete matrix assembly
+    CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
+
+    // Amm
+    MatScale(subMats[1][1], motionSystemScaleFactor_);
+
+    // Ams
+    MatScale(subMats[1][2], motionSystemScaleFactor_);
+
+    // Asf
+    MatScale(subMats[2][0], solidSystemScaleFactor_);
+
+    // Ass
+    MatScale(subMats[2][2], solidSystemScaleFactor_);
+
+    // Zero coupling matrices if not coupled
+    // There is an issue with non-zeros if we do not insert the coefficients in
+    // the first step, so we do it and zero them if not coupled
+    // Todo: find a more elegant/efficient solution
+    if (!coupled())
+    {
+        MatZeroEntries(subMats[0][1]);
+        MatZeroEntries(subMats[0][2]);
+        MatZeroEntries(subMats[1][2]);
+        MatZeroEntries(subMats[2][0]);
     }
 
     return 0;
