@@ -559,7 +559,10 @@ label newtonMonolithicCouplingInterface::formAfm
     // Lookup the fluid patch
     const fvPatchVectorField& fluidPatchU =
         fluid().U().boundaryField()[fluidPatchID];
-    if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
+
+    // Check the fluid U patch type is fixedValue (not just derived from it)
+    // if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
+    if (fluidPatchU.type() != "fixedValue")
     {
         FatalErrorInFunction
             << "The fluid interface patch must be of type 'fixedValue'"
@@ -1678,7 +1681,6 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
         )
     ),
     fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
-    solidToFluidCoupling_(fsiProperties().lookup("solidToFluidCoupling")),
     meshToFluidCoupling_(fsiProperties().lookup("meshToFluidCoupling")),
     solidToMeshCoupling_(fsiProperties().lookup("solidToMeshCoupling")),
     extrapolateSolidInterfaceDisplacement_
@@ -1757,7 +1759,6 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
     }
 
     Info<< "fluidToSolidCoupling: " << fluidToSolidCoupling_ << nl
-        << "solidToFluidCoupling: " << solidToFluidCoupling_ << nl
         << "meshToFluidCoupling: " << meshToFluidCoupling_ << nl
         << "solidToMeshCoupling: " << solidToMeshCoupling_ << nl
         << "extrapolateSolidInterfaceDisplacement: "
@@ -2507,9 +2508,6 @@ label newtonMonolithicCouplingInterface::formJacobian
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    // Zero entries
-    MatZeroEntries(jac);
-
     // Get access to the sub-matrices
     PetscInt nr, nc;
     Mat **subMats;
@@ -2521,6 +2519,9 @@ label newtonMonolithicCouplingInterface::formJacobian
             << "The matrix has the wrong number of sub matrices: "
             << "nr = " << nr << ", nc = " << nc << abort(FatalError);
     }
+
+    // Zero the entries
+    MatZeroEntries(jac);
 
     // Set the motion block size
     const label motionBlockSize = solidBlockSize;
@@ -2579,6 +2580,7 @@ label newtonMonolithicCouplingInterface::formJacobian
     }
 
 
+
     // Scale the solid matrix to preserve the condition number of the
     // monolithic system
     // We must assembly the matrix before we can use MatScale
@@ -2605,7 +2607,6 @@ label newtonMonolithicCouplingInterface::formJacobian
     if (!coupled())
     {
         MatZeroEntries(subMats[0][1]);
-        MatZeroEntries(subMats[0][2]);
         MatZeroEntries(subMats[1][2]);
         MatZeroEntries(subMats[2][0]);
     }

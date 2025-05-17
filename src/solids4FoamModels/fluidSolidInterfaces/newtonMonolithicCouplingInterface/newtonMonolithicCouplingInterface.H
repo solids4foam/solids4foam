@@ -69,9 +69,6 @@ class newtonMonolithicCouplingInterface
         //- Flag to enable fluid-to-solid coupling
         const Switch fluidToSolidCoupling_;
 
-        //- Flag to enable solid-to-fluid coupling
-        const Switch solidToFluidCoupling_;
-
         //- Flag to enable mesh-to-fluid coupling
         const Switch meshToFluidCoupling_;
 
