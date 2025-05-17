@@ -549,8 +549,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     // Initialise the block coefficient
     const label nCoeffCmpts = blockSize*blockSize;
-    PetscScalar values[nCoeffCmpts];
-    std::memset(values, 0, sizeof(values));
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
 
     forAll(own, faceI)
     {
@@ -585,7 +584,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
             MatSetValuesBlocked
             (
-                jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                values.cdata(),
                 ADD_VALUES
             )
         );
@@ -601,7 +601,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
             MatSetValuesBlocked
             (
-                jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                jac, 1, &globalBlockRowI, 1, &globalBlockColI, values.cdata(),
                 ADD_VALUES
             )
         );
@@ -619,7 +619,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
             MatSetValuesBlocked
             (
-                jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                jac, 1, &globalBlockColI, 1, &globalBlockColI, values.cdata(),
                 ADD_VALUES
             )
         );
@@ -635,7 +635,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
             MatSetValuesBlocked
             (
-                jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                jac, 1, &globalBlockColI, 1, &globalBlockRowI, values.cdata(),
                 ADD_VALUES
             )
         );
@@ -677,7 +677,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 (
                     MatSetValuesBlocked
                     (
-                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                        values.cdata(),
                         ADD_VALUES
                     );
                 );
@@ -697,7 +698,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 (
                     MatSetValuesBlocked
                     (
-                        jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                        jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                        values.cdata(),
                         ADD_VALUES
                     );
                 );
@@ -750,7 +752,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     (
                         MatSetValuesBlocked
                         (
-                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                            jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                            values.cdata(),
                             ADD_VALUES
                         )
                     );
@@ -837,8 +840,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 
     // Prepare coeff array
     const label nCoeffCmpts = blockSize*blockSize;
-    PetscScalar values[nCoeffCmpts];
-    std::memset(values, 0, sizeof(values));
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
 
     forAll(phiI, faceI)
     {
@@ -880,7 +882,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -901,7 +904,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -923,7 +927,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                    jac, 1, &globalBlockColI, 1, &globalBlockColI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -945,7 +950,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -968,7 +974,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -990,7 +997,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockRowI, 1, &globalBlockColI, values,
+                    jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -1012,7 +1020,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockColI, 1, &globalBlockColI, values,
+                    jac, 1, &globalBlockColI, 1, &globalBlockColI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -1034,7 +1043,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
             (
                 MatSetValuesBlocked
                 (
-                    jac, 1, &globalBlockColI, 1, &globalBlockRowI, values,
+                    jac, 1, &globalBlockColI, 1, &globalBlockRowI,
+                    values.cdata(),
                     ADD_VALUES
                 )
             );
@@ -1088,7 +1098,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                 (
                     MatSetValuesBlocked
                     (
-                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI, values,
+                        jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+                        values.cdata(),
                         ADD_VALUES
                     )
                 );
