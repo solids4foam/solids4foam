@@ -1834,7 +1834,7 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
     if
     (
         runTime.controlDict().getOrDefault("adjustTimeStep", false)
-     && runTime.timeIndex() > 0
+     && foamPetscSnesHelper::snesHasRun()
     )
     {
         const scalar maxDeltaT =

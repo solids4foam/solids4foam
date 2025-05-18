@@ -154,6 +154,9 @@ class foamPetscSnesHelper
         //- Cell volumes for the neighbouring processor patch cells
         mutable PtrList<scalarField> neiProcVolumes_;
 
+        //- A flag indicating if the solve function has been called
+        bool snesHasRun_;
+
 
     // Private Member Functions
 
@@ -436,6 +439,12 @@ public:
             //  otherwise, a fatal error is thrown within this function when
             //  the SNES solver fails
             int solve(const bool returnOnSnesError = false);
+
+            //- Return true if the solve function has been called
+            bool snesHasRun() const
+            {
+                return snesHasRun_;
+            }
 };
 
 

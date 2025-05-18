@@ -465,7 +465,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
         nLocalBlocks >= 0 ? new globalIndex(nLocalBlocks) : nullptr
     ),
     neiProcGlobalIDs_(),
-    neiProcVolumes_()
+    neiProcVolumes_(),
+    snesHasRun_(false)
 {
     if (initialise)
     {
@@ -1220,6 +1221,9 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     // Load the correct options database
     PetscOptionsPush(options_);
     SNESSetFromOptions(snes_);
+
+    // Set the snesHasRun flag
+    snesHasRun_ = true;
 
     // Solve the nonlinear system
     SNESSolve(snes_, NULL, x_);
