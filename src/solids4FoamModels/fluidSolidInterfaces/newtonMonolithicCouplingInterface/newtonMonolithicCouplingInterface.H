@@ -91,6 +91,19 @@ class newtonMonolithicCouplingInterface
         //- Pointer to sub-matrices
         Mat* subMatsPtr_;
 
+        //- Optional file for recording the time step sizes and number of
+        //  nonlinear iterations
+        autoPtr<OFstream> tsLogPtr_;
+
+        //- Store the old time value for resetting the time
+        scalar oldTimeValue_;
+
+        //- Number of consecutive failed SNES solves
+        label nConsecutiveFailedSolves_;
+
+        //- Maximum allowed number of consecutive failed SNES solves
+        const label maxAllowedConsecutiveFailedSolves_;
+
 
     // Private Member Functions
 
@@ -188,6 +201,10 @@ class newtonMonolithicCouplingInterface
 
         //- Predict the solution field at the start of a new time step
         void predict();
+
+        //- Reset the fields to the old time fields, e.g. after a failed time
+        //  step
+        void resetFieldsToOldTime();
 
         //- Disallow default bitwise copy construct
         newtonMonolithicCouplingInterface(const newtonMonolithicCouplingInterface&);

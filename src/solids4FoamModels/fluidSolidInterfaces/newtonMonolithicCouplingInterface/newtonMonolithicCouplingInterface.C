@@ -1507,11 +1507,6 @@ void newtonMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
 void newtonMonolithicCouplingInterface::predict()
 {
-    // if (nRegions_ != 2)
-    // {
-    //     notImplemented("Only implemented for nRegions = 2");
-    // }
-
     if (runTime().timeIndex() == 0)
     {
         return;
@@ -1546,35 +1541,90 @@ void newtonMonolithicCouplingInterface::predict()
     if (solidToMeshCoupling_)
     {
         mapInterfaceSolidToMeshMotion();
-
-        // We can solve the mesh motion or just move the mesh using the
-        // predicted motion
-
-        // Solve the mesh motion equations
-        //fluidMesh().update();
-
-        // // Update gradient of displacement
-        // motionSolid().mechanical().grad
-        // (
-        //     motionSolid().D(), motionSolid().gradD()
-        // );
-
-        // // Interpolate cell displacements to vertices
-        // motionSolid().mechanical().interpolate
-        // (
-        //     motionSolid().D(), motionSolid().gradD(), motionSolid().pointD()
-        // );
-
-        // // Move the mesh
-        // const vectorField& points0 =
-        //     refCast<const meshMotionSolidModelFvMotionSolver>
-        //     (
-        //         refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
-        //     ).points0();
-        // fluidMesh().movePoints(points0 + motionSolid().pointD());
-        // fluid().U().correctBoundaryConditions();
     }
 
+    // Insert the OpenFOAM fields into the PETSc solution vector
+
+    // Set twoD flag
+    const bool twoD = fluid().twoD();
+
+    // Set fluid and solid block sizes
+    const label fluidBlockSize = twoD ? 3 : 4;
+    const label solidBlockSize = twoD ? 2 : 3;
+
+    // The scalar row at which the solid equations start
+    const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // The scalar row at which the motion equations start
+    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
+
+    // Access the raw solution data
+    PetscScalar *xx;
+    VecGetArray(foamPetscSnesHelper::solution(), &xx);
+
+    // Insert the fluid velocity
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        fluid().U().primitiveFieldRef(),
+        xx,
+        0, // Location of U
+        fluidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Insert the fluid pressure
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        fluid().p().primitiveFieldRef(),
+        xx,
+        fluidBlockSize - 1, // Location of p component
+        fluidBlockSize
+    );
+
+    // Insert the displacement
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        solid().D().primitiveFieldRef(),
+        &xx[solidFirstEqnID],
+        0, // Location of first component
+        solidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Insert the motion displacement
+    foamPetscSnesHelper::InsertFieldComponents
+    (
+        motionSolid().D().primitiveFieldRef(),
+        &xx[motionFirstEqnID],
+        0, // Location of first component
+        solidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Restore the solution vector
+    VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
+}
+
+
+void newtonMonolithicCouplingInterface::resetFieldsToOldTime()
+{
+    Info<< "Resetting primary fields to their old time values" << nl << endl;
+
+    // Velocity
+    fluid().U() = fluid().U().oldTime();
+
+    // Pressure
+    fluid().p() = fluid().p().oldTime();
+
+    // Displacement
+    solid().D() = solid().D().oldTime();
+
+    // Mesh motion
+    motionSolid().D() = motionSolid().D().oldTime();
+
+    // Update the interface fields
+    mapInterfaceSolidToMeshMotion();
+    mapInterfaceMotionUToFluidU();
 
     // Insert the OpenFOAM fields into the PETSc solution vector
 
@@ -1693,7 +1743,17 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
     ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
     nRegions_(3),
-    subMatsPtr_(nullptr)
+    subMatsPtr_(nullptr),
+    tsLogPtr_(),
+    oldTimeValue_(runTime.value()),
+    nConsecutiveFailedSolves_(0),
+    maxAllowedConsecutiveFailedSolves_
+    (
+        fsiProperties().lookupOrDefault<label>
+        (
+            "maxAllowedConsecutiveFailedSolves", 5
+        )
+    )
 {
     if (solid().twoD() != fluid().twoD())
     {
@@ -1777,11 +1837,6 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
      && runTime.timeIndex() > 0
     )
     {
-        // Adjust the time step based on the number of outer (Newton) iterations
-        // required by the PETSc SNES solver
-        // We will aim to keep the number of iterations within the range of
-        // minTargetNIter to maxTargetNIter
-
         const scalar maxDeltaT =
             runTime.controlDict().get<scalar>("maxDeltaT");
         const scalar minDeltaT =
@@ -1792,24 +1847,73 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
         const int maxTargetNIter =
             runTime.controlDict().getOrDefault<int>("maxTargetNIter", 6);
 
+        const Switch enableTimeStepLog =
+            runTime.controlDict().getOrDefault("logTimeStepAdjustments", true);
+
         PetscInt numIter;
         SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
 
-        scalar newDeltaT = runTime.deltaTValue();
+        SNESConvergedReason reason;
+        SNESGetConvergedReason(foamPetscSnesHelper::snes(), &reason);
 
-        if (numIter > maxTargetNIter)
+        const scalar currentDeltaT = runTime.deltaTValue();
+        scalar newDeltaT = currentDeltaT;
+
+        if (reason < 0)
         {
-            newDeltaT = max(0.5*newDeltaT, minDeltaT);
+            // SNES failed to converge
+            newDeltaT = max(0.25*currentDeltaT, minDeltaT);
+            Info<< nl << "SNES failed to converge (reason = " << reason << "); "
+                << "reducing timestep to " << newDeltaT << endl;
         }
-        else if (numIter < minTargetNIter)
+        else
         {
-            newDeltaT = min(1.5*newDeltaT, maxDeltaT);
+            // Guard against zero
+            if (numIter <= 0)
+            {
+                numIter = 1;
+            }
+
+            scalar factor = 1.0;
+
+            if (numIter > maxTargetNIter + 1)
+            {
+                factor = max(0.5, 0.9*scalar(maxTargetNIter)/numIter);
+            }
+            else if (numIter < minTargetNIter - 1)
+            {
+                factor = min(1.5, 1.1*scalar(maxTargetNIter)/numIter);
+            }
+
+            newDeltaT = clamp(factor*currentDeltaT, minDeltaT, maxDeltaT);
         }
 
-        Info<< "Old time step = " << runTime.deltaTValue() << nl
-            << "New time step = " << newDeltaT << nl << endl;
+        Info<< nl << "Nonlinear iterations = " << numIter << nl
+            << "Old time step        = " << currentDeltaT << nl
+            << "New time step        = " << newDeltaT << nl << endl;
 
         runTime.setDeltaT(newDeltaT);
+
+        if (enableTimeStepLog)
+        {
+            if (tsLogPtr_.empty())
+            {
+                const fileName timeStepLogFile =
+                    runTime.controlDict().getOrDefault<fileName>
+                    (
+                        "timeStepLogFile", "timeStepLog.dat"
+                    );
+
+                tsLogPtr_.set(new OFstream(timeStepLogFile));
+            }
+
+            tsLogPtr_()
+                << runTime.timeName() << " "
+                << currentDeltaT << " "
+                << newDeltaT << " "
+                << numIter << " "
+                << reason << endl;
+        }
     }
 }
 
@@ -1853,7 +1957,53 @@ bool newtonMonolithicCouplingInterface::evolve()
         motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
 
     // Solve the nonlinear system and check the convergence
-    foamPetscSnesHelper::solve();
+    // If unsuccesful, reduce the time, reset the fields and try again
+    label reason = 0;
+    do
+    {
+        // Solve the monolithic system
+        // The solve failed if the return value is greater than 0
+        reason = foamPetscSnesHelper::solve(true);
+
+        // Reduce the time-step
+        setDeltaT(const_cast<Time&>(runTime()));
+
+        // Reset the time
+        const_cast<Time&>(runTime()).setTime
+        (
+            oldTimeValue_ + runTime().deltaTValue(), runTime().timeIndex()
+        );
+
+        // Reset the fields to the old time fields
+        resetFieldsToOldTime();
+
+        // Keep track of the number of failed solves and quit if the maximum
+        // allowed is reached
+        if (nConsecutiveFailedSolves_++ == maxAllowedConsecutiveFailedSolves_)
+        {
+            FatalErrorInFunction
+                << nl
+                << "The monolithic nonlinear solver (SNES) failed to converge "
+                << "after "
+                << maxAllowedConsecutiveFailedSolves_ << " consecutive attempts."
+                << nl << "This may indicate:\n"
+                << "  - A time step that is too large for stability," << nl
+                << "  - Highly nonlinear or poorly scaled physics," << nl
+                << "  - Insufficient or inappropriate preconditioning." << nl
+                << "Suggestions:" << nl
+                << "  - Try reducing the initial time step in 'controlDict'," << nl
+                << "  - Check solver settings or residuals," << nl
+                << "  - Enable SNES monitoring for diagnostics."
+                << exit(FatalError);
+        }
+    }
+    while (reason > 0);
+
+    // Reset the nConsecutiveFailedSolves counter
+    nConsecutiveFailedSolves_ = 0;
+
+    // Update the old time value
+    oldTimeValue_ = runTime().value();
 
     // Access the raw solution data
     const PetscScalar *xx;

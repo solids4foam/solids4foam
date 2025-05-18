@@ -1233,7 +1233,8 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     if (reason < 0)
     {
-        WarningInFunction
+        Info
+            << nl
             << "PETSc SNES solver return error check disabled" << endl
             << "The SNES nonlinear solver did not converge." << nl
             << " PETSc SNES convergence error code: " << reason << nl
