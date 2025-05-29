@@ -364,13 +364,16 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
         );
 
-        // Map the p field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<scalar>
-        (
-            p().primitiveFieldRef(),
-            foamPetscSnesHelper::solution(),
-            blockSize_ -1 // Location of first component
-        );
+        if (solvePressure())
+        {
+            // Map the p field to the SNES solution vector
+            foamPetscSnesHelper::InsertFieldComponents<scalar>
+            (
+                p().primitiveFieldRef(),
+                foamPetscSnesHelper::solution(),
+                blockSize_ -1 // Location of first component
+            );
+        }
     }
 
     // Solve the nonlinear system and check the convergence

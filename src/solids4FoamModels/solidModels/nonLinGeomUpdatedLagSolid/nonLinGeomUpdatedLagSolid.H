@@ -101,6 +101,10 @@ class nonLinGeomUpdatedLagSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Number of unknowns per cell, used by PETSc SNES solver
+        const label blockSize_;
+
+
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the

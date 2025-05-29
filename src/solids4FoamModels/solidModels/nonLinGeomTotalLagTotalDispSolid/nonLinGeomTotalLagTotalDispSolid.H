@@ -103,6 +103,7 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the

@@ -275,12 +275,13 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         //evolveImplicitSegregated();
 
         // Map the DD field to the SNES solution vector
+        // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
             DD().primitiveFieldRef(),
             foamPetscSnesHelper::solution(),
-            solidModel::twoD() ? 2 : 3, // Block size of x
-            0                           // Location of first component
+            0, // Location of first component
+            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
         );
     }
 
@@ -293,9 +294,11 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     (
         foamPetscSnesHelper::solution(),
         DD().primitiveFieldRef(),
-        solidModel::twoD() ? 2 : 3, // Block size of x
-        0                           // Location of first component
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
+
+    DD().correctBoundaryConditions();
 
     // Total displacement
     D() = D().oldTime() + DD();
@@ -428,7 +431,14 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    blockSize_
+    (
+      label(solidModel::twoD() ? 2 : 3)
+      //   solvePressure() // not yet implemented in this solid model
+      // ? label(solidModel::twoD() ? 3 : 4)
+      // : label(solidModel::twoD() ? 2 : 3)
+    )
 {
     DDisRequired();
 
