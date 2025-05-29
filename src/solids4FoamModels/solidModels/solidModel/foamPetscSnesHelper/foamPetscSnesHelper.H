@@ -125,9 +125,12 @@ class foamPetscSnesHelper
         //  We re-set the options file before each call to solve
         PetscOptions options_;
 
-        //- Flag to set whether the solver stops when PETSs SNES returns an
+        //- Flag to set whether the solver stops when PETSc SNES returns an
         //  error
-        const Switch stopOnPetscError_;
+        Switch stopOnPetscError_;
+
+        //- Flag to track if SNES diverged
+        bool diverged_;
 
         //- Pointer to the PETSc SNES object
         //  Note that SNES is a pointer type
@@ -136,6 +139,9 @@ class foamPetscSnesHelper
         //- Pointer to the PETSc solution vector
         //  Note that Vec is a pointer type
         Vec x_;
+
+        //- Pointer to a backup of the PETSc solution vector
+        Vec xBackup_;
 
         //- Pointer to the PETSc matrix
         //  Note that Mat is a pointer type
@@ -232,10 +238,34 @@ public:
                 return x_;
             }
 
+            //- Non-const access to the PETSc solution vector
+            Vec solutionBackup()
+            {
+                if (!xBackup_)
+                {
+                    // Initialise based on x
+                    VecDuplicate(x_, &xBackup_);
+                }
+
+                return xBackup_;
+            }
+
             //- Return a reference to the snes object
             SNES& snes()
             {
                 return snes_;
+            }
+
+            //- Return the stopOnPetscError flag
+            const Switch stopOnPetscError() const
+            {
+                return stopOnPetscError_;
+            }
+
+            //- Return non-const access to the diverged flag
+            bool& diverged()
+            {
+                return diverged_;
             }
 
             //- Const access to the global index object
@@ -246,6 +276,15 @@ public:
 
 
         // Edit
+
+            //- Store the solution to the solution backup
+            void storeSolutionBackup()
+            {
+                VecCopy(solution(), solutionBackup());
+            }
+
+            //- Reset the solution and snes object
+            void resetSnes();
 
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of

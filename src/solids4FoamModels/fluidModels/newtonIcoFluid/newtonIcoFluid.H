@@ -105,6 +105,9 @@ class newtonIcoFluid
         // Return a const reference to the rAU field
         const surfaceScalarField& rAUf() const;
 
+        // Return a const reference to the rAU field
+        surfaceScalarField& rAUf();
+
         //- Correct phi function
         void correctPhi();
 
@@ -189,6 +192,9 @@ public:
 
             //- Evolve the fluid model
             virtual bool evolve();
+
+            //- Return a const reference to the rAU field
+            void clearRAUf();
 
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of

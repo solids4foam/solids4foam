@@ -29,8 +29,6 @@ License
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-// #include "EulerDdtScheme.H"
-// #include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,23 +54,6 @@ void newtonIcoFluid::makeRAUf() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    volVectorField& U = const_cast<volVectorField&>(this->U());
-
-    fvVectorMatrix UEqn
-    (
-        fvm::ddt(U)
-      + fvm::div(phi(), U)
-      - fvc::laplacian(turbulence_->nuEff(), U)
-        //+ turbulence_->divDevReff(U)
-    );
-
-    UEqn.relax();
-
-    const scalar pressureSmoothingCoeff
-    (
-        readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
-    );
-
     rAUfPtr_.set
     (
         new surfaceScalarField
@@ -85,13 +66,25 @@ void newtonIcoFluid::makeRAUf() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            pressureSmoothingCoeff*fvc::interpolate(1.0/UEqn.A())
+            mesh(),
+            dimensionedScalar("0", dimTime, 0.0)
         )
     );
 }
 
 
 const surfaceScalarField& newtonIcoFluid::rAUf() const
+{
+    if (rAUfPtr_.empty())
+    {
+        makeRAUf();
+    }
+
+    return rAUfPtr_.ref();
+}
+
+
+surfaceScalarField& newtonIcoFluid::rAUf()
 {
     if (rAUfPtr_.empty())
     {
@@ -364,6 +357,12 @@ bool newtonIcoFluid::evolve()
     turbulence_->correct();
 
     return 0;
+}
+
+
+void newtonIcoFluid::clearRAUf()
+{
+    rAUfPtr_.clear();
 }
 
 
@@ -693,6 +692,15 @@ label newtonIcoFluid::formResidual
     // Fp = Dp - div((Jmf*invFmf.T() & Sf) & Uf)
     //
 
+    // Update rAUf
+    {
+        const scalar pressureSmoothingCoeff
+        (
+            readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
+        );
+        rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
+    }
+
     scalarField pressureResidual
     (
         fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
@@ -803,6 +811,17 @@ label newtonIcoFluid::formJacobian
         0,                         // column offset
         fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
     );
+
+    // Update rAUf
+    {
+        const scalar pressureSmoothingCoeff
+        (
+            readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
+        );
+        const volScalarField nuEff(turbulence_->nuEff());
+        const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
+        rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
+    }
 
     // Calculate pressure equation matrix
     fvScalarMatrix pEqn

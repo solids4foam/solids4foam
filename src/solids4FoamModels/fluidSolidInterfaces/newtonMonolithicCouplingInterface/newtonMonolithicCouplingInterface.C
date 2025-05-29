@@ -1359,8 +1359,6 @@ void newtonMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
     {
         fluidPatchU[fluidFaceI] = motionPatchU[fluidFaceI];
     }
-
-    fluid().phi() = fvc::interpolate(fluid().U()) & fluidMesh().Sf();
 }
 
 
@@ -1793,6 +1791,12 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
             << exit(FatalError);
     }
 
+    // Store old time values
+    fluid().U().storeOldTime();
+    fluid().p().storeOldTime();
+    solid().D().storeOldTime();
+    motionSolid().D().storeOldTime();
+
     if (predictor())
     {
         // Check ddt schemes are not steadyState
@@ -1859,11 +1863,12 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
         const scalar currentDeltaT = runTime.deltaTValue();
         scalar newDeltaT = currentDeltaT;
 
+        // if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
         if (reason < 0)
         {
             // SNES failed to converge
             newDeltaT = max(0.25*currentDeltaT, minDeltaT);
-            Info<< nl << "SNES failed to converge (reason = " << reason << "); "
+            Info<< nl << "SNES failed to converge: "
                 << "reducing timestep to " << newDeltaT << endl;
         }
         else
@@ -1888,7 +1893,7 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
             newDeltaT = clamp(factor*currentDeltaT, minDeltaT, maxDeltaT);
         }
 
-        Info<< nl << "Nonlinear iterations = " << numIter << nl
+        Info<< "Nonlinear iterations = " << numIter << nl
             << "Old time step        = " << currentDeltaT << nl
             << "New time step        = " << newDeltaT << nl << endl;
 
@@ -1905,6 +1910,9 @@ void newtonMonolithicCouplingInterface::setDeltaT(Time& runTime)
                     );
 
                 tsLogPtr_.set(new OFstream(timeStepLogFile));
+
+                tsLogPtr_()
+                    << "Time currentDeltaT newDeltaT numIter reason" << endl;
             }
 
             tsLogPtr_()
@@ -1933,6 +1941,12 @@ bool newtonMonolithicCouplingInterface::evolve()
         updateCoupled();
     }
 
+    // Ensure boundary conditions are up-to-date
+    fluid().U().correctBoundaryConditions();
+    fluid().p().correctBoundaryConditions();
+    solid().D().correctBoundaryConditions();
+    motionSolid().D().correctBoundaryConditions();
+
     // Solution predictor
     if (predictor() && newTimeStep())
     {
@@ -1956,26 +1970,54 @@ bool newtonMonolithicCouplingInterface::evolve()
     const label solidFirstEqnID =
         motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
 
+    // Store the SNES solution
+    foamPetscSnesHelper::storeSolutionBackup();
+
     // Solve the nonlinear system and check the convergence
     // If unsuccesful, reduce the time, reset the fields and try again
-    label reason = 0;
+    bool failed = false;
     do
     {
         // Solve the monolithic system
-        // The solve failed if the return value is greater than 0
-        reason = foamPetscSnesHelper::solve(true);
+        Info<< "Calling snes::solve" << endl;
+        failed = false;
+        foamPetscSnesHelper::solve(true);
 
-        // Reduce the time-step
-        setDeltaT(const_cast<Time&>(runTime()));
+        SNESConvergedReason reason;
+        SNESGetConvergedReason(foamPetscSnesHelper::snes(), &reason);
 
-        // Reset the time
-        const_cast<Time&>(runTime()).setTime
-        (
-            oldTimeValue_ + runTime().deltaTValue(), runTime().timeIndex()
-        );
+        if (reason < 0)
+        {
+            Info<< "Solution fail: reducing the time step and trying again"
+                << endl;
 
-        // Reset the fields to the old time fields
-        resetFieldsToOldTime();
+            failed = true;
+
+            // Reduce the time-step
+            setDeltaT(const_cast<Time&>(runTime()));
+
+            // Reset the time
+            const_cast<Time&>(runTime()).setTime
+            (
+                oldTimeValue_ + runTime().deltaTValue(), runTime().timeIndex()
+            );
+
+            // Reset the fields to the old time fields
+            resetFieldsToOldTime();
+
+            // Reset the SNES solution
+            VecCopy
+            (
+                foamPetscSnesHelper::solutionBackup(),
+                foamPetscSnesHelper::solution()
+            );
+
+            // Reset the SNES object
+            foamPetscSnesHelper::resetSnes();
+
+            // Clear rAUf field
+            refCast<fluidModels::newtonIcoFluid>(fluid()).clearRAUf();
+        }
 
         // Keep track of the number of failed solves and quit if the maximum
         // allowed is reached
@@ -1997,7 +2039,7 @@ bool newtonMonolithicCouplingInterface::evolve()
                 << exit(FatalError);
         }
     }
-    while (reason > 0);
+    while (failed);
 
     // Reset the nConsecutiveFailedSolves counter
     nConsecutiveFailedSolves_ = 0;
@@ -2110,19 +2152,6 @@ bool newtonMonolithicCouplingInterface::evolve()
             deformedSf
           & (fvc::interpolate(fluid().U() - motionSolid().U()));
     }
-
-
-    // Move the fluid mesh
-    // if (meshToFluidCoupling_)
-    // {
-    //     const vectorField& points0 =
-    //         refCast<const meshMotionSolidModelFvMotionSolver>
-    //         (
-    //             refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
-    //         ).points0();
-    //     fluidMesh().movePoints(points0 + motionSolid().pointD());
-    //     fluid().U().correctBoundaryConditions();
-    // }
 
     // Update fluid velocity acceleration
     fluid().A() = fvc::ddt(fluid().U());
@@ -2426,6 +2455,22 @@ label newtonMonolithicCouplingInterface::formResidual
     mapInterfaceSolidToMeshMotion();
 
 
+    // Check for unphysical values for J as an indicator for divergence
+    {
+        const volScalarField J(det(I + solid().gradD().T()));
+        const scalar maxJ = max(J).value();
+        const scalar minJ = min(J).value();
+
+        if (minJ < 1e-8 || maxJ > 1e6)
+        {
+            Info<< "The solution is diverging as minJ = " << minJ
+                << " and maxJ = " << maxJ
+                << endl;
+
+            return -1;
+        }
+    }
+
     // 2. Map the fluid interface traction to the solid interface
     if (fluidToSolidCoupling_ && coupled())
     {
@@ -2559,6 +2604,22 @@ label newtonMonolithicCouplingInterface::formResidual
         solidTractionPatch.traction() = solidTraction;
     }
 
+    // Check for unphysical values for Jm as an indicator for divergence
+    {
+        const volScalarField J(det(I + motionSolid().gradD().T()));
+        const scalar maxJ = max(J).value();
+        const scalar minJ = min(J).value();
+
+        if (minJ < 1e-8 || maxJ > 1e6)
+        {
+            Info<< "The solution is diverging as minJm = " << minJ
+                << " and maxJm = " << maxJ
+                << endl;
+
+            return -1;
+        }
+    }
+
     // 3. Update the solid residual, which now has the correct interface
     //    traction
     refCast<foamPetscSnesHelper>(solid()).formResidual
@@ -2617,7 +2678,7 @@ label newtonMonolithicCouplingInterface::formResidual
         f[i] *= motionSystemScaleFactor_;
     }
 
-    return 0;
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 

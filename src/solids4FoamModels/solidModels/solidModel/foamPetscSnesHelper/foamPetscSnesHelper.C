@@ -42,6 +42,8 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     PetscScalar       *ff;
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
+    PetscFunctionBeginUser;
+
     // Access x and f data
     CHKERRQ(VecGetArrayRead(x, &xx));
     CHKERRQ(VecGetArray(f, &ff));
@@ -49,16 +51,32 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     // Compute the residual
     if (user->solMod_.formResidual(ff, xx) != 0)
     {
-        Foam::FatalError
-            << "formResidual(ff, xx) returned an error code!"
-            << Foam::abort(Foam::FatalError);
+        if (user->solMod_.stopOnPetscError())
+        {
+            Foam::FatalError
+                << "formResidual(ff, xx) returned an error code!"
+                << Foam::abort(Foam::FatalError);
+        }
+        else
+        {
+            Foam::Warning
+                << "formResidual(ff, xx) returned an error code!"
+                << Foam::endl;
+        }
+
+        // Let SNES know about the error
+        user->solMod_.diverged() = true;
+        PetscCall(SNESSetFunctionDomainError(snes));
+
+        // Exit without an error code so SNES can exit "softly"
+        PetscFunctionReturn(PETSC_SUCCESS);
     }
 
     // Restore the solution and residual vectors
     CHKERRQ(VecRestoreArrayRead(x, &xx));
     CHKERRQ(VecRestoreArray(f, &ff));
 
-    return 0;
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 
@@ -110,6 +128,35 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     return 0;
 }
 
+
+PetscErrorCode convergenceCheckFoamPetscSnesHelper
+(
+    SNES snes,
+    PetscInt it,
+    PetscReal xnorm,
+    PetscReal gnorm,
+    PetscReal fnorm,
+    SNESConvergedReason *reason,
+    void *ctx
+)
+{
+  appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
+
+  // PETSc default check
+  PetscCall(SNESConvergedDefault(snes, it, xnorm, gnorm, fnorm, reason, NULL));
+  if (*reason)
+  {
+      return 0;
+  }
+
+  if (user->solMod_.diverged())
+  {
+      *reason = SNES_DIVERGED_FUNCTION_DOMAIN;
+      user->solMod_.diverged() = false;
+  }
+
+  return 0;
+}
 
 
 Foam::label Foam::initialiseJacobian
@@ -431,6 +478,14 @@ label foamPetscSnesHelper::initialiseSnes()
         SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user)
     );
 
+    // Set the convergence check function
+    CHKERRQ
+    (
+        SNESSetConvergenceTest
+        (
+            snes_, convergenceCheckFoamPetscSnesHelper, &user, NULL
+        )
+    );
     // Set solver options
     // Uses default options, can be overridden by command line options
     CHKERRQ(SNESSetFromOptions(snes_));
@@ -456,8 +511,10 @@ foamPetscSnesHelper::foamPetscSnesHelper
     initialised_(initialise),
     options_(nullptr),
     stopOnPetscError_(stopOnPetscError),
+    diverged_(false),
     snes_(nullptr),
     x_(nullptr),
+    xBackup_(nullptr),
     A_(nullptr),
     snesUserPtr_(),
     globalCellsPtr_
@@ -518,6 +575,41 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void foamPetscSnesHelper::resetSnes()
+{
+    Info<< "Resetting SNES" << endl;
+
+    SNESDestroy(&snes_);
+    VecDestroy(&x_);
+    MatDestroy(&A_);
+    snesUserPtr_.clear();
+    //initialised_ = false;
+
+    if (initialiseSnes() != 0)
+    {
+        FatalErrorInFunction
+            << "initialiseSnes failed" << abort(FatalError);
+    }
+
+    // Reset SNES internal state
+    //SNESReset(foamPetscSnesHelper::snes());
+    // Reset KSP and PC
+    // KSP ksp;
+    // SNESGetKSP(foamPetscSnesHelper::snes(), &ksp);
+    // // KSPReset(ksp);
+    // // KSPSetUp(ksp);  // Optional but safe
+
+    // PC pc;
+    // KSPGetPC(ksp, &pc);
+    // PCReset(pc);
+    // PCSetUp(pc);    // Optional but safe
+
+    // // Reset line search
+    // SNESLineSearch ls;
+    // SNESGetLineSearch(foamPetscSnesHelper::snes(), &ls);
+    // SNESLineSearchReset(ls);
+}
 
 
 label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
@@ -1208,6 +1300,9 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
             << abort(FatalError);
     }
 
+    // Reset the stopOnPetscError flag
+    stopOnPetscError_ = !returnOnSnesError;
+
     // Initialise the SNES object
     if (!snes_)
     {
@@ -1235,10 +1330,17 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     SNESConvergedReason reason;
     SNESGetConvergedReason(snes_, &reason);
 
-    if (reason < 0)
+    if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
     {
-        Info
-            << nl
+        Info<< nl
+            << "PETSc SNES solver returned a diverged function domain: "
+            << "returning" << endl;
+
+        return 0;
+    }
+    else if (reason < 0)
+    {
+        Info<< nl
             << "PETSc SNES solver return error check disabled" << endl
             << "The SNES nonlinear solver did not converge." << nl
             << " PETSc SNES convergence error code: " << reason << nl
