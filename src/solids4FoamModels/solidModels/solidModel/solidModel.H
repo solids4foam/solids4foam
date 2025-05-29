@@ -55,7 +55,6 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 
-
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -425,6 +424,7 @@ protected:
         //- Non-const access to the pressure
         volScalarField& p();
 
+#ifdef OPENFOAM_COM
         //- Return non-const access to fvOptions
         fv::options& fvOptions()
         {

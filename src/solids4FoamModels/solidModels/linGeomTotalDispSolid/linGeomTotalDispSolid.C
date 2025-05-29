@@ -333,6 +333,9 @@ bool linGeomTotalDispSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
 #ifdef OPENFOAM_NOT_EXTEND
         D().primitiveFieldRef(),
+#else
+        D().internalField(),
+#endif
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );

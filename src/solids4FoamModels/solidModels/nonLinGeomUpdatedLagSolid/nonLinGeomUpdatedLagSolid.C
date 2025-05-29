@@ -309,6 +309,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
 #ifdef OPENFOAM_NOT_EXTEND
         DD().primitiveFieldRef(),
+#else
+        DD().internalField(),
+#endif
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );

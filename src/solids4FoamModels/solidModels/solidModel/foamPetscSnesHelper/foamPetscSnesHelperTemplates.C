@@ -66,8 +66,11 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             // diag[blockRowI] (assumes contiguous storage)
 #ifdef OPENFOAM_COM
             const scalar* curDiagPtr =
-                //reinterpret_cast<const scalar*>(diag[blockRowI].begin());
                 reinterpret_cast<const scalar*>(&diag[blockRowI]);
+#else
+            const scalar* curDiagPtr =
+                &diag[blockRowI].component(0);
+#endif
 
             // Construct the diag block coefficient
             for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
