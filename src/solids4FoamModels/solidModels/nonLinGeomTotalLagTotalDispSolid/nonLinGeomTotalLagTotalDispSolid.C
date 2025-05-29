@@ -404,7 +404,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         // Update dpdt
         dpdtPtr_.ref() = fvc::ddt(p());
     }
-    
+
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
     pointD().correctBoundaryConditions();

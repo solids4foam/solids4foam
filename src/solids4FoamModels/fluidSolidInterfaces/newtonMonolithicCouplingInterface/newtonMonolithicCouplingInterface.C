@@ -742,7 +742,7 @@ label newtonMonolithicCouplingInterface::formAfm
             );
         }
     }
-    
+
 
     // Coupling ii. The mesh flux in the advection term of the fluid momentum
     // equation
@@ -1394,7 +1394,7 @@ void newtonMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
             << "'fixedValue'" << abort(FatalError);
     }
 
-    // Lookup the mesh motion velocity field 
+    // Lookup the mesh motion velocity field
     fvPatchVectorField& motionPatchU =
         motionSolid().U().boundaryFieldRef()[fluidPatchID];
 
