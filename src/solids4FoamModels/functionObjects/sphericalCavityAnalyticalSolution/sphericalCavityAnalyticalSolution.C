@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "sphericalCavityStressDisplacement.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

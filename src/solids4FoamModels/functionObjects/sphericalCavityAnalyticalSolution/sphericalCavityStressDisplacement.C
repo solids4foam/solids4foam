@@ -19,6 +19,7 @@ License
 
 #include "sphericalCavityStressDisplacement.H"
 #include "coordinateSystem.H"
+#include "transform.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -195,7 +196,11 @@ Foam::symmTensor Foam::sphericalCavityStress
 
     // Rotate the cylindrical stress to Cartesian coordinates
     const coordinateSystem cs("cylindrical", x, vector(0, 0, 1), x/mag(x));
+#ifdef OPENFOAM_COM
     const symmTensor sigmaCartesian = transform(cs.R(), sigmaCylindrical);
+#else
+    const symmTensor sigmaCartesian = transform(cs.R().R(), sigmaCylindrical);
+#endif
 
     return sigmaCartesian;
 }

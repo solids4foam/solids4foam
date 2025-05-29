@@ -58,6 +58,7 @@ SourceFiles
 #ifndef sphericalCavityStressDisplacement_H
 #define sphericalCavityStressDisplacement_H
 
+#include "vector.H"
 #include "symmTensor.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

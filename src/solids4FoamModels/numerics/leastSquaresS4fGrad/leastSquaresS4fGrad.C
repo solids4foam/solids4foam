@@ -25,10 +25,12 @@ License
 #include "surfaceMesh.H"
 #include "GeometricField.H"
 #include "extrapolatedCalculatedFvPatchField.H"
-#include "symmetryPolyPatch.H"
-#include "symmetryPlanePolyPatch.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "boolIOList.H"
+#include "symmetryPolyPatch.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -65,11 +67,18 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
                 IOobject::NO_WRITE
             ),
             mesh,
-            dimensioned<GradType>(vsf.dimensions()/dimLength, Zero),
+            dimensioned<GradType>
+            (
+                "0", vsf.dimensions()/dimLength, pTraits<GradType>::zero
+            ),
             extrapolatedCalculatedFvPatchField<GradType>::typeName
         )
     );
+#ifdef OPENFOAM_NOT_EXTEND
     GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad.ref();
+#else
+    GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad();
+#endif
 
     // Lookup the useBoundaryFaceValues list
     // This list needs to be created before calling the gradient operation
@@ -141,7 +150,9 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
         else if
         (
             isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+#endif
         )
         {
             // Treat symmetry planes consistently with internal faces

@@ -107,8 +107,13 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = n.boundaryField()[patchI];
 
+#ifdef OPENFOAM_NOT_EXTEND
             traction.boundaryFieldRef()[patchI] =
                 tracPatch.traction() - nPatch*tracPatch.pressure();
+#else
+            traction.boundaryField()[patchI] =
+                tracPatch.traction() - nPatch*tracPatch.pressure();
+#endif
         }
         else if
         (
@@ -126,8 +131,13 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
             const vectorField& nPatch = n.boundaryField()[patchI];
 
             // Set shear traction to zero
+#ifdef OPENFOAM_NOT_EXTEND
             traction.boundaryFieldRef()[patchI] =
                 sqr(nPatch) & traction.boundaryField()[patchI];
+#else
+            traction.boundaryField()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#endif
         }
     }
 }
@@ -278,7 +288,11 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
+#ifdef OPENFOAM_NOT_EXTEND
             DD().primitiveFieldRef(),
+#else
+            DD().internalField(),
+#endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
             solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
@@ -293,6 +307,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
+#ifdef OPENFOAM_NOT_EXTEND
         DD().primitiveFieldRef(),
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
@@ -485,7 +500,11 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     // Check the gradScheme
     const word gradDScheme
     (
+#ifdef OPENFOAM_NOT_EXTEND
         mesh().gradScheme("grad(" + DD().name() +')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + DD().name() +')')
+#endif
     );
 
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
@@ -520,7 +539,11 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
+#ifdef OPENFOAM_NOT_EXTEND
                         DD().boundaryFieldRef()[patchI]
+#else
+                        DD().boundaryField()[patchI]
+#endif
                     );
 
                 tracPatch.extrapolateValue() = true;

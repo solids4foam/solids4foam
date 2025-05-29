@@ -53,7 +53,6 @@ SourceFiles
 
 #include "globalIndex.H"
 #include "volFields.H"
-#include "sparseMatrix.H"
 #include "fvMatrices.H"
 #include "leastSquaresS4fVectors.H"
 
@@ -324,10 +323,12 @@ public:
             //  3 for a 3-D vector equation, 2 for 2-D vector equation, 1 for a
             //  scalar equation
             //  A non-zero return value indicates an error.
+            //  Note: fvM should be const but OF9 does not have required const
+            //  access functions
             template <class Type>
             label InsertFvMatrixIntoPETScMatrix
             (
-                const fvMatrix<Type>& fvM,
+                fvMatrix<Type>& fvM,
                 Mat jac,
                 const label rowOffset,
                 const label colOffset,

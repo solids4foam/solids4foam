@@ -118,7 +118,7 @@ void Foam::BlockEigenSolver::convertFoamMatrixToEigenMatrix
 (
     const BlockLduMatrix<vector>& matrix,
     Eigen::SparseMatrix<scalar>& A
-)
+) const
 {
     if (BlockLduSolver::debug)
     {

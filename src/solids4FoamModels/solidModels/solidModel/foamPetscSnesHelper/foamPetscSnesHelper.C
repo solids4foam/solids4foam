@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
 License
     This file is part of solids4foam.
 
@@ -20,7 +20,6 @@ License
 #ifdef USE_PETSC
 
 #include "foamPetscSnesHelper.H"
-#include "SparseMatrixTemplate.H"
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
 #include "symmetryPlaneFvPatchFields.H"

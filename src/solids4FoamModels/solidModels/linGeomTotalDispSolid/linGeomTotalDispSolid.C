@@ -86,8 +86,13 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = n.boundaryField()[patchI];
 
+#ifdef OPENFOAM_NOT_EXTEND
             traction.boundaryFieldRef()[patchI] =
                 tracPatch.traction() - nPatch*tracPatch.pressure();
+#else
+            traction.boundaryField()[patchI] =
+                tracPatch.traction() - nPatch*tracPatch.pressure();
+#endif
         }
         else if
         (
@@ -105,8 +110,13 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
             const vectorField& nPatch = n.boundaryField()[patchI];
 
             // Set shear traction to zero
+#ifdef OPENFOAM_NOT_EXTEND
             traction.boundaryFieldRef()[patchI] =
                 sqr(nPatch) & traction.boundaryField()[patchI];
+#else
+            traction.boundaryField()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#endif
         }
     }
 }
@@ -176,7 +186,9 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(mesh().magSf()*traction)
               + rho()*g()
+#ifdef OPENFOAM_COM
               + fvOptions()(ds_, D())
+#endif
             );
 
             // Add damping
@@ -202,14 +214,23 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                     (
                         magSqr
                         (
+#ifdef OPENFOAM_NOT_EXTEND
                             D().primitiveField()
                           - D().prevIter().primitiveField()
+#else
+                            D().internalField()
+                          - D().prevIter().internalField()
+#endif
                         )
                     )
                 );
 
             // Norm of the solution
+#ifdef OPENFOAM_NOT_EXTEND
             xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+#else
+            xNorm = sqrt(gSum(magSqr(D().internalField())));
+#endif
 
             // Store the initial residual
             if (iCorr == 0)
@@ -291,7 +312,11 @@ bool linGeomTotalDispSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
+#ifdef OPENFOAM_NOT_EXTEND
             D().primitiveFieldRef(),
+#else
+            D().internalField(),
+#endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
             solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
@@ -306,6 +331,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
+#ifdef OPENFOAM_NOT_EXTEND
         D().primitiveFieldRef(),
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
@@ -402,7 +428,11 @@ bool linGeomTotalDispSolid::evolveExplicit()
         {
             if (mesh.geometricD()[dirI] < 0)
             {
+#ifdef OPENFOAM_NOT_EXTEND
                 D.primitiveFieldRef().replace(dirI, 0.0);
+#else
+                D.internalField().replace(dirI, 0.0);
+#endif
             }
         }
     }
@@ -611,7 +641,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     // Check the gradScheme
     const word gradDScheme
     (
+#ifdef OPENFOAM_NOT_EXTEND
         mesh().gradScheme("grad(" + D().name() +')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + D().name() +')')
+#endif
     );
 
     if
@@ -655,7 +689,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
+#ifdef OPENFOAM_NOT_EXTEND
                         D().boundaryFieldRef()[patchI]
+#else
+                        D().boundaryField()[patchI]
+#endif
                     );
 
                 tracPatch.extrapolateValue() = true;
@@ -689,7 +727,9 @@ void linGeomTotalDispSolid::setDeltaT(Time& runTime)
             1.0/
             gMax
             (
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<scalar, Foam::surfaceMesh>
+#endif
                 (
                     mesh().surfaceInterpolation::
                     deltaCoeffs().internalField()
@@ -868,9 +908,11 @@ label linGeomTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
+#ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>

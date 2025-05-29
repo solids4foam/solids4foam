@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef OPENFOAM_ORG
+
 #include "kirchhoffPlateSolid.H"
 #include "GeometricFields.H"
 
@@ -37,7 +39,11 @@ mapAreaFieldToSingleLayerVolumeField
     const label areaPatchID = areaPatch().index();
     const label pMeshNFaces = pMesh.nFaces();
     const Field<Type> afI = af.internalField();
+#ifdef OPENFOAM_NOT_EXTEND
+    FieldField<fvPatchField, Type>& bf = vf.boundaryFieldRef();
+#else
     FieldField<fvPatchField, Type>& bf = vf.boundaryField();
+#endif
 
     // Check that bf area patch is not of type empty
     if (bf[areaPatchID].type() == "empty")
@@ -80,7 +86,13 @@ mapAreaFieldToSingleLayerVolumeField
 
     {
         const unallocLabelList& faceCells = areaShadowPatch().faceCells();
-        Field<Type>& patchField = vf.boundaryField()[areaShadowPatch().index()];
+#ifdef OPENFOAM_NOT_EXTEND
+        Field<Type>& patchField =
+            vf.boundaryFieldRef()[areaShadowPatch().index()];
+#else
+        Field<Type>& patchField =
+            vf.boundaryField()[areaShadowPatch().index()];
+#endif
 
         forAll(faceCells, faceI)
         {
@@ -88,5 +100,7 @@ mapAreaFieldToSingleLayerVolumeField
         }
     }
 }
+
+#endif // OPENFOAM_ORG
 
 // ************************************************************************* //

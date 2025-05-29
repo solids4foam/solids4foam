@@ -127,8 +127,12 @@ void normalDisplacementPointPatchVectorField::updateCoeffs()
         return;
     }
 
-    this->operator==(patch().pointNormals()*dispSeries_(this->db().time().timeOutputValue()));
-    fixedValuePointPatchField<vector>::updateCoeffs();
+    this->operator==
+    (
+        patch().pointNormals()*dispSeries_(this->db().time().timeOutputValue())
+    );
+
+    fixedValuePointPatchVectorField::updateCoeffs();
 }
 
 

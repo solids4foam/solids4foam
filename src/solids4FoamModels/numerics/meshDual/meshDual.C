@@ -19,11 +19,14 @@ License
 
 #include "meshDual.H"
 #include "meshDualiser.H"
-#include "polyTopoChange.H"
 #include "pointMesh.H"
 #include "pointFields.H"
 #include "meshTools.H"
-
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "polyTopoChange.H"
+#else
+    #include "directTopoChange.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -381,6 +384,10 @@ void Foam::meshDual::simpleMarkFeatures
         featureFaceSet.insert(faceI);
     }
 
+#ifdef OPENFOAM_ORG
+    typedef meshFaceZones faceZoneMesh;
+#endif
+
     // B. face zones.
     const faceZoneMesh& faceZones = mesh.faceZones();
 
@@ -453,10 +460,17 @@ Foam::meshDual::meshDual(const fvMesh& mesh, const dictionary& dict)
             Foam::IOobject::READ_IF_PRESENT,
             Foam::IOobject::NO_WRITE
         ),
+#ifdef OPENFOAM_NOT_EXTEND
         pointField(mesh.points()),
         faceList(mesh.faces()),
         labelList(mesh.faceOwner()),
         labelList(mesh.faceNeighbour()),
+#else
+        xferCopy(mesh.points()),
+        xferCopy(mesh.faces()),
+        xferCopy(mesh.faceOwner()),
+        xferCopy(mesh.faceNeighbour()),
+#endif
         true
     ),
     mesh_(mesh),

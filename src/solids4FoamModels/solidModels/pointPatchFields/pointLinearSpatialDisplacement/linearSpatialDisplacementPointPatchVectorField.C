@@ -136,7 +136,7 @@ void linearSpatialDisplacementPointPatchVectorField::updateCoeffs()
 
     this->operator==(a_ + (b_ & patch().localPoints()));
 
-    fixedValuePointPatchField<vector>::updateCoeffs();
+    fixedValuePointPatchVectorField::updateCoeffs();
 }
 
 
@@ -147,7 +147,7 @@ void linearSpatialDisplacementPointPatchVectorField::initEvaluate
 {
     updateCoeffs();
 
-    fixedValuePointPatchField::initEvaluate(commsType);
+    fixedValuePointPatchVectorField::initEvaluate(commsType);
 }
 
 

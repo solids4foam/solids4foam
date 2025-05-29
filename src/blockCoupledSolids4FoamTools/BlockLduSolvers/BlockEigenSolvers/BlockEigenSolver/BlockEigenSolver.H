@@ -85,7 +85,7 @@ protected:
         (
             const BlockLduMatrix<vector>& matrix,
             Eigen::SparseMatrix<scalar>& A
-        );
+        ) const;
 
         //- Switch to enable exporting of the linear system to the Matlab format
         const Switch writeMatlabFiles() const
@@ -124,7 +124,7 @@ public:
         (
             Field<vector>& x,
             const Field<vector>& b
-        ) = 0;
+        ) const = 0;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

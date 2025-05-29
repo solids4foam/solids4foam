@@ -51,12 +51,17 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
-#include "Enum.H"
 #include "twoDPointCorrector.H"
-#include "fvOptions.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
 
+
+#ifdef OPENFOAM_COM
+    #include "Enum.H"
+    #include "fvOptions.H"
+#else
+    #include "NamedEnum.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -84,8 +89,11 @@ public:
         };
 
         //- Solution algorithm names
+#ifdef OPENFOAM_COM
         static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
-
+#else
+        static const NamedEnum<solutionAlgorithm, 4> solutionAlgorithmNames_;
+#endif
 
 private:
 
@@ -422,6 +430,7 @@ protected:
         {
             return fvOptions_;
         }
+#endif
 
 public:
 

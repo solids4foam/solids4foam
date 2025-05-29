@@ -17,40 +17,17 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-//solidModel       coupledUnsLinearGeometryLinearElastic;
-//solidModel       coupledUnsLinGeometry;
 solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
 
-"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+linearGeometryTotalDisplacementCoeffs
 {
     // Solution algorithm
     //solutionAlgorithm implicitSegregated;
     solutionAlgorithm PETScSNES;
     //solutionAlgorithm explicit;
 
-    // Damping is useful (and often required) for stabilising explicit
-    // simulations
-    //dampingCoeff    [ 0 0 -1 0 0 0 0 ] 1e4;
-
     // PETSc options file used by PETScSNES
     optionsFile petscOptions.snes;
-
-    // Maximum number of momentum correctors
-    nCorrectors     1;
-
-    // Solution tolerance for displacement
-    solutionTolerance 1e-06;
-
-    // Alternative solution tolerance for displacement
-    alternativeTolerance 1e-07;
-
-    // Material law solution tolerance
-    materialTolerance 1e-05;
-
-    // Write frequency for the residuals
-    infoFrequency   10;
 }
 
 // ************************************************************************* //

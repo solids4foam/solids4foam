@@ -19,6 +19,7 @@ License
 
 #include "solidTractionFreeFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
+#include "volFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

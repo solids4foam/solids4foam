@@ -63,7 +63,7 @@ Foam::BlockEigenSparseLUSolver::solve
 (
     Field<Foam::vector>& U,
     const Field<Foam::vector>& blockB
-)
+) const
 {
     if (Pstream::parRun())
     {

@@ -29,7 +29,6 @@ ddtSchemes
 
 gradSchemes
 {
-    //default                extendedLeastSquares 0;
     default                leastSquaresS4f;
 }
 
@@ -42,14 +41,12 @@ divSchemes
 
 laplacianSchemes
 {
-    //default                 Gauss linear corrected;
-    default                 Gauss linear skewCorrected;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    //default                 corrected;
-    default                 skewCorrected;
+    default                 corrected;
 }
 
 interpolationSchemes
