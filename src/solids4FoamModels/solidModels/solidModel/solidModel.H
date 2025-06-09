@@ -54,6 +54,7 @@ SourceFiles
 #include "twoDPointCorrector.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
+#include "LRE.H"
 
 #ifdef OPENFOAM_COM
     #include "Enum.H"
@@ -195,6 +196,9 @@ private:
         //- Stabilisation term for momentum equation
         autoPtr<momentumStabilisation> stabilisationPtr_;
 
+        //- Local regression estimators interpolation object
+        mutable autoPtr<LRE> LREPtr_;
+
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -312,6 +316,9 @@ private:
 
         //- Make the gradD at quad points field
         void makeGradDQuad() const;
+
+        //- Make the Local Regression Estimator object
+        void makeLRE() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -742,6 +749,16 @@ public:
             {
                 return twoD_;
             }
+
+            //- Return local regression estimator interpolation
+            const LRE& LREInterp() const
+            {
+		if (LREPtr_.empty())
+                {
+                    makeLRE();
+                }
+		return LREPtr_();
+	    }
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement

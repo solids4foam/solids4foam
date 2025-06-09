@@ -22,6 +22,7 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -301,6 +302,42 @@ void Foam::solidModel::makeU() const
 }
 
 
+void Foam::solidModel::makeLRE() const
+{
+    if (!LREPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeLRE() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    // Include fixedValue patches should in the least squares stencils
+    boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
+    forAll(includePatchInStencils, patchI)
+    {
+        if
+        (
+            isA<fixedDisplacementFvPatchVectorField>
+            (
+                D().boundaryField()[patchI]
+            )
+        )
+        {
+            includePatchInStencils[patchI] = true;
+        }
+    }
+
+    LREPtr_.set
+    (
+        new LRE
+        (
+            mesh(),
+            includePatchInStencils,
+            solidModelDict().subDict("highOrderCoeffs").subDict("LRECoeffs")
+        )
+    );
+}
+
+
 void Foam::solidModel::makeSigmaQuad() const
 {
     if (!sigmaQuadPtr_.empty())
@@ -313,6 +350,18 @@ void Foam::solidModel::makeSigmaQuad() const
     (
         new List<List<symmTensor>>(mesh().nFaces())
     );
+
+    // Initialise lists
+    List<List<symmTensor>>& sigmaQuad = sigmaQuadPtr_.ref();
+    const List<List<point>>& quadPoints = LREInterp().faceGaussPoints();
+
+    forAll(sigmaQuad, faceI)
+    {
+	List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+
+	// Initialise face list size
+	faceSigmaQuad.setSize(quadPoints[faceI].size());
+    }
 }
 
 
@@ -328,6 +377,18 @@ void Foam::solidModel::makeGradDQuad() const
     (
         new List<List<tensor>>(mesh().nFaces())
     );
+
+    // Initialise lists
+    List<List<tensor>>& gradDQuad = gradDQuadPtr_.ref();
+    const List<List<point>>& quadPoints = LREInterp().faceGaussPoints();
+
+    forAll(gradDQuad, faceI)
+    {
+	List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+	// Initialise face list size
+	faceGradDQuad.setSize(quadPoints[faceI].size());
+    }
 }
 
 
@@ -851,6 +912,7 @@ Foam::solidModel::solidModel
         )
     ),
     stabilisationPtr_(),
+    LREPtr_(),
     solutionTol_
     (
         solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)

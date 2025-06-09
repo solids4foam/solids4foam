@@ -27,7 +27,6 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "sparseMatrixTools.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
-#include "fixedDisplacementFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -675,7 +674,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
-    LREPtr_(),
     highOrderJacobian_
     (
         solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
@@ -713,61 +711,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
-
-    if
-    (
-        solidModelDict().found("highOrderCoeffs")
-     || solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED
-    )
-    {
-        // Include fixedValue patches should in the least squares stencils
-        boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
-        forAll(includePatchInStencils, patchI)
-        {
-            if
-            (
-                isA<fixedDisplacementFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                includePatchInStencils[patchI] = true;
-            }
-        }
-
-        LREPtr_.set
-        (
-            new LRE
-            (
-                mesh(),
-                includePatchInStencils,
-                solidModelDict().subDict("highOrderCoeffs").subDict("LRECoeffs")
-            )
-        );
-
-	// Initialie sigma and gradD at quadrature points.
-	// They are stored in solidModel but list size is initialised here
-	// becouse LRE is not available is solidModel
-	if (highOrderResidual_)
-	{
-	    List<List<symmTensor>>& sigmaQuadrature = sigmaQuad();
-	    List<List<tensor>>& gradDQuadrature = gradDQuad();
-
-	    const List<List<point>>& quadPoints = LREPtr_().faceGaussPoints();
-
-	    forAll(sigmaQuadrature, i)
-	    {
-		List<symmTensor>& faceSigmaQuad = sigmaQuadrature[i];
-		List<tensor>& faceGradDQuad = gradDQuadrature[i];
-
-		const List<point>& faceQuadPoints = quadPoints[i];
-
-		faceSigmaQuad.setSize(faceQuadPoints.size());
-		faceGradDQuad.setSize(faceQuadPoints.size());
-	    }
-	}
-    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
 
@@ -988,12 +931,6 @@ bool linGeomTotalDispSolid::evolve()
 
     // Keep compiler happy
     return true;
-}
-
-
-const LRE& linGeomTotalDispSolid::LREInterp() const
-{
-    return LREPtr_();
 }
 
 
@@ -1235,26 +1172,32 @@ label linGeomTotalDispSolid::formJacobian
         p.correctBoundaryConditions();
     }
 
-    // Calculate a segregated approximation of the Jacobian
-    fvVectorMatrix approxJ
-    (
-        fvm::laplacian(impKf_, D, "laplacian(DD,D)")
-      - rho()*fvm::d2dt2(D)
-    );
-
-    if (dampingCoeff().value() > SMALL)
+    if (highOrderJacobian_)
     {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
     }
+    else
+    {
+	// Calculate a segregated approximation of the Jacobian
+	fvVectorMatrix approxJ
+	(
+            fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+          - rho()*fvm::d2dt2(D)
+	);
 
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
+	if (dampingCoeff().value() > SMALL)
+	{
+	    approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+	}
 
-    // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    (
-        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-    );
+	// Optional: under-relaxation of the linear system
+	approxJ.relax();
+
+	// Convert fvMatrix matrix to PETSc matrix
+	foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+	(
+            approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+	);
+    }
 
     if (solvePressure())
     {
