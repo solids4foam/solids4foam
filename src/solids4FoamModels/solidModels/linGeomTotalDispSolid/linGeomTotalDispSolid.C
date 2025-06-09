@@ -939,7 +939,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     if (highOrderJacobian_)
     {
 	// To add
-	NotImplemented;
+	//NotImplemented;
     }
 
     // Initialise based on compact stencil fvMesh
@@ -949,12 +949,6 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 
 label linGeomTotalDispSolid::initialiseSolution(Vec& x)
 {
-    if (highOrderJacobian_)
-    {
-	// To add
-	NotImplemented;
-    }
-
     // Initialise based on mesh.nCells()
     return Foam::initialiseSolution(x, mesh(), blockSize_);
 }
@@ -1174,6 +1168,50 @@ label linGeomTotalDispSolid::formJacobian
 
     if (highOrderJacobian_)
     {
+	// Calculate high order jacobian, in this case not approximation.
+
+	// Get first and second Lame parameters
+	tmp<volScalarField> tK = mechanical().bulkModulus();
+	const volScalarField& K = tK();
+
+	tmp<volScalarField> tMu = (impK_-K)*(3.0/4.0);
+	const volScalarField& mu = tMu();
+
+	tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+	const volScalarField& lambda = tLambda();
+
+	hofvm::laplacianIntoPETScMatrix
+	(
+	    jac,
+	    *this,
+	    mesh(),
+	    this->D(),
+	    mu,
+	    this->LREInterp(),
+	    solidModel::twoD() ? 2 : 3
+	);
+
+	hofvm::laplacianTransposeIntoPETScMatrix
+	(
+	    jac,
+	    *this,
+	    this->mesh(),
+	    this->D(),
+	    mu,
+	    this->LREInterp(),
+	    solidModel::twoD() ? 2 : 3
+	);
+
+	hofvm::laplacianTraceIntoPETScMatrix
+	(
+	    jac,
+	    *this,
+	    this->mesh(),
+	    this->D(),
+	    lambda,
+	    this->LREInterp(),
+	    solidModel::twoD() ? 2 : 3
+	);
     }
     else
     {

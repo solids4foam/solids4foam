@@ -95,18 +95,20 @@ Foam::tensor Foam::hofvm::laplacianTraceCoeff
 void Foam::hofvm::laplacianIntoPETScMatrix
 (
     Mat matrix,
+    const foamPetscSnesHelper& petscSnesHelper,
     const fvMesh& mesh,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const LRE& lre,
+    const label nScalarEqns,
     const label rowOffset,
-    const label colOffset,
-    const label nScalarEqns
+    const label colOffset
 )
 {
     hofvmLaplacianPETSc
     (
         matrix,
+	petscSnesHelper,
         mesh,
 	D,
         diffusivity,
@@ -142,21 +144,23 @@ void Foam::hofvm::laplacianIntoSparseMatrix
 }
 
 
-void Foam::hofvm::laplacianTraceInfoPETScMatrix
+void Foam::hofvm::laplacianTraceIntoPETScMatrix
 (
     Mat matrix,
+    const foamPetscSnesHelper& petscSnesHelper,
     const fvMesh& mesh,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const LRE& lre,
+    const label nScalarEqns,
     const label rowOffset,
-    const label colOffset,
-    const label nScalarEqns
- )
+    const label colOffset
+)
 {
     hofvmLaplacianPETSc
     (
         matrix,
+	petscSnesHelper,
         mesh,
 	D,
 	diffusivity,
@@ -195,18 +199,20 @@ void Foam::hofvm::laplacianTraceIntoSparseMatrix
 void Foam::hofvm::laplacianTransposeIntoPETScMatrix
 (
     Mat matrix,
+    const foamPetscSnesHelper& petscSnesHelper,
     const fvMesh& mesh,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const LRE& lre,
+    const label nScalarEqns,
     const label rowOffset,
-    const label colOffset,
-    const label nScalarEqns
+    const label colOffset
 )
 {
     hofvmLaplacianPETSc
     (
         matrix,
+	petscSnesHelper,
         mesh,
 	D,
         diffusivity,
@@ -242,9 +248,10 @@ void Foam::hofvm::laplacianTransposeIntoSparseMatrix
 }
 
 
-void Foam::hofvm::hofvmLaplacianPETSc
+Foam::label Foam::hofvm::hofvmLaplacianPETSc
 (
     Mat matrix,
+    const foamPetscSnesHelper& petscSnesHelper,
     const fvMesh& mesh,
     const volVectorField& D,
     const volScalarField& diffusivity,
@@ -261,7 +268,248 @@ void Foam::hofvm::hofvmLaplacianPETSc
     const label nScalarEqns
 )
 {
-    NotImplemented;
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+    const scalarField& magSfI = mesh.magSf().internalField();
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+
+    // Diffusion coefficient linearly interpolated to face centres.
+    // TO_DO: interpolate diffusivity to quad points using hofvc::interpolate
+    const surfaceScalarField gamma(fvc::interpolate(diffusivity));
+    const scalarField& gammaI = gamma.internalField();
+
+    // Face quadrature points weights
+    const List<List<scalar>>& facesQuadWeights = lre.faceGaussPointsWeight();
+
+    // Faces stencil
+    const List<labelList>& stencils = lre.globalFaceStencils();
+
+    // Gradient interpolation coefficients
+    const List<List<DynamicList<vector>>>& gradCoeffs =
+	lre.QRGradFaceGPCoeffs();
+
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(matrix, &blockSize);
+
+    // Initialise the block coefficient
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+
+    // Loop over internal faces
+    forAll(owner, faceI)
+    {
+	// Preliminaries
+	const vector& faceNormal = n[faceI];
+
+	const scalar gammaMagSf = magSfI[faceI] * gammaI[faceI];
+
+	// Face interpolation molecule
+	const labelList& faceStencil = stencils[faceI];
+
+	// Face quadrature points weights
+	const List<scalar>& faceQuadWeight = facesQuadWeights[faceI];
+
+	// Loop over face quadrature points
+	forAll(faceQuadWeight, pointI)
+	{
+	    // Quad point weight
+	    const scalar& quadPointW = faceQuadWeight[pointI];
+
+	    // Loop over interpolation stencil
+	    for(label cI = 0; cI < faceStencil.size(); cI++)
+	    {
+		const label globalCellID = faceStencil[cI];
+		const vector& cellGradCoeff = gradCoeffs[faceI][pointI][cI];
+
+		const tensor coeff =
+		    calcCoeff(gammaMagSf, quadPointW, cellGradCoeff, faceNormal);
+
+		// Local block row ID
+		const label ownCellID = owner[faceI];
+
+		// Local block column ID
+		const label neiCellID = neighbour[faceI];
+
+		// Global block row ID
+		const label globalBlockRowI =
+		    petscSnesHelper.globalCells().toGlobal(ownCellID);
+
+		// Global block column ID
+		const label globalBlockColI =
+		    petscSnesHelper.globalCells().toGlobal(neiCellID);
+
+		for (label i = 0; i < (blockSize - 1); ++i)
+		{
+                    for (label j = 0; j < (blockSize - 1); ++j)
+		    {
+			// Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
+			// the 4x4 (or 3x3 in 2-D) values matrix
+			values[(i + rowOffset)*blockSize + j + colOffset] =
+			    coeff[i*3 + j];
+		    }
+		}
+
+		CHKERRQ
+		(
+		    MatSetValuesBlocked
+		    (
+		        matrix, 1, &globalBlockRowI, 1, &globalCellID,
+			values.cdata(),
+			ADD_VALUES
+		    )
+		);
+
+		for (label i = 0; i < nCoeffCmpts; ++i)
+		{
+		    values[i] = -values[i];
+		}
+
+		CHKERRQ
+		(
+		    MatSetValuesBlocked
+		    (
+		        matrix, 1, &globalBlockColI, 1, &globalCellID,
+			values.cdata(),
+			ADD_VALUES
+		    )
+		);
+	    }
+	}
+    }
+
+    // Loop over boundary faces
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+	const word& patchType = mesh.boundaryMesh()[patchI].type();
+	const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
+	const scalarField& pGamma = gamma.boundaryField()[patchI];
+	const vectorField pNormal(mesh.boundary()[patchI].nf());
+
+	const label start = mesh.boundaryMesh()[patchI].start();
+
+	if (patchType == emptyPolyPatch::typeName)
+	{
+	    // Skip empty patches
+	}
+	else if (patchType == processorPolyPatch::typeName)
+	{
+	    NotImplemented;
+	}
+	else if (patchType == symmetryPolyPatch::typeName)
+	{
+	    NotImplemented;
+	}
+	else if
+	(
+	    isA<fixedGradientFvPatchVectorField>(D.boundaryField()[patchI])
+	)
+        {
+	    // For now, skip faces with prescribed gradient.
+	    // Contribution is added directly to the source vector in the case
+	    // of traction
+	}
+	else if
+	(
+	    isA<fixedValueFvPatchVectorField>(D.boundaryField()[patchI])
+	)
+	{
+            forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+		// Preliminaries
+		const vector& faceNormal = pNormal[faceI];
+		const scalar gammaMagSf = pMagSf[faceI] * pGamma[faceI];
+
+		// Get global face index, needed for lists from LRE class
+		const label faceID = faceI + start;
+
+		// Face interpolation molecule
+		const labelList& faceStencil = stencils[faceID];
+
+		// Face quadrature points weights
+		const List<scalar>& faceQuadWeight = facesQuadWeights[faceID];
+
+		forAll(faceQuadWeight, pointI)
+		{
+		    // Quad point weight
+		    const scalar& quadPointW = faceQuadWeight[pointI];
+
+		    // Loop over interpolation stencil.
+		    for(label cI = 0; cI < faceStencil.size(); cI++)
+		    {
+			const label globalCellID = faceStencil[cI];
+			const vector& cellGradCoeff =
+			    gradCoeffs[faceID][pointI][cI];
+
+			const tensor coeff =
+			    calcCoeff
+			    (
+			        gammaMagSf,
+				quadPointW,
+				cellGradCoeff,
+				faceNormal
+			    );
+
+			for (label i = 0; i < (blockSize - 1); ++i)
+			{
+			    for (label j = 0; j < (blockSize - 1); ++j)
+			    {
+				// Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
+				// the 4x4 (or 3x3 in 2-D) values matrix
+				values[(i + rowOffset)*blockSize + j + colOffset] =
+				    coeff[i*3 + j];
+			    }
+			}
+
+			// Local block row ID
+			const label ownCellID = owner[faceI];
+
+			// Global block row ID
+			const label globalBlockRowI =
+			    petscSnesHelper.globalCells().toGlobal(ownCellID);
+
+			CHKERRQ
+			(
+			    MatSetValuesBlocked
+			    (
+			        matrix, 1, &globalBlockRowI, 1, &globalCellID,
+				values.cdata(),
+				ADD_VALUES
+			     )
+			 );
+		    }
+
+		    // Include boundary value to the source
+		    // Last item in gradCoeff refers to boundary face.
+		    {
+		        const label size = faceStencil.size();
+
+		        const vector& cellGradCoeff =
+		            gradCoeffs[faceID][pointI][size];
+
+		        const tensor coeff =
+		            calcCoeff
+		            (
+		                gammaMagSf,
+		        	quadPointW,
+		        	cellGradCoeff,
+		        	faceNormal
+		            );
+
+                        //source[owner[faceID]] -=
+			//coeff & D.boundaryField()[patchI][faceI];
+		    }
+ 	        }
+	    }
+	}
+	else
+	{
+	    // Currently only displacement and traction boundary are implemented
+	    NotImplemented;
+	}
+    }
+
+    return 0;
 }
 
 void Foam::hofvm::hofvmLaplacianSparseMatrix

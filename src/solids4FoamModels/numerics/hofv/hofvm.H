@@ -44,6 +44,7 @@ Author
 #include "cellPointLeastSquaresVectors.H"
 #include "SparseMatrixTemplate.H"
 #include "LRE.H"
+#include "foamPetscSnesHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -83,13 +84,14 @@ namespace hofvm
     void laplacianIntoPETScMatrix
     (
         Mat matrix,
+	const foamPetscSnesHelper& petscSnesHelper,
 	const fvMesh& mesh,
 	const volVectorField& D,
 	const volScalarField& diffusivity,
 	const LRE& lre,
-	const label rowOffset,
-	const label colOffset,
-	const label nScalarEqns
+	const label nScalarEqns,
+	const label rowOffset = 0,
+	const label colOffset = 0
      );
 
     // Add coefficients to the sparse matrix for the Laplacian
@@ -107,13 +109,14 @@ namespace hofvm
     void laplacianTransposeIntoPETScMatrix
     (
         Mat matrix,
+	const foamPetscSnesHelper& petscSnesHelper,
 	const fvMesh& mesh,
 	const volVectorField& D,
 	const volScalarField& diffusivity,
 	const LRE& lre,
-	const label rowOffset,
-	const label colOffset,
-	const label nScalarEqns
+	const label nScalarEqns,
+	const label rowOffset = 0,
+	const label colOffset = 0
     );
 
     // Add coefficients to the sparse matrix for the Laplacian transpose
@@ -128,16 +131,17 @@ namespace hofvm
     );
 
     // Add coefficients to the matrix for the Laplacian trace
-    void laplacianTraceInfoPETScMatrix
+    void laplacianTraceIntoPETScMatrix
     (
         Mat matrix,
+	const foamPetscSnesHelper& petscSnesHelper,
 	const fvMesh& mesh,
 	const volVectorField& D,
 	const volScalarField& diffusivity,
 	const LRE& lre,
-	const label rowOffset,
-	const label colOffset,
-	const label nScalarEqns
+	const label nScalarEqns,
+	const label rowOffset = 0,
+	const label colOffset = 0
     );
 
     // Add coefficients to the matrix for the Laplacian trace
@@ -172,9 +176,10 @@ namespace hofvm
 
     // Function that is doing all work, matrix coefficients are calculated
     // using static functions for coefficient calculations
-    void hofvmLaplacianPETSc
+    label hofvmLaplacianPETSc
     (
         Mat matrix,
+	const foamPetscSnesHelper& petscSnesHelper,
         const fvMesh& mesh,
 	const volVectorField& D,
         const volScalarField& diffusivity,
