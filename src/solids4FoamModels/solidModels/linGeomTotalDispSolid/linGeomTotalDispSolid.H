@@ -42,6 +42,7 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "foamPetscSnesHelper.H"
+#include "LRE.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -92,6 +93,17 @@ class linGeomTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Local regression estimators interpolation object
+        autoPtr<LRE> LREPtr_;
+
+        //- Calculate complete Jacobian using high order, only used in
+        //  combination with PETSC_SNES
+        const Switch highOrderJacobian_;
+
+        //- High order residual calculation, only used in combination
+        //  with PETSC_SNES
+        const Switch highOrderResidual_;
+
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
 
@@ -121,6 +133,10 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
+
+        //- Evolve the solid solver using the high order implicit discretisation
+        //  and coupled solution strategy
+        bool evolveHighOrderImplicitCoupled();
 
         // Make the pDiffusivity field
         void makePDiffusivity() const;
@@ -186,6 +202,9 @@ public:
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+            //- Return local regression estimator interpolation object
+            const LRE& LREInterp() const;
 
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of

@@ -1652,12 +1652,27 @@ void Foam::mechanicalLaw::correct
 {
     notImplemented
     (
-        type() + "::correct(pointSymmTensorField&)\n"
-        "The correct(pointSymmTensorField&) function is not implemented\n"
-        " for the " + type() + " mechanical law"
+        type() + "::correct(pointSymmTensorField&, const pointTensorField)\n"
+        "The correct(pointSymmTensorField&, const pointTensorField) function "
+        "is not implemented\n for the " + type() + " mechanical law"
     );
 }
 
+
+void Foam::mechanicalLaw::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    notImplemented
+    (
+        type() + "::correct( const List<List<symmTensor>>& sigmaQuad, "
+        "List<List<tensor>>& gradDQuad)\n"
+        "The correct function is not implemented\n"
+        " for the " + type() + " mechanical law"
+    );
+}
 
 Foam::scalar Foam::mechanicalLaw::residual()
 {

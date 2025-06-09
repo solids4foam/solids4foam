@@ -611,6 +611,29 @@ void Foam::mechanicalModel::correct
 }
 
 
+void Foam::mechanicalModel::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        laws[0].correct(sigmaQuad, gradDQuad);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::correct(...): not implemented for more than "
+            "one material"
+        );
+    }
+}
+
+
 void Foam::mechanicalModel::mapGradToSubMeshes(const volTensorField& gradD)
 {
     const PtrList<mechanicalLaw>& laws = *this;

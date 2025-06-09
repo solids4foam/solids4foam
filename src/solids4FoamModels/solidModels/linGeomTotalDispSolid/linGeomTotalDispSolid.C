@@ -20,10 +20,14 @@ License
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
+#include "hofvm.H"
+#include "hofvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "sparseMatrixTools.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -472,6 +476,99 @@ bool linGeomTotalDispSolid::evolveExplicit()
     return true;
 }
 
+bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
+{
+    Info << "Solving the momentum equation for D using the implicit high order"
+	 << "discretisation solver" << endl;
+
+#ifdef USE_PETSC
+
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
+    // Initialise matrix
+    const label matrixNonZeroEntries = sum(LREInterp().cellFacesStencilSize());
+    sparseMatrix matrix(matrixNonZeroEntries);
+    Info<<"Matrix is filled by "
+	<< 100*matrixNonZeroEntries/sqr(scalar(mesh().nCells()))<<"%"<<endl;
+
+    // Initialise source vector
+    vectorField source(mesh().nCells(), vector::zero);
+
+    // Get first and second Lame parameters
+    tmp<volScalarField> tK = mechanical().bulkModulus();
+    const volScalarField& K = tK();
+
+    tmp<volScalarField> tMu = (impK_-K)*(3.0/4.0);
+    const volScalarField& mu = tMu();
+
+    tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+    const volScalarField& lambda = tLambda();
+
+    // Assemble matrix
+    {
+	// Add Laplacian contribution
+	hofvm::laplacianIntoSparseMatrix
+	(
+	    matrix,
+	    source,
+	    mesh(),
+	    D(),
+	    mu,
+	    LREInterp()
+	);
+
+	// Add Laplacian transpose contribution
+	hofvm::laplacianTransposeIntoSparseMatrix
+	(
+	    matrix,
+	    source,
+	    mesh(),
+	    D(),
+	    mu,
+	    LREInterp()
+	);
+
+	// Add Laplacian trace contribution
+	hofvm::laplacianTraceIntoSparseMatrix
+	(
+	    matrix,
+	    source,
+	    mesh(),
+	    D(),
+	    lambda,
+	    LREInterp()
+	);
+
+	// Add boundary traction to source. Traction faces are skipped
+	// when assembling matrix
+	hofvm::addTractionBoundaries(source, mesh(), D());
+    }
+
+    if (debug > 1)
+    {
+	matrix.print();
+    }
+
+    vectorField& solution = D().internalFieldRef();
+
+    // Eigen SparseLU direct solver
+    sparseMatrixTools::solveLinearSystemEigen
+    (
+        matrix, source, solution, solidModel::twoD(), false, debug
+    );
+
+#else
+    // In fact PETSc is not currently needed but i will leave it.
+    FatalErrorIn("linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()")
+	<< "PETSc not available. Please set the PETSC_DIR environment "
+        << "variable and re-compile solids4foam" << abort(FatalError);
+#endif
+
+    return true;
+}
+
+
 void linGeomTotalDispSolid::makePDiffusivity() const
 {
     if (pDiffusivityPtr_.valid())
@@ -578,6 +675,21 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
+    LREPtr_(),
+    highOrderJacobian_
+    (
+        solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+	(
+	    "highOrderJacobian", true
+	)
+    ),
+    highOrderResidual_
+    (
+        solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+	(
+	    "highOrderResidual", true
+	)
+    ),
     ds_
     (
         IOobject
@@ -601,6 +713,61 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    if
+    (
+        solidModelDict().found("highOrderCoeffs")
+     || solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED
+    )
+    {
+        // Include fixedValue patches should in the least squares stencils
+        boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
+        forAll(includePatchInStencils, patchI)
+        {
+            if
+            (
+                isA<fixedDisplacementFvPatchVectorField>
+                (
+                    D().boundaryField()[patchI]
+                )
+            )
+            {
+                includePatchInStencils[patchI] = true;
+            }
+        }
+
+        LREPtr_.set
+        (
+            new LRE
+            (
+                mesh(),
+                includePatchInStencils,
+                solidModelDict().subDict("highOrderCoeffs").subDict("LRECoeffs")
+            )
+        );
+
+	// Initialie sigma and gradD at quadrature points.
+	// They are stored in solidModel but list size is initialised here
+	// becouse LRE is not available is solidModel
+	if (highOrderResidual_)
+	{
+	    List<List<symmTensor>>& sigmaQuadrature = sigmaQuad();
+	    List<List<tensor>>& gradDQuadrature = gradDQuad();
+
+	    const List<List<point>>& quadPoints = LREPtr_().faceGaussPoints();
+
+	    forAll(sigmaQuadrature, i)
+	    {
+		List<symmTensor>& faceSigmaQuad = sigmaQuadrature[i];
+		List<tensor>& faceGradDQuad = gradDQuadrature[i];
+
+		const List<point>& faceQuadPoints = quadPoints[i];
+
+		faceSigmaQuad.setSize(faceQuadPoints.size());
+		faceGradDQuad.setSize(faceQuadPoints.size());
+	    }
+	}
+    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
 
@@ -772,12 +939,25 @@ bool linGeomTotalDispSolid::evolve()
     {
         return evolveSnes();
     }
-    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
-    // {
-    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-    //     // could be combined with PETSc to achieve this.. todo!
-    //     return evolveImplicitCoupled();
-    // }
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    {
+	if (solidModelDict().found("highOrderCoeffs"))
+	{
+	    return evolveHighOrderImplicitCoupled();
+	}
+	else
+	{
+	    FatalErrorIn
+	    (
+	        "bool linGeomTotalDispSolid::evolve"
+	    ) << "coupled implicit solver not yet implemented here"
+	      << abort(FatalError);
+
+            // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+	    // could be combined with PETSc to achieve this.. todo!
+	    //return evolveImplicitCoupled();
+	}
+    }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
         return evolveImplicitSegregated();
@@ -811,8 +991,20 @@ bool linGeomTotalDispSolid::evolve()
 }
 
 
+const LRE& linGeomTotalDispSolid::LREInterp() const
+{
+    return LREPtr_();
+}
+
+
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
+    if (highOrderJacobian_)
+    {
+	// To add
+	NotImplemented;
+    }
+
     // Initialise based on compact stencil fvMesh
     return Foam::initialiseJacobian(jac, mesh(), blockSize_);
 }
@@ -820,6 +1012,12 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 
 label linGeomTotalDispSolid::initialiseSolution(Vec& x)
 {
+    if (highOrderJacobian_)
+    {
+	// To add
+	NotImplemented;
+    }
+
     // Initialise based on mesh.nCells()
     return Foam::initialiseSolution(x, mesh(), blockSize_);
 }
@@ -881,7 +1079,38 @@ label linGeomTotalDispSolid::formResidual
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     // Traction vectors at the faces
-    surfaceVectorField traction(n & fvc::interpolate(sigma()));
+    surfaceVectorField traction
+    (
+        IOobject
+        (
+            "traction",
+             mesh.time().timeName(),
+             mesh,
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("0", dimPressure, vector::zero)
+    );
+
+    if (highOrderResidual_)
+    {
+        // Displacement gradient at quadrature  points
+	gradDQuad() = LREInterp().gradDQuad(D);
+
+        // Calcualte sigma at quadrature points
+	mechanical().correct(sigmaQuad(), gradDQuad());
+
+	// Quadrature points weights
+	const List<List<scalar>>& quadW = LREInterp().faceGaussPointsWeight();
+
+	// Integration over face quadrature points to get face traction
+	traction = hofvc::surfaceIntegrate(sigmaQuad(), quadW,  mesh);
+    }
+    else
+    {
+	traction = n & fvc::interpolate(sigma());
+    }
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation

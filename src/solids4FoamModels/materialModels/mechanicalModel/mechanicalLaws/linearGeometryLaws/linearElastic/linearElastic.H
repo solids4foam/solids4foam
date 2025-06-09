@@ -156,6 +156,14 @@ public:
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+        virtual void correct
+        (
+	    List<List<symmTensor>>& sigmaQuad,
+	    const List<List<tensor>>& gradDQuad
+        );
 };
 
 

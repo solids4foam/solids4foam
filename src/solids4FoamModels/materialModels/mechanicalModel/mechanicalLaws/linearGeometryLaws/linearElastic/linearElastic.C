@@ -73,7 +73,14 @@ Foam::linearElastic::linearElastic
         // Set the bulk modulus
         if (nu_.value() < 0.5)
         {
-            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+            if (planeStress())
+            {
+                K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
+	    }
+	    else
+	    {
+                K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+	    }
         }
         else
         {
@@ -425,6 +432,34 @@ void Foam::linearElastic::correct
     {
         // Hooke's law : standard form
         sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+    }
+}
+
+
+void Foam::linearElastic::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    // Initialise eps outside loop
+    symmTensor epsilon = symmTensor::zero;
+
+    // Get mu and lambda values
+    const scalar mu = mu_.value();
+    const scalar lambda = lambda_.value();
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, gpI)
+        {
+            epsilon = symm(faceGradDQuad[gpI]);
+
+            faceSigmaQuad[gpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
+        }
     }
 }
 

@@ -167,11 +167,18 @@ private:
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
+        //- Gradient of total displacement  at quadrature points,
+        //  used by high order discretisation
+        mutable autoPtr<List<List<tensor>>> gradDQuadPtr_;
+
         //- Stress field
         //  This is the engineering stress for linear geometry approaches, and
         //  true (Cauchy) stress for nonlinear geometry (large strain)
         //  approaches
         volSymmTensorField sigma_;
+
+        //- Stress field at quadrature points, used by high order discretisation
+        mutable autoPtr<List<List<symmTensor>>> sigmaQuadPtr_;
 
         //- Time-step index used to determine when it is a new time-step
         mutable label curTimeIndex_;
@@ -299,6 +306,12 @@ private:
 
         //- Make the U field
         void makeU() const;
+
+        //- Make the sigma at quad points field
+        void makeSigmaQuad() const;
+
+        //- Make the gradD at quad points field
+        void makeGradDQuad() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -631,6 +644,28 @@ public:
                 return gradD_;
             }
 
+            //- Return non-const reference to gradD at quadrature points
+            virtual List<List<tensor>>& gradDQuad()
+            {
+		if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return gradDQuadPtr_();
+            }
+
+            //- Return const reference to gradD at quadrature points
+            virtual const List<List<tensor>>& gradDQuad() const
+            {
+		if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return gradDQuadPtr_();
+            }
+
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
             {
@@ -654,6 +689,28 @@ public:
             {
                 return sigma_;
             }
+
+            //- Return non-const reference to sigma
+            virtual List<List<symmTensor>>& sigmaQuad()
+            {
+		if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+		return sigmaQuadPtr_();
+	    }
+
+            //- Return const reference to sigma
+            virtual const List<List<symmTensor>>& sigmaQuad() const
+            {
+		if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+		return sigmaQuadPtr_();
+	    }
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;

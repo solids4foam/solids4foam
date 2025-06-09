@@ -139,6 +139,10 @@ public:
         //- Calculate the surfaceField stress
         virtual void correct(surfaceSymmTensorField& sigma);
 
+        //- To get rid of compiler warning as correct below is not from the
+        //  base class
+        using mechanicalLaw::correct;
+
         //- Calculate the stress using the displacement gradient
         virtual void correct
         (

@@ -301,6 +301,36 @@ void Foam::solidModel::makeU() const
 }
 
 
+void Foam::solidModel::makeSigmaQuad() const
+{
+    if (!sigmaQuadPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeSigmaQuad() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    sigmaQuadPtr_.set
+    (
+        new List<List<symmTensor>>(mesh().nFaces())
+    );
+}
+
+
+void Foam::solidModel::makeGradDQuad() const
+{
+    if (!gradDQuadPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeGradDQuad() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    gradDQuadPtr_.set
+    (
+        new List<List<tensor>>(mesh().nFaces())
+    );
+}
+
+
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 {
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -784,6 +814,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
+    gradDQuadPtr_(),
     sigma_
     (
         IOobject
@@ -797,6 +828,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    sigmaQuadPtr_(),
     curTimeIndex_(-1),
     rhoPtr_(),
     g_

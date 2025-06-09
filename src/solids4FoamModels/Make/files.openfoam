@@ -219,6 +219,7 @@ numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
 numerics/logExpVolFields/logVolFields.C
+numerics/LRE/LRE.C
 numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/meshDual/meshDual.C
 numerics/meshDual/dualMeshToMeshMap.C
@@ -240,11 +241,15 @@ numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
+numerics/hofv/hofvm.C
+numerics/hofv/hofvc.C
 
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
-
+numerics/quadrature/quadrature.C
+numerics/quadrature/triQuadrature.C
+numerics/quadrature/lineQuadrature.C
 
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
