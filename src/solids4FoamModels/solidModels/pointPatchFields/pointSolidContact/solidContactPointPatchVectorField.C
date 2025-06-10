@@ -24,6 +24,7 @@ License
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
 #include "lookupSolidModel.H"
+#include "demandDrivenData.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
