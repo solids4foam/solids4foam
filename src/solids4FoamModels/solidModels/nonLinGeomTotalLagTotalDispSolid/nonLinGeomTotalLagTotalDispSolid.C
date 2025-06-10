@@ -922,16 +922,20 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Divided by bulkModulus form
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
         scalarField pressureResidual
         (
+          - fvc::ddt(omegaTau, p)
           - p/kappa
-          + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-          - fvc::div
-            (
-                (pDiffusivity()/kappaf)*mesh.Sf()
-              & fvc::interpolate(fvc::grad(p))
-            )
-          - 0.5*(pow(J_, 2.0) - 1.0)
+          + fvc::laplacian(omega/sqr(mesh.deltaCoeffs()), p, "laplacian(Dp,p)")
+          // + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+          // - fvc::div
+          //   (
+          //       (pDiffusivity()/kappaf)*mesh.Sf()
+          //     & fvc::interpolate(fvc::grad(p))
+          //   )
+          - 0.5*(pow(J_, 2.0) - 1.0)/J_
         //- tr(gradD())
         );
 
@@ -1013,13 +1017,22 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         //const volScalarField rKappa(1.0/mechanical().bulkModulus());
         const volScalarField rKappa(1.0/kappa);
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
         {
             // Calculate pressure equation matrix
-            const dimensionedScalar one("one", dimless, 1);
+            //const dimensionedScalar one("one", dimless, 1);
             fvScalarMatrix approxPressureJ
             (
+              - fvm::ddt(omegaTau, p)
               - fvm::Sp(rKappa, p)
-              + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+              // + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+              + fvm::laplacian
+                (
+                    omega/sqr(mesh().deltaCoeffs()),
+                    p,
+                    "jacobian-laplacian(rAU,p)"
+                )
             );
 
             // Insert the pressure equation
