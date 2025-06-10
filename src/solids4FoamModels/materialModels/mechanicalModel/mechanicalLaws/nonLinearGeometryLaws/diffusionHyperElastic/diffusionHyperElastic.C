@@ -47,6 +47,9 @@ void Foam::diffusionHyperElastic::updateD() const
     df_ = min(maxFactor_*avDf, max(minFactor_*avDf, df_));
     df_ /= avDf;
     d_ = fvc::average(df_);
+
+    // Enforce zero gradient boundaries
+    d_.correctBoundaryConditions();
 }
 
 
@@ -68,7 +71,19 @@ Foam::diffusionHyperElastic::diffusionHyperElastic
     minFactor_(dict.lookupOrDefault<scalar>("minFactor", 0.1)),
     motionDiffPtr_(motionDiffusivity::New(mesh, dict.lookup("diffusivity"))),
     df_("distf", motionDiffPtr_()()),
-    d_("stiffnessScaleFactor", fvc::average(df_))
+    d_
+    (
+        IOobject
+        (
+            "stiffnessScaleFactor",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        fvc::average(df_),
+        "zeroGradient"
+    )
 {
     // Store old F
     F().storeOldTime();
@@ -80,6 +95,10 @@ Foam::diffusionHyperElastic::diffusionHyperElastic
             << "maxFactor cannot be less than minFactor!" << exit(FatalError);
     }
 
+    // Enforce zero gradient boundaries
+    d_.correctBoundaryConditions();
+
+    // Update D
     updateD();
 
     if (Switch(dict.lookup("writeStiffScaleFactor")))

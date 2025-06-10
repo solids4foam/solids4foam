@@ -118,8 +118,8 @@ newtonIcoFluid::newtonIcoFluid
     ),
     Uf_(),
     rAUfPtr_(),
-    pRefCell_(0),
-    pRefValue_(0),
+    pRefCell_(-1),
+    pRefValue_(0.0),
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -129,20 +129,10 @@ newtonIcoFluid::newtonIcoFluid
         )
     ),
     rho_(laminarTransport_.lookup("rho")),
-    correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
-    checkMeshCourantNo_
-    (
-        pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
-    ),
-    moveMeshOuterCorrectors_
-    (
-        pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
-    ),
-    cumulativeContErr_(0),
     blockSize_(fluidModel::twoD() ? 3 : 4)
 {
-    setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
-    mesh().setFluxRequired(p().name());
+    setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
+    //mesh().setFluxRequired(p().name());
     turbulence_->validate();
 
     U().oldTime().oldTime();
@@ -427,6 +417,17 @@ label newtonIcoFluid::formResidual
         fvc::makeRelative(phi, U);
     }
 
+    // TESTING
+    // Set the flux to zero on walls, including FSI interfaces
+    // makeRelative should do this but mat not work as expected
+    forAll(U.boundaryField(), patchI)
+    {
+        if (mesh.boundaryMesh()[patchI].type() == "wall")
+        {
+            phi.boundaryFieldRef()[patchI] = 0.0;
+        }
+    }
+
     // Copy x into the p field
     scalarField& pI = p;
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
@@ -488,20 +489,53 @@ label newtonIcoFluid::formResidual
     // Fp = stabilisation - div(U)
     //    = stabilisation - tr(grad(U))
     // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
+    const dimensionedScalar omega("omega", fluidProperties());
+    const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
+    const scalar omegaExponent
+    (
+        readScalar(fluidProperties().lookup("omegaExponent"))
+    );
+    const surfaceScalarField localRe
+    (
+        fvc::interpolate(mag(U)/turbulence_->nuEff())/mesh.deltaCoeffs()
+    );
     scalarField pressureResidual
     (
-        fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
-      - fvc::div
+        fvc::laplacian
         (
-            (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+            omega*Foam::pow(1.0 + localRe/localReRef, omegaExponent)
+           /sqr(mesh.deltaCoeffs()),
+            p,
+            "laplacian(rAU,p)"
         )
+      //   fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
+      // - fvc::div
+      //   (
+      //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+      //   )
       // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
       - fvc::div(phi)
       // - fvc::div(U)
     );
 
+    //Info<< "localRe/localReRef = " << max(mag(localRe/localReRef)) << endl;
+
     // Make residual extensive
     pressureResidual *= mesh.V();
+
+    // If required, set pressure reference value
+    if (pRefCell_ != -1)
+    {
+        // Info<< "Setting the pressure residual row for cell " << pRefCell_
+        //     << " to be zero" << endl;
+
+        // Set the residual to zero for the pressure equation in the pRefCell
+        // cell
+        pressureResidual[pRefCell_] = 0.0;
+
+        // Set p in the pRefCell
+        p[pRefCell_] = pRefValue_;
+    }
 
     // Copy the pressureResidual into the f field as the final equation
     foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -693,28 +727,67 @@ label newtonIcoFluid::formResidual
     //
 
     // Update rAUf
-    {
-        const scalar pressureSmoothingCoeff
-        (
-            readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
-        );
-        rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
-    }
+    // {
+    //     const scalar pressureSmoothingCoeff
+    //     (
+    //         readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
+    //     );
+    //     rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
+    // }
 
+    // const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    // const surfaceVectorField gradpf(fvc::interpolate(fvc::grad(p)));
+    // const surfaceScalarField snGradp(fvc::snGrad(p));
+
+    const dimensionedScalar omega("omega", fluidProperties());
+    const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
+    const scalar omegaExponent
+    (
+        readScalar(fluidProperties().lookup("omegaExponent"))
+    );
+    const surfaceScalarField localRe
+    (
+        fvc::interpolate(mag(U)/turbulence_->nuEff())/mesh.deltaCoeffs()
+    );
     scalarField pressureResidual
     (
-        fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
-      - fvc::div
+        fvc::laplacian
         (
-            (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+            omega*Foam::pow(1.0 + localRe/localReRef, omegaExponent)
+           /sqr(mesh.deltaCoeffs()),
+            p,
+            "laplacian(rAU,p)"
         )
-      // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
+        // Reference configuration
+      //   fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
+      // - fvc::div
+      //   (
+      //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
+      //   )
+        // // Deformed configuration
+        // fvc::div
+        // (
+        //     deformedSf & (rAUf()*invFmf.T() & (n*snGradp - gradpf))
+        // )
+        //deformedSf
+        // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
       - fvc::div(phi)
       // - fvc::div(U)
     );
 
     // Make residual extensive
     pressureResidual *= mesh.V();
+
+    // If required, set pressure reference value
+    if (pRefCell_ != -1)
+    {
+        // Set the residual to zero for the pressure equation in the pRefCell
+        // cell
+        pressureResidual[pRefCell_] = pRefValue_;
+
+        // Set p in the pRefCell
+        p[pRefCell_] = pRefValue_;
+    }
 
     // Copy the pressureResidual into the f field as the final equation
     foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -813,25 +886,55 @@ label newtonIcoFluid::formJacobian
     );
 
     // Update rAUf
-    {
-        const scalar pressureSmoothingCoeff
-        (
-            readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
-        );
-        const volScalarField nuEff(turbulence_->nuEff());
-        const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
-        rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
-    }
+    // const scalar pressureSmoothingCoeff
+    // (
+    //     readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
+    // );
+    // {
+    //     const volScalarField nuEff(turbulence_->nuEff());
+    //     const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
+    //     rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
+    // }
+    const dimensionedScalar omega("omega", fluidProperties());
+    const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
+    const scalar omegaExponent
+    (
+        readScalar(fluidProperties().lookup("omegaExponent"))
+    );
+    const surfaceScalarField localRe
+    (
+        fvc::interpolate(mag(U)/turbulence_->nuEff())/mesh.deltaCoeffs()
+    );
 
     // Calculate pressure equation matrix
     fvScalarMatrix pEqn
     (
-        fvm::laplacian(rAUf(), p, "jacobian-laplacian(rAU,p)")
+        // fvm::laplacian(rAUf(), p, "jacobian-laplacian(rAU,p)")
+        fvm::laplacian
+        (
+            omega*Foam::pow(1.0 + localRe/localReRef, omegaExponent)
+           /sqr(mesh.deltaCoeffs()),
+            p,
+            "jacobian-laplacian(rAU,p)"
+        )
     );
 
     if (debug)
     {
         Info<< "Inserting p equation in Afluid" << endl;
+    }
+
+    // If required, set pressure reference value
+    if (pRefCell_ != -1)
+    {
+        // Info<< "Setting the pressure equation row for cell " << pRefCell_
+        //     << " to be diagonal" << endl;
+
+        // Set the off-diagonal to zero for cell pRefCell
+        pEqn.setValues(labelList(1, pRefCell_), 0.0);
+
+        // Set the diagonal to unity for cell pRefCell
+        pEqn.diag()[pRefCell_] = -1.0;
     }
 
     // Insert the pressure equation

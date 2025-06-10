@@ -81,18 +81,6 @@ class newtonIcoFluid
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
 
-        //- Correct phi flag
-        const bool correctPhi_;
-
-        //- Check Courant number flag
-        const bool checkMeshCourantNo_;
-
-        // Move mesh in the outer corrector loop flag
-        const bool moveMeshOuterCorrectors_;
-
-        //- Cumulative continuity errors
-        scalar cumulativeContErr_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
