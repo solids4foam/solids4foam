@@ -281,8 +281,7 @@ Foam::GuccioneElastic::GuccioneElastic
         dict.lookupOrDefault<Switch>("uniformFibreField", false)
     ),
     f0_(makeF0(uniformFibreField_, mesh, dict)),
-    // f0f_(makeF0f(uniformFibreField_, mesh, dict)),
-    f0f_(makeF0f(true, mesh, dict)), // disable f0f
+    f0f_(makeF0f(uniformFibreField_, mesh, dict)),
     s0_
     (
         IOobject
