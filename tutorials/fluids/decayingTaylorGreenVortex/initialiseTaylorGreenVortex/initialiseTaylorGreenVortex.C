@@ -76,8 +76,7 @@ int main(int argc, char *argv[])
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
-        dimensionedVector(dimVelocity, Zero)
+        mesh
     );
 
     // Initialise the pressure field
