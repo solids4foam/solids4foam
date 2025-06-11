@@ -25,6 +25,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "slipFvPatchFields.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -150,6 +151,10 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                 D.boundaryField()[patchI]
             )
          || isA<symmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<slipFvPatchVectorField>
             (
                 D.boundaryField()[patchI]
             )
