@@ -111,7 +111,7 @@ functions
             // Lookup U
             const auto& U = mesh().lookupObject<volVectorField>("U");
 
-            // Calcalulate the average 
+            // Calcalulate the average
             // Calculate the error
             const vectorField diff(U - exactU);
             const scalar errorL1(gAverage(mag(diff)));
