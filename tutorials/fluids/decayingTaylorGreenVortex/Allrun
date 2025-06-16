@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Build the utility for initialising the solution
+wmake initialiseTaylorGreenVortex
+
+# Copy 0.orig to 0
+restore0Dir
+
+# Create the mesh
+runApplication blockMesh
+
+# Initialie the velocity and pressure initial fields with the analytical
+# solutions
+runApplication initialiseTaylorGreenVortex
+
+# Run the solver
+runApplication solids4Foam

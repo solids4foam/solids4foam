@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    walls
+    {
+        type            zeroGradient;
+
+        // type            codedFixedValue;
+        // name            decayingTaylorGreenVortexPressure;
+
+        // code
+        // #{
+        //     const scalar Re = 10;
+        //     const scalar t = db().time().value();
+        //     const scalar pi = constant::mathematical::pi;
+        //     const scalar A = Foam::exp(-4.0*sqr(pi)*t/Re);
+
+        //     const scalarField x(patch().Cf().component(vector::X));
+        //     const scalarField y(patch().Cf().component(vector::Y));
+
+        //     const scalarField pressure
+        //     (
+        //         A*0.25*(Foam::cos(2*pi*x) + Foam::cos(2*pi*y))
+        //     );
+
+        //     operator==(pressure);
+        // #};
+
+        // value           uniform 0;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,40 @@
+# Nonlinear solver
+-snes_type newtonls
+#-snes_linesearch_type basic
+-snes_linesearch_type l2
+#-snes_rtol 1e-3
+#-snes_stol 1e-3
+-snes_max_it 1000
+-snes_monitor
+-snes_converged_reason
+#-snes_view
+
+# Calculate the Jacobian using matrix-free finite differencing
+-snes_mf
+-snes_mf_operator
+
+# Allow linear solver to fail
+-snes_max_linear_solve_fail 10000000
+
+# Increase the number of allowed function evaluations
+-snes_max_funcs 100000000
+
+# Linear solver
+-ksp_type lgmres
+-ksp_gmres_restart 400
+#-ksp_gmres_restart 500
+#-ksp_rtol 1e-3
+#-ksp_monitor
+#-ksp_view
+-ksp_converged_reason
+-ksp_max_it 400
+
+# Preconditioner - LU
+# Good for small/medium cases but will require large amounts of memory for
+# larger models
+-pc_type bjacobi
+-sub_pc_type lu
+
+# Construct the precondioner once and store it since it does not change
+#-snes_lag_preconditioner_persists true
+#-snes_lag_preconditioner -2
