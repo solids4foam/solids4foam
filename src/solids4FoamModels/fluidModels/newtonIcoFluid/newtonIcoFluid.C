@@ -514,10 +514,9 @@ label newtonIcoFluid::formResidual
       //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
       //   )
       // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
-      - fvc::div(phi)
-      // - fvc::div(U)
+        //- fvc::div(phi) // wrong! should be velocity!
+      - fvc::div(U)
     );
-
     //Info<< "localRe/localReRef = " << max(mag(localRe/localReRef)) << endl;
 
     // Make residual extensive
@@ -771,8 +770,8 @@ label newtonIcoFluid::formResidual
         // )
         //deformedSf
         // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
-      - fvc::div(phi)
-      // - fvc::div(U)
+        //- fvc::div(phi) // wrong! should be velocity!
+      - fvc::div(U)
     );
 
     // Make residual extensive
