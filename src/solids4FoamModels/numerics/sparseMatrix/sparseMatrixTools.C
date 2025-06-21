@@ -476,8 +476,8 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // off-core). For now, we will just use the max on-core non-zeros to
     // initialise not-owned values
 
-    int* d_nnz = (int*)malloc(n*sizeof(int));
-    int* o_nnz = (int*)malloc(n*sizeof(int));
+    label* d_nnz = (label*)malloc(n*sizeof(*d_nnz));
+    label* o_nnz = (label*)malloc(n*sizeof(*o_nnz));
     // label d_nnz[n];
     // label o_nnz[n];
     label d_nz = 0;
@@ -1061,8 +1061,8 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // off-core). For now, we will just use the max on-core non-zeros to
     // initialise not-owned values
 
-    int* d_nnz = (int*)malloc(n*sizeof(int));
-    int* o_nnz = (int*)malloc(n*sizeof(int));
+    label* d_nnz = (label*)malloc(n*sizeof(*d_nnz));
+    label* o_nnz = (label*)malloc(n*sizeof(*o_nnz));
     // label d_nnz[n];
     // label o_nnz[n];
     label d_nz = 0;

@@ -221,8 +221,8 @@ PetscErrorCode formJacobian
     for (auto iter = data.begin(); iter != data.end(); ++iter)
     {
         const Foam::tensor& coeff = iter();
-        const int blockRowI = localToGlobalPointMap[iter.key()[0]];
-        const int blockColI = localToGlobalPointMap[iter.key()[1]];
+        const Foam::label blockRowI = localToGlobalPointMap[iter.key()[0]];
+        const Foam::label blockColI = localToGlobalPointMap[iter.key()[1]];
 
         if (twoD)
         {
@@ -998,11 +998,11 @@ bool vertexCentredLinGeomSolid::evolveSnes()
 
     // Count the number of non-zeros
     // TODO: fix for parallel
-    int* d_nnz = (int*)malloc(n*sizeof(int));
-    int* o_nnz = (int*)malloc(n*sizeof(int));
+    label* d_nnz = (label*)malloc(n*sizeof(*d_nnz));
+    label* o_nnz = (label*)malloc(n*sizeof(*o_nnz));
     // label d_nnz[n];
     // label o_nnz[n];
-    int d_nz = 0;
+    label d_nz = 0;
     Foam::sparseMatrixTools::setNonZerosPerRow
     (
         d_nnz,
