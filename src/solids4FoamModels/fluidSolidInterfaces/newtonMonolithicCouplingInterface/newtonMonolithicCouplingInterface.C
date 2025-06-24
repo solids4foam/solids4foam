@@ -243,8 +243,8 @@ label newtonMonolithicCouplingInterface::initialiseAfm
     // Allocate per-scalar-row nonzeros
     // d is initialised to 1 to count the diagonal
     // while o is initialised to 0
-    std::vector<int> d_nnz(scalarRowN, fluidBlockSize);
-    std::vector<int> o_nnz(scalarRowN, 0);
+    std::vector<label> d_nnz(scalarRowN, fluidBlockSize);
+    std::vector<label> o_nnz(scalarRowN, 0);
 
     // Count neighbours sharing an internal face
     const Foam::labelUList& own = fluidMesh.owner();
@@ -368,8 +368,8 @@ label newtonMonolithicCouplingInterface::initialiseAms
     const label scalarRowN = fluidMesh.nCells()*motionBlockSize;
 
     // Allocate per-scalar-row nonzeros, initialised to 0
-    std::vector<int> d_nnz(scalarRowN, 0);
-    std::vector<int> o_nnz(scalarRowN, 0);
+    std::vector<label> d_nnz(scalarRowN, 0);
+    std::vector<label> o_nnz(scalarRowN, 0);
 
     // Set non-zeros for each interface fluid cells
     const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
@@ -455,8 +455,8 @@ label newtonMonolithicCouplingInterface::initialiseAsf
     const label scalarRowN = solidMesh.nCells()*solidBlockSize;
 
     // Allocate per-scalar-row nonzeros, initialised to 0
-    std::vector<int> d_nnz(scalarRowN, 0);
-    std::vector<int> o_nnz(scalarRowN, 0);
+    std::vector<label> d_nnz(scalarRowN, 0);
+    std::vector<label> o_nnz(scalarRowN, 0);
 
     // Set non-zeros for each interface solid cells
     const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();

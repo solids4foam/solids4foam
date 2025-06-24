@@ -190,10 +190,10 @@ Foam::label Foam::initialiseJacobian
     // Note: we assume a compact stencil, i.e. face only face neighbours
 
     // Number of on-processor non-zeros per row
-    int* d_nnz = (int*)malloc(blockn*sizeof(int));
+    label* d_nnz = (label*)malloc(blockn*sizeof(*d_nnz));
 
     // Number of off-processor non-zeros per row
-    int* o_nnz = (int*)malloc(blockn*sizeof(int));
+    label* o_nnz = (label*)malloc(blockn*sizeof(*o_nnz));
 
     // Initialise d_nnz to one and o_nnz to zero
     for (int i = 0; i < blockn; ++i)
