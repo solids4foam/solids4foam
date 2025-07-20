@@ -16,19 +16,18 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Function
-    triQuadrature
+    tetQuadrature
 
 Description
-    Quadrature for triangle
+    Quadrature for tetrahedra shape
 
     Source:
-    D. A. Dunavant,
-    High degree efficient symmetrical Gaussian quadrature rule for the triangle.
-    International Journal for Numerical Methods in Engineering,
-    21(6):1129–1148, jun 1985.
+    Lee Shunn, Frank Ham,
+    Symmetric quadrature rules for terahedra based on a cubic close-packed
+    lattice arrangement, Journal of Computational and Applied Mathematics, 2012
 
 SourceFile
-    triQuadrature.C
+    tetQuadrature.C
 
 Author
     Ivan Batistic, UCD. All rights reserved.
@@ -37,12 +36,12 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef triQuadrature_H
-#define triQuadrature_H
+#ifndef tetQuadrature_H
+#define tetQuadrature_H
 
-#include "triPoints.H"
+#include "tetPoints.H"
+#include "barycentric.H"
 #include "quadrature.H"
-#include "barycentric2D.H"
 #include "Tuple2.H"
 #include "vectorList.H"
 #include "scalarList.H"
@@ -53,10 +52,10 @@ Author
 namespace Foam
 {
 
-class triQuadrature
+class tetQuadrature
 :
     public quadrature,
-    public triPoints
+    public tetPoints
 {
 
     // Private data
@@ -72,18 +71,18 @@ class triQuadrature
         //- Map integration points from barycentric to cartesian coordinates
         tmp<Field<point>> barycentricToPoint
 	(
-	     const List<barycentric2D>& localPts
+	    const List<barycentric>& localPts
 	) const;
 
     // Static data
 
         //- Maximum order of accuracy when integrating polynomials
-        static constexpr label maxSupportedOrder = 10;
+        static constexpr label maxSupportedOrder = 6;
 
         //- Quadrature rules storage
         struct quadratureRule
         {
-            List<barycentric2D> points;
+            List<barycentric> points;
             List<scalar> weights;
         };
 
@@ -101,7 +100,7 @@ class triQuadrature
 public:
 
     // Constructors
-    triQuadrature(const triPoints& pts, const label& order);
+    tetQuadrature(const tetPoints& pts, const label& order);
 
     // Member Functions
 

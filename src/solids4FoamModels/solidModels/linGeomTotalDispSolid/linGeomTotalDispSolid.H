@@ -94,11 +94,11 @@ class linGeomTotalDispSolid
 
         //- Calculate complete Jacobian using high order, only used in
         //  combination with PETSC_SNES
-        const Switch highOrderJacobian_;
+        Switch highOrderJacobian_;
 
         //- High order residual calculation, only used in combination
         //  with PETSC_SNES
-        const Switch highOrderResidual_;
+        Switch highOrderResidual_;
 
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;

@@ -247,7 +247,9 @@ numerics/hofv/hofvc.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
+
 numerics/quadrature/quadrature.C
+numerics/quadrature/tetQuadrature.C
 numerics/quadrature/triQuadrature.C
 numerics/quadrature/lineQuadrature.C
 

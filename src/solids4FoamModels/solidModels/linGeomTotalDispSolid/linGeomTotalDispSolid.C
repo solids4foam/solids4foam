@@ -674,20 +674,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
-    highOrderJacobian_
-    (
-        solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
-	(
-	    "highOrderJacobian", true
-	)
-    ),
-    highOrderResidual_
-    (
-        solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
-	(
-	    "highOrderResidual", true
-	)
-    ),
+    highOrderJacobian_(false),
+    highOrderResidual_(false),
     ds_
     (
         IOobject
@@ -713,6 +701,21 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     mechanical().grad(D(), gradD());
 
     Info<< "solvePressure = " << solvePressure() << endl;
+
+    if (solidModelDict().found("highOrderCoeffs"))
+    {
+	highOrderJacobian_ =
+	    solidModelDict().subDict("highOrderCoeffs").get<Switch>
+	    (
+	         "highOrderJacobian"
+	     );
+
+	highOrderResidual_ =
+	    solidModelDict().subDict("highOrderCoeffs").get<Switch>
+	    (
+	        "highOrderResidual"
+	    );
+    }
 
     if (solvePressure())
     {
