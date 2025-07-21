@@ -925,11 +925,15 @@ void LRE::calcQRCoeffs() const
 
             // Weight using radially symmetric exponential function
             const scalar sqrK = -pow(k_,2);
-            const scalar w =
+            scalar w =
                 (
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
+	    if (w < SMALL)
+	    {
+		w = 0.0;
+	    }
             W.diagonal()[cI] = w;
         }
 
@@ -1199,11 +1203,15 @@ void LRE::calcGlobalQRCoeffs() const
 
             // Weight using radially symmetric exponential function
             const scalar sqrK = -pow(k_,2);
-            const scalar w =
+            scalar w =
                 (
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
+	    if (w < SMALL)
+	    {
+		w = 0.0;
+	    }
             W.diagonal()[cI] = w;
         }
 
@@ -1470,11 +1478,15 @@ void LRE::calcGlobalQRFaceCoeffs() const
 
             // Weight using radially symmetric exponential function
             const scalar sqrK = -pow(k_,2);
-            const scalar w =
+            scalar w =
                 (
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
+	    if (w < SMALL)
+	    {
+		w = 0.0;
+	    }
             W.diagonal()[cI] = w;
         }
 
@@ -1793,10 +1805,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
                 // Weight using radially symmetric exponential function
                 const scalar sqrK = -pow(k_,2);
-                const scalar w =
+                scalar w =
                     (
                         Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                     )/(1 - exp(sqrK));
+
+		if (w < SMALL)
+		{
+		    w = 0.0;
+		}
 
                 W.diagonal()[cI] = w;
 
@@ -2074,11 +2091,15 @@ void LRE::calcCholeskyCoeffs() const
 
             // Weight using radially symmetric exponential function
             const scalar sqrK = -pow(k_,2);
-            const scalar w =
+            scalar w =
                 (
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
+	    if (w < SMALL)
+	    {
+		w = 0.0;
+	    }
             W.diagonal()[cI] = w;
         }
 
@@ -2306,11 +2327,15 @@ void LRE::calcGlobalCholeskyCoeffs() const
 
             // Weight using radially symmetric exponential function
             const scalar sqrK = -pow(k_,2);
-            const scalar w =
+            scalar w =
                 (
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
+	    if (w < SMALL)
+	    {
+		w = 0.0;
+	    }
             W.diagonal()[cI] = w;
         }
 
