@@ -2446,6 +2446,24 @@ void LRE::calcQuadPointsAndWeights2D() const
 	    {
 		fQP.setSize(0);
 		fQPW.setSize(0);
+
+		// Quick check
+		{
+		    // Causing crash. Not initialised at this stage?
+		    //const vectorField pNormal(mesh.boundary()[patchID].nf());
+
+		    vector patchNormal = pp[0].normal(pts);
+		    patchNormal /= mag(patchNormal);
+
+		    scalar aligment = mag(mag(emptyDir & patchNormal) - 1.0);
+
+		    if (aligment > SMALL)
+		    {
+			FatalErrorInFunction
+			    << "Wrong empty direction. Empty direction should "
+			    << "be (0,0,1)" << exit(FatalError);
+		    }
+		}
 		continue;
 	    }
 	    // Stop in case of wedge, implementation is done only for 2D
@@ -2536,47 +2554,80 @@ void LRE::calcQuadPointsAndWeights3D() const
     // We have two options (N-number of face points):
     //                      - central point triangulation (N triangles)
     //                      - fan triangulation (N-2 triangles)
-    // Here we will choose fan triangulation to reduce the number of quadrature
-    // points per face.
-    const bool centralPointTriangulation = true;
+    // We will use fan triangulation for face decomposition. In the case that
+    // resulting faces are small or invalid we will switch to more robust
+    // central point decomposition (for each face separately).
+    // Instead of central decomposition, the alternative is interior constrained
+    // Delanuay triangulation which is much more complex to implement.
+    // Note: We are using fan triangulation from face.H class which is smart
+    // and adaptive triangulation
 
     // Triangulate each face and store points of each triangle
     List<List<triPoints>> faceTri(mesh.nFaces());
 
-    // initialise sub-list sizes
-    forAll(faceGP, i)
+    for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
     {
-        List<point>& fGP = faceGP[i];
-        List<scalar>& fGPW = faceGPW[i];
-        List<triPoints>& fT = faceTri[i];
+	const face& f = mesh.faces()[faceI];
+	const label nTri = f.nTriangles();
+	const label nPoints = f.size();
 
-        if (centralPointTriangulation)
-        {
-	    fGP.setSize(mesh.faces()[i].size()*triQuadrature::nPoints(N_));
-	    fGPW.setSize(mesh.faces()[i].size()*triQuadrature::nPoints(N_));
-	    fT.setSize(mesh.faces()[i].size());
-        }
-        else
-        {
-	    fGP.setSize((mesh.faces()[i].size()-2)*triQuadrature::nPoints(N_));
-	    fGPW.setSize((mesh.faces()[i].size()-2)*triQuadrature::nPoints(N_));
-            fT.setSize(mesh.faces()[i].size() - 2);
-        }
-    }
+	// Initialise sub-list sizes
+        List<point>& fGP = faceGP[faceI];
+        List<scalar>& fGPW = faceGPW[faceI];
+        List<triPoints>& fT = faceTri[faceI];
 
-    // Loop over faces and decompose each face, store triangles of each face
-    if (centralPointTriangulation)
-    {
-	// Triangulation using central point
-        for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
-        {
-            const face& f = mesh.faces()[faceI];
+	fGP.setSize(nTri*triQuadrature::nPoints(N_));
+	fGPW.setSize(nTri*triQuadrature::nPoints(N_));
+	fT.setSize(nTri);
 
+	// Have face triangulate itself (results in faceList)
+	faceList triFaces(nTri);
+
+	label nTmp = 0;
+	f.triangles(mesh.points(), nTmp, triFaces);
+
+	// Copy into faceTri list
+	forAll(triFaces, triFaceI)
+	{
+	    const face& triF = triFaces[triFaceI];
+
+	    // Store face (triangle) as triPoints object in faceTri list
+	    faceTri[faceI][triFaceI] =
+		triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
+	}
+
+	// Check triangulation and perform central point triangulation if needed
+	bool validDecomposition = true;
+	{
+	    const scalar faceArea = f.mag(pts);
+	    forAll(faceTri[faceI], triI)
+	    {
+		const scalar triArea = mag(faceTri[faceI][triI].areaNormal());
+	        const scalar areaRatio = triArea / faceArea;
+
+		if (areaRatio < 0.1)
+		{
+		    validDecomposition = false;
+
+		    WarningInFunction
+			<< "Swiching to central point triangulation for face"
+			<< faceI << " at " << mesh.faceCentres()[faceI]
+			<< endl;
+		}
+	    }
+	}
+
+	if (!validDecomposition)
+	{
+	    // Resise sub-list sizes
+	    faceGP[faceI].setSize(nPoints*triQuadrature::nPoints(N_));
+	    faceGPW[faceI].setSize(nPoints*triQuadrature::nPoints(N_));
+	    faceTri[faceI].setSize(nPoints);
+
+	    // Triangulation using central point
             const point fc = f.centre(pts);
 
-            const label nPoints = f.size();
-
-            label nextpI;
+	    label nextpI;
             for (label pI = 0; pI<nPoints; ++pI)
             {
                 if (pI < f.size() - 1)
@@ -2597,36 +2648,6 @@ void LRE::calcQuadPointsAndWeights3D() const
 
                 faceTri[faceI][pI] = tri;
             }
-        }
-    }
-    else
-    {
-	// Fan triangulation
-        for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
-        {
-            const face& f = mesh.faces()[faceI];
-            const label nPoints = f.size();
-
-	    // baseID is point label for triangulation. Here we can incorporate
-	    // some algorithm to chose the optimal point dor triangulation
-	    const label baseID = 0;
-
-	    for (label pI = 0; pI < nPoints; ++pI)
-	    {
-		label a = (baseID + 1 + pI) % nPoints;
-		label b = (baseID + 2 + pI) % nPoints;
-
-		if (b == baseID) break;
-
-		const triPoints tri
-		(
-		    pts[f[a]],
-		    pts[f[b]],
-		    pts[f[baseID]]
-		);
-
-		faceTri[faceI][pI] = tri;
-	    }
 	}
     }
 
