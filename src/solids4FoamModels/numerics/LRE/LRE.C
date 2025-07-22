@@ -2440,23 +2440,6 @@ void LRE::calcQuadPointsAndWeights2D() const
 		fQP.setSize(0);
 		fQPW.setSize(0);
 
-		// Quick check
-		{
-		    // Causing crash. Not initialised at this stage?
-		    //const vectorField pNormal(mesh.boundary()[patchID].nf());
-
-		    vector patchNormal = pp[0].normal(pts);
-		    patchNormal /= mag(patchNormal);
-
-		    scalar aligment = mag(mag(emptyDir & patchNormal) - 1.0);
-
-		    if (aligment > SMALL)
-		    {
-			FatalErrorInFunction
-			    << "Wrong empty direction. Empty direction should "
-			    << "be (0,0,1)" << exit(FatalError);
-		    }
-		}
 		continue;
 	    }
 	    // Stop in case of wedge, implementation is done only for 2D
