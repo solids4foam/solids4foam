@@ -62,6 +62,18 @@ namespace Foam
 
 class LRE
 {
+public:
+        //- Weight functions
+        enum weightFunction
+	{
+	    ONE,
+	    RAD_SYMM_EXP
+	};
+
+	//- Weight funtions names
+        static const Enum<weightFunction> weightFunctionNames_;
+
+private:
     // Private data
 
         //- Const reference to the mesh
@@ -78,6 +90,9 @@ class LRE
 
         //- Kernel shape parameter
         const scalar k_;
+
+        //- Weight function
+        const weightFunction weightFunction_;
 
         //- Maxium stencil size: used for initialising dynamic lists
         const label maxStencilSize_;
@@ -171,6 +186,15 @@ class LRE
         //- Return the least squares global cell stencils
         const labelListList& globalCellStencils() const;
 
+        //- Weight using radially symmetric exponential function
+        scalar radiallySymmetricExponentialWeight
+	(
+	     const scalar d,
+	     const scalar maxDist
+	) const;
+
+        //- Weight funtcion
+        scalar weight(const scalar d, const scalar maxDist) const;
 
         //- Calculate exponents for the Tayler series expansion terms
         void generateExponents
@@ -279,6 +303,12 @@ public:
 
 
     // Member Functions
+
+            //- Const access tot he weight function enum
+            const weightFunction& weightFunc() const
+            {
+		return weightFunction_;
+	    }
 
             //- Return order of accuracy
             label order() const {return N_;};

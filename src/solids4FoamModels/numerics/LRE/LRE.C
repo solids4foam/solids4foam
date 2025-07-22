@@ -36,6 +36,12 @@ namespace Foam
 
 defineTypeNameAndDebug(LRE, 0);
 
+const Enum<LRE::weightFunction> LRE::weightFunctionNames_
+({
+    {LRE::weightFunction::ONE, "one"},
+    {LRE::weightFunction::RAD_SYMM_EXP, "radiallySymmetricExponential"},
+});
+
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
@@ -726,6 +732,53 @@ const labelListList& LRE::globalFaceStencils() const
 }
 
 
+scalar LRE::radiallySymmetricExponentialWeight
+(
+    const scalar d,
+    const scalar maxDist
+) const
+{
+    // Smoothing length
+    const scalar dm = 2*maxDist;
+
+    const scalar sqrK = -sqr(k_);
+
+    scalar w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
+
+    // Clip small negative value
+    if (w < SMALL)
+    {
+	w = 0.0;
+    }
+
+    return w;
+}
+
+
+scalar LRE::weight(const scalar d, const scalar maxDist) const
+{
+    if (weightFunc() == weightFunction::ONE)
+    {
+	return 1.0;
+    }
+    else if (weightFunc() == weightFunction::RAD_SYMM_EXP)
+    {
+	return radiallySymmetricExponentialWeight(d, maxDist);
+    }
+    else
+    {
+        FatalErrorIn("void LRE::weight(const scalar d, const scalar maxDist)")
+            << "Unrecognised weight function. Available options are "
+            << LRE::weightFunctionNames_[LRE::weightFunction::ONE]
+	    << LRE::weightFunctionNames_[LRE::weightFunction::RAD_SYMM_EXP]
+            << endl;
+    }
+
+    // Keep compiler happy
+    return true;
+}
+
+
 void LRE::generateExponents
 (
     const label N,
@@ -920,21 +973,7 @@ void LRE::calcQRCoeffs() const
                 d = mag(neiC - C);
             }
 
-            // Smoothing length
-            const scalar dm = 2*maxDist;
-
-            // Weight using radially symmetric exponential function
-            const scalar sqrK = -pow(k_,2);
-            scalar w =
-                (
-                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                )/(1 - exp(sqrK));
-
-	    if (w < SMALL)
-	    {
-		w = 0.0;
-	    }
-            W.diagonal()[cI] = w;
+	    W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -1198,21 +1237,7 @@ void LRE::calcGlobalQRCoeffs() const
                 d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
             }
 
-            // Smoothing length
-            const scalar dm = 2*maxDist;
-
-            // Weight using radially symmetric exponential function
-            const scalar sqrK = -pow(k_,2);
-            scalar w =
-                (
-                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                )/(1 - exp(sqrK));
-
-	    if (w < SMALL)
-	    {
-		w = 0.0;
-	    }
-            W.diagonal()[cI] = w;
+	    W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -1473,21 +1498,7 @@ void LRE::calcGlobalQRFaceCoeffs() const
                 d = mag(globalCI[neiGlobalCellID] - curCf);
             }
 
-            // Smoothing length
-            const scalar dm = 2*maxDist;
-
-            // Weight using radially symmetric exponential function
-            const scalar sqrK = -pow(k_,2);
-            scalar w =
-                (
-                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                )/(1 - exp(sqrK));
-
-	    if (w < SMALL)
-	    {
-		w = 0.0;
-	    }
-            W.diagonal()[cI] = w;
+	    W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -1800,22 +1811,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     d = mag(globalCI[neiGlobalCellID] - curGP);
                 }
 
-                // Smoothing length
-                const scalar dm = 2*maxDist;
-
-                // Weight using radially symmetric exponential function
-                const scalar sqrK = -pow(k_,2);
-                scalar w =
-                    (
-                        Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                    )/(1 - exp(sqrK));
-
-		if (w < SMALL)
-		{
-		    w = 0.0;
-		}
-
-                W.diagonal()[cI] = w;
+		W.diagonal()[cI] = weight(d, maxDist);
 
                 // Add ghost point manually in second from last iteration
                 // and skip last iteration for ghostPoint
@@ -2086,21 +2082,7 @@ void LRE::calcCholeskyCoeffs() const
                 d = mag(neiC - C);
             }
 
-            // Smoothing length
-            const scalar dm = 2*maxDist;
-
-            // Weight using radially symmetric exponential function
-            const scalar sqrK = -pow(k_,2);
-            scalar w =
-                (
-                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                )/(1 - exp(sqrK));
-
-	    if (w < SMALL)
-	    {
-		w = 0.0;
-	    }
-            W.diagonal()[cI] = w;
+	    W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -2322,21 +2304,7 @@ void LRE::calcGlobalCholeskyCoeffs() const
                 d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
             }
 
-            // Smoothing length
-            const scalar dm = 2*maxDist;
-
-            // Weight using radially symmetric exponential function
-            const scalar sqrK = -pow(k_,2);
-            scalar w =
-                (
-                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-                )/(1 - exp(sqrK));
-
-	    if (w < SMALL)
-	    {
-		w = 0.0;
-	    }
-            W.diagonal()[cI] = w;
+	    W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -2909,6 +2877,7 @@ LRE::LRE
     N_(readInt(dict.lookup("N"))),
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
+    weightFunction_(weightFunctionNames_.get("weightFunction", dict)),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
     globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),

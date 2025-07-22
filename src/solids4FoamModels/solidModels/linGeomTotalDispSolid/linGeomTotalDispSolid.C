@@ -705,15 +705,15 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     if (solidModelDict().found("highOrderCoeffs"))
     {
 	highOrderJacobian_ =
-	    solidModelDict().subDict("highOrderCoeffs").get<Switch>
+	    solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
 	    (
-	         "highOrderJacobian"
-	     );
+	        "highOrderJacobian", false
+	    );
 
 	highOrderResidual_ =
-	    solidModelDict().subDict("highOrderCoeffs").get<Switch>
+	    solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
 	    (
-	        "highOrderResidual"
+	        "highOrderResidual", false
 	    );
     }
 
