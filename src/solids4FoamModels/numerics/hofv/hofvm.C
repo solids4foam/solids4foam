@@ -542,6 +542,9 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
     // Face quadrature points weights
     const List<List<scalar>>& facesQuadWeights = lre.faceGaussPointsWeight();
 
+    // Face quadrature points
+    const List<List<point>>& faceQuadPoints = lre.faceGaussPoints();
+
     // Faces stencil
     const List<labelList>& stencils = lre.globalFaceStencils();
 
@@ -674,13 +677,26 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 		        	quadPointW,
 		        	cellGradCoeff,
 		        	faceNormal
-		            );
+			     );
+			{
+			    Info<<"Modified for MMS case"<<__FILE__<<__LINE__<<endl;
+			    const label start = mesh.boundaryMesh()[patchI].start();
+			    const point qp = faceQuadPoints[faceI+start][pointI];
+			    const vector qpDisp = vector
+				(
+				    Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
+				    Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
+				    0.0
+				);
 
-                        source[owner[faceID]] -=
-		            coeff & D.boundaryField()[patchI][faceI];
+			    source[owner[faceID]] -= coeff & qpDisp;
+
+			}
+                        //source[owner[faceID]] -=
+		        //    coeff & D.boundaryField()[patchI][faceI];
 		    }
- 	        }
-	    }
+		}
+ 	    }
 	}
 	else
 	{

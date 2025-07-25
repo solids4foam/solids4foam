@@ -542,6 +542,12 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 	// Add boundary traction to source. Traction faces are skipped
 	// when assembling matrix
 	hofvm::addTractionBoundaries(source, mesh(), D());
+
+#ifdef OPENFOAM_COM
+	// Add optional fvOptions, e.g. MMS body force
+	// Note that "source()" is already multiplied by the volumes
+	source -= fvOptions()(ds_, const_cast<volVectorField&>(D()))().source();
+#endif
     }
 
     if (debug > 1)
