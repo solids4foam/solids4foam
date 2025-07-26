@@ -196,6 +196,9 @@ private:
         //- Weight funtcion
         scalar weight(const scalar d, const scalar maxDist) const;
 
+        //- Return minimum number of points in stencil for order N_
+        label minNn() const;
+
         //- Calculate exponents for the Tayler series expansion terms
         void generateExponents
         (
