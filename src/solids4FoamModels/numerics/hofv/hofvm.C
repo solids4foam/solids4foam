@@ -678,22 +678,37 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 		        	cellGradCoeff,
 		        	faceNormal
 			     );
-			{
-			    Info<<"Modified for MMS case"<<__FILE__<<__LINE__<<endl;
-			    const label start = mesh.boundaryMesh()[patchI].start();
+
+			vector disp = D.boundaryField()[patchI][faceI];
+
+			// Hard-coded for manufactured solution cases
+			if (D.boundaryField()[patchI].type() == "manufacturedSolution")
+		        {
 			    const point qp = faceQuadPoints[faceI+start][pointI];
-			    const vector qpDisp = vector
-				(
-				    Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
-				    Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
-				    0.0
-				);
 
-			    source[owner[faceID]] -= coeff & qpDisp;
-
+			    if (mesh.nGeometricD() == 2)
+			    {
+				// 2D MMS case
+				disp = vector
+				    (
+				        Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
+				        Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
+				        0.0
+				    );
+			    }
+			    else
+			    {
+				// 3D MMS case
+				disp = vector
+				    (
+				        Foam::log(qp.x()+3.0)*qp.y()*(qp.z()+1.0)+Foam::exp(qp.z()),
+					Foam::sin(qp.y()*qp.z()) + 3.0*qp.y(),
+					Foam::exp(qp.x()*qp.z())*qp.y() - 4.0*Foam::cos(qp.z())
+				    );
+			    }
 			}
-                        //source[owner[faceID]] -=
-		        //    coeff & D.boundaryField()[patchI][faceI];
+
+                        source[owner[faceID]] -= coeff & disp;
 		    }
 		}
  	    }

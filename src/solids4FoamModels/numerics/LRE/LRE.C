@@ -483,7 +483,7 @@ void LRE::makeGlobalFaceStencils() const
 	const labelList& owner = mesh.faceOwner();
 	const pointField& cellCentres = mesh.C();
 
-	label Nn_ = 10 + minNn();
+	label Nn = Nn_ + minNn();
 
 	// Avoid bounding box error in case of 2D cases
 	treeBoundBox bb(cellCentres);
@@ -514,7 +514,7 @@ void LRE::makeGlobalFaceStencils() const
 	    {
 		candidates = octree.findSphere(faceCentre, sphereR);
 
-		if (candidates.size() >= Nn_ || sphereR >= maxRadiusSqr)
+		if (candidates.size() >= Nn || sphereR >= maxRadiusSqr)
 		{
 		    break;
 		}
@@ -545,7 +545,7 @@ void LRE::makeGlobalFaceStencils() const
 	    );
 
 	    label n    = distList.size();
-	    label nMin = min(n, Nn_);
+	    label nMin = min(n, Nn);
 
 	    // Get sphere radius for last point
 	    scalar sphereRadius = distList[nMin-1].second();
@@ -2982,7 +2982,8 @@ LRE::LRE
     mesh_(mesh),
     includePatchInStencils_(includePatchInStencils),
     N_(readInt(dict.lookup("N"))),
-    nLayers_(readInt(dict.lookup("nLayers"))),
+    nLayers_(dict.getOrDefault<int>("nLayers", 3)),
+    Nn_(readInt(dict.lookup("Nn"))),
     k_(readScalar(dict.lookup("k"))),
     weightFunction_(weightFunctionNames_.get("weightFunction", dict)),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
@@ -3299,10 +3300,43 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
                             // point (boundary value) in stencil
                             if (ghostPoint && cI == Nn-2)
                             {
-                               const label localFaceI = faceI - pp.start();
+                                const label localFaceI = faceI - pp.start();
+			        vector disp = D.boundaryField()[patchID][localFaceI];
 
-                               gradDGP[faceI][pointI] +=
-                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*D.boundaryField()[patchID][localFaceI];
+			        // Hardcoded for manufactured solution cases
+				// This should be in boundary condition, but
+				// this is part of external case library, so
+				// I will leave it like this, for now.
+				if (D.boundaryField()[patchID].type() == "manufacturedSolution")
+				{
+				    const point qp = faceGP[faceI][pointI];
+
+				    if (mesh_.nGeometricD() == 2)
+				    {
+					// 2D MMS case
+					disp = vector
+					    (
+					        Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
+						Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
+						0.0
+					    );
+				    }
+				    else
+				    {
+					// 3D MMS case
+					disp = vector
+					    (
+					        Foam::log(qp.x()+3.0)*qp.y()*(qp.z()+1.0)+Foam::exp(qp.z()),
+					        Foam::sin(qp.y()*qp.z()) + 3.0*qp.y(),
+					        Foam::exp(qp.x()*qp.z())*qp.y() - 4.0*Foam::cos(qp.z())
+					    );
+				    }
+
+				}
+
+				gradDGP[faceI][pointI] +=
+                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*disp;
+
                                break;
                             }
                         }
@@ -3338,9 +3372,37 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
                             if (ghostPoint && cI == Nn-2)
                             {
                                const label localFaceI = faceI - pp.start();
+			       vector disp = D.boundaryField()[patchID][localFaceI];
+				if (D.boundaryField()[patchID].type() == "manufacturedSolution")
+				{
+				    const point qp = faceGP[faceI][pointI];
 
-                               gradDGP[faceI][pointI] +=
-                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*D.boundaryField()[patchID][localFaceI];
+				    if (mesh_.nGeometricD() == 2)
+				    {
+					// 2D MMS case
+					disp = vector
+					    (
+					        Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
+						Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
+						0.0
+					    );
+				    }
+				    else
+				    {
+					// 3D MMS case
+					disp = vector
+					    (
+					        Foam::log(qp.x()+3.0)*qp.y()*(qp.z()+1.0)+Foam::exp(qp.z()),
+					        Foam::sin(qp.y()*qp.z()) + 3.0*qp.y(),
+					        Foam::exp(qp.x()*qp.z())*qp.y() - 4.0*Foam::cos(qp.z())
+					    );
+				    }
+
+				}
+
+				gradDGP[faceI][pointI] +=
+                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*disp;
+
                                break;
                             }
                         }

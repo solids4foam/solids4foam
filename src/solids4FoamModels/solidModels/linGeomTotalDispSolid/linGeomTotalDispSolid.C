@@ -546,7 +546,7 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 #ifdef OPENFOAM_COM
 	// Add optional fvOptions, e.g. MMS body force
 	// Note that "source()" is already multiplied by the volumes
-	source -= fvOptions()(ds_, const_cast<volVectorField&>(D()))().source();
+	source += fvOptions()(ds_, const_cast<volVectorField&>(D()))().source();
 #endif
     }
 
@@ -1056,10 +1056,14 @@ label linGeomTotalDispSolid::formResidual
     // We add this before enforcing the traction condition as the stabilisation
     // is set to zero on traction boundaries
     // To-do: add a stabilisation traction function to momentumStabilisation
-    const scalar scaleFactor =
-        readScalar(stabilisation().dict().lookup("scaleFactor"));
-    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-    traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+    if (!highOrderResidual_)
+    {
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+	const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+
+	traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+    }
 
     // Enforce traction boundary conditions
     enforceTractionBoundaries(traction, D, n);

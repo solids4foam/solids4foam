@@ -88,6 +88,10 @@ private:
         //- Number of layers in the stencils
         const label nLayers_;
 
+        //- Numbers of cells in the stencil, in addition to the minimum number
+        //  required for some N
+        const label Nn_;
+
         //- Kernel shape parameter
         const scalar k_;
 
