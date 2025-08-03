@@ -80,25 +80,42 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad();
 #endif
 
-    // Lookup the useBoundaryFaceValues list
-    // This list needs to be created before calling the gradient operation
-    // The list defines which patch values should be used in the least squares
-    // calculation.
-    // There must be a nice way to define this on the fly, but for now this
-    // solution is OK, as it avoids misuse
-    const word useBndFcValName("useBoundaryFaceValues_" + vsf.name());
-    if (!mesh.foundObject<boolIOList>(useBndFcValName))
-    {
-        FatalErrorInFunction
-            << useBndFcValName << " boolIOList not found! " << nl
-            << "To use the leastSquaresS4fGrad scheme, you must first define an"
-            << " boolIOList called " << useBndFcValName << ", which indicates"
-            << " which patches should be used in the least squares problems for"
-            << " the " << vsf.name() << " field."
-            << abort(FatalError);
-    }
-    const boolIOList& useBoundaryFaceValues =
-        mesh.lookupObject<boolIOList>("useBoundaryFaceValues_" + vsf.name());
+    // // Lookup the useBoundaryFaceValues list
+    // // This list needs to be created before calling the gradient operation
+    // // The list defines which patch values should be used in the least squares
+    // // calculation.
+    // // There must be a nice way to define this on the fly, but for now this
+    // // solution is OK, as it avoids misuse
+    // const word useBndFcValName("useBoundaryFaceValues_" + vsf.name());
+    // if (!mesh.foundObject<boolIOList>(useBndFcValName))
+    // {
+    //     FatalErrorInFunction
+    //         << useBndFcValName << " boolIOList not found! " << nl
+    //         << "To use the leastSquaresS4fGrad scheme, you must first define an"
+    //         << " boolIOList called " << useBndFcValName << ", which indicates"
+    //         << " which patches should be used in the least squares problems for"
+    //         << " the " << vsf.name() << " field."
+    //         << abort(FatalError);
+    // }
+    // // const boolIOList& useBoundaryFaceValues =
+    // //     mesh.lookupObject<boolIOList>("useBoundaryFaceValues_" + vsf.name());
+
+    // Original approach
+    // // Prepare the useBoundaryFaceValues list for the least squares vector
+    // // We will set traction patches to false and displacement patches to true
+    // boolList useBoundaryFaceValues(mesh.boundary().size(), true);
+    // forAll(mesh.boundary(), patchI)
+    // {
+    //     if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
+    //     {
+    //         //useBoundaryFaceValues = false; // bug: [patchI] was missing!
+    //         useBoundaryFaceValues[patchI] = false;
+    //     }
+    // }
+
+    // For now, default to extrapolation on all boundaries
+    // We need to revisit this
+    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
 
     // Get reference to least square vectors
     const leastSquaresS4fVectors& lsv =
