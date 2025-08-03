@@ -852,7 +852,7 @@ label linGeomTotalDispSolid::formResidual
     mechanical().grad(D, gradD());
 
     // Enforce the boundary conditions again for any conditions that use gradD
-    D.correctBoundaryConditions();
+    //D.correctBoundaryConditions();
 
     // Update velocity
     U() = fvc::ddt(D);
