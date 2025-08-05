@@ -223,10 +223,8 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
     const vectorField& Sf = mesh().boundary()[patchID].Sf();
     const vectorField deformedSf(Jm*invFm.T() & Sf);
     const vectorField deformedNf(deformedSf/mag(deformedSf));
-    const tensorField gradU
-    (
-        fvc::grad(U())().boundaryField()[patchID]
-    ); // do I need to calculate the whole field?
+    const tensorField& gradU = this->gradU().boundaryField()[patchID];
+
     tvF.ref() = rho_.value()*deformedNf & (nuEff*invFm.T() & gradU);
 
     // Deformed mesh
@@ -343,8 +341,8 @@ bool newtonIcoFluid::evolve()
     }
 
     // Correct transport and turbulence models
-    laminarTransport_.correct();
-    turbulence_->correct();
+    // laminarTransport_.correct();
+    // turbulence_->correct();
 
     return 0;
 }
@@ -408,6 +406,9 @@ label newtonIcoFluid::formResidual
     // Enforce the boundary conditions
     U.correctBoundaryConditions();
 
+    // Update gradU
+    gradU() = fvc::grad(U);
+
     // Update the flux
     phi = fvc::interpolate(U) & mesh.Sf();
 
@@ -417,9 +418,8 @@ label newtonIcoFluid::formResidual
         fvc::makeRelative(phi, U);
     }
 
-    // TESTING
     // Set the flux to zero on walls, including FSI interfaces
-    // makeRelative should do this but mat not work as expected
+    // makeRelative should do this but may not work as expected
     forAll(U.boundaryField(), patchI)
     {
         if (mesh.boundaryMesh()[patchI].type() == "wall")
@@ -443,15 +443,12 @@ label newtonIcoFluid::formResidual
     // CHECK
     //constrainPressure(p, U, phiHbyA, rAtU());
 
-    // Correct Uf if the mesh is moving
-    //fvc::correctUf(Uf, U, phi);
-
-    // Make the fluxes relative to the mesh motion
-    //fvc::makeRelative(phi, U);
+    // Update gradp
+    gradp() = fvc::grad(p);
 
     // Correct the transport and turbulence models
-    laminarTransport_.correct();
-    turbulence_->correct();
+    //laminarTransport_.correct();
+    //turbulence_->correct();
 
     // The residual vector is defined as
     // F = div(sigma) - ddt(U) - div(phi*U)
@@ -462,12 +459,11 @@ label newtonIcoFluid::formResidual
     //
     // Check: do we want to include div(gradU.T).. it makes the stencil
     // larger and should be zero anyway, although it may increase accuracy
-    // To be checked ...
     vectorField residual
     (
         fvc::laplacian(turbulence_->nuEff(), U)
         //+ fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
-      - fvc::grad(p)
+      - gradp()
       - fvc::ddt(U)
       - fvc::div(phi, U)
     );
@@ -514,10 +510,8 @@ label newtonIcoFluid::formResidual
       //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
       //   )
       // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
-        //- fvc::div(phi) // wrong! should be velocity!
       - fvc::div(U)
     );
-    //Info<< "localRe/localReRef = " << max(mag(localRe/localReRef)) << endl;
 
     // Make residual extensive
     pressureResidual *= mesh.V();
@@ -595,9 +589,9 @@ label newtonIcoFluid::formResidual
     // Enforce the boundary conditions
     U.correctBoundaryConditions();
 
-    // Calculate the gradient of velocity
-    const volTensorField gradU(fvc::grad(U));
-    const surfaceTensorField gradUf(fvc::interpolate(gradU));
+    // Update the velocity gradient
+    gradU() = fvc::grad(U);
+    const surfaceTensorField gradUf(fvc::interpolate(gradU()));
 
     // Calculate the deformed area vectors
     const surfaceVectorField deformedSf(Jmf*invFmf.T() & mesh.Sf());
@@ -641,6 +635,9 @@ label newtonIcoFluid::formResidual
 
     // Enforce the boundary conditions
     p.correctBoundaryConditions();
+
+    // Update gradp
+    gradp() = fvc::grad(p);
 
     // Update the pressure BCs to ensure flux consistency
     // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
@@ -696,7 +693,7 @@ label newtonIcoFluid::formResidual
     vectorField residual
     (
         fvc::div(deformedSf & (nuEfff*invFmf.T() & gradUf))
-      - (Jm*invFm.T() & fvc::grad(p))
+      - (Jm*invFm.T() & gradp())
       - Jm*fvc::ddt(U)
       - fvc::div(phi, U)
       + alphaU*fvc::laplacian(nuEfff, U)
