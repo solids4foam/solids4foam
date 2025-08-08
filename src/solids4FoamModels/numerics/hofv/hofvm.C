@@ -529,7 +529,7 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
     )
 )
 {
-    const labelUList& owner = mesh.owner();
+    const labelUList& owner = mesh.faceOwner();
     const labelUList& neighbour = mesh.neighbour();
     const scalarField& magSfI = mesh.magSf().internalField();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -553,7 +553,7 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 	lre.QRGradFaceGPCoeffs();
 
     // Loop over internal faces
-    forAll(owner, faceI)
+    forAll(mesh.owner(), faceI)
     {
 	// Preliminaries
 	const vector& faceNormal = n[faceI];

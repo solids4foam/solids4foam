@@ -41,6 +41,8 @@ defineTypeNameAndDebug(LRE, 1);
 const Enum<LRE::weightFunction> LRE::weightFunctionNames_
 ({
     {LRE::weightFunction::ONE, "one"},
+    {LRE::weightFunction::LINEAR, "linear"},
+    {LRE::weightFunction::INV_DIST, "inverseDistance"},
     {LRE::weightFunction::RAD_SYMM_EXP, "radiallySymmetricExponential"},
 });
 
@@ -480,7 +482,7 @@ void LRE::makeGlobalFaceStencils() const
     if (radialStencil)
     {
 	const fvMesh& mesh = mesh_;
-	const labelList& owner = mesh.faceOwner();
+	const labelUList& owner = mesh.faceOwner();
 	const pointField& cellCentres = mesh.C();
 
 	label Nn = Nn_ + minNn();
@@ -505,8 +507,7 @@ void LRE::makeGlobalFaceStencils() const
 
 	forAll(mesh.faces(), faceI)
 	{
-	    const point& faceCentre = mesh.Cf()[faceI];
-
+	    const point& faceCentre = mesh.faceCentres()[faceI];
 	    scalar sphereR = 4.0*mag(faceCentre - cellCentres[owner[faceI]]);
 
 	    labelList candidates;
@@ -566,8 +567,8 @@ void LRE::makeGlobalFaceStencils() const
 		faceStencils[faceI][i] = distList[i].first();
 	    }
 	}
-	return;
     }
+    return;
 
     //Old code where face stencil is constructed using cell stencil
 
@@ -834,38 +835,37 @@ const labelListList& LRE::globalFaceStencils() const
 }
 
 
-scalar LRE::radiallySymmetricExponentialWeight
-(
-    const scalar d,
-    const scalar maxDist
-) const
-{
-    // Smoothing length
-    const scalar dm = 2*maxDist;
-
-    const scalar sqrK = -sqr(k_);
-
-    scalar w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
-
-    // Clip small negative value
-    if (w < SMALL)
-    {
-	w = 0.0;
-    }
-
-    return w;
-}
-
-
 scalar LRE::weight(const scalar d, const scalar maxDist) const
 {
+    scalar w = -1;
+
     if (weightFunc() == weightFunction::ONE)
     {
-	return 1.0;
+	w = 1.0;
+    }
+    else if (weightFunc() == weightFunction::LINEAR)
+    {
+	w = 1 - (d/maxDist);
+    }
+    else if (weightFunc() == weightFunction::INV_DIST)
+    {
+	// User parameters to control weight distribution
+	const scalar s = 1000;
+	const scalar b = 3;
+
+	w = 1.0 / (1.0 + s*pow((d/(2*maxDist)),b));
     }
     else if (weightFunc() == weightFunction::RAD_SYMM_EXP)
     {
-	return radiallySymmetricExponentialWeight(d, maxDist);
+	// Smoothing length
+	const scalar dm = 2*maxDist;
+
+	const scalar sqrK = -sqr(k_);
+
+	w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
+
+	// Clip small negative value
+	w = max(SMALL, w);
     }
     else
     {
@@ -876,8 +876,7 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
             << endl;
     }
 
-    // Keep compiler happy
-    return true;
+    return w;
 }
 
 
@@ -901,35 +900,51 @@ void LRE::generateExponents
     DynamicList<FixedList<label, 3>>& exponents
 ) const
 {
-    if (N_ < 1)
+    if (N < 1)
     {
         FatalErrorInFunction
             << "N must be at least 1!" << exit(FatalError);
     }
 
-    // Estimate the number of terms to set the capacity
-    const label estimatedSize = (N + 1)*(N + 2)*(N + 3)/6;
+    // Get the number of Taylor terms to set the capacity
+    const label estimatedSize = minNn();
     exponents.setCapacity(estimatedSize);
 
     // Add the constant term first
     exponents.append(FixedList<label, 3>{0, 0, 0});
 
-    for (label n = 1; n <= N; ++n)
+    // 2D and 3D cases have different number of exponents in Taylor series
+    if (mesh_.nGeometricD() == 2)
     {
-        for (label i = n; i >= 0; --i)
-        {
-            for (label j = n - i; j >= 0; --j)
-            {
-                label k = n - i - j;
-                if (i == 0 && j == 0 && k == 0)
-                {
-                    // Skip the constant term as it's already added
-                    continue;
-                }
-                FixedList<label, 3> exponent = {i, j, k};
-                exponents.append(exponent);
-            }
-        }
+	for (label n = 1; n <= N; ++n)
+	{
+	    for (label i = n; i >= 0; --i)
+	    {
+		const label j = n - i;
+		FixedList<label, 3> exponent  = {i, j, 1};
+		exponents.append(exponent);
+	    }
+	}
+    }
+    else
+    {
+	for (label n = 1; n <= N; ++n)
+	{
+	    for (label i = n; i >= 0; --i)
+	    {
+		for (label j = n - i; j >= 0; --j)
+		{
+		    label k = n - i - j;
+		    if (i == 0 && j == 0 && k == 0)
+		    {
+			// Skip the constant term as it's already added
+			continue;
+		    }
+		    FixedList<label, 3> exponent = {i, j, k};
+		    exponents.append(exponent);
+		}
+	    }
+	}
     }
 
     // Adjust capacity to actual size
@@ -1137,7 +1152,7 @@ void LRE::calcQRCoeffs() const
             );
             Eigen::VectorXd singularValues = svd.singularValues();
 
-            conditionNumber()[cellI] =
+            cellConditionNumber()[cellI] =
                 singularValues(0)
                /(singularValues(singularValues.size() - 1) + VSMALL);
         }
@@ -1189,9 +1204,9 @@ void LRE::calcQRCoeffs() const
 
     if (calcConditionNumber_)
     {
-        Info<< "Writing " << conditionNumber().name() << " to time = "
+        Info<< "Writing " << cellConditionNumber().name() << " to time = "
             << mesh.time().value() << endl;
-        conditionNumber().write();
+        cellConditionNumber().write();
     }
 
     //if (debug)
@@ -1401,7 +1416,7 @@ void LRE::calcGlobalQRCoeffs() const
             );
             Eigen::VectorXd singularValues = svd.singularValues();
 
-            conditionNumber()[localCellI] =
+            cellConditionNumber()[localCellI] =
                 singularValues(0)
                /(singularValues(singularValues.size() - 1) + VSMALL);
         }
@@ -1459,266 +1474,6 @@ void LRE::calcGlobalQRCoeffs() const
 }
 
 
-void LRE::calcGlobalQRFaceCoeffs() const
-{
-    //if (debug)
-    {
-        InfoInFunction
-            << "start" << endl;
-    }
-
-    if (QRGradFaceCoeffsPtr_)
-    {
-        FatalErrorInFunction
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    const fvMesh& mesh = mesh_;
-
-    QRGradFaceCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nFaces()));
-    List<DynamicList<vector>>& QRGradCoeffs = *QRGradFaceCoeffsPtr_;
-
-    // Refernces for brevity and efficiency
-    const vectorField& CI = mesh.C();
-    const vectorField& CfI = mesh.Cf();
-    FatalErrorInFunction << "Cf() should be replaced with faceCentres - check"
-                   << abort(FatalError);
-
-    // Collect CI for off-processor cells in the stencils
-    Map<vector> globalCI;
-    requestGlobalStencilData(CI, globalCI);
-
-    // Calculate Taylor series exponents
-    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
-    DynamicList<FixedList<label, 3>> exponents;
-    generateExponents(N_, exponents);
-    const label Np = exponents.size();
-    if (debug)
-    {
-        Info<< "Np = " << Np << endl;
-    }
-
-    // Precompute factorials up to N
-    List<scalar> factorials(N_ + 1, 1.0);
-    for (label n = 1; n <= N_; ++n)
-    {
-        factorials[n] = factorials[n - 1]*n;
-    }
-
-    // Coefficients
-    List<DynamicList<scalar>> c(mesh.nFaces());
-    List<DynamicList<scalar>> cx(mesh.nFaces());
-    List<DynamicList<scalar>> cy(mesh.nFaces());
-    List<DynamicList<scalar>> cz(mesh.nFaces());
-
-    const List<labelList>& stencils = globalFaceStencils();
-
-    forAll(stencils, faceI)
-    {
-        const labelList& curStencil = stencils[faceI];
-
-        // Centre of current face
-        const vector& curCf = CfI[faceI];
-
-        // Find max distance in this stencil
-        scalar maxDist = 0.0;
-        forAll(curStencil, cI)
-        {
-            const label neiGlobalCellID = curStencil[cI];
-
-            scalar d;
-            if (globalCells_.isLocal(neiGlobalCellID))
-            {
-                const label neiLocalCellID =
-                    globalCells_.toLocal(neiGlobalCellID);
-                d = mag(CI[neiLocalCellID] - curCf);
-            }
-            else
-            {
-                d = mag(globalCI[neiGlobalCellID] - curCf);
-            }
-
-            maxDist = max(maxDist, d);
-        }
-
-        // Loop over neighbours and construct matrix Q
-        const label Nn = curStencil.size();
-
-        // Use matrix format from Eigen/Dense library
-        // Avoid initialisation to zero as we will set every entry below
-        Eigen::MatrixXd Q(Np, Nn);
-
-        // Check to avoid Eigen error
-        if (Nn < Np)
-        {
-            FatalErrorInFunction
-                << "Interpolation stencil needs to be bigger than the "
-                << "number of elements in Taylor order!"
-                << exit(FatalError);
-        }
-
-        // Loop over stencil points
-        for (label cI = 0; cI < Nn; ++cI)
-        {
-            const label neiGlobalCellID = curStencil[cI];
-            vector dx;
-            if (globalCells_.isLocal(neiGlobalCellID))
-            {
-                const label neiLocalCellID =
-                    globalCells_.toLocal(neiGlobalCellID);
-
-                dx = CI[neiLocalCellID] - curCf;
-            }
-            else
-            {
-                dx = globalCI[neiGlobalCellID] - curCf;
-            }
-
-            // Compute monomial values for each exponent
-            for (label p = 0; p < Np; ++p)
-            {
-                const FixedList<label, 3>& exponent = exponents[p];
-                const label i = exponent[0];
-                const label j = exponent[1];
-                const label k = exponent[2];
-
-               // Compute factorial denominator
-               const scalar factorialDenominator =
-                   factorials[i]*factorials[j]*factorials[k];
-
-               // Compute and assign monomial value with factorials
-               // Note: the order of the quadratic and higher terms may not be
-               // the same as the previous manual approach
-               Q(p, cI) =
-                   pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-                  /factorialDenominator;
-            }
-        }
-
-        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
-        //W.setZero(); // no need to waste time initialising
-
-        for (label cI = 0; cI < Nn; cI++)
-        {
-            const label neiGlobalCellID = curStencil[cI];
-            scalar d;
-            if (globalCells_.isLocal(neiGlobalCellID))
-            {
-                const label neiLocalCellID =
-                    globalCells_.toLocal(neiGlobalCellID);
-
-                d = mag(CI[neiLocalCellID] - curCf);
-            }
-            else
-            {
-                d = mag(globalCI[neiGlobalCellID] - curCf);
-            }
-
-	    W.diagonal()[cI] = weight(d, maxDist);
-        }
-
-        // Now when we have W and Q, next step is QR decomposition
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
-            W.diagonal().cwiseSqrt().asDiagonal();
-        const Eigen::MatrixXd Qhat =
-            Q.array().rowwise()*sqrtW.diagonal().transpose().array();
-
-        // B hat
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
-            sqrtW.diagonal().asDiagonal();
-
-        // QR decomposition
-        Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
-
-        // Q and R matrices
-        const Eigen::MatrixXd O = qr.householderQ();
-        const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
-
-        // Slice Rbar and Qbar, as we do not need full matrix
-        // Note: auto is a reference type here (Rbar, Qbar are not copied)
-        const auto Rbar = R.topLeftCorner(Np, Np);
-        const auto Qbar = O.leftCols(Np);
-
-        // Perform element-wise multiplication and convert to MatrixXd
-        const Eigen::MatrixXd QbarBhat =
-            (
-                Qbar.transpose().array().rowwise()
-               *Bhat.diagonal().transpose().array()
-            ).matrix();
-
-        // Solve to get A
-        // const Eigen::MatrixXd A =
-        //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
-        // Solve using the modified QbarBhat
-        const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
-
-        // TODO: how best to display a surface field? Maybe use fvc::average to
-        // create a vol field
-        // // To be aware of interpolation accuracy we need to control the
-        // // condition number
-        // if (calcConditionNumber_)
-        // {
-        //     Eigen::JacobiSVD<Eigen::MatrixXd> svd
-        //     (
-        //         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
-        //     );
-        //     Eigen::VectorXd singularValues = svd.singularValues();
-
-        //     conditionNumber()[localCellI] =
-        //         singularValues(0)
-        //        /(singularValues(singularValues.size() - 1) + VSMALL);
-        // }
-
-        c[faceI].setCapacity(A.cols());
-        cx[faceI].setCapacity(A.cols());
-        cy[faceI].setCapacity(A.cols());
-        cz[faceI].setCapacity(A.cols());
-
-        Eigen::RowVectorXd cRow = A.row(0);
-        Eigen::RowVectorXd cxRow = A.row(1);
-        Eigen::RowVectorXd cyRow = A.row(2);
-        Eigen::RowVectorXd czRow = A.row(3);
-
-        for (label i = 0; i < A.cols(); ++i)
-        {
-            c[faceI].append(cRow(i));
-            cx[faceI].append(cxRow(i));
-            cy[faceI].append(cyRow(i));
-            cz[faceI].append(czRow(i));
-        }
-
-        c[faceI].shrink();
-        cx[faceI].shrink();
-        cy[faceI].shrink();
-        cz[faceI].shrink();
-    }
-
-    forAll(QRGradCoeffs, faceI)
-    {
-       const labelList& curStencil = stencils[faceI];
-       const label Nn = curStencil.size();
-
-       QRGradCoeffs[faceI].setCapacity(Nn);
-
-       for (label I = 0; I < Nn; I++)
-       {
-           QRGradCoeffs[faceI].append
-           (
-               vector(cx[faceI][I], cy[faceI][I], cz[faceI][I])
-           );
-       }
-
-       QRGradCoeffs[faceI].shrink();
-    }
-
-    if (debug)
-    {
-        InfoInFunction
-            << "end" << endl;
-    }
-}
-
-
 void LRE::calcGlobalQRFaceGPCoeffs() const
 {
     //if (debug)
@@ -1734,6 +1489,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
     }
 
     const fvMesh& mesh = mesh_;
+    const bool twoD = mesh_.nGeometricD() == 2;
 
     QRGradFaceGPCoeffsPtr_.set
     (
@@ -1741,10 +1497,13 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
     );
     List<List<DynamicList<vector>>>& QRGradCoeffs = *QRGradFaceGPCoeffsPtr_;
 
+    // Gauss point locations on each face
+    const List<List<point>>& faceGP = faceGaussPoints();
+
     forAll(QRGradCoeffs, faceI)
     {
         List<DynamicList<vector>>& facePointsGC = QRGradCoeffs[faceI];
-        facePointsGC.setSize(mesh.faces()[faceI].size()*triQuadrature::nPoints(N_));
+        facePointsGC.setSize(faceGP[faceI].size());
     }
 
     // Refernces for brevity and efficiency
@@ -1756,14 +1515,11 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
     requestGlobalStencilData(CI, globalCI);
 
     // Calculate Taylor series exponents
-    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    // 3D case: 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    // 2D case: 1 for zero order, 3 for 1 order, 6 for second order, etc.
     DynamicList<FixedList<label, 3>> exponents;
     generateExponents(N_, exponents);
     const label Np = exponents.size();
-    if (debug)
-    {
-        Info<< "Np = " << Np << endl;
-    }
 
     // Precompute factorials up to N
     List<scalar> factorials(N_ + 1, 1.0);
@@ -1781,19 +1537,13 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
     // Set size for second list
     forAll(c, faceI)
     {
-        c[faceI].setSize(mesh.faces()[faceI].size()*triQuadrature::nPoints(N_));
-        cx[faceI].setSize(mesh.faces()[faceI].size()*triQuadrature::nPoints(N_));
-        cy[faceI].setSize(mesh.faces()[faceI].size()*triQuadrature::nPoints(N_));
-        cz[faceI].setSize(mesh.faces()[faceI].size()*triQuadrature::nPoints(N_));
+        c[faceI].setSize(faceGP[faceI].size());
+        cx[faceI].setSize(faceGP[faceI].size());
+        cy[faceI].setSize(faceGP[faceI].size());
+	cz[faceI].setSize(faceGP[faceI].size());
     }
 
     const List<labelList>& stencils = globalFaceStencils();
-
-    // Gauss point locations on each face
-    const List<List<point>>& faceGP = faceGaussPoints();
-
-    // Gauss point weights
-    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
 
     forAll(stencils, faceI)
     {
@@ -1822,6 +1572,9 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
             maxDist = max(maxDist, d);
         }
+
+	// Scaling factor for Taylor series
+	const scalar h = 2.0 * maxDist;
 
         // We need to extend stencil for ghost point at boundary
         bool ghostPoint = false;
@@ -1874,6 +1627,9 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     dx = globalCI[neiGlobalCellID] - curGP;
                 }
 
+		// Normalise dx to improve conditioning
+		dx /= h;
+
                 // Compute monomial values for each exponent
                 for (label p = 0; p < Np; ++p)
                 {
@@ -1882,17 +1638,25 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     const label j = exponent[1];
                     const label k = exponent[2];
 
-                   // Compute factorial denominator
-                   const scalar factorialDenominator =
-                       factorials[i]*factorials[j]*factorials[k];
+		    // Compute factorial denominator
+		    const scalar factorialDenominator =
+			factorials[i]*factorials[j]*factorials[k];
 
-                   // Compute and assign monomial value with factorials
-                   // Note: the order of the quadratic and higher terms may not
-                   // be the same as the previous manual approach
-                   Q(p, cI) =
-                       pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-                      /factorialDenominator;
-                }
+		    // Compute and assign monomial value with factorials
+		    // Note: the order of the quadratic and higher terms may not
+		    // be the same as the previous manual approach
+		    if (twoD)
+		    {
+			Q(p, cI) =
+			    pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+		    }
+		    else
+		    {
+			Q(p, cI) =
+			    pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+			    /factorialDenominator;
+		    }
+		}
 
                 // Add ghost point manually in second from last iteration
                 // and skip last iteration for ghostPoint
@@ -1938,42 +1702,56 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                 }
             }
 
-            // Now when we have W and Q, next step is QR decomposition
-            const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
-                W.diagonal().cwiseSqrt().asDiagonal();
-            const Eigen::MatrixXd Qhat =
-                Q.array().rowwise()*sqrtW.diagonal().transpose().array();
+	    // Now when we have W and Q, next step is QR decomposition
+	    const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+		W.diagonal().cwiseSqrt().asDiagonal();
+	    const Eigen::MatrixXd Qhat =
+		Q.array().rowwise()*sqrtW.diagonal().transpose().array();
 
-            // B hat
-            const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
-                sqrtW.diagonal().asDiagonal();
+	    // B hat
+	    const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+		sqrtW.diagonal().asDiagonal();
 
-            // QR decomposition
-            Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+	    // QR decomposition
+	    Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-            // Q and R matrices
-            const Eigen::MatrixXd O = qr.householderQ();
-            const Eigen::MatrixXd& R =
-                qr.matrixQR().triangularView<Eigen::Upper>();
+	    // Q and R matrices
+	    const Eigen::MatrixXd O = qr.householderQ();
+	    const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
 
-            // Slice Rbar and Qbar, as we do not need full matrix
-            // Note: auto is a reference type here (Rbar, Qbar are not copied)
-            const auto Rbar = R.topLeftCorner(Np, Np);
-            const auto Qbar = O.leftCols(Np);
+	    // Slice Rbar and Qbar, as we do not need full matrix
+	    // Note: auto is a reference type here (Rbar, Qbar are not copied)
+	    const auto Rbar = R.topLeftCorner(Np, Np);
+	    const auto Qbar = O.leftCols(Np);
 
-            // Perform element-wise multiplication and convert to MatrixXd
-            const Eigen::MatrixXd QbarBhat =
-                (
-                    Qbar.transpose().array().rowwise()
-                   *Bhat.diagonal().transpose().array()
-                ).matrix();
+	    // Perform element-wise multiplication and convert to MatrixXd
+	    const Eigen::MatrixXd QbarBhat =
+		(
+		 Qbar.transpose().array().rowwise()
+		 *Bhat.diagonal().transpose().array()
+		 ).matrix();
 
-            // Solve to get A
-            // const Eigen::MatrixXd A =
-            //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
-            // Solve using the modified QbarBhat
-            const Eigen::MatrixXd A =
-                Rbar.colPivHouseholderQr().solve(QbarBhat);
+	    // Solve to get A
+	    //const Eigen::MatrixXd A =
+	    //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+	    // Solve using the modified QbarBhat
+	    const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
+	    //  Eigen::MatrixXd A =
+	    //	Rbar.template triangularView<Eigen::Upper>().solve(QbarBhat);
+
+	    if (calcConditionNumber_)
+	    {
+		Eigen::JacobiSVD<Eigen::MatrixXd> svd
+		    (
+		         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+		    );
+
+		Eigen::VectorXd singularValues = svd.singularValues();
+
+		faceConditionNumber()[faceI] =
+		    singularValues(0)
+		   /(singularValues(singularValues.size() - 1) + VSMALL);
+	    }
 
             c[faceI][gaussPointI].setCapacity(A.cols());
             cx[faceI][gaussPointI].setCapacity(A.cols());
@@ -1981,16 +1759,24 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             cz[faceI][gaussPointI].setCapacity(A.cols());
 
             Eigen::RowVectorXd cRow = A.row(0);
-            Eigen::RowVectorXd cxRow = A.row(1);
-            Eigen::RowVectorXd cyRow = A.row(2);
-            Eigen::RowVectorXd czRow = A.row(3);
+            Eigen::RowVectorXd cxRow = A.row(1)/h;
+            Eigen::RowVectorXd cyRow = A.row(2)/h;
+            Eigen::RowVectorXd czRow;
+	    if (twoD)
+	    {
+		czRow = Eigen::RowVectorXd::Zero(A.cols());
+	    }
+	    else
+	    {
+		czRow = A.row(3)/h;
+	    }
 
             for (label i = 0; i < A.cols(); ++i)
             {
                 c[faceI][gaussPointI].append(cRow(i));
                 cx[faceI][gaussPointI].append(cxRow(i));
                 cy[faceI][gaussPointI].append(cyRow(i));
-                cz[faceI][gaussPointI].append(czRow(i));
+		cz[faceI][gaussPointI].append(czRow(i));
             }
 
             c[faceI][gaussPointI].shrink();
@@ -2037,8 +1823,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
            }
 
            QRGradCoeffs[faceI][gaussPointI].shrink();
-       }
-   }
+        }
+    }
+
+    if (calcConditionNumber_)
+    {
+        Info<< "Writing " << faceConditionNumber().name() << " to time = "
+            << mesh.time().value() << endl;
+        faceConditionNumber().write();
+    }
 
     //if (debug)
     {
@@ -2842,23 +2635,12 @@ const List<DynamicList<vector>>& LRE::QRGradCoeffs() const
 }
 
 
-const List<DynamicList<vector>>& LRE::QRGradFaceCoeffs() const
-{
-    if (!QRGradFaceCoeffsPtr_)
-    {
-        calcGlobalQRFaceCoeffs();
-    }
-
-    return QRGradFaceCoeffsPtr_();
-}
-
-
 const List<List<DynamicList<vector>>>&
 LRE::QRGradFaceGPCoeffs() const
 {
     if (!QRGradFaceGPCoeffsPtr_)
     {
-        calcGlobalQRFaceGPCoeffs();
+	calcGlobalQRFaceGPCoeffs();
     }
 
     return QRGradFaceGPCoeffsPtr_();
@@ -2931,32 +2713,43 @@ LRE::sqrtW() const
 }
 
 
-volScalarField& LRE::conditionNumber() const
+volScalarField& LRE::cellConditionNumber() const
 {
-    if (!conditionNumberPtr_)
+    if (!cellConditionNumberPtr_)
     {
-        makeConditionNumber();
+        makeCellConditionNumber();
     }
 
-    return conditionNumberPtr_();
+    return cellConditionNumberPtr_();
 }
 
 
-void LRE::makeConditionNumber() const
+surfaceScalarField& LRE::faceConditionNumber() const
 {
-    if (conditionNumberPtr_)
+    if (!faceConditionNumberPtr_)
+    {
+        makeFaceConditionNumber();
+    }
+
+    return faceConditionNumberPtr_();
+}
+
+
+void LRE::makeCellConditionNumber() const
+{
+    if (cellConditionNumberPtr_)
     {
         FatalErrorInFunction
             << "Pointer already set" << exit(FatalError);
     }
 
-    conditionNumberPtr_.set
+    cellConditionNumberPtr_.set
     (
         new volScalarField
         (
            IOobject
            (
-               "conditionNumber",
+               "cellConditionNumber",
                mesh_.time().timeName(),
                mesh_,
                IOobject::NO_READ,
@@ -2965,6 +2758,33 @@ void LRE::makeConditionNumber() const
            mesh_,
            dimensionedScalar("0", dimless, Zero),
            "zeroGradient"
+        )
+    );
+}
+
+
+void LRE::makeFaceConditionNumber() const
+{
+    if (faceConditionNumberPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << exit(FatalError);
+    }
+
+    faceConditionNumberPtr_.set
+    (
+        new surfaceScalarField
+        (
+           IOobject
+           (
+               "faceConditionNumber",
+               mesh_.time().timeName(),
+               mesh_,
+               IOobject::NO_READ,
+               IOobject::AUTO_WRITE
+           ),
+           mesh_,
+           dimensionedScalar("0", dimless, Zero)
         )
     );
 }
@@ -2991,13 +2811,13 @@ LRE::LRE
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
     useGlobalStencils_(dict.lookup("useGlobalStencils")),
     calcConditionNumber_(dict.lookup("calcConditionNumber")),
-    conditionNumberPtr_(),
+    cellConditionNumberPtr_(),
+    faceConditionNumberPtr_(),
     stencilsPtr_(),
     stencilsBoundaryFacesPtr_(),
     globalCellStencilsPtr_(),
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
-    QRGradFaceCoeffsPtr_(),
     QRGradFaceGPCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
@@ -3089,117 +2909,12 @@ tmp<volTensorField> LRE::grad(const volVectorField& D) const
 }
 
 
-tmp<surfaceTensorField> LRE::fGrad(const volVectorField& D) const
-{
-    const fvMesh& mesh = mesh_;
-
-    // Prepare the return field
-    tmp<surfaceTensorField> tgradD
-    (
-        new surfaceTensorField
-        (
-           IOobject
-           (
-               "grad(" + D.name() + ")",
-               mesh.time().timeName(),
-               mesh,
-               IOobject::NO_READ,
-               IOobject::AUTO_WRITE
-           ),
-           mesh,
-           dimensionedTensor("0", dimless, Zero)
-        )
-    );
-    surfaceTensorField& gradD = tgradD.ref();
-    tensorField& gradDI = gradD;
-
-    const List<labelList>& stencils = globalFaceStencils();
-    const List<DynamicList<vector>>& QRGradCoeffs = QRGradFaceCoeffs();
-    const vectorField& DI = D;
-
-    // Collect DI for off-processor cells in the stencils
-    Map<vector> globalDI;
-    requestGlobalStencilData(DI, globalDI);
-
-    forAll(stencils, faceI)
-    {
-        const labelList& curStencil = stencils[faceI];
-        const label Nn = curStencil.size();
-
-        // Loop over stencil and multiply stencil cell values with
-        // corresponding interpolation coefficient
-        for (label cI = 0; cI < Nn; cI++)
-        {
-            const label neiGlobalCellI = curStencil[cI];
-
-            if (globalCells_.isLocal(neiGlobalCellI))
-            {
-                const label neiLocalCellI =
-                    globalCells_.toLocal(neiGlobalCellI);
-
-                if (mesh.isInternalFace(faceI))
-                {
-                    gradDI[faceI] +=
-                        QRGradCoeffs[faceI][cI]*DI[neiLocalCellI];
-                }
-                else
-                {
-                    // Boundary face
-                    const label patchID =
-                        mesh.boundaryMesh().whichPatch(faceI);
-                    const polyPatch& pp = mesh.boundaryMesh()[patchID];
-
-                    // Note: there is no special treatment for processor patches
-                    // as all patches may use global data depending on their
-                    // stencils
-                    if (!isA<emptyPolyPatch>(pp))
-                    {
-                        const label localFaceI = faceI - pp.start();
-                        gradD.boundaryFieldRef()[patchID][localFaceI] +=
-                            QRGradCoeffs[faceI][cI]*DI[neiLocalCellI];
-                    }
-                }
-            }
-            else // global cell in the stencil
-            {
-                if (mesh.isInternalFace(faceI))
-                {
-                    gradD[faceI] +=
-                        QRGradCoeffs[faceI][cI]*globalDI[neiGlobalCellI];
-                }
-                else
-                {
-                    // Boundary face
-                    const label patchID =
-                        mesh.boundaryMesh().whichPatch(faceI);
-                    const polyPatch& pp = mesh.boundaryMesh()[patchID];
-
-                    // Note: there is no special treatment for processor patches
-                    // as all patches may use global data depending on their
-                    // stencils
-                    if (!isA<emptyPolyPatch>(pp))
-                    {
-                        const label localFaceI = faceI - pp.start();
-                        gradD.boundaryFieldRef()[patchID][localFaceI] +=
-                            QRGradCoeffs[faceI][cI]*globalDI[neiGlobalCellI];
-                    }
-                }
-            }
-        }
-    }
-
-    gradD.correctBoundaryConditions();
-
-    return tgradD;
-}
-
-
 autoPtr<List<List<tensor>>> LRE::gradDQuad
 (
     const volVectorField& D
 ) const
 {
-    if (debug)
+    // if (debug)
     {
         InfoInFunction
             << "start" << endl;

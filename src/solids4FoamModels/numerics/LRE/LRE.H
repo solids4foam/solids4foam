@@ -67,6 +67,8 @@ public:
         enum weightFunction
 	{
 	    ONE,
+	    LINEAR,
+	    INV_DIST,
 	    RAD_SYMM_EXP
 	};
 
@@ -118,8 +120,11 @@ private:
         //- Calculate the condition number field
         const Switch calcConditionNumber_;
 
-        //- Condition number field of the least squares system
-        mutable autoPtr<volScalarField> conditionNumberPtr_;
+        //- Cell condition number field of the least squares system
+        mutable autoPtr<volScalarField> cellConditionNumberPtr_;
+
+        //- Face condition number field of the least squares system
+        mutable autoPtr<surfaceScalarField> faceConditionNumberPtr_;
 
         //- Least squares cell stencils
         mutable autoPtr<List<DynamicList<label>>> stencilsPtr_;
@@ -148,9 +153,6 @@ private:
 
         //- QR Gradient cell coefficients
         mutable autoPtr<List<DynamicList<vector>>> QRGradCoeffsPtr_;
-
-        //- QR Gradient face coefficients
-        mutable autoPtr<List<DynamicList<vector>>> QRGradFaceCoeffsPtr_;
 
         //- QR Gradient face Gauss points coefficients
         mutable autoPtr<List<List<DynamicList<vector>>>> QRGradFaceGPCoeffsPtr_;
@@ -189,13 +191,6 @@ private:
 
         //- Return the least squares global cell stencils
         const labelListList& globalCellStencils() const;
-
-        //- Weight using radially symmetric exponential function
-        scalar radiallySymmetricExponentialWeight
-	(
-	     const scalar d,
-	     const scalar maxDist
-	) const;
 
         //- Weight funtcion
         scalar weight(const scalar d, const scalar maxDist) const;
@@ -247,9 +242,6 @@ private:
         //- Return the gradient coefficients
         const List<DynamicList<vector>>& QRGradCoeffs() const;
 
-        //- Return the gradient face coefficients
-        const List<DynamicList<vector>>& QRGradFaceCoeffs() const;
-
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& stencilsBoundaryFaces() const;
 
@@ -264,11 +256,17 @@ private:
         const List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>&
             sqrtW() const;
 
-        //- Return the condition number field
-        volScalarField& conditionNumber() const;
+        //- Return the cell condition number field
+        volScalarField& cellConditionNumber() const;
 
-        //- Make the condition number field
-        void makeConditionNumber() const;
+        //- Return the face condition number field
+        surfaceScalarField& faceConditionNumber() const;
+
+        //- Make the cell condition number field
+        void makeCellConditionNumber() const;
+
+        //- Make the face condition number field
+        void makeFaceConditionNumber() const;
 
         //- Request data for off-processor cells in the stencils
         //  Given the local processor field data, return a map containing
