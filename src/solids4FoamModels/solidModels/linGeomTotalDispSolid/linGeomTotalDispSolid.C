@@ -563,6 +563,12 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
         matrix, source, solution, solidModel::twoD(), false, debug
     );
 
+    // Update gradient of displacement
+    gradD() = LREInterp().grad(D());
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
 #else
     // In fact PETSc is not currently needed but i will leave it.
     FatalErrorIn("linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()")

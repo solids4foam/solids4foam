@@ -55,7 +55,7 @@ void lineQuadrature::constructRules()
     // 2 point quadrature, exact for polynomials up to 3 order
     rules_.insert
     (
-        1,
+        3,
         quadratureRule
         {
             List<scalar>{1.0/sqrt(3.0), -1.0/sqrt(3.0)},
