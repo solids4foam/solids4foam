@@ -339,9 +339,10 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 		const label globalBlockColI =
 		    petscSnesHelper.globalCells().toGlobal(neiCellID);
 
-		for (label i = 0; i < (blockSize - 1); ++i)
+		std::fill(values.begin(), values.end(), 0.0);
+		for (label i = 0; i < nScalarEqns; ++i)
 		{
-                    for (label j = 0; j < (blockSize - 1); ++j)
+                    for (label j = 0; j < nScalarEqns; ++j)
 		    {
 			// Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
 			// the 4x4 (or 3x3 in 2-D) values matrix
@@ -450,9 +451,10 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 				faceNormal
 			    );
 
-			for (label i = 0; i < (blockSize - 1); ++i)
+			std::fill(values.begin(), values.end(), 0.0);
+			for (label i = 0; i < nScalarEqns; ++i)
 			{
-			    for (label j = 0; j < (blockSize - 1); ++j)
+			    for (label j = 0; j < nScalarEqns; ++j)
 			    {
 				// Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
 				// the 4x4 (or 3x3 in 2-D) values matrix
@@ -462,7 +464,7 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 			}
 
 			// Local block row ID
-			const label ownCellID = owner[faceI];
+			const label ownCellID = mesh.faceOwner()[faceID];
 
 			// Global block row ID
 			const label globalBlockRowI =
@@ -473,7 +475,7 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 			    MatSetValuesBlocked
 			    (
 			        matrix, 1, &globalBlockRowI, 1, &globalCellID,
-				values.cdata(),
+			        values.cdata(),
 				ADD_VALUES
 			     )
 			 );
@@ -711,7 +713,7 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
                         source[owner[faceID]] -= coeff & disp;
 		    }
 		}
- 	    }
+	    }
 	}
 	else
 	{

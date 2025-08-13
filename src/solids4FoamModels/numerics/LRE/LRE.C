@@ -36,7 +36,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(LRE, 1);
+defineTypeNameAndDebug(LRE, 0);
 
 const Enum<LRE::weightFunction> LRE::weightFunctionNames_
 ({
@@ -52,8 +52,10 @@ const Enum<LRE::weightFunction> LRE::weightFunctionNames_
 
 void LRE::makeGlobalCellStencils() const
 {
-    InfoInFunction
-        << "start" << endl;
+    if (debug)
+    {
+	InfoInFunction << "start" << endl;
+    }
 
     if (globalCellStencilsPtr_)
     {
@@ -568,8 +570,10 @@ void LRE::makeGlobalCellStencils() const
 
 void LRE::makeGlobalFaceStencils() const
 {
-    InfoInFunction
-        << "start" << endl;
+    if (debug)
+    {
+	InfoInFunction << "start" << endl;
+    }
 
     if (globalFaceStencilsPtr_)
     {
@@ -782,7 +786,7 @@ void LRE::makeGlobalFaceStencils() const
 
 void LRE::makeStencils() const
 {
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;
@@ -895,7 +899,7 @@ void LRE::makeStencils() const
         stencilsBoundaryFaces[cellI].shrink();
     }
 
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "end" << endl;
@@ -1055,7 +1059,7 @@ void LRE::generateExponents
 
 void LRE::calcQRCoeffs() const
 {
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;
@@ -1310,7 +1314,7 @@ void LRE::calcQRCoeffs() const
         cellConditionNumber().write();
     }
 
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "end" << endl;
@@ -1320,7 +1324,7 @@ void LRE::calcQRCoeffs() const
 
 void LRE::calcGlobalQRCoeffs() const
 {
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;
@@ -1595,7 +1599,7 @@ void LRE::calcGlobalQRCoeffs() const
         cellConditionNumber().write();
     }
 
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "end" << endl;
@@ -1605,7 +1609,7 @@ void LRE::calcGlobalQRCoeffs() const
 
 void LRE::calcGlobalQRFaceGPCoeffs() const
 {
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;
@@ -1962,7 +1966,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
         faceConditionNumber().write();
     }
 
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "end" << endl;
@@ -3043,7 +3047,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     const volVectorField& D
 ) const
 {
-    // if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;
