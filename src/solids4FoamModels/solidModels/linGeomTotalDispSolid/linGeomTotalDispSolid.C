@@ -951,14 +951,165 @@ bool linGeomTotalDispSolid::evolve()
 
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
-    if (highOrderJacobian_)
+    if (!highOrderJacobian_)
     {
-	// To add
-	//NotImplemented;
+	// Initialise based on compact stencil fvMesh
+	return Foam::initialiseJacobian(jac, mesh(), blockSize_);
     }
 
-    // Initialise based on compact stencil fvMesh
-    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+    if (jac)
+    {
+	FatalErrorInFunction
+            << "Jacobian matrix already initialised" << abort(FatalError);
+    }
+
+    // I'm adding this bool becouse this function will be moved to parent
+    // class where it is set to true by default
+    const bool createMat = true;
+
+    const label blockn = mesh().nCells();
+    const label n = blockn * blockSize_;
+    const label N = returnReduce(n, sumOp<label>());
+
+    // Create the matrix
+    if (createMat)
+    {
+	CHKERRQ(MatCreate(PETSC_COMM_WORLD, &jac));
+	CHKERRQ(MatSetSizes(jac, n, n, N, N));
+	CHKERRQ(MatSetType(jac, MATMPIBAIJ));
+	CHKERRQ(MatSetBlockSize(jac, blockSize_));
+	CHKERRQ(MatSetFromOptions(jac));
+    }
+
+     // Faces stencil (global)
+    const List<labelList>& stencils = LREInterp().globalFaceStencils();
+    const labelUList& owner = mesh().owner();
+    const labelUList& neighbour = mesh().neighbour();
+
+    // Unique column sets per local row (block row = cell)
+    List<labelHashSet> rowCols(blockn);
+
+    // Initialise List
+    forAll(rowCols, c)
+    {
+	rowCols[c] = labelHashSet(64);
+    }
+
+    // Ensure diagonal is present
+    for (label c = 0; c < blockn; ++c)
+    {
+        const label gRow = foamPetscSnesHelper::globalCells().toGlobal(c);
+        rowCols[c].insert(gRow);
+    }
+
+    // Loop over internal faces
+    forAll(owner, faceI)
+    {
+	// Face interpolation molecule
+	const labelList& faceStencil = stencils[faceI];
+
+	const label ownCellID = owner[faceI];
+	const label neiCellID = neighbour[faceI];
+
+	// Loop over interpolation stencil
+	for(label cI = 0; cI < faceStencil.size(); cI++)
+	{
+	    const label globalCellID = faceStencil[cI];
+
+	    rowCols[ownCellID].insert(globalCellID);
+	    rowCols[neiCellID].insert(globalCellID);
+	}
+    }
+
+    // Loop over boundary patches that modify matrix
+    forAll(mesh().boundary(), patchI)
+    {
+	if
+	(
+	    mesh().boundary()[patchI].type() == "processor"
+	    || isA<fixedGradientFvPatchVectorField>(D().boundaryField()[patchI])
+	)
+        {
+	    const labelUList& faceOwner = mesh().faceOwner();
+	    forAll(mesh().boundaryMesh()[patchI], faceI)
+            {
+		const label start = mesh().boundaryMesh()[patchI].start();
+
+		// Get global face index, needed for lists from LRE class
+		const label faceID = faceI + start;
+
+		// Face interpolation molecule
+		const labelList& faceStencil = stencils[faceID];
+
+		const label ownCellID = faceOwner[faceID];
+
+		// Loop over interpolation stencil
+		for(label cI = 0; cI < faceStencil.size(); cI++)
+		{
+		    const label globalCellID = faceStencil[cI];
+
+		    rowCols[ownCellID].insert(globalCellID);
+		}
+	    }
+	}
+
+        if (mesh().boundary()[patchI].coupled())
+        {
+            // Other coupled boundaries are not implemented
+            Foam::FatalError
+                << "Coupled boundary are not implemented, except for"
+                << " processor boundaries" << Foam::abort(Foam::FatalError);
+        }
+    }
+
+    // First global index on this processor
+    const label gStart = foamPetscSnesHelper::globalCells().localStart();
+
+    // One past the last global index on this processor
+    const label gEnd   = foamPetscSnesHelper::globalCells().localEnd();
+
+    // Convert labelHashSets to diag/off counts
+    std::vector<label> d_nnz(blockn, 0);
+    std::vector<label> o_nnz(blockn, 0);
+    for (label c = 0; c < blockn; ++c)
+    {
+        label diag = 0;
+	label off = 0;
+        for (auto it = rowCols[c].cbegin(); it != rowCols[c].cend(); ++it)
+        {
+	    // Global block index
+            const label gCol = *it;
+            (gCol >= gStart && gCol < gEnd) ? ++diag : ++off;
+        }
+        d_nnz[c] = diag;
+        o_nnz[c] = off;
+    }
+
+    // Allocate parallel matrix
+    CHKERRQ
+    (
+        MatMPIBAIJSetPreallocation
+	(
+	    jac,
+	    blockSize_,
+	    0,
+	    d_nnz.data(),
+	    0,
+	    o_nnz.data()
+        )
+    );
+
+    // Raise an error if mallocs are required during matrix assembly
+    CHKERRQ(MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));;
+
+    // Keep the pattern across assemblies (optional, helpful once your
+    // stencil stabilizes)
+    CHKERRQ(MatSetOption(jac, MAT_KEEP_NONZERO_PATTERN, PETSC_TRUE));
+
+    // Don't store zeros in the matrix (optional)
+    CHKERRQ(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+
+    return 0;
 }
 
 

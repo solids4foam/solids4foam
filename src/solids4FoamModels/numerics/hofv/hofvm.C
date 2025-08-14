@@ -351,6 +351,21 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 		    }
 		}
 
+		// Check for large coefficient values. They exists if LRE
+		// interpolation have large condition number
+		for (const scalar &v : values)
+		{
+		    if (mag(v) > 1e7)
+		    {
+			WarningInFunction
+			    << "Large matrix coefficient detected: " << v
+			    << " at face " << faceI
+			    << ", point " << pointI
+			    << ", globalCellID " << globalCellID
+			    << endl;
+		    }
+		}
+
 		CHKERRQ
 		(
 		    MatSetValuesBlocked
@@ -456,10 +471,25 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 			{
 			    for (label j = 0; j < nScalarEqns; ++j)
 			    {
-				// Copy 3x3 (or 2x2 in 2-D) coeff into the top left of
-				// the 4x4 (or 3x3 in 2-D) values matrix
+				// Copy 3x3 (or 2x2 in 2-D) coeff into the top
+				// left of the 4x4 (or 3x3 in 2-D) values matrix
 				values[(i + rowOffset)*blockSize + j + colOffset] =
 				    coeff[i*3 + j];
+			    }
+			}
+
+			// Check for large coefficient values. They exists if
+			// LRE interpolation have large condition number
+			for (const scalar &v : values)
+			{
+			    if (mag(v) > 1e7)
+			    {
+				WarningInFunction
+				    << "Large matrix coefficient detected: "
+				    << v << " at face " << faceI
+				    << ", point " << pointI
+				    << ", globalCellID " << globalCellID
+				    << endl;
 			    }
 			}
 
@@ -484,19 +514,19 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 		    // Include boundary value to the source
 		    // Last item in gradCoeff refers to boundary face.
 		    {
-		        const label size = faceStencil.size();
+		        // const label size = faceStencil.size();
 
-		        const vector& cellGradCoeff =
-		            gradCoeffs[faceID][pointI][size];
+		        // const vector& cellGradCoeff =
+		        //     gradCoeffs[faceID][pointI][size];
 
-		        const tensor coeff =
-		            calcCoeff
-		            (
-		                gammaMagSf,
-		        	quadPointW,
-		        	cellGradCoeff,
-		        	faceNormal
-		            );
+		        // const tensor coeff =
+		        //     calcCoeff
+		        //     (
+		        //         gammaMagSf,
+		        // 	quadPointW,
+		        // 	cellGradCoeff,
+		        // 	faceNormal
+		        //     );
 
                         //source[owner[faceID]] -=
 			//coeff & D.boundaryField()[patchI][faceI];
@@ -583,6 +613,17 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 		const tensor coeff =
 		    calcCoeff(gammaMagSf, quadPointW, cellGradCoeff, faceNormal);
 
+		scalar maxCoeff = cmptMax(mag(coeff));
+		if (maxCoeff > 1e7)
+		{
+		    WarningInFunction
+			<< "Large matrix coefficient detected: " << maxCoeff
+			<< " at face " << faceI
+			<< ", point " << pointI
+			<< ", stencil cell " << globalCellID
+			<< endl;
+		}
+
 		matrix(owner[faceI], globalCellID) += coeff;
 		matrix(neighbour[faceI], globalCellID) -= coeff;
 	    }
@@ -660,6 +701,17 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 				cellGradCoeff,
 				faceNormal
 			    );
+
+			scalar maxCoeff = cmptMax(mag(coeff));
+			if (maxCoeff > 1e7)
+			{
+			    WarningInFunction
+				<< "Large matrix coefficient detected: "
+				<< maxCoeff << " at face " << faceI
+				<< ", point " << pointI
+				<< ", stencil cell " << globalCellID
+				<< endl;
+			}
 
 			matrix(owner[faceID], globalCellID) += coeff;
 		    }

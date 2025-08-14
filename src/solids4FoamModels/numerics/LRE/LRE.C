@@ -97,20 +97,18 @@ void LRE::makeGlobalCellStencils() const
 	{
 	    const point& cellCentre = cellCentres[cellI];
 	    scalar sphereR =
-		4*std::cbrt(3*cellV[cellI]/(4*constant::mathematical::pi));
+		8.0*std::cbrt(3*cellV[cellI]/(4*constant::mathematical::pi));
 
 	    labelList candidates;
 	    while(true)
 	    {
-		candidates = octree.findSphere(cellCentre, sphereR);
+		candidates = octree.findSphere(cellCentre, sqr(sphereR));
 
-		if (candidates.size() >= Nn || sphereR >= maxRadius)
+		if (candidates.size() >= 1.5*Nn || sphereR >= 2.0*maxRadius)
 		{
 		    break;
 		}
-
-		// Grow radius (e.g. double each time)
-		sphereR = min(maxRadius, sphereR*2.0);
+	        sphereR *= 2.0;
 	    }
 
 	    List<Tuple2<label, scalar>> distList(candidates.size());
@@ -154,6 +152,14 @@ void LRE::makeGlobalCellStencils() const
 	    for (label i = 0; i < nTie; ++i)
 	    {
 		cellStencils[cellI][i] = distList[i].first();
+	    }
+
+	    if (cellStencils[cellI].size() < Nn)
+	    {
+		FatalErrorInFunction
+		    << "Number of face neighbours from octree search: "
+		    << cellStencils[cellI].size() << " is lower than required: "
+		    << Nn << abort(FatalError);
 	    }
         }
     }
@@ -613,20 +619,18 @@ void LRE::makeGlobalFaceStencils() const
 	forAll(mesh.faces(), faceI)
 	{
 	    const point& faceCentre = mesh.faceCentres()[faceI];
-	    scalar sphereR = 4.0*mag(faceCentre - cellCentres[owner[faceI]]);
+	    scalar sphereR = 8.0*mag(faceCentre - cellCentres[owner[faceI]]);
 
 	    labelList candidates;
 	    while(true)
 	    {
-		candidates = octree.findSphere(faceCentre, sphereR);
+		candidates = octree.findSphere(faceCentre, sqr(sphereR));
 
-		if (candidates.size() >= Nn || sphereR >= maxRadius)
+		if (candidates.size() >= 1.5*Nn || sphereR >= 2.0*maxRadius)
 		{
 		    break;
 		}
-
-		// Grow radius (e.g. double each time)
-		sphereR = min(maxRadius, sphereR*2.0);
+	        sphereR *= 2.0;
 	    }
 
 	    List<Tuple2<label, scalar>> distList(candidates.size());
@@ -649,8 +653,7 @@ void LRE::makeGlobalFaceStencils() const
 		     return A.second() < B.second();
 		 }
 	    );
-
-	    label n    = distList.size();
+	    label n = distList.size();
 	    label nMin = min(n, Nn);
 
 	    // Get sphere radius for last point
@@ -658,7 +661,7 @@ void LRE::makeGlobalFaceStencils() const
 
 	    // Extend to include candidates within tolerance of 1%
 	    // By doing this we perserve symmetric stencil on structured grids
-	    scalar tol = 1e-3*sphereRadius;
+	    scalar tol = 1e-6*sphereRadius;
 	    label nTie = nMin;
 	    while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
 	    {
@@ -671,6 +674,15 @@ void LRE::makeGlobalFaceStencils() const
 	    {
 		faceStencils[faceI][i] = distList[i].first();
 	    }
+
+	    if (faceStencils[faceI].size() < Nn)
+	    {
+		FatalErrorInFunction
+		    << "Number of face neighbours from octree search: "
+		    << faceStencils[faceI].size() << " is lower than required: "
+		    << Nn << abort(FatalError);
+	    }
+
 	}
     }
     return;
