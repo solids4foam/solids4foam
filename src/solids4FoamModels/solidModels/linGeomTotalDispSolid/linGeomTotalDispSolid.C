@@ -28,6 +28,7 @@ License
 #include "sparseMatrixTools.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -968,8 +969,10 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     const bool createMat = true;
 
     const label blockn = mesh().nCells();
-    const label n = blockn * blockSize_;
-    const label N = returnReduce(n, sumOp<label>());
+    const PetscInt bs = static_cast<PetscInt>(blockSize_);
+    const PetscInt n = static_cast<PetscInt>(blockn) * bs;
+    const PetscInt N =
+	static_cast<PetscInt>(returnReduce(label(n), sumOp<label>()));
 
     // Create the matrix
     if (createMat)
@@ -1027,7 +1030,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 	if
 	(
 	    mesh().boundary()[patchI].type() == "processor"
-	    || isA<fixedGradientFvPatchVectorField>(D().boundaryField()[patchI])
+	    || isA<fixedValueFvPatchVectorField>(D().boundaryField()[patchI])
 	)
         {
 	    const labelUList& faceOwner = mesh().faceOwner();
@@ -1069,12 +1072,12 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     const label gEnd   = foamPetscSnesHelper::globalCells().localEnd();
 
     // Convert labelHashSets to diag/off counts
-    std::vector<label> d_nnz(blockn, 0);
-    std::vector<label> o_nnz(blockn, 0);
+    List<PetscInt> d_nnz(blockn, 0);
+    List<PetscInt> o_nnz(blockn, 0);
     for (label c = 0; c < blockn; ++c)
     {
-        label diag = 0;
-	label off = 0;
+        PetscInt diag = 0;
+	PetscInt off = 0;
         for (auto it = rowCols[c].cbegin(); it != rowCols[c].cend(); ++it)
         {
 	    // Global block index
