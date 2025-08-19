@@ -485,33 +485,75 @@ label newtonIcoFluid::formResidual
     // Fp = stabilisation - div(U)
     //    = stabilisation - tr(grad(U))
     // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
-    const dimensionedScalar omega("omega", fluidProperties());
-    const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
-    const scalar omegaExponent
-    (
-        readScalar(fluidProperties().lookup("omegaExponent"))
-    );
-    const surfaceScalarField localRe
-    (
-        fvc::interpolate(mag(U)/turbulence_->nuEff())/mesh.deltaCoeffs()
-    );
     scalarField pressureResidual
     (
-        fvc::laplacian
-        (
-            omega*Foam::pow(1.0 + localRe/localReRef, omegaExponent)
-           /sqr(mesh.deltaCoeffs()),
-            p,
-            "laplacian(rAU,p)"
-        )
-      //   fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
-      // - fvc::div
-      //   (
-      //       (rAUf()*mesh.Sf()) & fvc::interpolate(fvc::grad(p))
-      //   )
-      // - tr(fvc::grad(U)) // probably more accurate on a bad grid?
       - fvc::div(U)
     );
+
+    // Add stabilisation
+    {
+        const dictionary& stabDict =
+            fluidProperties().subDict("stabilisation");
+
+        const word stabType(stabDict.lookup("type"));
+
+        if (stabType == "laplacian")
+        {
+            const dimensionedScalar omega("omega", fluidProperties());
+
+            pressureResidual +=
+                fvc::laplacian
+                (
+                    omega/sqr(mesh.deltaCoeffs()), p, "laplacian(rAU,p)"
+                );
+        }
+        else if (stabType == "RhieChow")
+        {
+            const dimensionedScalar scaleFactor("scaleFactor", stabDict);
+
+            fvVectorMatrix UEqn
+            (
+                fvm::laplacian(turbulence_->nuEff(), U)
+              - fvm::ddt(U)
+              - fvm::div(phi, U)
+            );
+
+            rAUf() = scaleFactor*fvc::interpolate(1.0/UEqn.A());
+
+            pressureResidual -=
+                fvc::laplacian(rAUf(), p, "laplacian(rAU,p)")
+              - fvc::div
+                (
+                    (rAUf()*mesh.Sf()) & fvc::interpolate(gradp())
+                );
+        }
+        else if (stabType == "JST")
+        {
+            const dimensionedScalar innerScaleFactor
+            (
+                "innerScaleFactor", stabDict
+            );
+
+            const dimensionedScalar outerScaleFactor
+            (
+                "outerScaleFactor", stabDict
+            );
+
+            pressureResidual -=
+                fvc::laplacian
+                (
+                    outerScaleFactor/sqr(mesh.deltaCoeffs()),
+                    fvc::laplacian(innerScaleFactor, p, "laplacian(rAU,p)"),
+                    "laplacian(rAU,p)"
+                );
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Stabilisation " << stabType << " not found!"
+                << exit(FatalError);
+        }
+    }
 
     // Make residual extensive
     pressureResidual *= mesh.V();
@@ -881,38 +923,52 @@ label newtonIcoFluid::formJacobian
         fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
     );
 
-    // Update rAUf
-    // const scalar pressureSmoothingCoeff
-    // (
-    //     readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
-    // );
-    // {
-    //     const volScalarField nuEff(turbulence_->nuEff());
-    //     const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
-    //     rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
-    // }
-    const dimensionedScalar omega("omega", fluidProperties());
-    const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
-    const scalar omegaExponent
-    (
-        readScalar(fluidProperties().lookup("omegaExponent"))
-    );
-    const surfaceScalarField localRe
-    (
-        fvc::interpolate(mag(U)/turbulence_->nuEff())/mesh.deltaCoeffs()
-    );
+    // Add stabilisation
+    {
+        const dictionary& stabDict =
+            fluidProperties().subDict("stabilisation");
+
+        const word stabType(stabDict.lookup("type"));
+
+        if (stabType == "laplacian")
+        {
+            const dimensionedScalar omega("omega", fluidProperties());
+            rAUf() = omega/sqr(mesh.deltaCoeffs());
+        }
+        else if (stabType == "RhieChow")
+        {
+            const dimensionedScalar scaleFactor("scaleFactor", stabDict);
+
+            UEqn -= fvm::div(phi(), U);
+
+            rAUf() = -scaleFactor*fvc::interpolate(1.0/UEqn.A());
+        }
+        else if (stabType == "JST")
+        {
+            const dimensionedScalar innerScaleFactor
+            (
+                "innerScaleFactor", stabDict
+            );
+
+            const dimensionedScalar outerScaleFactor
+            (
+                "outerScaleFactor", stabDict
+            );
+
+            rAUf() = outerScaleFactor*innerScaleFactor/sqr(mesh.deltaCoeffs());
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Stabilisation " << stabType << " not found!"
+                << exit(FatalError);
+        }
+    }
 
     // Calculate pressure equation matrix
     fvScalarMatrix pEqn
     (
-        // fvm::laplacian(rAUf(), p, "jacobian-laplacian(rAU,p)")
-        fvm::laplacian
-        (
-            omega*Foam::pow(1.0 + localRe/localReRef, omegaExponent)
-           /sqr(mesh.deltaCoeffs()),
-            p,
-            "jacobian-laplacian(rAU,p)"
-        )
+        fvm::laplacian(rAUf(), p, "jacobian-laplacian(rAU,p)")
     );
 
     if (debug)
