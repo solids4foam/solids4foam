@@ -155,7 +155,7 @@ private:
         mutable autoPtr<List<DynamicList<vector>>> QRGradCoeffsPtr_;
 
         //- QR Gradient face Gauss points coefficients
-        mutable autoPtr<List<List<DynamicList<vector>>>> QRGradFaceGPCoeffsPtr_;
+        mutable autoPtr<List<CompactListList<vector>>> QRGradFaceGPCoeffsPtr_;
 
         //- Cholesky decomposition
         mutable autoPtr<List<Eigen::LLT<Eigen::MatrixXd>>> choleskyPtr_;
@@ -169,11 +169,11 @@ private:
             List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>
         > sqrtWPtr_;
 
-        //- Face Gauss points
-        mutable autoPtr<List<List<point>>> faceQuadPointsPtr_;
+        //- Face quadrature points
+        mutable autoPtr<CompactListList<point>> faceQuadPointsPtr_;
 
-        //- Face Gauss points weights
-        mutable autoPtr<List<List<scalar>>> faceQuadPointsWeightPtr_;
+        //- Face quadrature points weights
+        mutable autoPtr<CompactListList<scalar>> faceQuadWeightPtr_;
 
     // Private Member Functions
 
@@ -321,17 +321,17 @@ public:
             //- Return overall cell stencil size using cell faces stencils
             tmp<labelField> cellFacesStencilSize() const;
 
-            //- Return the face Gauss points weights
-            const List<List<scalar>>& faceGaussPointsWeight() const;
+            //- Return the face quadrature weights
+            const CompactListList<scalar>& faceQuadWeight() const;
 
-            //- Return the face Gauss points
-            const List<List<point>>& faceGaussPoints() const;
+            //- Return the face quadrature points
+            const CompactListList<point>& faceQuadPoints() const;
 
             //- Return the least squares face cell stencils
             const labelListList& globalFaceStencils() const;
 
             //- Return the gradient face Gauss points coefficients
-            const List<List<DynamicList<vector>>>& QRGradFaceGPCoeffs() const;
+            const List<CompactListList<vector>>& QRGradFaceGPCoeffs() const;
 
         // Edit
 

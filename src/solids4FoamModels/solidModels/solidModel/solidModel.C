@@ -353,7 +353,7 @@ void Foam::solidModel::makeSigmaQuad() const
 
     // Initialise lists
     List<List<symmTensor>>& sigmaQuad = sigmaQuadPtr_.ref();
-    const List<List<point>>& quadPoints = LREInterp().faceGaussPoints();
+    const CompactListList<point>& quadPoints = LREInterp().faceQuadPoints();
 
     forAll(sigmaQuad, faceI)
     {
@@ -380,7 +380,7 @@ void Foam::solidModel::makeGradDQuad() const
 
     // Initialise lists
     List<List<tensor>>& gradDQuad = gradDQuadPtr_.ref();
-    const List<List<point>>& quadPoints = LREInterp().faceGaussPoints();
+    const CompactListList<point>& quadPoints = LREInterp().faceQuadPoints();
 
     forAll(gradDQuad, faceI)
     {

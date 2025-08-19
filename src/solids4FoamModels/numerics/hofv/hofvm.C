@@ -279,13 +279,13 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
     const scalarField& gammaI = gamma.internalField();
 
     // Face quadrature points weights
-    const List<List<scalar>>& facesQuadWeights = lre.faceGaussPointsWeight();
+    const CompactListList<scalar>& facesQuadWeights = lre.faceQuadWeight();
 
     // Faces stencil
     const List<labelList>& stencils = lre.globalFaceStencils();
 
     // Gradient interpolation coefficients
-    const List<List<DynamicList<vector>>>& gradCoeffs =
+    const List<CompactListList<vector>>& gradCoeffs =
 	lre.QRGradFaceGPCoeffs();
 
     // Get the blockSize
@@ -572,16 +572,16 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
     const scalarField& gammaI = gamma.internalField();
 
     // Face quadrature points weights
-    const List<List<scalar>>& facesQuadWeights = lre.faceGaussPointsWeight();
+    const CompactListList<scalar>& facesQuadWeights = lre.faceQuadWeight();
 
     // Face quadrature points
-    const List<List<point>>& faceQuadPoints = lre.faceGaussPoints();
+    const CompactListList<point>& faceQuadPoints = lre.faceQuadPoints();
 
     // Faces stencil
     const List<labelList>& stencils = lre.globalFaceStencils();
 
     // Gradient interpolation coefficients
-    const List<List<DynamicList<vector>>>& gradCoeffs =
+    const List<CompactListList<vector>>& gradCoeffs =
 	lre.QRGradFaceGPCoeffs();
 
     // Loop over internal faces

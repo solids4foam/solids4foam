@@ -586,7 +586,7 @@ void LRE::makeGlobalFaceStencils() const
         FatalErrorInFunction
             << "Pointer already set" << exit(FatalError);
     }
-
+    cpuTime timer;
     // Radial method, set true for testing. Implemented for serial run.
     const bool radialStencil = true;
 
@@ -685,6 +685,7 @@ void LRE::makeGlobalFaceStencils() const
 
 	}
     }
+    Info<<"--Molecule construction:"<<timer.elapsedCpuTime()<< endl;
     return;
 
     //Old code where face stencil is constructed using cell stencil
@@ -1638,18 +1639,12 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
     QRGradFaceGPCoeffsPtr_.set
     (
-        new List<List<DynamicList<vector>>>(mesh.nFaces())
+        new List<CompactListList<vector>>(mesh.nFaces())
     );
-    List<List<DynamicList<vector>>>& QRGradCoeffs = *QRGradFaceGPCoeffsPtr_;
+    List<CompactListList<vector>>& QRGradCoeffs = *QRGradFaceGPCoeffsPtr_;
 
-    // Gauss point locations on each face
-    const List<List<point>>& faceGP = faceGaussPoints();
-
-    forAll(QRGradCoeffs, faceI)
-    {
-        List<DynamicList<vector>>& facePointsGC = QRGradCoeffs[faceI];
-        facePointsGC.setSize(faceGP[faceI].size());
-    }
+    // Quadrature points locations on each face
+    const CompactListList<point>& faceGP = faceQuadPoints();
 
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
@@ -1673,23 +1668,9 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
-    // Coefficients
-    List<List<DynamicList<scalar>>> c(mesh.nFaces());
-    List<List<DynamicList<scalar>>> cx(mesh.nFaces());
-    List<List<DynamicList<scalar>>> cy(mesh.nFaces());
-    List<List<DynamicList<scalar>>> cz(mesh.nFaces());
-
-    // Set size for second list
-    forAll(c, faceI)
-    {
-        c[faceI].setSize(faceGP[faceI].size());
-        cx[faceI].setSize(faceGP[faceI].size());
-        cy[faceI].setSize(faceGP[faceI].size());
-	cz[faceI].setSize(faceGP[faceI].size());
-    }
-
     const List<labelList>& stencils = globalFaceStencils();
 
+    // Loop over all faces
     forAll(stencils, faceI)
     {
         const labelList& curStencil = stencils[faceI];
@@ -1743,10 +1724,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                 << exit(FatalError);
         }
 
-        // Face Gauss points
+        // Face quadrature points
         const List<point>& fGP = faceGP[faceI];
+	const label nGP = fGP.size();
 
-        // Loop over face Gauss points
+	// Allocate CompactListList for this face
+	labelList rowSizes(nGP, Nn);
+	QRGradCoeffs[faceI] = CompactListList<vector>(rowSizes);
+
+        // Loop over face quadrature points
         forAll(fGP, gaussPointI)
         {
             const vector& curGP = fGP[gaussPointI];
@@ -1898,76 +1884,17 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 		   /(singularValues(singularValues.size() - 1) + VSMALL);
 	    }
 
-            c[faceI][gaussPointI].setCapacity(A.cols());
-            cx[faceI][gaussPointI].setCapacity(A.cols());
-            cy[faceI][gaussPointI].setCapacity(A.cols());
-            cz[faceI][gaussPointI].setCapacity(A.cols());
-
             Eigen::RowVectorXd cRow = A.row(0);
             Eigen::RowVectorXd cxRow = A.row(1)/h;
             Eigen::RowVectorXd cyRow = A.row(2)/h;
-            Eigen::RowVectorXd czRow;
-	    if (twoD)
+            Eigen::RowVectorXd czRow =
+		twoD ? Eigen::RowVectorXd::Zero(A.cols()) : (A.row(3)/h).eval();
+
+	    for (label i = 0; i < A.cols(); ++i)
 	    {
-		czRow = Eigen::RowVectorXd::Zero(A.cols());
+		 QRGradCoeffs[faceI][gaussPointI][i] =
+		     vector(cxRow(i), cyRow(i), czRow(i));
 	    }
-	    else
-	    {
-		czRow = A.row(3)/h;
-	    }
-
-            for (label i = 0; i < A.cols(); ++i)
-            {
-                c[faceI][gaussPointI].append(cRow(i));
-                cx[faceI][gaussPointI].append(cxRow(i));
-                cy[faceI][gaussPointI].append(cyRow(i));
-		cz[faceI][gaussPointI].append(czRow(i));
-            }
-
-            c[faceI][gaussPointI].shrink();
-            cx[faceI][gaussPointI].shrink();
-            cy[faceI][gaussPointI].shrink();
-            cz[faceI][gaussPointI].shrink();
-        }
-
-    }
-
-    forAll(QRGradCoeffs, faceI)
-    {
-       const labelList& curStencil = stencils[faceI];
-
-        // We need to extend stencil for ghost point at boundary
-       bool ghostPoint = false;
-       if (!mesh.isInternalFace(faceI))
-       {
-           const label patchID = mesh.boundaryMesh().whichPatch(faceI);
-           ghostPoint = includePatchInStencils_[patchID];
-       }
-
-       // Number of neighbours in stencil
-       const label Nn = curStencil.size() + (ghostPoint ? 1 : 0);
-
-       const List<point>& fGP = faceGP[faceI];
-
-       // Loop over face Gauss points
-       forAll(fGP, gaussPointI)
-       {
-           QRGradCoeffs[faceI][gaussPointI].setCapacity(Nn);
-
-           for (label I = 0; I < Nn; I++)
-           {
-               QRGradCoeffs[faceI][gaussPointI].append
-               (
-                   vector
-                   (
-                       cx[faceI][gaussPointI][I],
-                       cy[faceI][gaussPointI][I],
-                       cz[faceI][gaussPointI][I]
-                   )
-               );
-           }
-
-           QRGradCoeffs[faceI][gaussPointI].shrink();
         }
     }
 
@@ -2457,7 +2384,7 @@ void LRE::calcQuadPointsAndWeights() const
 
 void LRE::calcQuadPointsAndWeights2D() const
 {
-    if (faceQuadPointsPtr_ || faceQuadPointsWeightPtr_)
+    if (faceQuadPointsPtr_ || faceQuadWeightPtr_)
     {
         FatalErrorInFunction
             << "Pointers already set!" << abort(FatalError);
@@ -2467,48 +2394,51 @@ void LRE::calcQuadPointsAndWeights2D() const
     const pointField& pts = mesh.points();
     const faceList& faces = mesh.faces();
 
-    // Quadrature point locations on each face
-    faceQuadPointsPtr_.set(new List<List<point>>(mesh.nFaces()));
-    List<List<point>>& faceQP = *faceQuadPointsPtr_;
-
-    // Quadrature point weights
-    faceQuadPointsWeightPtr_.set(new List<List<scalar>>(mesh.nFaces()));
-    List<List<scalar>>& faceQPW = *faceQuadPointsWeightPtr_;
-
     const vector emptyDir(vector(0,0,1));
     const scalar zCentre = boundBox(mesh.points()).centre().z();
 
-    // Initialise sub-list sizes
-    forAll(faceQP, faceI)
+    // Determine number of quadrature points per face
+    labelList nQpPerFace(mesh.nFaces(), 0);
+    forAll(faces, faceI)
     {
-        List<point>& fQP = faceQP[faceI];
-        List<scalar>& fQPW = faceQPW[faceI];
-
-	// Skip empty faces
 	if (faceI >= mesh.nInternalFaces())
-	{
-	    const label patchID = mesh.boundaryMesh().whichPatch(faceI);
-	    const polyPatch& pp = mesh.boundaryMesh()[patchID];
-	    if (pp.type() == "empty")
-	    {
-		fQP.setSize(0);
-		fQPW.setSize(0);
+        {
+            const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+            const polyPatch& pp = mesh.boundaryMesh()[patchID];
 
-		continue;
-	    }
-	    // Stop in case of wedge, implementation is done only for 2D
-	    if (pp.type() == "wedge")
-	    {
-	    	FatalErrorIn("calcQuadPointsAndWeights2D()")
-		    << "Not implemented for axisymmetric case, to do..."
-		    << abort(FatalError);
-	    }
+            if (pp.type() == "empty")
+            {
+                nQpPerFace[faceI] = 0;
+                continue;
+            }
+
+            if (pp.type() == "wedge")
+            {
+                FatalErrorIn("calcQuadPointsAndWeights2D()")
+                    << "Not implemented for axisymmetric case, to do..."
+                    << abort(FatalError);
+            }
+        }
+
+        nQpPerFace[faceI] = lineQuadrature::nPoints(N_);
+    }
+
+    // Initialise quadrature points and weights
+    faceQuadPointsPtr_.set(new CompactListList<point>(nQpPerFace));
+    faceQuadWeightPtr_.set(new CompactListList<scalar>(nQpPerFace));
+
+    CompactListList<point>& faceQP  = *faceQuadPointsPtr_;
+    CompactListList<scalar>& faceQPW = *faceQuadWeightPtr_;
+
+    forAll(faces, faceI)
+    {
+	if (!faceQP[faceI].size())
+	{
+	    // Skip empty faces
+	    continue;
 	}
 
-        fQP.setSize(lineQuadrature::nPoints(N_));
-        fQPW.setSize(lineQuadrature::nPoints(N_));
-
-	// Set face quadrature points and corresponding weights
+    	// Set face quadrature points and corresponding weights
 	// We will loop over face edges and take the edge on the
 	// empty patch. Edge is translated to domain mid-plane.
 
@@ -2548,7 +2478,7 @@ void LRE::calcQuadPointsAndWeights2D() const
 		}
 
 		// Go to next face, this face is done
-		continue;
+		break;
 	    }
 	}
     }
@@ -2563,7 +2493,7 @@ void LRE::calcQuadPointsAndWeights3D() const
             << "start" << endl;
     }
 
-    if (faceQuadPointsPtr_ || faceQuadPointsWeightPtr_)
+    if (faceQuadPointsPtr_ || faceQuadWeightPtr_)
     {
         FatalErrorInFunction
             << "Pointers already set!" << abort(FatalError);
@@ -2571,14 +2501,6 @@ void LRE::calcQuadPointsAndWeights3D() const
 
     const fvMesh& mesh = mesh_;
     const pointField& pts = mesh.points();
-
-    // Quadrature point locations on each face
-    faceQuadPointsPtr_.set(new List<List<point>>(mesh.nFaces()));
-    List<List<point>>& faceGP = *faceQuadPointsPtr_;
-
-    // Quadrature point weights
-    faceQuadPointsWeightPtr_.set(new List<List<scalar>>(mesh.nFaces()));
-    List<List<scalar>>& faceGPW = *faceQuadPointsWeightPtr_;
 
     // 1. Stage - decompose faces into triangles. Store triangle points
     // We have two options (N-number of face points):
@@ -2595,24 +2517,17 @@ void LRE::calcQuadPointsAndWeights3D() const
     // Triangulate each face and store points of each triangle
     List<List<triPoints>> faceTri(mesh.nFaces());
 
+    // Store how many quadrature points each face will have
+    labelList nQpPerFace(mesh.nFaces(), 0);
+
     for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
     {
 	const face& f = mesh.faces()[faceI];
 	const label nTri = f.nTriangles();
 	const label nPoints = f.size();
 
-	// Initialise sub-list sizes
-        List<point>& fGP = faceGP[faceI];
-        List<scalar>& fGPW = faceGPW[faceI];
-        List<triPoints>& fT = faceTri[faceI];
-
-	fGP.setSize(nTri*triQuadrature::nPoints(N_));
-	fGPW.setSize(nTri*triQuadrature::nPoints(N_));
-	fT.setSize(nTri);
-
-	// Have face triangulate itself (results in faceList)
+	// Triangulate using OpenFOAM build in adaptive fan triangulation
 	faceList triFaces(nTri);
-
 	label t2 = 0;
 	const label t1 = f.triangles(mesh.points(), t2, triFaces);
 
@@ -2625,6 +2540,7 @@ void LRE::calcQuadPointsAndWeights3D() const
 	}
 
 	// Copy into faceTri list
+	faceTri[faceI].setSize(nTri);
 	forAll(triFaces, triFaceI)
 	{
 	    const face& triF = triFaces[triFaceI];
@@ -2634,14 +2550,14 @@ void LRE::calcQuadPointsAndWeights3D() const
 		triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
 	}
 
-	// Check triangulation and perform central point triangulation if needed
+	// Check decomposition and perform central point triangulation if needed
 	bool validDecomposition = true;
 	{
 	    const scalar faceArea = f.mag(pts);
 	    forAll(faceTri[faceI], triI)
 	    {
 		const scalar triArea = mag(faceTri[faceI][triI].areaNormal());
-	        const scalar areaRatio = triArea / faceArea;
+	        const scalar areaRatio = triArea / (faceArea + VSMALL);
 
 		if (areaRatio < 0.1)
 		{
@@ -2651,46 +2567,39 @@ void LRE::calcQuadPointsAndWeights3D() const
 			<< "Swiching to central point triangulation for face"
 			<< faceI << " at " << mesh.faceCentres()[faceI]
 			<< endl;
+		    break;
 		}
 	    }
 	}
 
 	if (!validDecomposition)
 	{
-	    // Resise sub-list sizes
-	    faceGP[faceI].setSize(nPoints*triQuadrature::nPoints(N_));
-	    faceGPW[faceI].setSize(nPoints*triQuadrature::nPoints(N_));
-	    faceTri[faceI].setSize(nPoints);
-
 	    // Triangulation using central point
+	    faceTri[faceI].setSize(nPoints);
             const point fc = f.centre(pts);
 
-	    label nextpI;
             for (label pI = 0; pI<nPoints; ++pI)
             {
-                if (pI < f.size() - 1)
-                {
-                    nextpI = pI + 1;
-                }
-                else
-                {
-                    nextpI = 0;
-                }
+                const label nextpI = (pI + 1 < nPoints ? pI + 1 : 0);
 
-                const triPoints tri
-                (
-                    pts[f[pI]],
-                    pts[f[nextpI]],
-                    fc
-                );
-
-                faceTri[faceI][pI] = tri;
+                faceTri[faceI][pI] = triPoints(pts[f[pI]], pts[f[nextpI]], fc);
             }
 	}
+
+	// Final qp count for this face = (#triangles used) * (qp per triangle)
+        const label nTriUsed = faceTri[faceI].size();
+        nQpPerFace[faceI] = nTriUsed * triQuadrature::nPoints(N_);
     }
 
-    // 2. Stage - for each triangle calculate Gauss point locations and store
-    //            corresponding weights
+    // Allocate memory for compactListList for points and weights
+    faceQuadPointsPtr_.set(new CompactListList<point>(nQpPerFace));
+    faceQuadWeightPtr_.set(new CompactListList<scalar>(nQpPerFace));
+
+    CompactListList<point>&  faceQuadP  = *faceQuadPointsPtr_;
+    CompactListList<scalar>& faceQuadW = *faceQuadWeightPtr_;
+
+    // 2. Stage - for each triangle calculate quadrature point locations and
+    //            store corresponding weights
 
     forAll(faceTri, faceI)
     {
@@ -2701,28 +2610,26 @@ void LRE::calcQuadPointsAndWeights3D() const
         forAll(fT, tI)
         {
             const triPoints& tp = fT[tI];
-
             const scalar triArea = tp.mag();
-
-            const scalar scaleW = triArea/faceArea;
+            const scalar scaleW = triArea/(faceArea+VSMALL);
 
             // Get triangle Gauss points and weights
             const triQuadrature tq(tp, N_);
-            const List<point>& triangleGP = tq.points();
-            const List<scalar>& triangleGPweights = tq.weights();
+            const List<point>& triangleQuadP = tq.points();
+            const List<scalar>& triangleQuadW = tq.weights();
 
-            forAll(triangleGP, i)
+            forAll(triangleQuadP, i)
             {
                 const label pos = tI*tq.nPoints() + i;
-                faceGP[faceI][pos] = triangleGP[i];
-                faceGPW[faceI][pos] = scaleW*triangleGPweights[i];
+                faceQuadP[faceI][pos] = triangleQuadP[i];
+                faceQuadW[faceI][pos] = scaleW*triangleQuadW[i];
             }
         }
     }
 }
 
 
-const List<List<point>>& LRE::faceGaussPoints() const
+const CompactListList<point>& LRE::faceQuadPoints() const
 {
     if (!faceQuadPointsPtr_)
     {
@@ -2733,14 +2640,14 @@ const List<List<point>>& LRE::faceGaussPoints() const
 }
 
 
-const List<List<scalar>>& LRE::faceGaussPointsWeight() const
+const CompactListList<scalar>& LRE::faceQuadWeight() const
 {
-    if (!faceQuadPointsWeightPtr_)
+    if (!faceQuadWeightPtr_)
     {
         calcQuadPointsAndWeights();
     }
 
-    return faceQuadPointsWeightPtr_();
+    return faceQuadWeightPtr_();
 }
 
 
@@ -2780,7 +2687,7 @@ const List<DynamicList<vector>>& LRE::QRGradCoeffs() const
 }
 
 
-const List<List<DynamicList<vector>>>&
+const List<CompactListList<vector>>&
 LRE::QRGradFaceGPCoeffs() const
 {
     if (!QRGradFaceGPCoeffsPtr_)
@@ -2968,7 +2875,7 @@ LRE::LRE
     QhatPtr_(),
     sqrtWPtr_(),
     faceQuadPointsPtr_(),
-    faceQuadPointsWeightPtr_()
+    faceQuadWeightPtr_()
 {
     if (calcConditionNumber_)
     {
@@ -3068,7 +2975,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     const fvMesh& mesh = mesh_;
 
     // Gauss point locations on each face
-    const List<List<point>>& faceGP = faceGaussPoints();
+    const CompactListList<point>& faceGP = faceQuadPoints();
 
     // Prepare the return field
     autoPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
@@ -3096,7 +3003,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     const vectorField& DI = D;
     const List<labelList>& stencils = globalFaceStencils();
 
-    const List<List<DynamicList<vector>>>& pointQRGradCoeffs = QRGradFaceGPCoeffs();
+    const List<CompactListList<vector>>& pointQRGradCoeffs = QRGradFaceGPCoeffs();
 
     // Collect DI for off-processor cells in the stencils
     Map<vector> globalDI;

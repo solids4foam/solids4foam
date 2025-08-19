@@ -1202,7 +1202,7 @@ label linGeomTotalDispSolid::formResidual
 	mechanical().correct(sigmaQuad(), gradDQuad());
 
 	// Quadrature points weights
-	const List<List<scalar>>& quadW = LREInterp().faceGaussPointsWeight();
+	const CompactListList<scalar>& quadW = LREInterp().faceQuadWeight();
 
 	// Integration over face quadrature points to get face traction
 	traction = hofvc::surfaceIntegrate(sigmaQuad(), quadW,  mesh);

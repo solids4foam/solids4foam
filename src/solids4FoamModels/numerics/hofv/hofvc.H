@@ -58,7 +58,7 @@ namespace hofvc
     tmp<surfaceVectorField> surfaceIntegrate
     (
         const List<List<symmTensor>>& quadSigma,
-	const List<List<scalar>>& quadW,
+	const CompactListList<scalar>& quadW,
 	const fvMesh& mesh
     );
 
