@@ -503,9 +503,13 @@ bool pimpleFluid::evolve()
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
+            gradp() = fvc::grad(p);
+
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
          // fvOptions.correct(U);
+
+            gradU() = fvc::grad(U);
         }
 
         // Correct Uf if the mesh is moving
