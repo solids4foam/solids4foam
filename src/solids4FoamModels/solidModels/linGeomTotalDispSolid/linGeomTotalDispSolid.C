@@ -545,7 +545,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh().nCells(),
+        mesh(),
+        solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -814,14 +815,14 @@ bool linGeomTotalDispSolid::evolve()
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
-    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 
 label linGeomTotalDispSolid::initialiseSolution(Vec& x)
 {
     // Initialise based on mesh.nCells()
-    return Foam::initialiseSolution(x, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
 }
 
 

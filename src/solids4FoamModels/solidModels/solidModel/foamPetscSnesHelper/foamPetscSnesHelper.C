@@ -158,137 +158,6 @@ PetscErrorCode convergenceCheckFoamPetscSnesHelper
 }
 
 
-Foam::label Foam::initialiseJacobian
-(
-    Mat& jac,
-    const fvMesh& mesh,
-    const label blockSize,
-    const bool createMat
-)
-{
-    // Count number of local blocks and local scalar equations
-    const label blockn = mesh.nCells();
-    const label n = blockn*blockSize;
-
-    // Global system size: total number of scalar equation across all
-    // processors
-    const label N = returnReduce(n, sumOp<label>());
-
-    // // Set the Jacobian matrix size
-    if (createMat)
-    {
-        MatCreate(PETSC_COMM_WORLD, &jac);
-        MatSetFromOptions(jac);
-        MatSetSizes(jac, n, n, N, N);
-        MatSetType(jac, MATMPIAIJ);
-    }
-
-    // Set the block size
-    CHKERRQ(MatSetBlockSize(jac, blockSize));
-
-    // Count the number of non-zeros in the matrix
-    // Note: we assume a compact stencil, i.e. face only face neighbours
-
-    // Number of on-processor non-zeros per row
-    label* d_nnz = (label*)malloc(blockn*sizeof(*d_nnz));
-
-    // Number of off-processor non-zeros per row
-    label* o_nnz = (label*)malloc(blockn*sizeof(*o_nnz));
-
-    // Initialise d_nnz to one and o_nnz to zero
-    for (int i = 0; i < blockn; ++i)
-    {
-        d_nnz[i] = 1; // count diagonal cell
-        o_nnz[i] = 0;
-    }
-
-    // Take a reference to the mesh
-    //const Foam::fvMesh& mesh = user->solMod_.fmesh();
-
-    // Count neighbours sharing an internal face
-    const Foam::labelUList& own = mesh.owner();
-    const Foam::labelUList& nei = mesh.neighbour();
-    forAll(own, faceI)
-    {
-        const Foam::label ownCellID = own[faceI];
-        const Foam::label neiCellID = nei[faceI];
-        d_nnz[ownCellID]++;
-        d_nnz[neiCellID]++;
-    }
-
-    // Count off-processor neighbour cells
-    forAll(mesh.boundary(), patchI)
-    {
-        if (mesh.boundary()[patchI].type() == "processor")
-        {
-            const Foam::labelUList& faceCells =
-                mesh.boundary()[patchI].faceCells();
-
-            forAll(faceCells, fcI)
-            {
-                const Foam::label cellID = faceCells[fcI];
-                o_nnz[cellID]++;
-            }
-        }
-        else if (mesh.boundary()[patchI].coupled())
-        {
-            // Other coupled boundaries are not implemented
-            Foam::FatalError
-                << "Coupled boundary are not implemented, except for"
-                << " processor boundaries" << Foam::abort(Foam::FatalError);
-        }
-    }
-
-    // Allocate parallel matrix
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
-    // Allocate parallel matrix with the same conservative stencil per node
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize, 0, d_nnz, 0, o_nnz));
-
-    // Raise an error if mallocs are required during matrix assembly
-    MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
-
-    // Free memory
-    free(d_nnz);
-    free(o_nnz);
-
-    return 0;
-}
-
-
-Foam::label Foam::initialiseSolution
-(
-    Vec& x,
-    const fvMesh& mesh,
-    const label blockSize,
-    const bool createVec
-)
-{
-    if (createVec)
-    {
-        // Count number of local blocks and local scalar equations
-        const label blockn = mesh.nCells();
-        const label n = blockn*blockSize;
-
-        // Global system size: total number of scalar equation across all
-        // processors
-        const label N = returnReduce(n, sumOp<label>());
-
-        x = Vec();
-        CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
-        CHKERRQ(VecSetSizes(x, n, N));
-        CHKERRQ(VecSetType(x, VECMPI));
-    }
-
-    CHKERRQ(VecSetBlockSize(x, blockSize));
-    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
-    CHKERRQ(VecSetFromOptions(x));
-    CHKERRQ(VecZeroEntries(x));
-
-    return 0;
-}
-
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
@@ -298,6 +167,23 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
+
+const Enum<foamPetscSnesHelper::solutionLocation>
+foamPetscSnesHelper::solutionLocationNames_
+({
+    {
+        foamPetscSnesHelper::solutionLocation::CELLS,
+        "cells"
+    },
+    {
+        foamPetscSnesHelper::solutionLocation::POINTS,
+        "points"
+    },
+    {
+        foamPetscSnesHelper::solutionLocation::NONE,
+        "none"
+    },
+});
 
 
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
@@ -502,11 +388,13 @@ label foamPetscSnesHelper::initialiseSnes()
 foamPetscSnesHelper::foamPetscSnesHelper
 (
     fileName optionsFile,
-    const label nLocalBlocks,
+    const polyMesh& mesh,
+    const solutionLocation& location,
     const Switch stopOnPetscError,
     const Switch initialise
 )
 :
+    location_(location),
     initialised_(initialise),
     options_(nullptr),
     stopOnPetscError_(stopOnPetscError),
@@ -518,7 +406,15 @@ foamPetscSnesHelper::foamPetscSnesHelper
     snesUserPtr_(),
     globalCellsPtr_
     (
-        nLocalBlocks >= 0 ? new globalIndex(nLocalBlocks) : nullptr
+        location == solutionLocation::CELLS
+      ? new globalIndex(mesh.nCells())
+      : nullptr
+    ),
+    globalPointsPtr_
+    (
+        location == solutionLocation::POINTS
+      ? new globalPointIndices(mesh)
+      : nullptr
     ),
     neiProcGlobalIDs_(),
     neiProcVolumes_(),
@@ -608,6 +504,189 @@ void foamPetscSnesHelper::resetSnes()
     // SNESLineSearch ls;
     // SNESGetLineSearch(foamPetscSnesHelper::snes(), &ls);
     // SNESLineSearchReset(ls);
+}
+
+
+label foamPetscSnesHelper::initialiseJacobian
+(
+    Mat& jac,
+    const fvMesh& mesh,
+    const label blockSize,
+    const bool createMat
+)
+{
+    // Count number of local blocks and local scalar equations
+    const label blockn = mesh.nCells();
+    const label n = blockn*blockSize;
+
+    // Global system size: total number of scalar equation across all
+    // processors
+    const label N = returnReduce(n, sumOp<label>());
+
+    // // Set the Jacobian matrix size
+    if (createMat)
+    {
+        MatCreate(PETSC_COMM_WORLD, &jac);
+        MatSetFromOptions(jac);
+        MatSetSizes(jac, n, n, N, N);
+        MatSetType(jac, MATMPIAIJ);
+    }
+
+    // Set the block size
+    CHKERRQ(MatSetBlockSize(jac, blockSize));
+
+    // Count the number of non-zeros in the matrix
+    // Note: we assume a compact stencil, i.e. face only face neighbours
+
+    // Number of on-processor non-zeros per row
+    label* d_nnz = (label*)malloc(blockn*sizeof(*d_nnz));
+
+    // Number of off-processor non-zeros per row
+    label* o_nnz = (label*)malloc(blockn*sizeof(*o_nnz));
+
+    // Initialise d_nnz to one and o_nnz to zero
+    for (int i = 0; i < blockn; ++i)
+    {
+        d_nnz[i] = 1; // count diagonal cell
+        o_nnz[i] = 0;
+    }
+
+    // Take a reference to the mesh
+    //const Foam::fvMesh& mesh = user->solMod_.fmesh();
+
+    // Count neighbours sharing an internal face
+    const Foam::labelUList& own = mesh.owner();
+    const Foam::labelUList& nei = mesh.neighbour();
+    forAll(own, faceI)
+    {
+        const Foam::label ownCellID = own[faceI];
+        const Foam::label neiCellID = nei[faceI];
+        d_nnz[ownCellID]++;
+        d_nnz[neiCellID]++;
+    }
+
+    // Count off-processor neighbour cells
+    forAll(mesh.boundary(), patchI)
+    {
+        if (mesh.boundary()[patchI].type() == "processor")
+        {
+            const Foam::labelUList& faceCells =
+                mesh.boundary()[patchI].faceCells();
+
+            forAll(faceCells, fcI)
+            {
+                const Foam::label cellID = faceCells[fcI];
+                o_nnz[cellID]++;
+            }
+        }
+        else if (mesh.boundary()[patchI].coupled())
+        {
+            // Other coupled boundaries are not implemented
+            Foam::FatalError
+                << "Coupled boundary are not implemented, except for"
+                << " processor boundaries" << Foam::abort(Foam::FatalError);
+        }
+    }
+
+    // Allocate parallel matrix
+    //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
+    // Allocate parallel matrix with the same conservative stencil per node
+    //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
+    CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize, 0, d_nnz, 0, o_nnz));
+
+    // Raise an error if mallocs are required during matrix assembly
+    MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+
+    // Free memory
+    free(d_nnz);
+    free(o_nnz);
+
+    return 0;
+}
+
+
+label foamPetscSnesHelper::initialiseSolution
+(
+    Vec& x,
+    const fvMesh& mesh, // store this?
+    const label blockSize,
+    const bool createVec
+)
+{
+    notImplemented("Should we store fvMesh since the constructor needs it");
+
+    if (createVec)
+    {
+        // Number of local scalar equations
+        label n = -1;
+
+        // Number of scalar equations across all processors
+        label N = -1;
+
+        if (location_ == solutionLocation::CELLS)
+        {
+            // Set the number local scalar equations
+            n = mesh.nCells()*blockSize;
+
+            // Set the global system size
+            N = returnReduce(n, sumOp<label>());
+        }
+        else if (location_ == solutionLocation::POINTS)
+        {
+            // Note: the size of x is, in general, not equal to the number of
+            // points on this processor, as x only contains the points owned by
+            // this processor. To access the values not-owned by the proc, we
+            // need to request the values from the other processors
+
+            // Take references for brevity and efficiency
+            const labelList& localToGlobalPointMap =
+                globalPoints().localToGlobalPointMap();
+            const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+
+            // Find size of global system
+            // i.e. the highest global point index + 1
+            const label blockN = gMax(localToGlobalPointMap) + 1;
+            N = blockSize*blockN;
+
+            // Find the start and end global point indices for this proc
+            label blockStartID = N;
+            label blockEndID = -1;
+            forAll(ownedByThisProc, pI)
+            {
+                if (ownedByThisProc[pI])
+                {
+                    blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+                    blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+                }
+            }
+
+            //const label startID = blockSize*blockStartID;
+            //const label endID = blockSize*(blockEndID + 1) - 1;
+
+            // Find size of local system, i.e. the range of points owned by this
+            // proc
+            const label blockn = blockEndID - blockStartID + 1;
+            n = blockSize*blockn;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Unknown solution location = " << location_
+                << exit(FatalError);
+        }
+
+        x = Vec();
+        CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
+        CHKERRQ(VecSetSizes(x, n, N));
+        CHKERRQ(VecSetType(x, VECMPI));
+    }
+
+    CHKERRQ(VecSetBlockSize(x, blockSize));
+    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
+    CHKERRQ(VecSetFromOptions(x));
+    CHKERRQ(VecZeroEntries(x));
+
+    return 0;
 }
 
 

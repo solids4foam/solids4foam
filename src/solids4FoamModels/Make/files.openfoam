@@ -14,9 +14,9 @@ solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatch
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
-solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
+/*solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
-solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
+solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C*/
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
@@ -29,7 +29,7 @@ solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
-fluidModels/newtonIcoFluid/newtonIcoFluid.C
+/*fluidModels/newtonIcoFluid/newtonIcoFluid.C*/
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
@@ -41,7 +41,7 @@ fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
-fluidSolidInterfaces/newtonMonolithicCouplingInterface/newtonMonolithicCouplingInterface.C
+/*fluidSolidInterfaces/newtonMonolithicCouplingInterface/newtonMonolithicCouplingInterface.C*/
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C

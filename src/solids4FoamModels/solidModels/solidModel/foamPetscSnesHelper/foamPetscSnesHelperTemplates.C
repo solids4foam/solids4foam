@@ -379,18 +379,42 @@ void foamPetscSnesHelper::ExtractFieldComponents
     // compList
     const label nCompToInsert = compList.size();
 
-    // Loop over each block in vf and copy the selected components in x into the
-    // appropriate positions in vf.
-    // The source index for cell 'cellI' is computed as:
-    //   offset + (cellI*blockSize) + local component index.
-    forAll(vf, cellI)
+    if (location_ == solutionLocation::CELLS)
     {
-        for (label compI = 0; compI < nCompToInsert; ++compI)
+        // Loop over each block in vf and copy the selected components in x into the
+        // appropriate positions in vf.
+        // The source index for cell 'cellI' is computed as:
+        //   offset + (cellI*blockSize) + local component index.
+        forAll(vf, cellI)
         {
-            const label xIndex = offset + cellI*xBlockSize + compI;
-            const label vfIndex  = cellI*vfBlockSize + compList[compI];
-            vfPtr[vfIndex] = x[xIndex];
+            for (label compI = 0; compI < nCompToInsert; ++compI)
+            {
+                const label xIndex = offset + cellI*xBlockSize + compI;
+                const label vfIndex  = cellI*vfBlockSize + compList[compI];
+                vfPtr[vfIndex] = x[xIndex];
+            }
         }
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        notImplemented
+        (
+            "Function not implemented for solutionLocation::POINTS.\n"
+            "Instead, use the alternative function:\n"
+            "template <class Type>\n"
+            "void foamPetscSnesHelper::ExtractFieldComponents\n"
+            "(\n"
+            "    const Vec x,\n"
+            "    Field<Type>& vf,\n"
+            "    const label offset,\n"
+            "    const labelList& compIndices\n"
+            ") const\n"
+        );
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_ << exit(FatalError);
     }
 }
 
@@ -413,7 +437,169 @@ void foamPetscSnesHelper::ExtractFieldComponents
     VecGetBlockSize(x, &xBlockSize);
 
     // Insert vf into xx
-    ExtractFieldComponents(xx, vf, offset, xBlockSize, compIndices);
+    if (location_ == solutionLocation::CELLS)
+    {
+        ExtractFieldComponents(xx, vf, offset, xBlockSize, compIndices);
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // Obtain a pointer to the underlying scalar array in vf
+        // We assume vf is stored as contiguous data, i.e.
+        // (vx1, vy1, vz1, vx2, vy2, vz2, ..., vxN, vyN, vzN)
+#ifdef OPENFOAM_COM
+        scalar* vfPtr = reinterpret_cast<scalar*>(vf.begin());
+#else
+        scalar* vfPtr = &vf[0].component(0);
+#endif
+
+        // Get the number of components per field element from the traits (e.g.,
+        // 1 for scalar, 3 for vector, etc.)
+        const label vfBlockSize = pTraits<Type>::nComponents;
+
+        // Decide which components to extract: if compIndices is empty, default to
+        // all components
+        labelList compList;
+        if (compIndices.size() == 0)
+        {
+            compList.setSize(vfBlockSize);
+            for (label i = 0; i < vfBlockSize; ++i)
+            {
+                compList[i] = i;  // Default: copy all components in order
+            }
+        }
+        else
+        {
+            compList = compIndices;
+        }
+
+        // The number of components to insert per block is determined by the size of
+        // compList
+        const label nCompToInsert = compList.size();
+        // Extract the local processor values
+        // Loop over each point in vf, which is owned by this processor, and
+        // copy the selected components into the appropriate positions in x
+        // We will also count the number of non-local points
+        label localPointI = 0;
+        label nNotOwnedByThisProc = 0;
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        forAll(vf, pointI)
+        {
+            if (ownedByThisProc[pointI])
+            {
+                for (label compI = 0; compI < nCompToInsert; ++compI)
+                {
+                    const label xIndex =
+                        offset + localPointI*xBlockSize + compI;
+                    const label vfIndex  = pointI*vfBlockSize + compList[compI];
+                    vfPtr[vfIndex] = xx[xIndex];
+                }
+
+                localPointI++;
+            }
+            else
+            {
+                nNotOwnedByThisProc++;
+            }
+        }
+
+        // Extract values not owned by this processor; we need to sync these from
+        // other processors
+        {
+            // Convert to the number of scalar unknowns not owned by this
+            // processor
+            nNotOwnedByThisProc *= vfBlockSize;
+
+            // Collect the global solution scalar indices of the non-local point
+            // values
+
+            // Create a list of global indices on the on-proc points not owned by
+            // this proc
+            List<PetscInt> indices(nNotOwnedByThisProc);
+            label index = 0;
+            const labelList& localToGlobalPointMap =
+                globalPoints().localToGlobalPointMap();
+            forAll(ownedByThisProc, pointI)
+            {
+                if (!ownedByThisProc[pointI])
+                {
+                    // Calculate the global point index for this point
+                    const label globalPointI = localToGlobalPointMap[pointI];
+                    for (label compI = 0; compI < nCompToInsert; ++compI)
+                    {
+                        indices[index++] =
+                            offset + globalPointI*xBlockSize + compI;
+                    }
+                }
+            }
+
+            // Note: there are several PETSc objects below that could be stored
+            // The challenge is that this function could be called for different
+            // OpenFOAM fields (e.g., displacement, pressure) and the resulting
+            // scalar indexing sets will be different (although they are
+            // obviously related in terms of block rows). For now, leave it, but
+            // it is possible to make this more efficient.
+
+            // Create the index set
+            // Could be stored
+            IS indexSet;
+            ISCreateGeneral
+            (
+                PETSC_COMM_WORLD,
+                nNotOwnedByThisProc,
+                indices.data(),
+                PETSC_COPY_VALUES,
+                &indexSet
+            );
+
+            // Create a local vector for holding non-local values
+            // Could be stored
+            Vec xNotOwned;
+            VecCreate(PETSC_COMM_WORLD, &xNotOwned);
+            VecSetSizes(xNotOwned, nNotOwnedByThisProc, PETSC_DECIDE);
+            VecSetType(xNotOwned, VECMPI);
+            VecSetUp(xNotOwned);
+
+            // Create a context, which is required for syncing data
+            // Could be stored
+            VecScatter ctx;
+            VecScatterCreate(x, indexSet, xNotOwned, NULL, &ctx);
+            VecScatterBegin(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+            VecScatterEnd(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+            VecScatterDestroy(&ctx);
+
+            // Populate not-owned values array
+            // Could be stored
+            PetscScalar* xNotOwnedArr;
+            VecGetArray(xNotOwned, &xNotOwnedArr);
+            {
+                label index = 0;
+                forAll(vf, pointI)
+                {
+                    if (!ownedByThisProc[pointI])
+                    {
+                        for (label compI = 0; compI < nCompToInsert; ++compI)
+                        {
+                            const label vfIndex  =
+                                pointI*vfBlockSize + compList[compI];
+                            vfPtr[vfIndex] = xNotOwnedArr[index++];
+                        }
+                    }
+                }
+            }
+            VecRestoreArray(xNotOwned, &xNotOwnedArr);
+
+            // Destroy xNotOwned
+            VecDestroy(&xNotOwned);
+
+            // Destroy the index set
+            ISDestroy(&indexSet);
+        }
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_ << exit(FatalError);
+    }
 
     // Restore the x vector
     VecRestoreArrayRead(x, &xx);
@@ -462,18 +648,50 @@ void foamPetscSnesHelper::InsertFieldComponents
     // compList
     const label nCompToInsert = compList.size();
 
-    // Loop over each cell in vf and copy the selected components into the
-    // appropriate positions in x.
-    // The destination index for cell 'cellI' is computed as:
-    //   offset + (cellI*xBlockSize) + local component index.
-    forAll(vf, cellI)
+    if (location_ == solutionLocation::CELLS)
     {
-        for (label compI = 0; compI < nCompToInsert; ++compI)
+        // Loop over each cell in vf and copy the selected components into the
+        // appropriate positions in x.
+        // The destination index for cell 'cellI' is computed as:
+        //   offset + (cellI*xBlockSize) + local component index.
+        forAll(vf, cellI)
         {
-            const label xIndex = offset + cellI*xBlockSize + compI;
-            const label vfIndex  = cellI*vfBlockSize + compList[compI];
-            x[xIndex] = vfPtr[vfIndex];
+            for (label compI = 0; compI < nCompToInsert; ++compI)
+            {
+                const label xIndex = offset + cellI*xBlockSize + compI;
+                const label vfIndex  = cellI*vfBlockSize + compList[compI];
+                x[xIndex] = vfPtr[vfIndex];
+            }
         }
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // We assume here that the vf field has already been synced in parallel
+        // i.e., that the points on processor boundaries are already updated and
+        // consistent
+        // We only insert the values owned by this processor
+        label localPointI = 0;
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        forAll(vf, pointI)
+        {
+            if (ownedByThisProc[pointI])
+            {
+                for (label compI = 0; compI < nCompToInsert; ++compI)
+                {
+                    const label xIndex =
+                        offset + localPointI*xBlockSize + compI;
+                    const label vfIndex  = pointI*vfBlockSize + compList[compI];
+                    x[xIndex] = vfPtr[vfIndex];
+                }
+
+                localPointI++;
+            }
+        }
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_ << exit(FatalError);
     }
 }
 

@@ -52,6 +52,7 @@ SourceFiles
 #include <petscksp.h>
 
 #include "globalIndex.H"
+#include "globalPointIndices.H"
 #include "volFields.H"
 #include "fvMatrices.H"
 #include "leastSquaresS4fVectors.H"
@@ -82,40 +83,37 @@ typedef struct appCtxfoamPetscSnesHelper
 } appCtxfoamPetscSnesHelper;
 
 
-// * * * * * * * * *  External Helper Functions  * * * * * * * * * * * * * * //
-
 namespace Foam
 {
 
-    //- Initialise Joacobian based on compact stencil of the given mesh with the
-    //  given blockSize (number of scalar equations per cell)
-    label initialiseJacobian
-    (
-        Mat& jac,
-        const fvMesh& mesh,
-        const label blockSize,
-        const bool createMat = true  // MatCreate or similar should be called
-    );
-
-    //- Initialise the solution vector based on the given mesh and
-    //  blockSize (number of scalar equations per cell)
-    label initialiseSolution
-    (
-        Vec& x,
-        const fvMesh& mesh,
-        const label blockSize,
-        const bool createVec = true  // VecCreate or similar should be called
-    );
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
                      Class foamPetscSnesHelper Declaration
 \*---------------------------------------------------------------------------*/
 
 class foamPetscSnesHelper
 {
+public:
+
+        //- Location of the solution unknowns
+        enum solutionLocation
+        {
+            CELLS,
+            POINTS,
+            NONE
+        };
+
+        //- Solution location names
+        static const Enum<solutionLocation> solutionLocationNames_;
+
+private:
+
     // Private data
+
+        //- Location of the solution unknowns, e.g. cells or points
+        const solutionLocation& location_;
 
         //- Was PETSc initialised?
         const Switch initialised_;
@@ -152,6 +150,10 @@ class foamPetscSnesHelper
         //- Helper object for converting between local (on processor) and global
         //  cell indices
         autoPtr<globalIndex> globalCellsPtr_;
+
+        //- Helper object for converting between local (on processor) and global
+        //  point indices
+        autoPtr<globalPointIndices> globalPointsPtr_;
 
         //- Global cell IDs for the neighbouring processor patch cells
         mutable PtrList<labelList> neiProcGlobalIDs_;
@@ -198,15 +200,20 @@ public:
         //
         //  Parameters:
         //    optionsFile         - PETSc options file address
-        //    nLocalBlocks        - Optional: Number of blocks (e.g., cells) on
-        //                          this processor
+        //    mesh                - Used to access the number of cells or points
+        //                          as well as global syncing activities for
+        //                          points
+        //    location            - Optional: Location of the solution unknowns
+        //                          This is used to determine the local-to-global
+        //                          mapping
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc
         foamPetscSnesHelper
         (
             fileName optionsFile,
-            const label nLocalBlocks = -1,
+            const polyMesh& mesh,
+            const solutionLocation& location = solutionLocation::CELLS,
             const Switch stopOnPetscError = true,
             const Switch initialise = true
         );
@@ -270,7 +277,25 @@ public:
             //- Const access to the global index object
             const globalIndex& globalCells() const
             {
+                if (globalCellsPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not set" << exit(FatalError);
+                }
+
                 return globalCellsPtr_();
+            }
+
+            //- Const access to the global point object
+            const globalPointIndices& globalPoints() const
+            {
+                if (globalPointsPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not set" << exit(FatalError);
+                }
+
+                return globalPointsPtr_();
             }
 
 
@@ -292,9 +317,29 @@ public:
             //  assigned
             virtual label initialiseJacobian(Mat& jac) = 0;
 
+            //- Initialise Joacobian based on compact stencil of the given mesh with the
+            //  given blockSize (number of scalar equations per cell)
+            label initialiseJacobian
+            (
+                Mat& jac,
+                const fvMesh& mesh,
+                const label blockSize,
+                const bool createMat = true  // MatCreate or similar should be called
+            );
+
             //- Initialise the solution vector
             //  This procedure should set the size of the solution vector
             virtual label initialiseSolution(Vec& x) = 0;
+
+            //- Initialise the solution vector based on the given mesh and
+            //  blockSize
+            label initialiseSolution
+            (
+                Vec& x,
+                const fvMesh& mesh,
+                const label blockSize,
+                const bool createVec = true  // VecCreate or similar should be called
+            );
 
             //- Calculate the residual of the governing equations
             //  A non-zero return value indicates an error

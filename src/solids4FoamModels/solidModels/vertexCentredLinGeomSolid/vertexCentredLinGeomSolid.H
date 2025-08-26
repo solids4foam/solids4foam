@@ -24,18 +24,15 @@ Description
     unknown.
 
     Discretisation is performed using a vertex-centred finite volume approach
-    where the governing equations are integrated over a dual mesh. The dual mesh
-    is automatically constructed from the primary mesh using the meshDualiser.
+    where the governing equations are integrated over a dual mesh. The dual
+    mesh is automatically constructed from the primary mesh using the
+    meshDualiser.
 
-    Three solution are available, selected via solutionAlgorithm option:
-      - implicit Newton-Raphson
-      - implicit segregated
-      - explicit
-      - PETSc SNES (Scalable Nonlinear Equations Solvers)
+    An implicit Newton-Raphson algorithm is employed.
 
 Author
-    Philip Cardiff, UCD.
-    Federico Mazzanti, UCD.
+    Philip Cardiff, UCD.  All rights reserved.
+    Federico Mazzanti, UCD.  All rights reserved.
 
 SourceFiles
     vertexCentredLinGeomSolid.C
@@ -54,8 +51,12 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "Enum.H"
 #include "twoDPointCorrector.H"
-#include "pointVolInterpolation.H"
+#ifdef OPENFOAM_COM
+    #include "pointVolInterpolation.H"
+#endif
+#include "foamPetscSnesHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,8 +74,25 @@ namespace solidModels
 
 class vertexCentredLinGeomSolid
 :
-    public solidModel
+    public solidModel,
+    public foamPetscSnesHelper
 {
+public:
+
+        // //- Solution algorithms
+        // enum solutionAlgorithm
+        // {
+        //     IMPLICIT_COUPLED,
+        //     IMPLICIT_SEGREGATED,
+        //     EXPLICIT
+        // };
+
+        // //- Solution algorithm names
+        // static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
+
+
+private:
+
     // Private Data
 
         //- Mechanical model for dual mesh
@@ -86,8 +104,8 @@ class vertexCentredLinGeomSolid
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
-        // Compact edge gradient factor
-        const scalar zeta_;
+        //- Number of unknowns per cell, used by PETSc SNES solver
+        const label blockSize_;
 
         //- Flag to enable full Newton-Raphson approach, where the stiffness
         //  matrix is updated once per outer iteration. Alternatively, the
@@ -121,8 +139,8 @@ class vertexCentredLinGeomSolid
         //  fixed
         symmTensorField fixedDofDirections_;
 
-        //- Scale factor for the fixed degree of freedom equations to improve the
-        //  matrix conditioning
+        //- Scale factor for the fixed degree of freedom equations to improve
+        //  the matrix conditioning
         const scalar fixedDofScale_;
 
         //- Point velocity
@@ -138,11 +156,6 @@ class vertexCentredLinGeomSolid
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
-        //- Global point volume field
-        //  Dual mesh cell volumes associated with the primary mesh points,
-        //  where point volumes on processor boundaries are summed
-        pointScalarField pointGlobalVol_;
-
         //- Divergence of sigma at each primary point
         pointVectorField pointDivSigma_;
 
@@ -153,13 +166,22 @@ class vertexCentredLinGeomSolid
         surfaceSymmTensorField dualSigmaf_;
 
         //- Local-to-global point map and owner list
-        globalPointIndices globalPointIndices_;
+        // globalPointIndices globalPointIndices_;
 
+#ifdef OPENFOAM_COM
         //- Interpolator from points to cells
         pointVolInterpolation pointVolInterp_;
+#endif
 
 
     // Private Member Functions
+
+        //- Update the source vector for the linear system
+        void updateSource
+        (
+            vectorField& source,
+            const labelList& dualCellToPoint
+        );
 
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma
@@ -228,9 +250,7 @@ class vertexCentredLinGeomSolid
         //- Predict displacement field using the velocity field
         void predict();
 
-        //- Evolve the solid solver using the PETSc "SNES" nonlinear solver
-        //  SNES (Scalable Nonlinear Equations Solvers) is a general interface
-        //  to a large variety on nonlinear solution algorithms
+        //- Evolve the solid solver using the PETSc SNES nonlinear solver
         virtual bool evolveSnes();
 
         //- Evolve the solid solver using the implicit coupled approach
@@ -293,49 +313,37 @@ public:
                 return D();
             }
 
-            //- Const-access the fixed DOFs list
-            const globalPointIndices& gPointIndices() const
-            {
-                return globalPointIndices_;
-            }
-
-            //- Is the model two-dimensional
-            const boolList& fixedDofs() const
-            {
-                return fixedDofs_;
-            }
-
-            //- Is the model two-dimensional
-            const bool& twoD() const
-            {
-                return twoD_;
-            }
-
         // Edit
-
-            //- Calculate the momentum equation residual
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            tmp<vectorField> residualMomentum
-            (
-                const pointVectorField& pointD
-            );
-
-            //- Calculate the Jacobian for the momentum equation
-            //  This Jacobian is the derivative of residualMomentum with respect
-            //  to the solution vector (pointD)
-            //  This should be const but is not because of the mechanical law
-            //  The can be fixed when the mechanical models are refactored
-            tmp<sparseMatrix> JacobianMomentum
-            (
-                const pointVectorField& pointD
-            );
 
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x);
+
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector
+            virtual label formResidual
+            (
+                PetscScalar *f,        // Residual
+                const PetscScalar *x   // Solution
+            );
+
+            //- Form the Jacobian of the governing equation
+            virtual label formJacobian
+            (
+                Mat jac,              // Jacobian
+                const PetscScalar *x  // Solution
+            );
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad
