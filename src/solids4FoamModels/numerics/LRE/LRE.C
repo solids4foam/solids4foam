@@ -23,6 +23,9 @@ License
 #include "emptyPolyPatch.H"
 #include "fixedValueFvPatchFields.H"
 #include "processorPolyPatch.H"
+#include "symmetryPolyPatch.H"
+#include "symmetryPlanePolyPatch.H"
+
 #include "indexedOctree.H"
 #include "treeDataPoint.H"
 
@@ -618,15 +621,33 @@ void LRE::makeGlobalFaceStencils() const
 
 	forAll(mesh.faces(), faceI)
 	{
+	    // Number of neighbours for currect face. Alternated in the case of
+	    // symmetry plane
+	    label curNn = Nn;
+
 	    const point& faceCentre = mesh.faceCentres()[faceI];
 	    scalar sphereR = 8.0*mag(faceCentre - cellCentres[owner[faceI]]);
+
+	    // We will reflect stencil for faces at symmetry so we will half Nn
+	    if (!mesh.isInternalFace(faceI))
+	    {
+		const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+		if
+		(
+		    isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
+		 || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
+		)
+		{
+		    curNn = Nn / 2;
+		}
+	    }
 
 	    labelList candidates;
 	    while(true)
 	    {
 		candidates = octree.findSphere(faceCentre, sqr(sphereR));
 
-		if (candidates.size() >= 1.5*Nn || sphereR >= 2.0*maxRadius)
+		if (candidates.size() >= 1.5*curNn || sphereR >= 2.0*maxRadius)
 		{
 		    break;
 		}
@@ -654,14 +675,16 @@ void LRE::makeGlobalFaceStencils() const
 		 }
 	    );
 	    label n = distList.size();
-	    label nMin = min(n, Nn);
+	    label nMin = min(n, curNn);
 
 	    // Get sphere radius for last point
 	    scalar sphereRadius = distList[nMin-1].second();
 
-	    // Extend to include candidates within tolerance of 1%
+	    // Extend to include candidates within tolerance of 0.01%
 	    // By doing this we perserve symmetric stencil on structured grids
-	    scalar tol = 1e-6*sphereRadius;
+	    // Abobve is not entirely true becouse this is for face centre
+	    //and we use quadrature points
+	    scalar tol = 1e-5*sphereRadius;
 	    label nTie = nMin;
 	    while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
 	    {
@@ -675,14 +698,13 @@ void LRE::makeGlobalFaceStencils() const
 		faceStencils[faceI][i] = distList[i].first();
 	    }
 
-	    if (faceStencils[faceI].size() < Nn)
+	    if (faceStencils[faceI].size() < curNn)
 	    {
 		FatalErrorInFunction
 		    << "Number of face neighbours from octree search: "
 		    << faceStencils[faceI].size() << " is lower than required: "
 		    << Nn << abort(FatalError);
 	    }
-
 	}
     }
     Info<<"--Molecule construction:"<<timer.elapsedCpuTime()<< endl;
@@ -990,6 +1012,8 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
         FatalErrorIn("void LRE::weight(const scalar d, const scalar maxDist)")
             << "Unrecognised weight function. Available options are "
             << LRE::weightFunctionNames_[LRE::weightFunction::ONE]
+            << LRE::weightFunctionNames_[LRE::weightFunction::LINEAR]
+            << LRE::weightFunctionNames_[LRE::weightFunction::INV_DIST]
 	    << LRE::weightFunctionNames_[LRE::weightFunction::RAD_SYMM_EXP]
             << endl;
     }
@@ -1649,6 +1673,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
     const vectorField& CfI = mesh.faceCentres();
+    const surfaceVectorField& Sf = mesh.Sf();
 
     // Collect CI for off-processor cells in the stencils
     Map<vector> globalCI;
@@ -1710,17 +1735,40 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             ghostPoint = includePatchInStencils_[patchID];
         }
 
+	// We need to reflect complete stencil if face is on symmetry plane
+	bool symmetryFace = false;
+	if (!mesh.isInternalFace(faceI))
+	{
+	    const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+	    if
+	    (
+	        isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
+	     || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
+	    )
+	    {
+                symmetryFace = true;
+		if (ghostPoint)
+		{
+		    FatalErrorInFunction
+			<< "Face " << faceI << " is on symmetry plane but it is"
+			<< " set to fix value" << exit(FatalError);
+		}
+	    }
+	}
+
         // Number of neighbours in stencil
-        const label Nn = curStencil.size() + (ghostPoint ? 1 : 0);
+	const label stencilSize = curStencil.size();
+	const label Nn =
+	    stencilSize + (ghostPoint ? 1 : 0) + (symmetryFace ? stencilSize : 0);
 
         // Check to avoid Eigen error
         if (Nn < Np)
         {
             FatalErrorInFunction
                 << "Interpolation stencil needs to be bigger than the "
-                << "number of elements in aylor order!" << nl
+                << "number of elements in Taylor order!" << nl
                 << "Stencil size = " << Nn << ", Taylor elements = " << Np << nl
-                << "Face centre = " << curCf
+                << "Face centre = " << curCf << ", face = " << faceI
                 << exit(FatalError);
         }
 
@@ -1744,8 +1792,16 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             // Loop over stencil points and compute Q
             for (label cI = 0; cI < Nn; ++cI)
             {
-                const label neiGlobalCellID = curStencil[cI];
-                vector dx;
+		label id = cI;
+		// Stencil mirroring for symmetry plane face
+		if (symmetryFace && cI >= (Nn/2))
+		{
+		    id = cI - (Nn/2);
+                }
+
+		const label neiGlobalCellID = curStencil[id];
+
+		vector dx;
                 if (globalCells_.isLocal(neiGlobalCellID))
                 {
                     const label neiLocalCellID =
@@ -1757,6 +1813,13 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                 {
                     dx = globalCI[neiGlobalCellID] - curGP;
                 }
+
+		// Mirror dx for symmetry plane ghost stencil part
+		if (symmetryFace && cI >= (Nn/2))
+		{
+		    const vector n = Sf[faceI]/(mag(Sf[faceI])+VSMALL);
+		    dx = transform(I - 2.0*sqr(n), dx);
+		}
 
 		// Normalise dx to improve conditioning
 		dx /= h;
@@ -1808,7 +1871,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             // Loop over stencil points and compute W
             for (label cI = 0; cI < Nn; cI++)
             {
-                const label neiGlobalCellID = curStencil[cI];
+		// Add symmetry face ghost points manually, the weights are the
+		// same like for interior points
+		if (symmetryFace && cI == (Nn/2))
+		{
+		    W.diagonal().bottomRows(Nn/2) = W.diagonal().topRows(Nn/2);
+		    break;
+		}
+
+		const label neiGlobalCellID = curStencil[cI];
                 scalar d;
                 if (globalCells_.isLocal(neiGlobalCellID))
                 {
@@ -1858,9 +1929,9 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 	    // Perform element-wise multiplication and convert to MatrixXd
 	    const Eigen::MatrixXd QbarBhat =
 		(
-		 Qbar.transpose().array().rowwise()
-		 *Bhat.diagonal().transpose().array()
-		 ).matrix();
+		    Qbar.transpose().array().rowwise()
+		  * Bhat.diagonal().transpose().array()
+		).matrix();
 
 	    // Solve to get A
 	    //const Eigen::MatrixXd A =
@@ -1872,6 +1943,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
 	    if (calcConditionNumber_)
 	    {
+		// Sometimes svd is causing crash!
 		Eigen::JacobiSVD<Eigen::MatrixXd> svd
 		    (
 		         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV

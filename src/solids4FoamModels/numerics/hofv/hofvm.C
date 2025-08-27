@@ -32,6 +32,10 @@ License
 #include "symmetryPolyPatch.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "symmetryPolyPatch.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -412,9 +416,131 @@ Foam::label Foam::hofvm::hofvmLaplacianPETSc
 	{
 	    NotImplemented;
 	}
-	else if (patchType == symmetryPolyPatch::typeName)
+	else if
+	(
+	    patchType == symmetryPolyPatch::typeName
+	 || patchType == symmetryPlanePolyPatch::typeName
+	)
 	{
-	    NotImplemented;
+            forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+		// Preliminaries
+		const vector& faceNormal = pNormal[faceI];
+		const scalar gammaMagSf = pMagSf[faceI] * pGamma[faceI];
+
+		// Get global face index, needed for lists from LRE class
+		const label faceID = faceI + start;
+
+		// Face interpolation molecule
+		const labelList& faceStencil = stencils[faceID];
+
+		// Face quadrature points weights
+		const List<scalar>& faceQuadWeight = facesQuadWeights[faceID];
+
+		forAll(faceQuadWeight, pointI)
+		{
+		    // Quad point weight
+		    const scalar& quadPointW = faceQuadWeight[pointI];
+
+		    const label stencilSize = faceStencil.size();
+		    // Loop over interpolation stencil.
+		    for(label cI = 0; cI < stencilSize; cI++)
+		    {
+			const label globalCellID = faceStencil[cI];
+			const vector& cellGradCoeff =
+			    gradCoeffs[faceID][pointI][cI];
+			const vector& mirrorCellGradCoeff =
+			    gradCoeffs[faceID][pointI][cI+stencilSize];
+
+			const tensor coeff =
+			    calcCoeff
+			    (
+			        gammaMagSf,
+				quadPointW,
+				cellGradCoeff,
+				faceNormal
+			    );
+
+			// Householder reflection matrix
+			const tensor R = (I-2.0*sqr(faceNormal));
+		        const tensor mirrorCoeff =
+			    calcCoeff
+			    (
+			        gammaMagSf,
+				quadPointW,
+				mirrorCellGradCoeff,
+				faceNormal
+			    ) & R;
+
+			std::fill(values.begin(), values.end(), 0.0);
+			for (label i = 0; i < nScalarEqns; ++i)
+			{
+			    for (label j = 0; j < nScalarEqns; ++j)
+			    {
+				// Copy 3x3 (or 2x2 in 2-D) coeff into the top
+				// left of the 4x4 (or 3x3 in 2-D) values matrix
+				values[(i + rowOffset)*blockSize + j + colOffset] =
+				    coeff[i*3 + j];
+			    }
+			}
+
+			// Check for large coefficient values. They exists if
+			// LRE interpolation have large condition number
+			for (const scalar &v : values)
+			{
+			    if (mag(v) > 1e7)
+			    {
+				WarningInFunction
+				    << "Large matrix coefficient detected: "
+				    << v << " at face " << faceI
+				    << ", point " << pointI
+				    << ", globalCellID " << globalCellID
+				    << endl;
+			    }
+			}
+
+			// Local block row ID
+			const label ownCellID = mesh.faceOwner()[faceID];
+
+			// Global block row ID
+			const label globalBlockRowI =
+			    petscSnesHelper.globalCells().toGlobal(ownCellID);
+
+			CHKERRQ
+			(
+			    MatSetValuesBlocked
+			    (
+			        matrix, 1, &globalBlockRowI, 1, &globalCellID,
+			        values.cdata(),
+				ADD_VALUES
+			     )
+			 );
+
+			// Do the same for mirrored cells
+			std::fill(values.begin(), values.end(), 0.0);
+			for (label i = 0; i < nScalarEqns; ++i)
+			{
+			    for (label j = 0; j < nScalarEqns; ++j)
+			    {
+				// Copy 3x3 (or 2x2 in 2-D) coeff into the top
+				// left of the 4x4 (or 3x3 in 2-D) values matrix
+				values[(i + rowOffset)*blockSize + j + colOffset] =
+				    mirrorCoeff[i*3 + j];
+			    }
+			}
+
+			CHKERRQ
+			(
+			    MatSetValuesBlocked
+			    (
+			        matrix, 1, &globalBlockRowI, 1, &globalCellID,
+			        values.cdata(),
+				ADD_VALUES
+			     )
+			 );
+		    }
+ 	        }
+	    }
 	}
 	else if
 	(
@@ -648,9 +774,78 @@ void Foam::hofvm::hofvmLaplacianSparseMatrix
 	{
 	    NotImplemented;
 	}
-	else if (patchType == symmetryPolyPatch::typeName)
+	else if
+	(
+	    patchType == symmetryPolyPatch::typeName
+	 || patchType == symmetryPlanePolyPatch::typeName
+	)
 	{
-	    NotImplemented;
+	    forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+		// Preliminaries
+		const vector& faceNormal = pNormal[faceI];
+		const scalar gammaMagSf = pMagSf[faceI] * pGamma[faceI];
+
+		// Get global face index, needed for lists from LRE class
+		const label faceID = faceI + start;
+
+		// Face interpolation molecule
+		const labelList& faceStencil = stencils[faceID];
+
+		// Face quadrature points weights
+		const List<scalar>& faceQuadWeight = facesQuadWeights[faceID];
+
+		forAll(faceQuadWeight, pointI)
+		{
+		    // Quad point weight
+		    const scalar& quadPointW = faceQuadWeight[pointI];
+
+		    // Loop over interpolation stencil.
+		    const label stencilSize = faceStencil.size();
+		    for(label cI = 0; cI < stencilSize; cI++)
+		    {
+			const label globalCellID = faceStencil[cI];
+			const vector& cellGradCoeff =
+			    gradCoeffs[faceID][pointI][cI];
+			const vector& mirrorCellGradCoeff =
+			    gradCoeffs[faceID][pointI][cI+stencilSize];
+
+			const tensor coeff =
+			    calcCoeff
+			    (
+			        gammaMagSf,
+				quadPointW,
+				cellGradCoeff,
+				faceNormal
+			    );
+
+			// Householder reflection matrix
+			const tensor R = (I-2.0*sqr(faceNormal));
+		        const tensor mirrorCoeff =
+			    calcCoeff
+			    (
+			        gammaMagSf,
+				quadPointW,
+				mirrorCellGradCoeff,
+				faceNormal
+			    ) & R;
+
+			scalar maxCoeff = cmptMax(mag(coeff));
+			if (maxCoeff > 1e7)
+			{
+			    WarningInFunction
+				<< "Large matrix coefficient detected: "
+				<< maxCoeff << " at face " << faceI
+				<< ", point " << pointI
+				<< ", stencil cell " << globalCellID
+				<< endl;
+			}
+
+			matrix(owner[faceID], globalCellID) += coeff;
+			matrix(owner[faceID], globalCellID) += mirrorCoeff;
+		    }
+		}
+	    }
 	}
 	else if
 	(
