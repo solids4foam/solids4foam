@@ -741,6 +741,106 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
 }
 
 
+void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
+(
+    Mat jac,
+    const pointVectorField& pointD,
+    const scalarField& pointRhoI,
+    const scalarField& pointVolI,
+    ITstream& d2dt2Scheme,
+    const label nScalarEqns,
+    const labelList& localToGlobalPointMap,
+    const bool flipSign
+) const
+{
+    const scalar sign = flipSign ? -1.0 : 1.0;
+    const scalar deltaT = pointD.mesh().time().deltaTValue();
+    const label colOffset = 0;
+    const label rowOffset = 0;
+
+    // Read time scheme
+    const word d2dt2SchemeName(d2dt2Scheme);
+
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
+    // Initialise block coeff
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+
+    // Calculate the scalar coefficient field
+    scalarField coeffs(pointD.size());
+
+    // Add transient term coefficients
+    if (d2dt2SchemeName == "steadyState")
+    {
+        // Do nothing
+    }
+    else if (d2dt2SchemeName == "Euler")
+    {
+        forAll(pointRhoI, pointI)
+        {
+            coeffs[pointI] =
+                sign*pointVolI[pointI]*pointRhoI[pointI]/sqr(deltaT);
+        }
+    }
+    else if (d2dt2SchemeName == "backward")
+    {
+        forAll(pointRhoI, pointI)
+        {
+            coeffs[pointI] =
+                sign*(9.0/4.0)*pointVolI[pointI]*pointRhoI[pointI]/sqr(deltaT);
+        }
+    }
+    else if (d2dt2SchemeName == "NewmarkBeta")
+    {
+        const scalar beta(readScalar(d2dt2Scheme));
+        forAll(pointRhoI, pointI)
+        {
+            coeffs[pointI] =
+                sign*pointVolI[pointI]*pointRhoI[pointI]/(beta*sqr(deltaT));
+        }
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown d2dt2SchemeName scheme = " << d2dt2SchemeName
+            << exit(FatalError);
+    }
+
+    // Insert the coeffs into the PETSc matrix
+    forAll(pointRhoI, pointI)
+    {
+        // Construct the block coeff
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+            {
+                if (cmptI == cmptJ)
+                {
+                    values
+                    [
+                        (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                    ] = coeffs[pointI];
+                }
+            }
+        }
+
+        // Determine the global block row/column
+        const label globalBlockRowI = localToGlobalPointMap[pointI];
+
+        // Insert the block coefficient
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
+            values.cdata(),
+            ADD_VALUES
+        );
+    }
+}
+
+
 void vertexCentredLinGeomSolid::makeDualImpKf() const
 {
     if (dualImpKfPtr_.valid())
@@ -803,7 +903,6 @@ bool vertexCentredLinGeomSolid::evolveSnes()
         // Note: for point fields, the SNES solution vector may be smaller than
         // pointD.size() because points on processor boundaries may be owned by
         // other processors
-        notImplemented("I need InsertFieldComponents and its reverse for point fields");
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
 #ifdef OPENFOAM_NOT_EXTEND
@@ -820,15 +919,18 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
 
+    FatalError
+        << "after solve" << exit(FatalError);
+
     // Retrieve the solution
     // Map the PETSc solution to the D field
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
 #ifdef OPENFOAM_NOT_EXTEND
-        D().primitiveFieldRef(),
+        pointD().primitiveFieldRef(),
 #else
-        D().internalField(),
+        pointD().internalField(),
 #endif
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
@@ -1937,7 +2039,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
 label vertexCentredLinGeomSolid::initialiseJacobian(Mat& jac)
 {
-    notImplemented("WIP");
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
@@ -1951,147 +2052,122 @@ label vertexCentredLinGeomSolid::initialiseSolution(Vec& x)
 
 label vertexCentredLinGeomSolid::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
-    notImplemented("WIP");
+    const fvMesh& mesh = this->mesh();
 
-//     const fvMesh& mesh = this->mesh();
+    // Extract pointD from x
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+#ifdef OPENFOAM_NOT_EXTEND
+        pointD().primitiveFieldRef(),
+#else
+        pointD().internalField(),
+#endif
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    );
 
-//     // Copy x into the D field
-//     volVectorField& D = const_cast<volVectorField&>(this->D());
-//     vectorField& DI = D;
-//     foamPetscSnesHelper::ExtractFieldComponents<vector>
-//     (
-//         x,
-//         DI,
-//         0, // Location of first component
-//         blockSize_, // Block size of x
-//         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
-//     );
+    // Enforce the displacement boundary conditions
+    pointD().correctBoundaryConditions();
 
-//     // Enforce the boundary conditions
-//     D.correctBoundaryConditions();
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
 
-//     // Update gradient of displacement
-//     mechanical().grad(D, gradD());
+    // Calculate gradD at dual faces
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh,
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
 
-//     // Enforce the boundary conditions again for any conditions that use gradD
-//     //D.correctBoundaryConditions();
+    // Calculate stress at dual faces
+    dualMechanicalPtr_().correct(dualSigmaf_);
 
-//     // Update velocity
-//     U() = fvc::ddt(D);
+    // Point volume field
+    const scalarField& pointVolI = pointVol_.internalField();
 
-//     // Calculate the stress using run-time selectable mechanical law
-//     mechanical().correct(sigma());
+    // Point density field
+    const scalarField& pointRhoI = pointRho_.internalField();
 
-//     if (solvePressure())
-//     {
-//         // Copy x into the p field
-//         volScalarField& p = const_cast<volScalarField&>(this->p());
-//         scalarField& pI = p;
-//         foamPetscSnesHelper::ExtractFieldComponents<scalar>
-//         (
-//             x, pI, blockSize_ - 1, blockSize_
-//         );
+    // Calculate the tractions on the dual faces
+    surfaceVectorField dualTraction
+    (
+        (dualMesh().Sf()/dualMesh().magSf()) & dualSigmaf_
+    );
 
-//         // Enforce the boundary conditions
-//         p.correctBoundaryConditions();
+    // Enforce extract tractions on traction boundaries
+    enforceTractionBoundaries
+    (
+        pointD(), dualTraction, mesh, dualMeshMap().pointToDualFaces()
+    );
 
-//         // Replace the pressure component of stress
-//         sigma() = dev(sigma()) - p*I;
-//     }
+    // Set coupled boundary (e.g. processor) traction fields to zero: this
+    // ensures their global contribution is zero
+    forAll(dualTraction.boundaryField(), patchI)
+    {
+        if (dualTraction.boundaryField()[patchI].coupled())
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            dualTraction.boundaryFieldRef()[patchI] = vector::zero;
+#else
+            dualTraction.boundaryField()[patchI] = vector::zero;
+#endif
+        }
+    }
 
-//     // Unit normal vectors at the faces
-//     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    // Calculate divergence of stress for the dual cells
+    const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
 
-//     // Traction vectors at the faces
-//     surfaceVectorField traction(n & fvc::interpolate(sigma()));
+    // Map dual cell field to primary mesh point field
+    vectorField& pointDivSigma = pointDivSigma_;
+    pointDivSigma = vector::zero;
+    const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
+    forAll(dualDivSigma, dualCellI)
+    {
+        const label pointID = dualCellToPoint[dualCellI];
+        pointDivSigma[pointID] = dualDivSigma[dualCellI];
+    }
 
-//     // Add stabilisation to the traction
-//     // We add this before enforcing the traction condition as the stabilisation
-//     // is set to zero on traction boundaries
-//     // To-do: add a stabilisation traction function to momentumStabilisation
-//     const scalar scaleFactor =
-//         readScalar(stabilisation().dict().lookup("scaleFactor"));
-//     const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-//     traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+    // The residual vector F calculated as:
+    // F = div(sigma) + rho*g - rho*d2dt2(D)
 
-//     // Enforce traction boundary conditions
-//     enforceTractionBoundaries(traction, D, n);
+    vectorField residual
+    (
+        pointDivSigma*pointVolI
+      + pointRhoI*g().value()*pointVolI
+      - vfvc::d2dt2
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh.d2dt2Scheme("d2dt2(pointD)"),
+#else
+            mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)"),
+#endif
+            pointD(),
+            pointU_,
+            pointA_,
+            pointRho_,
+            pointVol_,
+            int(bool(debug))
+        )
+    );
 
-//     // The residual vector is defined as
-//     // F = div(sigma) + rho*g
-//     //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
-//     // where, here, we roll the stabilisationTerm into the div(sigma)
-//     vectorField residual
-//     (
-//         fvc::div(mesh.magSf()*traction)
-//       + rho()
-//        *(
-//             g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
-//         )
-//     );
-
-//     // Make residual extensive as fvc operators are intensive (per unit volume)
-//     residual *= mesh.V();
-
-// #ifdef OPENFOAM_COM
-//     // Add optional fvOptions, e.g. MMS body force
-//     // Note that "source()" is already multiplied by the volumes
-//     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
-// #endif
-
-//     // Copy the residual into the f field
-//     foamPetscSnesHelper::InsertFieldComponents<vector>
-//     (
-//         residual,
-//         f,
-//         0, // Location of first component
-//         blockSize_, // Block size of x
-//         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
-//     );
-
-//     if (solvePressure())
-//     {
-//         volScalarField& p = const_cast<volScalarField&>(this->p());
-
-//         // Calculate pressure equation residual
-//         // Res = p/k + div(D) - gamma*laplacian(p) + gamma*div(grad(p))
-//         // where
-//         //   - k: bulk modulus
-//         //   - gamma: "pDiffusivity" controls the amount of smoothing
-
-//         // scalarField pressureResidual
-//         // (
-//         //   - p
-//         //   + fvc::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
-//         //   - fvc::div(pDiffusivity()*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
-//         //   - mechanical().bulkModulus()*tr(gradD())
-//         //   //- mechanical().bulkModulus()*fvc::div(D)
-//         // );
-
-//         // Divided by bulkModulus form
-//         const volScalarField kappa("kappa", mechanical().bulkModulus());
-//         const surfaceScalarField kappaf(fvc::interpolate(kappa));
-//         scalarField pressureResidual
-//         (
-//           - p/kappa
-//           + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-//           - fvc::div((pDiffusivity()/kappaf)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
-//           - tr(gradD())
-//         );
-
-//         // Make residual extensive
-//         pressureResidual *= mesh.V();
-
-//         // Copy the pressureResidual into the f field as the 4th equation
-//         foamPetscSnesHelper::InsertFieldComponents<scalar>
-//         (
-//             pressureResidual, f, blockSize_ - 1, blockSize_
-//         );
-//     }
+    // Insert the residual into the PETSc residual
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        residual,
+        f,
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    );
 
     return 0;
 }
@@ -2100,112 +2176,102 @@ label vertexCentredLinGeomSolid::formResidual
 label vertexCentredLinGeomSolid::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
-    notImplemented("WIP");
+    const fvMesh& mesh = this->mesh();
 
-    // // Copy x into the D field
-    // volVectorField& D = const_cast<volVectorField&>(this->D());
-    // vectorField& DI = D;
-    // foamPetscSnesHelper::ExtractFieldComponents<vector>
+    // Extract pointD from x
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+#ifdef OPENFOAM_NOT_EXTEND
+        pointD().primitiveFieldRef(),
+#else
+        pointD().internalField(),
+#endif
+        0, // Location of first component
+        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Enforce the displacement boundary conditions
+    pointD().correctBoundaryConditions();
+
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+
+    // Calculate gradD at dual faces
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh,
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
+
+    // Calculate stress at dual faces
+    dualMechanicalPtr_().correct(dualSigmaf_);
+
+    // Calculate the material tangent
+    const Field<scalarSquareMatrix> materialTangent
+    (
+        dualMechanicalPtr_().materialTangentFaceField()
+    );
+
+    // Add div(sigma) coefficients
+    // vfvm::divSigma
     // (
-    //     x,
-    //     DI,
-    //     0, // Location of first component
-    //     blockSize_, // Block size of x
-    //     solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+    //     matrix,
+    //     mesh(),
+    //     dualMesh(),
+    //     dualMeshMap().dualFaceToCell(),
+    //     dualMeshMap().dualCellToPoint(),
+    //     materialTangent,
+    //     zetaImplicit
     // );
 
-    // // Enforce the boundary conditions
-    // D.correctBoundaryConditions();
+    // Lookup the d2dt2 scheme
+#ifdef OPENFOAM_NOT_EXTEND
+    ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(pointD)");
+#else
+    ITstream& d2dt2Scheme = mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)");
+#endif
 
-    // if (solvePressure())
-    // {
-    //     // Copy x into the p field
-    //     volScalarField& p = const_cast<volScalarField&>(this->p());
-    //     scalarField& pI = p;
-    //     foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    //     (
-    //         x, pI, blockSize_ - 1, blockSize_
-    //     );
+    // Add d2dt2 coefficients to jac
+    insertVfvmD2dt2IntoPETScMatrix
+    (
+        jac,
+        pointD(),
+        pointRho_,
+        pointVol_,
+        d2dt2Scheme,
+        blockSize_,     // nScalarEqns
+        globalPoints().localToGlobalPointMap(),
+        true           // flip sign
+    );
 
-    //     // Enforce the boundary conditions
-    //     p.correctBoundaryConditions();
-    // }
+    FatalError
+        << "Stop at " << __LINE__ << exit(FatalError);
 
-    // // Calculate a segregated approximation of the Jacobian
-    // fvVectorMatrix approxJ
+    // Enforce fixed DOF on the linear system
+    // sparseMatrixTools::enforceFixedDof
     // (
-    //     fvm::laplacian(impKf_, D, "laplacian(DD,D)")
-    //   - rho()*fvm::d2dt2(D)
+    //     matrix,
+    //     source,
+    //     fixedDofs_,
+    //     fixedDofDirections_,
+    //     fixedDofValues_,
+    //     fixedDofScale_
     // );
 
-    // if (dampingCoeff().value() > SMALL)
-    // {
-    //     approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
-    // }
+    if (solvePressure())
+    {
+        notImplemented("solvePressure not implemented yet for formJacobian");
+    }
 
-    // // Optional: under-relaxation of the linear system
-    // approxJ.relax();
-
-    // // Convert fvMatrix matrix to PETSc matrix
-    // foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    // (
-    //     approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-    // );
-
-    // if (solvePressure())
-    // {
-    //     const volScalarField& p = this->p();
-
-    //     const volScalarField kappa("kappa", mechanical().bulkModulus());
-    //     //const volScalarField rKappa(1.0/mechanical().bulkModulus());
-    //     const volScalarField rKappa(1.0/kappa);
-    //     const surfaceScalarField kappaf(fvc::interpolate(kappa));
-    //     {
-    //         // Calculate pressure equation matrix
-    //         const dimensionedScalar one("one", dimless, 1);
-    //         // fvScalarMatrix approxPressureJ
-    //         // (
-    //         //   - fvm::Sp(one, p)
-    //         //   + fvm::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
-    //         // );
-    //         fvScalarMatrix approxPressureJ
-    //         (
-    //           - fvm::Sp(rKappa, p)
-    //           + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-    //         );
-
-    //         // Insert the pressure equation
-    //         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-    //         (
-    //             approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-    //         );
-    //     }
-
-    //     // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
-    //     foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
-    //     (
-    //         p,
-    //         D,
-    //         jac,
-    //         blockSize_ - 1,            // row offset
-    //         0,                         // column offset
-    //         solidModel::twoD() ? 2 : 3 // number of scalar components of D
-    //     );
-
-    //     // Insert p-in-D term
-    //     // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation
-    //     foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
-    //     (
-    //         p,
-    //         jac,
-    //         0,                         // row offset
-    //         blockSize_ - 1,            // column offset
-    //         solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
-    //     );
-    // }
 
     return 0;
 }

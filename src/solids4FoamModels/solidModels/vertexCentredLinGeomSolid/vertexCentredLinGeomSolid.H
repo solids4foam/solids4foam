@@ -241,6 +241,19 @@ private:
             const scalar zeta // Discretisation parameter
         );
 
+        //- Insert vfvm::d2dt2 coefficients into the given PETSc matrix
+        void insertVfvmD2dt2IntoPETScMatrix
+        (
+            Mat jac,
+            const pointVectorField& pointD,
+            const scalarField& pointRhoI,
+            const scalarField& pointVolI,
+            ITstream& d2dt2Scheme,
+            const label nScalarEqns,
+            const labelList& localToGlobalPointMap,
+            const bool flipSign = false
+        ) const;
+
         //- Make dualImpKf field
         void makeDualImpKf() const;
 
@@ -334,15 +347,15 @@ public:
             //  array) vector
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,         // Residual
+                const Vec x    // Solution
             );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
             );
 
             //- Traction boundary surface normal gradient

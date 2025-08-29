@@ -828,8 +828,8 @@ label linGeomTotalDispSolid::initialiseSolution(Vec& x)
 
 label linGeomTotalDispSolid::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
     const fvMesh& mesh = this->mesh();
@@ -842,7 +842,6 @@ label linGeomTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -868,7 +867,7 @@ label linGeomTotalDispSolid::formResidual
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions
@@ -924,7 +923,6 @@ label linGeomTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -964,7 +962,7 @@ label linGeomTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual, f, blockSize_ - 1, blockSize_
+            pressureResidual, f, blockSize_ - 1
         );
     }
 
@@ -975,7 +973,7 @@ label linGeomTotalDispSolid::formResidual
 label linGeomTotalDispSolid::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
     // Copy x into the D field
@@ -986,7 +984,6 @@ label linGeomTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -1000,7 +997,7 @@ label linGeomTotalDispSolid::formJacobian
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions

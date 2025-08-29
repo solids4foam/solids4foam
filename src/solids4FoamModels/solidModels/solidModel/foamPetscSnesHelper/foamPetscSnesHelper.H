@@ -113,7 +113,7 @@ private:
     // Private data
 
         //- Location of the solution unknowns, e.g. cells or points
-        const solutionLocation& location_;
+        const solutionLocation location_;
 
         //- Was PETSc initialised?
         const Switch initialised_;
@@ -345,8 +345,10 @@ public:
             //  A non-zero return value indicates an error
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,         // Residual
+                const Vec x    // Solution
+                // PetscScalar *f,        // Residual
+                // const PetscScalar *x   // Solution
             ) = 0;
 
             //- Form the Jacobian
@@ -356,8 +358,9 @@ public:
             //  return value indicates an error
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
+                // const PetscScalar *x  // Solution
             ) = 0;
 
             //- Inserts the OpenFOAM fvMatrix 'fvM' into the PETSc matrix 'jac'.

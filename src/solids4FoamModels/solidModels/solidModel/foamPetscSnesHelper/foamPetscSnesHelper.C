@@ -48,7 +48,7 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     CHKERRQ(VecGetArray(f, &ff));
 
     // Compute the residual
-    if (user->solMod_.formResidual(ff, xx) != 0)
+    if (user->solMod_.formResidual(f, x) != 0)
     {
         if (user->solMod_.stopOnPetscError())
         {
@@ -104,7 +104,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     CHKERRQ(MatZeroEntries(B));
 
     // Populate the Jacobian => implemented by the solid model
-    if (user->solMod_.formJacobian(B, xx) != 0)
+    if (user->solMod_.formJacobian(B, x) != 0)
     {
         Foam::FatalError
             << "formJacobian(B, xx) returned an error code!"
@@ -371,6 +371,7 @@ label foamPetscSnesHelper::initialiseSnes()
             snes_, convergenceCheckFoamPetscSnesHelper, &user, NULL
         )
     );
+
     // Set solver options
     // Uses default options, can be overridden by command line options
     CHKERRQ(SNESSetFromOptions(snes_));
@@ -515,15 +516,68 @@ label foamPetscSnesHelper::initialiseJacobian
     const bool createMat
 )
 {
-    // Count number of local blocks and local scalar equations
-    const label blockn = mesh.nCells();
-    const label n = blockn*blockSize;
+    // Number of local block equations
+    label blockn = -1;
 
-    // Global system size: total number of scalar equation across all
-    // processors
-    const label N = returnReduce(n, sumOp<label>());
+    // Number of local scalar equations, i.e. blockn*blockSize
+    label n = -1;
 
-    // // Set the Jacobian matrix size
+    // Number of scalar equations across all processors
+    label N = -1;
+
+    if (location_ == solutionLocation::CELLS)
+    {
+        // Set the number local block equations
+        blockn = mesh.nCells();
+
+        // Set the number local scalar equations
+        n = mesh.nCells()*blockSize;
+
+        // Set the global system size
+        N = returnReduce(n, sumOp<label>());
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // Note: the size of x is, in general, not equal to the number of
+        // points on this processor, as x only contains the points owned by
+        // this processor. To access the values not-owned by the proc, we
+        // need to request the values from the other processors
+
+        // Take references for brevity and efficiency
+        const labelList& localToGlobalPointMap =
+            globalPoints().localToGlobalPointMap();
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+
+        // Find size of global system
+        // i.e. the highest global point index + 1
+        const label blockN = gMax(localToGlobalPointMap) + 1;
+        N = blockSize*blockN;
+
+        // Find the start and end global point indices for this proc
+        label blockStartID = N;
+        label blockEndID = -1;
+        forAll(ownedByThisProc, pI)
+        {
+            if (ownedByThisProc[pI])
+            {
+                blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+                blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+            }
+        }
+
+        // Find size of local system, i.e. the range of points owned by this
+        // proc
+        blockn = blockEndID - blockStartID + 1;
+        n = blockSize*blockn;
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_
+            << exit(FatalError);
+    }
+
+    // Set the Jacobian matrix size
     if (createMat)
     {
         MatCreate(PETSC_COMM_WORLD, &jac);
@@ -539,67 +593,98 @@ label foamPetscSnesHelper::initialiseJacobian
     // Note: we assume a compact stencil, i.e. face only face neighbours
 
     // Number of on-processor non-zeros per row
-    label* d_nnz = (label*)malloc(blockn*sizeof(*d_nnz));
+    // Initialise d_nnz to one
+    labelList d_nnz(blockn, 1);
 
     // Number of off-processor non-zeros per row
-    label* o_nnz = (label*)malloc(blockn*sizeof(*o_nnz));
+    // Initialise o_nnz to zero
+    labelList o_nnz(blockn, 0);
 
-    // Initialise d_nnz to one and o_nnz to zero
-    for (int i = 0; i < blockn; ++i)
+    // Count the neighbours
+    if (location_ == solutionLocation::CELLS)
     {
-        d_nnz[i] = 1; // count diagonal cell
-        o_nnz[i] = 0;
-    }
-
-    // Take a reference to the mesh
-    //const Foam::fvMesh& mesh = user->solMod_.fmesh();
-
-    // Count neighbours sharing an internal face
-    const Foam::labelUList& own = mesh.owner();
-    const Foam::labelUList& nei = mesh.neighbour();
-    forAll(own, faceI)
-    {
-        const Foam::label ownCellID = own[faceI];
-        const Foam::label neiCellID = nei[faceI];
-        d_nnz[ownCellID]++;
-        d_nnz[neiCellID]++;
-    }
-
-    // Count off-processor neighbour cells
-    forAll(mesh.boundary(), patchI)
-    {
-        if (mesh.boundary()[patchI].type() == "processor")
+        // Count neighbours sharing an internal face
+        const Foam::labelUList& own = mesh.owner();
+        const Foam::labelUList& nei = mesh.neighbour();
+        forAll(own, faceI)
         {
-            const Foam::labelUList& faceCells =
-                mesh.boundary()[patchI].faceCells();
+            const Foam::label ownCellID = own[faceI];
+            const Foam::label neiCellID = nei[faceI];
+            d_nnz[ownCellID]++;
+            d_nnz[neiCellID]++;
+        }
 
-            forAll(faceCells, fcI)
+        // Count off-processor neighbour cells
+        forAll(mesh.boundary(), patchI)
+        {
+            if (mesh.boundary()[patchI].type() == "processor")
             {
-                const Foam::label cellID = faceCells[fcI];
-                o_nnz[cellID]++;
+                const Foam::labelUList& faceCells =
+                    mesh.boundary()[patchI].faceCells();
+
+                forAll(faceCells, fcI)
+                {
+                    const Foam::label cellID = faceCells[fcI];
+                    o_nnz[cellID]++;
+                }
+            }
+            else if (mesh.boundary()[patchI].coupled())
+            {
+                // Other coupled boundaries are not implemented
+                Foam::FatalError
+                    << "Coupled boundary are not implemented, except for"
+                    << " processor boundaries" << Foam::abort(Foam::FatalError);
             }
         }
-        else if (mesh.boundary()[patchI].coupled())
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // Take references
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        const labelList& stencilSizeOwned = globalPoints().stencilSizeOwned();
+        const labelList& stencilSizeNotOwned =
+            globalPoints().stencilSizeNotOwned();
+
+        // Reset d_nnz to 0
+        d_nnz = 0;
+
+        // We can optionally track the max on-core non-zeros to zero
+        //label d_nz = 0;
+
+        // Count non-zeros
+        label rowI = 0;
+        forAll(stencilSizeOwned, blockRowI)
         {
-            // Other coupled boundaries are not implemented
-            Foam::FatalError
-                << "Coupled boundary are not implemented, except for"
-                << " processor boundaries" << Foam::abort(Foam::FatalError);
+            if (ownedByThisProc[blockRowI])
+            {
+                const label nCompOwned = stencilSizeOwned[blockRowI];
+                const label nCompNotOwned = stencilSizeNotOwned[blockRowI];
+
+                d_nnz[rowI] += nCompOwned;
+                o_nnz[rowI++] += nCompNotOwned;
+
+                //d_nz = max(d_nz, nCompOwned);
+            }
         }
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_
+            << exit(FatalError);
     }
 
     // Allocate parallel matrix
     //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
     // Allocate parallel matrix with the same conservative stencil per node
     //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize, 0, d_nnz, 0, o_nnz));
+    CHKERRQ(MatMPIBAIJSetPreallocation
+    (
+        jac, blockSize, 0, d_nnz.data(), 0, o_nnz.data())
+    );
 
     // Raise an error if mallocs are required during matrix assembly
     MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
-
-    // Free memory
-    free(d_nnz);
-    free(o_nnz);
 
     return 0;
 }
@@ -613,8 +698,6 @@ label foamPetscSnesHelper::initialiseSolution
     const bool createVec
 )
 {
-    notImplemented("Should we store fvMesh since the constructor needs it");
-
     if (createVec)
     {
         // Number of local scalar equations
