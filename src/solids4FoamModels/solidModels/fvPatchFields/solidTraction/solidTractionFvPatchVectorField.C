@@ -492,6 +492,49 @@ void solidTractionFvPatchVectorField::evaluate
 }
 
 
+autoPtr<CompactListList<vector>>
+solidTractionFvPatchVectorField::evaluateQuadrature
+(
+    const CompactListList<point>& faceQuadPoints
+) const
+{
+    // faceQuadPoints is list for whole mesh.
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    forAll(*this, faceI)
+    {
+        // Get the current face value
+        const vector& faceValue = (*this)[faceI];
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the same value to all quadrature points on this face
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            quadPointsValue[faceI][pointI] = faceValue;
+        }
+    }
+
+    return tQuadPointsValue;
+}
+
+
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {
     // Bug-fix: courtesy of Michael@UW at https://www.cfd-online.com/Forums/

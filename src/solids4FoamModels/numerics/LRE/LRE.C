@@ -21,7 +21,8 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
-#include "fixedValueFvPatchFields.H"
+#include "fixedDisplacementFvPatchVectorField.H"
+#include "fixedGradientFvPatchFields.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
 #include "symmetryPlanePolyPatch.H"
@@ -57,7 +58,7 @@ void LRE::makeGlobalCellStencils() const
 {
     if (debug)
     {
-	InfoInFunction << "start" << endl;
+        InfoInFunction << "start" << endl;
     }
 
     if (globalCellStencilsPtr_)
@@ -71,99 +72,99 @@ void LRE::makeGlobalCellStencils() const
 
     if (radialStencil)
     {
-	const fvMesh& mesh = mesh_;
-	const pointField& cellCentres = mesh.C();
-	const scalarField& cellV = mesh.V();
-	const label nCells = mesh.nCells();
+        const fvMesh& mesh = mesh_;
+        const pointField& cellCentres = mesh.C();
+        const scalarField& cellV = mesh.V();
+        const label nCells = mesh.nCells();
 
-	label Nn = Nn_ + minNn();
+        label Nn = Nn_ + minNn();
 
-	// Avoid bounding box error in case of 2D cases
-	treeBoundBox bb(cellCentres);
-	bb.grow(1e-4);
+        // Avoid bounding box error in case of 2D cases
+        treeBoundBox bb(cellCentres);
+        bb.grow(1e-4);
 
-	indexedOctree<treeDataPoint> octree
-	(
-	    treeDataPoint(cellCentres),
-	    bb,
-	    cellCentres.size(), // max level
-	    16, // leaf size
-	    1 // duplicity
+        indexedOctree<treeDataPoint> octree
+        (
+            treeDataPoint(cellCentres),
+            bb,
+            cellCentres.size(), // max level
+            16, // leaf size
+            1 // duplicity
         );
 
-	globalCellStencilsPtr_.set(new labelListList(nCells));
-	labelListList& cellStencils = globalCellStencilsPtr_();
+        globalCellStencilsPtr_.set(new labelListList(nCells));
+        labelListList& cellStencils = globalCellStencilsPtr_();
 
-	const scalar maxRadius = mesh.bounds().mag();
+        const scalar maxRadius = mesh.bounds().mag();
 
-	forAll(cellCentres, cellI)
-	{
-	    const point& cellCentre = cellCentres[cellI];
-	    scalar sphereR =
-		8.0*std::cbrt(3*cellV[cellI]/(4*constant::mathematical::pi));
+        forAll(cellCentres, cellI)
+        {
+            const point& cellCentre = cellCentres[cellI];
+            scalar sphereR =
+                8.0*std::cbrt(3*cellV[cellI]/(4*constant::mathematical::pi));
 
-	    labelList candidates;
-	    while(true)
-	    {
-		candidates = octree.findSphere(cellCentre, sqr(sphereR));
+            labelList candidates;
+            while(true)
+            {
+                candidates = octree.findSphere(cellCentre, sqr(sphereR));
 
-		if (candidates.size() >= 1.5*Nn || sphereR >= 2.0*maxRadius)
-		{
-		    break;
-		}
-	        sphereR *= 2.0;
-	    }
+                if (candidates.size() >= 1.5*Nn || sphereR >= 2.0*maxRadius)
+                {
+                    break;
+                }
+                sphereR *= 2.0;
+            }
 
-	    List<Tuple2<label, scalar>> distList(candidates.size());
-	    forAll(candidates, i)
-	    {
-		label cI = candidates[i];
-		distList[i] =
-		    Tuple2<label,scalar>
-		    (
-		        cI,
-			mag(cellCentres[cI] - cellCentre)
-		    );
-	    }
+            List<Tuple2<label, scalar>> distList(candidates.size());
+            forAll(candidates, i)
+            {
+                label cI = candidates[i];
+                distList[i] =
+                    Tuple2<label,scalar>
+                    (
+                        cI,
+                        mag(cellCentres[cI] - cellCentre)
+                    );
+            }
 
-	    Foam::stableSort
-	    (
-		 distList,
-		 [](auto& A, auto& B)
-		 {
-		     return A.second() < B.second();
-		 }
-	    );
+            Foam::stableSort
+            (
+                 distList,
+                 [](auto& A, auto& B)
+                 {
+                     return A.second() < B.second();
+                 }
+            );
 
-	    label n    = distList.size();
-	    label nMin = min(n, Nn);
+            label n    = distList.size();
+            label nMin = min(n, Nn);
 
-	    // Get sphere radius for last point
-	    scalar sphereRadius = distList[nMin-1].second();
+            // Get sphere radius for last point
+            scalar sphereRadius = distList[nMin-1].second();
 
-	    // Extend to include candidates within tolerance of 1%
-	    // By doing this we perserve symmetric stencil on structured grids
-	    scalar tol = 1e-3*sphereRadius;
-	    label nTie = nMin;
-	    while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
-	    {
-		++nTie;
-	    }
+            // Extend to include candidates within tolerance of 1%
+            // By doing this we perserve symmetric stencil on structured grids
+            scalar tol = 1e-3*sphereRadius;
+            label nTie = nMin;
+            while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
+            {
+                ++nTie;
+            }
 
-	    // Fill face stencils
-	    cellStencils[cellI].setSize(nTie);
-	    for (label i = 0; i < nTie; ++i)
-	    {
-		cellStencils[cellI][i] = distList[i].first();
-	    }
+            // Fill face stencils
+            cellStencils[cellI].setSize(nTie);
+            for (label i = 0; i < nTie; ++i)
+            {
+                cellStencils[cellI][i] = distList[i].first();
+            }
 
-	    if (cellStencils[cellI].size() < Nn)
-	    {
-		FatalErrorInFunction
-		    << "Number of face neighbours from octree search: "
-		    << cellStencils[cellI].size() << " is lower than required: "
-		    << Nn << abort(FatalError);
-	    }
+            if (cellStencils[cellI].size() < Nn)
+            {
+                FatalErrorInFunction
+                    << "Number of face neighbours from octree search: "
+                    << cellStencils[cellI].size() << " is lower than required: "
+                    << Nn << abort(FatalError);
+            }
         }
     }
     return;
@@ -581,7 +582,7 @@ void LRE::makeGlobalFaceStencils() const
 {
     if (debug)
     {
-	InfoInFunction << "start" << endl;
+        InfoInFunction << "start" << endl;
     }
 
     if (globalFaceStencilsPtr_)
@@ -595,117 +596,117 @@ void LRE::makeGlobalFaceStencils() const
 
     if (radialStencil)
     {
-	const fvMesh& mesh = mesh_;
-	const labelUList& owner = mesh.faceOwner();
-	const pointField& cellCentres = mesh.C();
+        const fvMesh& mesh = mesh_;
+        const labelUList& owner = mesh.faceOwner();
+        const pointField& cellCentres = mesh.C();
 
-	label Nn = Nn_ + minNn();
+        label Nn = Nn_ + minNn();
 
-	// Avoid bounding box error in case of 2D cases
-	treeBoundBox bb(cellCentres);
-	bb.grow(1e-4);
+        // Avoid bounding box error in case of 2D cases
+        treeBoundBox bb(cellCentres);
+        bb.grow(1e-4);
 
-	indexedOctree<treeDataPoint> octree
-	(
-	    treeDataPoint(cellCentres),
-	    bb,
-	    cellCentres.size(), // max level
-	    16, // leaf size
-	    1 // duplicity
+        indexedOctree<treeDataPoint> octree
+        (
+            treeDataPoint(cellCentres),
+            bb,
+            cellCentres.size(), // max level
+            16, // leaf size
+            1 // duplicity
         );
 
-	globalFaceStencilsPtr_.set(new labelListList(mesh.nFaces()));
-	labelListList& faceStencils = globalFaceStencilsPtr_();
+        globalFaceStencilsPtr_.set(new labelListList(mesh.nFaces()));
+        labelListList& faceStencils = globalFaceStencilsPtr_();
 
-	const scalar maxRadius = mesh.bounds().mag();
+        const scalar maxRadius = mesh.bounds().mag();
 
-	forAll(mesh.faces(), faceI)
-	{
-	    // Number of neighbours for currect face. Alternated in the case of
-	    // symmetry plane
-	    label curNn = Nn;
+        forAll(mesh.faces(), faceI)
+        {
+            // Number of neighbours for currect face. Alternated in the case of
+            // symmetry plane
+            label curNn = Nn;
 
-	    const point& faceCentre = mesh.faceCentres()[faceI];
-	    scalar sphereR = 8.0*mag(faceCentre - cellCentres[owner[faceI]]);
+            const point& faceCentre = mesh.faceCentres()[faceI];
+            scalar sphereR = 8.0*mag(faceCentre - cellCentres[owner[faceI]]);
 
-	    // We will reflect stencil for faces at symmetry so we will half Nn
-	    if (!mesh.isInternalFace(faceI))
-	    {
-		const label patchID = mesh.boundaryMesh().whichPatch(faceI);
-		if
-		(
-		    isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
-		 || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
-		)
-		{
-		    curNn = Nn / 2;
-		}
-	    }
+            // We will reflect stencil for faces at symmetry so we will half Nn
+            if (!mesh.isInternalFace(faceI))
+            {
+                const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+                if
+                (
+                    isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
+                 || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
+                )
+                {
+                    curNn = Nn / 2;
+                }
+            }
 
-	    labelList candidates;
-	    while(true)
-	    {
-		candidates = octree.findSphere(faceCentre, sqr(sphereR));
+            labelList candidates;
+            while(true)
+            {
+                candidates = octree.findSphere(faceCentre, sqr(sphereR));
 
-		if (candidates.size() >= 1.5*curNn || sphereR >= 2.0*maxRadius)
-		{
-		    break;
-		}
-	        sphereR *= 2.0;
-	    }
+                if (candidates.size() >= 1.5*curNn || sphereR >= 2.0*maxRadius)
+                {
+                    break;
+                }
+                sphereR *= 2.0;
+            }
 
-	    List<Tuple2<label, scalar>> distList(candidates.size());
-	    forAll(candidates, i)
-	    {
-		label cI = candidates[i];
-		distList[i] =
-		    Tuple2<label,scalar>
-		    (
-		        cI,
-			mag(cellCentres[cI] - faceCentre)
-		    );
-	    }
+            List<Tuple2<label, scalar>> distList(candidates.size());
+            forAll(candidates, i)
+            {
+                label cI = candidates[i];
+                distList[i] =
+                    Tuple2<label,scalar>
+                    (
+                        cI,
+                        mag(cellCentres[cI] - faceCentre)
+                    );
+            }
 
-	    Foam::stableSort
-	    (
-		 distList,
-		 [](auto& A, auto& B)
-		 {
-		     return A.second() < B.second();
-		 }
-	    );
-	    label n = distList.size();
-	    label nMin = min(n, curNn);
+            Foam::stableSort
+            (
+                 distList,
+                 [](auto& A, auto& B)
+                 {
+                     return A.second() < B.second();
+                 }
+            );
+            label n = distList.size();
+            label nMin = min(n, curNn);
 
-	    // Get sphere radius for last point
-	    scalar sphereRadius = distList[nMin-1].second();
+            // Get sphere radius for last point
+            scalar sphereRadius = distList[nMin-1].second();
 
-	    // Extend to include candidates within tolerance of 0.01%
-	    // By doing this we perserve symmetric stencil on structured grids
-	    // Abobve is not entirely true becouse this is for face centre
-	    //and we use quadrature points
-	    scalar tol = 1e-5*sphereRadius;
-	    label nTie = nMin;
-	    while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
-	    {
-		++nTie;
-	    }
+            // Extend to include candidates within tolerance of 0.01%
+            // By doing this we perserve symmetric stencil on structured grids
+            // Abobve is not entirely true becouse this is for face centre
+            //and we use quadrature points
+            scalar tol = 1e-5*sphereRadius;
+            label nTie = nMin;
+            while (nTie < n && mag(distList[nTie].second() - sphereRadius) < tol)
+            {
+                ++nTie;
+            }
 
-	    // Fill face stencils
-	    faceStencils[faceI].setSize(nTie);
-	    for (label i = 0; i < nTie; ++i)
-	    {
-		faceStencils[faceI][i] = distList[i].first();
-	    }
+            // Fill face stencils
+            faceStencils[faceI].setSize(nTie);
+            for (label i = 0; i < nTie; ++i)
+            {
+                faceStencils[faceI][i] = distList[i].first();
+            }
 
-	    if (faceStencils[faceI].size() < curNn)
-	    {
-		FatalErrorInFunction
-		    << "Number of face neighbours from octree search: "
-		    << faceStencils[faceI].size() << " is lower than required: "
-		    << Nn << abort(FatalError);
-	    }
-	}
+            if (faceStencils[faceI].size() < curNn)
+            {
+                FatalErrorInFunction
+                    << "Number of face neighbours from octree search: "
+                    << faceStencils[faceI].size() << " is lower than required: "
+                    << Nn << abort(FatalError);
+            }
+        }
     }
     Info<<"--Molecule construction:"<<timer.elapsedCpuTime()<< endl;
     return;
@@ -981,31 +982,31 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
 
     if (weightFunc() == weightFunction::ONE)
     {
-	w = 1.0;
+        w = 1.0;
     }
     else if (weightFunc() == weightFunction::LINEAR)
     {
-	w = 1 - (d/maxDist);
+        w = 1 - (d/maxDist);
     }
     else if (weightFunc() == weightFunction::INV_DIST)
     {
-	// User parameters to control weight distribution
-	const scalar s = 1000;
-	const scalar b = 3;
+        // User parameters to control weight distribution
+        const scalar s = 1000;
+        const scalar b = 3;
 
-	w = 1.0 / (1.0 + s*pow((d/(2*maxDist)),b));
+        w = 1.0 / (1.0 + s*pow((d/(2*maxDist)),b));
     }
     else if (weightFunc() == weightFunction::RAD_SYMM_EXP)
     {
-	// Smoothing length
-	const scalar dm = 2*maxDist;
+        // Smoothing length
+        const scalar dm = 2*maxDist;
 
-	const scalar sqrK = -sqr(k_);
+        const scalar sqrK = -sqr(k_);
 
-	w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
+        w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
 
-	// Clip small negative value
-	w = max(SMALL, w);
+        // Clip small negative value
+        w = max(SMALL, w);
     }
     else
     {
@@ -1014,7 +1015,7 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
             << LRE::weightFunctionNames_[LRE::weightFunction::ONE]
             << LRE::weightFunctionNames_[LRE::weightFunction::LINEAR]
             << LRE::weightFunctionNames_[LRE::weightFunction::INV_DIST]
-	    << LRE::weightFunctionNames_[LRE::weightFunction::RAD_SYMM_EXP]
+            << LRE::weightFunctionNames_[LRE::weightFunction::RAD_SYMM_EXP]
             << endl;
     }
 
@@ -1027,11 +1028,11 @@ label LRE::minNn() const
     // Taylor order in 2D case does not have terms related to z coordinate
     if (mesh_.nGeometricD() == 2)
     {
-	return ((N_+1)*(N_+2)/2);
+        return ((N_+1)*(N_+2)/2);
     }
     else
     {
-	return ((N_+1)*(N_+2)*(N_+3)/6);
+        return ((N_+1)*(N_+2)*(N_+3)/6);
     }
 }
 
@@ -1058,35 +1059,35 @@ void LRE::generateExponents
     // 2D and 3D cases have different number of exponents in Taylor series
     if (mesh_.nGeometricD() == 2)
     {
-	for (label n = 1; n <= N; ++n)
-	{
-	    for (label i = n; i >= 0; --i)
-	    {
-		const label j = n - i;
-		FixedList<label, 3> exponent  = {i, j, 1};
-		exponents.append(exponent);
-	    }
-	}
+        for (label n = 1; n <= N; ++n)
+        {
+            for (label i = n; i >= 0; --i)
+            {
+                const label j = n - i;
+                FixedList<label, 3> exponent  = {i, j, 1};
+                exponents.append(exponent);
+            }
+        }
     }
     else
     {
-	for (label n = 1; n <= N; ++n)
-	{
-	    for (label i = n; i >= 0; --i)
-	    {
-		for (label j = n - i; j >= 0; --j)
-		{
-		    label k = n - i - j;
-		    if (i == 0 && j == 0 && k == 0)
-		    {
-			// Skip the constant term as it's already added
-			continue;
-		    }
-		    FixedList<label, 3> exponent = {i, j, k};
-		    exponents.append(exponent);
-		}
-	    }
-	}
+        for (label n = 1; n <= N; ++n)
+        {
+            for (label i = n; i >= 0; --i)
+            {
+                for (label j = n - i; j >= 0; --j)
+                {
+                    label k = n - i - j;
+                    if (i == 0 && j == 0 && k == 0)
+                    {
+                        // Skip the constant term as it's already added
+                        continue;
+                    }
+                    FixedList<label, 3> exponent = {i, j, k};
+                    exponents.append(exponent);
+                }
+            }
+        }
     }
 
     // Adjust capacity to actual size
@@ -1246,7 +1247,7 @@ void LRE::calcQRCoeffs() const
                 d = mag(neiC - C);
             }
 
-	    W.diagonal()[cI] = weight(d, maxDist);
+            W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -1435,8 +1436,8 @@ void LRE::calcGlobalQRCoeffs() const
             maxDist = max(maxDist, d);
         }
 
-	// Scaling factor for Taylor series
-	const scalar h = 2.0 * maxDist;
+        // Scaling factor for Taylor series
+        const scalar h = 2.0 * maxDist;
 
         // Loop over neighbours and construct matrix Q
         const label Nn = curStencil.size();
@@ -1472,8 +1473,8 @@ void LRE::calcGlobalQRCoeffs() const
                 dx = globalCI[neiGlobalCellID] - CI[localCellI];
             }
 
-	    // Normalise dx to improve conditioning
-	    dx /= h;
+            // Normalise dx to improve conditioning
+            dx /= h;
 
             // Compute monomial values for each exponent
             for (label p = 0; p < Np; ++p)
@@ -1487,20 +1488,20 @@ void LRE::calcGlobalQRCoeffs() const
                 const scalar factorialDenominator =
                     factorials[i]*factorials[j]*factorials[k];
 
-		// Compute and assign monomial value with factorials
-		// Note: the order of the quadratic and higher terms may not be
-		// the same as the previous manual approach
-		if (twoD)
-		{
-		    Q(p, cI) =
-			pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
-		}
-		else
-		{
-		    Q(p, cI) =
-			pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-			/factorialDenominator;
-	        }
+                // Compute and assign monomial value with factorials
+                // Note: the order of the quadratic and higher terms may not be
+                // the same as the previous manual approach
+                if (twoD)
+                {
+                    Q(p, cI) =
+                        pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                }
+                else
+                {
+                    Q(p, cI) =
+                        pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                        /factorialDenominator;
+                }
             }
         }
 
@@ -1523,7 +1524,7 @@ void LRE::calcGlobalQRCoeffs() const
                 d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
             }
 
-	    W.diagonal()[cI] = weight(d, maxDist);
+            W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -1584,15 +1585,15 @@ void LRE::calcGlobalQRCoeffs() const
         Eigen::RowVectorXd cRow = A.row(0);
         Eigen::RowVectorXd cxRow = A.row(1)/h;
         Eigen::RowVectorXd cyRow = A.row(2)/h;
-	Eigen::RowVectorXd czRow;
-	if (twoD)
-	{
-	    czRow = Eigen::RowVectorXd::Zero(A.cols());
-	}
-	else
-	{
-	    czRow = A.row(3)/h;
-	}
+        Eigen::RowVectorXd czRow;
+        if (twoD)
+        {
+            czRow = Eigen::RowVectorXd::Zero(A.cols());
+        }
+        else
+        {
+            czRow = A.row(3)/h;
+        }
 
         for (label i = 0; i < A.cols(); ++i)
         {
@@ -1724,8 +1725,8 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             maxDist = max(maxDist, d);
         }
 
-	// Scaling factor for Taylor series
-	const scalar h = 2.0 * maxDist;
+        // Scaling factor for Taylor series
+        const scalar h = 2.0 * maxDist;
 
         // We need to extend stencil for ghost point at boundary
         bool ghostPoint = false;
@@ -1735,31 +1736,31 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             ghostPoint = includePatchInStencils_[patchID];
         }
 
-	// We need to reflect complete stencil if face is on symmetry plane
-	bool symmetryFace = false;
-	if (!mesh.isInternalFace(faceI))
-	{
-	    const label patchID = mesh.boundaryMesh().whichPatch(faceI);
-	    if
-	    (
-	        isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
-	     || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
-	    )
-	    {
+        // We need to reflect complete stencil if face is on symmetry plane
+        bool symmetryFace = false;
+        if (!mesh.isInternalFace(faceI))
+        {
+            const label patchID = mesh.boundaryMesh().whichPatch(faceI);
+            if
+            (
+                isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
+             || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
+            )
+            {
                 symmetryFace = true;
-		if (ghostPoint)
-		{
-		    FatalErrorInFunction
-			<< "Face " << faceI << " is on symmetry plane but it is"
-			<< " set to fix value" << exit(FatalError);
-		}
-	    }
-	}
+                if (ghostPoint)
+                {
+                    FatalErrorInFunction
+                        << "Face " << faceI << " is on symmetry plane but it is"
+                        << " set to fix value" << exit(FatalError);
+                }
+            }
+        }
 
         // Number of neighbours in stencil
-	const label stencilSize = curStencil.size();
-	const label Nn =
-	    stencilSize + (ghostPoint ? 1 : 0) + (symmetryFace ? stencilSize : 0);
+        const label stencilSize = curStencil.size();
+        const label Nn =
+            stencilSize + (ghostPoint ? 1 : 0) + (symmetryFace ? stencilSize : 0);
 
         // Check to avoid Eigen error
         if (Nn < Np)
@@ -1774,11 +1775,11 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
         // Face quadrature points
         const List<point>& fGP = faceGP[faceI];
-	const label nGP = fGP.size();
+        const label nGP = fGP.size();
 
-	// Allocate CompactListList for this face
-	labelList rowSizes(nGP, Nn);
-	QRGradCoeffs[faceI] = CompactListList<vector>(rowSizes);
+        // Allocate CompactListList for this face
+        labelList rowSizes(nGP, Nn);
+        QRGradCoeffs[faceI] = CompactListList<vector>(rowSizes);
 
         // Loop over face quadrature points
         forAll(fGP, gaussPointI)
@@ -1792,16 +1793,16 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             // Loop over stencil points and compute Q
             for (label cI = 0; cI < Nn; ++cI)
             {
-		label id = cI;
-		// Stencil mirroring for symmetry plane face
-		if (symmetryFace && cI >= (Nn/2))
-		{
-		    id = cI - (Nn/2);
+                label id = cI;
+                // Stencil mirroring for symmetry plane face
+                if (symmetryFace && cI >= (Nn/2))
+                {
+                    id = cI - (Nn/2);
                 }
 
-		const label neiGlobalCellID = curStencil[id];
+                const label neiGlobalCellID = curStencil[id];
 
-		vector dx;
+                vector dx;
                 if (globalCells_.isLocal(neiGlobalCellID))
                 {
                     const label neiLocalCellID =
@@ -1814,15 +1815,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     dx = globalCI[neiGlobalCellID] - curGP;
                 }
 
-		// Mirror dx for symmetry plane ghost stencil part
-		if (symmetryFace && cI >= (Nn/2))
-		{
-		    const vector n = Sf[faceI]/(mag(Sf[faceI])+VSMALL);
-		    dx = transform(I - 2.0*sqr(n), dx);
-		}
+                // Mirror dx for symmetry plane ghost stencil part
+                if (symmetryFace && cI >= (Nn/2))
+                {
+                    const vector n = Sf[faceI]/(mag(Sf[faceI])+VSMALL);
+                    dx = transform(I - 2.0*sqr(n), dx);
+                }
 
-		// Normalise dx to improve conditioning
-		dx /= h;
+                // Normalise dx to improve conditioning
+                dx /= h;
 
                 // Compute monomial values for each exponent
                 for (label p = 0; p < Np; ++p)
@@ -1832,25 +1833,25 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     const label j = exponent[1];
                     const label k = exponent[2];
 
-		    // Compute factorial denominator
-		    const scalar factorialDenominator =
-			factorials[i]*factorials[j]*factorials[k];
+                    // Compute factorial denominator
+                    const scalar factorialDenominator =
+                        factorials[i]*factorials[j]*factorials[k];
 
-		    // Compute and assign monomial value with factorials
-		    // Note: the order of the quadratic and higher terms may not
-		    // be the same as the previous manual approach
-		    if (twoD)
-		    {
-			Q(p, cI) =
-			    pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
-		    }
-		    else
-		    {
-			Q(p, cI) =
-			    pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-			    /factorialDenominator;
-		    }
-		}
+                    // Compute and assign monomial value with factorials
+                    // Note: the order of the quadratic and higher terms may not
+                    // be the same as the previous manual approach
+                    if (twoD)
+                    {
+                        Q(p, cI) =
+                            pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                    }
+                    else
+                    {
+                        Q(p, cI) =
+                            pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                            /factorialDenominator;
+                    }
+                }
 
                 // Add ghost point manually in second from last iteration
                 // and skip last iteration for ghostPoint
@@ -1871,15 +1872,15 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
             // Loop over stencil points and compute W
             for (label cI = 0; cI < Nn; cI++)
             {
-		// Add symmetry face ghost points manually, the weights are the
-		// same like for interior points
-		if (symmetryFace && cI == (Nn/2))
-		{
-		    W.diagonal().bottomRows(Nn/2) = W.diagonal().topRows(Nn/2);
-		    break;
-		}
+                // Add symmetry face ghost points manually, the weights are the
+                // same like for interior points
+                if (symmetryFace && cI == (Nn/2))
+                {
+                    W.diagonal().bottomRows(Nn/2) = W.diagonal().topRows(Nn/2);
+                    break;
+                }
 
-		const label neiGlobalCellID = curStencil[cI];
+                const label neiGlobalCellID = curStencil[cI];
                 scalar d;
                 if (globalCells_.isLocal(neiGlobalCellID))
                 {
@@ -1893,7 +1894,7 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                     d = mag(globalCI[neiGlobalCellID] - curGP);
                 }
 
-		W.diagonal()[cI] = weight(d, maxDist);
+                W.diagonal()[cI] = weight(d, maxDist);
 
                 // Add ghost point manually in second from last iteration
                 // and skip last iteration for ghostPoint
@@ -1904,69 +1905,69 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                 }
             }
 
-	    // Now when we have W and Q, next step is QR decomposition
-	    const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
-		W.diagonal().cwiseSqrt().asDiagonal();
-	    const Eigen::MatrixXd Qhat =
-		Q.array().rowwise()*sqrtW.diagonal().transpose().array();
+            // Now when we have W and Q, next step is QR decomposition
+            const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+                W.diagonal().cwiseSqrt().asDiagonal();
+            const Eigen::MatrixXd Qhat =
+                Q.array().rowwise()*sqrtW.diagonal().transpose().array();
 
-	    // B hat
-	    const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
-		sqrtW.diagonal().asDiagonal();
+            // B hat
+            const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+                sqrtW.diagonal().asDiagonal();
 
-	    // QR decomposition
-	    Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+            // QR decomposition
+            Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-	    // Q and R matrices
-	    const Eigen::MatrixXd O = qr.householderQ();
-	    const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
+            // Q and R matrices
+            const Eigen::MatrixXd O = qr.householderQ();
+            const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
 
-	    // Slice Rbar and Qbar, as we do not need full matrix
-	    // Note: auto is a reference type here (Rbar, Qbar are not copied)
-	    const auto Rbar = R.topLeftCorner(Np, Np);
-	    const auto Qbar = O.leftCols(Np);
+            // Slice Rbar and Qbar, as we do not need full matrix
+            // Note: auto is a reference type here (Rbar, Qbar are not copied)
+            const auto Rbar = R.topLeftCorner(Np, Np);
+            const auto Qbar = O.leftCols(Np);
 
-	    // Perform element-wise multiplication and convert to MatrixXd
-	    const Eigen::MatrixXd QbarBhat =
-		(
-		    Qbar.transpose().array().rowwise()
-		  * Bhat.diagonal().transpose().array()
-		).matrix();
+            // Perform element-wise multiplication and convert to MatrixXd
+            const Eigen::MatrixXd QbarBhat =
+                (
+                    Qbar.transpose().array().rowwise()
+                  * Bhat.diagonal().transpose().array()
+                ).matrix();
 
-	    // Solve to get A
-	    //const Eigen::MatrixXd A =
-	    //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
-	    // Solve using the modified QbarBhat
-	    const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
-	    //  Eigen::MatrixXd A =
-	    //	Rbar.template triangularView<Eigen::Upper>().solve(QbarBhat);
+            // Solve to get A
+            //const Eigen::MatrixXd A =
+            //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+            // Solve using the modified QbarBhat
+            const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
+            //  Eigen::MatrixXd A =
+            //  Rbar.template triangularView<Eigen::Upper>().solve(QbarBhat);
 
-	    if (calcConditionNumber_)
-	    {
-		// Sometimes svd is causing crash!
-		Eigen::JacobiSVD<Eigen::MatrixXd> svd
-		    (
-		         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
-		    );
+            if (calcConditionNumber_)
+            {
+                // Sometimes svd is causing crash!
+                Eigen::JacobiSVD<Eigen::MatrixXd> svd
+                    (
+                         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+                    );
 
-		Eigen::VectorXd singularValues = svd.singularValues();
+                Eigen::VectorXd singularValues = svd.singularValues();
 
-		faceConditionNumber()[faceI] =
-		    singularValues(0)
-		   /(singularValues(singularValues.size() - 1) + VSMALL);
-	    }
+                faceConditionNumber()[faceI] =
+                    singularValues(0)
+                   /(singularValues(singularValues.size() - 1) + VSMALL);
+            }
 
             Eigen::RowVectorXd cRow = A.row(0);
             Eigen::RowVectorXd cxRow = A.row(1)/h;
             Eigen::RowVectorXd cyRow = A.row(2)/h;
             Eigen::RowVectorXd czRow =
-		twoD ? Eigen::RowVectorXd::Zero(A.cols()) : (A.row(3)/h).eval();
+                twoD ? Eigen::RowVectorXd::Zero(A.cols()) : (A.row(3)/h).eval();
 
-	    for (label i = 0; i < A.cols(); ++i)
-	    {
-		 QRGradCoeffs[faceI][gaussPointI][i] =
-		     vector(cxRow(i), cyRow(i), czRow(i));
-	    }
+            for (label i = 0; i < A.cols(); ++i)
+            {
+                 QRGradCoeffs[faceI][gaussPointI][i] =
+                     vector(cxRow(i), cyRow(i), czRow(i));
+            }
         }
     }
 
@@ -2135,7 +2136,7 @@ void LRE::calcCholeskyCoeffs() const
                 d = mag(neiC - C);
             }
 
-	    W.diagonal()[cI] = weight(d, maxDist);
+            W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -2357,7 +2358,7 @@ void LRE::calcGlobalCholeskyCoeffs() const
                 d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
             }
 
-	    W.diagonal()[cI] = weight(d, maxDist);
+            W.diagonal()[cI] = weight(d, maxDist);
         }
 
         // Now when we have W and Q, next step is QR decomposition
@@ -2430,26 +2431,26 @@ void LRE::calcQuadPointsAndWeights() const
 {
     if (mesh_.nGeometricD() == 2)
     {
-	if (mesh_.solutionD()[vector::Z] > -1)
-	{
-	    FatalErrorIn("calcQuadPointsAndWeights()")
+        if (mesh_.solutionD()[vector::Z] > -1)
+        {
+            FatalErrorIn("calcQuadPointsAndWeights()")
                 << "For 2-D models, the empty direction "
                 << "must be z!" << abort(FatalError);
-	}
-	else
-	{
-	    calcQuadPointsAndWeights2D();
-     	}
+        }
+        else
+        {
+            calcQuadPointsAndWeights2D();
+        }
     }
     else if (mesh_.nGeometricD() == 3)
     {
-	calcQuadPointsAndWeights3D();
+        calcQuadPointsAndWeights3D();
     }
     else
     {
-	FatalErrorIn("calcQuadPointsAndWeights()")
+        FatalErrorIn("calcQuadPointsAndWeights()")
             << "Only implemented for 2-D and 3-D models!"
-	    << abort(FatalError);
+            << abort(FatalError);
     }
 }
 
@@ -2473,7 +2474,7 @@ void LRE::calcQuadPointsAndWeights2D() const
     labelList nQpPerFace(mesh.nFaces(), 0);
     forAll(faces, faceI)
     {
-	if (faceI >= mesh.nInternalFaces())
+        if (faceI >= mesh.nInternalFaces())
         {
             const label patchID = mesh.boundaryMesh().whichPatch(faceI);
             const polyPatch& pp = mesh.boundaryMesh()[patchID];
@@ -2504,55 +2505,55 @@ void LRE::calcQuadPointsAndWeights2D() const
 
     forAll(faces, faceI)
     {
-	if (!faceQP[faceI].size())
-	{
-	    // Skip empty faces
-	    continue;
-	}
+        if (!faceQP[faceI].size())
+        {
+            // Skip empty faces
+            continue;
+        }
 
-    	// Set face quadrature points and corresponding weights
-	// We will loop over face edges and take the edge on the
-	// empty patch. Edge is translated to domain mid-plane.
+        // Set face quadrature points and corresponding weights
+        // We will loop over face edges and take the edge on the
+        // empty patch. Edge is translated to domain mid-plane.
 
-	const face& curFace = faces[faceI];
-	const edgeList curFaceEdges = curFace.edges();
+        const face& curFace = faces[faceI];
+        const edgeList curFaceEdges = curFace.edges();
 
-	forAll(curFaceEdges, edgeI)
-	{
-	    const edge& curEdge = curFaceEdges[edgeI];
-	    const vector e  = curEdge.vec(pts);
-	    const vector eNorm = e / mag(e);
+        forAll(curFaceEdges, edgeI)
+        {
+            const edge& curEdge = curFaceEdges[edgeI];
+            const vector e  = curEdge.vec(pts);
+            const vector eNorm = e / mag(e);
 
-	    const scalar a = mag(mag(eNorm ^ emptyDir) - 1.0);
+            const scalar a = mag(mag(eNorm ^ emptyDir) - 1.0);
 
-	    if (a < SMALL)
-	    {
-		// This edge is perpendicular to empty direction, we will use it
-		point a = pts[curEdge.start()];
-		point b = pts[curEdge.end()];
+            if (a < SMALL)
+            {
+                // This edge is perpendicular to empty direction, we will use it
+                point a = pts[curEdge.start()];
+                point b = pts[curEdge.end()];
 
-		// Edge is lying on either front or back empty patch, we will
-		// translate it to the mid-plane on which cell centres are.
-		a.z() = zCentre;
-		b.z() = zCentre;
+                // Edge is lying on either front or back empty patch, we will
+                // translate it to the mid-plane on which cell centres are.
+                a.z() = zCentre;
+                b.z() = zCentre;
 
-		// Construct line and lineQuadrature
-		const linePointRef l(a,b);
-		const lineQuadrature lq(l, N_);
+                // Construct line and lineQuadrature
+                const linePointRef l(a,b);
+                const lineQuadrature lq(l, N_);
 
-		const List<point>& lineQP = lq.points();
-		const List<scalar>& lineQPweights = lq.weights();
+                const List<point>& lineQP = lq.points();
+                const List<scalar>& lineQPweights = lq.weights();
 
-		forAll(lineQP, pI)
-		{
-		    faceQP[faceI][pI] = lineQP[pI];
-		    faceQPW[faceI][pI] = lineQPweights[pI];
-		}
+                forAll(lineQP, pI)
+                {
+                    faceQP[faceI][pI] = lineQP[pI];
+                    faceQPW[faceI][pI] = lineQPweights[pI];
+                }
 
-		// Go to next face, this face is done
-		break;
-	    }
-	}
+                // Go to next face, this face is done
+                break;
+            }
+        }
     }
 }
 
@@ -2594,60 +2595,60 @@ void LRE::calcQuadPointsAndWeights3D() const
 
     for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
     {
-	const face& f = mesh.faces()[faceI];
-	const label nTri = f.nTriangles();
-	const label nPoints = f.size();
+        const face& f = mesh.faces()[faceI];
+        const label nTri = f.nTriangles();
+        const label nPoints = f.size();
 
-	// Triangulate using OpenFOAM build in adaptive fan triangulation
-	faceList triFaces(nTri);
-	label t2 = 0;
-	const label t1 = f.triangles(mesh.points(), t2, triFaces);
+        // Triangulate using OpenFOAM build in adaptive fan triangulation
+        faceList triFaces(nTri);
+        label t2 = 0;
+        const label t1 = f.triangles(mesh.points(), t2, triFaces);
 
-	if (nTri != t1 || nTri != t2)
-	{
-	    FatalErrorInFunction
-		<< "The numbers of reported triangles in the face do not "
-		<< "match that generated by the triangulation"
-		<< exit(FatalError);
-	}
+        if (nTri != t1 || nTri != t2)
+        {
+            FatalErrorInFunction
+                << "The numbers of reported triangles in the face do not "
+                << "match that generated by the triangulation"
+                << exit(FatalError);
+        }
 
-	// Copy into faceTri list
-	faceTri[faceI].setSize(nTri);
-	forAll(triFaces, triFaceI)
-	{
-	    const face& triF = triFaces[triFaceI];
+        // Copy into faceTri list
+        faceTri[faceI].setSize(nTri);
+        forAll(triFaces, triFaceI)
+        {
+            const face& triF = triFaces[triFaceI];
 
-	    // Store face (triangle) as triPoints object in faceTri list
-	    faceTri[faceI][triFaceI] =
-		triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
-	}
+            // Store face (triangle) as triPoints object in faceTri list
+            faceTri[faceI][triFaceI] =
+                triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
+        }
 
-	// Check decomposition and perform central point triangulation if needed
-	bool validDecomposition = true;
-	{
-	    const scalar faceArea = f.mag(pts);
-	    forAll(faceTri[faceI], triI)
-	    {
-		const scalar triArea = mag(faceTri[faceI][triI].areaNormal());
-	        const scalar areaRatio = triArea / (faceArea + VSMALL);
+        // Check decomposition and perform central point triangulation if needed
+        bool validDecomposition = true;
+        {
+            const scalar faceArea = f.mag(pts);
+            forAll(faceTri[faceI], triI)
+            {
+                const scalar triArea = mag(faceTri[faceI][triI].areaNormal());
+                const scalar areaRatio = triArea / (faceArea + VSMALL);
 
-		if (areaRatio < 0.1)
-		{
-		    validDecomposition = false;
+                if (areaRatio < 0.1)
+                {
+                    validDecomposition = false;
 
-		    WarningInFunction
-			<< "Swiching to central point triangulation for face"
-			<< faceI << " at " << mesh.faceCentres()[faceI]
-			<< endl;
-		    break;
-		}
-	    }
-	}
+                    WarningInFunction
+                        << "Swiching to central point triangulation for face"
+                        << faceI << " at " << mesh.faceCentres()[faceI]
+                        << endl;
+                    break;
+                }
+            }
+        }
 
-	if (!validDecomposition)
-	{
-	    // Triangulation using central point
-	    faceTri[faceI].setSize(nPoints);
+        if (!validDecomposition)
+        {
+            // Triangulation using central point
+            faceTri[faceI].setSize(nPoints);
             const point fc = f.centre(pts);
 
             for (label pI = 0; pI<nPoints; ++pI)
@@ -2656,9 +2657,9 @@ void LRE::calcQuadPointsAndWeights3D() const
 
                 faceTri[faceI][pI] = triPoints(pts[f[pI]], pts[f[nextpI]], fc);
             }
-	}
+        }
 
-	// Final qp count for this face = (#triangles used) * (qp per triangle)
+        // Final qp count for this face = (#triangles used) * (qp per triangle)
         const label nTriUsed = faceTri[faceI].size();
         nQpPerFace[faceI] = nTriUsed * triQuadrature::nPoints(N_);
     }
@@ -2764,7 +2765,7 @@ LRE::QRGradFaceGPCoeffs() const
 {
     if (!QRGradFaceGPCoeffsPtr_)
     {
-	calcGlobalQRFaceGPCoeffs();
+        calcGlobalQRFaceGPCoeffs();
     }
 
     return QRGradFaceGPCoeffsPtr_();
@@ -2983,22 +2984,22 @@ tmp<labelField> LRE::cellFacesStencilSize() const
     // Loop over cell faces stencils and merge thems into one
     forAll(mesh.cells(), cellI)
     {
-	labelHashSet cellStencil;
+        labelHashSet cellStencil;
 
-	const labelList& cellFaces = mesh.cells()[cellI];
+        const labelList& cellFaces = mesh.cells()[cellI];
 
-	forAll(cellFaces, faceI)
-	{
-	    label faceID = cellFaces[faceI];
+        forAll(cellFaces, faceI)
+        {
+            label faceID = cellFaces[faceI];
 
-	    // Loop over face stencil and store face stencil
-	    forAll(faceStencils[faceID], i)
-	    {
-		cellStencil.insert(faceStencils[faceID][i]);
-	    }
-	}
+            // Loop over face stencil and store face stencil
+            forAll(faceStencils[faceID], i)
+            {
+                cellStencil.insert(faceStencils[faceID][i]);
+            }
+        }
 
-	pnf[cellI] = cellStencil.size();
+        pnf[cellI] = cellStencil.size();
     }
 
     return tpnf;
@@ -3047,7 +3048,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     const fvMesh& mesh = mesh_;
 
     // Gauss point locations on each face
-    const CompactListList<point>& faceGP = faceQuadPoints();
+    const CompactListList<point>& faceQP = faceQuadPoints();
 
     // Prepare the return field
     autoPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
@@ -3056,7 +3057,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     forAll(gradDGP, i)
     {
         List<tensor>& faceGradGP = gradDGP[i];
-        const List<point>& faceGaussPts = faceGP[i];
+        const List<point>& faceGaussPts = faceQP[i];
 
         faceGradGP.setSize(faceGaussPts.size());
 
@@ -3065,9 +3066,6 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
             gradDGP[i][gradI]=tensor::zero;
         }
     }
-
-    // Gauss point weights
-    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
 
     // Loop over Gauss points, calculate interpolation coefficients.
     // Gauss points on face share the same interpolation stencil
@@ -3081,173 +3079,127 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     Map<vector> globalDI;
     requestGlobalStencilData(DI, globalDI);
 
-    forAll(stencils, faceI)
+    // Loop over interior faces
+    forAll(mesh.owner(), faceI)
     {
         const labelList& curStencil = stencils[faceI];
-
-        // We need to extend stencil for ghost point at boundary
-        bool ghostPoint = false;
-        if (!mesh.isInternalFace(faceI))
-        {
-            const label patchID = mesh.boundaryMesh().whichPatch(faceI);
-            ghostPoint = includePatchInStencils_[patchID];
-        }
-
-        // Number of neighbours in stencil
-        const label Nn = curStencil.size() + (ghostPoint ? 1 : 0);
-
-        const List<point>& fGP = faceGP[faceI];
+        const List<point>& fGP = faceQP[faceI];
 
         // Loop over face Gauss point
         forAll(fGP, pointI)
         {
-            // For current face Gauss point, loop over stencil and multiply cell
-            // values with corresponding interpolation coefficients
-            for(label cI = 0; cI < Nn; cI++)
+            // Loop over stencil points
+            forAll(curStencil, cI)
             {
                 const label neiGlobalCellI = curStencil[cI];
-
                 if (globalCells_.isLocal(neiGlobalCellI))
                 {
-                    const label neiLocalCellI =
-                        globalCells_.toLocal(neiGlobalCellI);
-
-                    if (mesh.isInternalFace(faceI))
-                    {
-                        gradDGP[faceI][pointI] +=
-                           pointQRGradCoeffs[faceI][pointI][cI]*DI[neiLocalCellI];
-                    }
-                    else
-                    {
-                        // Boundary face
-                        const label patchID =
-                            mesh.boundaryMesh().whichPatch(faceI);
-                        const polyPatch& pp = mesh.boundaryMesh()[patchID];
-
-                        // Note: there is no special treatment for processor patches
-                        // as all patches may use global data depending on their
-                        // stencils
-                        if (!isA<emptyPolyPatch>(pp))
-                        {
-                            // I'm doing same as for internal face. I do not
-                            // have field, so i do not have boundaryField
-                            //const label localFaceI = faceI - pp.start();
-                            gradDGP[faceI][pointI] +=
-                                pointQRGradCoeffs[faceI][pointI][cI]*DI[neiLocalCellI];
-
-                            // In case of fixed value boundaries we have ghost
-                            // point (boundary value) in stencil
-                            if (ghostPoint && cI == Nn-2)
-                            {
-                                const label localFaceI = faceI - pp.start();
-			        vector disp = D.boundaryField()[patchID][localFaceI];
-
-			        // Hardcoded for manufactured solution cases
-				// This should be in boundary condition, but
-				// this is part of external case library, so
-				// I will leave it like this, for now.
-				if (D.boundaryField()[patchID].type() == "manufacturedSolution")
-				{
-				    const point qp = faceGP[faceI][pointI];
-
-				    if (mesh_.nGeometricD() == 2)
-				    {
-					// 2D MMS case
-					disp = vector
-					    (
-					        Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
-						Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
-						0.0
-					    );
-				    }
-				    else
-				    {
-					// 3D MMS case
-					disp = vector
-					    (
-					        Foam::log(qp.x()+3.0)*qp.y()*(qp.z()+1.0)+Foam::exp(qp.z()),
-					        Foam::sin(qp.y()*qp.z()) + 3.0*qp.y(),
-					        Foam::exp(qp.x()*qp.z())*qp.y() - 4.0*Foam::cos(qp.z())
-					    );
-				    }
-
-				}
-
-				gradDGP[faceI][pointI] +=
-                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*disp;
-
-                               break;
-                            }
-                        }
-                    }
+                    const label neiLocalCellI = globalCells_.toLocal(neiGlobalCellI);
+                    gradDGP[faceI][pointI] +=
+                        pointQRGradCoeffs[faceI][pointI][cI] * DI[neiLocalCellI];
                 }
-                else // global cell in the stencil
+                else
                 {
-                    if (mesh.isInternalFace(faceI))
-                    {
-                        gradDGP[faceI][pointI] +=
-                            pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
-                    }
-                    else
-                    {
-                        // Boundary face
-                        const label patchID =
-                            mesh.boundaryMesh().whichPatch(faceI);
-                        const polyPatch& pp = mesh.boundaryMesh()[patchID];
-
-                        // Note: there is no special treatment for processor patches
-                        // as all patches may use global data depending on their
-                        // stencils
-                        if (!isA<emptyPolyPatch>(pp))
-                        {
-                            // I'm doing same as for internal face. I do not
-                            // have field, so i do not have boundaryField
-                            //const label localFaceI = faceI - pp.start();
-                            gradDGP[faceI][pointI] +=
-                                pointQRGradCoeffs[faceI][pointI][cI]*DI[neiGlobalCellI];
-
-                            // In case of fixed value boundaries we have ghost
-                            // point (boundary value) in stencil
-                            if (ghostPoint && cI == Nn-2)
-                            {
-                               const label localFaceI = faceI - pp.start();
-			       vector disp = D.boundaryField()[patchID][localFaceI];
-				if (D.boundaryField()[patchID].type() == "manufacturedSolution")
-				{
-				    const point qp = faceGP[faceI][pointI];
-
-				    if (mesh_.nGeometricD() == 2)
-				    {
-					// 2D MMS case
-					disp = vector
-					    (
-					        Foam::exp(Foam::sqr(qp.x()))*Foam::sin(qp.y()),
-						Foam::log(3+qp.y())*Foam::cos(qp.x()) + Foam::sin(qp.y()),
-						0.0
-					    );
-				    }
-				    else
-				    {
-					// 3D MMS case
-					disp = vector
-					    (
-					        Foam::log(qp.x()+3.0)*qp.y()*(qp.z()+1.0)+Foam::exp(qp.z()),
-					        Foam::sin(qp.y()*qp.z()) + 3.0*qp.y(),
-					        Foam::exp(qp.x()*qp.z())*qp.y() - 4.0*Foam::cos(qp.z())
-					    );
-				    }
-
-				}
-
-				gradDGP[faceI][pointI] +=
-                                    pointQRGradCoeffs[faceI][pointI][Nn-1]*disp;
-
-                               break;
-                            }
-                        }
-                    }
+                    // global cell in the stencil
+                    gradDGP[faceI][pointI] +=
+                        pointQRGradCoeffs[faceI][pointI][cI] * globalDI[neiGlobalCellI];
                 }
             }
+        }
+    }
+
+    // Loop over boundary
+    forAll(D.boundaryField(), patchI)
+    {
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        if (isA<emptyPolyPatch>(pp))
+        {
+            continue;
+        }
+        else if
+        (
+            pp.type() == symmetryPolyPatch::typeName
+         || pp.type() == symmetryPlanePolyPatch::typeName
+        )
+        {
+            NotImplemented;
+        }
+        else if
+        (
+            pp.type() == processorPolyPatch::typeName
+        )
+        {
+            NotImplemented;
+        }
+        else if
+        (
+            isA<fixedGradientFvPatchVectorField>(D.boundaryField()[patchI])
+        )
+        {
+            // Solid traction is fixed gradient, skip for now.
+        }
+        else if
+        (
+            isA<fixedDisplacementFvPatchVectorField>(D.boundaryField()[patchI])
+        )
+        {
+            if (!includePatchInStencils_[patchI])
+            {
+                FatalErrorInFunction
+                    << "fixedDisplacement should have ghost points"
+                    << exit(FatalError);
+            }
+
+            const fixedDisplacementFvPatchVectorField& patchField =
+                refCast<const fixedDisplacementFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+            // Get value at patch faces quadrature points
+            autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                patchField.evaluateQuadrature(faceQP);
+            const CompactListList<vector>& quadratureValues =
+                patchQuadraturePointsValue();
+
+            forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+                const label globalFaceID = faceI + D.boundaryField()[patchI].patch().start();
+                const labelList& curStencil = stencils[globalFaceID];
+                const List<point>& fGP = faceQP[globalFaceID];
+
+                // Loop over face Gauss point
+                forAll(fGP, pointI)
+                {
+                    // Loop over stencil points
+                    forAll(curStencil, cI)
+                    {
+                        const label neiGlobalCellI = curStencil[cI];
+                        if (globalCells_.isLocal(neiGlobalCellI))
+                        {
+                            const label neiLocalCellI = globalCells_.toLocal(neiGlobalCellI);
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * DI[neiLocalCellI];
+                        }
+                        else
+                        {
+                            // global cell in the stencil
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * globalDI[neiGlobalCellI];
+                        }
+                    }
+                    // Add ghost point contribution (ghost point is not in stencil)
+                    const vector& disp = quadratureValues[faceI][pointI];
+                    const label ghostPointID = curStencil.size();
+                    gradDGP[globalFaceID][pointI] +=
+                        pointQRGradCoeffs[globalFaceID][pointI][ghostPointID] * disp;
+                }
+            }
+        }
+        else
+        {
+            // Boundary condition not implemented
+            NotImplemented;
         }
     }
 

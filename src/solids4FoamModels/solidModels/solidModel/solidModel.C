@@ -66,9 +66,9 @@ namespace Foam
     template<>
     const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
     {
-     	"PETScSNES",
+        "PETScSNES",
         "implicitCoupled",
-	"implicitSegregated",
+        "implicitSegregated",
         "explicit"
     };
 #endif
@@ -357,10 +357,10 @@ void Foam::solidModel::makeSigmaQuad() const
 
     forAll(sigmaQuad, faceI)
     {
-	List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
 
-	// Initialise face list size
-	faceSigmaQuad.setSize(quadPoints[faceI].size());
+        // Initialise face list size
+        faceSigmaQuad.setSize(quadPoints[faceI].size());
     }
 }
 
@@ -384,10 +384,10 @@ void Foam::solidModel::makeGradDQuad() const
 
     forAll(gradDQuad, faceI)
     {
-	List<tensor>& faceGradDQuad = gradDQuad[faceI];
+        List<tensor>& faceGradDQuad = gradDQuad[faceI];
 
-	// Initialise face list size
-	faceGradDQuad.setSize(quadPoints[faceI].size());
+        // Initialise face list size
+        faceGradDQuad.setSize(quadPoints[faceI].size());
     }
 }
 

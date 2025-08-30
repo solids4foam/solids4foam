@@ -210,6 +210,12 @@ public:
                 return useUndeformedArea_;
             }
 
+            //- Return face quadrature values.
+            // Used for high order solvers, input is position of points
+            virtual autoPtr<CompactListList<vector>> evaluateQuadrature
+            (
+                const CompactListList<point>& faceQuadPoints
+            ) const;
 
         // Mapping functions
 
