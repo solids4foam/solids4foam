@@ -57,102 +57,102 @@ namespace hofvm
     tensor laplacianCoeff
     (
         const scalar& gammaMagSf,
-	const scalar& quadWeight,
-	const vector& gradInterpCoeff,
-	const vector& faceNormal
+        const scalar& quadWeight,
+        const vector& gradInterpCoeff,
+        const vector& faceNormal
     );
 
     //- Laplacian transpose coefficient
     tensor laplacianTransposeCoeff
     (
         const scalar& gammaMagSf,
-	const scalar& quadWeight,
-	const vector& gradInterpCoeff,
-	const vector& faceNormal
+        const scalar& quadWeight,
+        const vector& gradInterpCoeff,
+        const vector& faceNormal
      );
 
     //- Laplacian trace coefficient
     tensor laplacianTraceCoeff
     (
         const scalar& gammaMagSf,
-	const scalar& quadWeight,
-	const vector& gradInterpCoeff,
-	const vector& faceNormal
+        const scalar& quadWeight,
+        const vector& gradInterpCoeff,
+        const vector& faceNormal
      );
 
     // Add coefficients to the PETSc matrix for the Laplacian
     void laplacianIntoPETScMatrix
     (
         Mat matrix,
-	const foamPetscSnesHelper& petscSnesHelper,
-	const fvMesh& mesh,
-	const volVectorField& D,
-	const volScalarField& diffusivity,
-	const LRE& lre,
-	const label nScalarEqns,
-	const label rowOffset = 0,
-	const label colOffset = 0
+        const foamPetscSnesHelper& petscSnesHelper,
+        const fvMesh& mesh,
+        const volVectorField& D,
+        const volScalarField& diffusivity,
+        const LRE& lre,
+        const label nScalarEqns,
+        const label rowOffset = 0,
+        const label colOffset = 0
      );
 
     // Add coefficients to the sparse matrix for the Laplacian
     void laplacianIntoSparseMatrix
     (
         sparseMatrix& matrix,
-	vectorField& source,
+        vectorField& source,
         const fvMesh& mesh,
-	const volVectorField& D,
+        const volVectorField& D,
         const volScalarField& diffusivity,
-	const LRE& lre
+        const LRE& lre
     );
 
     // Add coefficients to the PETSc matrix for the Laplacian transpose
     void laplacianTransposeIntoPETScMatrix
     (
         Mat matrix,
-	const foamPetscSnesHelper& petscSnesHelper,
-	const fvMesh& mesh,
-	const volVectorField& D,
-	const volScalarField& diffusivity,
-	const LRE& lre,
-	const label nScalarEqns,
-	const label rowOffset = 0,
-	const label colOffset = 0
+        const foamPetscSnesHelper& petscSnesHelper,
+        const fvMesh& mesh,
+        const volVectorField& D,
+        const volScalarField& diffusivity,
+        const LRE& lre,
+        const label nScalarEqns,
+        const label rowOffset = 0,
+        const label colOffset = 0
     );
 
     // Add coefficients to the sparse matrix for the Laplacian transpose
     void laplacianTransposeIntoSparseMatrix
     (
         sparseMatrix& matrix,
-	vectorField& source,
+        vectorField& source,
         const fvMesh& mesh,
-	const volVectorField& D,
+        const volVectorField& D,
         const volScalarField& diffusivity,
-	const LRE& lre
+        const LRE& lre
     );
 
     // Add coefficients to the matrix for the Laplacian trace
     void laplacianTraceIntoPETScMatrix
     (
         Mat matrix,
-	const foamPetscSnesHelper& petscSnesHelper,
-	const fvMesh& mesh,
-	const volVectorField& D,
-	const volScalarField& diffusivity,
-	const LRE& lre,
-	const label nScalarEqns,
-	const label rowOffset = 0,
-	const label colOffset = 0
+        const foamPetscSnesHelper& petscSnesHelper,
+        const fvMesh& mesh,
+        const volVectorField& D,
+        const volScalarField& diffusivity,
+        const LRE& lre,
+        const label nScalarEqns,
+        const label rowOffset = 0,
+        const label colOffset = 0
     );
 
     // Add coefficients to the matrix for the Laplacian trace
     void laplacianTraceIntoSparseMatrix
     (
         sparseMatrix& matrix,
-	vectorField& source,
+        vectorField& source,
         const fvMesh& mesh,
-	const volVectorField& D,
+        const volVectorField& D,
         const volScalarField& diffusivity,
-	const LRE& lre
+        const LRE& lre
     );
 
     // Function that is doing all work, matrix coefficients are calculated
@@ -160,17 +160,17 @@ namespace hofvm
     void hofvmLaplacianSparseMatrix
     (
         sparseMatrix& matrix,
-	vectorField& source,
+        vectorField& source,
         const fvMesh& mesh,
-	const volVectorField& D,
+        const volVectorField& D,
         const volScalarField& diffusivity,
-	const LRE& lre,
-	tensor (*calcCoeff)
-	(
-	     const scalar& gammaMagSf,
-	     const scalar& quadWeight,
-	     const vector& gradInterpCoeff,
-	     const vector& faceNormal
+        const LRE& lre,
+        tensor (*calcCoeff)
+        (
+             const scalar& gammaMagSf,
+             const scalar& quadWeight,
+             const vector& gradInterpCoeff,
+             const vector& faceNormal
         )
     );
 
@@ -179,21 +179,21 @@ namespace hofvm
     label hofvmLaplacianPETSc
     (
         Mat matrix,
-	const foamPetscSnesHelper& petscSnesHelper,
+        const foamPetscSnesHelper& petscSnesHelper,
         const fvMesh& mesh,
-	const volVectorField& D,
+        const volVectorField& D,
         const volScalarField& diffusivity,
-	const LRE& lre,
-	tensor (*calcCoeff)
-	(
-	     const scalar& gammaMagSf,
-	     const scalar& quadWeight,
-	     const vector& gradInterpCoeff,
-	     const vector& faceNormal
+        const LRE& lre,
+        tensor (*calcCoeff)
+        (
+             const scalar& gammaMagSf,
+             const scalar& quadWeight,
+             const vector& gradInterpCoeff,
+             const vector& faceNormal
         ),
-	const label rowOffset,
-	const label colOffset,
-	const label nScalarEqns
+        const label rowOffset,
+        const label colOffset,
+        const label nScalarEqns
     );
 
     // At traction boundary we include traction directly to source vector.
@@ -201,9 +201,10 @@ namespace hofvm
     // and laplaceTranspose
     void addTractionBoundaries
     (
-	vectorField& source,
+        vectorField& source,
         const fvMesh& mesh,
-	const volVectorField& D
+        const volVectorField& D,
+        const LRE& lre
      );
 
 } // End namespace hofvm

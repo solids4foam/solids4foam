@@ -960,10 +960,15 @@ void Foam::hofvm::addTractionBoundaries
 (
     vectorField& source,
     const fvMesh& mesh,
-    const volVectorField& D
+    const volVectorField& D,
+    const LRE& lre
 )
 {
     const labelUList& owner = mesh.owner();
+
+    // Face quadrature points and weights
+    const CompactListList<point>& faceQuadPoints = lre.faceQuadPoints();
+    const CompactListList<scalar>& facesQuadWeights = lre.faceQuadWeight();
 
     forAll(mesh.boundaryMesh(), patchI)
     {
@@ -975,12 +980,11 @@ void Foam::hofvm::addTractionBoundaries
                     D.boundaryField()[patchI]
                 );
 
-            const vectorField pNormal(mesh.boundary()[patchI].nf());
-
-            const vectorField traction
-                (
-                    tracPatch.traction() - pNormal*tracPatch.pressure()
-                );
+            // Get value at patch faces quadrature points
+            autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                tracPatch.evaluateQuadrature(faceQuadPoints);
+            const CompactListList<vector>& quadratureValues =
+                patchQuadraturePointsValue();
 
             const label start = mesh.boundaryMesh()[patchI].start();
             const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
@@ -990,8 +994,18 @@ void Foam::hofvm::addTractionBoundaries
                 // Get global face index
                 const label faceID = faceI + start;
 
+                // Get the number of quadrature points for this face
+                const label nPoints = faceQuadPoints[faceID].size();
+
+                // Loop over quadrature points and add their contribution
+                vector traction = vector::zero;
+                for (label pointI = 0; pointI < nPoints; ++pointI)
+                {
+                    traction += quadratureValues[faceI][pointI]*facesQuadWeights[faceID][pointI];
+                }
+
                 // Face force
-                const vector force = pMagSf[faceI] * traction[faceI];
+                const vector force = pMagSf[faceI] * traction;
 
                 source[owner[faceID]] -= force;
             }

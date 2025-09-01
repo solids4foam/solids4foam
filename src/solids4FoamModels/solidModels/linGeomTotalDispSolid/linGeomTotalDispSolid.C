@@ -90,13 +90,50 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = n.boundaryField()[patchI];
 
+            if (highOrderResidual_)
+            {
+                // Face quadrature points and weights
+                const CompactListList<point>& faceQuadPoints =
+                    LREInterp().faceQuadPoints();
+                const CompactListList<scalar>& facesQuadWeights =
+                    LREInterp().faceQuadWeight();
+
+                // Get value at patch faces quadrature points
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature(faceQuadPoints);
+                const CompactListList<vector>& quadratureValues =
+                    patchQuadraturePointsValue();
+
+                forAll(mesh().boundaryMesh()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+
+                    // Get global face index
+                    const label faceID = faceI + start;
+;
+
+                    // Get the number of quadrature points for this face
+                    const label nPoints = faceQuadPoints[faceID].size();
+
+                    // Loop over quadrature points and add their contribution
+                    traction.boundaryFieldRef()[patchI][faceI] = vector::zero;
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+                        traction.boundaryFieldRef()[patchI][faceI] +=
+                            quadratureValues[faceI][pointI]*facesQuadWeights[faceID][pointI];
+                    }
+                }
+            }
+            else
+            {
 #ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
+                traction.boundaryFieldRef()[patchI] =
+                    tracPatch.traction() - nPatch*tracPatch.pressure();
 #else
-            traction.boundaryField()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
+                traction.boundaryField()[patchI] =
+                    tracPatch.traction() - nPatch*tracPatch.pressure();
 #endif
+            }
         }
         else if
         (
@@ -479,7 +516,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
 bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 {
     Info << "Solving the momentum equation for D using the implicit high order"
-	 << "discretisation solver" << endl;
+         << "discretisation solver" << endl;
 
 #ifdef USE_PETSC
 
@@ -490,7 +527,7 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
     const label matrixNonZeroEntries = sum(LREInterp().cellFacesStencilSize());
     sparseMatrix matrix(matrixNonZeroEntries);
     Info<<"Matrix is filled by "
-	<< 100*matrixNonZeroEntries/sqr(scalar(mesh().nCells()))<<"%"<<endl;
+        << 100*matrixNonZeroEntries/sqr(scalar(mesh().nCells()))<<"%"<<endl;
 
     // Initialise source vector
     vectorField source(mesh().nCells(), vector::zero);
@@ -507,53 +544,53 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 
     // Assemble matrix
     {
-	// Add Laplacian contribution
-	hofvm::laplacianIntoSparseMatrix
-	(
-	    matrix,
-	    source,
-	    mesh(),
-	    D(),
-	    mu,
-	    LREInterp()
-	);
+        // Add Laplacian contribution
+        hofvm::laplacianIntoSparseMatrix
+        (
+            matrix,
+            source,
+            mesh(),
+            D(),
+            mu,
+            LREInterp()
+        );
 
-	// Add Laplacian transpose contribution
-	hofvm::laplacianTransposeIntoSparseMatrix
-	(
-	    matrix,
-	    source,
-	    mesh(),
-	    D(),
-	    mu,
-	    LREInterp()
-	);
+        // Add Laplacian transpose contribution
+        hofvm::laplacianTransposeIntoSparseMatrix
+        (
+            matrix,
+            source,
+            mesh(),
+            D(),
+            mu,
+            LREInterp()
+        );
 
-	// Add Laplacian trace contribution
-	hofvm::laplacianTraceIntoSparseMatrix
-	(
-	    matrix,
-	    source,
-	    mesh(),
-	    D(),
-	    lambda,
-	    LREInterp()
-	);
+        // Add Laplacian trace contribution
+        hofvm::laplacianTraceIntoSparseMatrix
+        (
+            matrix,
+            source,
+            mesh(),
+            D(),
+            lambda,
+            LREInterp()
+        );
 
-	// Add boundary traction to source. Traction faces are skipped
-	// when assembling matrix
-	hofvm::addTractionBoundaries(source, mesh(), D());
+        // Add boundary traction to source. Traction faces are skipped
+        // when assembling matrix
+        hofvm::addTractionBoundaries(source, mesh(), D(), LREInterp());
 
 #ifdef OPENFOAM_COM
-	// Add optional fvOptions, e.g. MMS body force
-	// Note that "source()" is already multiplied by the volumes
-	source += fvOptions()(ds_, const_cast<volVectorField&>(D()))().source();
+        // Add optional fvOptions, e.g. MMS body force
+        // Note that "source()" is already multiplied by the volumes
+        source += fvOptions()(ds_, const_cast<volVectorField&>(D()))().source();
 #endif
     }
 
     if (debug > 1)
     {
-	matrix.print();
+        matrix.print();
     }
 
     vectorField& solution = D().internalFieldRef();
@@ -573,7 +610,7 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 #else
     // In fact PETSc is not currently needed but i will leave it.
     FatalErrorIn("linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()")
-	<< "PETSc not available. Please set the PETSC_DIR environment "
+        << "PETSc not available. Please set the PETSC_DIR environment "
         << "variable and re-compile solids4foam" << abort(FatalError);
 #endif
 
@@ -717,17 +754,17 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
     if (solidModelDict().found("highOrderCoeffs"))
     {
-	highOrderJacobian_ =
-	    solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
-	    (
-	        "highOrderJacobian", false
-	    );
+        highOrderJacobian_ =
+            solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+            (
+                "highOrderJacobian", false
+            );
 
-	highOrderResidual_ =
-	    solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
-	    (
-	        "highOrderResidual", false
-	    );
+        highOrderResidual_ =
+            solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+            (
+                "highOrderResidual", false
+            );
     }
 
     if (solvePressure())
@@ -900,22 +937,22 @@ bool linGeomTotalDispSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
-	if (solidModelDict().found("highOrderCoeffs"))
-	{
-	    return evolveHighOrderImplicitCoupled();
-	}
-	else
-	{
-	    FatalErrorIn
-	    (
-	        "bool linGeomTotalDispSolid::evolve"
-	    ) << "coupled implicit solver not yet implemented here"
-	      << abort(FatalError);
+        if (solidModelDict().found("highOrderCoeffs"))
+        {
+            return evolveHighOrderImplicitCoupled();
+        }
+        else
+        {
+            FatalErrorIn
+            (
+                "bool linGeomTotalDispSolid::evolve"
+            ) << "coupled implicit solver not yet implemented here"
+              << abort(FatalError);
 
             // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-	    // could be combined with PETSc to achieve this.. todo!
-	    //return evolveImplicitCoupled();
-	}
+            // could be combined with PETSc to achieve this.. todo!
+            //return evolveImplicitCoupled();
+        }
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
@@ -954,13 +991,13 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     if (!highOrderJacobian_)
     {
-	// Initialise based on compact stencil fvMesh
-	return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+        // Initialise based on compact stencil fvMesh
+        return Foam::initialiseJacobian(jac, mesh(), blockSize_);
     }
 
     if (jac)
     {
-	FatalErrorInFunction
+        FatalErrorInFunction
             << "Jacobian matrix already initialised" << abort(FatalError);
     }
 
@@ -972,16 +1009,16 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     const PetscInt bs = static_cast<PetscInt>(blockSize_);
     const PetscInt n = static_cast<PetscInt>(blockn) * bs;
     const PetscInt N =
-	static_cast<PetscInt>(returnReduce(label(n), sumOp<label>()));
+        static_cast<PetscInt>(returnReduce(label(n), sumOp<label>()));
 
     // Create the matrix
     if (createMat)
     {
-	CHKERRQ(MatCreate(PETSC_COMM_WORLD, &jac));
-	CHKERRQ(MatSetSizes(jac, n, n, N, N));
-	CHKERRQ(MatSetType(jac, MATMPIBAIJ));
-	CHKERRQ(MatSetBlockSize(jac, blockSize_));
-	CHKERRQ(MatSetFromOptions(jac));
+        CHKERRQ(MatCreate(PETSC_COMM_WORLD, &jac));
+        CHKERRQ(MatSetSizes(jac, n, n, N, N));
+        CHKERRQ(MatSetType(jac, MATMPIBAIJ));
+        CHKERRQ(MatSetBlockSize(jac, blockSize_));
+        CHKERRQ(MatSetFromOptions(jac));
     }
 
      // Faces stencil (global)
@@ -995,7 +1032,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     // Initialise List
     forAll(rowCols, c)
     {
-	rowCols[c] = labelHashSet(64);
+        rowCols[c] = labelHashSet(64);
     }
 
     // Ensure diagonal is present
@@ -1008,53 +1045,53 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     // Loop over internal faces
     forAll(owner, faceI)
     {
-	// Face interpolation molecule
-	const labelList& faceStencil = stencils[faceI];
+        // Face interpolation molecule
+        const labelList& faceStencil = stencils[faceI];
 
-	const label ownCellID = owner[faceI];
-	const label neiCellID = neighbour[faceI];
+        const label ownCellID = owner[faceI];
+        const label neiCellID = neighbour[faceI];
 
-	// Loop over interpolation stencil
-	for(label cI = 0; cI < faceStencil.size(); cI++)
-	{
-	    const label globalCellID = faceStencil[cI];
+        // Loop over interpolation stencil
+        for(label cI = 0; cI < faceStencil.size(); cI++)
+        {
+            const label globalCellID = faceStencil[cI];
 
-	    rowCols[ownCellID].insert(globalCellID);
-	    rowCols[neiCellID].insert(globalCellID);
-	}
+            rowCols[ownCellID].insert(globalCellID);
+            rowCols[neiCellID].insert(globalCellID);
+        }
     }
 
     // Loop over boundary patches that modify matrix
     forAll(mesh().boundary(), patchI)
     {
-	if
-	(
-	    mesh().boundary()[patchI].type() == "processor"
-	    || isA<fixedValueFvPatchVectorField>(D().boundaryField()[patchI])
-	)
+        if
+        (
+            mesh().boundary()[patchI].type() == "processor"
+            || isA<fixedValueFvPatchVectorField>(D().boundaryField()[patchI])
+        )
         {
-	    const labelUList& faceOwner = mesh().faceOwner();
-	    forAll(mesh().boundaryMesh()[patchI], faceI)
+            const labelUList& faceOwner = mesh().faceOwner();
+            forAll(mesh().boundaryMesh()[patchI], faceI)
             {
-		const label start = mesh().boundaryMesh()[patchI].start();
+                const label start = mesh().boundaryMesh()[patchI].start();
 
-		// Get global face index, needed for lists from LRE class
-		const label faceID = faceI + start;
+                // Get global face index, needed for lists from LRE class
+                const label faceID = faceI + start;
 
-		// Face interpolation molecule
-		const labelList& faceStencil = stencils[faceID];
+                // Face interpolation molecule
+                const labelList& faceStencil = stencils[faceID];
 
-		const label ownCellID = faceOwner[faceID];
+                const label ownCellID = faceOwner[faceID];
 
-		// Loop over interpolation stencil
-		for(label cI = 0; cI < faceStencil.size(); cI++)
-		{
-		    const label globalCellID = faceStencil[cI];
+                // Loop over interpolation stencil
+                for(label cI = 0; cI < faceStencil.size(); cI++)
+                {
+                    const label globalCellID = faceStencil[cI];
 
-		    rowCols[ownCellID].insert(globalCellID);
-		}
-	    }
-	}
+                    rowCols[ownCellID].insert(globalCellID);
+                }
+            }
+        }
 
         if (mesh().boundary()[patchI].coupled())
         {
@@ -1077,10 +1114,10 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     for (label c = 0; c < blockn; ++c)
     {
         PetscInt diag = 0;
-	PetscInt off = 0;
+        PetscInt off = 0;
         for (auto it = rowCols[c].cbegin(); it != rowCols[c].cend(); ++it)
         {
-	    // Global block index
+            // Global block index
             const label gCol = *it;
             (gCol >= gStart && gCol < gEnd) ? ++diag : ++off;
         }
@@ -1092,13 +1129,13 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
     CHKERRQ
     (
         MatMPIBAIJSetPreallocation
-	(
-	    jac,
-	    blockSize_,
-	    0,
-	    d_nnz.data(),
-	    0,
-	    o_nnz.data()
+        (
+            jac,
+            blockSize_,
+            0,
+            d_nnz.data(),
+            0,
+            o_nnz.data()
         )
     );
 
@@ -1196,20 +1233,20 @@ label linGeomTotalDispSolid::formResidual
     if (highOrderResidual_)
     {
         // Displacement gradient at quadrature  points
-	gradDQuad() = LREInterp().gradDQuad(D);
+        gradDQuad() = LREInterp().gradDQuad(D);
 
         // Calcualte sigma at quadrature points
-	mechanical().correct(sigmaQuad(), gradDQuad());
+        mechanical().correct(sigmaQuad(), gradDQuad());
 
-	// Quadrature points weights
-	const CompactListList<scalar>& quadW = LREInterp().faceQuadWeight();
+        // Quadrature points weights
+        const CompactListList<scalar>& quadW = LREInterp().faceQuadWeight();
 
-	// Integration over face quadrature points to get face traction
-	traction = hofvc::surfaceIntegrate(sigmaQuad(), quadW,  mesh);
+        // Integration over face quadrature points to get face traction
+        traction = hofvc::surfaceIntegrate(sigmaQuad(), quadW,  mesh);
     }
     else
     {
-	traction = n & fvc::interpolate(sigma());
+        traction = n & fvc::interpolate(sigma());
     }
 
     // Add stabilisation to the traction
@@ -1220,9 +1257,9 @@ label linGeomTotalDispSolid::formResidual
     {
         const scalar scaleFactor =
             readScalar(stabilisation().dict().lookup("scaleFactor"));
-	const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
 
-	traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+        traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
     }
 
     // Enforce traction boundary conditions
@@ -1341,73 +1378,73 @@ label linGeomTotalDispSolid::formJacobian
 
     if (highOrderJacobian_)
     {
-	// Calculate high order jacobian, in this case not approximation.
+        // Calculate high order jacobian, in this case not approximation.
 
-	// Get first and second Lame parameters
-	tmp<volScalarField> tK = mechanical().bulkModulus();
-	const volScalarField& K = tK();
+        // Get first and second Lame parameters
+        tmp<volScalarField> tK = mechanical().bulkModulus();
+        const volScalarField& K = tK();
 
-	tmp<volScalarField> tMu = (impK_-K)*(3.0/4.0);
-	const volScalarField& mu = tMu();
+        tmp<volScalarField> tMu = (impK_-K)*(3.0/4.0);
+        const volScalarField& mu = tMu();
 
-	tmp<volScalarField> tLambda = impK_ - 2.0*mu;
-	const volScalarField& lambda = tLambda();
+        tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+        const volScalarField& lambda = tLambda();
 
-	hofvm::laplacianIntoPETScMatrix
-	(
-	    jac,
-	    *this,
-	    mesh(),
-	    this->D(),
-	    mu,
-	    this->LREInterp(),
-	    solidModel::twoD() ? 2 : 3
-	);
+        hofvm::laplacianIntoPETScMatrix
+        (
+            jac,
+            *this,
+            mesh(),
+            this->D(),
+            mu,
+            this->LREInterp(),
+            solidModel::twoD() ? 2 : 3
+        );
 
-	hofvm::laplacianTransposeIntoPETScMatrix
-	(
-	    jac,
-	    *this,
-	    this->mesh(),
-	    this->D(),
-	    mu,
-	    this->LREInterp(),
-	    solidModel::twoD() ? 2 : 3
-	);
+        hofvm::laplacianTransposeIntoPETScMatrix
+        (
+            jac,
+            *this,
+            this->mesh(),
+            this->D(),
+            mu,
+            this->LREInterp(),
+            solidModel::twoD() ? 2 : 3
+        );
 
-	hofvm::laplacianTraceIntoPETScMatrix
-	(
-	    jac,
-	    *this,
-	    this->mesh(),
-	    this->D(),
-	    lambda,
-	    this->LREInterp(),
-	    solidModel::twoD() ? 2 : 3
-	);
+        hofvm::laplacianTraceIntoPETScMatrix
+        (
+            jac,
+            *this,
+            this->mesh(),
+            this->D(),
+            lambda,
+            this->LREInterp(),
+            solidModel::twoD() ? 2 : 3
+        );
     }
     else
     {
-	// Calculate a segregated approximation of the Jacobian
-	fvVectorMatrix approxJ
-	(
+        // Calculate a segregated approximation of the Jacobian
+        fvVectorMatrix approxJ
+        (
             fvm::laplacian(impKf_, D, "laplacian(DD,D)")
           - rho()*fvm::d2dt2(D)
-	);
+        );
 
-	if (dampingCoeff().value() > SMALL)
-	{
-	    approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
-	}
+        if (dampingCoeff().value() > SMALL)
+        {
+            approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+        }
 
-	// Optional: under-relaxation of the linear system
-	approxJ.relax();
+        // Optional: under-relaxation of the linear system
+        approxJ.relax();
 
-	// Convert fvMatrix matrix to PETSc matrix
-	foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-	(
+        // Convert fvMatrix matrix to PETSc matrix
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+        (
             approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-	);
+        );
     }
 
     if (solvePressure())
