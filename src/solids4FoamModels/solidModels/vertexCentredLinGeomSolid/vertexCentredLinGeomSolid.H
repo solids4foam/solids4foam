@@ -138,6 +138,7 @@ private:
         //  Calculated as sqr(n) where n is a fixed direction, e.g. I for fully
         //  fixed
         symmTensorField fixedDofDirections_;
+        vectorField fixedDofDirectionsVec_;
 
         //- Scale factor for the fixed degree of freedom equations to improve
         //  the matrix conditioning
@@ -198,7 +199,8 @@ private:
             const pointVectorField& pointD,
             boolList& fixedDofs,
             pointField& fixedDofValues,
-            symmTensorField& fixedDofDirections
+            symmTensorField& fixedDofDirections,
+            vectorField& fixedDofDirectionsVec
         ) const;
 
         //- Enforce extact tractions on traction boundaries
@@ -241,6 +243,22 @@ private:
             const scalar zeta // Discretisation parameter
         );
 
+        //- Insert vfvm::divSigma coefficients into the given PETSc matrix
+        void insertVfvmDivSigmaIntoPETScMatrix
+        (
+            Mat jac,
+            const pointVectorField& pointD,
+            const fvMesh& mesh,
+            const fvMesh& dualMesh,
+            const label nScalarEqns,
+            const labelList& localToGlobalPointMap,
+            const labelList& dualFaceToCell,
+            const labelList& dualCellToPoint,
+            const Field<scalarSquareMatrix>& materialTangent,
+            const scalar zetaImplicit,
+            const bool flipSign = false
+        ) const;
+
         //- Insert vfvm::d2dt2 coefficients into the given PETSc matrix
         void insertVfvmD2dt2IntoPETScMatrix
         (
@@ -253,6 +271,26 @@ private:
             const labelList& localToGlobalPointMap,
             const bool flipSign = false
         ) const;
+
+        //- Construct a PETSc index set for the fixed degrees of freedom
+        IS makeFixedScalarIsFromLocalMap
+        (
+            const labelList& localToGlobalPointMap,
+            const boolList& ownedByThisProc,
+            const List<boolList>& maskPerLocalPoint,
+            const label blockSize
+        ) const;
+
+        //- Enforce fixed DOF contributions on the linear system
+        void enforceFixedDof
+        (
+            Mat jac,
+            //scalarField& source,
+            const boolList& fixedDofs,
+            const scalarField& fixedDofDirections,
+            const scalarField& fixedDofValues,
+            const scalar fixedDofScale
+        );
 
         //- Make dualImpKf field
         void makeDualImpKf() const;

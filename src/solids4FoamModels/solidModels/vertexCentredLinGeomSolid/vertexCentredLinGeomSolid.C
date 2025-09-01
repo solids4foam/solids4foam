@@ -29,6 +29,8 @@ License
 #include "sparseMatrixTools.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
+#include "cellPointLeastSquaresVectors.H"
+#include "multiplyCoeff.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -264,7 +266,8 @@ void vertexCentredLinGeomSolid::setFixedDofs
     const pointVectorField& pointD,
     boolList& fixedDofs,
     pointField& fixedDofValues,
-    symmTensorField& fixedDofDirections
+    symmTensorField& fixedDofDirections,
+    vectorField& fixedDofDirectionsVec
 ) const
 {
     // Flag all fixed DOFs
@@ -313,12 +316,14 @@ void vertexCentredLinGeomSolid::setFixedDofs
                     // Set all directions as fixed, just in case it was
                     // previously marked as a symmetry point
                     fixedDofDirections[pointID] = symmTensor(I);
+                    fixedDofDirectionsVec[pointID] = vector::one;
                 }
                 else
                 {
                     fixedDofs[pointID] = true;
                     fixedDofValues[pointID] = disp;
                     fixedDofDirections[pointID] = symmTensor(I);
+                    fixedDofDirectionsVec[pointID] = vector::one;
                 }
             }
         }
@@ -402,6 +407,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                         }
 
                         fixedDofDirections[pointID] += curDir;
+                        fixedDofDirectionsVec[pointID] += pointNormals[pI];
                     }
                 }
                 else
@@ -409,6 +415,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                     fixedDofs[pointID] = true;
                     fixedDofValues[pointID] = normalDisp[pI]*pointNormals[pI];
                     fixedDofDirections[pointID] = sqr(pointNormals[pI]);
+                    fixedDofDirectionsVec[pointID] = pointNormals[pI];
                 }
             }
         }
@@ -741,6 +748,241 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
 }
 
 
+void vertexCentredLinGeomSolid::insertVfvmDivSigmaIntoPETScMatrix
+(
+    Mat jac,
+    const pointVectorField& pointD,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const label nScalarEqns,
+    const labelList& localToGlobalPointMap,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const Field<scalarSquareMatrix>& materialTangentField,
+    const scalar zeta,
+    const bool flipSign
+) const
+{
+    const scalar sign = flipSign ? -1.0 : 1.0;
+    const label colOffset = 0;
+    const label rowOffset = 0;
+
+    // Take references for clarity and efficiency
+    const labelListList& cellPoints = mesh.cellPoints();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.owner();
+    const labelList& dualNei = dualMesh.neighbour();
+    const vectorField& dualSf = dualMesh.faceAreas();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
+
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
+    // Initialise block coeff
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+
+    // Check the material tangents are the correct shape
+    forAll(materialTangentField, faceI)
+    {
+        if (materialTangentField[faceI].m() != 6)
+        {
+            FatalErrorIn("void Foam::vfvm::divSigma(...)")
+                << "The materialTangent for face " << faceI << " has "
+                << materialTangentField[faceI].m() << " rows "
+                << "but it should have 6!" << abort(FatalError);
+        }
+        else if (materialTangentField[faceI].n() != 6)
+        {
+            FatalErrorIn("void Foam::vfvm::divSigma(...)")
+                << "The materialTangent for face " << faceI << " has "
+                << materialTangentField[faceI].m() << " rows "
+                << "but it should have 6!" << abort(FatalError);
+        }
+    }
+
+    // Loop over all internal faces of the dual mesh
+    forAll(dualOwn, dualFaceI)
+    {
+        // Primary mesh cell in which dualFaceI resides
+        const label cellID = dualFaceToCell[dualFaceI];
+
+        // Material tangent at the dual mesh face
+        const scalarSquareMatrix& materialTangent =
+            materialTangentField[dualFaceI];
+
+        // Points in cellID
+        const labelList& curCellPoints = cellPoints[cellID];
+
+        // Dual cell owner of dualFaceI
+        const label dualOwnCellID = dualOwn[dualFaceI];
+
+        // Dual cell neighbour of dualFaceI
+        const label dualNeiCellID = dualNei[dualFaceI];
+
+        // Primary mesh point at the centre of dualOwnCellID
+        const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+        // Primary mesh point at the centre of dualNeiCellID
+        const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+        // Calculate the global owner and neighbour point indices
+        const label globalOwnPointID = localToGlobalPointMap[ownPointID];
+        const label globalNeiPointID = localToGlobalPointMap[neiPointID];
+
+        // dualFaceI area vector
+        const vector& curDualSf = dualSf[dualFaceI];
+
+        // Least squares vectors for cellID
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
+
+        // Unit edge vector from the own point to the nei point
+        vector edgeDir = points[neiPointID] - points[ownPointID];
+        const scalar edgeLength = mag(edgeDir);
+        edgeDir /= edgeLength;
+
+        // dualFaceI will contribute coefficients to the equation for each
+        // primary mesh point in the dual own cell, and, if an internal
+        // face, the dual neighbour cell
+
+        forAll(curCellPoints, cpI)
+        {
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+
+            // Calculate the global owner point index
+            const label globalPointID = localToGlobalPointMap[pointID];
+
+            // Take a copy of the least squares vector from the centre of
+            // cellID to pointID
+            vector lsVec = curLeastSquaresVecs[cpI];
+
+            // Replace the component in the primary mesh edge direction with
+            // a compact central-differencing calculation
+            // We remove the edge direction component by multiplying the
+            // least squares vectors by (I - sqr(edgeDir))
+            // Note that the compact edge direction component is added below
+            lsVec = ((I - zeta*sqr(edgeDir)) & lsVec);
+
+            // Calculate the coefficient for this point coming from dualFaceI
+            tensor coeff;
+            multiplyCoeff(coeff, curDualSf, materialTangent, lsVec);
+            coeff *= sign;
+
+            // Construct the block coeff
+            for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+            {
+                for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+                {
+                    values
+                    [
+                        (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                    ] = coeff[cmptI*3 + cmptJ];
+                }
+            }
+
+            // Add the coefficient to the ownPointID equation coming from
+            // pointID
+            // matrix(ownPointID, pointID) += coeff;
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalOwnPointID, 1, &globalPointID,
+                values.cdata(),
+                ADD_VALUES
+            );
+
+            // Add the coefficient to the neiPointID equation coming from
+            // pointID
+            // matrix(neiPointID, pointID) -= coeff;
+            forAll(values, cmptI)
+            {
+                values[cmptI] = -values[cmptI];
+            }
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalNeiPointID, 1, &globalPointID,
+                values.cdata(),
+                ADD_VALUES
+            );
+        }
+
+        // Add compact central-differencing component in the edge direction
+        // This is the gradient in the direction of the edge
+
+        // Edge unit direction vector divided by the edge length, so that we
+        // can reuse the multiplyCoeff function
+        const vector eOverLength = edgeDir/edgeLength;
+
+        // Compact edge direction coefficient
+        tensor edgeDirCoeff;
+        multiplyCoeff
+        (
+            edgeDirCoeff, curDualSf, materialTangent, eOverLength
+        );
+        edgeDirCoeff *= zeta;
+        edgeDirCoeff *= sign;
+
+        // Construct the block coeff
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+            {
+                values
+                [
+                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                ] = edgeDirCoeff[cmptI*3 + cmptJ];
+            }
+        }
+
+        // Insert coefficients for the ownPoint-neiPoint
+        // matrix(ownPointID, neiPointID) += edgeDirCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalOwnPointID, 1, &globalNeiPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Insert coefficients for the neiPoint-ownPointID
+        // matrix(neiPointID, ownPointID) += edgeDirCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalNeiPointID, 1, &globalOwnPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Flip the coefficient signs
+        forAll(values, cmptI)
+        {
+            values[cmptI] = -values[cmptI];
+        }
+
+        // Insert coefficients for the ownPoint-ownPoint
+        // matrix(ownPointID, ownPointID) -= edgeDirCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalOwnPointID, 1, &globalOwnPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Insert coefficients for the neiPoint-neiPoint
+        // matrix(neiPointID, neiPointID) -= edgeDirCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalNeiPointID, 1, &globalNeiPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+    }
+}
+
+
 void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
 (
     Mat jac,
@@ -764,10 +1006,6 @@ void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
     // Get the blockSize
     label blockSize;
     MatGetBlockSize(jac, &blockSize);
-
-    // Initialise block coeff
-    const label nCoeffCmpts = blockSize*blockSize;
-    List<PetscScalar> values(nCoeffCmpts, 0.0);
 
     // Calculate the scalar coefficient field
     scalarField coeffs(pointD.size());
@@ -809,6 +1047,10 @@ void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
             << exit(FatalError);
     }
 
+    // Initialise block coeff
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+
     // Insert the coeffs into the PETSc matrix
     forAll(pointRhoI, pointI)
     {
@@ -838,6 +1080,134 @@ void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
             ADD_VALUES
         );
     }
+}
+
+
+IS vertexCentredLinGeomSolid::makeFixedScalarIsFromLocalMap
+(
+    const labelList& localToGlobalPointMap,
+    const boolList& ownedByThisProc,
+    const List<boolList>& maskPerLocalPoint,
+    const label blockSize
+) const
+{
+    std::vector<PetscInt> rows;
+    rows.reserve(localToGlobalPointMap.size()*blockSize);
+
+    forAll(localToGlobalPointMap, i)
+    {
+        if (ownedByThisProc[i])
+        {
+            // global block row (node id)
+            const label gBlock = localToGlobalPointMap[i];
+
+            for (PetscInt c = 0; c < blockSize; ++c)
+            {
+                if (maskPerLocalPoint[i][c])
+                {
+                    // scalar global row
+                    rows.push_back((PetscInt)gBlock*blockSize + c);
+                }
+            }
+        }
+    }
+
+    IS is = nullptr;
+    ISCreateGeneral
+    (
+        PETSC_COMM_WORLD,
+        (PetscInt)rows.size(),
+        rows.data(),
+        PETSC_COPY_VALUES,
+        &is
+    );
+
+    return is; // caller must ISDestroy(&is)
+}
+
+
+void vertexCentredLinGeomSolid::enforceFixedDof
+(
+    Mat jac,
+    //scalarField& source,
+    const boolList& fixedDofs,
+    const scalarField& fixedDofDirections,
+    const scalarField& fixedDofValues,
+    const scalar fixedDofScale
+)
+{
+    /*
+
+    // Loop though the matrix and overwrite the coefficients for fixed DOFs
+    // To enforce the value we will set the diagonal to the identity and set
+    // the source to zero. The reason the source is zero is that we are solving
+    // for the correction and the correction is zero for fixed values.
+    // Rather than setting the identity on the diagonal, we will scale it by
+    // fixedDofScale to improve the condition number, although the
+    // preconditioner should not care.
+    // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
+    // will eliminate these coeffs and add their contribution (which is known)
+    // to the source.
+    HashTable
+    <
+        scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+    >& data = matrix.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        const label blockRowI = iter.key()[0];
+        const label blockColI = iter.key()[1];
+
+        if (fixedDofs[blockRowI] && mag(fixedDofDirections[blockRowI]) > 0)
+        {
+            scalar& coeff = iter();
+
+            if (debug)
+            {
+                Info<< "blockRow fixed: " << blockRowI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Set the source to zero as the correction is zero
+            source[blockRowI] = 0.0;
+
+            // Eliminate the fixed directions from the coeff
+            coeff = 0.0;
+
+            if (blockRowI == blockColI)
+            {
+                // Set the diagonal to enforce a zero correction
+                coeff = -fixedDofScale;
+            }
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
+            }
+        }
+        else if (fixedDofs[blockColI] && mag(fixedDofDirections[blockRowI]) > 0)
+        {
+            // This equation refers to a fixed DOF
+            // We will eliminate the coeff
+            scalar& coeff = iter();
+
+            if (debug)
+            {
+                Info<< "blockCol fixed: " << blockColI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Eliminate the fixed directions
+            coeff = 0.0;
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
+            }
+        }
+    }
+        */
 }
 
 
@@ -918,9 +1288,6 @@ bool vertexCentredLinGeomSolid::evolveSnes()
 
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
-
-    FatalError
-        << "after solve" << exit(FatalError);
 
     // Retrieve the solution
     // Map the PETSc solution to the D field
@@ -1780,6 +2147,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     fixedDofs_(mesh().nPoints(), false),
     fixedDofValues_(fixedDofs_.size(), vector::zero),
     fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
+    fixedDofDirectionsVec_(fixedDofs_.size(), vector::zero),
     fixedDofScale_
     (
         solidModelDict().lookupOrDefault<scalar>
@@ -1901,7 +2269,14 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     pointDisRequired();
 
     // Set fixed degree of freedom list
-    setFixedDofs(pointD(), fixedDofs_, fixedDofValues_, fixedDofDirections_);
+    setFixedDofs
+    (
+        pointD(),
+        fixedDofs_,
+        fixedDofValues_,
+        fixedDofDirections_,
+        fixedDofDirectionsVec_
+    );
 
     // Set point density field
     mechanical().volToPoint().interpolate(rho(), pointRho_);
@@ -2160,6 +2535,27 @@ label vertexCentredLinGeomSolid::formResidual
         )
     );
 
+    // Enforce fixed DOF by setting the residual to zero
+    {
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        forAll(residual, pointI)
+        {
+            if (ownedByThisProc[pointI])
+            {
+                if (fixedDofs_[pointI])
+                {
+                    for (label cmptI = 0; cmptI < blockSize_; ++cmptI)
+                    {
+                        if (mag(fixedDofDirectionsVec_[pointI][cmptI]) > SMALL)
+                        {
+                            residual[pointI][cmptI] = 0.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Insert the residual into the PETSc residual
     foamPetscSnesHelper::InsertFieldComponents<vector>
     (
@@ -2199,6 +2595,10 @@ label vertexCentredLinGeomSolid::formJacobian
 
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    const scalar zetaImplicit
+    (
+        solidModelDict().lookupOrDefault<scalar>("zetaImplicit", zeta)
+    );
 
     // Calculate gradD at dual faces
     dualGradDf_ = vfvc::fGrad
@@ -2215,23 +2615,34 @@ label vertexCentredLinGeomSolid::formJacobian
     // Calculate stress at dual faces
     dualMechanicalPtr_().correct(dualSigmaf_);
 
-    // Calculate the material tangent
-    const Field<scalarSquareMatrix> materialTangent
-    (
-        dualMechanicalPtr_().materialTangentFaceField()
-    );
+    if (solidModelDict().lookupOrDefault<Switch>("approximateJacobian", false))
+    {
+        notImplemented("approximateJacobian not implemented yet");
+    }
+    else
+    {
+        // Calculate the material tangent
+        const Field<scalarSquareMatrix> materialTangent
+        (
+            dualMechanicalPtr_().materialTangentFaceField()
+        );
 
-    // Add div(sigma) coefficients
-    // vfvm::divSigma
-    // (
-    //     matrix,
-    //     mesh(),
-    //     dualMesh(),
-    //     dualMeshMap().dualFaceToCell(),
-    //     dualMeshMap().dualCellToPoint(),
-    //     materialTangent,
-    //     zetaImplicit
-    // );
+        // Add linearisation of div(sigma) to jac
+        insertVfvmDivSigmaIntoPETScMatrix
+        (
+            jac,
+            pointD(),
+            mesh,
+            dualMesh(),
+            blockSize_,     // nScalarEqns
+            globalPoints().localToGlobalPointMap(),
+            dualMeshMap().dualFaceToCell(),
+            dualMeshMap().dualCellToPoint(),
+            materialTangent,
+            zetaImplicit,
+            false           // flip sign
+        );
+    }
 
     // Lookup the d2dt2 scheme
 #ifdef OPENFOAM_NOT_EXTEND
@@ -2253,19 +2664,52 @@ label vertexCentredLinGeomSolid::formJacobian
         true           // flip sign
     );
 
-    FatalError
-        << "Stop at " << __LINE__ << exit(FatalError);
+    // Enforce fixed DOF
+    {
+        // Mark all fixed degrees of freedom
+        List<boolList> mask
+        (
+            mesh.nPoints(), boolList(blockSize_, false)
+        );
 
-    // Enforce fixed DOF on the linear system
-    // sparseMatrixTools::enforceFixedDof
-    // (
-    //     matrix,
-    //     source,
-    //     fixedDofs_,
-    //     fixedDofDirections_,
-    //     fixedDofValues_,
-    //     fixedDofScale_
-    // );
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        forAll(mask, pointI)
+        {
+            if (ownedByThisProc[pointI])
+            {
+                if (fixedDofs_[pointI])
+                {
+                    for (label cmptI = 0; cmptI < blockSize_; ++cmptI)
+                    {
+                        if (mag(fixedDofDirectionsVec_[pointI][cmptI]) > SMALL)
+                        {
+                            mask[pointI][cmptI] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        IS rowsIS =
+            makeFixedScalarIsFromLocalMap
+            (
+                globalPoints().localToGlobalPointMap(),
+                ownedByThisProc,
+                mask,
+                blockSize_
+            );
+
+        // Complete matrix assembly
+        CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
+        CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
+
+        // Zero all rows and columns of fixed DOFs and set -fixedDofScale_ on
+        // the diagonal
+        MatZeroRowsColumnsIS(jac, rowsIS, -fixedDofScale_, NULL, NULL);
+
+        // TODO: store this IS!
+        ISDestroy(&rowsIS);
+    }
 
     if (solvePressure())
     {
