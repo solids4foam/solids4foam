@@ -2492,8 +2492,8 @@ void LRE::calcQuadPointsAndWeights2D() const
                     << abort(FatalError);
             }
         }
-
-        nQpPerFace[faceI] = lineQuadrature::nPoints(N_);
+        // We are integrading stress not displacement, therefore we have -1
+        nQpPerFace[faceI] = lineQuadrature::nPoints(N_-1);
     }
 
     // Initialise quadrature points and weights
@@ -2539,7 +2539,7 @@ void LRE::calcQuadPointsAndWeights2D() const
 
                 // Construct line and lineQuadrature
                 const linePointRef l(a,b);
-                const lineQuadrature lq(l, N_);
+                const lineQuadrature lq(l, N_-1);
 
                 const List<point>& lineQP = lq.points();
                 const List<scalar>& lineQPweights = lq.weights();
@@ -2661,7 +2661,8 @@ void LRE::calcQuadPointsAndWeights3D() const
 
         // Final qp count for this face = (#triangles used) * (qp per triangle)
         const label nTriUsed = faceTri[faceI].size();
-        nQpPerFace[faceI] = nTriUsed * triQuadrature::nPoints(N_);
+        // We are integrading stress not displacement, therefore we have -1
+        nQpPerFace[faceI] = nTriUsed * triQuadrature::nPoints(N_-1);
     }
 
     // Allocate memory for compactListList for points and weights
@@ -2687,7 +2688,7 @@ void LRE::calcQuadPointsAndWeights3D() const
             const scalar scaleW = triArea/(faceArea+VSMALL);
 
             // Get triangle Gauss points and weights
-            const triQuadrature tq(tp, N_);
+            const triQuadrature tq(tp, N_-1);
             const List<point>& triangleQuadP = tq.points();
             const List<scalar>& triangleQuadW = tq.weights();
 
