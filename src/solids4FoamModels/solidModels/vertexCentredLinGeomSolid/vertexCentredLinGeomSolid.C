@@ -1009,12 +1009,13 @@ void vertexCentredLinGeomSolid::insertVfvmD2dt2IntoPETScMatrix
     MatGetBlockSize(jac, &blockSize);
 
     // Calculate the scalar coefficient field
-    scalarField coeffs(pointD.size());
+    scalarField coeffs(pointD.size(), 0.0);
 
     // Add transient term coefficients
     if (d2dt2SchemeName == "steadyState")
     {
         // Do nothing
+        return;
     }
     else if (d2dt2SchemeName == "Euler")
     {
@@ -2648,29 +2649,24 @@ label vertexCentredLinGeomSolid::formJacobian
     CHKERRQ(MatAssemblyEnd(jac, MAT_FLUSH_ASSEMBLY));
 
     // Lookup the d2dt2 scheme
-// #ifdef OPENFOAM_NOT_EXTEND
-//     ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(pointD)");
-// #else
-//     ITstream& d2dt2Scheme = mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)");
-// #endif
+#ifdef OPENFOAM_NOT_EXTEND
+    ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(pointD)");
+#else
+    ITstream& d2dt2Scheme = mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)");
+#endif
 
-    // // Add d2dt2 coefficients to jac
-    // SOMETHING IS WRONG HERE!!! memory bug!
-    // insertVfvmD2dt2IntoPETScMatrix
-    // (
-    //     jac,
-    //     pointD(),
-    //     pointRho_,
-    //     pointVol_,
-    //     d2dt2Scheme,
-    //     blockSize_,     // nScalarEqns
-    //     globalPoints().localToGlobalPointMap(),
-    //     true           // flip sign
-    // );
-
-    // // DEBUG
-    // CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
-    // CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
+    // Add d2dt2 coefficients to jac
+    insertVfvmD2dt2IntoPETScMatrix
+    (
+        jac,
+        pointD(),
+        pointRho_,
+        pointVol_,
+        d2dt2Scheme,
+        blockSize_,     // nScalarEqns
+        globalPoints().localToGlobalPointMap(),
+        true           // flip sign
+    );
 
     // Enforce fixed DOF
     {
@@ -2708,40 +2704,6 @@ label vertexCentredLinGeomSolid::formJacobian
                 mask,
                 blockSize_
             );
-        // std::vector<PetscInt> rows;
-        // const labelList& localToGlobalPointMap =
-        //     globalPoints().localToGlobalPointMap();
-        //DynamicList<label> rows(localToGlobalPointMap.size()*blockSize_);
-        // rows.reserve(localToGlobalPointMap.size()*blockSize_);
-        // forAll(localToGlobalPointMap, i)
-        // {
-        //     if (ownedByThisProc[i])
-        //     {
-        //         // global block row (node id)
-        //         const label gBlock = localToGlobalPointMap[i];
-
-        //         for (PetscInt c = 0; c < blockSize_; ++c)
-        //         {
-        //             if (mask[i][c])
-        //             {
-        //                 // scalar global row
-        //                 // rows.push_back((PetscInt)gBlock*blockSize_ + c);
-        //                 rows.append(gBlock*blockSize_ + c);
-        //             }
-        //         }
-        //     }
-        // }
-
-        // IS rowsIS = nullptr;
-        // ISCreateGeneral
-        // (
-        //     PETSC_COMM_WORLD,
-        //     (PetscInt)rows.size(),
-        //     rows.data(),
-        //     PETSC_COPY_VALUES,
-        //     &rowsIS
-        // );
-
 
         // Complete matrix assembly
         CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
