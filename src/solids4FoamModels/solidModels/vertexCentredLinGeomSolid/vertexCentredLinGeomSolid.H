@@ -47,7 +47,6 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
-#include "sparseMatrix.H"
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
@@ -77,20 +76,6 @@ class vertexCentredLinGeomSolid
     public solidModel,
     public foamPetscSnesHelper
 {
-public:
-
-        // //- Solution algorithms
-        // enum solutionAlgorithm
-        // {
-        //     IMPLICIT_COUPLED,
-        //     IMPLICIT_SEGREGATED,
-        //     EXPLICIT
-        // };
-
-        // //- Solution algorithm names
-        // static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
-
-
 private:
 
     // Private Data
@@ -106,21 +91,6 @@ private:
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
-
-        //- Flag to enable full Newton-Raphson approach, where the stiffness
-        //  matrix is updated once per outer iteration. Alternatively, the
-        //  stiffness matrix is only updated once per time-step
-        const Switch fullNewton_;
-
-        //- Flag to enable steadyState
-        Switch steadyState_;
-
-        //- Flag indicating if the case is 2-D or 3-D
-        const bool twoD_;
-
-        //- Object for correcting the displacement field in 2-D
-        //  This ensures the front and back planes have the same displacements
-        twoDPointCorrector twoDCorrector_;
 
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
@@ -143,6 +113,10 @@ private:
         //- Scale factor for the fixed degree of freedom equations to improve
         //  the matrix conditioning
         const scalar fixedDofScale_;
+
+        //- Pointer to PETSc indexing object used for identifying fixed degrees
+        //  of freedom
+        mutable IS fixedDofRowsISPtr_;
 
         //- Point velocity
         pointVectorField pointU_;
@@ -177,12 +151,12 @@ private:
 
     // Private Member Functions
 
-        //- Update the source vector for the linear system
-        void updateSource
-        (
-            vectorField& source,
-            const labelList& dualCellToPoint
-        );
+        // //- Update the source vector for the linear system
+        // void updateSource
+        // (
+        //     vectorField& source,
+        //     const labelList& dualCellToPoint
+        // );
 
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma
@@ -212,85 +186,38 @@ private:
             const labelListList& pointToDualFaces
         ) const;
 
-        //- Check convergence of Newton-Raphson loop
-        bool converged
-        (
-            const label iCorr,
-            scalar& initResidual,
-            const scalar res,
-            const label nInterations,
-            const pointVectorField& pointD,
-            const vectorField& pointDcorr
-        ) const;
-
-        //- Calculate line search slope for the given eta parameter
-        scalar calculateLineSearchSlope
-        (
-            const scalar eta,
-            const vectorField& pointDcorr,
-            pointVectorField& pointD,
-            surfaceTensorField& dualGradDf,
-            surfaceSymmTensorField& dualSigmaf,
-            const scalar zeta
-        );
-
-        scalar calculateLineSearchFactor
-        (
-            const scalar rTol, // Slope reduction tolerance
-            const int maxIter, // Maximum number of line search iterations
-            const vectorField& pointDcorr, // Point displacement correction
-            const vectorField& source, // Linear system source
-            const scalar zeta // Discretisation parameter
-        );
-
-        //- Insert vfvm::divSigma coefficients into the given PETSc matrix
-        void insertVfvmDivSigmaIntoPETScMatrix
-        (
-            Mat jac,
-            const pointVectorField& pointD,
-            const fvMesh& mesh,
-            const fvMesh& dualMesh,
-            const label nScalarEqns,
-            const labelList& localToGlobalPointMap,
-            const labelList& dualFaceToCell,
-            const labelList& dualCellToPoint,
-            const Field<scalarSquareMatrix>& materialTangent,
-            const scalar zetaImplicit,
-            const bool flipSign = false
-        ) const;
-
-        //- Insert vfvm::d2dt2 coefficients into the given PETSc matrix
-        void insertVfvmD2dt2IntoPETScMatrix
-        (
-            Mat jac,
-            const pointVectorField& pointD,
-            const scalarField& pointRhoI,
-            const scalarField& pointVolI,
-            ITstream& d2dt2Scheme,
-            const label nScalarEqns,
-            const labelList& localToGlobalPointMap,
-            const bool flipSign = false
-        ) const;
-
         //- Construct a PETSc index set for the fixed degrees of freedom
-        IS makeFixedScalarIsFromLocalMap
-        (
-            const labelList& localToGlobalPointMap,
-            const boolList& ownedByThisProc,
-            const List<boolList>& maskPerLocalPoint,
-            const label blockSize
-        ) const;
+        // IS makeFixedScalarIsFromLocalMap
+        // (
+        //     const labelList& localToGlobalPointMap,
+        //     const boolList& ownedByThisProc,
+        //     const List<boolList>& maskPerLocalPoint,
+        //     const label blockSize
+        // ) const;
 
         //- Enforce fixed DOF contributions on the linear system
-        void enforceFixedDof
-        (
-            Mat jac,
-            //scalarField& source,
-            const boolList& fixedDofs,
-            const scalarField& fixedDofDirections,
-            const scalarField& fixedDofValues,
-            const scalar fixedDofScale
-        );
+        // void enforceFixedDof
+        // (
+        //     Mat jac,
+        //     const boolList& fixedDofs,
+        //     const scalarField& fixedDofDirections,
+        //     const scalarField& fixedDofValues,
+        //     const scalar fixedDofScale
+        // );
+
+        //- Make fixedDofRowsIS object
+        void makeFixedDofRowsIS() const;
+
+        //- Return fixedDofRowsIS object
+        IS fixedDofRowsIS() const
+        {
+            if (fixedDofRowsISPtr_ == nullptr)
+            {
+                makeFixedDofRowsIS();
+            }
+
+            return fixedDofRowsISPtr_;
+        }
 
         //- Make dualImpKf field
         void makeDualImpKf() const;
@@ -305,10 +232,10 @@ private:
         virtual bool evolveSnes();
 
         //- Evolve the solid solver using the implicit coupled approach
-        virtual bool evolveImplicitCoupled();
+        // virtual bool evolveImplicitCoupled();
 
         //- Evolve the solid solver using the implicit segregated approach
-        virtual bool evolveImplicitSegregated();
+        // virtual bool evolveImplicitSegregated();
 
         //- Evolve the solid solver using the explicit approach
         virtual bool evolveExplicit();

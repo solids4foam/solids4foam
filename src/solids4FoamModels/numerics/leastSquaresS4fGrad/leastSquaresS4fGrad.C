@@ -115,7 +115,17 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     // For now, default to extrapolation on all boundaries
     // We need to revisit this
-    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    // forAll(useBoundaryFaceValues, patchI)
+    // {
+    //     if (vsf.boundaryField()[patchI].fixesValue())
+    //     {
+    //         Info<< "leastSquaresS4f: " << vsf.name()
+    //             << ": use patch values for "
+    //             << mesh.boundary()[patchI].name() << endl;
+    //         useBoundaryFaceValues[patchI] = true;
+    //     }
+    // }
 
     // Get reference to least square vectors
     const leastSquaresS4fVectors& lsv =
