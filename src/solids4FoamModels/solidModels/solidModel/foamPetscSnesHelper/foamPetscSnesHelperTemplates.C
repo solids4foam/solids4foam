@@ -472,9 +472,9 @@ void foamPetscSnesHelper::ExtractFieldComponents
             compList = compIndices;
         }
 
-        // The number of components to insert per block is determined by the size of
+        // The number of components to extract per block is determined by the size of
         // compList
-        const label nCompToInsert = compList.size();
+        const label nCompToExtract = compList.size();
         // Extract the local processor values
         // Loop over each point in vf, which is owned by this processor, and
         // copy the selected components into the appropriate positions in x
@@ -486,7 +486,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
         {
             if (ownedByThisProc[pointI])
             {
-                for (label compI = 0; compI < nCompToInsert; ++compI)
+                for (label compI = 0; compI < nCompToExtract; ++compI)
                 {
                     const label xIndex =
                         offset + localPointI*xBlockSize + compI;
@@ -504,6 +504,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
         // Extract values not owned by this processor; we need to sync these from
         // other processors
+        if (Pstream::parRun())
         {
             // Convert to the number of scalar unknowns not owned by this
             // processor
@@ -524,7 +525,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
                 {
                     // Calculate the global point index for this point
                     const label globalPointI = localToGlobalPointMap[pointI];
-                    for (label compI = 0; compI < nCompToInsert; ++compI)
+                    for (label compI = 0; compI < nCompToExtract; ++compI)
                     {
                         indices[index++] =
                             offset + globalPointI*xBlockSize + compI;
@@ -577,7 +578,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
                 {
                     if (!ownedByThisProc[pointI])
                     {
-                        for (label compI = 0; compI < nCompToInsert; ++compI)
+                        for (label compI = 0; compI < nCompToExtract; ++compI)
                         {
                             const label vfIndex  =
                                 pointI*vfBlockSize + compList[compI];
