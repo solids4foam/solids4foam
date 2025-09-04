@@ -360,6 +360,227 @@ void Foam::vfvm::d2dt2
 }
 
 
+void Foam::vfvm::laplacian
+(
+    Mat jac,
+    const Switch compactStencil,
+    const scalar zeta, // compact stencil coefficient
+    const meshDual& dualMesh,
+    const label nScalarEqns,
+    const labelList& localToGlobalPointMap,
+    const scalarField& diffusivity, // diffusivity in the primary cells
+    const bool flipSign
+)
+{
+    const scalar sign = flipSign ? -1.0 : 1.0;
+    const label colOffset = 0;
+    const label rowOffset = 0;
+
+    // Take references for clarity and efficiency
+    const fvMesh& mesh = dualMesh.mesh();
+    const labelListList& cellPoints = mesh.cellPoints();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.owner();
+    const labelList& dualNei = dualMesh.neighbour();
+    const vectorField& dualSf = dualMesh.faceAreas();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
+    const labelList& dualFaceToCell = dualMesh.dualMeshMap().dualFaceToCell();
+    const labelList& dualCellToPoint = dualMesh.dualMeshMap().dualCellToPoint();
+
+    // Second order identity as a 9 component tensor
+    const tensor I2(I);
+
+    // Get the blockSize
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
+    // Initialise block coeff
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+
+    // Loop over all internal faces of the dual mesh
+    forAll(dualOwn, dualFaceI)
+    {
+        // Primary mesh cell in which dualFaceI resides
+        const label cellID = dualFaceToCell[dualFaceI];
+
+        // Diffusivity in the primary cells
+        // const scalar diffCellID = diffusivity[cellID];
+
+        // Points in cellID
+        const labelList& curCellPoints = cellPoints[cellID];
+
+        // Dual cell owner of dualFaceI
+        const label dualOwnCellID = dualOwn[dualFaceI];
+
+        // Dual cell neighbour of dualFaceI
+        const label dualNeiCellID = dualNei[dualFaceI];
+
+        // Primary mesh point at the centre of dualOwnCellID
+        const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+        // Primary mesh point at the centre of dualNeiCellID
+        const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+        // Calculate the global owner and neighbour point indices
+        const label globalOwnPointID = localToGlobalPointMap[ownPointID];
+        const label globalNeiPointID = localToGlobalPointMap[neiPointID];
+
+        // dualFaceI area vector
+        const vector& curDualSf = dualSf[dualFaceI];
+
+        // Least squares vectors for cellID
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
+
+        // Unit edge vector from the own point to the nei point
+        vector edgeDir = points[neiPointID] - points[ownPointID];
+        const scalar edgeLength = mag(edgeDir);
+        edgeDir /= edgeLength;
+
+        // Edge unit direction vector divided by the edge length, so that we
+        // can reuse the multiplyCoeff function
+        const vector eOverLength = edgeDir/edgeLength;
+
+        // Dual face unit normal
+        // const scalar curDualMagSf = mag(curDualSf);
+        // const vector curDualN = curDualSf/curDualMagSf;
+
+        // dualFaceI will contribute coefficients to the equation for each
+        // primary mesh point in the dual own cell, and, if an internal
+        // face, the dual neighbour cell
+
+        forAll(curCellPoints, cpI)
+        {
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+
+            // Calculate the global owner point index
+            const label globalPointID = localToGlobalPointMap[pointID];
+
+            // Take a copy of the least squares vector from the centre of
+            // cellID to pointID
+            vector lsVec = curLeastSquaresVecs[cpI];
+
+            // Replace the component in the primary mesh edge direction with
+            // a compact central-differencing calculation
+            // We remove the edge direction component by multiplying the
+            // least squares vectors by (I - sqr(edgeDir))
+            // Note that the compact edge direction component is added below
+            lsVec = ((I - zeta*sqr(edgeDir)) & lsVec);
+            //lsVec = ((I - zeta*sqr(curDualN)) & lsVec);
+
+            // Calculate the coefficient for this point coming from dualFaceI
+            tensor coeff((curDualSf & lsVec)*I2);
+            coeff *= sign;
+
+            // Construct the block coeff
+            for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+            {
+                for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+                {
+                    values
+                    [
+                        (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                    ] = coeff[cmptI*3 + cmptJ];
+                }
+            }
+
+            // Add the coefficient to the ownPointID equation coming from
+            // pointID
+            // matrix(ownPointID, pointID) += coeff;
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalOwnPointID, 1, &globalPointID,
+                values.cdata(),
+                ADD_VALUES
+            );
+
+            // Add the coefficient to the neiPointID equation coming from
+            // pointID
+            // matrix(neiPointID, pointID) -= coeff;
+            forAll(values, cmptI)
+            {
+                values[cmptI] = -values[cmptI];
+            }
+            MatSetValuesBlocked
+            (
+                jac, 1, &globalNeiPointID, 1, &globalPointID,
+                values.cdata(),
+                ADD_VALUES
+            );
+        }
+
+        // Add compact central-differencing component
+
+        // Delta coefficient
+        // const scalar deltaCoeff =
+        //     1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
+
+        // Compact edge direction coefficient
+        tensor compactCoeff((curDualSf & eOverLength)*I2*zeta);
+        //const tensor compactCoeff(curDualMagSf*deltaCoeff*I2*zeta);
+        compactCoeff *= sign;
+
+        // Construct the block coeff
+        for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
+        {
+            for (label cmptJ = 0; cmptJ < nScalarEqns; ++cmptJ)
+            {
+                values
+                [
+                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                ] = compactCoeff[cmptI*3 + cmptJ];
+            }
+        }
+
+        // Insert coefficients for the ownPoint-neiPoint
+        // matrix(ownPointID, neiPointID) += compactCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalOwnPointID, 1, &globalNeiPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Insert coefficients for the neiPoint-ownPointID
+        // matrix(neiPointID, ownPointID) += compactCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalNeiPointID, 1, &globalOwnPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Flip the coefficient signs
+        forAll(values, cmptI)
+        {
+            values[cmptI] = -values[cmptI];
+        }
+
+        // Insert coefficients for the ownPoint-ownPoint
+        // matrix(ownPointID, ownPointID) -= compactCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalOwnPointID, 1, &globalOwnPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+
+        // Insert coefficients for the neiPoint-neiPoint
+        // matrix(neiPointID, neiPointID) -= compactCoeff;
+        MatSetValuesBlocked
+        (
+            jac, 1, &globalNeiPointID, 1, &globalNeiPointID,
+            values.cdata(),
+            ADD_VALUES
+        );
+    }
+}
+
+
 // void Foam::vfvm::divSigma
 // (
 //     sparseMatrix& matrix,

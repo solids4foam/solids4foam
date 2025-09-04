@@ -1923,7 +1923,19 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (solidModelDict().lookupOrDefault<Switch>("approximateJacobian", false))
     {
-        notImplemented("approximateJacobian not implemented yet");
+        // Add laplacian term as a compact approximate linearisation of
+        // div(sigma)
+        vfvm::laplacian
+        (
+            jac,
+            Switch(solidModelDict().lookup("compactImplicitStencil")),
+            zetaImplicit,
+            dualMesh(),
+            blockSize_,     // nScalarEqns
+            globalPoints().localToGlobalPointMap(),
+            dualImpKf().primitiveField(),
+            false           // flip sign
+        );
     }
     else
     {

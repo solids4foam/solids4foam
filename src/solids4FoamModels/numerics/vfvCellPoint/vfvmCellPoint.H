@@ -84,6 +84,18 @@ namespace vfvm
         const bool flipSign = false
     );
 
+    // Insert laplacian coefficients into the given PETSc matrix
+    void laplacian
+    (
+        Mat jac,
+        const Switch compactStencil,
+        const scalar zeta, // compact stencil coefficient
+        const meshDual& dualMesh,
+        const label nScalarEqns,
+        const labelList& localToGlobalPointMap,
+        const scalarField& diffusivity, // diffusivity in the primary cells
+        const bool flipSign = false
+    );
     // // Add coefficients to the matrix for the divergence of stress
     // // Note: this function does not calculate contributions to the right-hand
     // // side
