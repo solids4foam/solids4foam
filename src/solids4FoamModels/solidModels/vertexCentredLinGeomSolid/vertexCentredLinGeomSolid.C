@@ -1737,6 +1737,11 @@ label vertexCentredLinGeomSolid::formResidual
     const Vec x
 )
 {
+    if (Pstream::parRun())
+    {
+        notImplemented("To be fixed in parallel");
+    }
+
     const fvMesh& mesh = this->mesh();
 
     // Extract pointD from x
