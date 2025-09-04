@@ -625,22 +625,23 @@ tmp<vectorField> d2dt2
 
 tmp<vectorField> ddt
 (
-    ITstream& ddtScheme,
+    const fvMesh& mesh,
     const pointVectorField& pointP
 )
 {
-    ITstream d2dt2Scheme(ddtScheme);
-    return ddt(ddtScheme, d2dt2Scheme, pointP);
-}
+    // Note: currently we have hard-coded in the names pointD and pointU: this
+    // is not good. We need a better solution!
 
+#ifdef OPENFOAM_NOT_EXTEND
+    ITstream& ddtScheme = mesh.ddtScheme("ddt(" + pointP.name() + ")");
+    ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(" + pointP.name() + ")");
+#else
+    ITstream& ddtScheme =
+        mesh.schemesDict().ddtScheme("ddt(" + pointP.name() + ")");
+    ITstream& d2dt2Scheme =
+        mesh.schemesDict().d2dt2Scheme("d2dt2(" + pointP.name() + ")");
+#endif
 
-tmp<vectorField> ddt
-(
-    ITstream& ddtScheme,
-    ITstream& d2dt2Scheme,
-    const pointVectorField& pointP
-)
-{
     // Take a reference to the internal field
     const vectorField& pointPI = pointP.internalField();
 

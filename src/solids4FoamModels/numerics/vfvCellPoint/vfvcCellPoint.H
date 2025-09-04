@@ -114,19 +114,9 @@ namespace vfvc
     );
 
     // First time derivative of pointVectorField
-    // This function is primarily used for the displacement field and checks if
-    // the velocity and acceleration schemes are consistent
     tmp<vectorField> ddt
     (
-        ITstream& ddtScheme,
-        ITstream& d2dt2Scheme,
-        const pointVectorField& pointP
-    );
-
-    // First time derivative of pointVectorField
-    tmp<vectorField> ddt
-    (
-        ITstream& ddtScheme,
+        const fvMesh& mesh,
         const pointVectorField& pointP
     );
 

@@ -623,8 +623,16 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Update the increment of displacement
     pointDD() = pointD() - pointD().oldTime();
 
-    Warning
-        << "Update pointU and pointA" << endl;
+    // Update point accelerations and velocities
+    // Note: the acceleration needs to be updated before the
+    // velocity for NewmarkBeta
+#ifdef OPENFOAM_NOT_EXTEND
+    pointA_.primitiveFieldRef() = vfvc::ddt(mesh(), pointU_);
+    pointU_.primitiveFieldRef() = vfvc::ddt(mesh(), pointD());
+#else
+    pointA_.internalField() = vfvc::ddt(mesh(), pointU_);
+    pointU_.internalField() = vfvc::ddt(mesh(), pointD());
+#endif
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
