@@ -45,27 +45,7 @@ namespace Foam
 namespace solidModels
 {
 
-static PetscErrorCode MatCheckFinite(Mat A, const char* where)
-{
-  PetscInt rstart, rend; PetscCall(MatGetOwnershipRange(A,&rstart,&rend));
-  for (PetscInt i=rstart; i<rend; ++i) {
-    const PetscInt *cols; const PetscScalar *vals; PetscInt ncols;
-    PetscCall(MatGetRow(A,i,&ncols,&cols,&vals));
-    for (PetscInt k=0; k<ncols; ++k) {
-      if (PetscIsInfOrNanScalar(vals[k])) {
-        PetscCall(PetscPrintf(PETSC_COMM_SELF,
-          "[%s] NaN/Inf at row %D col %D (val=%g)\n",
-          where,i,cols[k],(double)PetscRealPart(vals[k])));
-        PetscCheck(PETSC_FALSE,PETSC_COMM_SELF,PETSC_ERR_FP,
-                   "NaN/Inf in matrix");
-      }
-    }
-    PetscCall(MatRestoreRow(A,i,&ncols,&cols,&vals));
-  }
-  return 0;
-}
 
-    
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
@@ -2663,25 +2643,34 @@ label vertexCentredLinGeomSolid::formJacobian
         );
     }
 
-    // Lookup the d2dt2 scheme
-#ifdef OPENFOAM_NOT_EXTEND
-    ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(pointD)");
-#else
-    ITstream& d2dt2Scheme = mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)");
-#endif
+    // Do we need to flush the matrix before inserting the next coefficients?
+    CHKERRQ(MatAssemblyBegin(jac, MAT_FLUSH_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(jac, MAT_FLUSH_ASSEMBLY));
 
-    // Add d2dt2 coefficients to jac
-    insertVfvmD2dt2IntoPETScMatrix
-    (
-        jac,
-        pointD(),
-        pointRho_,
-        pointVol_,
-        d2dt2Scheme,
-        blockSize_,     // nScalarEqns
-        globalPoints().localToGlobalPointMap(),
-        true           // flip sign
-    );
+    // Lookup the d2dt2 scheme
+// #ifdef OPENFOAM_NOT_EXTEND
+//     ITstream& d2dt2Scheme = mesh.d2dt2Scheme("d2dt2(pointD)");
+// #else
+//     ITstream& d2dt2Scheme = mesh.schemesDict().d2dt2Scheme("d2dt2(pointD)");
+// #endif
+
+    // // Add d2dt2 coefficients to jac
+    // SOMETHING IS WRONG HERE!!! memory bug!
+    // insertVfvmD2dt2IntoPETScMatrix
+    // (
+    //     jac,
+    //     pointD(),
+    //     pointRho_,
+    //     pointVol_,
+    //     d2dt2Scheme,
+    //     blockSize_,     // nScalarEqns
+    //     globalPoints().localToGlobalPointMap(),
+    //     true           // flip sign
+    // );
+
+    // // DEBUG
+    // CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
+    // CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
 
     // Enforce fixed DOF
     {
@@ -2711,73 +2700,56 @@ label vertexCentredLinGeomSolid::formJacobian
             }
         }
 
-        // IS rowsIS =
-        //     makeFixedScalarIsFromLocalMap
-        //     (
-        //         globalPoints().localToGlobalPointMap(),
-        //         ownedByThisProc,
-        //         mask,
-        //         blockSize_
-        //     );
+        IS rowsIS =
+            makeFixedScalarIsFromLocalMap
+            (
+                globalPoints().localToGlobalPointMap(),
+                ownedByThisProc,
+                mask,
+                blockSize_
+            );
         // std::vector<PetscInt> rows;
-        const labelList& localToGlobalPointMap =
-            globalPoints().localToGlobalPointMap();
-        DynamicList<label> rows(localToGlobalPointMap.size()*blockSize_);
+        // const labelList& localToGlobalPointMap =
+        //     globalPoints().localToGlobalPointMap();
+        //DynamicList<label> rows(localToGlobalPointMap.size()*blockSize_);
         // rows.reserve(localToGlobalPointMap.size()*blockSize_);
+        // forAll(localToGlobalPointMap, i)
+        // {
+        //     if (ownedByThisProc[i])
+        //     {
+        //         // global block row (node id)
+        //         const label gBlock = localToGlobalPointMap[i];
 
-        forAll(localToGlobalPointMap, i)
-        {
-            if (ownedByThisProc[i])
-            {
-                // global block row (node id)
-                const label gBlock = localToGlobalPointMap[i];
+        //         for (PetscInt c = 0; c < blockSize_; ++c)
+        //         {
+        //             if (mask[i][c])
+        //             {
+        //                 // scalar global row
+        //                 // rows.push_back((PetscInt)gBlock*blockSize_ + c);
+        //                 rows.append(gBlock*blockSize_ + c);
+        //             }
+        //         }
+        //     }
+        // }
 
-                for (PetscInt c = 0; c < blockSize_; ++c)
-                {
-                    if (mask[i][c])
-                    {
-                        // scalar global row
-                        // rows.push_back((PetscInt)gBlock*blockSize_ + c);
-                        rows.append(gBlock*blockSize_ + c);
-                    }
-                }
-            }
-        }
-
-        IS rowsIS = nullptr;
-        ISCreateGeneral
-        (
-            PETSC_COMM_WORLD,
-            (PetscInt)rows.size(),
-            rows.data(),
-            PETSC_COPY_VALUES,
-            &rowsIS
-        );
+        // IS rowsIS = nullptr;
+        // ISCreateGeneral
+        // (
+        //     PETSC_COMM_WORLD,
+        //     (PetscInt)rows.size(),
+        //     rows.data(),
+        //     PETSC_COPY_VALUES,
+        //     &rowsIS
+        // );
 
 
         // Complete matrix assembly
         CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
         CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
 
-        Info<< "CHECK 1:" << endl;
-        if (MatCheckFinite(jac,"after-assembly") != 0)
-        {
-            FatalError
-                << "error: after-assembly" << exit(FatalError);
-        }
-        Info<< "CHECK 1: PASSED" << endl;
-
         // Zero all rows and columns of fixed DOFs and set -fixedDofScale_ on
         // the diagonal
         MatZeroRowsColumnsIS(jac, rowsIS, -fixedDofScale_, NULL, NULL);
-
-        Info<< "CHECK 2" << endl;
-        if (MatCheckFinite(jac,"after-zero-rows") != 0)
-        {
-            FatalError
-                << "error: after-zero-rows" << exit(FatalError);
-        }
-        Info<< "CHECK 2: PASSED" << endl;
 
         // TODO: store this IS!
         ISDestroy(&rowsIS);
@@ -2787,7 +2759,6 @@ label vertexCentredLinGeomSolid::formJacobian
     {
         notImplemented("solvePressure not implemented yet for formJacobian");
     }
-
 
     return 0;
 }
@@ -2924,7 +2895,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     {
         // Stress at the points
         pointSymmTensorField pSigma
-	(
+        (
             IOobject
             (
                 "pSigma",

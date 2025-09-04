@@ -589,10 +589,6 @@ label foamPetscSnesHelper::initialiseJacobian
     // Set the block size
     CHKERRQ(MatSetBlockSize(jac, blockSize));
 
-    Info<< "n = " << n << nl
-        << "N = " << N << nl
-        << "blockn = " << blockn << endl;
-
     // Count the number of non-zeros in the matrix
     // Note: we assume a compact stencil, i.e. face only face neighbours
 
@@ -761,10 +757,6 @@ label foamPetscSnesHelper::initialiseSolution
                 << "Unknown solution location = " << location_
                 << exit(FatalError);
         }
-
-        Info<< "InitSol" << nl
-            << "n = " << n << nl
-            << "N = " << N << endl;
 
         x = Vec();
         CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));

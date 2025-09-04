@@ -435,7 +435,6 @@ void foamPetscSnesHelper::ExtractFieldComponents
     // Lookup x block size
     label xBlockSize;
     VecGetBlockSize(x, &xBlockSize);
-    Info<< "ExtractFieldComponents: bs = " << xBlockSize << endl;
 
     // Insert vf into xx
     if (location_ == solutionLocation::CELLS)
@@ -444,7 +443,6 @@ void foamPetscSnesHelper::ExtractFieldComponents
     }
     else if (location_ == solutionLocation::POINTS)
     {
-        Info<< "ExtractFieldComponents: POINTS" << endl;
         // Obtain a pointer to the underlying scalar array in vf
         // We assume vf is stored as contiguous data, i.e.
         // (vx1, vy1, vz1, vx2, vy2, vz2, ..., vxN, vyN, vzN)
@@ -457,7 +455,6 @@ void foamPetscSnesHelper::ExtractFieldComponents
         // Get the number of components per field element from the traits (e.g.,
         // 1 for scalar, 3 for vector, etc.)
         const label vfBlockSize = pTraits<Type>::nComponents;
-        Info<< "vfBlockSize = " << vfBlockSize << endl;
 
         // Decide which components to extract: if compIndices is empty, default to
         // all components
@@ -504,9 +501,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
                 nNotOwnedByThisProc++;
             }
         }
-        Info<< "localPointI = " << localPointI << endl;
 
-        /*
         // Extract values not owned by this processor; we need to sync these from
         // other processors
         if (Pstream::parRun())
@@ -599,11 +594,6 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
             // Destroy the index set
             ISDestroy(&indexSet);
-        }
-        */
-        if (Pstream::parRun())
-        {
-            notImplemented("Fix for parallel");
         }
     }
     else
