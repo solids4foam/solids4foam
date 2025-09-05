@@ -506,9 +506,9 @@ void foamPetscSnesHelper::ExtractFieldComponents
         // other processors
         if (Pstream::parRun())
         {
-            // Convert to the number of scalar unknowns not owned by this
-            // processor
-            nNotOwnedByThisProc *= vfBlockSize;
+            // Convert to the number of scalar unknowns on this processor but
+            // are not owned by this processor
+            nNotOwnedByThisProc *= xBlockSize;
 
             // Collect the global solution scalar indices of the non-local point
             // values
