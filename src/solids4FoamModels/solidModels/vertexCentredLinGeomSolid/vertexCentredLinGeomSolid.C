@@ -137,10 +137,10 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
 
     // Convert force to force per unit volume
     // Perform calculation per point to avoid dimension checks
-    const scalarField& pointVolI = pointVol_;
+    const scalarField& pointGlobalVolI = pointGlobalVol_;
     forAll(pointDivSigmaI, pointI)
     {
-        pointDivSigmaI[pointI] /= pointVolI[pointI];
+        pointDivSigmaI[pointI] /= pointGlobalVolI[pointI];
     }
 
     if (debug)
@@ -1512,6 +1512,19 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         pMesh(),
         dimensionedScalar("0", dimVolume, 0.0)
     ),
+    pointGlobalVol_
+    (
+        IOobject
+        (
+            "pointGlobalVolumes",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimVolume, 0.0)
+    ),
     pointDivSigma_
     (
         IOobject
@@ -1584,11 +1597,8 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
-#ifdef OPENFOAM_NOT_EXTEND
     scalarField& pointVolI = pointVol_.primitiveFieldRef();
-#else
-    scalarField& pointVolI = pointVol_.internalField();
-#endif
+    scalarField& pointGlobalVolI = pointGlobalVol_;
     const scalarField& dualCellVol = dualMesh().V();
     const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
     forAll(dualCellToPoint, dualCellI)
@@ -1598,7 +1608,14 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
         // Map the cell volume
         pointVolI[pointID] = dualCellVol[dualCellI];
+        pointGlobalVolI[pointID] = dualCellVol[dualCellI];
     }
+
+    // Sum the shared point volumes to create the point global volumes
+    pointConstraints::syncUntransformedData
+    (
+        mesh(), pointGlobalVol_, plusEqOp<scalar>()
+    );
 
     // Store old time fields
     pointD().oldTime().storeOldTime();
@@ -1737,11 +1754,6 @@ label vertexCentredLinGeomSolid::formResidual
     const Vec x
 )
 {
-    if (Pstream::parRun())
-    {
-        notImplemented("To be fixed in parallel");
-    }
-
     const fvMesh& mesh = this->mesh();
 
     // Extract pointD from x
@@ -1810,25 +1822,49 @@ label vertexCentredLinGeomSolid::formResidual
         }
     }
 
-    // Calculate divergence of stress for the dual cells
+    // Calculate divergence of stress (force per unit volume) for the dual
+    // cells
     const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
 
+    // Calculate absolute divergence of stress (force)
+    // We do this to allow syncing of forces at points on processor boundaries
+    const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
+
     // Map dual cell field to primary mesh point field
-    vectorField& pointDivSigma = pointDivSigma_;
-    pointDivSigma = vector::zero;
+    // We temporarily use the pointDivSigma field to hold absolute forces
+    // but convert them back to force per unit volume below
+    vectorField& pointDivSigmaI = pointDivSigma_;
     const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
-    forAll(dualDivSigma, dualCellI)
+    forAll(dualDivSigmaAbs, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
-        pointDivSigma[pointID] = dualDivSigma[dualCellI];
+        pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
+    }
+
+    // Sum absolute forces in parallel
+    pointConstraints::syncUntransformedData
+    (
+        mesh, pointDivSigma_, plusEqOp<vector>()
+    );
+
+    // Convert force to force per unit volume
+    // Perform calculation per point to avoid dimension checks
+    const scalarField& pointGlobalVolI = pointGlobalVol_;
+    forAll(pointDivSigmaI, pointI)
+    {
+        pointDivSigmaI[pointI] /= pointGlobalVolI[pointI];
     }
 
     // The residual vector F calculated as:
     // F = div(sigma) + rho*g - rho*d2dt2(D)
 
+    // Note: we integrate the residual here over the local point volumes as
+    // opposed to the global point volumes but it does not matter: it does not
+    // affect the Jacobian and only the residual from the processor which owns
+    // the point is used.
     vectorField residual
     (
-        pointDivSigma*pointVolI
+        pointDivSigma_*pointVolI
       + pointRhoI*g().value()*pointVolI
       - vfvc::d2dt2
         (

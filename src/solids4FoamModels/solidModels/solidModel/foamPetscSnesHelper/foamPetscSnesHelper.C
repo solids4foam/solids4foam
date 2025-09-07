@@ -1462,7 +1462,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     }
 
     // Reset the stopOnPetscError flag
-    stopOnPetscError_ = !returnOnSnesError;
+    //stopOnPetscError_ = !returnOnSnesError;
 
     // Initialise the SNES object
     if (!snes_)
