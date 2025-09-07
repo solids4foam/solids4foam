@@ -51,6 +51,7 @@ SourceFiles
 #include <petscsnes.h>
 #include <petscksp.h>
 
+#include "PetscHandles.H"
 #include "globalIndex.H"
 #include "globalPointIndices.H"
 #include "volFields.H"
@@ -131,18 +132,18 @@ private:
 
         //- Pointer to the PETSc SNES object
         //  Note that SNES is a pointer type
-        SNES snes_;
+        SnesHandle snes_;
 
         //- Pointer to the PETSc solution vector
         //  Note that Vec is a pointer type
-        Vec x_;
+        VecHandle x_;
 
         //- Pointer to a backup of the PETSc solution vector
-        Vec xBackup_;
+        VecHandle xBackup_;
 
         //- Pointer to the PETSc matrix
         //  Note that Mat is a pointer type
-        Mat A_;
+        MatHandle A_;
 
         //- PETSc user context
         autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
@@ -231,7 +232,7 @@ public:
             //- Non-const access to the PETSc solution vector
             Vec solution()
             {
-                if (!x_)
+                if (!x_.v)
                 {
                     // Initialise snes object
                     if (initialiseSnes() != 0)
@@ -241,25 +242,25 @@ public:
                     }
                 }
 
-                return x_;
+                return x_.v;
             }
 
             //- Non-const access to the PETSc solution vector
             Vec solutionBackup()
             {
-                if (!xBackup_)
+                if (!xBackup_.v)
                 {
                     // Initialise based on x
-                    VecDuplicate(x_, &xBackup_);
+                    VecDuplicate(x_.v, xBackup_.put());
                 }
 
-                return xBackup_;
+                return xBackup_.v;
             }
 
             //- Return a reference to the snes object
             SNES& snes()
             {
-                return snes_;
+                return snes_.s;
             }
 
             //- Return the stopOnPetscError flag

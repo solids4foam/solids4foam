@@ -331,36 +331,39 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
 
 label foamPetscSnesHelper::initialiseSnes()
 {
-    if (snes_)
+    if (snes_.s)
     {
         FatalErrorInFunction
             << "Pointer already set" << abort(FatalError);
     }
 
     // Create the PETSc SNES object
-    snes_ = SNES();
-    CHKERRQ(SNESCreate(PETSC_COMM_WORLD, &snes_));
+    snes_.s = SNES();
+    CHKERRQ(SNESCreate(PETSC_COMM_WORLD, &snes_.s));
 
     // Create user data context
     snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
     appCtxfoamPetscSnesHelper& user = snesUserPtr_();
 
     // Set the user context
-    CHKERRQ(SNESSetApplicationContext(snes_, &user));
+    CHKERRQ(SNESSetApplicationContext(snes_.s, &user));
 
     // Set the residual function
     CHKERRQ
     (
-        SNESSetFunction(snes_, NULL, formResidualFoamPetscSnesHelper, &user)
+        SNESSetFunction(snes_.s, NULL, formResidualFoamPetscSnesHelper, &user)
     );
 
     // The derived class initialises A
-    CHKERRQ(initialiseJacobian(A_));
+    CHKERRQ(initialiseJacobian(A_.m));
 
     // Set the Jacobian function
     CHKERRQ
     (
-        SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user)
+        SNESSetJacobian
+        (
+            snes_.s, A_.m, A_.m, formJacobianFoamPetscSnesHelper, &user
+        )
     );
 
     // Set the convergence check function
@@ -368,16 +371,16 @@ label foamPetscSnesHelper::initialiseSnes()
     (
         SNESSetConvergenceTest
         (
-            snes_, convergenceCheckFoamPetscSnesHelper, &user, NULL
+            snes_.s, convergenceCheckFoamPetscSnesHelper, &user, NULL
         )
     );
 
     // Set solver options
     // Uses default options, can be overridden by command line options
-    CHKERRQ(SNESSetFromOptions(snes_));
+    CHKERRQ(SNESSetFromOptions(snes_.s));
 
     // The derived class initialises the solution vector
-    CHKERRQ(initialiseSolution(x_));
+    CHKERRQ(initialiseSolution(x_.v));
 
     return 0;
 }
@@ -400,10 +403,10 @@ foamPetscSnesHelper::foamPetscSnesHelper
     options_(nullptr),
     stopOnPetscError_(stopOnPetscError),
     diverged_(false),
-    snes_(nullptr),
-    x_(nullptr),
-    xBackup_(nullptr),
-    A_(nullptr),
+    snes_(),
+    x_(),
+    xBackup_(),
+    A_(),
     snesUserPtr_(),
     globalCellsPtr_
     (
@@ -458,9 +461,6 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
     if (initialised_)
     {
         PetscOptionsDestroy(&options_);
-        SNESDestroy(&snes_);
-        VecDestroy(&x_);
-        MatDestroy(&A_);
         snesUserPtr_.clear();
 
         WarningInFunction
@@ -476,11 +476,10 @@ void foamPetscSnesHelper::resetSnes()
 {
     Info<< "Resetting SNES" << endl;
 
-    SNESDestroy(&snes_);
-    VecDestroy(&x_);
-    MatDestroy(&A_);
+    snes_.reset();
+    x_.reset();
+    A_.reset();
     snesUserPtr_.clear();
-    //initialised_ = false;
 
     if (initialiseSnes() != 0)
     {
@@ -489,7 +488,7 @@ void foamPetscSnesHelper::resetSnes()
     }
 
     // Reset SNES internal state
-    //SNESReset(foamPetscSnesHelper::snes());
+    // SNESReset(foamPetscSnesHelper::snes());
     // Reset KSP and PC
     // KSP ksp;
     // SNESGetKSP(foamPetscSnesHelper::snes(), &ksp);
@@ -1476,20 +1475,20 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     // Load the correct options database
     PetscOptionsPush(options_);
-    SNESSetFromOptions(snes_);
+    SNESSetFromOptions(snes_.s);
 
     // Set the snesHasRun flag
     snesHasRun_ = true;
 
     // Solve the nonlinear system
-    SNESSolve(snes_, NULL, x_);
+    SNESSolve(snes_.s, NULL, x_.v);
 
     // Un-load the options file
     PetscOptionsPop();
 
     // Check convergence
     SNESConvergedReason reason;
-    SNESGetConvergedReason(snes_, &reason);
+    SNESGetConvergedReason(snes_.s, &reason);
 
     if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
     {
