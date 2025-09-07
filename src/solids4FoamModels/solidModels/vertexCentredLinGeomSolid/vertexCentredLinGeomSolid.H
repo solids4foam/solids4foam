@@ -55,7 +55,9 @@ SourceFiles
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif
-#include "foamPetscSnesHelper.H"
+#ifdef USE_PETSC
+    #include "foamPetscSnesHelper.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,8 +75,10 @@ namespace solidModels
 
 class vertexCentredLinGeomSolid
 :
-    public solidModel,
-    public foamPetscSnesHelper
+    public solidModel
+#ifdef USE_PETSC
+    , public foamPetscSnesHelper
+#endif
 {
 private:
 
@@ -114,9 +118,11 @@ private:
         //  the matrix conditioning
         const scalar fixedDofScale_;
 
+#ifdef USE_PETSC
         //- Pointer to PETSc indexing object used for identifying fixed degrees
         //  of freedom
         mutable IS fixedDofRowsISPtr_;
+#endif
 
         //- Point velocity
         pointVectorField pointU_;
@@ -158,13 +164,6 @@ private:
 
     // Private Member Functions
 
-        // //- Update the source vector for the linear system
-        // void updateSource
-        // (
-        //     vectorField& source,
-        //     const labelList& dualCellToPoint
-        // );
-
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma
         (
@@ -193,25 +192,7 @@ private:
             const labelListList& pointToDualFaces
         ) const;
 
-        //- Construct a PETSc index set for the fixed degrees of freedom
-        // IS makeFixedScalarIsFromLocalMap
-        // (
-        //     const labelList& localToGlobalPointMap,
-        //     const boolList& ownedByThisProc,
-        //     const List<boolList>& maskPerLocalPoint,
-        //     const label blockSize
-        // ) const;
-
-        //- Enforce fixed DOF contributions on the linear system
-        // void enforceFixedDof
-        // (
-        //     Mat jac,
-        //     const boolList& fixedDofs,
-        //     const scalarField& fixedDofDirections,
-        //     const scalarField& fixedDofValues,
-        //     const scalar fixedDofScale
-        // );
-
+#ifdef USE_PETSC
         //- Make fixedDofRowsIS object
         void makeFixedDofRowsIS() const;
 
@@ -225,6 +206,7 @@ private:
 
             return fixedDofRowsISPtr_;
         }
+#endif
 
         //- Make dualImpKf field
         void makeDualImpKf() const;
@@ -237,12 +219,6 @@ private:
 
         //- Evolve the solid solver using the PETSc SNES nonlinear solver
         virtual bool evolveSnes();
-
-        //- Evolve the solid solver using the implicit coupled approach
-        // virtual bool evolveImplicitCoupled();
-
-        //- Evolve the solid solver using the implicit segregated approach
-        // virtual bool evolveImplicitSegregated();
 
         //- Evolve the solid solver using the explicit approach
         virtual bool evolveExplicit();
@@ -306,6 +282,7 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
+#ifdef USE_PETSC
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
             //  the matrix
@@ -329,6 +306,7 @@ public:
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
             );
+#endif // USE_PETSC
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad
