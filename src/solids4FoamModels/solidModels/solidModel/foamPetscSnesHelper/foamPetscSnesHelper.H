@@ -202,8 +202,8 @@ public:
         //  Parameters:
         //    optionsFile         - PETSc options file address
         //    mesh                - Used to access the number of cells or points
-        //                          as well as global syncing activities for
-        //                          points
+        //                          and global syncing activities for points,
+        //                          and fvSolution solvers dictionary
         //    location            - Optional: Location of the solution unknowns
         //                          This is used to determine the local-to-global
         //                          mapping
@@ -213,7 +213,7 @@ public:
         foamPetscSnesHelper
         (
             fileName optionsFile,
-            const polyMesh& mesh,
+            const fvMesh& mesh,
             const solutionLocation& location = solutionLocation::CELLS,
             const Switch stopOnPetscError = true,
             const Switch initialise = true

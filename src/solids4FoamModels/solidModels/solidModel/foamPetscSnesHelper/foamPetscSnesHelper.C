@@ -26,6 +26,8 @@ License
 #include "leastSquaresVectors.H"
 #include "fvm.H"
 #include "IFstream.H"
+#include "petscUtils.H"
+#include "petscErrorHandling.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -392,7 +394,7 @@ label foamPetscSnesHelper::initialiseSnes()
 foamPetscSnesHelper::foamPetscSnesHelper
 (
     fileName optionsFile,
-    const polyMesh& mesh,
+    const fvMesh& mesh,
     const solutionLocation& location,
     const Switch stopOnPetscError,
     const Switch initialise
@@ -426,30 +428,69 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        // Expand the options file name
-        optionsFile.expand();
+        // Initialise PETSc without any options file
+        PetscInitialize(NULL, NULL, NULL, NULL);
 
-        // Check the options file exists
-        IFstream is(optionsFile);
-        if (!is.good())
+        // Create and store the options database from a dedicated options file
+        // or from an OpenFOAM dict
+
+        // Lookup the solver in fvSolution and check if PETSc is specified
+        bool useDict = false;
+        const dictionary& solverDict = mesh.solverDict("D");
+        if (!solverDict.empty())
         {
-            FatalErrorInFunction
-                << "Cannot find the PETSc options file: " << optionsFile
-                << abort(FatalError);
+            if (solverDict.lookupOrDefault<word>("solver", "none") == "petsc")
+            {
+                useDict = true;
+            }
         }
 
-        // Initialise PETSc with an options file, but we will need to reset it
-        // before each call to snes.solve as PETSc actively uses only one
-        // options database and there may be several objects using PETSc, e.g.
-        // solid solver, fluid solver, mesh motion
-        PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
-
-        // Create and store the options database
+        // Create an empty options database
         PetscOptionsCreate(&options_);
-        PetscOptionsInsertFile
-        (
-            PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
-        );
+
+        // Populate the options database from the dict or options file
+        if (useDict)
+        {
+            Info<< "Reading the PETSc options from fvSolution" << endl;
+
+            // We will load (push) the empty options database and populate it
+            // with options from the the dictionary, then unload (pop) the
+            // database
+            const dictionary& optionsDict =
+                mesh.solverDict("D").subDict("options");
+
+            // Load (push) the database
+            AssertPETSc(PetscOptionsPush(options_));
+
+            // Populate the database
+            PetscUtils::setFlags("", optionsDict, debug);
+
+            // Unload (pop) the database
+            AssertPETSc(PetscOptionsPop());
+        }
+        else
+        {
+            Info<< "Reading the PETSc options from the " << optionsFile
+                << " file" << endl;
+
+            // Expand the options file name
+            optionsFile.expand();
+
+            // Check the options file exists
+            IFstream is(optionsFile);
+            if (!is.good())
+            {
+                FatalErrorInFunction
+                    << "Cannot find the PETSc options file: " << optionsFile
+                    << abort(FatalError);
+            }
+
+            // Populate the options database with the options file
+            PetscOptionsInsertFile
+            (
+                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
+            );
+        }
     }
 }
 
