@@ -24,7 +24,7 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
-/*solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C*/
+solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -224,7 +224,6 @@ numerics/meshDual/dualMeshToMeshMap.C
 numerics/meshDual/meshDualiser.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/multiplyCoeff/multiplyCoeff.C
-numerics/multiplyCoeff/multiplyCoeffRectMat.C
 numerics/multiplyCoeff/multiplyCoeffExtended.C
 
 numerics/newAMIInterpolation/newAMIInterpolationName.C

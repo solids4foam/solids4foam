@@ -153,9 +153,6 @@ private:
         //- Stress field at the dual mesh faces
         surfaceSymmTensorField dualSigmaf_;
 
-        //- Local-to-global point map and owner list
-        // globalPointIndices globalPointIndices_;
-
 #ifdef OPENFOAM_COM
         //- Interpolator from points to cells
         pointVolInterpolation pointVolInterp_;

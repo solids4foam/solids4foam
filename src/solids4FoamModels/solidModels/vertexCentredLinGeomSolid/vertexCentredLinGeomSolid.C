@@ -65,7 +65,7 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
     }
 
     // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 1.0));
 
     // Calculate gradD at dual faces
     dualGradDf = vfvc::fGrad
@@ -615,7 +615,7 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     pointD().correctBoundaryConditions();
 
     // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 1.0));
 
     // Calculate gradD at dual faces
     dualGradDf_ = vfvc::fGrad
@@ -1219,7 +1219,7 @@ label vertexCentredLinGeomSolid::formJacobian
     pointD().correctBoundaryConditions();
 
     // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 1.0));
     const scalar zetaImplicit
     (
         solidModelDict().lookupOrDefault<scalar>("zetaImplicit", zeta)
