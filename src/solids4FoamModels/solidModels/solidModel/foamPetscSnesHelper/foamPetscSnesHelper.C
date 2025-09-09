@@ -393,6 +393,7 @@ label foamPetscSnesHelper::initialiseSnes()
 
 foamPetscSnesHelper::foamPetscSnesHelper
 (
+    const word& fieldName,
     fileName optionsFile,
     const fvMesh& mesh,
     const solutionLocation& location,
@@ -436,9 +437,9 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
         // Lookup the solver in fvSolution and check if PETSc is specified
         bool useDict = false;
-        if (mesh.solversDict().found("D"))
+        if (mesh.solversDict().found(fieldName))
         {
-            const dictionary& solverDict = mesh.solverDict("D");
+            const dictionary& solverDict = mesh.solverDict(fieldName);
             if (!solverDict.empty())
             {
                 if
@@ -489,7 +490,9 @@ foamPetscSnesHelper::foamPetscSnesHelper
             {
                 FatalErrorInFunction
                     << "Cannot find the PETSc options file: " << optionsFile
-                    << abort(FatalError);
+                    << ". Either provide an option file or add the PETSc "
+                    << "solver settings to fvSolution/solvers/" << fieldName
+                    << exit(FatalError);
             }
 
             // Populate the options database with the options file

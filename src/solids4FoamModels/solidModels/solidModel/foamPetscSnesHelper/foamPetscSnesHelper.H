@@ -200,6 +200,8 @@ public:
         //- Construct from nBlocks and blockSize
         //
         //  Parameters:
+        //    solution field name - Name of the solution field used to look up
+        //                          PETSc options from fvSolution
         //    optionsFile         - PETSc options file address
         //    mesh                - Used to access the number of cells or points
         //                          and global syncing activities for points,
@@ -212,6 +214,7 @@ public:
         //    initialise          - Optional: Initialise PETSc
         foamPetscSnesHelper
         (
+            const word& fieldName,
             fileName optionsFile,
             const fvMesh& mesh,
             const solutionLocation& location = solutionLocation::CELLS,

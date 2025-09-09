@@ -538,6 +538,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
+        "D",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>

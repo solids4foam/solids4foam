@@ -197,8 +197,8 @@ public:
             //  array) vector
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,         // Residual
+                const Vec x    // Solution
             );
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
@@ -206,16 +206,16 @@ public:
             //  representing the fluid domain motion)
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x,  // Solution
+                Vec f,         // Residual
+                const Vec x,    // Solution
                 const solidModel& motion
             );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
             );
 };
 

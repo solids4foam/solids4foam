@@ -752,6 +752,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 #ifdef USE_PETSC
     foamPetscSnesHelper
     (
+        "pointD",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>
