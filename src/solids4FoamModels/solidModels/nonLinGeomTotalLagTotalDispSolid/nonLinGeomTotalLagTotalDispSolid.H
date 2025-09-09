@@ -207,15 +207,15 @@ public:
             //  array) vector
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,         // Residual
+                const Vec x    // Solution
             );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
             );
 
             //- Traction boundary surface normal gradient

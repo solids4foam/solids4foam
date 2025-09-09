@@ -403,14 +403,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     // Retrieve the solution
     // Map the PETSc solution to the D field
+    vectorField& DI = D();
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
-#ifdef OPENFOAM_NOT_EXTEND
-        D().primitiveFieldRef(),
-#else
-        D().internalField(),
-#endif
+        DI,
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
@@ -421,10 +418,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     {
         // Map the PETSc solution to the p field
         // p is located in the last ("blockSize - 1") component
+        scalarField& pI = p();
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
             foamPetscSnesHelper::solution(),
-            p().primitiveFieldRef(),
+            pI,
             blockSize_ - 1 // Location of p component
         );
 
@@ -521,6 +519,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
+        "D",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>
@@ -528,7 +527,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh().nCells(),
+        mesh(),
+        solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -783,21 +783,21 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
-    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 
 label nonLinGeomTotalLagTotalDispSolid::initialiseSolution(Vec& x)
 {
     // Initialise based on mesh.nCells()
-    return Foam::initialiseSolution(x, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
 }
 
 
 label nonLinGeomTotalLagTotalDispSolid::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
     const fvMesh& mesh = this->mesh();
@@ -810,7 +810,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -848,7 +847,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions
@@ -916,7 +915,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -928,20 +926,14 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
         const dimensionedScalar omega("omega", solidModelDict());
-        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
         scalarField pressureResidual
         (
-          - fvc::ddt(omegaTau, p)
           - p/kappa
-          + fvc::laplacian(omega/sqr(mesh.deltaCoeffs()), p, "laplacian(Dp,p)")
-          // + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-          // - fvc::div
-          //   (
-          //       (pDiffusivity()/kappaf)*mesh.Sf()
-          //     & fvc::interpolate(fvc::grad(p))
-          //   )
+          + fvc::laplacian
+            (
+                omega/sqr(mesh.deltaCoeffs()/impKf_), p, "laplacian(Dp,p)"
+            )
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
-        //- tr(gradD())
         );
 
         // Make residual extensive
@@ -950,7 +942,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual, f, blockSize_ - 1, blockSize_
+            pressureResidual, f, blockSize_ - 1
         );
     }
 
@@ -961,7 +953,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 label nonLinGeomTotalLagTotalDispSolid::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
     // Copy x into the D field
@@ -972,7 +964,6 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
 
@@ -986,7 +977,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions
@@ -1023,18 +1014,15 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         const volScalarField rKappa(1.0/kappa);
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
         const dimensionedScalar omega("omega", solidModelDict());
-        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
         {
             // Calculate pressure equation matrix
             //const dimensionedScalar one("one", dimless, 1);
             fvScalarMatrix approxPressureJ
             (
-              - fvm::ddt(omegaTau, p)
               - fvm::Sp(rKappa, p)
-              // + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
               + fvm::laplacian
                 (
-                    omega/sqr(mesh().deltaCoeffs()),
+                    omega/sqr(mesh().deltaCoeffs())/impKf_,
                     p,
                     "jacobian-laplacian(rAU,p)"
                 )

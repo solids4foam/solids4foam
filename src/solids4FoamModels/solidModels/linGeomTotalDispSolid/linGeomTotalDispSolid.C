@@ -328,14 +328,11 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Retrieve the solution
     // Map the PETSc solution to the D field
+    vectorField& DI = D();
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
-#ifdef OPENFOAM_NOT_EXTEND
-        D().primitiveFieldRef(),
-#else
-        D().internalField(),
-#endif
+        DI,
         0, // Location of first component
         solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
     );
@@ -346,10 +343,11 @@ bool linGeomTotalDispSolid::evolveSnes()
     {
         // Map the PETSc solution to the p field
         // p is located in the 4th component
+        scalarField& pI = p();
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
             foamPetscSnesHelper::solution(),
-            p().primitiveFieldRef(),
+            pI,
             blockSize_ - 1 // Location of p component
         );
 
