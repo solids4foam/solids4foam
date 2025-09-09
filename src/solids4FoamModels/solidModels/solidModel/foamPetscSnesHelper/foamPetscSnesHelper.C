@@ -436,12 +436,19 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
         // Lookup the solver in fvSolution and check if PETSc is specified
         bool useDict = false;
-        const dictionary& solverDict = mesh.solverDict("D");
-        if (!solverDict.empty())
+        if (mesh.solversDict().found("D"))
         {
-            if (solverDict.lookupOrDefault<word>("solver", "none") == "petsc")
+            const dictionary& solverDict = mesh.solverDict("D");
+            if (!solverDict.empty())
             {
-                useDict = true;
+                if
+                (
+                    solverDict.lookupOrDefault<word>("solver", "none")
+                 == "petsc"
+                )
+                {
+                    useDict = true;
+                }
             }
         }
 
