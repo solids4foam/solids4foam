@@ -136,7 +136,7 @@ private:
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         //  For a point on a processor boundary, this is the dual cell volume
-        //  associated with the the local processor 
+        //  associated with the the local processor
         pointScalarField pointVol_;
 
         //- Global point volume field
