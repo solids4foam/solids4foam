@@ -17,9 +17,10 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
-#include "multiplyCoeffExtended.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "surfaceFields.H"
 
@@ -35,7 +36,7 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<scalarSquareMatrix>& materialTangentField,
+    const List<scalarSquareMatrix>& materialTangentField,
     const scalar zeta,
     const bool flipSign
 )
@@ -270,8 +271,8 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<scalarSquareMatrix>& materialTangentField,
-    const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+    const List<scalarSquareMatrix>& materialTangentField,
+    const List<RectangularMatrix<scalar>>& geometricStiffnessField,
     const symmTensorField& sigmaField,
     const tensorField& dualGradDField,
     const scalar zeta,
@@ -407,7 +408,7 @@ void Foam::vfvm::divSigma
 
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
-            multiplyCoeffExtended
+            multiplyCoeff
             (
                 coeff,
                 curDualSfDef,
@@ -464,7 +465,7 @@ void Foam::vfvm::divSigma
 
         // Compact edge direction coefficient
         tensor edgeDirCoeff;
-        multiplyCoeffExtended
+        multiplyCoeff
         (
             edgeDirCoeff,
             curDualSfDef,
@@ -964,5 +965,6 @@ void Foam::vfvm::laplacian
 //     return tmatrix;
 // }
 
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

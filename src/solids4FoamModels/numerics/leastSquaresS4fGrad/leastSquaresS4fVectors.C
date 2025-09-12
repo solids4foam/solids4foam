@@ -86,23 +86,27 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
     const boolList& useBoundaryFaceValues_
 )
 :
+#ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>
     (
         objName, mesh
     ),
+#else
+    MeshObject<fvMesh, leastSquaresS4fVectors>(mesh),
+#endif
     useBoundaryFaceValues_(useBoundaryFaceValues_),
     pVectors_
     (
         IOobject
         (
             "LeastSquaresP",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
+        mesh,
         dimensionedVector(dimless/dimLength, Zero)
     ),
     nVectors_
@@ -110,13 +114,13 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         IOobject
         (
             "LeastSquaresN",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
+        mesh,
         dimensionedVector(dimless/dimLength, Zero)
     )
 {

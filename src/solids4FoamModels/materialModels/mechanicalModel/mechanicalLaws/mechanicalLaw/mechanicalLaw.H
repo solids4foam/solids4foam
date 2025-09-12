@@ -508,7 +508,6 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
         virtual scalarSquareMatrix materialTangent() const
         {
@@ -519,6 +518,7 @@ public:
             return scalarSquareMatrix(0);
         }
 
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
         virtual tmp<Field<scalarSquareMatrix>>

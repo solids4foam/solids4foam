@@ -35,6 +35,7 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
+#include "RectangularMatrix.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "scalarMatrices.H"
 #else
@@ -45,6 +46,10 @@ Author
 
 namespace Foam
 {
+
+#ifdef FOAMEXTEND
+    typedef RectangularMatrix<scalar> scalarRectangularMatrix;
+#endif
 
     // This function multiplies a vector by a 4th order tensor by a third
     // order tensor as encountered in the assembling of block coefficients
@@ -59,6 +64,32 @@ namespace Foam
         tensor& coeff,
         const vector& Sf,
         const scalarSquareMatrix& C,
+        const vector& g
+    );
+
+    // The multiplication evaluates the following in index notation:
+    //     coeff_ij = (Sf_m C_mikl + G_mkl sigma_mi)*g_k delta_lj
+    // where delta is kronecker delta.
+    // The 4th order material tangent matrix is represented by a 6x6 matrix and
+    // the geometric stiffness matrix is represented by a 3x9 matrix
+    void multiplyCoeff
+    (
+        tensor& coeff,
+        const vector& Sf,
+        const scalarSquareMatrix& C,
+        const scalarRectangularMatrix& G,
+        const symmTensor& sigma,
+        const vector& g
+    );
+
+    // The multiplication evaluates the following in index notation:
+    //     coeff_ij = gradP_m G_mkl g_k
+    // The geometric stiffness matrix is represented by a 3x9 matrix
+    void multiplyCoeff
+    (
+        vector& coeff,
+        const scalarRectangularMatrix& G,
+        const vector& gradP,
         const vector& g
     );
 

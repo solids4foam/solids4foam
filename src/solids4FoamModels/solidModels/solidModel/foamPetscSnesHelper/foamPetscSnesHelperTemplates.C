@@ -64,7 +64,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         {
             // Obtain a pointer to the underlying scalar data in
             // diag[blockRowI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
             const scalar* curDiagPtr =
                 reinterpret_cast<const scalar*>(&diag[blockRowI]);
 #else
@@ -240,7 +240,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                 {
                     // Obtain a pointer to the underlying scalar data in
                     // intCoeffs[faceI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
                     const scalar* curIntCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (
@@ -281,7 +281,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                 {
                     // Obtain a pointer to the underlying scalar data in
                     // neiCoeffs[faceI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
                     const scalar* curNeiCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (

@@ -272,11 +272,20 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
 Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
 {
     // Prepare 6x6 tangent matrix
-    scalarSquareMatrix matTang(6, 0.0);
+    scalarSquareMatrix tang(6, 0.0);
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const auto& matTang = tang;
+#else
+    // Create a function to mimic matrix access operator
+    auto&& matTang = [&](const label i, const label j) -> decltype(auto)
+    {
+        return tang[i][j];
+    };
+#endif
 
     // Define matrix indices for readability
     const label XX = symmTensor::XX;
@@ -307,9 +316,8 @@ Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
     matTang(YZ, YZ) = mu;
     matTang(XZ, XZ) = mu;
 
-    return matTang;
+    return tang;
 }
-#endif
 
 
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const

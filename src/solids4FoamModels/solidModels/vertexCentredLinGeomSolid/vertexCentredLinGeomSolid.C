@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "vertexCentredLinGeomSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
@@ -1461,5 +1463,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

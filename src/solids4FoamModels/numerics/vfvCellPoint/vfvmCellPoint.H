@@ -66,7 +66,7 @@ namespace vfvm
         const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangent,
+        const List<scalarSquareMatrix>& materialTangent,
         const scalar zetaImplicit,
         const bool flipSign = false
     );
@@ -86,8 +86,8 @@ namespace vfvm
         const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangent,
-        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const List<scalarSquareMatrix>& materialTangent,
+        const List<RectangularMatrix<scalar>>& geometricStiffnessField,
         const symmTensorField& sigma,
         const tensorField& dualGradDField,
         const scalar zetaImplicit,
