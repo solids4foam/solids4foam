@@ -1,5 +1,5 @@
 #!/bin/bash
-1;95;0ccd "${0%/*}" || exit  # Run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 # Check if OpenFOAM/FOAM has been sourced
 if [[ -z "${WM_PROJECT}" ]]
