@@ -373,6 +373,7 @@ void Foam::multiplyCoeff
       + Sf[vector::Z]*C(ZZ,ZZ)*g[vector::Z];
 }
 
+
 void Foam::multiplyCoeff
 (
     tensor& coeff,

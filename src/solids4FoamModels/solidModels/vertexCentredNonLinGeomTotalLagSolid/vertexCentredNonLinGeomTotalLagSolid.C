@@ -475,7 +475,12 @@ void vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
     const surfaceTensorField& gradDRef // Reference gradD
 ) const
 {
-    geometricStiffness.resize(mesh().nFaces());
+    // Set size and initialise to zero
+    geometricStiffness.resize(dualMesh().nFaces());
+    forAll(geometricStiffness, faceI)
+    {
+        geometricStiffness[faceI].clear();
+    }
 
     // For small strain the geometric stiffness is zero
     if (!useGeometricStiffness_)
@@ -1605,7 +1610,7 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
         const surfaceVectorField& dualSf = dualMesh().Sf();
 
         // Calculate the geometric stiffness
-        List<mat39> geometricStiffness(mesh.nFaces());
+        List<mat39> geometricStiffness(dualMesh().nFaces());
         geometricStiffnessField(geometricStiffness, dualSf, dualGradDf_);
 
         // Add linearisation of div(sigma) to jac

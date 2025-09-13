@@ -332,6 +332,19 @@ void Foam::vfvm::divSigma
         // Sensitivity term at the dual mesh face
         const mat39& geometricStiffness = geometricStiffnessField[dualFaceI];
 
+        // Info<< "dualFaceI = " << dualFaceI << " ";
+        // for (int i = 0; i < 3; ++i)
+        // {
+        //     for (int j = 0; j < 9; ++j)
+        //     {
+        //         if (mag(geometricStiffness(i, j)) > SMALL)
+        //         {
+        //             Info<< " " << geometricStiffness(i, j);
+        //         }
+        //     }
+        // }
+        // Info<< endl;
+
         // Sigma at the dual mesh face
         const symmTensor sigma = sigmaField[dualFaceI];
 

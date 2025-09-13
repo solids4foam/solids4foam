@@ -59,10 +59,26 @@ struct mat39
     // Element access
     inline scalar& operator()(label i, label j)
     {
+#ifdef FULLDEBUG
+        if (i >= nRows_ || j >= nCols_)
+        {
+            FatalErrorInFunction
+                << "Out of bounds" << exit(FatalError);
+        }
+#endif
+
         return a_[i*nCols_ + j];
     }
     inline const scalar& operator()(label i, label j) const
     {
+#ifdef FULLDEBUG
+        if (i >= nRows_ || j >= nCols_)
+        {
+            FatalErrorInFunction
+                << "Out of bounds" << exit(FatalError);
+        }
+#endif
+
         return a_[i*nCols_ + j];
     }
 

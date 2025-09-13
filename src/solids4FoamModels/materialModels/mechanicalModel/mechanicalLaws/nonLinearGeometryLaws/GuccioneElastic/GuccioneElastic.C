@@ -519,22 +519,12 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::impK() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::GuccioneElastic::materialTangentField() const
+void Foam::GuccioneElastic::materialTangentField(List<mat66>& matTan) const
 {
-    // Prepare tmp field
-    tmp<Field<scalarSquareMatrix>> tresult
-    (
-        new Field<scalarSquareMatrix>
-        (
-            mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
-        )
-    );
-    Field<scalarSquareMatrix>& result = tresult.ref();
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
     // Calculate tangent field
-    // if (dict().lookup("numericalTangent"))
     {
         // Lookup gradient of displacement
         const surfaceTensorField& gradDRef =
@@ -617,12 +607,18 @@ Foam::GuccioneElastic::materialTangentField() const
             // Insert tangent component
             forAll(tangCmptI, faceI)
             {
-                result[faceI](XX, cmptI) = tangCmptI[faceI][XX];
-                result[faceI](YY, cmptI) = tangCmptI[faceI][YY];
-                result[faceI](ZZ, cmptI) = tangCmptI[faceI][ZZ];
-                result[faceI](XY, cmptI) = tangCmptI[faceI][XY];
-                result[faceI](YZ, cmptI) = tangCmptI[faceI][YZ];
-                result[faceI](XZ, cmptI) = tangCmptI[faceI][XZ];
+                // Take a reference to the current tangent
+                mat66& curMatTan = matTan[faceI];
+
+                // Zero the tangent
+                curMatTan.clear();
+
+                curMatTan(XX, cmptI) = tangCmptI[faceI][XX];
+                curMatTan(YY, cmptI) = tangCmptI[faceI][YY];
+                curMatTan(ZZ, cmptI) = tangCmptI[faceI][ZZ];
+                curMatTan(XY, cmptI) = tangCmptI[faceI][XY];
+                curMatTan(YZ, cmptI) = tangCmptI[faceI][YZ];
+                curMatTan(XZ, cmptI) = tangCmptI[faceI][XZ];
             }
 
             forAll(tangCmpt.boundaryField(), patchI)
@@ -635,24 +631,24 @@ Foam::GuccioneElastic::materialTangentField() const
                 {
                     const label faceID = start + fI;
 
-                    result[faceID](XX, cmptI) = tangCmptI[fI][XX];
-                    result[faceID](YY, cmptI) = tangCmptI[fI][YY];
-                    result[faceID](ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    result[faceID](XY, cmptI) = tangCmptI[fI][XY];
-                    result[faceID](YZ, cmptI) = tangCmptI[fI][YZ];
-                    result[faceID](XZ, cmptI) = tangCmptI[fI][XZ];
+                    // Take a reference to the current tangent
+                    mat66& curMatTan = matTan[faceID];
+
+                    // Zero the tangent
+                    curMatTan.clear();
+
+                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
                 }
             }
         }
     }
-    // else // Analytical tangent
-    // {
-    //     notImplemented("Analytical tangent not implemented");
-    // }
-
-    return tresult;
 }
-#endif
+
 
 Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::bulkModulus() const
 {

@@ -58,10 +58,26 @@ struct mat66
     // Element access
     inline scalar& operator()(label i, label j)
     {
+#ifdef FULLDEBUG
+        if (i >= dim_ || j >= dim_)
+        {
+            FatalErrorInFunction
+                << "Out of bounds" << exit(FatalError);
+        }
+#endif
+
         return a_[i*dim_ + j];
     }
     inline const scalar& operator()(label i, label j) const
     {
+#ifdef FULLDEBUG
+        if (i >= dim_ || j >= dim_)
+        {
+            FatalErrorInFunction
+                << "Out of bounds" << exit(FatalError);
+        }
+#endif
+
         return a_[i*dim_ + j];
     }
 
