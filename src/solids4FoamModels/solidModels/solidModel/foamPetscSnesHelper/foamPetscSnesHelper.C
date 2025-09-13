@@ -22,12 +22,14 @@ License
 #include "foamPetscSnesHelper.H"
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
-#include "symmetryPlaneFvPatchFields.H"
 #include "leastSquaresVectors.H"
 #include "fvm.H"
 #include "IFstream.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlaneFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -170,22 +172,32 @@ namespace Foam
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 
-const Enum<foamPetscSnesHelper::solutionLocation>
-foamPetscSnesHelper::solutionLocationNames_
-({
+#ifdef OPENFOAM_NOT_EXTEND
+    const Enum<foamPetscSnesHelper::solutionLocation>
+    foamPetscSnesHelper::solutionLocationNames_
+    ({
+        {
+            foamPetscSnesHelper::solutionLocation::CELLS,
+            "cells"
+        },
+        {
+            foamPetscSnesHelper::solutionLocation::POINTS,
+            "points"
+        },
+        {
+            foamPetscSnesHelper::solutionLocation::NONE,
+            "none"
+        },
+    });
+#else
+    template<>
+    const char* NamedEnum<foamPetscSnesHelper::solutionLocation, 3>::names[] =
     {
-        foamPetscSnesHelper::solutionLocation::CELLS,
-        "cells"
-    },
-    {
-        foamPetscSnesHelper::solutionLocation::POINTS,
-        "points"
-    },
-    {
-        foamPetscSnesHelper::solutionLocation::NONE,
-        "none"
-    },
-});
+     	"cells",
+        "points",
+	"none"
+    };
+#endif
 
 
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
@@ -220,7 +232,16 @@ void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
             // Take a copy of the faceCells (local IDs) and convert them to
             // global IDs
             labelList globalFaceCells(fp.faceCells());
+#ifdef OPENFOAM_NOT_EXTEND
             foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+#else
+            forAll(globalFaceCells, cI)
+            {
+                const label localCellID = globalFaceCells[cI];
+                globalFaceCells[cI] =
+                    foamPetscSnesHelper::globalCells().toGlobal(localCellID);
+            }
+#endif
 
             // Send global IDs to the neighbour proc
             const processorFvPatch& procPatch =
@@ -327,7 +348,11 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
         }
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     return leastSquaresS4fVectors::New(lsName, p.mesh(), useBoundaryFaceValues);
+#else
+    return leastSquaresS4fVectors::New(p.mesh(), useBoundaryFaceValues);
+#endif
 }
 
 
@@ -437,9 +462,17 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
         // Lookup the solver in fvSolution and check if PETSc is specified
         bool useDict = false;
+#ifdef OPENFOAM_NOT_EXTEND
         if (mesh.solversDict().found(fieldName))
         {
             const dictionary& solverDict = mesh.solverDict(fieldName);
+#else
+        if (mesh.solutionDict().subDict("solvers").found(fieldName))
+        {
+            const dictionary& solverDict =
+                mesh.solutionDict().solverDict(fieldName);
+#endif
+
             if (!solverDict.empty())
             {
                 if
@@ -464,8 +497,13 @@ foamPetscSnesHelper::foamPetscSnesHelper
             // We will load (push) the empty options database and populate it
             // with options from the the dictionary, then unload (pop) the
             // database
+#ifdef OPENFOAM_NOT_EXTEND
             const dictionary& optionsDict =
                 mesh.solverDict("D").subDict("options");
+#else
+            const dictionary& optionsDict =
+                mesh.solutionDict().solverDict(fieldName).subDict("options");
+#endif
 
             // Load (push) the database
             AssertPETSc(PetscOptionsPush(options_));
@@ -1018,7 +1056,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         else if
         (
             isA<symmetryPolyPatch>(fp.patch())
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(fp.patch())
+#endif
         )
         {
             // The delta in scalar p across the symmetry is zero by definition
@@ -1373,7 +1413,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         (
             patch.type() != "empty"
          && !isA<symmetryFvPatchField<vector>>(pU)
+#ifdef OPENFOAM_NOT_EXTEND
          && !isA<symmetryPlaneFvPatchField<vector>>(pU)
+#endif
          && !pU.fixesValue()
         )
         {

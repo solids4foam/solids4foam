@@ -64,7 +64,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         {
             // Obtain a pointer to the underlying scalar data in
             // diag[blockRowI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
             const scalar* curDiagPtr =
                 reinterpret_cast<const scalar*>(&diag[blockRowI]);
 #else
@@ -240,7 +240,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                 {
                     // Obtain a pointer to the underlying scalar data in
                     // intCoeffs[faceI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
                     const scalar* curIntCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (
@@ -281,7 +281,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                 {
                     // Obtain a pointer to the underlying scalar data in
                     // neiCoeffs[faceI] (assumes contiguous storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
                     const scalar* curNeiCoeffsPtr =
                         reinterpret_cast<const scalar*>
                         (
@@ -349,7 +349,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
     // Obtain a pointer to the underlying scalar array in vf
     // We assume vf is stored as contiguous data, i.e.
     // (vx1, vy1, vz1, vx2, vy2, vz2, ..., vxN, vyN, vzN)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
     scalar* vfPtr = reinterpret_cast<scalar*>(vf.begin());
 #else
     scalar* vfPtr = &vf[0].component(0);
@@ -446,7 +446,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
         // Obtain a pointer to the underlying scalar array in vf
         // We assume vf is stored as contiguous data, i.e.
         // (vx1, vy1, vz1, vx2, vy2, vz2, ..., vxN, vyN, vzN)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
         scalar* vfPtr = reinterpret_cast<scalar*>(vf.begin());
 #else
         scalar* vfPtr = &vf[0].component(0);
@@ -619,7 +619,7 @@ void foamPetscSnesHelper::InsertFieldComponents
 {
     // Get a pointer to the underlying scalar data of vf (assumes contiguous
     // storage)
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
     const scalar* vfPtr = reinterpret_cast<const scalar*>(vf.begin());
 #else
     const scalar* vfPtr = &vf[0].component(0);

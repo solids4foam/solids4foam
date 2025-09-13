@@ -15,36 +15,59 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
+Class
+    Foam::makeList
+
+Description
+      Provides a helper function Foam::makeList<T>() for constructing
+      Foam::List<T> objects from an initializer_list.
+
+      This utility enables code such as
+
+          labelList ids = Foam::makeList<label>({0,1,2});
+
+      which is supported in modern OpenFOAM via public initializer_list
+      constructors, but not in foam-extend. Using makeList() centralises
+      the difference and provides a single, portable syntax across all
+      OpenFOAM variants.
+
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
-#ifdef FOAMEXTEND
+#ifndef makeList_H
+#define makeList_H
 
-#include "componentMixedPointPatchFields.H"
-#include "pointPatchFields.H"
-#include "pointBoundaryMesh.H"
-#include "pointMesh.H"
-#include "addToRunTimeSelectionTable.H"
+#include "List.H"
+#include "label.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+    template<class T>
+    inline List<T> makeList(std::initializer_list<T> il)
+    {
+        List<T> L(il.size());
+        label i = 0;
 
-makeTemplatePointPatchTypeField                                               \
-(                                                                             \
-    pointPatchVectorField,                                                    \
-    componentMixedPointPatchVectorField                                       \
-);                                                                            \
+        for (const T& v : il)
+        {
+            L[i++] = v;
+        }
 
-// makePointPatchFields(componentMixed, pointPatch, PointPatch);
-// makePointPatchFields(slip, pointPatch, PointPatch);
+        return L; // NRVO/move on modern forks; fine for small lists regardless
+    }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
 
-#endif // FOAMEXTEND
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
 
 // ************************************************************************* //

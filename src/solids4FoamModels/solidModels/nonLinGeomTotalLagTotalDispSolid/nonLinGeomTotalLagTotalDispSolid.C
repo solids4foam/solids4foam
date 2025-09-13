@@ -26,6 +26,8 @@ License
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
+#include "makeList.H"
+#include "tmpRef.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -79,7 +81,7 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     if (solvePressure())
     {
         // Predict p using the dp/dt field
-        p() = p().oldTime() + dpdtPtr_.ref()*runTime().deltaT();
+        p() = p().oldTime() + autoPtrRef(dpdtPtr_)*runTime().deltaT();
         // p() = p().oldTime() + dpdt*runTime().deltaT()
         //     + 0.5*sqr(runTime().deltaT())*d2pdt2;
 
@@ -383,7 +385,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
 
         if (solvePressure())
@@ -391,7 +395,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             // Map the p field to the SNES solution vector
             foamPetscSnesHelper::InsertFieldComponents<scalar>
             (
-                p().primitiveFieldRef(),
+                p(),
                 foamPetscSnesHelper::solution(),
                 blockSize_ -1 // Location of first component
             );
@@ -409,7 +413,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     D().correctBoundaryConditions();
@@ -429,7 +435,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         p().correctBoundaryConditions();
 
         // Update dpdt
-        dpdtPtr_.ref() = fvc::ddt(p());
+        autoPtrRef(dpdtPtr_) = fvc::ddt(p());
     }
 
     // Interpolate cell displacements to vertices
@@ -504,7 +510,7 @@ const surfaceScalarField& nonLinGeomTotalLagTotalDispSolid::pDiffusivity() const
         makePDiffusivity();
     }
 
-    return pDiffusivityPtr_.ref();
+    return autoPtrRef(pDiffusivityPtr_);
 }
 
 
@@ -810,7 +816,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -915,7 +923,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     if (solvePressure())
@@ -925,7 +935,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Divided by bulkModulus form
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
-        const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omega(solidModelDict().lookup("omega"));
         scalarField pressureResidual
         (
           - p/kappa
@@ -964,7 +974,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -1013,7 +1025,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         //const volScalarField rKappa(1.0/mechanical().bulkModulus());
         const volScalarField rKappa(1.0/kappa);
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
-        const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omega(solidModelDict().lookup("omega"));
         {
             // Calculate pressure equation matrix
             //const dimensionedScalar one("one", dimless, 1);

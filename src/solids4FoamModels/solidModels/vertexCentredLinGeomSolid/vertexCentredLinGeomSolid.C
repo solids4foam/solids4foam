@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "vertexCentredLinGeomSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
@@ -1259,10 +1261,8 @@ label vertexCentredLinGeomSolid::formJacobian
     else
     {
         // Calculate the material tangent
-        const Field<scalarSquareMatrix> materialTangent
-        (
-            dualMechanicalPtr_().materialTangentFaceField()
-        );
+        List<mat66> materialTangent(mesh.nFaces);
+        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma
@@ -1461,5 +1461,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

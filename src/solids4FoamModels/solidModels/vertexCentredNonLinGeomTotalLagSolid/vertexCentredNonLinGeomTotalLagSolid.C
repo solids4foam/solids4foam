@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAM_NOT_EXTEND
 
 #include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
@@ -1784,6 +1784,6 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
 
 } // End namespace Foam
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

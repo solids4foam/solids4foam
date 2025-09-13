@@ -35,10 +35,16 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulentTransportModel.H"
-#include "CorrectPhi.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "turbulentTransportModel.H"
+    #include "CorrectPhi.H"
+#else
+    #include "turbulenceModel.H"
+#endif
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
+#include "tmpRef.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -166,7 +172,7 @@ public:
                         << "Pointer not set" << abort(FatalError);
                 }
 
-                return turbulence_.ref();
+                return autoPtrRef(turbulence_);
             }
 
             //- Reference to the fluid density

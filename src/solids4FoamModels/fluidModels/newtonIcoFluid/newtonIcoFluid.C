@@ -19,16 +19,17 @@ License
 
 #include "newtonIcoFluid.H"
 #include "addToRunTimeSelectionTable.H"
-#include "CorrectPhi.H"
 #include "fvc.H"
 #include "fvm.H"
-#include "constrainHbyA.H"
-#include "constrainPressure.H"
+//#include "constrainHbyA.H"
+//#include "constrainPressure.H"
 #include "findRefCell.H"
-#include "elasticSlipWallVelocityFvPatchVectorField.H"
-#include "elasticWallVelocityFvPatchVectorField.H"
-#include "elasticWallPressureFvPatchScalarField.H"
-#include "movingWallPressureFvPatchScalarField.H"
+// #include "elasticSlipWallVelocityFvPatchVectorField.H"
+// #include "elasticWallVelocityFvPatchVectorField.H"
+// #include "elasticWallPressureFvPatchScalarField.H"
+// #include "movingWallPressureFvPatchScalarField.H"
+#include "makeList.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -80,7 +81,7 @@ const surfaceScalarField& newtonIcoFluid::rAUf() const
         makeRAUf();
     }
 
-    return rAUfPtr_.ref();
+    return autoPtrRef(rAUfPtr_);
 }
 
 
@@ -91,7 +92,7 @@ surfaceScalarField& newtonIcoFluid::rAUf()
         makeRAUf();
     }
 
-    return rAUfPtr_.ref();
+    return autoPtrRef(rAUfPtr_);
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -135,7 +136,10 @@ newtonIcoFluid::newtonIcoFluid
 {
     setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
     //mesh().setFluxRequired(p().name());
+
+#ifdef OPENFOAM_NOT_EXTEND
     turbulence_->validate();
+#endif
 
     U().oldTime().oldTime();
 
@@ -185,7 +189,7 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    tvF.ref() = rho_.value()
+    tmpRef(tvF) = rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
@@ -202,7 +206,7 @@ tmp<scalarField> newtonIcoFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF.ref() = rho_.value()*p().boundaryField()[patchID];
+    tmpRef(tpF) = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -227,10 +231,10 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
     const vectorField deformedNf(deformedSf/mag(deformedSf));
     const tensorField& gradU = this->gradU().boundaryField()[patchID];
 
-    tvF.ref() = rho_.value()*deformedNf & (nuEff*invFm.T() & gradU);
+    tmpRef(tvF) = rho_.value()*deformedNf & (nuEff*invFm.T() & gradU);
 
     // Deformed mesh
-    // tvF.ref() = rho_.value()
+    // tmpRef(tvF) = rho_.value()
     //    *(
     //         mesh().boundary()[patchID].nf()
     //       & (-turbulence_->devReff()().boundaryField()[patchID])
@@ -280,7 +284,11 @@ bool newtonIcoFluid::evolve()
     // }
 
     // Update the mesh
+#ifdef OPENFOAM_NOT_EXTEND
     mesh.controlledUpdate();
+#else
+    mesh.update();
+#endif
 
     // Update the flux
     phi = fvc::interpolate(U) & mesh.Sf();
@@ -306,10 +314,12 @@ bool newtonIcoFluid::evolve()
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         xx,
-        U.primitiveFieldRef(),
+        U,
         0, // Location of U
         blockSize_,
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     U.correctBoundaryConditions();
@@ -319,7 +329,7 @@ bool newtonIcoFluid::evolve()
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
     (
         xx,
-        p.primitiveFieldRef(),
+        p,
         blockSize_ - 1, // Location of p component
         blockSize_
     );
@@ -401,7 +411,9 @@ label newtonIcoFluid::formResidual
         x,
         UI,
         0, // Location of first UI component
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -425,7 +437,11 @@ label newtonIcoFluid::formResidual
     {
         if (mesh.boundaryMesh()[patchI].type() == "wall")
         {
+#ifdef OPENFOAM_NOT_EXTEND
             phi.boundaryFieldRef()[patchI] = 0.0;
+#else
+            phi.boundaryField()[patchI] = 0.0;
+#endif
         }
     }
 
@@ -478,7 +494,9 @@ label newtonIcoFluid::formResidual
         residual,
         f,
         0, // Location of first component
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Calculate pressure equation residual
@@ -499,7 +517,7 @@ label newtonIcoFluid::formResidual
 
         if (stabType == "laplacian")
         {
-            const dimensionedScalar omega("omega", fluidProperties());
+            const dimensionedScalar omega(fluidProperties().lookup("omega"));
 
             pressureResidual +=
                 fvc::laplacian
@@ -509,7 +527,7 @@ label newtonIcoFluid::formResidual
         }
         else if (stabType == "RhieChow")
         {
-            const dimensionedScalar scaleFactor("scaleFactor", stabDict);
+            const dimensionedScalar scaleFactor(stabDict.lookup("scaleFactor"));
 
             fvVectorMatrix UEqn
             (
@@ -531,12 +549,12 @@ label newtonIcoFluid::formResidual
         {
             const dimensionedScalar innerScaleFactor
             (
-                "innerScaleFactor", stabDict
+                stabDict.lookup("innerScaleFactor")
             );
 
             const dimensionedScalar outerScaleFactor
             (
-                "outerScaleFactor", stabDict
+                stabDict.lookup("outerScaleFactor")
             );
 
             pressureResidual -=
@@ -624,7 +642,9 @@ label newtonIcoFluid::formResidual
         x,
         UI,
         0, // Location of first UI component
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -750,7 +770,9 @@ label newtonIcoFluid::formResidual
         residual,
         f,
         0, // Location of first component
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Deformed configuration
@@ -775,7 +797,7 @@ label newtonIcoFluid::formResidual
     // const surfaceVectorField gradpf(fvc::interpolate(fvc::grad(p)));
     // const surfaceScalarField snGradp(fvc::snGrad(p));
 
-    const dimensionedScalar omega("omega", fluidProperties());
+    const dimensionedScalar omega(fluidProperties().lookup("omega"));
     const scalar localReRef(readScalar(fluidProperties().lookup("localReRef")));
     const scalar omegaExponent
     (
@@ -857,7 +879,9 @@ label newtonIcoFluid::formJacobian
         x,
         UI,
         0, // Location of first component
-        fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -929,12 +953,12 @@ label newtonIcoFluid::formJacobian
 
         if (stabType == "laplacian")
         {
-            const dimensionedScalar omega("omega", fluidProperties());
+            const dimensionedScalar omega(fluidProperties().lookup("omega"));
             rAUf() = omega/sqr(mesh.deltaCoeffs());
         }
         else if (stabType == "RhieChow")
         {
-            const dimensionedScalar scaleFactor("scaleFactor", stabDict);
+            const dimensionedScalar scaleFactor(stabDict.lookup("scaleFactor"));
 
             UEqn -= fvm::div(phi(), U);
 
@@ -944,12 +968,12 @@ label newtonIcoFluid::formJacobian
         {
             const dimensionedScalar innerScaleFactor
             (
-                "innerScaleFactor", stabDict
+                stabDict.lookup("innerScaleFactor")
             );
 
             const dimensionedScalar outerScaleFactor
             (
-                "outerScaleFactor", stabDict
+                stabDict.lookup("outerScaleFactor")
             );
 
             rAUf() = outerScaleFactor*innerScaleFactor/sqr(mesh.deltaCoeffs());
@@ -980,7 +1004,11 @@ label newtonIcoFluid::formJacobian
         //     << " to be diagonal" << endl;
 
         // Set the off-diagonal to zero for cell pRefCell
+#ifdef OPENFOAM_NOT_EXTEND
         pEqn.setValues(labelList(1, pRefCell_), 0.0);
+#else
+        pEqn.setValues(labelList(1, pRefCell_), scalarField(1, 0.0));
+#endif
 
         // Set the diagonal to unity for cell pRefCell
         pEqn.diag()[pRefCell_] = -1.0;

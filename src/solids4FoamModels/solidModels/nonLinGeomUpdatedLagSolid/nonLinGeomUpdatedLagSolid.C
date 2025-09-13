@@ -26,6 +26,8 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "makeList.H"
+#include "tmpRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -295,7 +297,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -313,7 +317,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         DD().internalField(),
 #endif
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     DD().correctBoundaryConditions();
@@ -634,7 +640,9 @@ label nonLinGeomUpdatedLagSolid::formResidual
         x,
         DDI,
         0,                          // Location of first DDI component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -720,7 +728,9 @@ label nonLinGeomUpdatedLagSolid::formResidual
         residual,
         f,
         0,                          // Location of first DI component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     if (solvePressure())
@@ -746,7 +756,9 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         x,
         DDI,
         0,                          // Location of first DDI component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
