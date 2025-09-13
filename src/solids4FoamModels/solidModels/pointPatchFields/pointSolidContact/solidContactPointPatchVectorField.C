@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "solidContactPointPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
@@ -25,9 +27,7 @@ License
 #include "pointMesh.H"
 #include "lookupSolidModel.H"
 #include "demandDrivenData.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "Time.H"
-#endif
+#include "Time.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1500,5 +1500,7 @@ makePointPatchTypeField
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif //  OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

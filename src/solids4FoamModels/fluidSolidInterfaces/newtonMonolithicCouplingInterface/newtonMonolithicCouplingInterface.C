@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "newtonMonolithicCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "directMapInterfaceToInterfaceMapping.H"
@@ -2831,5 +2833,7 @@ label newtonMonolithicCouplingInterface::formJacobian
 } // End namespace fluidSolidInterfaces
 
 } // End namespace Foam
+
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

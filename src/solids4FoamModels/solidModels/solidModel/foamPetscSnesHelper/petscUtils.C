@@ -44,6 +44,7 @@ void Foam::PetscUtils::setFlags
     const bool verbose
 )
 {
+#ifdef OPENFOAM_NOT_EXTEND
     for (const entry& e : dict)
     {
         if (e.isDict())
@@ -81,6 +82,41 @@ void Foam::PetscUtils::setFlags
             AssertPETSc(PetscOptionsSetValue(NULL, key.c_str(), val.c_str()));
         }
     }
+#else // FOAMEXTEND
+    // foam-extend: iterate with FOAM's list iterator macro
+    forAllConstIter(dictionary, dict, iter)
+    {
+        const entry& e = iter();
+
+        if (e.isDict())
+        {
+            WarningInFunction
+                << "Skipping sub-dict " << e.keyword() << " in " << dict.name()
+                << endl;
+            continue;
+        }
+
+        const word key = '-' + prefix + e.keyword();
+
+        // In foam-extend, use the token stream
+        if (!e.isStream() || e.stream().size() == 0)
+        {
+            // No value -> PETSc flag
+            if (verbose) Info<< key << nl;
+            AssertPETSc(PetscOptionsSetValue(NULL, key.c_str(), nullptr));
+        }
+        else
+        {
+            // Read the first token as the value
+            // stream API is non-const
+            ITstream& is = const_cast<ITstream&>(e.stream());
+            word val;
+            is >> val;   // assume single-token PETSc option values
+            if (verbose) Info<< key << ' ' << val << nl;
+            AssertPETSc(PetscOptionsSetValue(NULL, key.c_str(), val.c_str()));
+        }
+    }
+#endif // FOAMEXTEND
 }
 
 

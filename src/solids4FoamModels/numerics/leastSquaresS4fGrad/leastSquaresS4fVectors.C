@@ -107,7 +107,7 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
             false
         ),
         mesh,
-        dimensionedVector(dimless/dimLength, Zero)
+        dimensionedVector("zero", dimless/dimLength, vector::zero)
     ),
     nVectors_
     (
@@ -121,7 +121,7 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
             false
         ),
         mesh,
-        dimensionedVector(dimless/dimLength, Zero)
+        dimensionedVector("zero", dimless/dimLength, vector::zero)
     )
 {
     calcLeastSquaresVectors();

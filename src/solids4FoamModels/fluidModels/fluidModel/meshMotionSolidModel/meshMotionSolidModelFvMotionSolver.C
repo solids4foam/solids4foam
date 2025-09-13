@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "meshMotionSolidModelFvMotionSolver.H"
 #include "motionInterpolation.H"
 #include "motionDiffusivity.H"
@@ -150,5 +152,6 @@ void Foam::meshMotionSolidModelFvMotionSolver::updateMesh
     displacementMotionSolver::updateMesh(mpm);
 }
 
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //
