@@ -43,6 +43,7 @@ Author
 #include "scalarMatrices.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "meshDual.H"
+#include "matNN.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
