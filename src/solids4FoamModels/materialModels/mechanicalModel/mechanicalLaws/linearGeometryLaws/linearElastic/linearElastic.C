@@ -22,6 +22,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "pointFieldFunctions.H"
+#include "tmpRef.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -188,11 +189,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
+    tmpRef(tresult).correctBoundaryConditions();
 
     return tresult;
 }
@@ -218,11 +215,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::shearModulus() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
+    tmpRef(tresult).correctBoundaryConditions();
 
     return tresult;
 }

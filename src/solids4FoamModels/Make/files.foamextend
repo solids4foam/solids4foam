@@ -11,20 +11,20 @@ solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSo
 solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
 solidModels/kirchhoffPlateSolid/clampedMoment/clampedMomentFaPatchScalarField.C
 solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatchScalarField.C
-solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
+/*
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
-solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
 solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
+*/
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-/*solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
-solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C*/
+solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -33,7 +33,6 @@ fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
-/*fluidModels/vertexCentredFluid/vertexCentredFluid.C*/
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
@@ -213,8 +212,8 @@ numerics/globalPolyPatch/globalPolyPatch.C
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
-numerics/leastSquaresS4fGrad/leastSquaresS4fGrads.C
-numerics/leastSquaresS4fGrad/leastSquaresS4fVectors.C
+/*numerics/leastSquaresS4fGrad/leastSquaresS4fGrads.C
+numerics/leastSquaresS4fGrad/leastSquaresS4fVectors.C*/
 numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
@@ -224,9 +223,7 @@ numerics/meshDual/meshDual.C
 numerics/meshDual/dualMeshToMeshMap.C
 numerics/meshDual/meshDualiser.C
 numerics/minEdgeLength/minEdgeLength.C
-/*numerics/multiplyCoeff/multiplyCoeff.C
-numerics/multiplyCoeff/multiplyCoeffRectMat.C
-numerics/multiplyCoeff/multiplyCoeffExtended.C*/
+numerics/multiplyCoeff/multiplyCoeff.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
@@ -237,13 +234,9 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 /*numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
-numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
+numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C*/
 numerics/vfvCellPoint/vfvcCellPoint.C
-numerics/vfvCellPoint/vfvmCellPoint.C*/
-
-/*numerics/sparseMatrix/sparseMatrix.C
-numerics/sparseMatrix/SparseMatrixTemplates.C
-numerics/sparseMatrix/sparseMatrixTools.C*/
+numerics/vfvCellPoint/vfvmCellPoint.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C

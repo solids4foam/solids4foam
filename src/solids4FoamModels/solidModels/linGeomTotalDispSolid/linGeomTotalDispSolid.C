@@ -25,6 +25,8 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "makeList.H"
+#include "tmpRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -319,7 +321,9 @@ bool linGeomTotalDispSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -334,7 +338,9 @@ bool linGeomTotalDispSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     D().correctBoundaryConditions();
@@ -522,7 +528,7 @@ const surfaceScalarField& linGeomTotalDispSolid::pDiffusivity() const
         makePDiffusivity();
     }
 
-    return pDiffusivityPtr_.ref();
+    return autoPtrRef(pDiffusivityPtr_);
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -841,7 +847,9 @@ label linGeomTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -922,7 +930,9 @@ label linGeomTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     if (solvePressure())
@@ -983,7 +993,9 @@ label linGeomTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
