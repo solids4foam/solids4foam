@@ -1261,10 +1261,8 @@ label vertexCentredLinGeomSolid::formJacobian
     else
     {
         // Calculate the material tangent
-        const Field<scalarSquareMatrix> materialTangent
-        (
-            dualMechanicalPtr_().materialTangentFaceField()
-        );
+        List<mat66> materialTangent(mesh.nFaces);
+        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma

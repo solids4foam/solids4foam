@@ -36,7 +36,7 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const List<scalarSquareMatrix>& materialTangentField,
+    const List<mat66>& materialTangentField,
     const scalar zeta,
     const bool flipSign
 )
@@ -90,8 +90,7 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const scalarSquareMatrix& materialTangent =
-            materialTangentField[dualFaceI];
+        const mat66& materialTangent = materialTangentField[dualFaceI];
 
         // Points in cellID
         const labelList& curCellPoints = cellPoints[cellID];
@@ -271,8 +270,8 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const List<scalarSquareMatrix>& materialTangentField,
-    const List<RectangularMatrix<scalar>>& geometricStiffnessField,
+    const List<mat66>& materialTangentField,
+    const List<mat39>& geometricStiffnessField,
     const symmTensorField& sigmaField,
     const tensorField& dualGradDField,
     const scalar zeta,
@@ -328,12 +327,10 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const scalarSquareMatrix& materialTangent =
-            materialTangentField[dualFaceI];
+        const mat66& materialTangent = materialTangentField[dualFaceI];
 
         // Sensitivity term at the dual mesh face
-        const RectangularMatrix<scalar>& geometricStiffness =
-            geometricStiffnessField[dualFaceI];
+        const mat39& geometricStiffness = geometricStiffnessField[dualFaceI];
 
         // Sigma at the dual mesh face
         const symmTensor sigma = sigmaField[dualFaceI];

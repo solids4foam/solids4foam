@@ -265,20 +265,11 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
-Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
+Foam::mat66 Foam::linearElastic::materialTangent() const
 {
-    // Prepare 6x6 tangent matrix
-    scalarSquareMatrix tang(6, 0.0);
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const auto& matTang = tang;
-#else
-    // Create a function to mimic matrix access operator
-    auto&& matTang = [&](const label i, const label j) -> decltype(auto)
-    {
-        return tang[i][j];
-    };
-#endif
+    // Prepare 6x6 tangent matrix and fill with zeros
+    mat66 matTan;
+    matTan.clear();
 
     // Define matrix indices for readability
     const label XX = symmTensor::XX;
@@ -293,23 +284,23 @@ Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
     const scalar twoMuLambda = 2*mu + lambda;
 
     // Set components
-    matTang(XX, XX) = twoMuLambda;
-    matTang(XX, YY) = lambda;
-    matTang(XX, ZZ) = lambda;
+    matTan(XX, XX) = twoMuLambda;
+    matTan(XX, YY) = lambda;
+    matTan(XX, ZZ) = lambda;
 
-    matTang(YY, XX) = lambda;
-    matTang(YY, YY) = twoMuLambda;
-    matTang(YY, ZZ) = lambda;
+    matTan(YY, XX) = lambda;
+    matTan(YY, YY) = twoMuLambda;
+    matTan(YY, ZZ) = lambda;
 
-    matTang(ZZ, XX) = lambda;
-    matTang(ZZ, YY) = lambda;
-    matTang(ZZ, ZZ) = twoMuLambda;
+    matTan(ZZ, XX) = lambda;
+    matTan(ZZ, YY) = lambda;
+    matTan(ZZ, ZZ) = twoMuLambda;
 
-    matTang(XY, XY) = mu;
-    matTang(YZ, YZ) = mu;
-    matTang(XZ, XZ) = mu;
+    matTan(XY, XY) = mu;
+    matTan(YZ, YZ) = mu;
+    matTan(XZ, XZ) = mu;
 
-    return tang;
+    return matTan;
 }
 
 

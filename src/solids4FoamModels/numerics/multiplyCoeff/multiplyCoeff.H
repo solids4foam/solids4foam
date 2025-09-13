@@ -35,21 +35,13 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#include "RectangularMatrix.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "scalarMatrices.H"
-#else
-    #include "scalarSquareMatrix.H"
-#endif
+#include "mat66.H"
+#include "mat39.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
-#ifdef FOAMEXTEND
-    typedef RectangularMatrix<scalar> scalarRectangularMatrix;
-#endif
 
     // This function multiplies a vector by a 4th order tensor by a third
     // order tensor as encountered in the assembling of block coefficients
@@ -63,7 +55,7 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        const scalarSquareMatrix& C,
+        const mat66& C,
         const vector& g
     );
 
@@ -76,8 +68,8 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        const scalarSquareMatrix& C,
-        const scalarRectangularMatrix& G,
+        const mat66& C,
+        const mat39& G,
         const symmTensor& sigma,
         const vector& g
     );
@@ -88,7 +80,7 @@ namespace Foam
     void multiplyCoeff
     (
         vector& coeff,
-        const scalarRectangularMatrix& G,
+        const mat39& G,
         const vector& gradP,
         const vector& g
     );

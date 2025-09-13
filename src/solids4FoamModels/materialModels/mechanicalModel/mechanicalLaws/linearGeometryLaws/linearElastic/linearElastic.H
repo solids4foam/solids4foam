@@ -113,8 +113,8 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-        //- Material tangent for Newton Raphson loop
-        virtual scalarSquareMatrix materialTangent() const;
+        //- Material tangent
+        virtual mat66 materialTangent() const;
 
         //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
         virtual const dimensionedScalar& mu() const;

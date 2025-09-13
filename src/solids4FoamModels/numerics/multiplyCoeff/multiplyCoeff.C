@@ -25,7 +25,7 @@ void Foam::multiplyCoeff
 (
     tensor& coeff,
     const vector& Sf,
-    const scalarSquareMatrix& Cmat,
+    const mat66& C,
     const vector& g
 )
 {
@@ -47,16 +47,6 @@ void Foam::multiplyCoeff
     const label XY = symmTensor::XY;
     const label YZ = symmTensor::YZ;
     const label XZ = symmTensor::XZ;
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const auto& C = Cmat;
-#else
-    // Create a function to mimic matrix access operator
-    auto&& C = [&](const label i, const label j) -> decltype(auto)
-    {
-        return Cmat[i][j];
-    };
-#endif
 
     // Index notation
     // coeff_ij = Sf_m C_mikl g_k delta_lj
@@ -387,47 +377,30 @@ void Foam::multiplyCoeff
 (
     tensor& coeff,
     const vector& Sf,
-    const scalarSquareMatrix& Cmat,
-    const scalarRectangularMatrix& Gmat,
+    const mat66& C,
+    const mat39& G,
     const symmTensor& sigma,
     const vector& g
 )
 {
 #ifdef FULLDEBUG
     // Check the dimensions of C are correct
-    if (Cmat.m() != 6 || Cmat.n() != 6)
+    if (C.m() != 6 || C.n() != 6)
     {
         FatalError
             << "The material tangent matrix C has the wrong dimensions!" << nl
-            << "It should be 6 x 6 but it is " << Cmat.m() << " x " << Cmat.n()
+            << "It should be 6 x 6 but it is " << C.m() << " x " << C.n()
             << abort(FatalError);
     }
 
     // Check the dimensions of G are correct
-    if (Gmat.m() != 3 || Gmat.n() != 9)
+    if (G.m() != 3 || G.n() != 9)
     {
         FatalError
             << "The geometric stiffness G has the wrong dimensions!" << nl
-            << "It should be 3 x 9 but it is " << Gmat.m() << " x " << Gmat.n()
+            << "It should be 3 x 9 but it is " << G.m() << " x " << G.n()
             << abort(FatalError);
     }
-#endif
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const auto& C = Cmat;
-    const auto& G = Gmat;
-#else
-    // Create functions to mimic matrix access operator
-
-    auto&& C = [&](const label i, const label j) -> decltype(auto)
-    {
-        return Cmat[i][j];
-    };
-
-    auto&& G = [&](const label i, const label j) -> decltype(auto)
-    {
-        return Gmat[i][j];
-    };
 #endif
 
     // Define matrix indices for readability (for C only)
@@ -849,30 +822,20 @@ void Foam::multiplyCoeff
 void Foam::multiplyCoeff
 (
     vector& coeff,
-    const scalarRectangularMatrix& Gmat,
+    const mat39& G,
     const vector& gradP,
     const vector& g
 )
 {
 #ifdef FULLDEBUG
     // Check the dimensions of G are correct
-    if (Gmat.m() != 3 || Gmat.n() != 9)
+    if (G.m() != 3 || G.n() != 9)
     {
         FatalError
             << "The geometric stiffness G has the wrong dimensions!" << nl
             << "It should be 3 x 9 but it is " << Gmat.m() << " x " << Gmat.n()
             << abort(FatalError);
     }
-#endif
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const auto& G = Gmat;
-#else
-    // Create functions to mimic matrix access operator
-    auto&& G = [&](const label i, const label j) -> decltype(auto)
-    {
-        return Gmat[i][j];
-    };
 #endif
 
     // Index notation
