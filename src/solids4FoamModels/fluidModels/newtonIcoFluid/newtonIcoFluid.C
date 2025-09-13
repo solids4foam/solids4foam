@@ -527,7 +527,7 @@ label newtonIcoFluid::formResidual
         }
         else if (stabType == "RhieChow")
         {
-            const dimensionedScalar scaleFactor(stabDict.lookup("scaleFactor"));
+            const scalar scaleFactor(readScalar(stabDict.lookup("scaleFactor")));
 
             fvVectorMatrix UEqn
             (
@@ -958,7 +958,7 @@ label newtonIcoFluid::formJacobian
         }
         else if (stabType == "RhieChow")
         {
-            const dimensionedScalar scaleFactor(stabDict.lookup("scaleFactor"));
+            const scalar scaleFactor(readScalar(stabDict.lookup("scaleFactor")));
 
             UEqn -= fvm::div(phi(), U);
 

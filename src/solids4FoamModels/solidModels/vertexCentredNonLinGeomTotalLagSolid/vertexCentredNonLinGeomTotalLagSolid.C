@@ -468,28 +468,19 @@ void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
 }
 
 
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
+void vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 (
-    const surfaceVectorField& SfUndef, //Undeformed surface area vector field
-    const surfaceTensorField& gradDRef //Reference gradD
+    List<mat39>& geometricStiffness,
+    const surfaceVectorField& SfUndef, // Undeformed surface area vector field
+    const surfaceTensorField& gradDRef // Reference gradD
 ) const
 {
-    // Prepare tmp field
-    // Todo: switch to 3 x 6 matrix instead of 3 x 9
-    tmp<Field<RectangularMatrix<scalar>>> tresult
-    (
-        new Field<RectangularMatrix<scalar>>
-        (
-            dualMesh().nFaces(), RectangularMatrix<scalar>(3, 9, 0.0)
-        )
-    );
-    Field<RectangularMatrix<scalar>>& result = tresult.ref();
+    geometricStiffness.resize(mesh().nFaces());
 
     // For small strain the geometric stiffness is zero
     if (!useGeometricStiffness_)
     {
-        return tresult;
+        return;
     }
 
     // Calculate surface vector as per the total Lagrangian formulation
@@ -539,59 +530,62 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
         // Insert each component
         forAll(tangCmptI, faceI)
         {
+            mat39& curGeomStiff = geometricStiffness[faceI];
+            curGeomStiff.clear();
+
             if (cmptI == tensor::XX)
             {
-                result[faceI](0,0) = tangCmptI[faceI][0];
-                result[faceI](1,0) = tangCmptI[faceI][1];
-                result[faceI](2,0) = tangCmptI[faceI][2];
+                curGeomStiff(0,0) = tangCmptI[faceI][0];
+                curGeomStiff(1,0) = tangCmptI[faceI][1];
+                curGeomStiff(2,0) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::XY)
             {
-                result[faceI](0,1) = tangCmptI[faceI][0];
-                result[faceI](1,1) = tangCmptI[faceI][1];
-                result[faceI](2,1) = tangCmptI[faceI][2];
+                curGeomStiff(0,1) = tangCmptI[faceI][0];
+                curGeomStiff(1,1) = tangCmptI[faceI][1];
+                curGeomStiff(2,1) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::XZ)
             {
-                result[faceI](0,2) = tangCmptI[faceI][0];
-                result[faceI](1,2) = tangCmptI[faceI][1];
-                result[faceI](2,2) = tangCmptI[faceI][2];
+                curGeomStiff(0,2) = tangCmptI[faceI][0];
+                curGeomStiff(1,2) = tangCmptI[faceI][1];
+                curGeomStiff(2,2) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YX)
             {
-                result[faceI](0,3) = tangCmptI[faceI][0];
-                result[faceI](1,3) = tangCmptI[faceI][1];
-                result[faceI](2,3) = tangCmptI[faceI][2];
+                curGeomStiff(0,3) = tangCmptI[faceI][0];
+                curGeomStiff(1,3) = tangCmptI[faceI][1];
+                curGeomStiff(2,3) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YY)
             {
-                result[faceI](0,4) = tangCmptI[faceI][0];
-                result[faceI](1,4) = tangCmptI[faceI][1];
-                result[faceI](2,4) = tangCmptI[faceI][2];
+                curGeomStiff(0,4) = tangCmptI[faceI][0];
+                curGeomStiff(1,4) = tangCmptI[faceI][1];
+                curGeomStiff(2,4) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YZ)
             {
-                result[faceI](0,5) = tangCmptI[faceI][0];
-                result[faceI](1,5) = tangCmptI[faceI][1];
-                result[faceI](2,5) = tangCmptI[faceI][2];
+                curGeomStiff(0,5) = tangCmptI[faceI][0];
+                curGeomStiff(1,5) = tangCmptI[faceI][1];
+                curGeomStiff(2,5) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZX)
             {
-                result[faceI](0,6) = tangCmptI[faceI][0];
-                result[faceI](1,6) = tangCmptI[faceI][1];
-                result[faceI](2,6) = tangCmptI[faceI][2];
+                curGeomStiff(0,6) = tangCmptI[faceI][0];
+                curGeomStiff(1,6) = tangCmptI[faceI][1];
+                curGeomStiff(2,6) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZY)
             {
-                result[faceI](0,7) = tangCmptI[faceI][0];
-                result[faceI](1,7) = tangCmptI[faceI][1];
-                result[faceI](2,7) = tangCmptI[faceI][2];
+                curGeomStiff(0,7) = tangCmptI[faceI][0];
+                curGeomStiff(1,7) = tangCmptI[faceI][1];
+                curGeomStiff(2,7) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZZ)
             {
-                result[faceI](0,8) = tangCmptI[faceI][0];
-                result[faceI](1,8) = tangCmptI[faceI][1];
-                result[faceI](2,8) = tangCmptI[faceI][2];
+                curGeomStiff(0,8) = tangCmptI[faceI][0];
+                curGeomStiff(1,8) = tangCmptI[faceI][1];
+                curGeomStiff(2,8) = tangCmptI[faceI][2];
             }
         }
 
@@ -605,65 +599,66 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
             {
                 const label faceID = start + fI;
 
+                mat39& curGeomStiff = geometricStiffness[faceID];
+                curGeomStiff.clear();
+
                 if (cmptI == tensor::XX)
                 {
-                    result[faceID](0,0) = tangCmptI[fI][0];
-                    result[faceID](1,0) = tangCmptI[fI][1];
-                    result[faceID](2,0) = tangCmptI[fI][2];
+                    curGeomStiff(0,0) = tangCmptI[fI][0];
+                    curGeomStiff(1,0) = tangCmptI[fI][1];
+                    curGeomStiff(2,0) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::XY)
                 {
-                    result[faceID](0,1) = tangCmptI[fI][0];
-                    result[faceID](1,1) = tangCmptI[fI][1];
-                    result[faceID](2,1) = tangCmptI[fI][2];
+                    curGeomStiff(0,1) = tangCmptI[fI][0];
+                    curGeomStiff(1,1) = tangCmptI[fI][1];
+                    curGeomStiff(2,1) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::XZ)
                 {
-                    result[faceID](0,2) = tangCmptI[fI][0];
-                    result[faceID](1,2) = tangCmptI[fI][1];
-                    result[faceID](2,2) = tangCmptI[fI][2];
+                    curGeomStiff(0,2) = tangCmptI[fI][0];
+                    curGeomStiff(1,2) = tangCmptI[fI][1];
+                    curGeomStiff(2,2) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YX)
                 {
-                    result[faceID](0,3) = tangCmptI[fI][0];
-                    result[faceID](1,3) = tangCmptI[fI][1];
-                    result[faceID](2,3) = tangCmptI[fI][2];
+                    curGeomStiff(0,3) = tangCmptI[fI][0];
+                    curGeomStiff(1,3) = tangCmptI[fI][1];
+                    curGeomStiff(2,3) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YY)
                 {
-                    result[faceID](0,4) = tangCmptI[fI][0];
-                    result[faceID](1,4) = tangCmptI[fI][1];
-                    result[faceID](2,4) = tangCmptI[fI][2];
+                    curGeomStiff(0,4) = tangCmptI[fI][0];
+                    curGeomStiff(1,4) = tangCmptI[fI][1];
+                    curGeomStiff(2,4) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YZ)
                 {
-                    result[faceID](0,5) = tangCmptI[fI][0];
-                    result[faceID](1,5) = tangCmptI[fI][1];
-                    result[faceID](2,5) = tangCmptI[fI][2];
+                    curGeomStiff(0,5) = tangCmptI[fI][0];
+                    curGeomStiff(1,5) = tangCmptI[fI][1];
+                    curGeomStiff(2,5) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZX)
                 {
-                    result[faceID](0,6) = tangCmptI[fI][0];
-                    result[faceID](1,6) = tangCmptI[fI][1];
-                    result[faceID](2,6) = tangCmptI[fI][2];
+                    curGeomStiff(0,6) = tangCmptI[fI][0];
+                    curGeomStiff(1,6) = tangCmptI[fI][1];
+                    curGeomStiff(2,6) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZY)
                 {
-                    result[faceID](0,7) = tangCmptI[fI][0];
-                    result[faceID](1,7) = tangCmptI[fI][1];
-                    result[faceID](2,7) = tangCmptI[fI][2];
+                    curGeomStiff(0,7) = tangCmptI[fI][0];
+                    curGeomStiff(1,7) = tangCmptI[fI][1];
+                    curGeomStiff(2,7) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZZ)
                 {
-                    result[faceID](0,8) = tangCmptI[fI][0];
-                    result[faceID](1,8) = tangCmptI[fI][1];
-                    result[faceID](2,8) = tangCmptI[fI][2];
+                    curGeomStiff(0,8) = tangCmptI[fI][0];
+                    curGeomStiff(1,8) = tangCmptI[fI][1];
+                    curGeomStiff(2,8) = tangCmptI[fI][2];
                 }
             }
         }
     }
-
-    return tresult;
 }
 
 
@@ -1603,19 +1598,15 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     else
     {
         // Calculate the material tangent
-        const Field<scalarSquareMatrix> materialTangent
-        (
-            dualMechanicalPtr_().materialTangentFaceField()
-        );
+        List<mat66> materialTangent(mesh.nFaces());
+        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // The dual mesh undeformed area vectors
         const surfaceVectorField& dualSf = dualMesh().Sf();
 
         // Calculate the geometric stiffness
-        const Field<RectangularMatrix<scalar>> geometricStiffness
-        (
-            geometricStiffnessField(dualSf, dualGradDf_)
-        );
+        List<mat39> geometricStiffness(mesh.nFaces());
+        geometricStiffnessField(geometricStiffness, dualSf, dualGradDf_);
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma

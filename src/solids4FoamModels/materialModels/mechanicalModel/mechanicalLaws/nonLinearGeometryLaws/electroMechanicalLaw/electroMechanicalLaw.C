@@ -80,13 +80,10 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::electroMechanicalLaw::materialTangentField() const
+void Foam::electroMechanicalLaw::materialTangentField(List<mat66>& matTan) const
 {
-    return passiveMechLawPtr_->materialTangentField();
+    passiveMechLawPtr_->materialTangentField(matTan);
 }
-#endif
 
 
 Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::bulkModulus() const

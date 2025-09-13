@@ -91,6 +91,15 @@ class newtonMonolithicCouplingInterface
         //- Pointer to sub-matrices
         Mat* subMatsPtr_;
 
+        //- PETSc index set for the fluid unknowns
+        mutable IS isFluid_;
+
+        //- PETSc index set for the motion unknowns
+        mutable IS isMotion_;
+
+        //- PETSc index set for the solid unknowns
+        mutable IS isSolid_;
+
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
@@ -106,6 +115,42 @@ class newtonMonolithicCouplingInterface
 
 
     // Private Member Functions
+
+        //- Make the isFluid, isMotion and isSolid index sets
+        void makeIsFluidIsMotionIsSolid() const;
+
+        //- Return isFluid pointer
+        IS isFluid() const
+        {
+            if (isFluid_ == nullptr)
+            {
+                makeIsFluidIsMotionIsSolid();
+            }
+
+            return isFluid_;
+        }
+
+        //- Return isSolid pointer
+        IS isMotion() const
+        {
+            if (isMotion_ == nullptr)
+            {
+                makeIsFluidIsMotionIsSolid();
+            }
+
+            return isMotion_;
+        }
+
+        //- Return isSolid pointer
+        IS isSolid() const
+        {
+            if (isSolid_ == nullptr)
+            {
+                makeIsFluidIsMotionIsSolid();
+            }
+
+            return isSolid_;
+        }
 
         //- Return a reference to the mesh motion solver
         foamPetscSnesHelper& motion();
@@ -207,7 +252,10 @@ class newtonMonolithicCouplingInterface
         void resetFieldsToOldTime();
 
         //- Disallow default bitwise copy construct
-        newtonMonolithicCouplingInterface(const newtonMonolithicCouplingInterface&);
+        newtonMonolithicCouplingInterface
+        (
+            const newtonMonolithicCouplingInterface&
+        );
 
         //- Disallow default bitwise assignment
         void operator=(const newtonMonolithicCouplingInterface&);
@@ -242,6 +290,11 @@ public:
             // Free the array of Mat handles
             delete[] subMatsPtr_;
             subMatsPtr_ = nullptr;
+
+            // Free index sets
+            ISDestroy(&isFluid_);
+            ISDestroy(&isMotion_);
+            ISDestroy(&isSolid_);
         }
 
 
@@ -268,15 +321,15 @@ public:
             //  array) vector
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,        // Residual
+                const Vec x   // Solution
             );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,     // Jacobian
+                const Vec x  // Solution
             );
 };
 

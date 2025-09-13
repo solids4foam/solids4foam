@@ -50,6 +50,7 @@ SourceFiles
 #include "uniformDimensionedFields.H"
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
+#include "matNN.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif
@@ -231,9 +232,9 @@ private:
         //  nonlinearity
         // The undeformed surface areas and current displacement gradient are
         // required
-        tmp<Field<RectangularMatrix<scalar>>>
-        geometricStiffnessField
+        void geometricStiffnessField
         (
+            List<mat39>& geometricStiffness,
             const surfaceVectorField& SfUndef,
             const surfaceTensorField& gradDRef
         ) const;
