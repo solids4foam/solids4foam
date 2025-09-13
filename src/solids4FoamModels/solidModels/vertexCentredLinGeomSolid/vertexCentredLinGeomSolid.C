@@ -17,8 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-
 #include "vertexCentredLinGeomSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
@@ -29,6 +27,7 @@ License
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
+#include "makeList.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -129,11 +128,22 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
         pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum absolute forces in parallel
     pointConstraints::syncUntransformedData
     (
         mesh(), pointDivSigma, plusEqOp<vector>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Convert force to force per unit volume
     // Perform calculation per point to avoid dimension checks
@@ -596,7 +606,9 @@ bool vertexCentredLinGeomSolid::evolveSnes()
             pointDI,
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -611,7 +623,9 @@ bool vertexCentredLinGeomSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     pointD().correctBoundaryConditions();
@@ -728,7 +742,11 @@ bool vertexCentredLinGeomSolid::evolveExplicit()
         {
             if (mesh().geometricD()[dirI] < 0)
             {
+#ifdef OPENFOAM_NOT_EXTEND
                 pointD().primitiveFieldRef().replace(dirI, 0.0);
+#else
+                pointD().internalField().replace(dirI, 0.0);
+#endif
             }
         }
     }
@@ -737,7 +755,24 @@ bool vertexCentredLinGeomSolid::evolveExplicit()
     updatePointDivSigma(pointD(), dualGradDf_, dualSigmaf_, pointDivSigma_);
 
     // Compute acceleration
+#ifdef OPENFOAM_NOT_EXTEND
     pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_ + g();
+#else
+    pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_;
+
+    if (mag(g().value()) > SMALL)
+    {
+        // foam-extend does not implement the addition of a uniform dimensioned
+        // field to a geometric point field so we will do it manually
+        vectorField& pointAI = pointA_;
+        const vector gVec(g().value());
+        forAll(pointAI, pointI)
+        {
+            pointAI[pointI] += gVec;
+        }
+        pointA_.correctBoundaryConditions();
+    }
+#endif
 
     return true;
 }
@@ -939,7 +974,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
-    scalarField& pointVolI = pointVol_.primitiveFieldRef();
+    scalarField& pointVolI = pointVol_;
     scalarField& pointGlobalVolI = pointGlobalVol_;
     const scalarField& dualCellVol = dualMesh().V();
     const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
@@ -953,11 +988,22 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         pointGlobalVolI[pointID] = dualCellVol[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum the shared point volumes to create the point global volumes
     pointConstraints::syncUntransformedData
     (
         mesh(), pointGlobalVol_, plusEqOp<scalar>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Store old time fields
     pointD().oldTime().storeOldTime();
@@ -1055,23 +1101,40 @@ bool vertexCentredLinGeomSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
+#ifdef OPENFOAM_NOT_EXTEND
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << " instead of "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::IMPLICIT_COUPLED]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Use "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << " instead of "
+            << solutionAlgorithmNames_[solutionAlgorithm::IMPLICIT_COUPLED]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
+#ifdef OPENFOAM_NOT_EXTEND
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << solutionAlgorithmNames_.names()[IMPLICIT_SEGREGATED]
             << " is not implemented. The behaviour can be mimicked with "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << solutionAlgorithmNames_[IMPLICIT_SEGREGATED]
+            << " is not implemented. The behaviour can be mimicked with "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
@@ -1082,9 +1145,15 @@ bool vertexCentredLinGeomSolid::evolve()
     }
     else
     {
+#ifdef OPENFOAM_NOT_EXTEND
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
             << solutionAlgorithmNames_.names() << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            << solutionAlgorithmNames_.toc() << exit(FatalError);
+#endif
     }
 
     // Keep compiler happy
@@ -1122,7 +1191,9 @@ label vertexCentredLinGeomSolid::formResidual
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1192,7 +1263,9 @@ label vertexCentredLinGeomSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     return 0;
@@ -1214,7 +1287,9 @@ label vertexCentredLinGeomSolid::formJacobian
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1254,14 +1329,14 @@ label vertexCentredLinGeomSolid::formJacobian
             dualMesh(),
             blockSize_,     // nScalarEqns
             globalPoints().localToGlobalPointMap(),
-            dualImpKf().primitiveField(),
+            dualImpKf(),
             false           // flip sign
         );
     }
     else
     {
         // Calculate the material tangent
-        List<mat66> materialTangent(mesh.nFaces);
+        List<mat66> materialTangent(mesh.nFaces());
         dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // Add linearisation of div(sigma) to jac
@@ -1415,10 +1490,10 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
 
-#ifdef FOAMEXTEND
-    pEpsilon.internalField() = symm(pGradD.internalField());
-#else
+#ifdef OPENFOAM_NOT_EXTEND
     pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+#else
+    pEpsilon.internalField() = symm(pGradD.internalField());
 #endif
     pEpsilon.write();
 
@@ -1437,11 +1512,11 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
         dimensionedScalar("0", dimless, 0.0)
     );
 
-#ifdef FOAMEXTEND
-    pEpsilonEq.internalField() =
+#ifdef OPENFOAM_NOT_EXTEND
+    pEpsilonEq.primitiveFieldRef() =
         sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
 #else
-    pEpsilonEq.primitiveFieldRef() =
+    pEpsilonEq.internalField() =
         sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
 #endif
     pEpsilonEq.write();
@@ -1461,7 +1536,5 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //
