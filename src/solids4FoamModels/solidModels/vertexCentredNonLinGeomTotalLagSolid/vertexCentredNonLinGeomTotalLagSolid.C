@@ -26,8 +26,7 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
-#include "makeList.H"
-#include "tmpRef.H"
+#include "compatibilityFunctions.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif

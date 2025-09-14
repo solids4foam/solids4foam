@@ -44,22 +44,20 @@ SourceFiles
 #include "pimpleControl.H"
 #include "pisoControl.H"
 #include "boolIOList.H"
+#include "compatibilityFunctions.H"
+#include "globalPolyPatch.H"
+
 #ifdef OPENFOAM_COM
     #include "gravityMeshObject.H"
-#else
-    #include "uniformDimensionedFields.H"
-#endif
-#include "globalPolyPatch.H"
-#ifdef FOAMEXTEND
+    #include "fvOptions.H"
+#elif defined(FOAMEXTEND)
     #include "oversetMesh.H"
-#endif
-#ifdef OPENFOAM_ORG
+    #include "uniformDimensionedFields.H"
+#elif defined(OPENFOAM_ORG)
     #include "fvModels.H"
     #include "fvConstraints.H"
-#elif OPENFOAM_COM
-    #include "fvOptions.H"
+    #include "uniformDimensionedFields.H"
 #endif
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -21,14 +21,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "fvm.H"
-//#include "constrainHbyA.H"
-//#include "constrainPressure.H"
 #include "findRefCell.H"
-// #include "elasticSlipWallVelocityFvPatchVectorField.H"
-// #include "elasticWallVelocityFvPatchVectorField.H"
-// #include "elasticWallPressureFvPatchScalarField.H"
-// #include "movingWallPressureFvPatchScalarField.H"
-#include "makeList.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

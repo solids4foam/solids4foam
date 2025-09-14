@@ -27,7 +27,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "boolIOList.H"
 #include "symmetryPolyPatch.H"
-#include "tmpRef.H"
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "extrapolatedCalculatedFvPatchField.H"
     #include "symmetryPlanePolyPatch.H"

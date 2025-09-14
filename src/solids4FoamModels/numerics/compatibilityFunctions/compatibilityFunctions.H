@@ -16,31 +16,35 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::tmpRef
+    Foam::compatibilityFunctions
 
 Description
-      Provides portable helper functions Foam::tmpRef() and Foam::autoRef()
-      for accessing the contents of Foam::tmp<T> and Foam::autoPtr<T> objects
-      across different OpenFOAM variants.
+      Collection of small helper functions that provide a uniform API across
+      different OpenFOAM variants (foam-extend, OpenFOAM.org, OpenFOAM.com).
 
-      - In OpenFOAM-foundation/ESI forks, tmp<T>::ref() is used.
-      - In foam-extend, operator() is used instead.
+      These wrappers centralise differences in class and function interfaces,
+      allowing the main codebase to remain free of scattered #ifdefs. Typical
+      helpers include:
 
-      Using tmpRef() and autoPtrRef() removes the need for scattered #ifdefs in
-      user code:
-          tmp<volScalarField> tf = fvc::div(phi);
-          volScalarField& f = Foam::tmpRef(tf);
+        - tmpRef()           : access the underlying object of a tmp<T>
+        - autoPtrRef()       : access the underlying object of a autoPtr<T>
+        - boundaryFieldRef() : obtain a modifiable boundary field reference
+        - makeList<T>()      : construct a List<T> from an initializer_list
 
-          autoPtr<scalarField> apf(new scalarField(10, 0.0));
-          volScalarField& f = Foam::autoPtrRef(apf);
+      Usage example:
+          #include "compatibilityFunctions.H"
+
+          auto& phi = Foam::tmpRef(tphi);
+          boundaryRef(dualTraction)[patchI] = vector::zero;
+          labelList ids = Foam::makeList<label>({0,1,2});
 
 Author
     Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef tmpRef_H
-#define tmpRef_H
+#ifndef compatibilityFunctions_H
+#define compatibilityFunctions_H
 
 #include "tmp.H"
 #include "autoPtr.H"
@@ -94,6 +98,20 @@ namespace Foam
 #endif
     }
 
+    // Non-const field → modifiable primitiveField&
+    template<class Type, template<class> class PatchField, class GeoMesh>
+    inline Foam::Field<Type>& primitiveFieldRef
+    (
+        Foam::GeometricField<Type, PatchField, GeoMesh>& fld
+    )
+    {
+#ifdef FOAMEXTEND
+        return fld.internalField();
+#else
+        return fld.primitiveFieldRef();
+#endif
+    }
+
     // Non-const field → modifiable Boundary&
     template<class Type, template<class> class PatchField, class GeoMesh>
 #ifdef FOAMEXTEND
@@ -114,6 +132,27 @@ namespace Foam
 #endif
     }
 
+    // Provides a helper function Foam::makeList<T>() for constructing
+    // Foam::List<T> objects from an initializer_list.
+    // This function enables code such as
+    //     labelList ids = Foam::makeList<label>({0,1,2});
+    // which is supported in modern OpenFOAM via public initializer_list
+    // constructors, but not in foam-extend. Using makeList() centralises
+    // the difference and provides a single, portable syntax across all
+    // OpenFOAM variants.
+    template<class T>
+    inline List<T> makeList(std::initializer_list<T> il)
+    {
+        List<T> L(il.size());
+        label i = 0;
+
+        for (const T& v : il)
+        {
+            L[i++] = v;
+        }
+
+        return L; // NRVO/move on modern forks; fine for small lists regardless
+    }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -54,7 +54,7 @@ SourceFiles
 #include "twoDPointCorrector.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
-
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"

@@ -43,7 +43,6 @@ SourceFiles
 #endif
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
-#include "tmpRef.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
