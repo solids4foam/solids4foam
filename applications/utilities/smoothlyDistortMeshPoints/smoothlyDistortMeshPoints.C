@@ -122,7 +122,11 @@ int main(int argc, char *argv[])
     const scalar Cx = C.x();
     const scalar Cy = C.y();
     const scalar Cz = C.z();
+#ifdef OPENFOAM_NOT_EXTEND
     const scalar pi = constant::mathematical::pi;
+#else
+    const scalar pi = mathematicalConstant::pi;
+#endif
 
     forAll(newPoints, pointI)
     {
