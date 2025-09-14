@@ -17,8 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-
 #include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
@@ -28,6 +26,8 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
+#include "makeList.H"
+#include "tmpRef.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -127,7 +127,7 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-            dualTraction.boundaryFieldRef()[patchI] = vector::zero;
+            boundaryFieldRef(dualTraction)[patchI] = vector::zero;
         }
     }
 
@@ -149,11 +149,22 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
         pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum absolute forces in parallel
     pointConstraints::syncUntransformedData
     (
         mesh(), pointDivSigma, plusEqOp<vector>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Convert force to force per unit volume
     // Perform calculation per point to avoid dimension checks
@@ -446,7 +457,7 @@ void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-            dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
+            boundaryFieldRef(dualTraction)[patchI] = dualFaceTraction;
         }
         else if
         (
@@ -461,7 +472,7 @@ void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
             // It is assumed that the deformedN is the same as the initial
             // reference normal
             const vectorField n(dualMesh.boundary()[patchI].nf());
-            dualTraction.boundaryFieldRef()[patchI] =
+            boundaryFieldRef(dualTraction)[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
         }
     }
@@ -833,7 +844,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveSnes()
             pointDI,
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -848,7 +861,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     pointD().correctBoundaryConditions();
@@ -965,7 +980,11 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveExplicit()
         {
             if (mesh().geometricD()[dirI] < 0)
             {
+#ifdef OPENFOAM_NOT_EXTEND
                 pointD().primitiveFieldRef().replace(dirI, 0.0);
+#else
+                pointD().internalField().replace(dirI, 0.0);
+#endif
             }
         }
     }
@@ -983,7 +1002,24 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveExplicit()
     );
 
     // Compute acceleration
+#ifdef OPENFOAM_NOT_EXTEND
     pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_ + g();
+#else
+    pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_;
+
+    if (mag(g().value()) > SMALL)
+    {
+        // foam-extend does not implement the addition of a uniform dimensioned
+        // field to a geometric point field so we will do it manually
+        vectorField& pointAI = pointA_;
+        const vector gVec(g().value());
+        forAll(pointAI, pointI)
+        {
+            pointAI[pointI] += gVec;
+        }
+        pointA_.correctBoundaryConditions();
+    }
+#endif
 
     return true;
 }
@@ -1288,11 +1324,22 @@ vertexCentredNonLinGeomTotalLagSolid
         pointGlobalVolI[pointID] = dualCellVol[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum the shared point volumes to create the point global volumes
     pointConstraints::syncUntransformedData
     (
         mesh(), pointGlobalVol_, plusEqOp<scalar>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Store old time fields
     pointD().oldTime().storeOldTime();
@@ -1347,7 +1394,11 @@ void vertexCentredNonLinGeomTotalLagSolid::setDeltaT(Time& runTime)
             1.0/
             gMax
             (
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<scalar, Foam::surfaceMesh>
+#else
+                Field<scalar>
+#endif
                 (
                     dualMesh().surfaceInterpolation::deltaCoeffs().internalField()
                    *waveSpeed
@@ -1388,23 +1439,40 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+#ifdef OPENFOAM_NOT_EXTEND
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << " instead of "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::IMPLICIT_COUPLED]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << "Use "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << " instead of "
+            << solutionAlgorithmNames_[solutionAlgorithm::IMPLICIT_COUPLED]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+#ifdef OPENFOAM_NOT_EXTEND
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << solutionAlgorithmNames_.names()[IMPLICIT_SEGREGATED]
             << " is not implemented. The behaviour can be mimicked with "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << solutionAlgorithmNames_[IMPLICIT_SEGREGATED]
+            << " is not implemented. The behaviour can be mimicked with "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
@@ -1415,9 +1483,15 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else
     {
-        FatalErrorIn("bool evolve()")
+#ifdef OPENFOAM_NOT_EXTEND
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
-            << solutionAlgorithmNames_.names() << endl;
+            << solutionAlgorithmNames_.names() << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            << solutionAlgorithmNames_.toc() << exit(FatalError);
+#endif
     }
 
     // Keep compiler happy
@@ -1455,7 +1529,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formResidual
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1534,7 +1610,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     return 0;
@@ -1556,7 +1634,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1596,7 +1676,7 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
             dualMesh(),
             blockSize_,     // nScalarEqns
             globalPoints().localToGlobalPointMap(),
-            dualImpKf().primitiveField(),
+            dualImpKf(),
             false           // flip sign
         );
     }
@@ -1694,7 +1774,7 @@ void vertexCentredNonLinGeomTotalLagSolid::setTraction
     );
 
     // Lookup point patch field
-    pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
+    pointPatchVectorField& ptPatch = boundaryFieldRef(pointD())[patchID];
 
     if (isA<solidTractionPointPatchVectorField>(ptPatch))
     {
@@ -1745,7 +1825,11 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
 
+#ifdef OPENFOAM_NOT_EXTEND
     pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+#else
+    pEpsilon.internalField() = symm(pGradD.internalField());
+#endif
     pEpsilon.write();
 
     // Equivalent strain at the points
@@ -1763,8 +1847,13 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedScalar("0", dimless, 0.0)
     );
 
+#ifdef OPENFOAM_NOT_EXTEND
     pEpsilonEq.primitiveFieldRef() =
         sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#else
+    pEpsilonEq.internalField() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#endif
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
@@ -1780,6 +1869,5 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
 
 } // End namespace Foam
 
-#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

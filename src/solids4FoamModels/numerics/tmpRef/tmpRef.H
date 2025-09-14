@@ -94,6 +94,27 @@ namespace Foam
 #endif
     }
 
+    // Non-const field → modifiable Boundary&
+    template<class Type, template<class> class PatchField, class GeoMesh>
+#ifdef FOAMEXTEND
+    inline typename GeometricField<Type, PatchField, GeoMesh>::GeometricBoundaryField&
+#else
+    inline typename GeometricField<Type, PatchField, GeoMesh>::Boundary&
+#endif
+    boundaryFieldRef
+    (
+        GeometricField<Type, PatchField, GeoMesh>& fld,
+        const bool updateAccessTime = true
+    )
+    {
+#ifdef FOAMEXTEND
+        return fld.boundaryField();
+#else
+        return fld.boundaryFieldRef(updateAccessTime);
+#endif
+    }
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam

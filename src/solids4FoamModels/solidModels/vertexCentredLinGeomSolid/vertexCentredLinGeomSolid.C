@@ -28,6 +28,7 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
 #include "makeList.H"
+#include "tmpRef.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -101,11 +102,7 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-#ifdef OPENFOAM_NOT_EXTEND
-            dualTraction.boundaryFieldRef()[patchI] = vector::zero;
-#else
-            dualTraction.boundaryField()[patchI] = vector::zero;
-#endif
+            boundaryFieldRef(dualTraction)[patchI] = vector::zero;
         }
     }
 
@@ -424,11 +421,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-#ifdef OPENFOAM_NOT_EXTEND
-            dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
-#else
-            dualTraction.boundaryField()[patchI] = dualFaceTraction;
-#endif
+            boundaryFieldRef(dualTraction)[patchI] = dualFaceTraction;
         }
         else if
         (
@@ -441,13 +434,8 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
         {
             // Set the dual patch face shear traction to zero
             const vectorField n(dualMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
-            dualTraction.boundaryFieldRef()[patchI] =
+            boundaryFieldRef(dualTraction)[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
-#else
-            dualTraction.boundaryField()[patchI] =
-                (sqr(n) & dualTraction.boundaryField()[patchI]);
-#endif
         }
     }
 }
@@ -1418,11 +1406,7 @@ void vertexCentredLinGeomSolid::setTraction
     );
 
     // Lookup point patch field
-#ifdef OPENFOAM_NOT_EXTEND
-    pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
-#else
-    pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];
-#endif
+    pointPatchVectorField& ptPatch = boundaryFieldRef(pointD())[patchID];
 
     if (isA<solidTractionPointPatchVectorField>(ptPatch))
     {
