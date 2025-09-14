@@ -2866,13 +2866,6 @@ label newtonMonolithicCouplingInterface::formJacobian
     // Set the motion block size
     const label motionBlockSize = solidBlockSize;
 
-    // The scalar row at which the motion equations start
-    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-    // The scalar row at which the solid equations start
-    const label solidFirstEqnID =
-        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-
     // Form diagonal submatrices
     //  - Aff: fluid equations (momentum and pressure)
     //  - Amm: mesh motion equations in the fluid domain
