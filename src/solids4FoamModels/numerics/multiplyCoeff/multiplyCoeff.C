@@ -834,7 +834,7 @@ void Foam::multiplyCoeff
     {
         FatalError
             << "The geometric stiffness G has the wrong dimensions!" << nl
-            << "It should be 3 x 9 but it is " << Gmat.m() << " x " << Gmat.n()
+            << "It should be 3 x 9 but it is " << G.m() << " x " << G.n()
             << abort(FatalError);
     }
 #endif
