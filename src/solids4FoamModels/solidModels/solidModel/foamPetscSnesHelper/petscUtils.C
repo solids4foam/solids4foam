@@ -44,7 +44,7 @@ void Foam::PetscUtils::setFlags
     const bool verbose
 )
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     for (const entry& e : dict)
     {
         if (e.isDict())
@@ -82,7 +82,7 @@ void Foam::PetscUtils::setFlags
             AssertPETSc(PetscOptionsSetValue(NULL, key.c_str(), val.c_str()));
         }
     }
-#else // FOAMEXTEND
+#else // FOAMEXTEND and OPENFOAM_ORG
     // foam-extend: iterate with FOAM's list iterator macro
     forAllConstIter(dictionary, dict, iter)
     {

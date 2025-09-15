@@ -596,11 +596,7 @@ Foam::volScalarField& Foam::solidModel::p()
         );
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
-    return pPtr_.ref();
-#else
-    return pPtr_();
-#endif
+    return autoPtrRef(pPtr_);
 }
 
 

@@ -572,11 +572,7 @@ public:
                     makeU();
                 }
 
-#ifdef OPENFOAM_NOT_EXTEND
-                return UPtr_.ref();
-#else
-                return UPtr_();
-#endif
+                return autoPtrRef(UPtr_);
             }
 
             //- Return const reference to U
@@ -587,11 +583,7 @@ public:
                     makeU();
                 }
 
-#ifdef OPENFOAM_NOT_EXTEND
-                return UPtr_.ref();
-#else
-                return UPtr_();
-#endif
+                return autoPtrRef(UPtr_);
             }
 
             //- Return non-const reference to UPtr

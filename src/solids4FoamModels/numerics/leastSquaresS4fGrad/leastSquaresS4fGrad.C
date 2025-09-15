@@ -129,7 +129,7 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     // }
 
     // Get reference to least square vectors
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     const leastSquaresS4fVectors& lsv =
         leastSquaresS4fVectors::New
         (

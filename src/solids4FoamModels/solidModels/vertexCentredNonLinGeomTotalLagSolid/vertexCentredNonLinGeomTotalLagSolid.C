@@ -1438,7 +1438,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
@@ -1459,7 +1459,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << solutionAlgorithmNames_.names()[IMPLICIT_SEGREGATED]
             << " is not implemented. The behaviour can be mimicked with "
@@ -1482,7 +1482,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
             << solutionAlgorithmNames_.names() << exit(FatalError);

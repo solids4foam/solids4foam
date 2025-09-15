@@ -120,7 +120,11 @@ newtonIcoFluid::newtonIcoFluid
     laminarTransport_(U(), phi()),
     turbulence_
     (
+#ifdef OPENFOAM_ORG
+        incompressible::momentumTransportModel::New
+#else
         incompressible::turbulenceModel::New
+#endif
         (
             U(), phi(), laminarTransport_
         )
@@ -186,7 +190,11 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
     tmpRef(tvF) = rho_.value()
        *(
             mesh().boundary()[patchID].nf()
+#ifdef OPENFOAM_ORG
+          & (-turbulence_->devTau()().boundaryField()[patchID])
+#else
           & (-turbulence_->devReff()().boundaryField()[patchID])
+#endif
         );
 
     return tvF;
@@ -278,7 +286,7 @@ bool newtonIcoFluid::evolve()
     // }
 
     // Update the mesh
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     mesh.controlledUpdate();
 #else
     mesh.update();
@@ -998,7 +1006,7 @@ label newtonIcoFluid::formJacobian
         //     << " to be diagonal" << endl;
 
         // Set the off-diagonal to zero for cell pRefCell
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         pEqn.setValues(labelList(1, pRefCell_), 0.0);
 #else
         pEqn.setValues(labelList(1, pRefCell_), scalarField(1, 0.0));

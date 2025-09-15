@@ -86,11 +86,13 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
     const boolList& useBoundaryFaceValues_
 )
 :
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>
     (
         objName, mesh
     ),
+#elif defined(OPENFOAM_ORG)
+    MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>(mesh),
 #else
     MeshObject<fvMesh, leastSquaresS4fVectors>(mesh),
 #endif

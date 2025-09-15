@@ -1088,7 +1088,7 @@ bool vertexCentredLinGeomSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
@@ -1109,7 +1109,7 @@ bool vertexCentredLinGeomSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << solutionAlgorithmNames_.names()[IMPLICIT_SEGREGATED]
             << " is not implemented. The behaviour can be mimicked with "
@@ -1132,7 +1132,7 @@ bool vertexCentredLinGeomSolid::evolve()
     }
     else
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
             << solutionAlgorithmNames_.names() << exit(FatalError);

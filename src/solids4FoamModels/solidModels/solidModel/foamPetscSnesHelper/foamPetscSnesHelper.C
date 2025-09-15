@@ -172,7 +172,7 @@ namespace Foam
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     const Enum<foamPetscSnesHelper::solutionLocation>
     foamPetscSnesHelper::solutionLocationNames_
     ({
@@ -232,7 +232,7 @@ void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
             // Take a copy of the faceCells (local IDs) and convert them to
             // global IDs
             labelList globalFaceCells(fp.faceCells());
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
             foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
 #else
             forAll(globalFaceCells, cI)
@@ -348,7 +348,7 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
         }
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     return leastSquaresS4fVectors::New(lsName, p.mesh(), useBoundaryFaceValues);
 #else
     return leastSquaresS4fVectors::New(p.mesh(), useBoundaryFaceValues);
@@ -462,7 +462,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
         // Lookup the solver in fvSolution and check if PETSc is specified
         bool useDict = false;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         if (mesh.solversDict().found(fieldName))
         {
             const dictionary& solverDict = mesh.solverDict(fieldName);
@@ -470,7 +470,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
         if (mesh.solutionDict().subDict("solvers").found(fieldName))
         {
             const dictionary& solverDict =
-                mesh.solutionDict().solverDict(fieldName);
+                mesh.solutionDict().subDict("solvers").subDict(fieldName);
 #endif
 
             if (!solverDict.empty())

@@ -80,10 +80,10 @@ namespace Foam
     template<class T>
     inline T& autoPtrRef(autoPtr<T>& t)
     {
-#ifdef FOAMEXTEND
-        return t();     // foam-extend
+#ifdef OPENFOAM_COM
+        return t.ref(); // com
 #else
-        return t.ref(); // foundation/esi
+        return t();     // foam-extend/org
 #endif
     }
 
@@ -91,10 +91,10 @@ namespace Foam
     template<class T>
     inline const T& autoPtrRef(const autoPtr<T>& t)
     {
-#ifdef FOAMEXTEND
-        return t();
+#ifdef OPENFOAM_COM
+        return t.ref(); // com
 #else
-        return t.ref();
+        return t();     // foam-extend/org
 #endif
     }
 
@@ -105,10 +105,10 @@ namespace Foam
         Foam::GeometricField<Type, PatchField, GeoMesh>& fld
     )
     {
-#ifdef FOAMEXTEND
-        return fld.internalField();
-#else
+#ifdef OPENFOAM_NOT_EXTEND
         return fld.primitiveFieldRef();
+#else
+        return fld.internalField();
 #endif
     }
 
@@ -119,16 +119,12 @@ namespace Foam
 #else
     inline typename GeometricField<Type, PatchField, GeoMesh>::Boundary&
 #endif
-    boundaryFieldRef
-    (
-        GeometricField<Type, PatchField, GeoMesh>& fld,
-        const bool updateAccessTime = true
-    )
+    boundaryFieldRef(GeometricField<Type, PatchField, GeoMesh>& fld)
     {
-#ifdef FOAMEXTEND
-        return fld.boundaryField();
+#ifdef OPENFOAM_NOT_EXTEND
+        return fld.boundaryFieldRef();
 #else
-        return fld.boundaryFieldRef(updateAccessTime);
+        return fld.boundaryField();
 #endif
     }
 

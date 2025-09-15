@@ -35,9 +35,12 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
     #include "turbulentTransportModel.H"
     #include "CorrectPhi.H"
+#elif defined(OPENFOAM_ORG)
+    #include "singlePhaseTransportModel.H"
+    #include "kinematicMomentumTransportModel.H"
 #else
     #include "turbulenceModel.H"
 #endif
@@ -81,7 +84,11 @@ class newtonIcoFluid
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
+#ifdef OPENFOAM_ORG
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         autoPtr<incompressible::turbulenceModel> turbulence_;
+#endif
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
@@ -163,7 +170,11 @@ public:
             ) const;
 
             //- Return a reference to the turbulence model
+#ifdef OPENFOAM_ORG
+            incompressible::momentumTransportModel& turbulence()
+#else
             incompressible::turbulenceModel& turbulence()
+#endif
             {
                 if (turbulence_.empty())
                 {

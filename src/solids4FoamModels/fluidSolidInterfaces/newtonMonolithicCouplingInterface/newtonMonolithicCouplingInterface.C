@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
 
 #include "newtonMonolithicCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"

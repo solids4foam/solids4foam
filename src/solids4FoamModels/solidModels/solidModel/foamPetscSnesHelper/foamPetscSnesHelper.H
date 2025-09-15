@@ -107,7 +107,7 @@ public:
         };
 
         //- Solution location names
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         static const Enum<solutionLocation> solutionLocationNames_;
 #else
         static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
