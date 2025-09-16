@@ -23,6 +23,7 @@ License
 #include "patchToPatchInterpolation.H"
 #include "surfaceFields.H"
 #include "pointPointLeastSquaresVectors.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,11 +64,7 @@ tmp<volVectorField> grad
             "zeroGradient"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    volVectorField& result = tresult.ref();
-#else
-    volVectorField& result = tresult();
-#endif
+    volVectorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
 
@@ -136,11 +133,7 @@ tmp<volTensorField> grad
             "zeroGradient"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    volTensorField& result = tresult.ref();
-#else
-    volTensorField& result = tresult();
-#endif
+    volTensorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
 
@@ -212,11 +205,7 @@ tmp<pointTensorField> pGrad
             "calculated"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    pointTensorField& result = tresult.ref();
-#else
-    pointTensorField& result = tresult();
-#endif
+    pointTensorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
 
@@ -299,11 +288,7 @@ tmp<surfaceVectorField> fGrad
             )
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceVectorField& result = tresult.ref();
-#else
-    surfaceVectorField& result = tresult();
-#endif
+    surfaceVectorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     vectorField& resultI = result;
@@ -379,13 +364,8 @@ tmp<surfaceVectorField> fGrad
                 // Use the gradient in the adjacent primary cell-centre
                 // This will result in inconsistent values at processor patches
                 // Is this an issue?
-#ifdef OPENFOAM_NOT_EXTEND
-                result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                     gradTI[cellID];
-#else
-                result.boundaryField()[dualPatchID][localDualFaceID] =
-                    gradTI[cellID];
-#endif
             }
         }
     }
@@ -435,11 +415,7 @@ tmp<surfaceTensorField> fGrad
             )
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceTensorField& result = tresult.ref();
-#else
-    surfaceTensorField& result = tresult();
-#endif
+    surfaceTensorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     tensorField& resultI = result;
@@ -519,13 +495,8 @@ tmp<surfaceTensorField> fGrad
                     // Use the gradient in the adjacent primary cell-centre
                     // This will result in inconsistent values at processor patches
                     // Is this an issue?
-#ifdef OPENFOAM_NOT_EXTEND
-                    result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                    boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         gradDI[cellID];
-#else
-                    result.boundaryField()[dualPatchID][localDualFaceID] =
-                        gradDI[cellID];
-#endif
                 }
             }
         }
@@ -556,11 +527,7 @@ tmp<vectorField> d2dt2
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointDI.size(), vector::zero));
-#ifdef OPENFOAM_NOT_EXTEND
-    vectorField& result = tresult.ref();
-#else
-    vectorField& result = tresult();
-#endif
+    vectorField& result = tmpRef(tresult);
 
     // Read the time-scheme
     const word d2dt2SchemeName(d2dt2Scheme);
@@ -647,11 +614,7 @@ tmp<vectorField> ddt
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointPI.size(), vector::zero));
-#ifdef OPENFOAM_NOT_EXTEND
-    vectorField& result = tresult.ref();
-#else
-    vectorField& result = tresult();
-#endif
+    vectorField& result = tmpRef(tresult);
 
     // Read ddt time-scheme
     const word ddtSchemeName(ddtScheme);
@@ -795,11 +758,7 @@ tmp<pointScalarField> laplacian
             "calculated"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    pointScalarField& result = tresult.ref();
-#else
-    pointScalarField& result = tresult();
-#endif
+    pointScalarField& result = tmpRef(tresult);
 
         // Take reference for clarity and efficiency
     //const labelListList& cellPoints = mesh.cellPoints();
@@ -886,11 +845,7 @@ tmp<volScalarField> interpolate
             "calculated"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    volScalarField& result = tresult.ref();
-#else
-    volScalarField& result = tresult();
-#endif
+    volScalarField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     scalarField& resultI = result;
@@ -953,11 +908,7 @@ tmp<volVectorField> interpolate
             "calculated"
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    volVectorField& result = tresult.ref();
-#else
-    volVectorField& result = tresult();
-#endif
+    volVectorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     vectorField& resultI = result;
@@ -1028,11 +979,7 @@ tmp<surfaceScalarField> interpolate
             )
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceScalarField& result = tresult.ref();
-#else
-    surfaceScalarField& result = tresult();
-#endif
+    surfaceScalarField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     scalarField& resultI = result;
@@ -1105,13 +1052,8 @@ tmp<surfaceScalarField> interpolate
                     // Use the gradient in the adjacent primary cell-centre
                     // This will result in inconsistent values at processor patches
                     // Is this an issue?
-#ifdef OPENFOAM_NOT_EXTEND
-                    result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                    boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         volPI[cellID];
-#else
-                    result.boundaryField()[dualPatchID][localDualFaceID] =
-                        volPI[cellID];
-#endif
                 }
             }
         }
@@ -1159,11 +1101,7 @@ tmp<surfaceVectorField> interpolate
             )
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceVectorField& result = tresult.ref();
-#else
-    surfaceVectorField& result = tresult();
-#endif
+    surfaceVectorField& result = tmpRef(tresult);
 
     // Take references for clarity and efficiency
     vectorField& resultI = result;
@@ -1237,13 +1175,8 @@ tmp<surfaceVectorField> interpolate
                     // Use the gradient in the adjacent primary cell-centre
                     // This will result in inconsistent values at processor patches
                     // Is this an issue?
-#ifdef OPENFOAM_NOT_EXTEND
-                    result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                    boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         volPI[cellID];
-#else
-                    result.boundaryField()[dualPatchID][localDualFaceID] =
-                        volPI[cellID];
-#endif
                 }
             }
         }

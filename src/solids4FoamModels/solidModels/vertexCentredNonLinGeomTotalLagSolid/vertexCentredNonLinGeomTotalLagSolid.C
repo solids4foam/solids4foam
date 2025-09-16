@@ -979,11 +979,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveExplicit()
         {
             if (mesh().geometricD()[dirI] < 0)
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                pointD().primitiveFieldRef().replace(dirI, 0.0);
-#else
-                pointD().internalField().replace(dirI, 0.0);
-#endif
+                primitiveFieldRef(pointD()).replace(dirI, 0.0);
             }
         }
     }
@@ -1089,6 +1085,9 @@ vertexCentredNonLinGeomTotalLagSolid
             ).value()
         )
     ),
+#ifdef USE_PETSC
+    fixedDofRowsISPtr_(nullptr),
+#endif
     pointP_
     (
         IOobject
@@ -1682,7 +1681,7 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     else
     {
         // Calculate the material tangent
-        List<mat66> materialTangent(mesh.nFaces());
+        List<mat66> materialTangent(dualMesh().nFaces());
         dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // The dual mesh undeformed area vectors
@@ -1741,7 +1740,6 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     // Zero all rows and columns of fixed DOFs and set -fixedDofScale_ on
     // the diagonal
     MatZeroRowsColumnsIS(jac, fixedDofRowsIS(), -fixedDofScale_, NULL, NULL);
-
 
     if (solvePressure())
     {
@@ -1824,11 +1822,7 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
-#else
-    pEpsilon.internalField() = symm(pGradD.internalField());
-#endif
+    primitiveFieldRef(pEpsilon) = symm(pGradD.internalField());
     pEpsilon.write();
 
     // Equivalent strain at the points
@@ -1846,13 +1840,8 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedScalar("0", dimless, 0.0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    pEpsilonEq.primitiveFieldRef() =
+    primitiveFieldRef(pEpsilonEq) =
         sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
-#else
-    pEpsilonEq.internalField() =
-        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
-#endif
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;

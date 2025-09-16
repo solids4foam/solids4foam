@@ -823,7 +823,9 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
             ).value()
         )
     ),
-    fixedDofRowsISPtr_(),
+#ifdef USE_PETSC
+    fixedDofRowsISPtr_(nullptr),
+#endif
     pointU_
     (
         IOobject

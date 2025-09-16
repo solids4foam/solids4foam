@@ -17,8 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
 #include "cellPointLeastSquaresVectors.H"
@@ -974,7 +972,5 @@ void Foam::vfvm::laplacian
 //     }
 //     return tmatrix;
 // }
-
-#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

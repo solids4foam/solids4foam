@@ -50,6 +50,7 @@ else
 endif
 
 EXE_INC = \
+    -DFULLDEBUG -g -O0 \
     -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
