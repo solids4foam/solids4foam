@@ -840,8 +840,8 @@ void Foam::multiplyCoeff
 #endif
 
     // Index notation
-    // coeff_l = gradP_m G_mkl g_k 
-    
+    // coeff_l = gradP_m G_mkl g_k
+
     // coeff_1 = gradP_m G_mk1 g_k
     //
     //          = gradP_1 G_1k1 g_k
@@ -851,11 +851,11 @@ void Foam::multiplyCoeff
     //          = gradP_1 G_111 g_1
     //          + gradP_1 G_121 g_2
     //          + gradP_1 G_131 g_3
-    //            
+    //
     //          + gradP_2 G_211 g_1
     //          + gradP_2 G_221 g_2
     //          + gradP_2 G_231 g_3
-    //            
+    //
     //          + gradP_3 G_311 g_1
     //          + gradP_3 G_321 g_2
     //          + gradP_3 G_331 g_3
@@ -882,11 +882,11 @@ void Foam::multiplyCoeff
     //          = gradP_1 G_112 g_1
     //          + gradP_1 G_122 g_2
     //          + gradP_1 G_132 g_3
-    //            
+    //
     //          + gradP_2 G_212 g_1
     //          + gradP_2 G_222 g_2
     //          + gradP_2 G_232 g_3
-    //            
+    //
     //          + gradP_3 G_312 g_1
     //          + gradP_3 G_322 g_2
     //          + gradP_3 G_332 g_3
@@ -913,11 +913,11 @@ void Foam::multiplyCoeff
     //          = gradP_1 G_113 g_1
     //          + gradP_1 G_123 g_2
     //          + gradP_1 G_133 g_3
-    //            
+    //
     //          + gradP_2 G_213 g_1
     //          + gradP_2 G_223 g_2
     //          + gradP_2 G_233 g_3
-    //            
+    //
     //          + gradP_3 G_313 g_1
     //          + gradP_3 G_323 g_2
     //          + gradP_3 G_333 g_3

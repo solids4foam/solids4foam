@@ -2884,7 +2884,7 @@ label newtonMonolithicCouplingInterface::formJacobian
         );
         VecRestoreSubVector(x, isFluid(), &xFluid);
     }
- 
+
     // Amm
     {
         Vec xMotion = nullptr;
