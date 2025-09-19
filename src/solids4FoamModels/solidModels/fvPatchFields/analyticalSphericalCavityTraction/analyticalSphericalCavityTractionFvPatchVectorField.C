@@ -153,6 +153,53 @@ void analyticalSphericalCavityTractionFvPatchVectorField::updateCoeffs()
 }
 
 
+autoPtr<CompactListList<vector>>
+analyticalSphericalCavityTractionFvPatchVectorField::evaluateQuadrature
+(
+    const CompactListList<point>& faceQuadPoints
+) const
+{
+     // faceQuadPoints is list for whole mesh.
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Patch unit normals
+    vectorField n(patch().nf());
+
+    // Loop over faces
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the values to face quadrature points
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const point quadPoint = faceQuadPoints[globalFaceID][pointI];
+            quadPointsValue[faceI][pointI] =
+                n[faceI] & sphericalCavityStress(T0_, nu_, cavityR_, quadPoint);
+        }
+    }
+
+    return tQuadPointsValue;
+}
+
+
 // Write
 void analyticalSphericalCavityTractionFvPatchVectorField::write(Ostream& os) const
 {

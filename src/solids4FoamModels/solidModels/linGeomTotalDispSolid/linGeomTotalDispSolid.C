@@ -398,7 +398,19 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
 
     // Update gradient of displacement
-    mechanical().grad(D(), gradD());
+    if (highOrderResidual_)
+    {
+        // Update gradient of displacement
+        gradD() = LREInterp().grad(D());
+
+        // Calculate the cell centre stress using run-time selectable
+        // mechanical law
+        mechanical().correct(sigma());
+    }
+    else
+    {
+        mechanical().grad(D(), gradD());
+    }
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
@@ -412,6 +424,7 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Velocity
     U() = fvc::ddt(D());
+
 
     return true;
 }
@@ -544,6 +557,8 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 
     // Assemble matrix
     {
+        cpuTime timer;
+
         // Add Laplacian contribution
         hofvm::laplacianIntoSparseMatrix
         (
@@ -580,6 +595,8 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
         // Add boundary traction to source. Traction faces are skipped
         // when assembling matrix
         hofvm::addTractionBoundaries(source, mesh(), D(), LREInterp());
+        Info<<"Matrix construction time: "<<timer.elapsedCpuTime()<< " s"
+            <<  endl;
 
 #ifdef OPENFOAM_COM
         // Add optional fvOptions, e.g. MMS body force
@@ -596,10 +613,12 @@ bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
     vectorField& solution = D().internalFieldRef();
 
     // Eigen SparseLU direct solver
+    cpuTime timer;
     sparseMatrixTools::solveLinearSystemEigen
     (
         matrix, source, solution, solidModel::twoD(), false, debug
     );
+    Info<<"Eigen solve time: "<<timer.elapsedCpuTime()<< " s" << endl;
 
     // Update gradient of displacement
     gradD() = LREInterp().grad(D());
@@ -1067,6 +1086,8 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
         if
         (
             mesh().boundary()[patchI].type() == "processor"
+            || mesh().boundary()[patchI].type() == "symmetry"
+            || mesh().boundary()[patchI].type() == "symmetryPlane"
             || isA<fixedValueFvPatchVectorField>(D().boundaryField()[patchI])
         )
         {

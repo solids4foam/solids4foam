@@ -1004,9 +1004,6 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
         const scalar sqrK = -sqr(k_);
 
         w = (Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK))/(1 - exp(sqrK));
-
-        // Clip small negative value
-        w = max(SMALL, w);
     }
     else
     {
@@ -1018,6 +1015,9 @@ scalar LRE::weight(const scalar d, const scalar maxDist) const
             << LRE::weightFunctionNames_[LRE::weightFunction::RAD_SYMM_EXP]
             << endl;
     }
+
+    // Clip small negative value
+    w = max(SMALL, w);
 
     return w;
 }
@@ -1934,14 +1934,47 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
                   * Bhat.diagonal().transpose().array()
                 ).matrix();
 
+            // Alternative Tikhonov regularization
+            if (false)
+            {
+                scalar lambda = 1e-6;
+
+                Eigen::MatrixXd lhs = Rbar.transpose() * Rbar
+                    + lambda*lambda * Eigen::MatrixXd::Identity(Np, Np);
+
+                Eigen::MatrixXd rhs = Rbar.transpose() * QbarBhat;
+
+                Eigen::MatrixXd A = lhs.ldlt().solve(rhs);
+            }
+
+            // Tikhonov regularization
+            if (false)
+            {
+                 // Regularization parameter
+                scalar lambda = 1e-2; // tune this
+
+                // Augment Rbar and QbarBhat for Tikhonov
+                Eigen::MatrixXd Rreg(Rbar.rows() + Np, Rbar.cols());
+                Rreg << Rbar,
+                         lambda * Eigen::MatrixXd::Identity(Np, Np);
+
+                Eigen::MatrixXd Breg(QbarBhat.rows() + Np, QbarBhat.cols());
+                Breg << QbarBhat,
+                         Eigen::MatrixXd::Zero(Np, QbarBhat.cols());
+
+                // Solve the augmented system
+                Eigen::MatrixXd A = Rreg.colPivHouseholderQr().solve(Breg);
+            }
+
             // Solve to get A
             //const Eigen::MatrixXd A =
             //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
             // Solve using the modified QbarBhat
             const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
-            //  Eigen::MatrixXd A =
-            //  Rbar.template triangularView<Eigen::Upper>().solve(QbarBhat);
+            //Eigen::MatrixXd A =
+            //    Rbar.template triangularView<Eigen::Upper>().solve(QbarBhat);
 
+            // Condition number is visualised as average of quad points values
             if (calcConditionNumber_)
             {
                 // Sometimes svd is causing crash!
@@ -1952,9 +1985,23 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
 
                 Eigen::VectorXd singularValues = svd.singularValues();
 
-                faceConditionNumber()[faceI] =
-                    singularValues(0)
-                   /(singularValues(singularValues.size() - 1) + VSMALL);
+                if (faceI < mesh_.nInternalFaces())
+                {
+                    faceConditionNumber()[faceI] =
+                        (1.0/nGP)*(singularValues(0)
+                         /(singularValues(singularValues.size() - 1) + VSMALL));
+                }
+                else
+                {
+                    const label patchID =
+                            mesh.boundaryMesh().whichPatch(faceI);
+                    const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                    const label localFaceI = faceI - pp.start();
+                    faceConditionNumber().boundaryFieldRef()[patchID][localFaceI]
+                        =  (1.0/nGP)*(singularValues(0)
+                         /(singularValues(singularValues.size() - 1) + VSMALL));
+                }
             }
 
             Eigen::RowVectorXd cRow = A.row(0);
@@ -2592,6 +2639,8 @@ void LRE::calcQuadPointsAndWeights3D() const
 
     // Store how many quadrature points each face will have
     labelList nQpPerFace(mesh.nFaces(), 0);
+    scalarField faceArea(mesh.nFaces(), 0.0);
+    bool centralDecompActivate = false;
 
     for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
     {
@@ -2619,8 +2668,9 @@ void LRE::calcQuadPointsAndWeights3D() const
             const face& triF = triFaces[triFaceI];
 
             // Store face (triangle) as triPoints object in faceTri list
-            faceTri[faceI][triFaceI] =
-                triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
+            triPoints tri = triPoints(pts[triF[0]], pts[triF[1]], pts[triF[2]]);
+            faceTri[faceI][triFaceI] = tri;
+            faceArea[faceI] += mag(triPointRef(tri).mag());
         }
 
         // Check decomposition and perform central point triangulation if needed
@@ -2632,14 +2682,10 @@ void LRE::calcQuadPointsAndWeights3D() const
                 const scalar triArea = mag(faceTri[faceI][triI].areaNormal());
                 const scalar areaRatio = triArea / (faceArea + VSMALL);
 
-                if (areaRatio < 0.1)
+                if (areaRatio < 0.05)
                 {
                     validDecomposition = false;
-
-                    WarningInFunction
-                        << "Swiching to central point triangulation for face"
-                        << faceI << " at " << mesh.faceCentres()[faceI]
-                        << endl;
+                    centralDecompActivate = true;
                     break;
                 }
             }
@@ -2656,7 +2702,7 @@ void LRE::calcQuadPointsAndWeights3D() const
                 const label nextpI = (pI + 1 < nPoints ? pI + 1 : 0);
 
                 faceTri[faceI][pI] = triPoints(pts[f[pI]], pts[f[nextpI]], fc);
-            }
+           }
         }
 
         // Final qp count for this face = (#triangles used) * (qp per triangle)
@@ -2665,11 +2711,19 @@ void LRE::calcQuadPointsAndWeights3D() const
         nQpPerFace[faceI] = nTriUsed * triQuadrature::nPoints(N_-1);
     }
 
+    if (centralDecompActivate)
+    {
+        WarningInFunction
+            << "Swiching to central point triangulation for one or more faces"
+            << endl;
+    }
+
+
     // Allocate memory for compactListList for points and weights
     faceQuadPointsPtr_.set(new CompactListList<point>(nQpPerFace));
     faceQuadWeightPtr_.set(new CompactListList<scalar>(nQpPerFace));
 
-    CompactListList<point>&  faceQuadP  = *faceQuadPointsPtr_;
+    CompactListList<point>&  faceQuadP = *faceQuadPointsPtr_;
     CompactListList<scalar>& faceQuadW = *faceQuadWeightPtr_;
 
     // 2. Stage - for each triangle calculate quadrature point locations and
@@ -2679,15 +2733,13 @@ void LRE::calcQuadPointsAndWeights3D() const
     {
         const List<triPoints>& fT = faceTri[faceI];
 
-        const scalar& faceArea = mag(mesh.faceAreas()[faceI]);
-
         forAll(fT, tI)
         {
             const triPoints& tp = fT[tI];
             const scalar triArea = tp.mag();
-            const scalar scaleW = triArea/(faceArea+VSMALL);
+            const scalar scaleW = triArea/(faceArea[faceI]+VSMALL);
 
-            // Get triangle Gauss points and weights
+            // Get triangle Gauss poins and weights
             const triQuadrature tq(tp, N_-1);
             const List<point>& triangleQuadP = tq.points();
             const List<scalar>& triangleQuadW = tq.weights();
@@ -3124,7 +3176,49 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
          || pp.type() == symmetryPlanePolyPatch::typeName
         )
         {
-            NotImplemented;
+            const vectorField pNormal(mesh.boundary()[patchI].nf());
+
+            forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+                const label globalFaceID = faceI + D.boundaryField()[patchI].patch().start();
+                const labelList& curStencil = stencils[globalFaceID];
+                const List<point>& fGP = faceQP[globalFaceID];
+                const label stencilSize = curStencil.size();
+                const vector& faceNormal = pNormal[faceI];
+
+                // Loop over face quadrature points
+                forAll(fGP, pointI)
+                {
+                    // Loop over stencil points
+                    forAll(curStencil, cI)
+                    {
+                        const label neiGlobalCellI = curStencil[cI];
+                        if (globalCells_.isLocal(neiGlobalCellI))
+                        {
+                            const label neiLocalCellI = globalCells_.toLocal(neiGlobalCellI);
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * DI[neiLocalCellI];
+
+                            const tensor R = (I-2.0*sqr(faceNormal));
+                            const vector mirrorDI = R & DI[neiLocalCellI];
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI+stencilSize] * mirrorDI;
+
+                        }
+                        else
+                        {
+                            // global cell in the stencil
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * globalDI[neiGlobalCellI];
+
+                            const tensor R = (I-2.0*sqr(faceNormal));
+                            const vector mirrorDI = R & globalDI[neiGlobalCellI];
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI+stencilSize] * mirrorDI;
+                        }
+                    }
+                }
+            }
         }
         else if
         (

@@ -66,7 +66,7 @@ private:
     // Private Member Functions
 
         //- Analytical solution
-        symmTensor plateHoleSolution(const vector& C);
+        symmTensor plateHoleSolution(const vector& C) const;
 
 
 public:
@@ -142,6 +142,13 @@ public:
 
 
     // Member functions
+
+            //- Return face quadrature values.
+            // Used for high order solvers, input is position of points
+            virtual autoPtr<CompactListList<vector>> evaluateQuadrature
+            (
+                const CompactListList<point>& faceQuadPoints
+            ) const;
 
         // Mapping functions
 

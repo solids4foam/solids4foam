@@ -1,0 +1,57 @@
+// 	Info<<"----------------"<<endl;
+// 	MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY);
+
+// PetscViewer viewer;
+// PetscViewerCreate(PETSC_COMM_WORLD, &viewer);
+// PetscViewerSetType(viewer, PETSCVIEWERASCII);          // ASCII text
+// PetscViewerSetFormat(viewer, PETSC_VIEWER_ASCII_DENSE); // nice dense format
+// PetscViewerASCIIOpen(PETSC_COMM_WORLD, NULL, &viewer);  // NULL -> stdout
+
+// MatView(jac, viewer);
+
+// PetscViewerDestroy(&viewer);
+
+
+
+
+   if (false)
+    {
+             // Initialise based on exact jacobian
+             //        return Foam::initialiseBlockJacobian(jac, mesh(), blockSize_);
+
+             PetscInt d_nz_guess = 0;
+             PetscInt o_nz_guess = 0;
+
+                       // Local/global scalar sizes
+              const PetscInt blockn = static_cast<PetscInt>(mesh().nCells()); // local block rows (cells)
+              const PetscInt n      = blockn * blockSize_;                   // local scalar rows
+              const PetscInt N      = returnReduce(n, sumOp<label>());      // global scalar rows
+
+              if (true) {
+                MatCreate(PETSC_COMM_WORLD, &jac);
+                MatSetSizes(jac, n, n, N, N);
+                MatSetType(jac, MATMPIBAIJ);        // block CSR
+                MatSetBlockSize(jac, blockSize_);    // 2 or 3
+                MatSetFromOptions(jac);             // allow -mat_type override, etc.
+              } else {
+                // Ensure correct block size even if A already exists
+                 MatSetBlockSize(jac, blockSize_);
+              }
+
+              // --- Slow & simple preallocation ---
+              // Option 1: Start with ZERO space; PETSc will reallocate a lot (slowest but simplest)
+              // PetscCall(MatMPIBAIJSetPreallocation(A, blockSize, 0, NULL, 0, NULL));
+
+              // Option 2: Give small UNIFORM guesses to reduce reallocations (still no per-row counts)
+              CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize_,
+                                                   d_nz_guess, /*d_nnz*/ NULL,
+                                                   o_nz_guess, /*o_nnz*/ NULL));
+
+              // Allow new nonzeros (dynamic growth). Do NOT forbid new allocation.
+              MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+
+              // Keep the pattern across assemblies (optional, helpful once your stencil stabilizes)
+              MatSetOption(jac, MAT_KEEP_NONZERO_PATTERN, PETSC_TRUE);
+
+	      return 0;
+    }
