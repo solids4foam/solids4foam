@@ -994,7 +994,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
 
                 // Neighbour global cell ID
@@ -1015,7 +1015,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         jac, 1, &globalBlockRowI, 1, &globalBlockColI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
             }
         }
