@@ -35,6 +35,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #ifndef vfvmCellPoint_H
 #define vfvmCellPoint_H
 
@@ -44,9 +46,7 @@ Author
 #include "cellPointLeastSquaresVectors.H"
 #include "meshDual.H"
 #include "matNN.H"
-#ifdef USE_PETSC
-    #include <petscksp.h>
-#endif
+#include <petscksp.h>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -140,5 +140,7 @@ namespace vfvm
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //

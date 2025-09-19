@@ -28,9 +28,6 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
 #include "compatibilityFunctions.H"
-#ifdef USE_PETSC
-    #include <petscksp.h>
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -669,12 +666,13 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     pointVolInterp_.interpolate(pointD(), D());
 #endif
 
-#else  // USE_PETSC not defined
+#else
 
     FatalErrorInFunction
         << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
         << "PETSC installation directory and re-build solids4foam"
         << exit(FatalError);
+
 #endif
 
     return true;
@@ -1016,10 +1014,12 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
 vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
 {
+#ifdef USE_PETSC
     if (fixedDofRowsISPtr_ != nullptr)
     {
         ISDestroy(&fixedDofRowsISPtr_);
     }
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

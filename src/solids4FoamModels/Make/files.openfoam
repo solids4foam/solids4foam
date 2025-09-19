@@ -6,6 +6,7 @@ solidModels/solidModel/checkConvergence.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
+solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
 solidModels/solidModel/foamPetscSnesHelper/petscUtils.C
 solidModels/solidModel/foamPetscSnesHelper/petscErrorHandling.C
 

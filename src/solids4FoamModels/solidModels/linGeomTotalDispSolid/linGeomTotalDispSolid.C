@@ -300,6 +300,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
 bool linGeomTotalDispSolid::evolveSnes()
 {
+#ifdef USE_PETSC
     Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
 
     // Update D boundary conditions
@@ -374,6 +375,15 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Velocity
     U() = fvc::ddt(D());
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
 
     return true;
 }
@@ -816,6 +826,8 @@ bool linGeomTotalDispSolid::evolve()
 }
 
 
+#ifdef USE_PETSC
+
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
@@ -1090,6 +1102,7 @@ label linGeomTotalDispSolid::formJacobian
     return 0;
 }
 
+#endif // USE_PETSC
 
 tmp<vectorField> linGeomTotalDispSolid::tractionBoundarySnGrad
 (

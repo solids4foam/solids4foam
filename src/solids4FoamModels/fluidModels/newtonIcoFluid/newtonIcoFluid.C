@@ -248,6 +248,7 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
 
 bool newtonIcoFluid::evolve()
 {
+#ifdef USE_PETSC
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     // Take references
@@ -358,6 +359,15 @@ bool newtonIcoFluid::evolve()
     // laminarTransport_.correct();
     // turbulence_->correct();
 
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
+
     return 0;
 }
 
@@ -367,6 +377,8 @@ void newtonIcoFluid::clearRAUf()
     rAUfPtr_.clear();
 }
 
+
+#ifdef USE_PETSC
 
 label newtonIcoFluid::initialiseJacobian(Mat& jac)
 {
@@ -1051,6 +1063,8 @@ label newtonIcoFluid::formJacobian
 
     return 0;
 }
+
+#endif // USE_PETSC
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

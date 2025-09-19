@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #include "lduMatrix.H"
 #include "error.H"
 #include "petscUtils.H"
@@ -119,5 +121,6 @@ void Foam::PetscUtils::setFlags
 #endif // FOAMEXTEND
 }
 
-
 // ************************************************************************* //
+
+#endif // #ifdef USE_PETSC

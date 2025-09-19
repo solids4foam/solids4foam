@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
 #include "cellPointLeastSquaresVectors.H"
@@ -972,5 +974,7 @@ void Foam::vfvm::laplacian
 //     }
 //     return tmatrix;
 // }
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //

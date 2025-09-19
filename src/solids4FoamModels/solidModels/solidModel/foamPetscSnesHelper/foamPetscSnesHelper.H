@@ -556,7 +556,94 @@ public:
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#endif // #ifdef USE_PETSC
+#else  // !USE_PETSC
+
+// Minimal opaque PETSc types so signatures compile without PETSc headers
+typedef struct _p_Mat*  Mat;
+typedef struct _p_Vec*  Vec;
+typedef struct _p_SNES* SNES;
+
+#include "Switch.H"
+#include "word.H"
+#include "fileName.H"
+#include "fvMesh.H"
+#include "List.H"
+#include "label.H"
+
+// Keep it in the Foam namespace like the real one
+namespace Foam
+{
+
+class foamPetscSnesHelper
+{
+public:
+    // Same enum so downstream code compiles
+    enum solutionLocation { CELLS, POINTS, NONE };
+
+#ifdef OPENFOAM_COM
+    // If you rely on solutionLocationNames_, you can still declare it.
+    // Provide a definition in a .C for the no-PETSc build if needed,
+    // or omit it if not referenced.
+    static const Enum<solutionLocation> solutionLocationNames_;
+#else
+    static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
+#endif
+
+    // Constructor with identical signature: does nothing in no-PETSc builds
+    foamPetscSnesHelper
+    (
+        const word& /*fieldName*/,
+        fileName /*optionsFile*/,
+        const fvMesh& /*mesh*/,
+        const solutionLocation& /*location*/ = solutionLocation::CELLS,
+        const Switch /*stopOnPetscError*/ = true,
+        const Switch /*initialise*/ = true
+    )
+    {}
+
+    virtual ~foamPetscSnesHelper() {}
+
+    // --- Minimal API surface you might call even when PETSc is off
+
+    // If something accidentally calls solve() without PETSc, you can either:
+    //  a) return an error code (0=success in your code? pick a non-zero),
+    //  b) or abort loudly.
+    int solve(const bool /*returnOnSnesError*/ = false)
+    {
+        FatalErrorInFunction
+            << "PETSc support disabled at compile time (USE_PETSC not defined)"
+            << abort(FatalError);
+        return -1;
+    }
+
+    // If you ever take the SNES by reference, provide a stub accessor
+    // to keep overload resolution happy (don’t call it!)
+    SNES& snes()
+    {
+        FatalErrorInFunction
+            << "PETSc support disabled at compile time"
+            << abort(FatalError);
+        static SNES dummy = nullptr; // never reached
+        return dummy;
+    }
+
+    // --- Keep the pure virtuals so derived classes still compile & define them
+    virtual label initialiseJacobian(Mat& /*jac*/) { return 0; }
+    virtual label initialiseSolution(Vec& /*x*/) { return 0; }
+    virtual label formResidual(Vec /*f*/, const Vec /*x*/) { return 0; }
+    virtual label formJacobian(Mat /*jac*/, const Vec /*x*/) { return 0; }
+
+    // If you have template helpers that don’t depend on PETSc directly,
+    // you can keep them here as well (or omit to keep the stub minimal).
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+} // namespace Foam
+
+#endif // #ifndef USE_PETSC
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

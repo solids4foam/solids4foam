@@ -272,6 +272,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
 
 bool nonLinGeomUpdatedLagSolid::evolveSnes()
 {
+#ifdef USE_PETSC
     Info<< "Solving the momentum equation for DD using PETSc SNES" << endl;
 
     // Update D boundary conditions
@@ -338,6 +339,15 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 
     // Acceleration
     A_ = fvc::d2dt2(D());
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
 
     return true;
 }
@@ -611,6 +621,8 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 }
 
 
+#ifdef USE_PETSC
+
 label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
@@ -787,6 +799,8 @@ label nonLinGeomUpdatedLagSolid::formJacobian
     return 0;
 }
 
+
+#endif // USE_PETSC
 
 tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 (

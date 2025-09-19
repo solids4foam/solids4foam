@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #ifdef OPENFOAM_COM
 
 #include "newtonMonolithicCouplingInterface.H"
@@ -2973,5 +2975,7 @@ label newtonMonolithicCouplingInterface::formJacobian
 } // End namespace Foam
 
 #endif // OPENFOAM_NOT_EXTEND
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //
