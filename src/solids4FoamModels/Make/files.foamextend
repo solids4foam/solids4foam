@@ -5,9 +5,6 @@ solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/checkConvergence.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
-solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
-solidModels/solidModel/foamPetscSnesHelper/petscUtils.C
-solidModels/solidModel/foamPetscSnesHelper/petscErrorHandling.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
@@ -211,6 +208,10 @@ numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/deltaVectors/deltaVectors.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
+numerics/foamPetscSnesHelper/foamPetscSnesHelper.C
+numerics/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
+numerics/foamPetscSnesHelper/petscUtils.C
+numerics/foamPetscSnesHelper/petscErrorHandling.C
 numerics/fvc/fvcCellLimitedGrad.C
 numerics/globalPointIndices/globalPointIndices.C
 numerics/globalPolyPatch/globalPolyPatch.C
