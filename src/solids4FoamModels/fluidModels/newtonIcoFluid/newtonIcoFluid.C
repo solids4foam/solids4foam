@@ -260,24 +260,35 @@ bool newtonIcoFluid::evolve()
     U.correctBoundaryConditions();
 
     // Solution predictor
-    // if (predictor_ && newTimeStep())
-    // {
-    //     predict();
+    const Switch predictor(fluidProperties().lookup("predictor"));
+    if (predictor && runTime().timeIndex() > 1) // && newTimeStep())
+    {
+        Info<< "Applying a linear predictor to velocity" << endl;
+        //predict();
+        // Applying a linear predictor to velocity
+        U = 2.0*U.oldTime() - U.oldTime().oldTime();
+        Info<< "Applying a linear predictor to velocity: done" << endl;
 
-    //     // Map the U field to the SNES solution vector
-    //     foamPetscSnesHelper::InsertFieldComponents<vector>
-    //     (
-    //         U.primitiveFieldRef(),
-    //         foamPetscSnesHelper::solution(),
-    //         fluidModel::twoD() ? 2 : 3, // Block size of x
-    //         0                           // Location of first component
-    //     );
-    //
-    //     // Update phi field
-    //
-    //     // Also predict p field
-    //     // Todo
-    // }
+        // We could optionally apply a correction to this velocity field to
+        // ensure it is divergence free, i.e. solve for potential and apply
+        //  the correction
+
+        // Access the raw solution data
+        // const PetscScalar *xx;
+        // VecGetArray(foamPetscSnesHelper::solution(), &xx);
+
+        // Map the U field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<vector>
+        (
+            U.primitiveFieldRef(),
+            foamPetscSnesHelper::solution(),
+            blockSize_,
+            fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        );
+
+        // Restore the solution vector
+        // VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
+    }
 
     // Update the mesh
     mesh.controlledUpdate();
@@ -328,6 +339,9 @@ bool newtonIcoFluid::evolve()
 
     // Correct Uf if the mesh is moving
     //fvc::correctUf(Uf, U, phi);
+
+    // Restore the solution vector
+    VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
 
     // Update the flux
     //phi = mesh.Sf() & Uf();
