@@ -20,6 +20,7 @@ License
 #include "leastSquaresS4fVectors.H"
 #include "volFields.H"
 #include "symmetryPolyPatch.H"
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlanePolyPatch.H"
 #endif
@@ -169,13 +170,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
     }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceVectorField::Boundary& pVectorsBf =
-        pVectors_.boundaryFieldRef();
-#else
-    surfaceVectorField::GeometricBoundaryField& pVectorsBf =
-        pVectors_.boundaryField();
-#endif
+    auto& pVectorsBf = boundaryFieldRef(pVectors_);
 
     forAll(pVectorsBf, patchi)
     {
