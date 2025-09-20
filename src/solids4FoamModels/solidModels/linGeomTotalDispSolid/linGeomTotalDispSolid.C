@@ -25,6 +25,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -299,6 +300,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
 bool linGeomTotalDispSolid::evolveSnes()
 {
+#ifdef USE_PETSC
     Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
 
     // Update D boundary conditions
@@ -319,7 +321,9 @@ bool linGeomTotalDispSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -334,7 +338,9 @@ bool linGeomTotalDispSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     D().correctBoundaryConditions();
@@ -369,6 +375,15 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Velocity
     U() = fvc::ddt(D());
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
 
     return true;
 }
@@ -522,7 +537,7 @@ const surfaceScalarField& linGeomTotalDispSolid::pDiffusivity() const
         makePDiffusivity();
     }
 
-    return pDiffusivityPtr_.ref();
+    return autoPtrRef(pDiffusivityPtr_);
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -811,6 +826,8 @@ bool linGeomTotalDispSolid::evolve()
 }
 
 
+#ifdef USE_PETSC
+
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
@@ -841,7 +858,9 @@ label linGeomTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -922,7 +941,9 @@ label linGeomTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     if (solvePressure())
@@ -983,7 +1004,9 @@ label linGeomTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -1079,6 +1102,7 @@ label linGeomTotalDispSolid::formJacobian
     return 0;
 }
 
+#endif // USE_PETSC
 
 tmp<vectorField> linGeomTotalDispSolid::tractionBoundarySnGrad
 (

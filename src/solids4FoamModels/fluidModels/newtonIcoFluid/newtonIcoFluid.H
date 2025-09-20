@@ -35,10 +35,18 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulentTransportModel.H"
-#include "CorrectPhi.H"
+#ifdef OPENFOAM_COM
+    #include "turbulentTransportModel.H"
+    #include "CorrectPhi.H"
+#elif defined(OPENFOAM_ORG)
+    #include "singlePhaseTransportModel.H"
+    #include "kinematicMomentumTransportModel.H"
+#else
+    #include "turbulenceModel.H"
+#endif
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -76,7 +84,11 @@ class newtonIcoFluid
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
+#ifdef OPENFOAM_ORG
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         autoPtr<incompressible::turbulenceModel> turbulence_;
+#endif
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
@@ -158,7 +170,11 @@ public:
             ) const;
 
             //- Return a reference to the turbulence model
+#ifdef OPENFOAM_ORG
+            incompressible::momentumTransportModel& turbulence()
+#else
             incompressible::turbulenceModel& turbulence()
+#endif
             {
                 if (turbulence_.empty())
                 {
@@ -166,7 +182,7 @@ public:
                         << "Pointer not set" << abort(FatalError);
                 }
 
-                return turbulence_.ref();
+                return autoPtrRef(turbulence_);
             }
 
             //- Reference to the fluid density
@@ -184,6 +200,7 @@ public:
             //- Return a const reference to the rAU field
             void clearRAUf();
 
+#ifdef USE_PETSC
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
             //  the matrix
@@ -217,6 +234,7 @@ public:
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
             );
+#endif // USE_PETSC
 };
 
 

@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #include "petscErrorHandling.H"
 #include "error.H"
 
@@ -100,3 +102,5 @@ void Foam::PetscErrorHandling::Handler
 
 
 // ************************************************************************* //
+
+#endif // #ifdef USE_PETSC

@@ -35,6 +35,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #ifndef vfvmCellPoint_H
 #define vfvmCellPoint_H
 
@@ -43,9 +45,8 @@ Author
 #include "scalarMatrices.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "meshDual.H"
-#ifdef USE_PETSC
-    #include <petscksp.h>
-#endif
+#include "matNN.H"
+#include <petscksp.h>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -66,7 +67,7 @@ namespace vfvm
         const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangent,
+        const List<mat66>& materialTangent,
         const scalar zetaImplicit,
         const bool flipSign = false
     );
@@ -86,8 +87,8 @@ namespace vfvm
         const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangent,
-        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const List<mat66>& materialTangent,
+        const List<mat39>& geometricStiffnessField,
         const symmTensorField& sigma,
         const tensorField& dualGradDField,
         const scalar zetaImplicit,
@@ -139,5 +140,7 @@ namespace vfvm
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //

@@ -17,8 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
-
 #include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
@@ -28,6 +26,7 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
+#include "compatibilityFunctions.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -127,7 +126,7 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-            dualTraction.boundaryFieldRef()[patchI] = vector::zero;
+            boundaryFieldRef(dualTraction)[patchI] = vector::zero;
         }
     }
 
@@ -149,11 +148,22 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
         pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum absolute forces in parallel
     pointConstraints::syncUntransformedData
     (
         mesh(), pointDivSigma, plusEqOp<vector>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Convert force to force per unit volume
     // Perform calculation per point to avoid dimension checks
@@ -446,7 +456,7 @@ void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-            dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
+            boundaryFieldRef(dualTraction)[patchI] = dualFaceTraction;
         }
         else if
         (
@@ -461,35 +471,31 @@ void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
             // It is assumed that the deformedN is the same as the initial
             // reference normal
             const vectorField n(dualMesh.boundary()[patchI].nf());
-            dualTraction.boundaryFieldRef()[patchI] =
+            boundaryFieldRef(dualTraction)[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
         }
     }
 }
 
 
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
+void vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 (
-    const surfaceVectorField& SfUndef, //Undeformed surface area vector field
-    const surfaceTensorField& gradDRef //Reference gradD
+    List<mat39>& geometricStiffness,
+    const surfaceVectorField& SfUndef, // Undeformed surface area vector field
+    const surfaceTensorField& gradDRef // Reference gradD
 ) const
 {
-    // Prepare tmp field
-    // Todo: switch to 3 x 6 matrix instead of 3 x 9
-    tmp<Field<RectangularMatrix<scalar>>> tresult
-    (
-        new Field<RectangularMatrix<scalar>>
-        (
-            dualMesh().nFaces(), RectangularMatrix<scalar>(3, 9, 0.0)
-        )
-    );
-    Field<RectangularMatrix<scalar>>& result = tresult.ref();
+    // Set size and initialise to zero
+    geometricStiffness.resize(dualMesh().nFaces());
+    forAll(geometricStiffness, faceI)
+    {
+        geometricStiffness[faceI].clear();
+    }
 
     // For small strain the geometric stiffness is zero
     if (!useGeometricStiffness_)
     {
-        return tresult;
+        return;
     }
 
     // Calculate surface vector as per the total Lagrangian formulation
@@ -539,59 +545,62 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
         // Insert each component
         forAll(tangCmptI, faceI)
         {
+            mat39& curGeomStiff = geometricStiffness[faceI];
+            curGeomStiff.clear();
+
             if (cmptI == tensor::XX)
             {
-                result[faceI](0,0) = tangCmptI[faceI][0];
-                result[faceI](1,0) = tangCmptI[faceI][1];
-                result[faceI](2,0) = tangCmptI[faceI][2];
+                curGeomStiff(0,0) = tangCmptI[faceI][0];
+                curGeomStiff(1,0) = tangCmptI[faceI][1];
+                curGeomStiff(2,0) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::XY)
             {
-                result[faceI](0,1) = tangCmptI[faceI][0];
-                result[faceI](1,1) = tangCmptI[faceI][1];
-                result[faceI](2,1) = tangCmptI[faceI][2];
+                curGeomStiff(0,1) = tangCmptI[faceI][0];
+                curGeomStiff(1,1) = tangCmptI[faceI][1];
+                curGeomStiff(2,1) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::XZ)
             {
-                result[faceI](0,2) = tangCmptI[faceI][0];
-                result[faceI](1,2) = tangCmptI[faceI][1];
-                result[faceI](2,2) = tangCmptI[faceI][2];
+                curGeomStiff(0,2) = tangCmptI[faceI][0];
+                curGeomStiff(1,2) = tangCmptI[faceI][1];
+                curGeomStiff(2,2) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YX)
             {
-                result[faceI](0,3) = tangCmptI[faceI][0];
-                result[faceI](1,3) = tangCmptI[faceI][1];
-                result[faceI](2,3) = tangCmptI[faceI][2];
+                curGeomStiff(0,3) = tangCmptI[faceI][0];
+                curGeomStiff(1,3) = tangCmptI[faceI][1];
+                curGeomStiff(2,3) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YY)
             {
-                result[faceI](0,4) = tangCmptI[faceI][0];
-                result[faceI](1,4) = tangCmptI[faceI][1];
-                result[faceI](2,4) = tangCmptI[faceI][2];
+                curGeomStiff(0,4) = tangCmptI[faceI][0];
+                curGeomStiff(1,4) = tangCmptI[faceI][1];
+                curGeomStiff(2,4) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::YZ)
             {
-                result[faceI](0,5) = tangCmptI[faceI][0];
-                result[faceI](1,5) = tangCmptI[faceI][1];
-                result[faceI](2,5) = tangCmptI[faceI][2];
+                curGeomStiff(0,5) = tangCmptI[faceI][0];
+                curGeomStiff(1,5) = tangCmptI[faceI][1];
+                curGeomStiff(2,5) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZX)
             {
-                result[faceI](0,6) = tangCmptI[faceI][0];
-                result[faceI](1,6) = tangCmptI[faceI][1];
-                result[faceI](2,6) = tangCmptI[faceI][2];
+                curGeomStiff(0,6) = tangCmptI[faceI][0];
+                curGeomStiff(1,6) = tangCmptI[faceI][1];
+                curGeomStiff(2,6) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZY)
             {
-                result[faceI](0,7) = tangCmptI[faceI][0];
-                result[faceI](1,7) = tangCmptI[faceI][1];
-                result[faceI](2,7) = tangCmptI[faceI][2];
+                curGeomStiff(0,7) = tangCmptI[faceI][0];
+                curGeomStiff(1,7) = tangCmptI[faceI][1];
+                curGeomStiff(2,7) = tangCmptI[faceI][2];
             }
             else if (cmptI == tensor::ZZ)
             {
-                result[faceI](0,8) = tangCmptI[faceI][0];
-                result[faceI](1,8) = tangCmptI[faceI][1];
-                result[faceI](2,8) = tangCmptI[faceI][2];
+                curGeomStiff(0,8) = tangCmptI[faceI][0];
+                curGeomStiff(1,8) = tangCmptI[faceI][1];
+                curGeomStiff(2,8) = tangCmptI[faceI][2];
             }
         }
 
@@ -605,65 +614,66 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
             {
                 const label faceID = start + fI;
 
+                mat39& curGeomStiff = geometricStiffness[faceID];
+                curGeomStiff.clear();
+
                 if (cmptI == tensor::XX)
                 {
-                    result[faceID](0,0) = tangCmptI[fI][0];
-                    result[faceID](1,0) = tangCmptI[fI][1];
-                    result[faceID](2,0) = tangCmptI[fI][2];
+                    curGeomStiff(0,0) = tangCmptI[fI][0];
+                    curGeomStiff(1,0) = tangCmptI[fI][1];
+                    curGeomStiff(2,0) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::XY)
                 {
-                    result[faceID](0,1) = tangCmptI[fI][0];
-                    result[faceID](1,1) = tangCmptI[fI][1];
-                    result[faceID](2,1) = tangCmptI[fI][2];
+                    curGeomStiff(0,1) = tangCmptI[fI][0];
+                    curGeomStiff(1,1) = tangCmptI[fI][1];
+                    curGeomStiff(2,1) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::XZ)
                 {
-                    result[faceID](0,2) = tangCmptI[fI][0];
-                    result[faceID](1,2) = tangCmptI[fI][1];
-                    result[faceID](2,2) = tangCmptI[fI][2];
+                    curGeomStiff(0,2) = tangCmptI[fI][0];
+                    curGeomStiff(1,2) = tangCmptI[fI][1];
+                    curGeomStiff(2,2) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YX)
                 {
-                    result[faceID](0,3) = tangCmptI[fI][0];
-                    result[faceID](1,3) = tangCmptI[fI][1];
-                    result[faceID](2,3) = tangCmptI[fI][2];
+                    curGeomStiff(0,3) = tangCmptI[fI][0];
+                    curGeomStiff(1,3) = tangCmptI[fI][1];
+                    curGeomStiff(2,3) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YY)
                 {
-                    result[faceID](0,4) = tangCmptI[fI][0];
-                    result[faceID](1,4) = tangCmptI[fI][1];
-                    result[faceID](2,4) = tangCmptI[fI][2];
+                    curGeomStiff(0,4) = tangCmptI[fI][0];
+                    curGeomStiff(1,4) = tangCmptI[fI][1];
+                    curGeomStiff(2,4) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::YZ)
                 {
-                    result[faceID](0,5) = tangCmptI[fI][0];
-                    result[faceID](1,5) = tangCmptI[fI][1];
-                    result[faceID](2,5) = tangCmptI[fI][2];
+                    curGeomStiff(0,5) = tangCmptI[fI][0];
+                    curGeomStiff(1,5) = tangCmptI[fI][1];
+                    curGeomStiff(2,5) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZX)
                 {
-                    result[faceID](0,6) = tangCmptI[fI][0];
-                    result[faceID](1,6) = tangCmptI[fI][1];
-                    result[faceID](2,6) = tangCmptI[fI][2];
+                    curGeomStiff(0,6) = tangCmptI[fI][0];
+                    curGeomStiff(1,6) = tangCmptI[fI][1];
+                    curGeomStiff(2,6) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZY)
                 {
-                    result[faceID](0,7) = tangCmptI[fI][0];
-                    result[faceID](1,7) = tangCmptI[fI][1];
-                    result[faceID](2,7) = tangCmptI[fI][2];
+                    curGeomStiff(0,7) = tangCmptI[fI][0];
+                    curGeomStiff(1,7) = tangCmptI[fI][1];
+                    curGeomStiff(2,7) = tangCmptI[fI][2];
                 }
                 else if (cmptI == tensor::ZZ)
                 {
-                    result[faceID](0,8) = tangCmptI[fI][0];
-                    result[faceID](1,8) = tangCmptI[fI][1];
-                    result[faceID](2,8) = tangCmptI[fI][2];
+                    curGeomStiff(0,8) = tangCmptI[fI][0];
+                    curGeomStiff(1,8) = tangCmptI[fI][1];
+                    curGeomStiff(2,8) = tangCmptI[fI][2];
                 }
             }
         }
     }
-
-    return tresult;
 }
 
 
@@ -833,7 +843,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveSnes()
             pointDI,
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -848,7 +860,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveSnes()
         foamPetscSnesHelper::solution(),
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     pointD().correctBoundaryConditions();
@@ -905,12 +919,13 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveSnes()
     pointVolInterp_.interpolate(pointD(), D());
 #endif
 
-#else  // USE_PETSC not defined
+#else
 
     FatalErrorInFunction
         << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
         << "PETSC installation directory and re-build solids4foam"
         << exit(FatalError);
+
 #endif
 
     return true;
@@ -965,7 +980,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveExplicit()
         {
             if (mesh().geometricD()[dirI] < 0)
             {
-                pointD().primitiveFieldRef().replace(dirI, 0.0);
+                primitiveFieldRef(pointD()).replace(dirI, 0.0);
             }
         }
     }
@@ -983,7 +998,24 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveExplicit()
     );
 
     // Compute acceleration
+#ifdef OPENFOAM_NOT_EXTEND
     pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_ + g();
+#else
+    pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_;
+
+    if (mag(g().value()) > SMALL)
+    {
+        // foam-extend does not implement the addition of a uniform dimensioned
+        // field to a geometric point field so we will do it manually
+        vectorField& pointAI = pointA_;
+        const vector gVec(g().value());
+        forAll(pointAI, pointI)
+        {
+            pointAI[pointI] += gVec;
+        }
+        pointA_.correctBoundaryConditions();
+    }
+#endif
 
     return true;
 }
@@ -1054,6 +1086,9 @@ vertexCentredNonLinGeomTotalLagSolid
             ).value()
         )
     ),
+#ifdef USE_PETSC
+    fixedDofRowsISPtr_(nullptr),
+#endif
     pointP_
     (
         IOobject
@@ -1288,11 +1323,22 @@ vertexCentredNonLinGeomTotalLagSolid
         pointGlobalVolI[pointID] = dualCellVol[dualCellI];
     }
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Sum the shared point volumes to create the point global volumes
     pointConstraints::syncUntransformedData
     (
         mesh(), pointGlobalVol_, plusEqOp<scalar>()
     );
+#else
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Running " + type() + " in parallel us currently only possible in "
+            "OpenFOAM.com versions"
+        );
+    }
+#endif
 
     // Store old time fields
     pointD().oldTime().storeOldTime();
@@ -1347,7 +1393,11 @@ void vertexCentredNonLinGeomTotalLagSolid::setDeltaT(Time& runTime)
             1.0/
             gMax
             (
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<scalar, Foam::surfaceMesh>
+#else
+                Field<scalar>
+#endif
                 (
                     dualMesh().surfaceInterpolation::deltaCoeffs().internalField()
                    *waveSpeed
@@ -1388,23 +1438,40 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+#ifdef OPENFOAM_COM
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << " instead of "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::IMPLICIT_COUPLED]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << "Use "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << " instead of "
+            << solutionAlgorithmNames_[solutionAlgorithm::IMPLICIT_COUPLED]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
     }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+#ifdef OPENFOAM_COM
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << solutionAlgorithmNames_.names()[IMPLICIT_SEGREGATED]
             << " is not implemented. The behaviour can be mimicked with "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << solutionAlgorithmNames_[IMPLICIT_SEGREGATED]
+            << " is not implemented. The behaviour can be mimicked with "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << exit(FatalError);
+#endif
 
         // Keep compiler happy
         return true;
@@ -1415,9 +1482,15 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     }
     else
     {
-        FatalErrorIn("bool evolve()")
+#ifdef OPENFOAM_COM
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
-            << solutionAlgorithmNames_.names() << endl;
+            << solutionAlgorithmNames_.names() << exit(FatalError);
+#else
+        FatalErrorIn("bool vertexCentredNonLinGeomTotalLagSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            << solutionAlgorithmNames_.toc() << exit(FatalError);
+#endif
     }
 
     // Keep compiler happy
@@ -1455,7 +1528,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formResidual
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1534,7 +1609,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     return 0;
@@ -1556,7 +1633,9 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
         x,
         pointDI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the displacement boundary conditions
@@ -1596,26 +1675,22 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
             dualMesh(),
             blockSize_,     // nScalarEqns
             globalPoints().localToGlobalPointMap(),
-            dualImpKf().primitiveField(),
+            dualImpKf(),
             false           // flip sign
         );
     }
     else
     {
         // Calculate the material tangent
-        const Field<scalarSquareMatrix> materialTangent
-        (
-            dualMechanicalPtr_().materialTangentFaceField()
-        );
+        List<mat66> materialTangent(dualMesh().nFaces());
+        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
 
         // The dual mesh undeformed area vectors
         const surfaceVectorField& dualSf = dualMesh().Sf();
 
         // Calculate the geometric stiffness
-        const Field<RectangularMatrix<scalar>> geometricStiffness
-        (
-            geometricStiffnessField(dualSf, dualGradDf_)
-        );
+        List<mat39> geometricStiffness(dualMesh().nFaces());
+        geometricStiffnessField(geometricStiffness, dualSf, dualGradDf_);
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma
@@ -1667,7 +1742,6 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     // the diagonal
     MatZeroRowsColumnsIS(jac, fixedDofRowsIS(), -fixedDofScale_, NULL, NULL);
 
-
     if (solvePressure())
     {
         notImplemented("solvePressure not implemented yet for formJacobian");
@@ -1698,7 +1772,7 @@ void vertexCentredNonLinGeomTotalLagSolid::setTraction
     );
 
     // Lookup point patch field
-    pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
+    pointPatchVectorField& ptPatch = boundaryFieldRef(pointD())[patchID];
 
     if (isA<solidTractionPointPatchVectorField>(ptPatch))
     {
@@ -1749,7 +1823,7 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
 
-    pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+    primitiveFieldRef(pEpsilon) = symm(pGradD.internalField());
     pEpsilon.write();
 
     // Equivalent strain at the points
@@ -1767,7 +1841,7 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
         dimensionedScalar("0", dimless, 0.0)
     );
 
-    pEpsilonEq.primitiveFieldRef() =
+    primitiveFieldRef(pEpsilonEq) =
         sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
     pEpsilonEq.write();
 
@@ -1784,6 +1858,5 @@ void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
 
 } // End namespace Foam
 
-#endif // OPENFOAM_COM
 
 // ************************************************************************* //

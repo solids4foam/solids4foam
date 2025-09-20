@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
 License
     This file is part of solids4foam.
 
@@ -17,34 +17,42 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef FOAMEXTEND
-
-#include "componentMixedPointPatchFields.H"
-#include "pointPatchFields.H"
-#include "pointBoundaryMesh.H"
-#include "pointMesh.H"
-#include "addToRunTimeSelectionTable.H"
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+#include "foamPetscSnesHelper.H"
 
 namespace Foam
 {
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-makeTemplatePointPatchTypeField                                               \
-(                                                                             \
-    pointPatchVectorField,                                                    \
-    componentMixedPointPatchVectorField                                       \
-);                                                                            \
-
-// makePointPatchFields(componentMixed, pointPatch, PointPatch);
-// makePointPatchFields(slip, pointPatch, PointPatch);
+#ifdef OPENFOAM_COM
+    const Enum<foamPetscSnesHelper::solutionLocation>
+    foamPetscSnesHelper::solutionLocationNames_
+    ({
+        {
+            foamPetscSnesHelper::solutionLocation::CELLS,
+            "cells"
+        },
+        {
+            foamPetscSnesHelper::solutionLocation::POINTS,
+            "points"
+        },
+        {
+            foamPetscSnesHelper::solutionLocation::NONE,
+            "none"
+        },
+    });
+#else
+    template<>
+    const char* NamedEnum<foamPetscSnesHelper::solutionLocation, 3>::names[] =
+    {
+     	"cells",
+        "points",
+	"none"
+    };
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-#endif // FOAMEXTEND
 
 // ************************************************************************* //

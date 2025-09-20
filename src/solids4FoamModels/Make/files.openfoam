@@ -5,9 +5,6 @@ solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/checkConvergence.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
-solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
-solidModels/solidModel/foamPetscSnesHelper/petscUtils.C
-solidModels/solidModel/foamPetscSnesHelper/petscErrorHandling.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
@@ -82,7 +79,7 @@ $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(nonLinGeomLaws)/rotationInvariantLinearElastic/rotationInvariantLinearElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
-
+$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 $(nonLinGeomLaws)/YeohElastic/YeohElastic.C
 
@@ -105,6 +102,9 @@ $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorFiel
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidForce/solidForceFvPatchVectorField.C
+$(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorField.C
+$(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorFieldCalcContact.C
+$(solidFvPatchFields)/solidRigidContact/triSurfaceMotion/triSurfaceMotion.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
@@ -116,7 +116,7 @@ $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
-
+$(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
 $(pointPatchFields)/pointLinearSpatialDisplacement/linearSpatialDisplacementPointPatchVectorField.C
 $(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorField.C
@@ -202,10 +202,14 @@ numerics/AMIInterpolationS4F/AMIInterpolationS4FNew.C
 numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4F.C
 numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4FParallelOps.C
 numerics/AMIInterpolationS4F/faceAreaWeightAMIS4F/faceAreaWeightAMIS4F.C
-numerics/boolIOList/boolIOList.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/boolIOList/boolIOList.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/deltaVectors/deltaVectors.C
+numerics/foamPetscSnesHelper/foamPetscSnesHelper.C
+numerics/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
+numerics/foamPetscSnesHelper/petscUtils.C
+numerics/foamPetscSnesHelper/petscErrorHandling.C
 numerics/fvc/fvcCellLimitedGrad.C
 numerics/globalPointIndices/globalPointIndices.C
 numerics/globalPolyPatch/globalPolyPatch.C
@@ -224,7 +228,6 @@ numerics/meshDual/dualMeshToMeshMap.C
 numerics/meshDual/meshDualiser.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/multiplyCoeff/multiplyCoeff.C
-numerics/multiplyCoeff/multiplyCoeffExtended.C
 
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C

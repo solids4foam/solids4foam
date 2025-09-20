@@ -17,9 +17,10 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
-#include "multiplyCoeffExtended.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "surfaceFields.H"
 
@@ -35,7 +36,7 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<scalarSquareMatrix>& materialTangentField,
+    const List<mat66>& materialTangentField,
     const scalar zeta,
     const bool flipSign
 )
@@ -89,8 +90,7 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const scalarSquareMatrix& materialTangent =
-            materialTangentField[dualFaceI];
+        const mat66& materialTangent = materialTangentField[dualFaceI];
 
         // Points in cellID
         const labelList& curCellPoints = cellPoints[cellID];
@@ -270,8 +270,8 @@ void Foam::vfvm::divSigma
     const labelList& localToGlobalPointMap,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<scalarSquareMatrix>& materialTangentField,
-    const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+    const List<mat66>& materialTangentField,
+    const List<mat39>& geometricStiffnessField,
     const symmTensorField& sigmaField,
     const tensorField& dualGradDField,
     const scalar zeta,
@@ -327,12 +327,23 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const scalarSquareMatrix& materialTangent =
-            materialTangentField[dualFaceI];
+        const mat66& materialTangent = materialTangentField[dualFaceI];
 
         // Sensitivity term at the dual mesh face
-        const RectangularMatrix<scalar>& geometricStiffness =
-            geometricStiffnessField[dualFaceI];
+        const mat39& geometricStiffness = geometricStiffnessField[dualFaceI];
+
+        // Info<< "dualFaceI = " << dualFaceI << " ";
+        // for (int i = 0; i < 3; ++i)
+        // {
+        //     for (int j = 0; j < 9; ++j)
+        //     {
+        //         if (mag(geometricStiffness(i, j)) > SMALL)
+        //         {
+        //             Info<< " " << geometricStiffness(i, j);
+        //         }
+        //     }
+        // }
+        // Info<< endl;
 
         // Sigma at the dual mesh face
         const symmTensor sigma = sigmaField[dualFaceI];
@@ -407,7 +418,7 @@ void Foam::vfvm::divSigma
 
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
-            multiplyCoeffExtended
+            multiplyCoeff
             (
                 coeff,
                 curDualSfDef,
@@ -464,7 +475,7 @@ void Foam::vfvm::divSigma
 
         // Compact edge direction coefficient
         tensor edgeDirCoeff;
-        multiplyCoeffExtended
+        multiplyCoeff
         (
             edgeDirCoeff,
             curDualSfDef,
@@ -964,5 +975,6 @@ void Foam::vfvm::laplacian
 //     return tmatrix;
 // }
 
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //

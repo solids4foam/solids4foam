@@ -22,12 +22,14 @@ License
 #include "foamPetscSnesHelper.H"
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
-#include "symmetryPlaneFvPatchFields.H"
 #include "leastSquaresVectors.H"
 #include "fvm.H"
 #include "IFstream.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlaneFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -170,24 +172,6 @@ namespace Foam
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
 
-const Enum<foamPetscSnesHelper::solutionLocation>
-foamPetscSnesHelper::solutionLocationNames_
-({
-    {
-        foamPetscSnesHelper::solutionLocation::CELLS,
-        "cells"
-    },
-    {
-        foamPetscSnesHelper::solutionLocation::POINTS,
-        "points"
-    },
-    {
-        foamPetscSnesHelper::solutionLocation::NONE,
-        "none"
-    },
-});
-
-
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
 
 void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
@@ -220,7 +204,16 @@ void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
             // Take a copy of the faceCells (local IDs) and convert them to
             // global IDs
             labelList globalFaceCells(fp.faceCells());
+#ifdef OPENFOAM_COM
             foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+#else
+            forAll(globalFaceCells, cI)
+            {
+                const label localCellID = globalFaceCells[cI];
+                globalFaceCells[cI] =
+                    foamPetscSnesHelper::globalCells().toGlobal(localCellID);
+            }
+#endif
 
             // Send global IDs to the neighbour proc
             const processorFvPatch& procPatch =
@@ -327,7 +320,11 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
         }
     }
 
+#ifdef OPENFOAM_COM
     return leastSquaresS4fVectors::New(lsName, p.mesh(), useBoundaryFaceValues);
+#else
+    return leastSquaresS4fVectors::New(p.mesh(), useBoundaryFaceValues);
+#endif
 }
 
 
@@ -341,26 +338,26 @@ label foamPetscSnesHelper::initialiseSnes()
 
     // Create the PETSc SNES object
     snes_.s = SNES();
-    CHKERRQ(SNESCreate(PETSC_COMM_WORLD, &snes_.s));
+    AssertPETSc(SNESCreate(PETSC_COMM_WORLD, &snes_.s));
 
     // Create user data context
     snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
     appCtxfoamPetscSnesHelper& user = snesUserPtr_();
 
     // Set the user context
-    CHKERRQ(SNESSetApplicationContext(snes_.s, &user));
+    AssertPETSc(SNESSetApplicationContext(snes_.s, &user));
 
     // Set the residual function
-    CHKERRQ
+    AssertPETSc
     (
         SNESSetFunction(snes_.s, NULL, formResidualFoamPetscSnesHelper, &user)
     );
 
     // The derived class initialises A
-    CHKERRQ(initialiseJacobian(A_.m));
+    AssertPETSc(initialiseJacobian(A_.m));
 
     // Set the Jacobian function
-    CHKERRQ
+    AssertPETSc
     (
         SNESSetJacobian
         (
@@ -369,7 +366,7 @@ label foamPetscSnesHelper::initialiseSnes()
     );
 
     // Set the convergence check function
-    CHKERRQ
+    AssertPETSc
     (
         SNESSetConvergenceTest
         (
@@ -379,10 +376,10 @@ label foamPetscSnesHelper::initialiseSnes()
 
     // Set solver options
     // Uses default options, can be overridden by command line options
-    CHKERRQ(SNESSetFromOptions(snes_.s));
+    AssertPETSc(SNESSetFromOptions(snes_.s));
 
     // The derived class initialises the solution vector
-    CHKERRQ(initialiseSolution(x_.v));
+    AssertPETSc(initialiseSolution(x_.v));
 
     return 0;
 }
@@ -437,9 +434,17 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
         // Lookup the solver in fvSolution and check if PETSc is specified
         bool useDict = false;
+#ifdef OPENFOAM_COM
         if (mesh.solversDict().found(fieldName))
         {
             const dictionary& solverDict = mesh.solverDict(fieldName);
+#else
+        if (mesh.solutionDict().subDict("solvers").found(fieldName))
+        {
+            const dictionary& solverDict =
+                mesh.solutionDict().subDict("solvers").subDict(fieldName);
+#endif
+
             if (!solverDict.empty())
             {
                 if
@@ -464,8 +469,13 @@ foamPetscSnesHelper::foamPetscSnesHelper
             // We will load (push) the empty options database and populate it
             // with options from the the dictionary, then unload (pop) the
             // database
+#ifdef OPENFOAM_NOT_EXTEND
             const dictionary& optionsDict =
                 mesh.solverDict("D").subDict("options");
+#else
+            const dictionary& optionsDict =
+                mesh.solutionDict().solverDict(fieldName).subDict("options");
+#endif
 
             // Load (push) the database
             AssertPETSc(PetscOptionsPush(options_));
@@ -637,7 +647,7 @@ label foamPetscSnesHelper::initialiseJacobian
     }
 
     // Set the block size
-    CHKERRQ(MatSetBlockSize(jac, blockSize));
+    AssertPETSc(MatSetBlockSize(jac, blockSize));
 
     // Count the number of non-zeros in the matrix
     // Note: we assume a compact stencil, i.e. face only face neighbours
@@ -725,10 +735,10 @@ label foamPetscSnesHelper::initialiseJacobian
     }
 
     // Allocate parallel matrix
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
+    //AssertPETSc(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
     // Allocate parallel matrix with the same conservative stencil per node
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    CHKERRQ(MatMPIBAIJSetPreallocation
+    //AssertPETSc(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
+    AssertPETSc(MatMPIBAIJSetPreallocation
     (
         jac, blockSize, 0, d_nnz.data(), 0, o_nnz.data())
     );
@@ -809,15 +819,15 @@ label foamPetscSnesHelper::initialiseSolution
         }
 
         x = Vec();
-        CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
-        CHKERRQ(VecSetSizes(x, n, N));
-        CHKERRQ(VecSetType(x, VECMPI));
+        AssertPETSc(VecCreate(PETSC_COMM_WORLD, &x));
+        AssertPETSc(VecSetSizes(x, n, N));
+        AssertPETSc(VecSetType(x, VECMPI));
     }
 
-    CHKERRQ(VecSetBlockSize(x, blockSize));
-    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
-    CHKERRQ(VecSetFromOptions(x));
-    CHKERRQ(VecZeroEntries(x));
+    AssertPETSc(VecSetBlockSize(x, blockSize));
+    AssertPETSc(PetscObjectSetName((PetscObject) x, "Solution"));
+    AssertPETSc(VecSetFromOptions(x));
+    AssertPETSc(VecZeroEntries(x));
 
     return 0;
 }
@@ -884,7 +894,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
             values[cmptI*blockSize + colOffset] =
                 -sign*VI[ownCellID]*ownLs[faceI][cmptI];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -901,7 +911,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             values[i] = -values[i];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -919,7 +929,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
             values[cmptI*blockSize + colOffset] =
                 -sign*VI[neiCellID]*neiLs[faceI][cmptI];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -935,7 +945,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             values[i] = -values[i];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -977,14 +987,14 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     values[cmptI*blockSize + colOffset] =
                         -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
                         jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
 
                 // Neighbour global cell ID
@@ -998,14 +1008,14 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         sign*patchNeiVols[patchFaceI]
                        *patchNeiLs[patchFaceI][cmptI];
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
                         jac, 1, &globalBlockRowI, 1, &globalBlockColI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
             }
         }
@@ -1018,7 +1028,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         else if
         (
             isA<symmetryPolyPatch>(fp.patch())
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(fp.patch())
+#endif
         )
         {
             // The delta in scalar p across the symmetry is zero by definition
@@ -1052,7 +1064,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         values[cmptI*blockSize + colOffset] =
                             -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                     }
-                    CHKERRQ
+                    AssertPETSc
                     (
                         MatSetValuesBlocked
                         (
@@ -1182,7 +1194,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1204,7 +1216,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1227,7 +1239,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1250,7 +1262,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1274,7 +1286,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1297,7 +1309,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1320,7 +1332,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1343,7 +1355,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1373,7 +1385,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         (
             patch.type() != "empty"
          && !isA<symmetryFvPatchField<vector>>(pU)
+#ifdef OPENFOAM_NOT_EXTEND
          && !isA<symmetryPlaneFvPatchField<vector>>(pU)
+#endif
          && !pU.fixesValue()
         )
         {
@@ -1398,7 +1412,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                             coeff[i*3 + j];
                     }
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
@@ -1532,7 +1546,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     snesHasRun_ = true;
 
     // Solve the nonlinear system
-    SNESSolve(snes_.s, NULL, x_.v);
+    AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
 
     // Un-load the options file
     PetscOptionsPop();

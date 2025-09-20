@@ -17,6 +17,10 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
+#ifdef OPENFOAM_COM
+
 #include "newtonMonolithicCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "directMapInterfaceToInterfaceMapping.H"
@@ -45,6 +49,77 @@ addToRunTimeSelectionTable
 
 
 // * * * * * * * * * * * Private Member Functions* * * * * * * * * * * * * * //
+
+
+void newtonMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
+{
+    if (isFluid_ != nullptr || isMotion_ != nullptr || isSolid_ != nullptr)
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << exit(FatalError);
+    }
+
+    // Set twoD flag
+    const bool twoD = fluid().twoD();
+
+    // Fluid
+    label NFluid = -1;
+    {
+        // Set the number local block equations
+        const label blockn = fluid().mesh().nCells();
+
+        // Fluid and solid block size
+        const label fluidBlockSize = twoD ? 3 : 4;
+
+        // Set the number local scalar equations
+        const label n = blockn*fluidBlockSize;
+
+        // Set the global system size
+        NFluid = returnReduce(n, sumOp<label>());
+
+        // Create the index sets, where it is assumed the motion equations come first
+        ISCreateStride(PETSC_COMM_WORLD, NFluid, 0, 1, &isFluid_);
+    }
+
+    // Fluid mesh motion
+    label NMotion = -1;
+    {
+        // Set the number local block equations
+        // Note: the motion mesh is the fluid mesh
+        const label blockn = fluid().mesh().nCells();
+
+        // Motion and solid block size
+        const label motionBlockSize = twoD ? 2 : 3;
+
+        // Set the number local scalar equations
+        const label n = blockn*motionBlockSize;
+
+        // Set the global system size
+        NMotion = returnReduce(n, sumOp<label>());
+
+        // Create the index sets, where it is assumed the motion equations come first
+        ISCreateStride(PETSC_COMM_WORLD, NMotion, NFluid, 1, &isMotion_);
+    }
+
+    // Solid
+    {
+        // Set the number local block equations
+        const label blockn = solid().mesh().nCells();
+
+        // Solid block size
+        const label solidBlockSize = twoD ? 2 : 3;
+
+        // Set the number local scalar equations
+        const label n = blockn*solidBlockSize;
+
+        // Set the global system size
+        const label NSolid = returnReduce(n, sumOp<label>());
+
+        // Create the solid index set assuming the solid equations are after the
+        // motion equations
+        ISCreateStride(PETSC_COMM_WORLD, NSolid, NMotion, 1, &isSolid_);
+    }
+}
 
 
 foamPetscSnesHelper& newtonMonolithicCouplingInterface::motion()
@@ -1698,6 +1773,7 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     foamPetscSnesHelper
     (
+        "UpD",
         fileName
         (
             fsiProperties().lookupOrDefault<fileName>
@@ -1705,7 +1781,8 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
                 "optionsFile", "petscOptions"
             )
         ),
-        2*fluid().mesh().nCells() + solid().mesh().nCells(),
+        fluid().mesh(), // fluid/fvSolution will be used
+        solutionLocation::NONE,
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true // Will PETSc be used
     ),
@@ -1742,6 +1819,8 @@ newtonMonolithicCouplingInterface::newtonMonolithicCouplingInterface
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
     nRegions_(3),
     subMatsPtr_(nullptr),
+    isFluid_(nullptr),
+    isSolid_(nullptr),
     tsLogPtr_(),
     oldTimeValue_(runTime.value()),
     nConsecutiveFailedSolves_(0),
@@ -2238,21 +2317,21 @@ label newtonMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     //  - Ass: solid equations
 
     // Aff
-    Foam::initialiseJacobian
+    foamPetscSnesHelper::initialiseJacobian
     (
         subMats[0][0], fluid().mesh(), fluidBlockSize, false
     );
     PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
 
     // Amm
-    Foam::initialiseJacobian
+    foamPetscSnesHelper::initialiseJacobian
     (
         subMats[1][1], fluid().mesh(), motionBlockSize, false
     );
     PetscObjectSetName((PetscObject)subMats[1][1], "Amm");
 
     // Ass
-    Foam::initialiseJacobian
+    foamPetscSnesHelper::initialiseJacobian
     (
         subMats[2][2], solid().mesh(), solidBlockSize, false
     );
@@ -2342,8 +2421,8 @@ label newtonMonolithicCouplingInterface::initialiseSolution(Vec& x)
 
 label newtonMonolithicCouplingInterface::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
     // Set twoD flag
@@ -2401,12 +2480,14 @@ label newtonMonolithicCouplingInterface::formResidual
 
         // Retrieve the solution
         // Map the PETSc solution to the U field
+        Vec xFluid = nullptr;
+        VecGetSubVector(x, isFluid(), &xFluid);
+        VecSetBlockSize(xFluid, fluidBlockSize);
         foamPetscSnesHelper::ExtractFieldComponents<vector>
         (
-            x,
+            xFluid,
             U.primitiveFieldRef(),
             0, // Location of U
-            fluidBlockSize,
             fluid().twoD() ? labelList({0,1}) : labelList({0,1,2})
         );
 
@@ -2423,27 +2504,34 @@ label newtonMonolithicCouplingInterface::formResidual
         // p is located in the final component
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x,
+            xFluid,
             p.primitiveFieldRef(),
-            fluidBlockSize - 1, // Location of p component
-            fluidBlockSize
+            fluidBlockSize - 1 // Location of p component
         );
 
         p.correctBoundaryConditions();
+
+        VecRestoreSubVector(x, isFluid(), &xFluid);
     }
 
     // Extract D field (needed for motion interface)
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        &x[solidFirstEqnID],
-        solid().D().primitiveFieldRef(),
-        0, // Location of first component
-        solidBlockSize, // Block size of x
-        twoD ? labelList({0,1}) : labelList({0,1,2})
-    );
+    {
+        Vec xSolid = nullptr;
+        VecGetSubVector(x, isSolid(), &xSolid);
+        VecSetBlockSize(xSolid, solidBlockSize);
+        foamPetscSnesHelper::ExtractFieldComponents<vector>
+        (
+            xSolid,
+            solid().D().primitiveFieldRef(),
+            0, // Location of first component
+            twoD ? labelList({0,1}) : labelList({0,1,2})
+        );
 
-    // Enforce the boundary conditions
-    solid().D().correctBoundaryConditions();
+        // Enforce the boundary conditions
+        solid().D().correctBoundaryConditions();
+
+        VecRestoreSubVector(x, isSolid(), &xSolid);
+    }
 
     // Update gradient of displacement
     solid().mechanical().grad
@@ -2478,17 +2566,23 @@ label newtonMonolithicCouplingInterface::formResidual
         const label fluidPatchID =
             fluidSolidInterface::fluidPatchIndices()[0];
 
-        foamPetscSnesHelper::ExtractFieldComponents<vector>
-        (
-            &x[motionFirstEqnID],
-            motionSolid().D().primitiveFieldRef(),
-            0, // Location of first component
-            solidBlockSize, // Block size of x
-            twoD ? labelList({0,1}) : labelList({0,1,2})
-        );
+        {
+            Vec xMotion = nullptr;
+            VecGetSubVector(x, isMotion(), &xMotion);
+            VecSetBlockSize(xMotion, motionBlockSize);
+            foamPetscSnesHelper::ExtractFieldComponents<vector>
+            (
+                xMotion,
+                motionSolid().D().primitiveFieldRef(),
+                0, // Location of first component
+                twoD ? labelList({0,1}) : labelList({0,1,2})
+            );
 
-        // Enforce the boundary conditions
-        motionSolid().D().correctBoundaryConditions();
+            // Enforce the boundary conditions
+            motionSolid().D().correctBoundaryConditions();
+
+            VecRestoreSubVector(x, isMotion(), &xMotion);
+        }
 
         // Map D to motionD
         mapInterfaceSolidToMeshMotion();
@@ -2622,10 +2716,22 @@ label newtonMonolithicCouplingInterface::formResidual
 
     // 3. Update the solid residual, which now has the correct interface
     //    traction
-    refCast<foamPetscSnesHelper>(solid()).formResidual
-    (
-        &f[solidFirstEqnID], &x[solidFirstEqnID]
-    );
+    // We create a temporary no-copy xSolid and fSolid Vec pointers, which are a
+    // "view" of the solid equations in the full solution vectors x and f
+    {
+        Vec xSolid = nullptr;
+        Vec fSolid = nullptr;
+        VecGetSubVector(x, isSolid(), &xSolid);
+        VecGetSubVector(f, isSolid(), &fSolid);
+        VecSetBlockSize(xSolid, solidBlockSize);
+        VecSetBlockSize(fSolid, solidBlockSize);
+        refCast<foamPetscSnesHelper>(solid()).formResidual
+        (
+            fSolid, xSolid
+        );
+        VecRestoreSubVector(x, isSolid(), &xSolid);
+        VecRestoreSubVector(f, isSolid(), &fSolid);
+    }
 
     // 4. Map the solid interface displacement and velocity to the mesh
     //    motion interface
@@ -2636,10 +2742,20 @@ label newtonMonolithicCouplingInterface::formResidual
 
     // 5. Update the mesh motion residual, which now has the correct interface
     //    displacement
-    refCast<foamPetscSnesHelper>(motionSolid()).formResidual
-    (
-        &f[motionFirstEqnID], &x[motionFirstEqnID]
-    );
+    {
+        Vec xMotion = nullptr;
+        Vec fMotion = nullptr;
+        VecGetSubVector(x, isMotion(), &xMotion);
+        VecGetSubVector(f, isMotion(), &fMotion);
+        VecSetBlockSize(xMotion, motionBlockSize);
+        VecSetBlockSize(fMotion, motionBlockSize);
+        refCast<foamPetscSnesHelper>(motionSolid()).formResidual
+        (
+            fMotion, xMotion
+        );
+        VecRestoreSubVector(x, isMotion(), &xMotion);
+        VecRestoreSubVector(f, isMotion(), &fMotion);
+    }
 
     // 6. Map the mesh motion interface velocity to the fluid interface
     // Note: it is assumed the motion.U() is dDm/dt even for steady-state cases
@@ -2655,28 +2771,43 @@ label newtonMonolithicCouplingInterface::formResidual
     //refCast<foamPetscSnesHelper>(fluid()).formResidual(f, x);
     // The fluid residual should be calculated over the reference
     // configuration
-    refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
-    (
-        f, x, motionSolid()
-    );
+    {
+        Vec xFluid = nullptr;
+        Vec fFluid = nullptr;
+        VecGetSubVector(x, isFluid(), &xFluid);
+        VecGetSubVector(f, isFluid(), &fFluid);
+        VecSetBlockSize(xFluid, fluidBlockSize);
+        VecSetBlockSize(fFluid, fluidBlockSize);
+        refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
+        (
+            fFluid, xFluid, motionSolid()
+        );
+        VecRestoreSubVector(x, isFluid(), &xFluid);
+        VecRestoreSubVector(f, isFluid(), &fFluid);
+    }
 
     // 8. Apply scaling factor to solid and motion equations to preserve the
     // condition number of the monolithic system
     // TODO: what about scaling the fluid equations?
 
+    PetscScalar* ff;
+    VecGetArray(f, &ff);
+
     const label solidSystemEnd =
         solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
     for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
     {
-        f[i] *= solidSystemScaleFactor_;
+        ff[i] *= solidSystemScaleFactor_;
     }
 
     const label motionSystemEnd =
         motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
     for (int i = motionFirstEqnID; i < motionSystemEnd; ++i)
     {
-        f[i] *= motionSystemScaleFactor_;
+        ff[i] *= motionSystemScaleFactor_;
     }
+
+    VecRestoreArray(f, &ff);
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -2685,7 +2816,7 @@ label newtonMonolithicCouplingInterface::formResidual
 label newtonMonolithicCouplingInterface::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
     // Our monolithic system matrix will take the form:
@@ -2737,35 +2868,46 @@ label newtonMonolithicCouplingInterface::formJacobian
     // Set the motion block size
     const label motionBlockSize = solidBlockSize;
 
-    // The scalar row at which the motion equations start
-    const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-    // The scalar row at which the solid equations start
-    const label solidFirstEqnID =
-        motionFirstEqnID + fluidMesh().nCells()*motionBlockSize;
-
     // Form diagonal submatrices
     //  - Aff: fluid equations (momentum and pressure)
     //  - Amm: mesh motion equations in the fluid domain
     //  - Ass: solid equations
 
     // Aff
-    refCast<foamPetscSnesHelper>(fluid()).formJacobian
-    (
-        subMats[0][0], x
-    );
+    {
+        Vec xFluid = nullptr;
+        VecGetSubVector(x, isFluid(), &xFluid);
+        VecSetBlockSize(xFluid, fluidBlockSize);
+        refCast<foamPetscSnesHelper>(fluid()).formJacobian
+        (
+            subMats[0][0], xFluid
+        );
+        VecRestoreSubVector(x, isFluid(), &xFluid);
+    }
 
     // Amm
-    refCast<foamPetscSnesHelper>(motionSolid()).formJacobian
-    (
-        subMats[1][1], &x[motionFirstEqnID]
-    );
+    {
+        Vec xMotion = nullptr;
+        VecGetSubVector(x, isMotion(), &xMotion);
+        VecSetBlockSize(xMotion, motionBlockSize);
+        refCast<foamPetscSnesHelper>(motionSolid()).formJacobian
+        (
+            subMats[1][1], xMotion
+        );
+        VecRestoreSubVector(x, isMotion(), &xMotion);
+    }
 
     // Ass
-    refCast<foamPetscSnesHelper>(solid()).formJacobian
-    (
-        subMats[2][2], &x[solidFirstEqnID]
-    );
+    {
+        Vec xSolid = nullptr;
+        VecGetSubVector(x, isSolid(), &xSolid);
+        VecSetBlockSize(xSolid, solidBlockSize);
+        refCast<foamPetscSnesHelper>(solid()).formJacobian
+        (
+            subMats[2][2], xSolid
+        );
+        VecRestoreSubVector(x, isSolid(), &xSolid);
+    }
 
     // Form off-diagonal submatrices:
     //  - Afm: mesh motion terms in the fluid equations
@@ -2831,5 +2973,9 @@ label newtonMonolithicCouplingInterface::formJacobian
 } // End namespace fluidSolidInterfaces
 
 } // End namespace Foam
+
+#endif // OPENFOAM_NOT_EXTEND
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //
