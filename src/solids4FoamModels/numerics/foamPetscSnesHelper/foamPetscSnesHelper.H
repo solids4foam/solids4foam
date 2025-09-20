@@ -51,7 +51,9 @@ SourceFiles
 #include <petscsnes.h>
 #include <petscksp.h>
 
+#include "PetscHandles.H"
 #include "globalIndex.H"
+#include "globalPointIndices.H"
 #include "volFields.H"
 #include "fvMatrices.H"
 #include "leastSquaresS4fVectors.H"
@@ -82,40 +84,41 @@ typedef struct appCtxfoamPetscSnesHelper
 } appCtxfoamPetscSnesHelper;
 
 
-// * * * * * * * * *  External Helper Functions  * * * * * * * * * * * * * * //
-
 namespace Foam
 {
 
-    //- Initialise Joacobian based on compact stencil of the given mesh with the
-    //  given blockSize (number of scalar equations per cell)
-    label initialiseJacobian
-    (
-        Mat& jac,
-        const fvMesh& mesh,
-        const label blockSize,
-        const bool createMat = true  // MatCreate or similar should be called
-    );
-
-    //- Initialise the solution vector based on the given mesh and
-    //  blockSize (number of scalar equations per cell)
-    label initialiseSolution
-    (
-        Vec& x,
-        const fvMesh& mesh,
-        const label blockSize,
-        const bool createVec = true  // VecCreate or similar should be called
-    );
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
                      Class foamPetscSnesHelper Declaration
 \*---------------------------------------------------------------------------*/
 
 class foamPetscSnesHelper
 {
+public:
+
+        //- Location of the solution unknowns
+        enum solutionLocation
+        {
+            CELLS,
+            POINTS,
+            NONE
+        };
+
+        //- Solution location names
+#ifdef OPENFOAM_COM
+        static const Enum<solutionLocation> solutionLocationNames_;
+#else
+        static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
+#endif
+
+private:
+
     // Private data
+
+        //- Location of the solution unknowns, e.g. cells or points
+        const solutionLocation location_;
 
         //- Was PETSc initialised?
         const Switch initialised_;
@@ -133,18 +136,18 @@ class foamPetscSnesHelper
 
         //- Pointer to the PETSc SNES object
         //  Note that SNES is a pointer type
-        SNES snes_;
+        SnesHandle snes_;
 
         //- Pointer to the PETSc solution vector
         //  Note that Vec is a pointer type
-        Vec x_;
+        VecHandle x_;
 
         //- Pointer to a backup of the PETSc solution vector
-        Vec xBackup_;
+        VecHandle xBackup_;
 
         //- Pointer to the PETSc matrix
         //  Note that Mat is a pointer type
-        Mat A_;
+        MatHandle A_;
 
         //- PETSc user context
         autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
@@ -152,6 +155,10 @@ class foamPetscSnesHelper
         //- Helper object for converting between local (on processor) and global
         //  cell indices
         autoPtr<globalIndex> globalCellsPtr_;
+
+        //- Helper object for converting between local (on processor) and global
+        //  point indices
+        autoPtr<globalPointIndices> globalPointsPtr_;
 
         //- Global cell IDs for the neighbouring processor patch cells
         mutable PtrList<labelList> neiProcGlobalIDs_;
@@ -197,16 +204,24 @@ public:
         //- Construct from nBlocks and blockSize
         //
         //  Parameters:
+        //    solution field name - Name of the solution field used to look up
+        //                          PETSc options from fvSolution
         //    optionsFile         - PETSc options file address
-        //    nLocalBlocks        - Optional: Number of blocks (e.g., cells) on
-        //                          this processor
+        //    mesh                - Used to access the number of cells or points
+        //                          and global syncing activities for points,
+        //                          and fvSolution solvers dictionary
+        //    location            - Optional: Location of the solution unknowns
+        //                          This is used to determine the local-to-global
+        //                          mapping
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc
         foamPetscSnesHelper
         (
+            const word& fieldName,
             fileName optionsFile,
-            const label nLocalBlocks = -1,
+            const fvMesh& mesh,
+            const solutionLocation& location = solutionLocation::CELLS,
             const Switch stopOnPetscError = true,
             const Switch initialise = true
         );
@@ -224,7 +239,7 @@ public:
             //- Non-const access to the PETSc solution vector
             Vec solution()
             {
-                if (!x_)
+                if (!x_.v)
                 {
                     // Initialise snes object
                     if (initialiseSnes() != 0)
@@ -234,25 +249,25 @@ public:
                     }
                 }
 
-                return x_;
+                return x_.v;
             }
 
             //- Non-const access to the PETSc solution vector
             Vec solutionBackup()
             {
-                if (!xBackup_)
+                if (!xBackup_.v)
                 {
                     // Initialise based on x
-                    VecDuplicate(x_, &xBackup_);
+                    VecDuplicate(x_.v, xBackup_.put());
                 }
 
-                return xBackup_;
+                return xBackup_.v;
             }
 
             //- Return a reference to the snes object
             SNES& snes()
             {
-                return snes_;
+                return snes_.s;
             }
 
             //- Return the stopOnPetscError flag
@@ -270,7 +285,25 @@ public:
             //- Const access to the global index object
             const globalIndex& globalCells() const
             {
+                if (globalCellsPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not set" << exit(FatalError);
+                }
+
                 return globalCellsPtr_();
+            }
+
+            //- Const access to the global point object
+            const globalPointIndices& globalPoints() const
+            {
+                if (globalPointsPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not set" << exit(FatalError);
+                }
+
+                return globalPointsPtr_();
             }
 
 
@@ -292,16 +325,38 @@ public:
             //  assigned
             virtual label initialiseJacobian(Mat& jac) = 0;
 
+            //- Initialise Joacobian based on compact stencil of the given mesh with the
+            //  given blockSize (number of scalar equations per cell)
+            label initialiseJacobian
+            (
+                Mat& jac,
+                const fvMesh& mesh,
+                const label blockSize,
+                const bool createMat = true  // MatCreate or similar should be called
+            );
+
             //- Initialise the solution vector
             //  This procedure should set the size of the solution vector
             virtual label initialiseSolution(Vec& x) = 0;
+
+            //- Initialise the solution vector based on the given mesh and
+            //  blockSize
+            label initialiseSolution
+            (
+                Vec& x,
+                const fvMesh& mesh,
+                const label blockSize,
+                const bool createVec = true  // VecCreate or similar should be called
+            );
 
             //- Calculate the residual of the governing equations
             //  A non-zero return value indicates an error
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,         // Residual
+                const Vec x    // Solution
+                // PetscScalar *f,        // Residual
+                // const PetscScalar *x   // Solution
             ) = 0;
 
             //- Form the Jacobian
@@ -311,8 +366,9 @@ public:
             //  return value indicates an error
             virtual label formJacobian
             (
-                Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
+                // const PetscScalar *x  // Solution
             ) = 0;
 
             //- Inserts the OpenFOAM fvMatrix 'fvM' into the PETSc matrix 'jac'.
@@ -500,7 +556,94 @@ public:
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#endif // #ifdef USE_PETSC
+#else  // !USE_PETSC
+
+// Minimal opaque PETSc types so signatures compile without PETSc headers
+typedef struct _p_Mat*  Mat;
+typedef struct _p_Vec*  Vec;
+typedef struct _p_SNES* SNES;
+
+#include "Switch.H"
+#include "word.H"
+#include "fileName.H"
+#include "fvMesh.H"
+#include "List.H"
+#include "label.H"
+
+// Keep it in the Foam namespace like the real one
+namespace Foam
+{
+
+class foamPetscSnesHelper
+{
+public:
+    // Same enum so downstream code compiles
+    enum solutionLocation { CELLS, POINTS, NONE };
+
+#ifdef OPENFOAM_COM
+    // If you rely on solutionLocationNames_, you can still declare it.
+    // Provide a definition in a .C for the no-PETSc build if needed,
+    // or omit it if not referenced.
+    static const Enum<solutionLocation> solutionLocationNames_;
+#else
+    static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
+#endif
+
+    // Constructor with identical signature: does nothing in no-PETSc builds
+    foamPetscSnesHelper
+    (
+        const word& /*fieldName*/,
+        fileName /*optionsFile*/,
+        const fvMesh& /*mesh*/,
+        const solutionLocation& /*location*/ = solutionLocation::CELLS,
+        const Switch /*stopOnPetscError*/ = true,
+        const Switch /*initialise*/ = true
+    )
+    {}
+
+    virtual ~foamPetscSnesHelper() {}
+
+    // --- Minimal API surface you might call even when PETSc is off
+
+    // If something accidentally calls solve() without PETSc, you can either:
+    //  a) return an error code (0=success in your code? pick a non-zero),
+    //  b) or abort loudly.
+    int solve(const bool /*returnOnSnesError*/ = false)
+    {
+        FatalErrorInFunction
+            << "PETSc support disabled at compile time (USE_PETSC not defined)"
+            << abort(FatalError);
+        return -1;
+    }
+
+    // If you ever take the SNES by reference, provide a stub accessor
+    // to keep overload resolution happy (don’t call it!)
+    SNES& snes()
+    {
+        FatalErrorInFunction
+            << "PETSc support disabled at compile time"
+            << abort(FatalError);
+        static SNES dummy = nullptr; // never reached
+        return dummy;
+    }
+
+    // --- Keep the pure virtuals so derived classes still compile & define them
+    virtual label initialiseJacobian(Mat& /*jac*/) { return 0; }
+    virtual label initialiseSolution(Vec& /*x*/) { return 0; }
+    virtual label formResidual(Vec /*f*/, const Vec /*x*/) { return 0; }
+    virtual label formJacobian(Mat /*jac*/, const Vec /*x*/) { return 0; }
+
+    // If you have template helpers that don’t depend on PETSc directly,
+    // you can keep them here as well (or omit to keep the stub minimal).
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+} // namespace Foam
+
+#endif // #ifndef USE_PETSC
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

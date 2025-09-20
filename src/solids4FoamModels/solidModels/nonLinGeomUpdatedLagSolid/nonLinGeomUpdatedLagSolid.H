@@ -196,6 +196,7 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
+#ifdef USE_PETSC
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
             //  the matrix
@@ -209,16 +210,17 @@ public:
             //  array) vector
             virtual label formResidual
             (
-                PetscScalar *f,        // Residual
-                const PetscScalar *x   // Solution
+                Vec f,        // Residual
+                const Vec x   // Solution
             );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
                 Mat jac,              // Jacobian
-                const PetscScalar *x  // Solution
+                const Vec x  // Solution
             );
+#endif // USE_PETSC
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad

@@ -25,6 +25,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -299,6 +300,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
 bool linGeomTotalDispSolid::evolveSnes()
 {
+#ifdef USE_PETSC
     Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
 
     // Update D boundary conditions
@@ -319,7 +321,9 @@ bool linGeomTotalDispSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -328,16 +332,15 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Retrieve the solution
     // Map the PETSc solution to the D field
+    vectorField& DI = D();
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
-#ifdef OPENFOAM_NOT_EXTEND
-        D().primitiveFieldRef(),
-#else
-        D().internalField(),
-#endif
+        DI,
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     D().correctBoundaryConditions();
@@ -346,10 +349,11 @@ bool linGeomTotalDispSolid::evolveSnes()
     {
         // Map the PETSc solution to the p field
         // p is located in the 4th component
+        scalarField& pI = p();
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
             foamPetscSnesHelper::solution(),
-            p().primitiveFieldRef(),
+            pI,
             blockSize_ - 1 // Location of p component
         );
 
@@ -371,6 +375,15 @@ bool linGeomTotalDispSolid::evolveSnes()
 
     // Velocity
     U() = fvc::ddt(D());
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
 
     return true;
 }
@@ -524,7 +537,7 @@ const surfaceScalarField& linGeomTotalDispSolid::pDiffusivity() const
         makePDiffusivity();
     }
 
-    return pDiffusivityPtr_.ref();
+    return autoPtrRef(pDiffusivityPtr_);
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -538,6 +551,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
+        "D",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>
@@ -545,7 +559,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh().nCells(),
+        mesh(),
+        solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -811,24 +826,26 @@ bool linGeomTotalDispSolid::evolve()
 }
 
 
+#ifdef USE_PETSC
+
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
-    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 
 label linGeomTotalDispSolid::initialiseSolution(Vec& x)
 {
     // Initialise based on mesh.nCells()
-    return Foam::initialiseSolution(x, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
 }
 
 
 label linGeomTotalDispSolid::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
     const fvMesh& mesh = this->mesh();
@@ -841,8 +858,9 @@ label linGeomTotalDispSolid::formResidual
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -867,7 +885,7 @@ label linGeomTotalDispSolid::formResidual
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions
@@ -923,8 +941,9 @@ label linGeomTotalDispSolid::formResidual
         residual,
         f,
         0, // Location of first component
-        blockSize_, // Block size of x
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     if (solvePressure())
@@ -963,7 +982,7 @@ label linGeomTotalDispSolid::formResidual
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            pressureResidual, f, blockSize_ - 1, blockSize_
+            pressureResidual, f, blockSize_ - 1
         );
     }
 
@@ -974,7 +993,7 @@ label linGeomTotalDispSolid::formResidual
 label linGeomTotalDispSolid::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
     // Copy x into the D field
@@ -985,8 +1004,9 @@ label linGeomTotalDispSolid::formJacobian
         x,
         DI,
         0, // Location of first component
-        blockSize_, // Block size of x
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -999,7 +1019,7 @@ label linGeomTotalDispSolid::formJacobian
         scalarField& pI = p;
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1, blockSize_
+            x, pI, blockSize_ - 1
         );
 
         // Enforce the boundary conditions
@@ -1082,6 +1102,7 @@ label linGeomTotalDispSolid::formJacobian
     return 0;
 }
 
+#endif // USE_PETSC
 
 tmp<vectorField> linGeomTotalDispSolid::tractionBoundarySnGrad
 (

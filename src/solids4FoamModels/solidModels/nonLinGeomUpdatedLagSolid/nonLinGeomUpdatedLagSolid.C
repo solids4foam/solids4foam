@@ -26,6 +26,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -271,6 +272,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
 
 bool nonLinGeomUpdatedLagSolid::evolveSnes()
 {
+#ifdef USE_PETSC
     Info<< "Solving the momentum equation for DD using PETSc SNES" << endl;
 
     // Update D boundary conditions
@@ -295,7 +297,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 #endif
             foamPetscSnesHelper::solution(),
             0, // Location of first component
-            solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
     }
 
@@ -313,7 +317,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         DD().internalField(),
 #endif
         0, // Location of first component
-        solidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     DD().correctBoundaryConditions();
@@ -334,6 +340,15 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     // Acceleration
     A_ = fvc::d2dt2(D());
 
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
+
     return true;
 }
 
@@ -349,6 +364,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
+        "DD",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>
@@ -356,7 +372,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 "optionsFile", "petscOptions"
             )
         ),
-        mesh().nCells(),
+        mesh(),
+        solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
@@ -604,24 +621,26 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 }
 
 
+#ifdef USE_PETSC
+
 label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
-    return Foam::initialiseJacobian(jac, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
 
 
 label nonLinGeomUpdatedLagSolid::initialiseSolution(Vec& x)
 {
     // Initialise based on mesh.nCells()
-    return Foam::initialiseSolution(x, mesh(), blockSize_);
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
 }
 
 
 label nonLinGeomUpdatedLagSolid::formResidual
 (
-    PetscScalar *f,
-    const PetscScalar *x
+    Vec f,
+    const Vec x
 )
 {
     // Copy x into the DD field
@@ -632,7 +651,9 @@ label nonLinGeomUpdatedLagSolid::formResidual
         x,
         DDI,
         0,                          // Location of first DDI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -718,8 +739,15 @@ label nonLinGeomUpdatedLagSolid::formResidual
         residual,
         f,
         0,                          // Location of first DI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
+
+    if (solvePressure())
+    {
+        notImplemented("Not implemented for active 'solvePressure'");
+    }
 
     return 0;
 }
@@ -728,7 +756,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
 label nonLinGeomUpdatedLagSolid::formJacobian
 (
     Mat jac,
-    const PetscScalar *x
+    const Vec x
 )
 {
     // Copy x into the DD field
@@ -739,7 +767,9 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         x,
         DDI,
         0,                          // Location of first DDI component
-        solidModel::twoD() ? 2 : 3  // Number of components to extract
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
     // Enforce the boundary conditions
@@ -769,6 +799,8 @@ label nonLinGeomUpdatedLagSolid::formJacobian
     return 0;
 }
 
+
+#endif // USE_PETSC
 
 tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 (

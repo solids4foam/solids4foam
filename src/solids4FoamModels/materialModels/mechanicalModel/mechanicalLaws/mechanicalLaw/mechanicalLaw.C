@@ -1618,20 +1618,17 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::mechanicalLaw::materialTangentField() const
+void Foam::mechanicalLaw::materialTangentField(List<mat66>& matTan) const
 {
-    // Default to uniform field
-    // This function can be overwritten in specific mechanical laws
-    tmp<Field<scalarSquareMatrix>> tresult
-    (
-        new Field<scalarSquareMatrix>(mesh().nFaces(), materialTangent())
-    );
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
-    return tresult;
+    // Default to uniform field
+    forAll(matTan, faceI)
+    {
+        matTan[faceI] = materialTangent();
+    }
 }
-#endif
 
 
 void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)

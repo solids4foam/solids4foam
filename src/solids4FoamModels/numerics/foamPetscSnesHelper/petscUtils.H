@@ -15,48 +15,54 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
-Function
-    multiplyCoeffRectMat
+Namespace
+    Foam::PetscUtils
 
 Description
-    Helper function used when assembling finite volume solid mechanics block
-    coupled stiffness matrices.
+    Utilities for OpenFOAM / PETSc interaction
 
-SourceFile
-    multiplyCoeffRectMat.C
+    This file was copied and modified from the petsc4Foam library.
 
-Author
-    Philip Cardiff, UCD. All rights reserved.
-    Federico Mazzanti, UCD. All rights reserved.
+SourceFiles
+    petscUtils.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef multiplyCoeffRectMat_H
-#define multiplyCoeffRectMat_H
+#ifndef Foam_module_petscUtils_H
+#define Foam_module_petscUtils_H
 
-#include "fieldTypes.H"
-#include "RectangularMatrix.H"
+// OpenFOAM
+#include "scalarField.H"
+
+// PETSc
+#include "petscvec.h"
+#include "petscksp.h"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-    // This function multiplies a vector by a 4th order tensor by a third
-    // order tensor as encountered in the assembling of block coefficients
-    // in a finite volume solid mechanics procedure. The result is placed
-    // in the coeff variable.
-    // The multiplication evaluates the following in index notation:
-    //     coeff_ij = Sf_m C_mikl g_k delta_lj
-    // where delta is kronecker delta
-    void multiplyCoeffRectMat
-    (
-        tensor& coeff,
-        const vector& Sf,
-        const RectangularMatrix<scalar>& C,
-        const vector& g
-    );
+namespace PetscUtils
+{
 
+/*---------------------------------------------------------------------------*\
+                             Namespace PetscUtils
+\*---------------------------------------------------------------------------*/
+
+//- Set PETSc flags.
+//  The prefix does not contain a leading '-'
+void setFlags
+(
+    const word& prefix,
+    const dictionary& dict,
+    const bool verbose = false
+);
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace PetscUtils
 } // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

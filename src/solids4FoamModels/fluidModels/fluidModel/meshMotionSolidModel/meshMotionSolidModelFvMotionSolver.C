@@ -17,8 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "meshMotionSolidModelFvMotionSolver.H"
-#include "motionInterpolation.H"
 #include "motionDiffusivity.H"
 #include "fvmLaplacian.H"
 #include "addToRunTimeSelectionTable.H"
@@ -28,6 +29,7 @@ License
 #include "fvcLaplacian.H"
 #include "mapPolyMesh.H"
 #include "fvOptions.H"
+#include "motionInterpolation.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -150,5 +152,6 @@ void Foam::meshMotionSolidModelFvMotionSolver::updateMesh
     displacementMotionSolver::updateMesh(mpm);
 }
 
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

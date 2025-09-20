@@ -22,10 +22,14 @@ License
 #include "foamPetscSnesHelper.H"
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
-#include "symmetryPlaneFvPatchFields.H"
 #include "leastSquaresVectors.H"
 #include "fvm.H"
 #include "IFstream.H"
+#include "petscUtils.H"
+#include "petscErrorHandling.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "symmetryPlaneFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -48,7 +52,7 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     CHKERRQ(VecGetArray(f, &ff));
 
     // Compute the residual
-    if (user->solMod_.formResidual(ff, xx) != 0)
+    if (user->solMod_.formResidual(f, x) != 0)
     {
         if (user->solMod_.stopOnPetscError())
         {
@@ -104,7 +108,7 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     CHKERRQ(MatZeroEntries(B));
 
     // Populate the Jacobian => implemented by the solid model
-    if (user->solMod_.formJacobian(B, xx) != 0)
+    if (user->solMod_.formJacobian(B, x) != 0)
     {
         Foam::FatalError
             << "formJacobian(B, xx) returned an error code!"
@@ -158,137 +162,6 @@ PetscErrorCode convergenceCheckFoamPetscSnesHelper
 }
 
 
-Foam::label Foam::initialiseJacobian
-(
-    Mat& jac,
-    const fvMesh& mesh,
-    const label blockSize,
-    const bool createMat
-)
-{
-    // Count number of local blocks and local scalar equations
-    const label blockn = mesh.nCells();
-    const label n = blockn*blockSize;
-
-    // Global system size: total number of scalar equation across all
-    // processors
-    const label N = returnReduce(n, sumOp<label>());
-
-    // // Set the Jacobian matrix size
-    if (createMat)
-    {
-        MatCreate(PETSC_COMM_WORLD, &jac);
-        MatSetFromOptions(jac);
-        MatSetSizes(jac, n, n, N, N);
-        MatSetType(jac, MATMPIAIJ);
-    }
-
-    // Set the block size
-    CHKERRQ(MatSetBlockSize(jac, blockSize));
-
-    // Count the number of non-zeros in the matrix
-    // Note: we assume a compact stencil, i.e. face only face neighbours
-
-    // Number of on-processor non-zeros per row
-    label* d_nnz = (label*)malloc(blockn*sizeof(*d_nnz));
-
-    // Number of off-processor non-zeros per row
-    label* o_nnz = (label*)malloc(blockn*sizeof(*o_nnz));
-
-    // Initialise d_nnz to one and o_nnz to zero
-    for (int i = 0; i < blockn; ++i)
-    {
-        d_nnz[i] = 1; // count diagonal cell
-        o_nnz[i] = 0;
-    }
-
-    // Take a reference to the mesh
-    //const Foam::fvMesh& mesh = user->solMod_.fmesh();
-
-    // Count neighbours sharing an internal face
-    const Foam::labelUList& own = mesh.owner();
-    const Foam::labelUList& nei = mesh.neighbour();
-    forAll(own, faceI)
-    {
-        const Foam::label ownCellID = own[faceI];
-        const Foam::label neiCellID = nei[faceI];
-        d_nnz[ownCellID]++;
-        d_nnz[neiCellID]++;
-    }
-
-    // Count off-processor neighbour cells
-    forAll(mesh.boundary(), patchI)
-    {
-        if (mesh.boundary()[patchI].type() == "processor")
-        {
-            const Foam::labelUList& faceCells =
-                mesh.boundary()[patchI].faceCells();
-
-            forAll(faceCells, fcI)
-            {
-                const Foam::label cellID = faceCells[fcI];
-                o_nnz[cellID]++;
-            }
-        }
-        else if (mesh.boundary()[patchI].coupled())
-        {
-            // Other coupled boundaries are not implemented
-            Foam::FatalError
-                << "Coupled boundary are not implemented, except for"
-                << " processor boundaries" << Foam::abort(Foam::FatalError);
-        }
-    }
-
-    // Allocate parallel matrix
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
-    // Allocate parallel matrix with the same conservative stencil per node
-    //CHKERRQ(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    CHKERRQ(MatMPIBAIJSetPreallocation(jac, blockSize, 0, d_nnz, 0, o_nnz));
-
-    // Raise an error if mallocs are required during matrix assembly
-    MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
-
-    // Free memory
-    free(d_nnz);
-    free(o_nnz);
-
-    return 0;
-}
-
-
-Foam::label Foam::initialiseSolution
-(
-    Vec& x,
-    const fvMesh& mesh,
-    const label blockSize,
-    const bool createVec
-)
-{
-    if (createVec)
-    {
-        // Count number of local blocks and local scalar equations
-        const label blockn = mesh.nCells();
-        const label n = blockn*blockSize;
-
-        // Global system size: total number of scalar equation across all
-        // processors
-        const label N = returnReduce(n, sumOp<label>());
-
-        x = Vec();
-        CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
-        CHKERRQ(VecSetSizes(x, n, N));
-        CHKERRQ(VecSetType(x, VECMPI));
-    }
-
-    CHKERRQ(VecSetBlockSize(x, blockSize));
-    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
-    CHKERRQ(VecSetFromOptions(x));
-    CHKERRQ(VecZeroEntries(x));
-
-    return 0;
-}
-
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
@@ -298,7 +171,6 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(foamPetscSnesHelper, 0);
-
 
 // * * * * * * * * * * * * * * * Private Function  * * * * * * * * * * * * * //
 
@@ -332,7 +204,16 @@ void foamPetscSnesHelper::makeNeiProcFields(const fvMesh& mesh) const
             // Take a copy of the faceCells (local IDs) and convert them to
             // global IDs
             labelList globalFaceCells(fp.faceCells());
+#ifdef OPENFOAM_COM
             foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+#else
+            forAll(globalFaceCells, cI)
+            {
+                const label localCellID = globalFaceCells[cI];
+                globalFaceCells[cI] =
+                    foamPetscSnesHelper::globalCells().toGlobal(localCellID);
+            }
+#endif
 
             // Send global IDs to the neighbour proc
             const processorFvPatch& procPatch =
@@ -439,58 +320,66 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
         }
     }
 
+#ifdef OPENFOAM_COM
     return leastSquaresS4fVectors::New(lsName, p.mesh(), useBoundaryFaceValues);
+#else
+    return leastSquaresS4fVectors::New(p.mesh(), useBoundaryFaceValues);
+#endif
 }
 
 
 label foamPetscSnesHelper::initialiseSnes()
 {
-    if (snes_)
+    if (snes_.s)
     {
         FatalErrorInFunction
             << "Pointer already set" << abort(FatalError);
     }
 
     // Create the PETSc SNES object
-    snes_ = SNES();
-    CHKERRQ(SNESCreate(PETSC_COMM_WORLD, &snes_));
+    snes_.s = SNES();
+    AssertPETSc(SNESCreate(PETSC_COMM_WORLD, &snes_.s));
 
     // Create user data context
     snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
     appCtxfoamPetscSnesHelper& user = snesUserPtr_();
 
     // Set the user context
-    CHKERRQ(SNESSetApplicationContext(snes_, &user));
+    AssertPETSc(SNESSetApplicationContext(snes_.s, &user));
 
     // Set the residual function
-    CHKERRQ
+    AssertPETSc
     (
-        SNESSetFunction(snes_, NULL, formResidualFoamPetscSnesHelper, &user)
+        SNESSetFunction(snes_.s, NULL, formResidualFoamPetscSnesHelper, &user)
     );
 
     // The derived class initialises A
-    CHKERRQ(initialiseJacobian(A_));
+    AssertPETSc(initialiseJacobian(A_.m));
 
     // Set the Jacobian function
-    CHKERRQ
+    AssertPETSc
     (
-        SNESSetJacobian(snes_, A_, A_, formJacobianFoamPetscSnesHelper, &user)
+        SNESSetJacobian
+        (
+            snes_.s, A_.m, A_.m, formJacobianFoamPetscSnesHelper, &user
+        )
     );
 
     // Set the convergence check function
-    CHKERRQ
+    AssertPETSc
     (
         SNESSetConvergenceTest
         (
-            snes_, convergenceCheckFoamPetscSnesHelper, &user, NULL
+            snes_.s, convergenceCheckFoamPetscSnesHelper, &user, NULL
         )
     );
+
     // Set solver options
     // Uses default options, can be overridden by command line options
-    CHKERRQ(SNESSetFromOptions(snes_));
+    AssertPETSc(SNESSetFromOptions(snes_.s));
 
     // The derived class initialises the solution vector
-    CHKERRQ(initialiseSolution(x_));
+    AssertPETSc(initialiseSolution(x_.v));
 
     return 0;
 }
@@ -501,24 +390,35 @@ label foamPetscSnesHelper::initialiseSnes()
 
 foamPetscSnesHelper::foamPetscSnesHelper
 (
+    const word& fieldName,
     fileName optionsFile,
-    const label nLocalBlocks,
+    const fvMesh& mesh,
+    const solutionLocation& location,
     const Switch stopOnPetscError,
     const Switch initialise
 )
 :
+    location_(location),
     initialised_(initialise),
     options_(nullptr),
     stopOnPetscError_(stopOnPetscError),
     diverged_(false),
-    snes_(nullptr),
-    x_(nullptr),
-    xBackup_(nullptr),
-    A_(nullptr),
+    snes_(),
+    x_(),
+    xBackup_(),
+    A_(),
     snesUserPtr_(),
     globalCellsPtr_
     (
-        nLocalBlocks >= 0 ? new globalIndex(nLocalBlocks) : nullptr
+        location == solutionLocation::CELLS
+      ? new globalIndex(mesh.nCells())
+      : nullptr
+    ),
+    globalPointsPtr_
+    (
+        location == solutionLocation::POINTS
+      ? new globalPointIndices(mesh)
+      : nullptr
     ),
     neiProcGlobalIDs_(),
     neiProcVolumes_(),
@@ -526,30 +426,91 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        // Expand the options file name
-        optionsFile.expand();
+        // Initialise PETSc without any options file
+        PetscInitialize(NULL, NULL, NULL, NULL);
 
-        // Check the options file exists
-        IFstream is(optionsFile);
-        if (!is.good())
+        // Create and store the options database from a dedicated options file
+        // or from an OpenFOAM dict
+
+        // Lookup the solver in fvSolution and check if PETSc is specified
+        bool useDict = false;
+#ifdef OPENFOAM_COM
+        if (mesh.solversDict().found(fieldName))
         {
-            FatalErrorInFunction
-                << "Cannot find the PETSc options file: " << optionsFile
-                << abort(FatalError);
+            const dictionary& solverDict = mesh.solverDict(fieldName);
+#else
+        if (mesh.solutionDict().subDict("solvers").found(fieldName))
+        {
+            const dictionary& solverDict =
+                mesh.solutionDict().subDict("solvers").subDict(fieldName);
+#endif
+
+            if (!solverDict.empty())
+            {
+                if
+                (
+                    solverDict.lookupOrDefault<word>("solver", "none")
+                 == "petsc"
+                )
+                {
+                    useDict = true;
+                }
+            }
         }
 
-        // Initialise PETSc with an options file, but we will need to reset it
-        // before each call to snes.solve as PETSc actively uses only one
-        // options database and there may be several objects using PETSc, e.g.
-        // solid solver, fluid solver, mesh motion
-        PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
-
-        // Create and store the options database
+        // Create an empty options database
         PetscOptionsCreate(&options_);
-        PetscOptionsInsertFile
-        (
-            PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
-        );
+
+        // Populate the options database from the dict or options file
+        if (useDict)
+        {
+            Info<< "Reading the PETSc options from fvSolution" << endl;
+
+            // We will load (push) the empty options database and populate it
+            // with options from the the dictionary, then unload (pop) the
+            // database
+#ifdef OPENFOAM_NOT_EXTEND
+            const dictionary& optionsDict =
+                mesh.solverDict("D").subDict("options");
+#else
+            const dictionary& optionsDict =
+                mesh.solutionDict().solverDict(fieldName).subDict("options");
+#endif
+
+            // Load (push) the database
+            AssertPETSc(PetscOptionsPush(options_));
+
+            // Populate the database
+            PetscUtils::setFlags("", optionsDict, debug);
+
+            // Unload (pop) the database
+            AssertPETSc(PetscOptionsPop());
+        }
+        else
+        {
+            Info<< "Reading the PETSc options from the " << optionsFile
+                << " file" << endl;
+
+            // Expand the options file name
+            optionsFile.expand();
+
+            // Check the options file exists
+            IFstream is(optionsFile);
+            if (!is.good())
+            {
+                FatalErrorInFunction
+                    << "Cannot find the PETSc options file: " << optionsFile
+                    << ". Either provide an option file or add the PETSc "
+                    << "solver settings to fvSolution/solvers/" << fieldName
+                    << exit(FatalError);
+            }
+
+            // Populate the options database with the options file
+            PetscOptionsInsertFile
+            (
+                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
+            );
+        }
     }
 }
 
@@ -561,9 +522,6 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
     if (initialised_)
     {
         PetscOptionsDestroy(&options_);
-        SNESDestroy(&snes_);
-        VecDestroy(&x_);
-        MatDestroy(&A_);
         snesUserPtr_.clear();
 
         WarningInFunction
@@ -579,11 +537,10 @@ void foamPetscSnesHelper::resetSnes()
 {
     Info<< "Resetting SNES" << endl;
 
-    SNESDestroy(&snes_);
-    VecDestroy(&x_);
-    MatDestroy(&A_);
+    snes_.reset();
+    x_.reset();
+    A_.reset();
     snesUserPtr_.clear();
-    //initialised_ = false;
 
     if (initialiseSnes() != 0)
     {
@@ -592,7 +549,7 @@ void foamPetscSnesHelper::resetSnes()
     }
 
     // Reset SNES internal state
-    //SNESReset(foamPetscSnesHelper::snes());
+    // SNESReset(foamPetscSnesHelper::snes());
     // Reset KSP and PC
     // KSP ksp;
     // SNESGetKSP(foamPetscSnesHelper::snes(), &ksp);
@@ -608,6 +565,271 @@ void foamPetscSnesHelper::resetSnes()
     // SNESLineSearch ls;
     // SNESGetLineSearch(foamPetscSnesHelper::snes(), &ls);
     // SNESLineSearchReset(ls);
+}
+
+
+label foamPetscSnesHelper::initialiseJacobian
+(
+    Mat& jac,
+    const fvMesh& mesh,
+    const label blockSize,
+    const bool createMat
+)
+{
+    // Number of local block equations
+    label blockn = -1;
+
+    // Number of local scalar equations, i.e. blockn*blockSize
+    label n = -1;
+
+    // Number of scalar equations across all processors
+    label N = -1;
+
+    if (location_ == solutionLocation::CELLS)
+    {
+        // Set the number local block equations
+        blockn = mesh.nCells();
+
+        // Set the number local scalar equations
+        n = mesh.nCells()*blockSize;
+
+        // Set the global system size
+        N = returnReduce(n, sumOp<label>());
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // Note: the size of x is, in general, not equal to the number of
+        // points on this processor, as x only contains the points owned by
+        // this processor. To access the values not-owned by the proc, we
+        // need to request the values from the other processors
+
+        // Take references for brevity and efficiency
+        const labelList& localToGlobalPointMap =
+            globalPoints().localToGlobalPointMap();
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+
+        // Find size of global system
+        // i.e. the highest global point index + 1
+        const label blockN = gMax(localToGlobalPointMap) + 1;
+        N = blockSize*blockN;
+
+        // Find the start and end global point indices for this proc
+        label blockStartID = N;
+        label blockEndID = -1;
+        forAll(ownedByThisProc, pI)
+        {
+            if (ownedByThisProc[pI])
+            {
+                blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+                blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+            }
+        }
+
+        // Find size of local system, i.e. the range of points owned by this
+        // proc
+        blockn = blockEndID - blockStartID + 1;
+        n = blockSize*blockn;
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_
+            << exit(FatalError);
+    }
+
+    // Set the Jacobian matrix size
+    if (createMat)
+    {
+        MatCreate(PETSC_COMM_WORLD, &jac);
+        MatSetFromOptions(jac);
+        MatSetSizes(jac, n, n, N, N);
+        MatSetType(jac, MATMPIAIJ);
+    }
+
+    // Set the block size
+    AssertPETSc(MatSetBlockSize(jac, blockSize));
+
+    // Count the number of non-zeros in the matrix
+    // Note: we assume a compact stencil, i.e. face only face neighbours
+
+    // Number of on-processor non-zeros per row
+    // Initialise d_nnz to one
+    labelList d_nnz(blockn, 1);
+
+    // Number of off-processor non-zeros per row
+    // Initialise o_nnz to zero
+    labelList o_nnz(blockn, 0);
+
+    // Count the neighbours
+    if (location_ == solutionLocation::CELLS)
+    {
+        // Count neighbours sharing an internal face
+        const Foam::labelUList& own = mesh.owner();
+        const Foam::labelUList& nei = mesh.neighbour();
+        forAll(own, faceI)
+        {
+            const Foam::label ownCellID = own[faceI];
+            const Foam::label neiCellID = nei[faceI];
+            d_nnz[ownCellID]++;
+            d_nnz[neiCellID]++;
+        }
+
+        // Count off-processor neighbour cells
+        forAll(mesh.boundary(), patchI)
+        {
+            if (mesh.boundary()[patchI].type() == "processor")
+            {
+                const Foam::labelUList& faceCells =
+                    mesh.boundary()[patchI].faceCells();
+
+                forAll(faceCells, fcI)
+                {
+                    const Foam::label cellID = faceCells[fcI];
+                    o_nnz[cellID]++;
+                }
+            }
+            else if (mesh.boundary()[patchI].coupled())
+            {
+                // Other coupled boundaries are not implemented
+                Foam::FatalError
+                    << "Coupled boundary are not implemented, except for"
+                    << " processor boundaries" << Foam::abort(Foam::FatalError);
+            }
+        }
+    }
+    else if (location_ == solutionLocation::POINTS)
+    {
+        // Take references
+        const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+        const labelList& stencilSizeOwned = globalPoints().stencilSizeOwned();
+        const labelList& stencilSizeNotOwned =
+            globalPoints().stencilSizeNotOwned();
+
+        // Reset d_nnz to 0
+        d_nnz = 0;
+
+        // We can optionally track the max on-core non-zeros to zero
+        //label d_nz = 0;
+
+        // Count non-zeros
+        label rowI = 0;
+        forAll(stencilSizeOwned, blockRowI)
+        {
+            if (ownedByThisProc[blockRowI])
+            {
+                const label nCompOwned = stencilSizeOwned[blockRowI];
+                const label nCompNotOwned = stencilSizeNotOwned[blockRowI];
+
+                d_nnz[rowI] += nCompOwned;
+                o_nnz[rowI++] += nCompNotOwned;
+
+                //d_nz = max(d_nz, nCompOwned);
+            }
+        }
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown solution location = " << location_
+            << exit(FatalError);
+    }
+
+    // Allocate parallel matrix
+    //AssertPETSc(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
+    // Allocate parallel matrix with the same conservative stencil per node
+    //AssertPETSc(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
+    AssertPETSc(MatMPIBAIJSetPreallocation
+    (
+        jac, blockSize, 0, d_nnz.data(), 0, o_nnz.data())
+    );
+
+    // Raise an error if mallocs are required during matrix assembly
+    MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+
+    return 0;
+}
+
+
+label foamPetscSnesHelper::initialiseSolution
+(
+    Vec& x,
+    const fvMesh& mesh, // store this?
+    const label blockSize,
+    const bool createVec
+)
+{
+    if (createVec)
+    {
+        // Number of local scalar equations
+        label n = -1;
+
+        // Number of scalar equations across all processors
+        label N = -1;
+
+        if (location_ == solutionLocation::CELLS)
+        {
+            // Set the number local scalar equations
+            n = mesh.nCells()*blockSize;
+
+            // Set the global system size
+            N = returnReduce(n, sumOp<label>());
+        }
+        else if (location_ == solutionLocation::POINTS)
+        {
+            // Note: the size of x is, in general, not equal to the number of
+            // points on this processor, as x only contains the points owned by
+            // this processor. To access the values not-owned by the proc, we
+            // need to request the values from the other processors
+
+            // Take references for brevity and efficiency
+            const labelList& localToGlobalPointMap =
+                globalPoints().localToGlobalPointMap();
+            const boolList& ownedByThisProc = globalPoints().ownedByThisProc();
+
+            // Find size of global system
+            // i.e. the highest global point index + 1
+            const label blockN = gMax(localToGlobalPointMap) + 1;
+            N = blockSize*blockN;
+
+            // Find the start and end global point indices for this proc
+            label blockStartID = N;
+            label blockEndID = -1;
+            forAll(ownedByThisProc, pI)
+            {
+                if (ownedByThisProc[pI])
+                {
+                    blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+                    blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+                }
+            }
+
+            //const label startID = blockSize*blockStartID;
+            //const label endID = blockSize*(blockEndID + 1) - 1;
+
+            // Find size of local system, i.e. the range of points owned by this
+            // proc
+            const label blockn = blockEndID - blockStartID + 1;
+            n = blockSize*blockn;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Unknown solution location = " << location_
+                << exit(FatalError);
+        }
+
+        x = Vec();
+        AssertPETSc(VecCreate(PETSC_COMM_WORLD, &x));
+        AssertPETSc(VecSetSizes(x, n, N));
+        AssertPETSc(VecSetType(x, VECMPI));
+    }
+
+    AssertPETSc(VecSetBlockSize(x, blockSize));
+    AssertPETSc(PetscObjectSetName((PetscObject) x, "Solution"));
+    AssertPETSc(VecSetFromOptions(x));
+    AssertPETSc(VecZeroEntries(x));
+
+    return 0;
 }
 
 
@@ -672,7 +894,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
             values[cmptI*blockSize + colOffset] =
                 -sign*VI[ownCellID]*ownLs[faceI][cmptI];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -689,7 +911,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             values[i] = -values[i];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -707,7 +929,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
             values[cmptI*blockSize + colOffset] =
                 -sign*VI[neiCellID]*neiLs[faceI][cmptI];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -723,7 +945,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             values[i] = -values[i];
         }
-        CHKERRQ
+        AssertPETSc
         (
             MatSetValuesBlocked
             (
@@ -765,14 +987,14 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     values[cmptI*blockSize + colOffset] =
                         -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
                         jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
 
                 // Neighbour global cell ID
@@ -786,14 +1008,14 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         sign*patchNeiVols[patchFaceI]
                        *patchNeiLs[patchFaceI][cmptI];
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
                         jac, 1, &globalBlockRowI, 1, &globalBlockColI,
                         values.cdata(),
                         ADD_VALUES
-                    );
+                    )
                 );
             }
         }
@@ -806,7 +1028,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         else if
         (
             isA<symmetryPolyPatch>(fp.patch())
+#ifdef OPENFOAM_NOT_EXTEND
          || isA<symmetryPlanePolyPatch>(fp.patch())
+#endif
         )
         {
             // The delta in scalar p across the symmetry is zero by definition
@@ -840,7 +1064,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         values[cmptI*blockSize + colOffset] =
                             -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                     }
-                    CHKERRQ
+                    AssertPETSc
                     (
                         MatSetValuesBlocked
                         (
@@ -970,7 +1194,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -992,7 +1216,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1015,7 +1239,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1038,7 +1262,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1062,7 +1286,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1085,7 +1309,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1108,7 +1332,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1131,7 +1355,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                         coeff[i*3 + j];
                 }
             }
-            CHKERRQ
+            AssertPETSc
             (
                 MatSetValuesBlocked
                 (
@@ -1161,7 +1385,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         (
             patch.type() != "empty"
          && !isA<symmetryFvPatchField<vector>>(pU)
+#ifdef OPENFOAM_NOT_EXTEND
          && !isA<symmetryPlaneFvPatchField<vector>>(pU)
+#endif
          && !pU.fixesValue()
         )
         {
@@ -1186,7 +1412,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
                             coeff[i*3 + j];
                     }
                 }
-                CHKERRQ
+                AssertPETSc
                 (
                     MatSetValuesBlocked
                     (
@@ -1300,7 +1526,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     }
 
     // Reset the stopOnPetscError flag
-    stopOnPetscError_ = !returnOnSnesError;
+    //stopOnPetscError_ = !returnOnSnesError;
 
     // Initialise the SNES object
     if (!snes_)
@@ -1314,20 +1540,20 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     // Load the correct options database
     PetscOptionsPush(options_);
-    SNESSetFromOptions(snes_);
+    SNESSetFromOptions(snes_.s);
 
     // Set the snesHasRun flag
     snesHasRun_ = true;
 
     // Solve the nonlinear system
-    SNESSolve(snes_, NULL, x_);
+    AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
 
     // Un-load the options file
     PetscOptionsPop();
 
     // Check convergence
     SNESConvergedReason reason;
-    SNESGetConvergedReason(snes_, &reason);
+    SNESGetConvergedReason(snes_.s, &reason);
 
     if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
     {

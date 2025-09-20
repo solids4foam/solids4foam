@@ -370,6 +370,11 @@ snGrad() const
 
         return tnGradU;
     }
+    else
+    {
+        WarningInFunction
+            << "Did not find grad(" + UName + ")!" << endl;
+    }
 
     return
     (

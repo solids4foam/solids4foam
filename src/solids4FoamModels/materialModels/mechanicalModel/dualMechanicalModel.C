@@ -330,65 +330,33 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
     return mesh_;
 }
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::dualMechanicalModel::materialTangentFaceField() const
+
+void Foam::dualMechanicalModel::materialTangentFaceField
+(
+    List<mat66>& matTan
+) const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
-    // Prepare the field
-    tmp<Field<scalarSquareMatrix>> tresult
-    (
-        new Field<scalarSquareMatrix>
-        (
-            mesh().nFaces(), scalarSquareMatrix(6)
-        )
-    );
-    Field<scalarSquareMatrix>& result = tresult.ref();
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
     if (laws.size() == 1)
     {
-        result = laws[0].materialTangentField();
-
-        if (result.size() != mesh().nFaces())
-        {
-            FatalErrorIn("dualMechanicalModel::materialTangentField()")
-                << "The materialTangentField field for law 0 is the wrong size!"
-                << abort(FatalError);
-        }
+        laws[0].materialTangentField(matTan);
     }
     else
     {
         // Accumulate data for all materials
         // Note: the value on each dual face is uniquely set by one material law
-        // forAll(laws, lawI)
-        // {
-        //     const Field<scalarSquareMatrix> matTanI
-        //     (
-        //         laws[lawI].materialTangentField()
-        //     );
-
-        //     if (matTanI.size() != mesh().nFaces())
-        //     {
-        //         FatalErrorIn("dualMechanicalModel::materialTangentField()")
-        //             << "The materialTangentField field for law " << lawI
-        //             << " is the wrong size!" << abort(FatalError);
-        //     }
-
-        //     // Insert values from actual material region into main sigma field
-        //     result += dualFaceInThisMaterialList()[lawI]*matTanI;
-        // }
-
         // This does work but the problem can be that the maps for the boundary
         // faces sometimes struggle to be defined when creating the
         // dualFaceInThisMaterialList function. It should be possible to make
         // this robust
         notImplemented("Not implemented for more than one material");
     }
-
-    return tresult;
 }
-#endif
+
 
 Foam::tmp<Foam::surfaceScalarField>
 Foam::dualMechanicalModel::impKf() const

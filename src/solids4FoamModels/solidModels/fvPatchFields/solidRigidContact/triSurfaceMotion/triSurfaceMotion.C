@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef FOAMEXTEND
+
 #include "triSurfaceMotion.H"
 #include "RodriguesRotation.H"
 
@@ -170,5 +172,6 @@ Foam::tmp<Foam::pointField> Foam::triSurfaceMotion::newPoints()
     return tnewPoints;
 }
 
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

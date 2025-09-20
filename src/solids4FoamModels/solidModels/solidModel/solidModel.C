@@ -575,7 +575,7 @@ Foam::volVectorField& Foam::solidModel::rhoD2dt2D() const
 
 Foam::volScalarField& Foam::solidModel::p()
 {
-    if (!pPtr_)
+    if (pPtr_.empty())
     {
         pPtr_.set
         (
@@ -596,7 +596,7 @@ Foam::volScalarField& Foam::solidModel::p()
         );
     }
 
-    return pPtr_.ref();
+    return autoPtrRef(pPtr_);
 }
 
 

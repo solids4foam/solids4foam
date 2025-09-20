@@ -20,6 +20,8 @@ InClass
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "solidContactPointPatchVectorField.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
@@ -736,5 +738,6 @@ Foam::solidContactPointPatchVectorField::zoneForThisSlave() const
     return shadowZones()[masterShadowID];
 }
 
+#endif //  OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

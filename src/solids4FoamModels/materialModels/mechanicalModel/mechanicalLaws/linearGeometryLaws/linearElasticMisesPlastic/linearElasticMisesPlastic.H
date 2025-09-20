@@ -281,10 +281,9 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_COM
-        //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
-#endif
+        //- Populate the material tangent field
+        //  The size of this field should be mesh.nFaces()
+        virtual void materialTangentField(List<mat66>& matTan) const;
 
         //- Return the implicit stiffness as a diagTensor
 #ifndef OPENFOAM_NOT_EXTEND

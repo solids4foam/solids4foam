@@ -20,6 +20,7 @@ License
 #include "leastSquaresS4fVectors.H"
 #include "volFields.H"
 #include "symmetryPolyPatch.H"
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlanePolyPatch.H"
 #endif
@@ -86,38 +87,44 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
     const boolList& useBoundaryFaceValues_
 )
 :
+#ifdef OPENFOAM_COM
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>
     (
         objName, mesh
     ),
+#elif defined(OPENFOAM_ORG)
+    MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>(mesh),
+#else
+    MeshObject<fvMesh, leastSquaresS4fVectors>(mesh),
+#endif
     useBoundaryFaceValues_(useBoundaryFaceValues_),
     pVectors_
     (
         IOobject
         (
             "LeastSquaresP",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
-        dimensionedVector(dimless/dimLength, Zero)
+        mesh,
+        dimensionedVector("zero", dimless/dimLength, vector::zero)
     ),
     nVectors_
     (
         IOobject
         (
             "LeastSquaresN",
-            mesh_.pointsInstance(),
-            mesh_,
+            mesh.pointsInstance(),
+            mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE,
             false
         ),
-        mesh_,
-        dimensionedVector(dimless/dimLength, Zero)
+        mesh,
+        dimensionedVector("zero", dimless/dimLength, vector::zero)
     )
 {
     calcLeastSquaresVectors();
@@ -163,13 +170,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
     }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-    surfaceVectorField::Boundary& pVectorsBf =
-        pVectors_.boundaryFieldRef();
-#else
-    surfaceVectorField::GeometricBoundaryField& pVectorsBf =
-        pVectors_.boundaryField();
-#endif
+    auto& pVectorsBf = boundaryFieldRef(pVectors_);
 
     forAll(pVectorsBf, patchi)
     {

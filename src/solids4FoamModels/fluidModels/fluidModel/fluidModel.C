@@ -709,7 +709,7 @@ Foam::fluidModel::fluidModel
 #ifdef OPENFOAM_ORG
     fvModels_(fvModels::New(mesh())),
     fvConstraints_(fvConstraints::New(mesh())),
-#elif OPENFOAM_COM
+#elif defined(OPENFOAM_COM)
     fvOptions_(fv::options::New(mesh())),
 #endif
     fsiMeshUpdate_(false),
@@ -767,7 +767,7 @@ Foam::fluidModel::fluidModel
     {
         Info << "No fvConstraints present" << endl;
     }
-#elif OPENFOAM_COM
+#elif defined(OPENFOAM_COM)
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
     {

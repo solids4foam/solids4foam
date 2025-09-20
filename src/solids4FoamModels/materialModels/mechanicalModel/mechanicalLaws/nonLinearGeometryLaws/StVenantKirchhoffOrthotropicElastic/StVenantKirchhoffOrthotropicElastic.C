@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef FOAMEXTEND
+
 #include "StVenantKirchhoffOrthotropicElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
@@ -480,5 +482,7 @@ void Foam::StVenantKirchhoffOrthotropicElastic::setRestart()
     F().writeOpt() = IOobject::AUTO_WRITE;
     Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
+
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

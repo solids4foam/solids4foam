@@ -20,6 +20,8 @@ InClass
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef FOAMEXTEND
+
 #include "solidRigidContactFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
@@ -1026,5 +1028,6 @@ namespace Foam
     );
 }
 
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

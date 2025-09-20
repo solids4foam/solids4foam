@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 #include "diffusionHyperElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
@@ -206,5 +208,6 @@ void Foam::diffusionHyperElastic::correct(surfaceSymmTensorField& sigma)
     NotImplemented;
 }
 
+#endif // OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

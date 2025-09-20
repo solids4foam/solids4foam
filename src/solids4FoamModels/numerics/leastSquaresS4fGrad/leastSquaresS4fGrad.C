@@ -24,11 +24,12 @@ License
 #include "volMesh.H"
 #include "surfaceMesh.H"
 #include "GeometricField.H"
-#include "extrapolatedCalculatedFvPatchField.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "boolIOList.H"
 #include "symmetryPolyPatch.H"
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_NOT_EXTEND
+    #include "extrapolatedCalculatedFvPatchField.H"
     #include "symmetryPlanePolyPatch.H"
 #endif
 
@@ -71,14 +72,14 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
             (
                 "0", vsf.dimensions()/dimLength, pTraits<GradType>::zero
             ),
+#ifdef OPENFOAM_NOT_EXTEND
             extrapolatedCalculatedFvPatchField<GradType>::typeName
+#else
+            calculatedFvPatchField<GradType>::typeName
+#endif
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad.ref();
-#else
-    GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad();
-#endif
+    GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tmpRef(tlsGrad);
 
     // // Lookup the useBoundaryFaceValues list
     // // This list needs to be created before calling the gradient operation
@@ -115,14 +116,29 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     // For now, default to extrapolation on all boundaries
     // We need to revisit this
-    const boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    boolList useBoundaryFaceValues(mesh.boundary().size(), false);
+    // forAll(useBoundaryFaceValues, patchI)
+    // {
+    //     if (vsf.boundaryField()[patchI].fixesValue())
+    //     {
+    //         Info<< "leastSquaresS4f: " << vsf.name()
+    //             << ": use patch values for "
+    //             << mesh.boundary()[patchI].name() << endl;
+    //         useBoundaryFaceValues[patchI] = true;
+    //     }
+    // }
 
     // Get reference to least square vectors
+#ifdef OPENFOAM_COM
     const leastSquaresS4fVectors& lsv =
         leastSquaresS4fVectors::New
         (
             "leastSquaresVectors" + vsf.name(), mesh, useBoundaryFaceValues
         );
+#else
+    const leastSquaresS4fVectors& lsv =
+        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
+#endif
 
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();

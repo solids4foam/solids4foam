@@ -54,7 +54,7 @@ SourceFiles
 #include "twoDPointCorrector.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
-
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -572,7 +572,7 @@ public:
                     makeU();
                 }
 
-                return UPtr_.ref();
+                return autoPtrRef(UPtr_);
             }
 
             //- Return const reference to U
@@ -583,7 +583,7 @@ public:
                     makeU();
                 }
 
-                return UPtr_();
+                return autoPtrRef(UPtr_);
             }
 
             //- Return non-const reference to UPtr
