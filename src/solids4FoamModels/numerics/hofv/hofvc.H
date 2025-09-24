@@ -58,8 +58,19 @@ namespace hofvc
     tmp<surfaceVectorField> surfaceIntegrate
     (
         const List<List<symmTensor>>& quadSigma,
-	const CompactListList<scalar>& quadW,
-	const fvMesh& mesh
+        const CompactListList<scalar>& quadW,
+        const fvMesh& mesh
+    );
+
+    //- Surface integration of sigma using quadrature points and their weights.
+    //  Sigma is mapped to reference configuration, surface traction refers
+    //  to original configuration
+    tmp<surfaceVectorField> surfaceIntegrate
+    (
+        const List<List<symmTensor>>& quadSigma,
+        const List<List<tensor>>& gradDQuad,
+        const CompactListList<scalar>& quadW,
+        const fvMesh& mesh
     );
 
 } // End namespace hofvc

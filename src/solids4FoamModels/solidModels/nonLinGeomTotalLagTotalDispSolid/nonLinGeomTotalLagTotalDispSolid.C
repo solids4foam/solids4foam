@@ -20,6 +20,7 @@ License
 #include "nonLinGeomTotalLagTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
+#include "hofvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
@@ -429,6 +430,19 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         dpdtPtr_.ref() = fvc::ddt(p());
     }
 
+    if (highOrderResidual_)
+    {
+        // Update cell centre gradient of displacement
+        gradD() = LREInterp().grad(D());
+
+        // Calculate the cell centre stress using run-time selectable
+        // mechanical law
+        mechanical().correct(sigma());
+
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
+    }
+
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
     pointD().correctBoundaryConditions();
@@ -592,7 +606,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
-    )
+    ),
+    highOrderResidual_(false)
 {
     DisRequired();
 
@@ -632,6 +647,15 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 fvc::ddt(p())
             )
         );
+    }
+
+    if (solidModelDict().found("highOrderCoeffs"))
+    {
+        highOrderResidual_ =
+            solidModelDict().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+            (
+                "highOrderResidual", false
+            );
     }
 
     if (predictor_)
@@ -812,29 +836,40 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Update gradient of displacement
-    mechanical().grad(D, gradD());
-
     // Enforce the boundary conditions again for any conditions that use gradD
     D.correctBoundaryConditions();
 
     // Increment of displacement
     DD() = D - D.oldTime();
 
-    // Update gradient of displacement increment
-    gradDD() = gradD() - gradD().oldTime();
+    if (highOrderResidual_)
+    {
+        // Displacement gradient at quadrature points
+        gradDQuad() = LREInterp().gradDQuad(D);
 
-    // Total deformation gradient
-    F_ = I + gradD().T();
+        // Calculate sigma at quadrature points
+        mechanical().correct(sigmaQuad(), gradDQuad());
+    }
+    else
+    {
+        // Update gradient of displacement
+        mechanical().grad(D, gradD());
 
-    // Inverse of the deformation gradient
-    Finv_ = inv(F_);
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
 
-    // Jacobian of the deformation gradient
-    J_ = det(F_);
+        // Total deformation gradient
+        F_ = I + gradD().T();
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+        // Inverse of the deformation gradient
+        Finv_ = inv(F_);
+
+        // Jacobian of the deformation gradient
+        J_ = det(F_);
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+    }
 
     if (solvePressure())
     {
@@ -853,36 +888,20 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         sigma() = dev(sigma()) - p*I;
     }
 
-    // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
-    const surfaceVectorField SfCurrent
-    (
-        fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
-    );
-    const surfaceScalarField magSfCurrent(mag(SfCurrent));
-    const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
-
     // Traction vectors at the faces
-    //surfaceVectorField traction(n & fvc::interpolate(sigma()));
-    surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
-
-    //fvc::div(J_*Finv_ & sigma(), "div(sigma)");
-
-    // Add stabilisation to the traction
-    // We add this before enforcing the traction condition as the stabilisation
-    // is set to zero on traction boundaries
-    // To-do: add a stabilisation traction function to momentumStabilisation
-    const scalar scaleFactor =
-        readScalar(stabilisation().dict().lookup("scaleFactor"));
-    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-    traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
-
-    // Calculate the force at the faces
-    surfaceVectorField force(magSfCurrent*traction);
-
-    // Enforce traction boundary conditions
-    // enforceTractionBoundaries(traction, D, nCurrent);
-    enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+    surfaceVectorField traction
+    (
+        IOobject
+        (
+            "traction",
+             mesh.time().timeName(),
+             mesh,
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("0", dimPressure, vector::zero)
+    );
 
     // The residual vector is defined as
     // F = div(sigma) + rho*g
@@ -890,13 +909,74 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // where, here, we roll the stabilisationTerm into the div(sigma)
     vectorField residual
     (
-        // fvc::div(magSfCurrent*traction)
-        fvc::div(force)
-      + rho()
+        rho()
        *(
             g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
         )
     );
+
+    if (highOrderResidual_)
+    {
+        // Quadrature points weights
+        const CompactListList<scalar>& WQuad = LREInterp().faceQuadWeight();
+
+        // Integration over face quadrature points to get face traction
+        // Integration is performed on reference configuration by mapping
+        // sigma to reference configuration
+        // I'm doing like this because I'm not sure what to do with face normals?
+
+        // F and J are calculated both here for stress mapping and for sigma
+        // Same duplication have original solver, but for high-order this can be
+        // overhead
+        traction =
+            hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), WQuad, mesh);
+
+        // Calculate the force at the faces
+        surfaceVectorField force(mesh.magSf()*traction);
+
+        // Enforce traction boundary conditions
+        //        enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+
+        // Add div(sigma) calculated in reference configuration to the residual
+        residual += fvc::div(force);
+    }
+    else
+    {
+        // Unit normal vectors at the faces
+        const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+        const surfaceVectorField SfCurrent
+            (
+                fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
+            );
+
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+        // Traction vectors at the faces
+        //surfaceVectorField traction(n & fvc::interpolate(sigma()));
+        surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+        //fvc::div(J_*Finv_ & sigma(), "div(sigma)");
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+
+         // Calculate the force at the faces
+        surfaceVectorField force(magSfCurrent*traction);
+
+        // Enforce traction boundary conditions
+        // enforceTractionBoundaries(traction, D, nCurrent);
+        enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+
+        // Add div(sigma) calculated in current configuration to the residual
+        residual += fvc::div(force);
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();

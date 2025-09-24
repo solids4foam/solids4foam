@@ -369,6 +369,36 @@ void Foam::neoHookeanElastic::correct
 }
 
 
+void Foam::neoHookeanElastic::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    // Initialise outside loop for efficiency
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+    symmTensor s = symmTensor::zero;
+    symmTensor bEbar = symmTensor::zero;
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            F = I + faceGradDQuad[qpI].T();
+            J = det(F);
+            bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
+            s = (mu_*dev(bEbar)).value();
+
+            faceSigmaQuad[qpI] = (1.0/J)*((0.5*K_*(pow(J, 2) - 1)*I).value() + s);
+        }
+    }
+}
+
+
 void Foam::neoHookeanElastic::correctF
 (
     surfaceSymmTensorField& sigma,

@@ -110,7 +110,6 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
                     // Get global face index
                     const label faceID = faceI + start;
-;
 
                     // Get the number of quadrature points for this face
                     const label nPoints = faceQuadPoints[faceID].size();

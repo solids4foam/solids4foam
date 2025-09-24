@@ -87,7 +87,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         forAll(tfPatch, faceI)
         {
             const label globalFaceID =
-		mesh.boundaryMesh()[patchI].start() + faceI;
+                mesh.boundaryMesh()[patchI].start() + faceI;
 
             // Sigma at the Gauss quadrature points on the face
             const List<symmTensor>& faceQuadStress = quadSigma[globalFaceID];
@@ -97,13 +97,106 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
             const vector& faceNormal =
                 mesh.faceAreas()[globalFaceID]
-	      / mag(mesh.faceAreas()[globalFaceID]);
+              / mag(mesh.faceAreas()[globalFaceID]);
 
             forAll(faceQuadStress, pI)
             {
                 // Add traction contribution of this quadrature point
                 tfPatch[faceI] +=
-		    faceNormal & (faceQuadStress[pI] * faceQuadW[pI]);
+                    faceNormal & (faceQuadStress[pI] * faceQuadW[pI]);
+            }
+        }
+    }
+
+    return tsf;
+};
+
+
+tmp<surfaceVectorField> hofvc::surfaceIntegrate
+(
+    const List<List<symmTensor>>& quadSigma,
+    const List<List<tensor>>& gradDQuad,
+    const CompactListList<scalar>& quadW,
+    const fvMesh& mesh
+)
+{
+    tmp<surfaceVectorField> tsf
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "surfaceIntegrate(sigma)",
+                 mesh.time().timeName(),
+                 mesh,
+                 IOobject::NO_READ,
+                 IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector("0", dimPressure, vector::zero)
+        )
+    );
+
+    surfaceVectorField& tf = tsf.ref();
+
+    forAll (tf, faceI)
+    {
+        // Sigma at the quadrature points on the face
+        const List<symmTensor>& faceQuadSigma = quadSigma[faceI];
+
+        // Grad of displacement for the quadrature points on the face
+        const List<tensor>& faceQuadGradD = gradDQuad[faceI];
+
+        // Weights for the quadrature points on the face
+        const List<scalar>& faceQuadW = quadW[faceI];
+
+        const vector& faceNormal =
+            mesh.faceAreas()[faceI]/mag(mesh.faceAreas()[faceI]);
+
+        forAll(faceQuadSigma, pI)
+        {
+            const tensor& gradD = faceQuadGradD[pI];
+            const tensor F = I + gradD.T();
+            const tensor invFT = inv(F.T());
+            const scalar J = det(F);
+
+            // Add traction contribution of this quadrature point
+            tf[faceI] +=
+                faceQuadW[pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
+        }
+    }
+
+    forAll (tf.boundaryField(), patchI)
+    {
+        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        forAll(tfPatch, faceI)
+        {
+            const label globalFaceID =
+                mesh.boundaryMesh()[patchI].start() + faceI;
+
+            // Sigma at the Gauss quadrature points on the face
+            const List<symmTensor>& faceQuadSigma = quadSigma[globalFaceID];
+
+            // Grad of displacement for the quadrature points on the face
+            const List<tensor>& faceQuadGradD = gradDQuad[globalFaceID];
+
+            // Gauss quadrature weights on the face
+            const List<scalar>& faceQuadW = quadW[globalFaceID];
+
+            const vector& faceNormal =
+                mesh.faceAreas()[globalFaceID]
+              / mag(mesh.faceAreas()[globalFaceID]);
+
+            forAll(faceQuadSigma, pI)
+            {
+                const tensor& gradD = faceQuadGradD[pI];
+                const tensor F = I + gradD.T();
+                const tensor invFT = inv(F.T());
+                const scalar J = det(F);
+
+                // Add traction contribution of this quadrature point
+                tfPatch[faceI] +=
+                    faceQuadW[pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
             }
         }
     }

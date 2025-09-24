@@ -103,6 +103,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- High order SNES residual calculation
+        Switch highOrderResidual_;
+
 
     // Private Member Functions
 

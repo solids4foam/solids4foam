@@ -139,6 +139,14 @@ public:
         //- Calculate the surfaceField stress
         virtual void correct(surfaceSymmTensorField& sigma);
 
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+        virtual void correct
+        (
+            List<List<symmTensor>>& sigmaQuad,
+            const List<List<tensor>>& gradDQuad
+        );
+
         //- To get rid of compiler warning as correct below is not from the
         //  base class
         using mechanicalLaw::correct;
