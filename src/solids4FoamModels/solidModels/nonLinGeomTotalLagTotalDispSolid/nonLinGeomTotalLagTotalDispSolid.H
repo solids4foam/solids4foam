@@ -109,6 +109,9 @@ class nonLinGeomTotalLagTotalDispSolid
 
     // Private Member Functions
 
+        //- Calculate currect face areas in the case of high order approach
+        surfaceVectorField currentSf();
+
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();

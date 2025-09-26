@@ -50,6 +50,59 @@ addToRunTimeSelectionTable
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
+surfaceVectorField nonLinGeomTotalLagTotalDispSolid::currentSf()
+{
+    // Reference face area vectors
+    const surfaceVectorField& Sf = mesh().Sf();
+
+    // Initialised to vector::one to avoid problems later, only boundary values
+    // are updated to right values
+    surfaceVectorField currSf
+    (
+        IOobject
+        (
+            "currSf",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", Sf.dimensions(), vector::one)
+    );
+
+    const CompactListList<scalar>& WQuad = LREInterp().faceQuadWeight();
+    List<List<tensor>>& gradDQuad = this->gradDQuad();
+
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+
+    // We will update face areas vectors for boundary faces
+    forAll (currSf.boundaryField(), patchI)
+    {
+        vectorField& currSfPatch = currSf.boundaryFieldRef()[patchI];
+        forAll(currSfPatch, faceI)
+        {
+            const label globalFaceID =
+                mesh().boundaryMesh()[patchI].start() + faceI;
+
+            const List<scalar>& faceQuadW = WQuad[globalFaceID];
+            const List<tensor>& faceQuadGradD = gradDQuad[globalFaceID];
+
+            tensor avgMapping = tensor::zero;
+            forAll(faceQuadW, qpI)
+            {
+                F = I + faceQuadGradD[qpI].T();
+                J = det(F);
+                avgMapping += (J * inv(F.T())) * faceQuadW[qpI];
+            }
+            currSfPatch[faceI] = avgMapping & Sf[faceI];
+        }
+    }
+
+    return currSf;
+}
+
 void nonLinGeomTotalLagTotalDispSolid::predict()
 {
     Info<< "Linear predictor" << endl;
@@ -934,8 +987,12 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Calculate the force at the faces
         surfaceVectorField force(mesh.magSf()*traction);
 
+        const surfaceVectorField SfCurrent = currentSf();
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
         // Enforce traction boundary conditions
-        //        enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+         enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
 
         // Add div(sigma) calculated in reference configuration to the residual
         residual += fvc::div(force);
