@@ -471,7 +471,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
             // database
 #ifdef OPENFOAM_NOT_EXTEND
             const dictionary& optionsDict =
-                mesh.solverDict("D").subDict("options");
+                mesh.solverDict(fieldName).subDict("options");
 #else
             const dictionary& optionsDict =
                 mesh.solutionDict().solverDict(fieldName).subDict("options");
