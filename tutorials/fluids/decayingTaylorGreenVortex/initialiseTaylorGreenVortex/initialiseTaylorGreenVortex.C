@@ -63,9 +63,7 @@ int main(int argc, char *argv[])
     //const scalar pOffset = 0;
 
     // Initialise the velocity field
-    // U must exist and should use a boundary condition that prescribes the
-    // analytical velocity in time 
-    Info<< "Reading U" << endl;
+    Info<< "Creating U" << endl;
     volVectorField U
     (
         IOobject
@@ -73,10 +71,11 @@ int main(int argc, char *argv[])
             "U",
             runTime.timeName(),
             mesh,
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh,
+        dimensionedVector(dimVelocity, Zero)
     );
 
     // Initialise the pressure field
@@ -92,8 +91,7 @@ int main(int argc, char *argv[])
             IOobject::AUTO_WRITE
         ),
         mesh,
-        dimensionedScalar(dimPressure/dimDensity, 0.0),
-        "zeroGradient"
+        dimensionedScalar(dimPressure, 0.0)
     );
 
     // Set the internal field

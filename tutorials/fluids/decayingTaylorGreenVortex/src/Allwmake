@@ -1,0 +1,5 @@
+#!/bin/bash
+cd "${0%/*}" || exit    # Run from this directory
+
+wmake $* libso decayingTaylorGreenVortexFvPatchVectorField
+wmake $* libso decayingTaylorGreenVortexMeshMotion

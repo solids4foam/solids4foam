@@ -6,6 +6,9 @@
 # Build the utility for initialising the solution
 wmake initialiseTaylorGreenVortex
 
+# Build boundary condition and mesh motion libraries
+(cd src && ./Allwmake)
+
 # Copy 0.orig to 0
 restore0Dir
 

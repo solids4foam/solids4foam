@@ -24,27 +24,35 @@ boundaryField
 {
     walls
     {
-        type            codedFixedValue;
-        name            decayingTaylorGreenVortexVelocity;
+        // decayingTaylorGreenVortexVelocity employs non-orthogonal corrections
+        // which are required to achieve second-order accuracy on grids with
+        // boundary non-orthogonality
+        type            decayingTaylorGreenVortexVelocity;
 
-        code
-        #{
-            const scalar Re = 10;
-            const scalar t = db().time().value();
-            const scalar pi = constant::mathematical::pi;
-            const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
+        // codedFixedValue does NOT employ non-orthogonal corrections and hence
+        // will approach zero-order accuracy for grids which contain boundary
+        // non-orthogonality in the limit of mesh refinement
+        // type            codedFixedValue;
+        // name            decayingTaylorGreenVortexVelocity;
 
-            const scalarField x(patch().Cf().component(vector::X));
-            const scalarField y(patch().Cf().component(vector::Y));
+        // code
+        // #{
+        //     const scalar Re = 10;
+        //     const scalar t = db().time().value();
+        //     const scalar pi = constant::mathematical::pi;
+        //     const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
 
-            const vectorField velocity
-            (
-                A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
-              - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
-            );
+        //     const scalarField x(patch().Cf().component(vector::X));
+        //     const scalarField y(patch().Cf().component(vector::Y));
 
-            operator==(velocity);
-        #};
+        //     const vectorField velocity
+        //     (
+        //         A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
+        //       - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
+        //     );
+
+        //     operator==(velocity);
+        // #};
 
         value           uniform (0 0 0);
     }

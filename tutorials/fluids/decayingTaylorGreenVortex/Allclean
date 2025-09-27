@@ -4,5 +4,6 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 wclean initialiseTaylorGreenVortex
+(cd src && ./Allwclean)
 cleanCase0
 rm -rf constant/polyMesh dynamicCode
