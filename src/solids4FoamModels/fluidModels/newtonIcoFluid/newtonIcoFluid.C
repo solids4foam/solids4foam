@@ -287,10 +287,12 @@ bool newtonIcoFluid::evolve()
         // Map the U field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
-            U.primitiveFieldRef(),
+            U,
             foamPetscSnesHelper::solution(),
             blockSize_,
-            fluidModel::twoD() ? labelList({0,1}) : labelList({0,1,2})
+            fluidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
         );
 
         // Restore the solution vector
