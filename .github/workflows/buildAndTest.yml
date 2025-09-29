@@ -19,7 +19,7 @@ jobs:
         run: |
           source /usr/lib/openfoam/openfoam2412/etc/bashrc
           (cd optionalFixes && ./Allreplace)
-          ./Allwmake
+          ./Allwmake -j 24
 
       - name: Alltest
         shell: bash -l {0}
@@ -41,7 +41,7 @@ jobs:
         run: |
           source /opt/openfoam9/etc/bashrc
           (cd optionalFixes && ./Allreplace)
-          ./Allwmake
+          ./Allwmake -j 24
 
       - name: Alltest
         shell: bash -l {0}
@@ -63,7 +63,7 @@ jobs:
         run: |
           source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
           (cd optionalFixes && ./Allreplace)
-          ./Allwmake
+          ./Allwmake -j 24
 
       - name: Alltest
         shell: bash -l {0}

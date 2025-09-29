@@ -11,34 +11,70 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p;
+    class       dictionary;
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+scale   1;
 
-internalField   uniform 0;
+vertices
+(
+    (0 0 0)
+    (1 0 0)
+    (1 1 0)
+    (0 1 0)
+    (0 0 0.1)
+    (1 0 0.1)
+    (1 1 0.1)
+    (0 1 0.1)
+);
 
-boundaryField
-{
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (10 10 1) //simpleGrading (1 1 1)
+    simpleGrading
+    (
+        (
+            (0.2 0.3 4)
+            (0.6 0.4 1)
+            (0.2 0.3 0.25)
+        )
+        (
+            (0.2 0.3 4)
+            (0.6 0.4 1)
+            (0.2 0.3 0.25)
+        )
+        1
+    )
+);
+
+edges
+(
+);
+
+boundary
+(
     walls
     {
-        // fixedGradientCorrected employs non-orthogonal corrections
-        // which are required to achieve second-order accuracy on grids with
-        // boundary non-orthogonality
-        type            fixedGradientCorrected;
-        gradient        uniform 0;
-
-        // zeroGradient does NOT employ non-orthogonal corrections and hence
-        // will approach zero-order accuracy for grids which contain boundary
-        // non-orthogonality in the limit of mesh refinement
-        // type            zeroGradient;
+        type wall;
+        faces
+        (
+            (3 7 6 2)
+            (0 4 7 3)
+            (2 6 5 1)
+            (1 5 4 0)
+        );
     }
     frontAndBack
     {
-        type            empty;
+        type empty;
+        faces
+        (
+            (0 3 2 1)
+            (4 5 6 7)
+        );
     }
-}
+);
 
 // ************************************************************************* //

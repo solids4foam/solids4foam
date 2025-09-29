@@ -11,29 +11,23 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p;
+    class       pointVectorField;
+    object      pointDisplacement;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [0 1 0 0 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform (0 0 0);
 
 boundaryField
 {
     walls
     {
-        // fixedGradientCorrected employs non-orthogonal corrections
-        // which are required to achieve second-order accuracy on grids with
-        // boundary non-orthogonality
-        type            fixedGradientCorrected;
-        gradient        uniform 0;
-
-        // zeroGradient does NOT employ non-orthogonal corrections and hence
-        // will approach zero-order accuracy for grids which contain boundary
-        // non-orthogonality in the limit of mesh refinement
-        // type            zeroGradient;
+        //type            fixedValue;
+        // type            calculated;
+        type            slip;
+        value           uniform (0 0 0);
     }
     frontAndBack
     {

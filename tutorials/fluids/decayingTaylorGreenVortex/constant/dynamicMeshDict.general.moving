@@ -11,34 +11,20 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p;
+    class       dictionary;
+    object      dynamicMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
-
-internalField   uniform 0;
-
-boundaryField
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+solver          decayingTaylorGreenVortexMeshMotion;
+decayingTaylorGreenVortexMeshMotionCoeffs
 {
-    walls
-    {
-        // fixedGradientCorrected employs non-orthogonal corrections
-        // which are required to achieve second-order accuracy on grids with
-        // boundary non-orthogonality
-        type            fixedGradientCorrected;
-        gradient        uniform 0;
+    // Motion scale factor
+    //scaleFactor    0.1;
+    scaleFactor    0.01;
 
-        // zeroGradient does NOT employ non-orthogonal corrections and hence
-        // will approach zero-order accuracy for grids which contain boundary
-        // non-orthogonality in the limit of mesh refinement
-        // type            zeroGradient;
-    }
-    frontAndBack
-    {
-        type            empty;
-    }
+    orthogonalMeshMotion no;
 }
 
 // ************************************************************************* //

@@ -17,6 +17,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs
+(
+    "libdecayingTaylorGreenVortexMeshMotion.so"
+    "libdecayingTaylorGreenVortexFvPatchVectorField.so"
+);
+
 application     solids4Foam;
 
 startFrom       startTime;
@@ -111,12 +117,23 @@ functions
             // Lookup U
             const auto& U = mesh().lookupObject<volVectorField>("U");
 
-            // Calcalulate the average
             // Calculate the error
+            const volScalarField magError("magError", mag(U - exactU));
+            Info<< "Writing magError to " << time().timeName() << endl;
+            magError.write();
+            const scalarField& Vol = mesh().V().field();
+            const scalar totalVol = gSum(Vol);
             const vectorField diff(U - exactU);
-            const scalar errorL1(gAverage(mag(diff)));
-            const scalar errorL2(sqrt(gAverage(magSqr(diff))));
-            const scalar errorLInf(gMax(mag(diff)));
+
+            // Arithmetic errors
+            // const scalar errorL1 = gAverage(mag(diff));
+            // const scalar errorL2 = sqrt(gAverage(magSqr(diff)));
+            // const scalar errorLInf = gMax(mag(diff));
+
+            // Volume-weighted errors
+            const scalar errorL1 = gSum(mag(diff*Vol))/totalVol;
+            const scalar errorL2 = sqrt(gSum(magSqr(diff)*Vol)/totalVol);
+            const scalar errorLInf = gMax(mag(diff));
 
             Info<< "Velocity errors norms:" << nl
                 << "    mean L1 = " << errorL1 << nl
