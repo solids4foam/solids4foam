@@ -350,6 +350,8 @@ bool pimpleFluid::evolve()
     const bool checkMeshCourantNo = checkMeshCourantNo_;
     const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
+    #include "CourantNo.H"
+
     // --- Pressure-velocity PIMPLE corrector loop
     while (pimple.loop())
     {
