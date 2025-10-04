@@ -684,7 +684,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 << " and "
                 << solidModel::solutionAlgorithmNames_
                    [
-                       solidModel::solutionAlgorithm::PETSC_SNES
+                       solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
                    ]
                 << " solution algorithms" << abort(FatalError);
         }

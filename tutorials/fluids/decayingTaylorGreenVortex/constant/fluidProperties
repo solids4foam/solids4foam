@@ -27,15 +27,14 @@ newtonIcoFluidCoeffs
     {
         type    RhieChow;
         scaleFactor 1.0;
-        // omega     [0 -2 1 0 0 0 0] 0.625;
-        // alphaU    1.0;
     }
 
     // Set the pressure to zero at the centre cell
     pRefPoint (0.5 0.5 0);
     pRefValue 0.0;
 
-    // PETSc options file used by PETSc SNES
+    // Optional: specific PETSc options file instead of defining options in
+    // fvSolution
     //optionsFile petscOptions.pcsplit;
 }
 
