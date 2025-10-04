@@ -22,6 +22,8 @@ solidModel linearGeometryTotalDisplacement;
 
 "linearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
 {
+    solutionAlgorithm PETScSNES;
+
     // Maximum number of momentum correctors
     nCorrectors             20000;
 
