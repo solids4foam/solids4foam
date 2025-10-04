@@ -267,7 +267,11 @@ bool newtonIcoFluid::evolve()
     U.correctBoundaryConditions();
 
     // Solution predictor
-    const Switch predictor(fluidProperties().lookup("predictor"));
+    const Switch predictor
+    (
+        fluidProperties().lookupOrDefault<Switch>("predictor", false)
+    );
+
     if (predictor && runTime().timeIndex() > 1) // && newTimeStep())
     {
         Info<< "Applying a linear predictor to velocity" << endl;
@@ -541,11 +545,11 @@ label newtonIcoFluid::formResidual
         const dictionary& stabDict =
             fluidProperties().subDict("stabilisation");
 
-        const word stabType(stabDict.lookup("type"));
+        const word stabType(stabDict.lookupOrDefault<word>("type", "RhieChow"));
 
         if (stabType == "laplacian")
         {
-            const dimensionedScalar omega(fluidProperties().lookup("omega"));
+            const dimensionedScalar omega(stabDict.lookup("omega"));
 
             pressureResidual +=
                 fvc::laplacian
@@ -977,7 +981,7 @@ label newtonIcoFluid::formJacobian
         const dictionary& stabDict =
             fluidProperties().subDict("stabilisation");
 
-        const word stabType(stabDict.lookup("type"));
+        const word stabType(stabDict.lookupOrDefault<word>("type", "RhieChow"));
 
         if (stabType == "laplacian")
         {
