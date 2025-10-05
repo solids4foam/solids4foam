@@ -355,8 +355,6 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-                // PetscScalar *f,        // Residual
-                // const PetscScalar *x   // Solution
             ) = 0;
 
             //- Form the Jacobian
@@ -368,8 +366,30 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
-                // const PetscScalar *x  // Solution
             ) = 0;
+
+            //- Apply a physics-based preconditioner
+            //  This should (approximately) solve y = M^{-1} x, where M is an
+            //  approximation of the solid model's Jacobian. This is used inside
+            //  the `-pc_type physics` preconditioner.
+            //  For example, we may use an approximate segregated solver as a
+            //  preconditioner for a Jacobian-free Newton-Krylov solver
+            //  A non-zero return value indicates an error
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            )
+            {
+                notImplemented
+                (
+                    "`label precondition(...)` is not implemented for this "
+                    "solid model. The `physics` preconditioner can only be used"
+                    " if the chosen solidModel implements this function"
+                );
+
+                return 0;
+            }
 
             //- Inserts the OpenFOAM fvMatrix 'fvM' into the PETSc matrix 'jac'.
             //  Converts the finite volume matrix into block coefficients using

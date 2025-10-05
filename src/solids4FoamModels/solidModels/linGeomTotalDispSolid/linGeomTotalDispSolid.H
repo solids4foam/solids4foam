@@ -211,6 +211,13 @@ public:
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
             );
+
+            //- Apply a physics-based preconditioner
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            );
 #endif // USE_PETSC
 
             //- Traction boundary surface normal gradient

@@ -27,6 +27,8 @@ License
 #include "IFstream.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
+#include <petsc/private/pcimpl.h>
+#include "petscdmshell.h"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlaneFvPatchFields.H"
 #endif
@@ -159,6 +161,119 @@ PetscErrorCode convergenceCheckFoamPetscSnesHelper
   }
 
   return 0;
+}
+
+
+static PetscErrorCode PCApplyPhysics(PC pc, Vec x, Vec y)
+{
+    PetscFunctionBeginUser;
+
+    // Retreive the solid model context from the DM
+    DM dm = nullptr;
+    AssertPETSc(PCGetDM(pc, &dm));
+    appCtxfoamPetscSnesHelper* user = nullptr;
+
+    if (dm)
+    {
+        AssertPETSc(DMGetApplicationContext(dm, (void**)&user));
+    }
+
+    if (!user)
+    {
+        Foam::FatalError
+            << "The solid model context needs to be attached to the SNES "
+            << "object via a DM"
+            << Foam::abort(Foam::FatalError);
+    }
+
+    // Call the solid model precondition function
+    AssertPETSc(user->solMod_.precondition(y, x));
+
+    PetscFunctionReturn(0);
+}
+
+
+static PetscErrorCode PCSetUpPhysics(PC pc)
+{
+    PetscFunctionBeginUser;
+
+    // // Retreive the solid model context from the DM
+    // DM dm = nullptr;
+    // AssertPETSc(PCGetDM(pc, &dm));
+    // appCtxfoamPetscSnesHelper* user = nullptr;
+
+    // if (dm)
+    // {
+    //     AssertPETSc(DMGetApplicationContext(dm, (void**)&user));
+    // }
+
+    // if (!user)
+    // {
+    //     Foam::FatalError
+    //         << "The solid model context needs to be attached to the SNES "
+    //         << "object via a DM"
+    //         << Foam::abort(Foam::FatalError);
+    // }
+
+    // Read any runtime knobs and set them in my solid model
+    // char variant[64] = "schur";
+    // PetscOptionsGetString
+    // (
+    //     nullptr, nullptr, "-pc_physics_variant", variant, sizeof(variant), nullptr
+    // );
+    // PetscInt steps = 3;
+    // PetscReal tol = 1e-1;
+    // PetscOptionsGetInt(nullptr, nullptr, "-pc_physics_steps", &steps, nullptr);
+    // PetscOptionsGetReal(nullptr, nullptr, "-pc_physics_tol", &tol, nullptr);
+
+    PetscFunctionReturn(0);
+}
+
+
+static PetscErrorCode PCDestroyPhysics(PC pc)
+{
+    PetscFunctionBeginUser;
+
+    // Nothing to do
+
+    PetscFunctionReturn(0);
+}
+
+
+static PetscErrorCode PCCreatePhysics(PC pc)
+{
+    PetscFunctionBeginUser;
+
+    pc->ops->setup   = PCSetUpPhysics;
+    pc->ops->apply   = PCApplyPhysics;
+    pc->ops->destroy = PCDestroyPhysics;
+
+    PetscFunctionReturn(0);
+}
+
+
+extern "C" PetscErrorCode PCRegisterPhysics()
+{
+    PetscFunctionBeginUser;
+
+    // Register the name "physics" so users can select "-pc_type physics"
+    PetscCall(PCRegister("physics", PCCreatePhysics));
+
+    PetscFunctionReturn(0);
+}
+
+
+extern "C" PetscErrorCode PCPhysicsEnsureRegistered(void)
+{
+    static bool done = false;
+    if (!done)
+    {
+        // Register the "physics" preconditioner
+        PetscCall(PCRegisterPhysics());
+        done = true;
+    }
+
+    return 0;
 }
 
 
@@ -374,9 +489,48 @@ label foamPetscSnesHelper::initialiseSnes()
         )
     );
 
+    // Register the solids4foam physics-based solver preconditioner, which can
+    // be optionally called with "-pc_type physics"
+    AssertPETSc(PCPhysicsEnsureRegistered());
+
+    // Store a pointer to the solid model context in a DM, which is attached to
+    // the SNES object
+    {
+        // Make a DMShell and store the user ctx on it
+        DM dm;
+        DMShellCreate(PETSC_COMM_WORLD, &dm);
+        DMSetApplicationContext(dm, &user);
+
+        // Attach the DM to SNES
+        SNESSetDM(snes_.s, dm);
+        DMDestroy(&dm); // SNES holds a ref
+    }
+
     // Set solver options
     // Uses default options, can be overridden by command line options
     AssertPETSc(SNESSetFromOptions(snes_.s));
+
+    // Attach the solid model context if the "physics" precondition is chosen
+    // This needs to happen after SNESSetFromOptions
+    // {
+    //     Info<< "CHECKING for physics PC" << endl;
+    //     KSP ksp; PC pc;
+    //     AssertPETSc(SNESGetKSP(snes_.s, &ksp));
+    //     AssertPETSc(KSPGetPC(ksp, &pc));
+
+    //     PetscBool isPhysics = PETSC_FALSE;
+    //     AssertPETSc
+    //     (
+    //         PetscObjectTypeCompare((PetscObject)pc, "physics", &isPhysics)
+    //     );
+
+    //     // if (isPhysics)
+    //     {
+    //         Info<< "ATTACHING user" << endl;
+    //         // pc->data = &user;
+    //         Info<< "ATTACHING user: DONE" << endl;
+    //     }
+    // }
 
     // The derived class initialises the solution vector
     AssertPETSc(initialiseSolution(x_.v));
