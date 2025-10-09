@@ -1,10 +1,10 @@
--ksp_type  cg
-#-ksp_cg_single_reduction  true
-#-ksp_monitor_short
--ksp_atol 1e-11
--ksp_rtol 1e-11
-#-ksp_norm_type none
--pc_type  hypre
+-snes_type newtonls
+-snes_monitor
+-snes_converged_reason
+-ksp_type lgmres
+-ksp_gmres_restart 100
+-ksp_converged_reason
+-pc_type hypre
 -pc_hypre_type boomeramg
 -pc_hypre_boomeramg_max_iter 1
 -pc_hypre_boomeramg_strong_threshold 0.25

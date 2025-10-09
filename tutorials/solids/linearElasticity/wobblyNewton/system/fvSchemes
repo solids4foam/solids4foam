@@ -28,6 +28,7 @@ d2dt2Schemes
     // beta = 0.25, gamma = 0.5 for 2nd order with no dissipation
     // For unconditional stability, beta >= gamma/2 >= 0.25
     d2dt2(pointD)    NewmarkBeta 0.25 0.5;
+    d2dt2(pointU)    NewmarkBeta 0.25 0.5;
 
     // Cell-centred schemes
     // d2dt2(DD)         steadyState;
@@ -63,7 +64,7 @@ gradSchemes
     snGradCorr(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U)) cellLimited leastSquares 1.0;
 
     // For segregated solids
-    grad(DD)          leastSquares;
+    grad(DD)          pointCellsLeastSquares;
 }
 
 divSchemes
