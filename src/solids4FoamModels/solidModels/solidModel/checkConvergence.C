@@ -40,6 +40,8 @@ convergenceParameters readConvergenceParameters(const dictionary& dict)
         dict.lookupOrDefault<label>("infoFrequency", 100);
     p.writeConvergedReason_ =
         dict.lookupOrDefault<Switch>("writeConvergedReason", true);
+    p.stopOnError_ =
+        dict.lookupOrDefault<Switch>("stopOnError", true);
 
     return p;
 }
@@ -68,7 +70,8 @@ bool checkConvergence
         param.sTol_,
         param.divTol_,
         param.writeResidualFrequency_,
-        param.writeConvergedReason_
+        param.writeConvergedReason_,
+        param.stopOnError_
     );
 }
 
@@ -86,7 +89,8 @@ bool checkConvergence
     const scalar stol,
     const scalar divtol,
     const label writeResidualFrequency,
-    const bool writeConvergedReason
+    const bool writeConvergedReason,
+    const bool stopOnError
 )
 {
     // Precompute tolerances
@@ -152,21 +156,43 @@ bool checkConvergence
     // 4. Check Divergence
     if (currentResidualNorm >= divtol*initialResidualNorm)
     {
-        FatalErrorInFunction
-            << "Iteration " << iteration
-            << setw(20) << ": Diverged - Residual grew excessively."
-            << abort(FatalError);
-        return false;
+        if (stopOnError)
+        {
+            FatalErrorInFunction
+                << "Iteration " << iteration
+                << setw(20) << ": Diverged - Residual grew excessively."
+                << abort(FatalError);
+        }
+        else
+        {
+            WarningInFunction
+                << "Iteration " << iteration
+                << setw(20) << ": Diverged - Residual grew excessively."
+                << endl;
+        }
+
+        return true;
     }
 
     // 5. Check Maximum Iterations
     if (iteration >= maxIterations)
     {
-        FatalErrorInFunction
-            << "Iteration " << iteration
-            << setw(20) << ": Failed - Maximum iterations reached."
-            << abort(FatalError);
-        return false;
+        if (stopOnError)
+        {
+            FatalErrorInFunction
+                << "Iteration " << iteration
+                << setw(20) << ": Failed - Maximum iterations reached."
+                << abort(FatalError);
+        }
+        else
+        {
+            WarningInFunction
+                << "Iteration " << iteration
+                << setw(20) << ": Failed - Maximum iterations reached."
+                << endl;
+        }
+
+        return true;
     }
 
     // 6. Not Converged Yet

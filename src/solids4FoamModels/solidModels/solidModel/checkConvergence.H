@@ -45,6 +45,7 @@ namespace Foam
         label maxIterations_;
         label writeResidualFrequency_;
         Switch writeConvergedReason_;
+        Switch stopOnError_;
     };
 
 
@@ -105,7 +106,8 @@ namespace Foam
         const scalar stol,
         const scalar divtol,
         const label writeResidualFrequency,
-        const bool writeConvergedReason
+        const bool writeConvergedReason,
+        const bool stopOnError = true
     );
 
 
