@@ -23,7 +23,7 @@ jobs:
         with:
           push: true
           tags: solids4foam/solids4foam-v2.0-openfoam-v2012:latest
-          file: Dockerfile.openfoamv2012
+          file: .docker/Dockerfile.openfoamv2012
 
   docker-openfoam9:
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
         with:
           push: true
           tags: solids4foam/solids4foam-v2.0-openfoam-9:latest
-          file: Dockerfile.openfoam9
+          file: .docker/Dockerfile.openfoam9
 
   docker-foamextend41:
     runs-on: ubuntu-latest
@@ -55,4 +55,4 @@ jobs:
         with:
           push: true
           tags: solids4foam/solids4foam-v2.0-foam-extend-4.1:latest
-          file: Dockerfile.foamextend41
+          file: .docker/Dockerfile.foamextend41
