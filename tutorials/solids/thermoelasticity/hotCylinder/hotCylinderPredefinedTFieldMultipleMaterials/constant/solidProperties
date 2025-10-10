@@ -21,21 +21,6 @@ FoamFile
 //solidModel     thermalLinearGeometry;
 solidModel     linearGeometryTotalDisplacement;
 
-"linearGeometryCoeffs|thermalLinearGeometryCoeffs|weakThermalLinearGeometryCoeffs"
-{
-    // Maximum number of correctors
-    nCorrectors    1000;
-
-    // Solution tolerance
-    solutionTolerance 1e-06;
-
-    // Alternative solution tolerance
-    alternativeTolerance 1e-07;
-
-    // Write frequency for the residuals
-    infoFrequencyT  100;
-}
-
 linearGeometryTotalDisplacementCoeffs
 {
     // Maximum number of correctors

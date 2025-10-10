@@ -23,7 +23,7 @@ d2dt2Schemes
 
 ddtSchemes
 {
-    default            steadyState;
+    default            Euler;
 }
 
 gradSchemes
@@ -38,24 +38,17 @@ divSchemes
 
 laplacianSchemes
 {
-    default            none;
-    laplacian(DD,D)    Gauss linear corrected;
-    laplacian(DDD,DD)  Gauss linear corrected;
+    default            Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
+    default            corrected;
 }
 
 interpolationSchemes
 {
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-    interpolate(grad(DD)) linear;
+    default            linear;
 }
 
 // ************************************************************************* //

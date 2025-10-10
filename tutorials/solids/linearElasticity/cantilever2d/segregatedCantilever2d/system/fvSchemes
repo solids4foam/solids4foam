@@ -42,20 +42,17 @@ divSchemes
 
 laplacianSchemes
 {
-    default                 none;
-    laplacian(DD,D)         Gauss linear corrected;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default                 none;
+    default                 corrected;
 }
 
 interpolationSchemes
 {
-    default                 none;
-    interpolate(impK)       linear;
-    interpolate(grad(D))    linear;
+    default                 linear;
 }
 
 // ************************************************************************* //

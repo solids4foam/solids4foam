@@ -190,15 +190,30 @@ do
 done
 
 # Modify solidProperties
-# set nCorrectors to 1 for solids4foam solvers
+# set nCorrectors to 1 for solids4foam solvers and set the stopOnError flag to
+# off
 echo "Modifying the solidProperties to run only one iteration"
 for SP in $(find . -name "solidProperties")
 do
-    mv ${SP} ${SP}.org
+    mv "${SP}" "${SP}.org"
+
+    awk '
+      /Coeffs/ { want=1 }                 # saw a *Coeffs line → arm insertion
+      { print }                           # print current line
+      /\{/ && want {
+        print "    nCorrectors 1;";
+        print "    stopOnError no;";
+        want=0                            # done for this block
+      }
+    ' "${SP}.org" > "${SP}"
+
     sed \
+    -i \
     -e "s|//nCorrectors.*;|nCorrectors 1;|g" \
     -e "s|nCorrectors.*;|nCorrectors 1;|g" \
-    ${SP}.org > ${SP}
+    ${SP}
+
+    sed -i -e "s|stopOnError.*;|stopOnError no;|g" ${SP}
 done
 
 # Modify fsiProperties

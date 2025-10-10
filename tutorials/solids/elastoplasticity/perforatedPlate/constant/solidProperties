@@ -17,13 +17,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-solidModel     linearGeometry;
-//solidModel     unsLinearGeometry;
-//solidModel     linearGeometryTotalDisplacement;
+solidModel     linearGeometryTotalDisplacement;
 
-"linearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+linearGeometryTotalDisplacementCoeffs
 {
+    // Predict the displacement at the start of a new time step
+    predictor yes;
+
     // Maximum number of momentum correctors
     //nCorrectors     1000;
 
