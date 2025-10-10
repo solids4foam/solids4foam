@@ -34,7 +34,7 @@ convergenceParameters readConvergenceParameters(const dictionary& dict)
     p.rTol_ = dict.lookupOrDefault<scalar>("rTol", 1e-6);
     p.aTol_ = dict.lookupOrDefault<scalar>("aTol", 1e-50);
     p.sTol_ = dict.lookupOrDefault<scalar>("sTol", 1e-10);
-    p.divTol_ = dict.lookupOrDefault<scalar>("divTol", 1e4);
+    p.divTol_ = dict.lookupOrDefault<scalar>("divTol", 1e6);
     p.maxIterations_ = dict.lookupOrDefault<label>("nCorrectors", 10000);
     p.writeResidualFrequency_ =
         dict.lookupOrDefault<label>("infoFrequency", 100);
