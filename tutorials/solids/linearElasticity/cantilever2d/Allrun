@@ -50,7 +50,7 @@ APPROACH="${1:-petscSnes}"
 # Validate approach name
 case "$APPROACH" in
     petscSnes|vertexCentred|segregated|unsCoupled) ;;
-    *) 
+    *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
         exit 1
