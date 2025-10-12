@@ -43,6 +43,7 @@ Author
 
 #include "vectorField.H"
 #include "dictionary.H"
+#include "symmTensor.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
