@@ -1113,6 +1113,7 @@ label linGeomTotalDispSolid::precondition
     const Vec x    // Input: vector to be preconditioned
 )
 {
+#ifdef OPENFOAM_COM
     // Take references
     const fvMesh& mesh = this->mesh();
     volVectorField& D = this->D();
@@ -1254,6 +1255,12 @@ label linGeomTotalDispSolid::precondition
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;
+#endif
+
+#else // Not OPENFOAM_COM
+    FatalErrorInFunction
+        << "precondition(...) not implemented for this version of OpenFOAM"
+        << exit(FatalError);
 #endif
 
     return 0;
