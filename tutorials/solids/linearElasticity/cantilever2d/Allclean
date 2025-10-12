@@ -6,8 +6,9 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+wclean lib src
+
 cleanCase
-rm -rf case.foam postProcessing residuals
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
