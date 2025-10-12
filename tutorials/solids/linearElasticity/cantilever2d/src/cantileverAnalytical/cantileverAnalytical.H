@@ -110,12 +110,20 @@ public:
 
         // Access
 
+            //- Return the displacements at the given location
+            vector displacement(const vector& location) const;
+
             //- Return the displacements at the given locations
             tmp<vectorField> displacement(const vectorField& locations) const;
+
+            //- Return the tractions at the given location
+            vector traction(const vector& location) const;
 
             //- Return the tractions at the given locations
             tmp<vectorField> traction(const vectorField& locations) const;
 
+            //- Return the stress tensor at the given location
+            symmTensor stress(const vector& location) const;
 
     // Write
 

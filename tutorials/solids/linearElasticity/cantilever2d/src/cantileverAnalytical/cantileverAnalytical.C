@@ -66,6 +66,35 @@ Foam::cantileverAnalytical::cantileverAnalytical(const dictionary& dict)
 // * * * * * * * * * * * * * * * Public Functions  * * * * * * * * * * * * * //
 
 
+Foam::vector Foam::cantileverAnalytical::displacement
+(
+    const vector& location
+) const
+{
+    if (E_ < SMALL || L_ < SMALL || D_ < SMALL || I_ < SMALL)
+    {
+        FatalErrorInFunction
+            << "E, L, D and I must be greater than 0!" << exit(FatalError);
+    }
+
+    // Extract x and y location components
+    const scalar x(location.component(vector::X));
+    const scalar y(location.component(vector::Y));
+
+    // Return the displacement per Augarde and Deeks
+    return
+        vector
+        (
+            (P_*y/(6*E_*I_))*((6*L_ - 3*x)*x + (2 + nu_)*(y*y - D_*D_/4.0)),
+           -(P_/(6*E_*I_))
+           *(
+                3*nu_*y*y*(L_ - x) + (4 + 5*nu_)*D_*D_*x/4 + (3*L_ - x)*x*x
+            ),
+            0
+        );
+}
+
+
 Foam::tmp<Foam::vectorField> Foam::cantileverAnalytical::displacement
 (
     const vectorField& locations
@@ -81,15 +110,39 @@ Foam::tmp<Foam::vectorField> Foam::cantileverAnalytical::displacement
     tmp<vectorField> tresult(new vectorField(locations.size(), vector::zero));
     vectorField& result = tmpRef(tresult);
 
-    // Extract x and y location components
-    const scalarField x(locations.component(vector::X));
-    const scalarField y(locations.component(vector::Y));
-
-    // Calculate the displacement per Augarde and Deeks
-    result.replace(vector::X, (P_*y/(6*E_*I_))*(2 + nu_)*(y*y - D_*D_/4.0));
-    result.replace(vector::Y, -(P_/(6*E_*I_))*3*nu_*y*y*L_);
+    // Calculate the result per location
+    forAll(result, i)
+    {
+        result[i] = displacement(locations[i]);
+    }
 
     return tresult;
+}
+
+
+Foam::vector Foam::cantileverAnalytical::traction
+(
+    const vector& location
+) const
+{
+    if (E_ < SMALL || L_ < SMALL || D_ < SMALL || I_ < SMALL)
+    {
+        FatalErrorInFunction
+            << "E, L, D and I must be greater than 0!" << exit(FatalError);
+    }
+
+    // Extract x and y location components
+    const scalar x(location.component(vector::X));
+    const scalar y(location.component(vector::Y));
+
+    // Return the traction on the x plane
+    return
+        vector
+        (
+            P_*(L_ - x)*y/I_,
+            -(P_/(2*I_))*(D_*D_/4 - y*y),
+            0
+        );
 }
 
 
@@ -108,15 +161,38 @@ Foam::tmp<Foam::vectorField> Foam::cantileverAnalytical::traction
     tmp<vectorField> tresult(new vectorField(locations.size(), vector::zero));
     vectorField& result = tmpRef(tresult);
 
-    // Extract x and y location components
-    const scalarField x(locations.component(vector::X));
-    const scalarField y(locations.component(vector::Y));
-
-    // Calculate traction field
-    result.replace(vector::X, P_*(L_ - x)*y/I_);
-    result.replace(vector::Y, -(P_/(2*I_))*(D_*D_/4 - y*y));
+    // Calculate the result per location
+    forAll(result, i)
+    {
+        result[i] = traction(locations[i]);
+    }
 
     return tresult;
+}
+
+
+Foam::symmTensor Foam::cantileverAnalytical::stress
+(
+    const vector& location
+) const
+{
+    if (E_ < SMALL || L_ < SMALL || D_ < SMALL || I_ < SMALL)
+    {
+        FatalErrorInFunction
+            << "E, L, D and I must be greater than 0!" << exit(FatalError);
+    }
+
+    // Calculate the traction on the x plane
+    const vector trac(traction(location));
+
+    // Return the stress tensor
+    return
+        symmTensor
+        (
+            trac.x(), trac.y(), 0.0,
+                      0.0,      0.0,
+                                0.0
+        );
 }
 
 

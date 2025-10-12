@@ -48,6 +48,7 @@ Author
 
 #include "tmp.H"
 #include "autoPtr.H"
+#include "GeometricFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

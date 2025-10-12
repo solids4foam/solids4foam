@@ -106,14 +106,12 @@ bool Foam::cantileverAnalyticalSolution::writeData()
         {
             if (cellStress_)
             {
-                sI[cellI] =
-                    cantileverStress(CI[cellI], P_, E_, nu_, L_, D_, I_);
+                sI[cellI] = analyticalSol_.stress(CI[cellI]);
             }
 
             if (cellDisplacement_)
             {
-                aDI[cellI] =
-                    cantileverDisplacement(CI[cellI], P_, E_, nu_, L_, D_, I_);
+                aDI[cellI] = analyticalSol_.displacement(CI[cellI]);
             }
         }
 
@@ -134,20 +132,12 @@ bool Foam::cantileverAnalyticalSolution::writeData()
                 {
                     if (cellStress_)
                     {
-                        sP[faceI] =
-                            cantileverStress
-                            (
-                                CP[faceI], P_, E_, nu_, L_, D_, I_
-                            );
+                        sP[faceI] = analyticalSol_.stress(CP[faceI]);
                     }
 
                     if (cellDisplacement_)
                     {
-                        aDP[faceI] =
-                            cantileverDisplacement
-                            (
-                                CP[faceI], P_, E_, nu_, L_, D_, I_
-                            );
+                        aDP[faceI] = analyticalSol_.displacement(CP[faceI]);
                     }
                 }
             }
@@ -259,17 +249,12 @@ bool Foam::cantileverAnalyticalSolution::writeData()
         {
             if (pointStress_)
             {
-                sI[pointI] =
-                    cantileverStress(points[pointI], P_, E_, nu_, L_, D_, I_);
+                sI[pointI] = analyticalSol_.stress(points[pointI]);
             }
 
             if (pointDisplacement_)
             {
-                aDI[pointI] =
-                    cantileverDisplacement
-                    (
-                        points[pointI], P_, E_, nu_, L_, D_, I_
-                    );
+                aDI[pointI] = analyticalSol_.displacement(points[pointI]);
             }
         }
 
@@ -328,12 +313,7 @@ Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
     functionObject(name),
     name_(name),
     time_(t),
-    P_(readScalar(dict.lookup("P"))),
-    E_(readScalar(dict.lookup("E"))),
-    nu_(readScalar(dict.lookup("nu"))),
-    L_(readScalar(dict.lookup("L"))),
-    D_(readScalar(dict.lookup("D"))),
-    I_(Foam::pow(D_, 3.0)/12.0),
+    analyticalSol_(dict),
     cellDisplacement_
     (
         dict.lookupOrDefault<Switch>("cellDisplacement", true)
@@ -352,20 +332,6 @@ Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
-
-    if (L_ < SMALL || D_ < SMALL)
-    {
-        FatalErrorIn(this->name() + " function object constructor")
-            << "L and D should both be greater than 0!"
-            << abort(FatalError);
-    }
-
-    if (E_ < SMALL || nu_ < SMALL)
-    {
-        FatalErrorIn(this->name() + " function object constructor")
-            << "E and nu should be positive!"
-            << abort(FatalError);
-    }
 }
 
 

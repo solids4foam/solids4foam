@@ -46,6 +46,7 @@ SourceFiles
 #include "dictionary.H"
 #include "fvMesh.H"
 #include "OFstream.H"
+#include "cantileverAnalytical.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -68,23 +69,9 @@ class cantileverAnalyticalSolution
         //- Reference to main object registry
         const Time& time_;
 
-        //- Load applied in the minus y direction at the other end of the beam
-        const scalar P_;
-
-        //- Young's modulus
-        const scalar E_;
-
-        //- Poisson's ratio
-        const scalar nu_;
-
-        //- Length of the beam
-        const scalar L_;
-
-        //- Depth of the beam
-        const scalar D_;
-
-        //- Second moment of area
-        const scalar I_;
+        //- Helper object for calculating the analytical displacements and
+        //  traction
+        cantileverAnalytical analyticalSol_;
 
         //- Calculate cell displacement fields
         const Switch cellDisplacement_;
