@@ -727,7 +727,7 @@ function solids4Foam::runParallel()
 #     Run the case using the specified solid model. This script modifies the
 #     case to work with the specified solid model and then runs the case.
 #     Modification are made to the solidProperties, fvSchemes, fvSolution,
-#     boundary conditions, etc., as needed. 
+#     boundary conditions, etc., as needed.
 # Arguments:
 #     1: Address of the case directory
 #     2: Name of the solid model to use
@@ -758,7 +758,7 @@ function solids4Foam::runSolidModel()
     if [ ! -d "${DICTS_DIR}" ]; then
         solids4Foam::err "Cannot find ${DICTS_DIR}. Do default dicts exist for this solid model?"
     fi
-    
+
     # Copy default dictionaries for the specified solid model
 
     echo "Replacing solidProperties"
@@ -766,7 +766,7 @@ function solids4Foam::runSolidModel()
 
     echo "Replacing fvSolution"
     \cp ${DICTS_DIR}/fvSolution ${CASE_DIR}/system/
-    
+
     echo "Replacing fvSchemes"
     \cp ${DICTS_DIR}/fvSchemes ${CASE_DIR}/system/
 
@@ -796,7 +796,7 @@ function solids4Foam::runSolidModel()
             \mv "${CASE_DIR}/0/DD" "${CASE_DIR}/0/D"
             sed -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
         fi
-        
+
         if [ "${DISP}" = "DD" ] && [ -f "${CASE_DIR}/0/D" ]; then
             echo "Renaming ${CASE_DIR}/0/D to ${CASE_DIR}/0/DD"
             \mv "${CASE_DIR}/0/D" "${CASE_DIR}/0/DD"

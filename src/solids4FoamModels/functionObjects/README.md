@@ -1258,12 +1258,12 @@ This function object is currently only implemented for serial run!
         cavityAnalytical
         {
             type sphericalCavityAnalyticalSolution;
-            
+
             farFieldTractionZ 1e6;
             cavityRadius 0.2;
             E 200e9;
             nu 0.3;
-    
+
             // Optional
             cellDisplacement yes;
             pointDisplacement no;
