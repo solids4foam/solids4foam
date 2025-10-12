@@ -1,3 +1,0 @@
-cantileverTractionPointPatchVectorField.C
-
-LIB = $(FOAM_MODULE_LIBBIN)/libcantileverTractionPointPatch
