@@ -29,8 +29,8 @@ Prepared by Ivan Batistić, with additions by Philip Cardiff
   (in `*.inp` format) into the FOAM mesh format.
   Currently, this utility only supports 3-D hexahedral cells/elements.
   Note that each distribution of `OpenFOAM` comes with a set of mesh converters
-  (but not for Abaqus), see the available one
-  [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).
+  (but not for Abaqus), see the available ones in the
+  [OpenFOAM User Guide](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).
 - **Arguments**
 
   - `<mesh.inp>` name of the Abaqus mesh file.
@@ -214,24 +214,24 @@ to `constant` before running the simulation!
 
 ## `projectPatchToSphere`
 
-- __Utility purpose__
+- **Utility purpose**
   Project points of the specified patch onto the surface of a sphere.
   It does not alter internal points.
 
-- __Arguments__
+- **Arguments**
 
   - `<patchName>` patch to be projected;
   - `(x y z)` origin vector of the sphere.
   - `radius` radius of the sphere.
 
-- __Options/parameters__
+- **Options/parameters**
 
   None
 
-- __Example of usage__
+- **Example of usage**
 
   ```bash
-  $ projectPatchToSphere leftPatch (0 0 0) 0.5
+  projectPatchToSphere leftPatch (0 0 0) 0.5
   ```
 
 ```note
