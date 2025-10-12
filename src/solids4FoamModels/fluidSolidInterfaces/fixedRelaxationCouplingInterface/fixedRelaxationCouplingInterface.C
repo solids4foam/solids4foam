@@ -76,8 +76,7 @@ bool fixedRelaxationCouplingInterface::evolve()
 
         solid().evolve();
 
-        residualNorm =
-            updateResidual();
+        residualNorm = updateResidual();
     }
 
     do

@@ -35,7 +35,7 @@ surfaces
 (
     surface
     {
-        type patch;   
+        type patch;
         patchName   foundation;
     }
 );

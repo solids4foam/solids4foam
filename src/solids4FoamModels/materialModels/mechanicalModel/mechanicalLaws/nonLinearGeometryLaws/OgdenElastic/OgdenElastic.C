@@ -64,11 +64,12 @@ Foam::OgdenElastic::OgdenElastic
         << "    K = "   << K_.value() << endl;
 
     // Compute lineaarised shear modulus
-    mu() = mu1_ + mu2_ + mu3_;;
+    this->mu(mu1_ + mu2_ + mu3_);
+    this->K(K_);
 
     // Update surface fields
-    muf() = fvc::interpolate(mu());
-    Kf()  = fvc::interpolate(K());
+    this->muf(fvc::interpolate(mu()));
+    this->Kf(fvc::interpolate(K()));
 }
 
 

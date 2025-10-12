@@ -23,7 +23,7 @@ interpolationScheme cellPointFace;
 
 fields
 (
-    sigma:Transformed analyticalRadialStress analyticalHoopStress T analyticalT 
+    sigma:Transformed analyticalRadialStress analyticalHoopStress T analyticalT
 );
 
 sets

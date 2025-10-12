@@ -342,7 +342,11 @@ void Foam::mechanicalLaw::makeF()
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::NO_WRITE
+                // ZT: Must write in order to allow restart
+                // for incremental TL solvers.
+                // Required if correct(sigma) is used in the solver
+                IOobject::AUTO_WRITE
+                // IOobject::NO_WRITE
             ),
             mesh(),
             dimensionedTensor("I", dimless, I)
@@ -369,7 +373,10 @@ void Foam::mechanicalLaw::makeFf()
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::NO_WRITE
+                // ZT: Must write in order to allow restart
+                // for incremental TL solvers.
+                // Required if correct(sigmaf) is used in the solver
+                IOobject::AUTO_WRITE
             ),
             mesh(),
             dimensionedTensor("I", dimless, I)

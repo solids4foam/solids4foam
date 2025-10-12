@@ -9,7 +9,7 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
 # Create volume mesh
 solids4Foam::runApplication blockMesh

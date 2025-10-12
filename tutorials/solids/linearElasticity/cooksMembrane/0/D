@@ -31,7 +31,7 @@ boundaryField
     right
     {
         type            solidTraction;
-        traction        uniform ( 0 6250 0 );
+        traction        uniform ( 0 6.25e6 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
     }

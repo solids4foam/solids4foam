@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface thermal;
+
+"thermalCoeffs|fixedRelaxationCoeffs"
+{
+    // Interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Predict interface temperature and heat flux fields at the start of a new
+    // time step using linearly extrapolation
+    predictTemperatureAndHeatFlux yes;
+
+    // Enable FSI coupling
+    mechanicalCoupling yes;
+
+    // Fixed under-relaxation factor for thermal FSI coupling
+    // relaxationFactor is used if thermoRelaxationFactor is not given
+    thermoRelaxationFactor 1.0;
+
+    // Fixed under-relaxation factor for mechanical FSI coupling
+    relaxationFactor 1.0;
+
+    // Thermo-FSI outer loop tolerance
+    outerCorrTolerance 1e-5;
+
+    // Thermo-FSI outer maximum number of iterations
+    nOuterCorr 100;
+
+    // Enable thermo-FSI coupling
+    coupled yes;
+
+    // Write residuals to a file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

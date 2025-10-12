@@ -44,13 +44,21 @@ then
         "pointBoundaryMesh.C" \
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
-    
+
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
     replaceFile \
         "foam-extend-4.1" \
         "EulerDdtScheme.C" \
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+
+    # This fixes consistent Rhie-Chow interpolation
+    # for Euler scheme
+    replaceFile \
+        "foam-extend-4.1" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
         "$FOAM_SRC/finiteVolume"
 
     # Fix time index storage in the storeOldTimes function
@@ -62,11 +70,20 @@ then
 elif [[ $WM_PROJECT_VERSION == v* ]]
 then
     # Fix time index storage in the storeOldTimes function
-    replaceFile \
-        "OpenFOAM-${WM_PROJECT_VERSION}" \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
+    if [ "${WM_PROJECT_VERSION:1}" -ge 2412 ]
+    then
+        replaceFile \
+            "OpenFOAM-v2412" \
+            "backwardDdtScheme.C" \
+            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+            "$FOAM_SRC/finiteVolume"
+    else
+        replaceFile \
+            "OpenFOAM-v2012" \
+            "backwardDdtScheme.C" \
+            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+            "$FOAM_SRC/finiteVolume"
+    fi
 else
     # Fix time index storage in the storeOldTimes function
     replaceFile \

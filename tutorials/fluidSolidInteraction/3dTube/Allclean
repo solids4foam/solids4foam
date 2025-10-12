@@ -20,6 +20,7 @@ else
 fi
 
 rm -rf case.foam postProcessing residuals
+rm -rf radialDisplacement.pdf fsiConvergence.pdf axialDisplacement.pdf
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
@@ -37,6 +38,6 @@ fi
 
 # Link files back to default with pimpleFluid
 for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
-do 
+do
     ln -vnsf ${file##*/} ${file%.*}
 done

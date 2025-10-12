@@ -27,9 +27,10 @@ mechanical
         rho         rho [ 1 -3 0 0 0 0 0 ] 7800;
         E           E [ 1 -1 -2 0 0 0 0 ] 689.5564786e6;
         nu          nu [ 0 0 0 0 0 0 0 ] 0.32;
-
         outOfBounds     clamp;
         "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        //solvePressureEqn  yes;
+        //pressureSmoothingScaleFactor 100;
     }
 );
 

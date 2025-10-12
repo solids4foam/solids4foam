@@ -610,7 +610,14 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mu_ = E_/(2.0*(1.0 + nu_));
 
         // Set the bulk modulus
-        K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+	if (planeStress())
+        {
+            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
+	}
+	else
+	{
+            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+	}
     }
     else if (dict.found("mu") && dict.found("K"))
     {

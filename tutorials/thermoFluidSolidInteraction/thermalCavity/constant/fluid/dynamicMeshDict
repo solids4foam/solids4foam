@@ -14,10 +14,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dynamicFvMesh dynamicMotionSolverFvMesh;
+dynamicFvMesh staticFvMesh;
 
-"solver|motionSolver" velocityLaplacian;
+// dynamicFvMesh dynamicMotionSolverFvMesh;
 
-diffusivity quadratic inverseDistance (interface);
+// solver velocityLaplacian;
+
+// diffusivity quadratic inverseDistance (interface);
 
 // ************************************************************************* //

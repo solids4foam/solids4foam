@@ -212,7 +212,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
         result =
         (
            fvc::laplacian(gammaf, vf, "laplacian(DD,D)")
-         - fvc::div(gammaf*mesh.Sf() & fvc::interpolate(gradVf))
+         - fvc::div(gammaf*(mesh.Sf() & fvc::interpolate(gradVf)))
         );
     }
     else if (method == "JamesonSchmidtTurkel")

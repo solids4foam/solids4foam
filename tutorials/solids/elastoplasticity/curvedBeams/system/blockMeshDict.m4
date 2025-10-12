@@ -43,7 +43,7 @@ m4_define(zB, L)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-convertToMeters 0.001;
+scale 0.001;
 
 vertices
 (

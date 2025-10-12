@@ -30,14 +30,10 @@ boundaryField
     }
     right
     {
-        type            solidTraction;
-        tractionSeries
-        {
-            "fileName|file"    "$FOAM_CASE/constant/timeVsTraction";
-            outOfBounds clamp;
-        }
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            analyticalPlateHoleTraction;
+        farFieldTractionX 1e6;
+        holeRadius      0.5;
+	value           uniform (0 0 0);
     }
     down
     {
@@ -47,10 +43,10 @@ boundaryField
     }
     up
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            analyticalPlateHoleTraction;
+        farFieldTractionX 1e6;
+        holeRadius      0.5;
+	value		uniform (0 0 0);
     }
     hole
     {

@@ -1,0 +1,97 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 280;
+
+boundaryField
+{
+<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/pointD
+    plate
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+========
+    inlet1
+    {
+        type            fixedValue;
+        value           uniform 280;
+    }
+
+    inlet2
+    {
+        type            fixedValue;
+        value           uniform 320;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/fluid/T
+    }
+
+    interface
+    {
+        type            thermalRobin;
+
+        // Apply dirichlet bc
+        // dirichlet true;
+        // neumann false;
+
+        lambda lambdaEff;
+
+        value           uniform 280;
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+        value           $internalField;
+    }
+
+    top
+    {
+        type            zeroGradient;
+        value           $internalField;
+    }
+<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/pointD
+    cylinder
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+========
+
+    frontAndBack
+    {
+        type            empty;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/fluid/T
+    }
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    frontAndBackPlanes
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

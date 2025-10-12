@@ -56,3 +56,13 @@ solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
 solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating plots"
+    gnuplot -p displacement.gnuplot &> /dev/null
+    gnuplot -p fsiConvergence.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

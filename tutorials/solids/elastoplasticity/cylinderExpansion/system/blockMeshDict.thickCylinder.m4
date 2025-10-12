@@ -41,7 +41,7 @@ define(mr, 10) // number of cells in radial direction
 
 // start of blockMeshDict
 
-convertToMeters 0.001;
+scale 0.001;
 
 vertices
 (

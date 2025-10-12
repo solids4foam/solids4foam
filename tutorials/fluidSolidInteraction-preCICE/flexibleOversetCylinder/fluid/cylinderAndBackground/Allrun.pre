@@ -20,7 +20,7 @@ restore0Dir
 # Use cellSets to write zoneID
 runApplication setFields
 
-# preCICE needs 2-D geometry to be in the XY plane 
+# preCICE needs 2-D geometry to be in the XY plane
 runApplication transformPoints -rotate-angle "((1 0 0) 90)"
 
 #------------------------------------------------------------------------------

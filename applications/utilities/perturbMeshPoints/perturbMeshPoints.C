@@ -58,7 +58,6 @@ Author
     #include "primitiveMeshTools.H"
 #endif
 
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 using namespace Foam;
@@ -205,10 +204,11 @@ void calcFeatures
 #endif // OPENFOAM_COM
 
 
+#ifdef OPENFOAM_NOT_EXTEND
+
 // Modified form OpenFOAM-v2312 primitiveMeshCheck.C
 label numSevereNonOrthoFaces(const fvMesh& mesh)
 {
-#ifdef OPENFOAM_NOT_EXTEND
     // Calculate the mesh orthogonality
     tmp<scalarField> tortho = primitiveMeshTools::faceOrthogonality
     (
@@ -234,11 +234,9 @@ label numSevereNonOrthoFaces(const fvMesh& mesh)
     }
 
     return severeNonOrth;
-#else
-    // Checks not performed for foam extend
-    return 0;
-#endif
 }
+
+#endif // OPENFOAM_NOT_EXTEND
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -285,7 +283,7 @@ int main(int argc, char *argv[])
     }
 
     // Create random number generator
-    autoPtr<Random> rndPtr(new Random(seed));
+    Random rnd(seed);
 
     // Store original points
     const pointField oldPoints = mesh.points();
@@ -318,8 +316,6 @@ int main(int argc, char *argv[])
 
         minEdgeLength[pI] = minLen;
     }
-    Info<< "Minimum edge lengths: " << min(minEdgeLength)
-        << "->" << max(minEdgeLength) << endl;
 
     // Store the original minEdgeLength
     const scalarField oldMinEdgeLength(minEdgeLength);
@@ -377,9 +373,6 @@ int main(int argc, char *argv[])
     do
     {
         Info<< "Iteration = " << iter << endl;
-
-        // Take a reference to the random number generator
-        Random& rnd = rndPtr();
 
         // Calculate new points
         pointField newPoints(oldPoints);
@@ -448,7 +441,13 @@ int main(int argc, char *argv[])
         // Move the mesh
         Info<< "Applying the perturbation to the points" << endl;
         mesh.movePoints(newPoints);
-        mesh.clearOut();
+#ifdef OPENFOAM_COM
+    #if (OPENFOAM >= 2112)
+        mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
+    #else
+        mesh.setPhi().writeOpt() = IOobject::NO_WRITE;
+    #endif
+#endif
 
         // Check for negative or small cell volumes
         const scalarField& VI = mesh.V();
@@ -470,7 +469,11 @@ int main(int argc, char *argv[])
         }
 
         // Check if there are any severely non-orthogonal faces
+#ifdef OPENFOAM_NOT_EXTEND
         const label nNonOrthoFaces = numSevereNonOrthoFaces(mesh);
+#else
+        const label nNonOrthoFaces = 0;
+#endif
 
         // A valid mesh has no negative or small volumes and no severely
         // non-orthogonal faces
@@ -585,6 +588,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
+#ifdef OPENFOAM_COM
                     Warning
                         << "Maximum mesh correction steps reached, but the mesh "
                         << "is still invalid" << endl;
@@ -592,18 +596,18 @@ int main(int argc, char *argv[])
                     Info<< "Resetting the random number generator seed" << endl;
 
                     // Change the seed for the random number generator
-#ifdef OPENFOAM_COM
                     rnd.reset(seed + 1);
-#else
-                    rndPtr.clear();
-                    rndPtr.set(new Random(seed + 1));
-#endif
 
                     // Reset minEdgeLength
                     minEdgeLength = oldMinEdgeLength;
 
                     // Reset iter
                     iter = 0;
+#else
+                    FatalError
+                        << "Maximum mesh correction steps reached, but the mesh "
+                        << "is still invalid" << abort(FatalError);
+#endif
                 }
             }
         }

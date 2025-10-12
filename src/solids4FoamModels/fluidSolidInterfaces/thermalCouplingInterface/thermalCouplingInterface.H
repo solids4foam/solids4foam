@@ -33,7 +33,7 @@ SourceFiles
 #ifndef thermalCouplingInterface_H
 #define thermalCouplingInterface_H
 
-#include "fluidSolidInterface.H"
+#include "fixedRelaxationCouplingInterface.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -44,12 +44,12 @@ namespace fluidSolidInterfaces
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class thermalCouplingInterface Declaration
+                  Class thermalCouplingInterface Declaration
 \*---------------------------------------------------------------------------*/
 
 class thermalCouplingInterface
 :
-    public fluidSolidInterface
+    public fixedRelaxationCouplingInterface
 {
     // Private data
 
@@ -57,7 +57,10 @@ class thermalCouplingInterface
         const scalar relaxationFactor_;
 
         //- Predict temperature and heat-flux at fluid and solid interface
-        const bool predictTemperatureAndHeatFlux_;
+        const Switch predictTemperatureAndHeatFlux_;
+
+        //- Flag to enable mechanical coupling between the fluid and solid
+        const Switch mechanicalCoupling_;
 
         //- Residual file pointer
         autoPtr<OFstream> thermalResidualFilePtr_;

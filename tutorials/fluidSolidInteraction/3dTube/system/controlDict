@@ -38,7 +38,7 @@ writeFormat     binary;
 
 writePrecision  6;
 
-writeCompression uncompressed;
+writeCompression off;
 
 timeFormat      general;
 
@@ -64,9 +64,9 @@ functions
     forces
     {
         type                forces;
-        "libs|functionObjectLibs" ( "libforces.so" );
-        outputControl       timeStep;
-        outputInterval      1;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
         patches             (wall);
         "pName|p"           p;
         "UName|U"           U;
@@ -76,6 +76,17 @@ functions
         CofR                (0.5 0.1 0);
         region              fluid;
     }
+    fsiConvData
+    {
+        type fsiConvergenceData;
+        region fluid;
+    }
+
+}
+
+DebugSwitches
+{
+    elasticWallPressure  1;
 }
 
 DebugSwitches

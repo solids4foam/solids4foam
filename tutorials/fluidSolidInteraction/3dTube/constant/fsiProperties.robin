@@ -42,7 +42,7 @@ fixedRelaxationCoeffs
     interfaceDeformationLimit   0;
 
     coupled yes;
-    
+
     // Write fsi residuals to file
     writeResidualsToFile yes;
 }

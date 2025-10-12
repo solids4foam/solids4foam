@@ -12,18 +12,19 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 d2dt2Schemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 ddtSchemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 gradSchemes
@@ -33,22 +34,22 @@ gradSchemes
 
 divSchemes
 {
-    default            Gauss linear;
+    default     Gauss linear;
 }
 
 laplacianSchemes
 {
-    default            Gauss linear corrected;
+    default         Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default            corrected;
+    default         corrected;
 }
 
 interpolationSchemes
 {
-    default            linear;
+    default           linear;
 }
 
 // ************************************************************************* //

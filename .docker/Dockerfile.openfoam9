@@ -12,13 +12,13 @@ MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
 # Change default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Add solids4Foam 
+# Add solids4Foam
 COPY . /opt/solids4foam
 
 # Compile solids4Foam
 RUN source /opt/openfoam9/etc/bashrc && \
     cd /opt/solids4foam && \
-    ./Allwmake
+    ./Allwmake -j -s
 
 # Clean log files
 RUN cd /opt/solids4foam && \

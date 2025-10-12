@@ -95,6 +95,14 @@ public:
 
     // Member Functions
 
+        // Access
+
+            //- Relaxation factor
+            virtual scalar relaxationFactor() const
+            {
+                return relaxationFactor_;
+            }
+
         // Edit
 
             //- Evolve the interface

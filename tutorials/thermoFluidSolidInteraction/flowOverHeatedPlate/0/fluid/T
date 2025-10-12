@@ -29,7 +29,7 @@ boundaryField
         type            thermalRobin;
         lambda          lambdaEff;
         value           $internalField;
-        
+
         // Apply dirichlet bc
         // dirichlet true;
         // neumann false;

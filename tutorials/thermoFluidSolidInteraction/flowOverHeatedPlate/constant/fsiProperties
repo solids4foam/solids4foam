@@ -16,13 +16,13 @@ FoamFile
 
 fluidSolidInterface thermal;
 
-thermalCoeffs
+"thermalCoeffs|fixedRelaxationCoeffs"
 {
     solidPatch top;
     fluidPatch interface;
 
     predictTemperatureAndHeatFlux true;
-    
+
     relaxationFactor 1;
 
     interfaceDeformationLimit 0;

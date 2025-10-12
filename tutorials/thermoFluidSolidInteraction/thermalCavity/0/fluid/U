@@ -29,7 +29,7 @@ boundaryField
 
     right
     {
-        type            newMovingWallVelocity;
+        type            fixedValue;
         value           uniform (0 0 0);
     }
 
@@ -44,7 +44,7 @@ boundaryField
         type            fixedValue;
         value           uniform (0 0 0);
     }
-    
+
     frontAndBack
     {
         type            empty;
