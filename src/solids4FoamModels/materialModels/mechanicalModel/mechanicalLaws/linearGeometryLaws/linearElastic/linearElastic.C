@@ -76,11 +76,11 @@ Foam::linearElastic::linearElastic
             if (planeStress())
             {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
-	    }
-	    else
-	    {
+            }
+            else
+            {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
-	    }
+            }
         }
         else
         {
@@ -454,11 +454,11 @@ void Foam::linearElastic::correct
         List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
         const List<tensor>& faceGradDQuad = gradDQuad[faceI];
 
-        forAll(faceSigmaQuad, gpI)
+        forAll(faceSigmaQuad, qpI)
         {
-            epsilon = symm(faceGradDQuad[gpI]);
+            epsilon = symm(faceGradDQuad[qpI]);
 
-            faceSigmaQuad[gpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
+            faceSigmaQuad[qpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
         }
     }
 }

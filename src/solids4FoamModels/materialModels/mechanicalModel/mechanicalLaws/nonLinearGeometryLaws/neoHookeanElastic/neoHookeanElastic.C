@@ -390,10 +390,24 @@ void Foam::neoHookeanElastic::correct
         {
             F = I + faceGradDQuad[qpI].T();
             J = det(F);
-            bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
-            s = (mu_*dev(bEbar)).value();
+            if (J > SMALL)
+            {
+                bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
+                s = (mu_*dev(bEbar)).value();
 
-            faceSigmaQuad[qpI] = (1.0/J)*((0.5*K_*(pow(J, 2) - 1)*I).value() + s);
+                sigmaQuad[faceI][qpI] = (1.0/J)*((0.5*K_*(pow(J, 2) - 1)*I).value() + s);
+
+            }
+            else
+            {
+                WarningInFunction
+                    << "Unphysical Jacobian J = " << J << " at face " << faceI
+                    << ", qp " << qpI << "." << nl
+                    << "Falling back to small strain model to prevent crash." << endl;
+
+                // Calculate stress using Hooke's law
+                sigmaQuad[faceI][qpI] = (2.0*mu_*dev(symm(faceGradDQuad[qpI]))).value() + (K_*tr(faceGradDQuad[qpI])*I).value();
+            }
         }
     }
 }

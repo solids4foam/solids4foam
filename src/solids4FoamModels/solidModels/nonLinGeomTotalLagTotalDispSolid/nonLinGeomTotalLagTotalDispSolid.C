@@ -889,9 +889,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Enforce the boundary conditions again for any conditions that use gradD
-    D.correctBoundaryConditions();
-
     // Increment of displacement
     DD() = D - D.oldTime();
 

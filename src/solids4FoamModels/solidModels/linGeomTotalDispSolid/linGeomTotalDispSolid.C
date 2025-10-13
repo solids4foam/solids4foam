@@ -23,6 +23,7 @@ License
 #include "hofvm.H"
 #include "hofvc.H"
 #include "fvMatrices.H"
+#include "deltaVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "sparseMatrixTools.H"
@@ -835,7 +836,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     if
     (
         solutionAlg() == solutionAlgorithm::PETSC_SNES
-     || solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED
+        //     || solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED
     )
     {
         if (gradDScheme != "leastSquaresS4f")
@@ -855,7 +856,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 << " solution algorithms" << abort(FatalError);
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
+        //Set extrapolateValue to true for solidTraction boundaries
         forAll(D().boundaryField(), patchI)
         {
             if
@@ -1203,17 +1204,8 @@ label linGeomTotalDispSolid::formResidual
     // Enforce the boundary conditions
     D.correctBoundaryConditions();
 
-    // Update gradient of displacement
-    mechanical().grad(D, gradD());
-
-    // Enforce the boundary conditions again for any conditions that use gradD
-    D.correctBoundaryConditions();
-
     // Update velocity
     U() = fvc::ddt(D);
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
 
     if (solvePressure())
     {
@@ -1266,6 +1258,15 @@ label linGeomTotalDispSolid::formResidual
     }
     else
     {
+        // Update gradient of displacement
+        mechanical().grad(D, gradD());
+
+        // Enforce the boundary conditions again for any conditions that use gradD
+        D.correctBoundaryConditions();
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+
         traction = n & fvc::interpolate(sigma());
     }
 
@@ -1280,6 +1281,119 @@ label linGeomTotalDispSolid::formResidual
         const surfaceTensorField gradDf(fvc::interpolate(gradD()));
 
         traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+    }
+    else
+    {
+        const scalar scaleFactor =
+                readScalar(stabilisation().dict().lookup("scaleFactor"));
+
+        if (word(stabilisation().dict().lookup("type")) == "RhieChow")
+        {
+            // HO grad at cell centre
+            gradD() = LREInterp().grad(D);
+
+            // HO cell centre grad  interpolated linearly to face
+            const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+
+            // We have problems with snGrad at boundaries!
+            traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+
+            // Attempt to use uncorrected grad at faces
+            //traction += scaleFactor*impKf_*(fvc::snGrad(D) - ((mesh.delta()/mag(mesh.delta())) & gradDf));
+        }
+        else if(word(stabilisation().dict().lookup("type")) == "alpha")
+        {
+            const labelList& own = mesh.owner();
+            const labelList& nei = mesh.neighbour();
+            const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+            const vectorField& nI = n.internalField();
+            const vectorField deltaI(deltaVectors(mesh));
+            const surfaceVectorField& Cf = mesh.Cf();
+            const vectorField& C = mesh.C();
+            const vectorField& vfI = D();
+
+            // HO grad at cell centre
+            gradD() = LREInterp().grad(D);
+            const tensorField& gradVfI = gradD().internalField();
+
+            forAll(traction, faceI)
+            {
+                const label ownCellID = own[faceI];
+                const label neiCellID = nei[faceI];
+
+                const tensor& ownGradVf = gradVfI[ownCellID];
+                const tensor& neiGradVf = gradVfI[neiCellID];
+
+                const vector& ownVf = vfI[ownCellID];
+                const vector& neiVf = vfI[neiCellID];
+
+                const vector& n = nI[faceI];
+                const vector& d = deltaI[faceI];
+
+                const vector dOwn = Cf[faceI] - C[ownCellID];
+                const vector dNei = Cf[faceI] - C[neiCellID];
+
+                const vector extrapOwnVf = ownVf + (dOwn & ownGradVf);
+                const vector extrapNeiVf = neiVf + (dNei & neiGradVf);
+
+                const scalar denom = max(mag(n & d), VSMALL);
+
+                const vector faceDamping =
+                    scaleFactor*impKf_[faceI]*(extrapNeiVf - extrapOwnVf)/denom;
+
+                traction[faceI] += faceDamping;
+            }
+
+            // Loop over patches
+            forAll(traction.boundaryField(), patchI)
+            {
+                const fvPatchVectorField& patch = D.boundaryField()[patchI];
+                const fvPatch& p = mesh.boundary()[patchI];
+                const labelList& faceCells = p.faceCells();
+                vectorField n(p.nf());
+
+                const scalarField& impKfPatch = impKf_.boundaryField()[patchI];
+
+                if (isA<fixedValueFvPatchVectorField>(patch))
+                {
+                    // Prescribed boundary displacement
+                    fvPatchVectorField& Dp = D.boundaryFieldRef()[patchI];
+                    Dp.updateCoeffs();
+                    vectorField patchD(Dp.size());
+                    patchD = Dp;
+
+                    const vectorField& patchCf = mesh.Cf().boundaryField()[patchI];
+
+                    forAll(traction.boundaryField()[patchI], faceI)
+                    {
+                        const label ownCellID = faceCells[faceI];
+
+                        const tensor& ownGradVf = gradVfI[ownCellID];
+                        const vector& ownVf = vfI[ownCellID];
+                        const vector& patchFaceD = patchD[faceI];
+
+                        const vector d = patchCf[faceI] - C[ownCellID];
+                        const vector normal = n[faceI];
+
+                        const vector extrapOwnVf = ownVf + (d & ownGradVf);
+
+                        const scalar denom = max(mag(normal & d), VSMALL);
+
+                        const vector faceDamping =
+                            scaleFactor*impKfPatch[faceI]*(patchFaceD - extrapOwnVf)/denom;
+
+                        traction.boundaryFieldRef()[patchI][faceI] += faceDamping;
+                    }
+                }
+            }
+
+        }
+        else
+        {
+            WarningIn(type() + "::formResidual()")
+                << "Stabilisation scheme not defined"
+                << nl << endl;
+        }
     }
 
     // Enforce traction boundary conditions
