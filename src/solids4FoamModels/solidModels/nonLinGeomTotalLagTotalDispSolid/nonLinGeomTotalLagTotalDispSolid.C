@@ -235,7 +235,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         surfaceVectorField force(magSfCurrent*traction);
 
         // Enforce traction boundary conditions
-        // enforceTractionBoundaries(traction, D, nCurrent);
         enforceTractionBoundaries(force, D(), nCurrent, magSfCurrent);
 
         // Momentum equation total displacement total Lagrangian form
@@ -619,6 +618,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
 
+    // It is important to call the stress calculation procedure during the
+    // constructor to allow it to correctly initialise fields
+    mechanical().correct(sigma());
+
     Info<< "solvePressure = " << solvePressure() << endl;
     if (solvePressure())
     {
@@ -904,7 +907,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     surfaceVectorField force(magSfCurrent*traction);
 
     // Enforce traction boundary conditions
-    // enforceTractionBoundaries(traction, D, nCurrent);
     enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
 
     // The residual vector is defined as

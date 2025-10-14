@@ -114,9 +114,10 @@ class nonLinGeomUpdatedLagSolid
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
         (
-            surfaceVectorField& traction,
-            const volVectorField& DD,     // displacement increment field
-            const surfaceVectorField& n   // unit normals field
+            surfaceVectorField& force,             // force at the faces
+            const volVectorField& D,               // displacement field
+            const surfaceVectorField& nCurrent,    // deformed unit normals
+            const surfaceScalarField& magSfCurrent // deformed area magnitudes
         ) const;
 
         //- Evolve the solid solver using the segregated implicit approach

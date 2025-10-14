@@ -26,6 +26,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -84,61 +85,84 @@ void nonLinGeomUpdatedLagSolid::predict()
 
 void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 (
-    surfaceVectorField& traction,
-    const volVectorField& DD,
-    const surfaceVectorField& n
+    surfaceVectorField& force,
+    const volVectorField& D,
+    const surfaceVectorField& nCurrent,
+    const surfaceScalarField& magSfCurrent
 ) const
 {
     // Enforce traction conditions
-    forAll(DD.boundaryField(), patchI)
+    forAll(D.boundaryField(), patchI)
     {
+#ifdef OPENFOAM_NOT_EXTEND
+        vectorField& forceP = force.boundaryFieldRef()[patchI];
+#else
+        vectorField& forceP = force.boundaryField()[patchI];
+#endif
+
         if
         (
             isA<solidTractionFvPatchVectorField>
             (
-                DD.boundaryField()[patchI]
+                D.boundaryField()[patchI]
             )
         )
         {
             const solidTractionFvPatchVectorField& tracPatch =
                 refCast<const solidTractionFvPatchVectorField>
                 (
-                    DD.boundaryField()[patchI]
+                    D.boundaryField()[patchI]
                 );
 
-            const vectorField& nPatch = n.boundaryField()[patchI];
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
-#ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
-#else
-            traction.boundaryField()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
-#endif
+            // traction.boundaryFieldRef()[patchI] =
+            //     tracPatch.traction() - nPatch*tracPatch.pressure();
+            if (tracPatch.useUndeformedArea())
+            {
+                notImplemented("Not implemented for updated Lagrangian");
+
+                // const scalarField& magSfPatch =
+                //     D.mesh().boundary()[patchI].magSf();
+
+                // forceP =
+                //     (
+                //         tracPatch.traction() - nPatch*tracPatch.pressure()
+                //     )*magSfPatch;
+            }
+            else
+            {
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
+
+                forceP =
+                    (
+                        tracPatch.traction() - nPatch*tracPatch.pressure()
+                    )*magSfCurrentPatch;
+            }
         }
         else if
         (
             isA<fixedDisplacementZeroShearFvPatchVectorField>
             (
-                DD.boundaryField()[patchI]
+                D.boundaryField()[patchI]
             )
          || isA<symmetryFvPatchVectorField>
             (
-                DD.boundaryField()[patchI]
+                D.boundaryField()[patchI]
+            )
+         || isA<slipFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
             )
         )
         {
-            // Unit normals
-            const vectorField& nPatch = n.boundaryField()[patchI];
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
             // Set shear traction to zero
-#ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-                sqr(nPatch) & traction.boundaryField()[patchI];
-#else
-            traction.boundaryField()[patchI] =
-                sqr(nPatch) & traction.boundaryField()[patchI];
-#endif
+            // traction.boundaryFieldRef()[patchI] =
+                // sqr(nPatch) & traction.boundaryField()[patchI];
+            forceP = sqr(nPatch) & force.boundaryField()[patchI];
         }
     }
 }
@@ -166,11 +190,40 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
     Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
         << endl;
 
+    // Updated (end of last time step) unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
     // Momentum equation loop
     do
     {
         // Store fields for under-relaxation and residual calculation
         DD().storePrevIter();
+
+        // Calculate deformed area vectors and normals
+        const surfaceVectorField SfCurrent
+        (
+            fvc::interpolate(relJ_*relFinv_.T()) & mesh().Sf()
+        );
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+        // Traction vectors at the faces
+        surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(DD()) - (n & gradDDf));
+
+        // Calculate the force at the faces
+        surfaceVectorField force(magSfCurrent*traction);
+
+        // Enforce traction boundary conditions
+        enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
 
         // Momentum equation incremental updated Lagrangian form
         fvVectorMatrix DDEqn
@@ -179,9 +232,8 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
           + fvc::d2dt2(rho_, D().oldTime())
          == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(relJ_*relFinv_ & sigma(), "div(sigma)")
+          + fvc::div(force)
           + rho_*g()
-          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Under-relax the linear system
@@ -481,6 +533,10 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     fvm::d2dt2(rho_, DD());
     fvc::d2dt2(rho_, D().oldTime());
 
+    // It is important to call the stress calculation procedure during the
+    // constructor to allow it to correctly initialise fields
+    mechanical().correct(sigma());
+
     if (predictor_)
     {
         // Check ddt scheme for D is not steadyState
@@ -710,8 +766,11 @@ label nonLinGeomUpdatedLagSolid::formResidual
     const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
     traction += scaleFactor*impKf_*(fvc::snGrad(DD) - (n & gradDDf));
 
+    // Calculate the force at the faces
+    surfaceVectorField force(magSfCurrent*traction);
+
     // Enforce traction boundary conditions
-    enforceTractionBoundaries(traction, DD, nCurrent);
+    enforceTractionBoundaries(force, DD, nCurrent, magSfCurrent);
 
     // The residual vector is defined as
     // F = div(sigma) + rho*g

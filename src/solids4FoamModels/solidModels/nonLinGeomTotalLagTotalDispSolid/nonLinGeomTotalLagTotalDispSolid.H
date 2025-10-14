@@ -113,7 +113,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
         (
-            // surfaceVectorField& traction,
             surfaceVectorField& force,             // force at the faces
             const volVectorField& D,               // displacement field
             const surfaceVectorField& nCurrent,    // deformed unit normals
