@@ -1095,268 +1095,294 @@ void LRE::generateExponents
 }
 
 
+label LRE::rowOf
+(
+    const List<FixedList<label, 3>>& exponents,
+    label i,
+    label j,
+    label k
+) const
+{
+    for (label r = 0; r < exponents.size(); ++r)
+    {
+        const FixedList<label, 3>& e = exponents[r];
+        if (e[0] == i && e[1] == j && e[2] == k)
+        {
+            return r;
+        }
+    }
+
+    FatalErrorInFunction
+        << "Missing exponent (" << i << "," << j << "," << k << ") in basis!"
+        << exit(FatalError);
+
+    //  Keeps compiler happy
+    return -1;
+}
+
+
 void LRE::calcQRCoeffs() const
 {
-    if (debug)
-    {
-        InfoInFunction
-            << "start" << endl;
-    }
+    // if (debug)
+    // {
+    //     InfoInFunction
+    //         << "start" << endl;
+    // }
 
-    if (QRInterpCoeffsPtr_ || QRGradCoeffsPtr_)
-    {
-        FatalErrorInFunction
-            << "Pointers already set!" << abort(FatalError);
-    }
+    // if (QRInterpCoeffsPtr_ || QRGradCoeffsPtr_)
+    // {
+    //     FatalErrorInFunction
+    //         << "Pointers already set!" << abort(FatalError);
+    // }
 
-    const fvMesh& mesh = mesh_;
+    // const fvMesh& mesh = mesh_;
 
-    QRInterpCoeffsPtr_.set(new List<DynamicList<scalar>>(mesh.nCells()));
-    List<DynamicList<scalar>>& QRInterpCoeffs = *QRInterpCoeffsPtr_;
+    // QRInterpCoeffsPtr_.set(new List<DynamicList<scalar>>(mesh.nCells()));
+    // List<DynamicList<scalar>>& QRInterpCoeffs = *QRInterpCoeffsPtr_;
 
-    QRGradCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nCells()));
-    List<DynamicList<vector>>& QRGradCoeffs = *QRGradCoeffsPtr_;
+    // QRGradCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nCells()));
+    // List<DynamicList<vector>>& QRGradCoeffs = *QRGradCoeffsPtr_;
 
-    // Refernces for brevity and efficiency
-    const vectorField& CI = mesh.C();
-    const vectorField& CfI = mesh.Cf();
+    // // Refernces for brevity and efficiency
+    // const vectorField& CI = mesh.C();
+    // const vectorField& CfI = mesh.Cf();
 
-    // Calculate Taylor series exponents
-    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
-    DynamicList<FixedList<label, 3>> exponents;
-    generateExponents(N_, exponents);
-    const label Np = exponents.size();
-    if (debug)
-    {
-        Info<< "Np = " << Np << endl;
-    }
+    // // Calculate Taylor series exponents
+    // // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    // DynamicList<FixedList<label, 3>> exponents;
+    // generateExponents(N_, exponents);
+    // const label Np = exponents.size();
+    // if (debug)
+    // {
+    //     Info<< "Np = " << Np << endl;
+    // }
 
-    // Precompute factorials up to N
-    List<scalar> factorials(N_ + 1, 1.0);
-    for (label n = 1; n <= N_; ++n)
-    {
-        factorials[n] = factorials[n - 1]*n;
-    }
+    // // Precompute factorials up to N
+    // List<scalar> factorials(N_ + 1, 1.0);
+    // for (label n = 1; n <= N_; ++n)
+    // {
+    //     factorials[n] = factorials[n - 1]*n;
+    // }
 
-    List<DynamicList<scalar>> c(mesh.nCells());
-    List<DynamicList<scalar>> cx(mesh.nCells());
-    List<DynamicList<scalar>> cy(mesh.nCells());
-    List<DynamicList<scalar>> cz(mesh.nCells());
+    // List<DynamicList<scalar>> c(mesh.nCells());
+    // List<DynamicList<scalar>> cx(mesh.nCells());
+    // List<DynamicList<scalar>> cy(mesh.nCells());
+    // List<DynamicList<scalar>> cz(mesh.nCells());
 
-    const List<DynamicList<label>>& stencilsBoundaryFaces =
-        this->stencilsBoundaryFaces();
-    const List<DynamicList<label>>& stencils = this->stencils();
+    // const List<DynamicList<label>>& stencilsBoundaryFaces =
+    //     this->stencilsBoundaryFaces();
+    // const List<DynamicList<label>>& stencils = this->stencils();
 
-    forAll(stencils, cellI)
-    {
-        const DynamicList<label>& curStencil = stencils[cellI];
+    // forAll(stencils, cellI)
+    // {
+    //     const DynamicList<label>& curStencil = stencils[cellI];
 
-        // Find max distance in this stencil
-        scalar maxDist = 0.0;
-        const vector& curC = CI[cellI];
-        forAll(curStencil, cI)
-        {
-            const label neiCellID = curStencil[cI];
-            const scalar d = mag(CI[neiCellID] - curC);
-            if (d > maxDist)
-            {
-                maxDist = d;
-            }
-        }
+    //     // Find max distance in this stencil
+    //     scalar maxDist = 0.0;
+    //     const vector& curC = CI[cellI];
+    //     forAll(curStencil, cI)
+    //     {
+    //         const label neiCellID = curStencil[cI];
+    //         const scalar d = mag(CI[neiCellID] - curC);
+    //         if (d > maxDist)
+    //         {
+    //             maxDist = d;
+    //         }
+    //     }
 
-        // Loop over neighbours and construct matrix Q
-        const label Nn =
-            curStencil.size() + stencilsBoundaryFaces[cellI].size();
+    //     // Loop over neighbours and construct matrix Q
+    //     const label Nn =
+    //         curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
-        // Use matrix format from Eigen/Dense library
-        // Avoid initialisation to zero as we will set every entry below
-        Eigen::MatrixXd Q(Np, Nn);
+    //     // Use matrix format from Eigen/Dense library
+    //     // Avoid initialisation to zero as we will set every entry below
+    //     Eigen::MatrixXd Q(Np, Nn);
 
-        // Check to avoid Eigen error
-        if (Nn < Np)
-        {
-            FatalErrorInFunction
-                << "Interpolation stencil needs to be bigger than the "
-                << "number of elements in Taylor order!" << nl
-                << "Stencil size = " << Nn << ", Taylor elements = " << Np << nl
-                << "Cell centre = " << curC
-                << exit(FatalError);
-        }
+    //     // Check to avoid Eigen error
+    //     if (Nn < Np)
+    //     {
+    //         FatalErrorInFunction
+    //             << "Interpolation stencil needs to be bigger than the "
+    //             << "number of elements in Taylor order!" << nl
+    //             << "Stencil size = " << Nn << ", Taylor elements = " << Np << nl
+    //             << "Cell centre = " << curC
+    //             << exit(FatalError);
+    //     }
 
-        // Loop over stencil points
-        for (label cI = 0; cI < Nn; ++cI)
-        {
-            vector dx;
-            if (cI < curStencil.size())
-            {
-                const label neiCellID = curStencil[cI];
-                const vector& neiC = CI[neiCellID];
-                dx = neiC - CI[cellI];
-            }
-            else
-            {
-                const label i = cI - curStencil.size();
-                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
-                const vector& neiC = CfI[globalFaceID];
-                dx = neiC - CI[cellI];
-            }
+    //     // Loop over stencil points
+    //     for (label cI = 0; cI < Nn; ++cI)
+    //     {
+    //         vector dx;
+    //         if (cI < curStencil.size())
+    //         {
+    //             const label neiCellID = curStencil[cI];
+    //             const vector& neiC = CI[neiCellID];
+    //             dx = neiC - CI[cellI];
+    //         }
+    //         else
+    //         {
+    //             const label i = cI - curStencil.size();
+    //             const label globalFaceID = stencilsBoundaryFaces[cellI][i];
+    //             const vector& neiC = CfI[globalFaceID];
+    //             dx = neiC - CI[cellI];
+    //         }
 
-            // Compute monomial values for each exponent
-            for (label p = 0; p < Np; ++p)
-            {
-                const FixedList<label, 3>& exponent = exponents[p];
-                const label i = exponent[0];
-                const label j = exponent[1];
-                const label k = exponent[2];
+    //         // Compute monomial values for each exponent
+    //         for (label p = 0; p < Np; ++p)
+    //         {
+    //             const FixedList<label, 3>& exponent = exponents[p];
+    //             const label i = exponent[0];
+    //             const label j = exponent[1];
+    //             const label k = exponent[2];
 
-               // Compute factorial denominator
-               const scalar factorialDenominator =
-                   factorials[i]*factorials[j]*factorials[k];
+    //            // Compute factorial denominator
+    //            const scalar factorialDenominator =
+    //                factorials[i]*factorials[j]*factorials[k];
 
-               // Compute and assign monomial value with factorials
-               // Note: the order of the quadratic and higher terms may not be
-               // the same as the previous manual approach
-               Q(p, cI) =
-                   pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-                  /factorialDenominator;
-            }
-        }
+    //            // Compute and assign monomial value with factorials
+    //            // Note: the order of the quadratic and higher terms may not be
+    //            // the same as the previous manual approach
+    //            Q(p, cI) =
+    //                pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+    //               /factorialDenominator;
+    //         }
+    //     }
 
-        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
-        //W.setZero(); // no need to waste time initialising
+    //     Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
+    //     //W.setZero(); // no need to waste time initialising
 
-        for (label cI = 0; cI < Nn; cI++)
-        {
-            scalar d;
+    //     for (label cI = 0; cI < Nn; cI++)
+    //     {
+    //         scalar d;
 
-            if (cI < curStencil.size())
-            {
-                const vector& C = CI[cellI];
-                const label neiCellID = curStencil[cI];
-                const vector& neiC = CI[neiCellID];
-                d = mag(neiC - C);
-            }
-            else
-            {
-                // For boundary cells we need to add boundary face as
-                // neigbour
-                const vector& C = CI[cellI];
-                const label i = cI - curStencil.size();
-                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
-                const vector& neiC = CfI[globalFaceID];
-                d = mag(neiC - C);
-            }
+    //         if (cI < curStencil.size())
+    //         {
+    //             const vector& C = CI[cellI];
+    //             const label neiCellID = curStencil[cI];
+    //             const vector& neiC = CI[neiCellID];
+    //             d = mag(neiC - C);
+    //         }
+    //         else
+    //         {
+    //             // For boundary cells we need to add boundary face as
+    //             // neigbour
+    //             const vector& C = CI[cellI];
+    //             const label i = cI - curStencil.size();
+    //             const label globalFaceID = stencilsBoundaryFaces[cellI][i];
+    //             const vector& neiC = CfI[globalFaceID];
+    //             d = mag(neiC - C);
+    //         }
 
-            W.diagonal()[cI] = weight(d, maxDist);
-        }
+    //         W.diagonal()[cI] = weight(d, maxDist);
+    //     }
 
-        // Now when we have W and Q, next step is QR decomposition
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
-            W.diagonal().cwiseSqrt().asDiagonal();
-        const Eigen::MatrixXd Qhat =
-            Q.array().rowwise()*sqrtW.diagonal().transpose().array();
+    //     // Now when we have W and Q, next step is QR decomposition
+    //     const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+    //         W.diagonal().cwiseSqrt().asDiagonal();
+    //     const Eigen::MatrixXd Qhat =
+    //         Q.array().rowwise()*sqrtW.diagonal().transpose().array();
 
-        // B hat
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
-            sqrtW.diagonal().asDiagonal();
+    //     // B hat
+    //     const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+    //         sqrtW.diagonal().asDiagonal();
 
-        // QR decomposition
-        Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+    //     // QR decomposition
+    //     Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-        // Q and R matrices
-        const Eigen::MatrixXd O = qr.householderQ();
-        const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
+    //     // Q and R matrices
+    //     const Eigen::MatrixXd O = qr.householderQ();
+    //     const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
 
-        // Slice Rbar and Qbar, as we do not need full matrix
-        // Note: auto is a reference type here (Rbar, Qbar are not copied)
-        const auto Rbar = R.topLeftCorner(Np, Np);
-        const auto Qbar = O.leftCols(Np);
+    //     // Slice Rbar and Qbar, as we do not need full matrix
+    //     // Note: auto is a reference type here (Rbar, Qbar are not copied)
+    //     const auto Rbar = R.topLeftCorner(Np, Np);
+    //     const auto Qbar = O.leftCols(Np);
 
-        // Perform element-wise multiplication and convert to MatrixXd
-        const Eigen::MatrixXd QbarBhat =
-            (
-                Qbar.transpose().array().rowwise()
-               *Bhat.diagonal().transpose().array()
-            ).matrix();
+    //     // Perform element-wise multiplication and convert to MatrixXd
+    //     const Eigen::MatrixXd QbarBhat =
+    //         (
+    //             Qbar.transpose().array().rowwise()
+    //            *Bhat.diagonal().transpose().array()
+    //         ).matrix();
 
-        // Solve to get A
-        // const Eigen::MatrixXd A =
-        //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
-        // Solve using the modified QbarBhat
-        const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
+    //     // Solve to get A
+    //     // const Eigen::MatrixXd A =
+    //     //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+    //     // Solve using the modified QbarBhat
+    //     const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-        // To be aware of interpolation accuracy we need to control the
-        // condition number
-        if (calcConditionNumber_)
-        {
-            Eigen::JacobiSVD<Eigen::MatrixXd> svd
-            (
-                Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
-            );
-            Eigen::VectorXd singularValues = svd.singularValues();
+    //     // To be aware of interpolation accuracy we need to control the
+    //     // condition number
+    //     if (calcConditionNumber_)
+    //     {
+    //         Eigen::JacobiSVD<Eigen::MatrixXd> svd
+    //         (
+    //             Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+    //         );
+    //         Eigen::VectorXd singularValues = svd.singularValues();
 
-            cellConditionNumber()[cellI] =
-                singularValues(0)
-               /(singularValues(singularValues.size() - 1) + VSMALL);
-        }
+    //         cellConditionNumber()[cellI] =
+    //             singularValues(0)
+    //            /(singularValues(singularValues.size() - 1) + VSMALL);
+    //     }
 
-        c[cellI].setCapacity(A.cols());
-        cx[cellI].setCapacity(A.cols());
-        cy[cellI].setCapacity(A.cols());
-        cz[cellI].setCapacity(A.cols());
+    //     c[cellI].setCapacity(A.cols());
+    //     cx[cellI].setCapacity(A.cols());
+    //     cy[cellI].setCapacity(A.cols());
+    //     cz[cellI].setCapacity(A.cols());
 
-        Eigen::RowVectorXd cRow = A.row(0);
-        Eigen::RowVectorXd cxRow = A.row(1);
-        Eigen::RowVectorXd cyRow = A.row(2);
-        Eigen::RowVectorXd czRow = A.row(3);
+    //     Eigen::RowVectorXd cRow = A.row(0);
+    //     Eigen::RowVectorXd cxRow = A.row(1);
+    //     Eigen::RowVectorXd cyRow = A.row(2);
+    //     Eigen::RowVectorXd czRow = A.row(3);
 
-        for (label i = 0; i < A.cols(); ++i)
-        {
-            c[cellI].append(cRow(i));
-            cx[cellI].append(cxRow(i));
-            cy[cellI].append(cyRow(i));
-            cz[cellI].append(czRow(i));
-        }
+    //     for (label i = 0; i < A.cols(); ++i)
+    //     {
+    //         c[cellI].append(cRow(i));
+    //         cx[cellI].append(cxRow(i));
+    //         cy[cellI].append(cyRow(i));
+    //         cz[cellI].append(czRow(i));
+    //     }
 
-        c[cellI].shrink();
-        cx[cellI].shrink();
-        cy[cellI].shrink();
-        cz[cellI].shrink();
-    }
+    //     c[cellI].shrink();
+    //     cx[cellI].shrink();
+    //     cy[cellI].shrink();
+    //     cz[cellI].shrink();
+    // }
 
-    forAll(QRInterpCoeffs, cellI)
-    {
-       const DynamicList<label>& curStencil = stencils[cellI];
-       const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
+    // forAll(QRInterpCoeffs, cellI)
+    // {
+    //    const DynamicList<label>& curStencil = stencils[cellI];
+    //    const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
-       QRInterpCoeffs[cellI].setCapacity(Nn);
-       QRGradCoeffs[cellI].setCapacity(Nn);
+    //    QRInterpCoeffs[cellI].setCapacity(Nn);
+    //    QRGradCoeffs[cellI].setCapacity(Nn);
 
-       for (label I = 0; I < Nn; I++)
-       {
-           QRInterpCoeffs[cellI].append(c[cellI][I]);
-           QRGradCoeffs[cellI].append
-           (
-               vector(cx[cellI][I], cy[cellI][I], cz[cellI][I])
-           );
-       }
+    //    for (label I = 0; I < Nn; I++)
+    //    {
+    //        QRInterpCoeffs[cellI].append(c[cellI][I]);
+    //        QRGradCoeffs[cellI].append
+    //        (
+    //            vector(cx[cellI][I], cy[cellI][I], cz[cellI][I])
+    //        );
+    //    }
 
-       QRInterpCoeffs[cellI].shrink();
-       QRGradCoeffs[cellI].shrink();
-    }
+    //    QRInterpCoeffs[cellI].shrink();
+    //    QRGradCoeffs[cellI].shrink();
+    // }
 
-    if (calcConditionNumber_)
-    {
-        Info<< "Writing " << cellConditionNumber().name() << " to time = "
-            << mesh.time().value() << endl;
-        cellConditionNumber().write();
-    }
+    // if (calcConditionNumber_)
+    // {
+    //     Info<< "Writing " << cellConditionNumber().name() << " to time = "
+    //         << mesh.time().value() << endl;
+    //     cellConditionNumber().write();
+    // }
 
-    if (debug)
-    {
-        InfoInFunction
-            << "end" << endl;
-    }
+    // if (debug)
+    // {
+    //     InfoInFunction
+    //         << "end" << endl;
+    // }
 }
 
 
@@ -1377,11 +1403,25 @@ void LRE::calcGlobalQRCoeffs() const
     const fvMesh& mesh = mesh_;
     const bool twoD = mesh_.nGeometricD() == 2;
 
-    QRInterpCoeffsPtr_.set(new List<DynamicList<scalar>>(mesh.nCells()));
-    List<DynamicList<scalar>>& QRInterpCoeffs = *QRInterpCoeffsPtr_;
+    const List<labelList>& stencils = globalCellStencils();
 
-    QRGradCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nCells()));
-    List<DynamicList<vector>>& QRGradCoeffs = *QRGradCoeffsPtr_;
+    labelList rowSizes(mesh.nCells());
+    forAll(stencils, localCellI)
+    {
+        // The size is the number of stencil neighbors plus the cell center
+        rowSizes[localCellI] = stencils[localCellI].size() + 1;
+    }
+
+    // Allocate CompactListList for interpolation coefficients
+    QRInterpCoeffsPtr_.set(new CompactListList<scalar>(rowSizes));
+    CompactListList<scalar>& QRInterpCoeffs = *QRInterpCoeffsPtr_;
+
+    // Allocate CompactListList for gradient interpolation coefficients
+    QRGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
+    CompactListList<vector>& QRGradCoeffs = *QRGradCoeffsPtr_;
+
+    cellHessianCoeffsPtr_.set( new CompactListList<symmTensor>(rowSizes));
+    CompactListList<symmTensor>& cellHessianCoeffs = *cellHessianCoeffsPtr_;
 
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
@@ -1403,13 +1443,6 @@ void LRE::calcGlobalQRCoeffs() const
     {
         factorials[n] = factorials[n - 1]*n;
     }
-
-    List<DynamicList<scalar>> c(mesh.nCells());
-    List<DynamicList<scalar>> cx(mesh.nCells());
-    List<DynamicList<scalar>> cy(mesh.nCells());
-    List<DynamicList<scalar>> cz(mesh.nCells());
-
-    const List<labelList>& stencils = globalCellStencils();
 
     forAll(stencils, localCellI)
     {
@@ -1439,8 +1472,8 @@ void LRE::calcGlobalQRCoeffs() const
         // Scaling factor for Taylor series
         const scalar h = 2.0 * maxDist;
 
-        // Loop over neighbours and construct matrix Q
-        const label Nn = curStencil.size();
+        // In number of neigbours we will add cell centre itself
+        const label Nn = curStencil.size() + 1;
 
         // Use matrix format from Eigen/Dense library
         // Avoid initialisation to zero as we will set every entry below
@@ -1457,7 +1490,7 @@ void LRE::calcGlobalQRCoeffs() const
         }
 
         // Loop over stencil points
-        for (label cI = 0; cI < Nn; ++cI)
+        for (label cI = 0; cI < curStencil.size(); ++cI)
         {
             const label neiGlobalCellID = curStencil[cI];
             vector dx;
@@ -1505,10 +1538,15 @@ void LRE::calcGlobalQRCoeffs() const
             }
         }
 
+        // Add the final column for the cell-center point explicitly
+        // monomials at dx=0 → [1, 0, 0, 0, ...]
+        Q.col(Nn-1).setZero();
+        Q(0, Nn-1) = 1.0;
+
         Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
         //W.setZero(); // no need to waste time initialising
 
-        for (label cI = 0; cI < Nn; cI++)
+        for (label cI = 0; cI < curStencil.size(); cI++)
         {
             const label neiGlobalCellID = curStencil[cI];
             scalar d;
@@ -1526,6 +1564,9 @@ void LRE::calcGlobalQRCoeffs() const
 
             W.diagonal()[cI] = weight(d, maxDist);
         }
+
+        // Cell-centre point weight
+        W.diagonal()(Nn-1) = 1.0;
 
         // Now when we have W and Q, next step is QR decomposition
         const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
@@ -1577,57 +1618,64 @@ void LRE::calcGlobalQRCoeffs() const
                /(singularValues(singularValues.size() - 1) + VSMALL);
         }
 
-        c[localCellI].setCapacity(A.cols());
-        cx[localCellI].setCapacity(A.cols());
-        cy[localCellI].setCapacity(A.cols());
-        cz[localCellI].setCapacity(A.cols());
-
         Eigen::RowVectorXd cRow = A.row(0);
         Eigen::RowVectorXd cxRow = A.row(1)/h;
         Eigen::RowVectorXd cyRow = A.row(2)/h;
-        Eigen::RowVectorXd czRow;
-        if (twoD)
-        {
-            czRow = Eigen::RowVectorXd::Zero(A.cols());
-        }
-        else
-        {
-            czRow = A.row(3)/h;
-        }
+        Eigen::RowVectorXd czRow =
+            twoD ? Eigen::RowVectorXd::Zero(A.cols()) : (A.row(3)/h).eval();
 
         for (label i = 0; i < A.cols(); ++i)
         {
-            c[localCellI].append(cRow(i));
-            cx[localCellI].append(cxRow(i));
-            cy[localCellI].append(cyRow(i));
-            cz[localCellI].append(czRow(i));
+            QRInterpCoeffs[localCellI][i] = scalar(cRow(i));
+            QRGradCoeffs[localCellI][i] = vector(cxRow(i), cyRow(i), czRow(i));
         }
 
-        c[localCellI].shrink();
-        cx[localCellI].shrink();
-        cy[localCellI].shrink();
-        cz[localCellI].shrink();
-    }
+        if (N_ >= 2)
+        {
+            const scalar invh2 = 1.0/(h*h);
 
-    forAll(QRInterpCoeffs, localCellI)
-    {
-       const labelList& curStencil = stencils[localCellI];
-       const label Nn = curStencil.size();
+            // Get positions in A matrix
+            const label ixx = rowOf(exponents, 2, 0, 0); // for d^2/dx^2
+            const label iyy = rowOf(exponents, 0, 2, 0); // for d^2/dy^2
+            const label ixy = rowOf(exponents, 1, 1, 0); // for d^2/dxdy
+            const label izz = twoD ? -1 : rowOf(exponents, 0, 0, 2); // for d^2/dz^2
+            const label ixz = twoD ? -1 : rowOf(exponents, 1, 0, 1); // for d^2/dxdz
+            const label iyz = twoD ? -1 : rowOf(exponents, 0, 1, 1); // for d^2/dydz
 
-       QRInterpCoeffs[localCellI].setCapacity(Nn);
-       QRGradCoeffs[localCellI].setCapacity(Nn);
+            Eigen::RowVectorXd cxxRow = A.row(ixx) * invh2 ;
+            Eigen::RowVectorXd cyyRow = A.row(iyy) * invh2;
+            Eigen::RowVectorXd cxyRow = A.row(ixy) * invh2;
 
-       for (label I = 0; I < Nn; I++)
-       {
-           QRInterpCoeffs[localCellI].append(c[localCellI][I]);
-           QRGradCoeffs[localCellI].append
-           (
-               vector(cx[localCellI][I], cy[localCellI][I], cz[localCellI][I])
-           );
-       }
+            Eigen::RowVectorXd czzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(izz) * invh2).eval();
 
-       QRInterpCoeffs[localCellI].shrink();
-       QRGradCoeffs[localCellI].shrink();
+            Eigen::RowVectorXd cxzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(ixz) * invh2).eval();
+
+            Eigen::RowVectorXd cyzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols())
+                : (A.row(iyz) * invh2).eval();
+
+            // Store Hessian tensor
+            for (label i = 0; i < A.cols(); ++i)
+            {
+                cellHessianCoeffs[localCellI][i] =
+                    symmTensor
+                    (
+                        cxxRow(i),
+                        cxyRow(i),
+                        cxzRow(i),
+                        cyyRow(i),
+                        cyzRow(i),
+                        czzRow(i)
+                    );
+            }
+        }
     }
 
     if (calcConditionNumber_)
@@ -2777,7 +2825,7 @@ const CompactListList<scalar>& LRE::faceQuadWeight() const
 }
 
 
-const List<DynamicList<scalar>>& LRE::QRInterpCoeffs() const
+const CompactListList<scalar>& LRE::QRInterpCoeffs() const
 {
     if (!QRInterpCoeffsPtr_)
     {
@@ -2795,7 +2843,7 @@ const List<DynamicList<scalar>>& LRE::QRInterpCoeffs() const
 }
 
 
-const List<DynamicList<vector>>& LRE::QRGradCoeffs() const
+const CompactListList<vector>& LRE::QRGradCoeffs() const
 {
     if (!QRGradCoeffsPtr_)
     {
@@ -2811,6 +2859,25 @@ const List<DynamicList<vector>>& LRE::QRGradCoeffs() const
 
     return QRGradCoeffsPtr_();
 }
+
+
+const CompactListList<symmTensor>& LRE::cellHessianCoeffs() const
+{
+    if (!cellHessianCoeffsPtr_)
+    {
+        if (useGlobalStencils_)
+        {
+            calcGlobalQRCoeffs();
+        }
+        else
+        {
+            calcQRCoeffs();
+        }
+    }
+
+    return cellHessianCoeffsPtr_();
+}
+
 
 
 const List<CompactListList<vector>>&
@@ -2996,6 +3063,7 @@ LRE::LRE
     globalCellStencilsPtr_(),
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
+    cellHessianCoeffsPtr_(),
     QRGradFaceGPCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
@@ -3084,6 +3152,80 @@ tmp<volTensorField> LRE::grad(const volVectorField& D) const
             return gradCholesky(D);
         }
     }
+}
+
+
+tmp<volSymmTensorField> LRE::hessian
+(
+    const volScalarField& s
+) const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    // Prepare the return field
+    tmp<volSymmTensorField> tHessian
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "hessian",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("0", dimless, symmTensor::zero),
+            "zeroGradient"
+        )
+    );
+
+    volSymmTensorField& hessian = tHessian.ref();
+
+    const List<labelList>& stencils = globalCellStencils();
+    const CompactListList<symmTensor>& hessianCoeffs = this->cellHessianCoeffs();
+    const scalarField& sI = s;
+
+    // Collect sfI for off-processor cells in the stencils
+    Map<scalar> globalSI;
+    requestGlobalStencilData(sI, globalSI);
+
+    forAll(stencils, localCellI)
+    {
+        const labelList& curStencil = stencils[localCellI];
+
+        for (label cI = 0; cI < curStencil.size(); cI++)
+        {
+            const label neiGlobalCellI = curStencil[cI];
+            const scalar neighborValue =
+                globalCells_.isLocal(neiGlobalCellI)
+              ? sI[globalCells_.toLocal(neiGlobalCellI)]
+              : globalSI[neiGlobalCellI];
+
+            hessian[localCellI] +=
+                hessianCoeffs[localCellI][cI] * neighborValue;
+        }
+        // Add cell centre itself
+        hessian[localCellI] +=
+            hessianCoeffs[localCellI][curStencil.size()] * sI[localCellI];
+    }
+
+    hessian.correctBoundaryConditions();
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+
+    return tHessian;
 }
 
 
@@ -3342,7 +3484,7 @@ tmp<volTensorField> LRE::gradQR(const volVectorField& D) const
     const List<DynamicList<label>>& stencils = this->stencils();
     const List<DynamicList<label>>& stencilsBoundaryFaces =
         this->stencilsBoundaryFaces();
-    const List<DynamicList<vector>>& QRGradCoeffs = this->QRGradCoeffs();
+    const CompactListList<vector>& QRGradCoeffs = this->QRGradCoeffs();
 
     forAll(stencils, cellI)
     {
@@ -3403,7 +3545,7 @@ tmp<volTensorField> LRE::gradQR(const volVectorField& D) const
 
 tmp<volTensorField> LRE::gradGlobalQR(const volVectorField& D) const
 {
-    if (debug)
+    //if (debug)
     {
         InfoInFunction
             << "start" << endl;
@@ -3432,7 +3574,7 @@ tmp<volTensorField> LRE::gradGlobalQR(const volVectorField& D) const
     volTensorField& gradD = tgradD.ref();
 
     const List<labelList>& stencils = globalCellStencils();
-    const List<DynamicList<vector>>& QRGradCoeffs = this->QRGradCoeffs();
+    const CompactListList<vector>& QRGradCoeffs = this->QRGradCoeffs();
     const vectorField& DI = D;
 
     // Collect DI for off-processor cells in the stencils
@@ -3442,11 +3584,10 @@ tmp<volTensorField> LRE::gradGlobalQR(const volVectorField& D) const
     forAll(stencils, localCellI)
     {
         const labelList& curStencil = stencils[localCellI];
-        const label Nn = curStencil.size();
 
         // Loop over stencil and multiply stencil cell values with
         // corresponding interpolation coefficient
-        for (label cI = 0; cI < Nn; cI++)
+        for (label cI = 0; cI < curStencil.size(); cI++)
         {
             const label neiGlobalCellI = curStencil[cI];
 
@@ -3464,6 +3605,10 @@ tmp<volTensorField> LRE::gradGlobalQR(const volVectorField& D) const
                     QRGradCoeffs[localCellI][cI]*globalDI[neiGlobalCellI];
             }
         }
+
+        // Add cell centre itself
+        gradD[localCellI] +=
+            QRGradCoeffs[localCellI][curStencil.size()]*DI[localCellI];
     }
 
     gradD.correctBoundaryConditions();

@@ -30,8 +30,8 @@ Description
 
     Source:
         Castrillo P, Canelas A, Schillaci E, Rigola J, Oliva A. High-order
-	finite volume method for linear elasticity on unstructured meshes.
-	Comput Struct, 2022.
+        finite volume method for linear elasticity on unstructured meshes.
+        Comput Struct, 2022.
 
 Author
     Ivan Batistic, UCD.
@@ -65,14 +65,14 @@ class LRE
 public:
         //- Weight functions
         enum weightFunction
-	{
-	    ONE,
-	    LINEAR,
-	    INV_DIST,
-	    RAD_SYMM_EXP
-	};
+        {
+            ONE,
+            LINEAR,
+            INV_DIST,
+            RAD_SYMM_EXP
+        };
 
-	//- Weight funtions names
+        //- Weight funtions names
         static const Enum<weightFunction> weightFunctionNames_;
 
 private:
@@ -148,11 +148,14 @@ private:
         //  not and to convert between global and local indices
         mutable autoPtr<labelListList> globalFaceStencilsPtr_;
 
-        //- QR Interpolation coefficients
-        mutable autoPtr<List<DynamicList<scalar>>> QRInterpCoeffsPtr_;
+        //- Cell centre interpolation coefficients
+        mutable autoPtr<CompactListList<scalar>> QRInterpCoeffsPtr_;
 
-        //- QR Gradient cell coefficients
-        mutable autoPtr<List<DynamicList<vector>>> QRGradCoeffsPtr_;
+        //- Cell centre gradient coefficients
+        mutable autoPtr<CompactListList<vector>> QRGradCoeffsPtr_;
+
+        // - Cell centre Hessian tensor
+        mutable autoPtr<CompactListList<symmTensor>> cellHessianCoeffsPtr_;
 
         //- QR Gradient face Gauss points coefficients
         mutable autoPtr<List<CompactListList<vector>>> QRGradFaceGPCoeffsPtr_;
@@ -205,6 +208,16 @@ private:
             DynamicList<FixedList<label, 3>>& exponents
         ) const;
 
+        //- Return the row index for exponent (i,j,k) in the generated
+        //  Taylor basis
+        label rowOf
+        (
+            const List<FixedList<label, 3>>& exponents,
+            label i,
+            label j,
+            label k
+        ) const;
+
         //- Calculate coefficients for the QR decomposition approach
         void calcQRCoeffs() const;
 
@@ -237,10 +250,13 @@ private:
         void calcQuadPointsAndWeights() const;
 
         //- Return the interpolation coefficients
-        const List<DynamicList<scalar>>& QRInterpCoeffs() const;
+        const CompactListList<scalar>& QRInterpCoeffs() const;
 
         //- Return the gradient coefficients
-        const List<DynamicList<vector>>& QRGradCoeffs() const;
+        const CompactListList<vector>& QRGradCoeffs() const;
+
+        //- Return the cell centres Hessian coeffs
+        const CompactListList<symmTensor>&  cellHessianCoeffs() const;
 
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& stencilsBoundaryFaces() const;
@@ -312,8 +328,8 @@ public:
             //- Const access tot he weight function enum
             const weightFunction& weightFunc() const
             {
-		return weightFunction_;
-	    }
+                return weightFunction_;
+            }
 
             //- Return order of accuracy
             label order() const {return N_;};
@@ -338,14 +354,18 @@ public:
             //- Calculate the gradient of a volVectorField
             tmp<volTensorField> grad(const volVectorField& D) const;
 
+            //- Calculate the hessian tensor at the cell centres for the given
+            //  scalar field
+            tmp<volSymmTensorField> hessian(const volScalarField& s) const;
+
             //- Calculate the face gradient of a volVectorField
             tmp<surfaceTensorField> fGrad(const volVectorField& D) const;
 
             //- Calculate the face Gauss points gradient of a volVectorField
             autoPtr<List<List<tensor>>> gradDQuad
-	    (
-	        const volVectorField& D
-	    ) const;
+            (
+                const volVectorField& D
+            ) const;
 
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition

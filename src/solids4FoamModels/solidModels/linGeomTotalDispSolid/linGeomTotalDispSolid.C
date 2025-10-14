@@ -1316,6 +1316,19 @@ label linGeomTotalDispSolid::formResidual
             gradD() = LREInterp().grad(D);
             const tensorField& gradVfI = gradD().internalField();
 
+            // Decompose the vector field D into its scalar components
+            volScalarField Dx(D.component(vector::X));
+            volScalarField Dy(D.component(vector::Y));
+            volScalarField Dz(D.component(vector::Z));
+
+            tmp<volSymmTensorField> tHessDx = LREInterp().hessian(Dx);
+            tmp<volSymmTensorField> tHessDy = LREInterp().hessian(Dy);
+            tmp<volSymmTensorField> tHessDz = LREInterp().hessian(Dz);
+
+            const symmTensorField& hessDxI = tHessDx->internalField();
+            const symmTensorField& hessDyI = tHessDy->internalField();
+            const symmTensorField& hessDzI = tHessDz->internalField();
+
             forAll(traction, faceI)
             {
                 const label ownCellID = own[faceI];
@@ -1333,8 +1346,21 @@ label linGeomTotalDispSolid::formResidual
                 const vector dOwn = Cf[faceI] - C[ownCellID];
                 const vector dNei = Cf[faceI] - C[neiCellID];
 
-                const vector extrapOwnVf = ownVf + (dOwn & ownGradVf);
-                const vector extrapNeiVf = neiVf + (dNei & neiGradVf);
+                // Linear part
+                vector extrapOwnVf = ownVf + (dOwn & ownGradVf);
+                vector extrapNeiVf = neiVf + (dNei & neiGradVf);
+
+                // Quadratic part
+                if (LREInterp().order() >= 2)
+                {
+                    extrapOwnVf.x() += 0.5 * (dOwn & (hessDxI[ownCellID] & dOwn));
+                    extrapOwnVf.y() += 0.5 * (dOwn & (hessDyI[ownCellID] & dOwn));
+                    extrapOwnVf.z() += 0.5 * (dOwn & (hessDzI[ownCellID] & dOwn));
+
+                    extrapNeiVf.x() += 0.5 * (dNei & (hessDxI[neiCellID] & dNei));
+                    extrapNeiVf.y() += 0.5 * (dNei & (hessDyI[neiCellID] & dNei));
+                    extrapNeiVf.z() += 0.5 * (dNei & (hessDzI[neiCellID] & dNei));
+                }
 
                 const scalar denom = max(mag(n & d), VSMALL);
 
@@ -1384,6 +1410,13 @@ label linGeomTotalDispSolid::formResidual
 
                         traction.boundaryFieldRef()[patchI][faceI] += faceDamping;
                     }
+                }
+                if (Pstream::parRun())
+                {
+                    notImplemented
+                    (
+                        "Parallel boundaries for alpha scheme have to be implemented"
+                    );
                 }
             }
 
