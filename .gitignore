@@ -102,3 +102,7 @@ compile_flags.txt
 .cache/
 
 # end-of-file
+
+.vscode/
+src/solids4FoamModels/solidModels/explicitGodunovCCSolid/explicitGodunovCCSolid copy
+src/solids4FoamModels/solidModels/explicitGodunovCCSolid/gEqns copy

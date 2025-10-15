@@ -1,0 +1,99 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+solvers
+{
+
+    p
+    {
+    solver           PCG;
+    preconditioner   DIC;
+    tolerance        1e-8;
+    relTol 	         1.0e-3;
+    }
+
+    pFinal
+    {
+        $p;
+        relTol          0;
+    }
+
+    pcorr
+    {
+        $p;
+    }
+
+    pcorrFinal
+    {
+        $pcorr;
+        relTol          0;
+    }
+
+    Phi
+    {
+        $p;
+    }
+
+    "(U|cellDisplacement)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-6;
+        relTol          1e-4;
+        minIter         2;
+    }
+
+    "(U|cellDisplacement)Final"
+    {
+        $U;
+        relTol          0;
+    }
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0.001;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+}
+
+PIMPLE
+{
+    nCorrectors 4;
+    nNonOrthogonalCorrectors 1;
+    // tolerance 1.0e-14;
+    // relTol 5e-3;
+    consistent  true;
+    correctPhi  true;
+    momentumPredictor true;
+    nOuterCorrectors	1;
+}
+
+potentialFlow
+{
+    nNonOrthogonalCorrectors 10;
+}

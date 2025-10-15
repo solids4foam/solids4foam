@@ -1762,6 +1762,7 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
+
 #ifdef FOAMEXTEND
     else if
     (
@@ -1814,6 +1815,7 @@ void Foam::solidModel::setTraction
 #else
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
 #endif
+
 }
 
 

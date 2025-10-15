@@ -1,0 +1,143 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Original Authors
+    Jibran Haider - explicitSolidDynamics toolkit
+
+    Original source code retrieved from:
+    https://github.com/jibranhaider/explicitSolidDynamics/
+
+Modifications by
+    Khoder Alhamwi Alshaar, IITB - Modified to implement the explicit Godunov
+    scheme for solid mechanics as part of the solids4foam project.
+
+Class
+    Foam::interpolationSchemes
+
+Description
+    Define interpolation schemes.
+
+SourceFiles
+    interpolationSchemes.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef interpolationSchemes_H
+#define interpolationSchemes_H
+
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "pointFields.H"
+#include "pointConstraints.H"
+#include "volPointInterpolation.H"
+#include "fvPatchFields.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+class interpolationSchemes
+{
+    // Private data
+
+        //- Mesh
+        const fvMesh& mesh_;
+
+        //- Cell owners
+        const labelUList& own_;
+
+        //- Material cell centre coordinates
+        const volVectorField& X_;
+
+        //- Material face centre coordinates
+        const surfaceVectorField& XF_;
+
+        //- Material nodal coordinates
+        const pointField& XN_;
+
+private:
+
+    // Private member functions
+
+        //- Disallow default bitwise copy construct
+        interpolationSchemes(const interpolationSchemes&);
+
+        //- Disallow default bitwise assignment
+        void operator=(const interpolationSchemes&);
+
+public:
+
+    //- Runtime type information
+    TypeName("interpolationSchemes");
+
+    // Constructors
+
+        //- Construct from mesh
+            explicit interpolationSchemes(const fvMesh&);
+
+    //- Destructor
+    virtual ~interpolationSchemes();
+
+
+    // Member functions
+
+        // Edit
+
+            //- Surface to volume interpolation
+            volVectorField surfaceToVol
+            (
+                const GeometricField<vector, fvsPatchField, surfaceMesh>&
+            ) const;
+
+            //- Helper: push master point data to collocated points
+            //  (Borrowed from volPointInterpolation class in OpenFOAM)
+            template<class Type>
+            void pushUntransformedData(List<Type>&) const;
+
+            //- Add separated contributions
+            //  (Borrowed from volPointInterpolation class in OpenFOAM)
+            template<class Type>
+            void addSeparated
+            (
+                GeometricField<Type, pointPatchField, pointMesh>&
+            ) const;
+
+            // Volume to point interpolation for vectorField
+            void volToPoint
+            (
+                const GeometricField<vector, fvPatchField, volMesh>& U,
+                const GeometricField<tensor, fvPatchField, volMesh>& Ugrad,
+                GeometricField<vector, pointPatchField, pointMesh>& Un
+            ) const;
+
+            //- Point to surface interpolation
+            surfaceVectorField pointToSurface
+            (
+                const GeometricField<vector, pointPatchField, pointMesh>& U
+            ) const;
+};
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

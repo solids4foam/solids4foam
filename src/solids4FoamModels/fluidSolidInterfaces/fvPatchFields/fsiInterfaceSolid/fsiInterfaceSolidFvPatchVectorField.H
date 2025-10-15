@@ -38,6 +38,8 @@ Author
 #endif
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "explicitSolidTractionTractionFvPatchVectorField.H"
+#include "explicitSolidTractionLinearMomentumFvPatchVectorField.H"
 #include "normalContactModel.H"
 #include "frictionContactModel.H"
 #include "globalPolyPatch.H"

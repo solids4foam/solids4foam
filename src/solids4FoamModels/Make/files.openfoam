@@ -28,6 +28,24 @@ solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
+explicitGodunovCCSolid = solidModels/explicitGodunovCCSolid
+$(explicitGodunovCCSolid)/mathematics/operations/operations.C
+$(explicitGodunovCCSolid)/mathematics/mechanics/mechanics.C
+$(explicitGodunovCCSolid)/boundaryConditions/moving/movingDisplacementLinearMomentumFvPatchVectorField/movingDisplacementLinearMomentumFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/moving/movingDisplacementNodalLinearMomentumPointPatchVectorField/movingDisplacementNodalLinearMomentumPointPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/moving/movingDisplacementTractionFvPatchVectorField/movingDisplacementTractionFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/moving/movingTractionFvPatchVectorField/movingTractionFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/traction/tractionLinearMomentumFvPatchVectorField/tractionLinearMomentumFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/traction/tractionTractionFvPatchVectorField/tractionTractionFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/symmetric/symmetricLinearMomentumFvPatchVectorField/symmetricLinearMomentumFvPatchVectorField.C
+$(explicitGodunovCCSolid)/boundaryConditions/symmetric/symmetricTractionFvPatchVectorField/symmetricTractionFvPatchVectorField.C
+$(explicitGodunovCCSolid)/models/solidMaterialModel/solidMaterialModel.C
+$(explicitGodunovCCSolid)/schemes/gradientSchemes/gradientSchemes.C
+$(explicitGodunovCCSolid)/schemes/interpolationSchemes/interpolationSchemes.C
+$(explicitGodunovCCSolid)/schemes/angularMomentum/angularMomentum.C
+$(explicitGodunovCCSolid)/explicitGodunovCCSolid.C
+
+
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
@@ -104,6 +122,8 @@ $(solidFvPatchFields)/solidForce/solidForceFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+$(solidFvPatchFields)/explicitSolidTractionTraction/explicitSolidTractionTractionFvPatchVectorField.C
+$(solidFvPatchFields)/explicitSolidTractionLinearMomentum/explicitSolidTractionLinearMomentumFvPatchVectorField.C
 $(solidFvPatchFields)/solidVelocity/solidVelocityFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
