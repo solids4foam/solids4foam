@@ -1103,10 +1103,12 @@ label LRE::rowOf
     label k
 ) const
 {
+    const bool twoD = mesh_.nGeometricD() == 2;
+
     for (label r = 0; r < exponents.size(); ++r)
     {
         const FixedList<label, 3>& e = exponents[r];
-        if (e[0] == i && e[1] == j && e[2] == k)
+        if (e[0] == i && e[1] == j && (twoD || e[2] == k))
         {
             return r;
         }
@@ -1420,7 +1422,7 @@ void LRE::calcGlobalQRCoeffs() const
     QRGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
     CompactListList<vector>& QRGradCoeffs = *QRGradCoeffsPtr_;
 
-    cellHessianCoeffsPtr_.set( new CompactListList<symmTensor>(rowSizes));
+    cellHessianCoeffsPtr_.set(new CompactListList<symmTensor>(rowSizes));
     CompactListList<symmTensor>& cellHessianCoeffs = *cellHessianCoeffsPtr_;
 
     // Refernces for brevity and efficiency

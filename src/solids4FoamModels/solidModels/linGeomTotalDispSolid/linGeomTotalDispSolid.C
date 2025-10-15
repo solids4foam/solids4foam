@@ -1320,7 +1320,7 @@ label linGeomTotalDispSolid::formResidual
             volScalarField Dx(D.component(vector::X));
             volScalarField Dy(D.component(vector::Y));
             volScalarField Dz(D.component(vector::Z));
-
+// TO_CHECK - what is happening here if i have N < 1?? Just field creation and return?
             tmp<volSymmTensorField> tHessDx = LREInterp().hessian(Dx);
             tmp<volSymmTensorField> tHessDy = LREInterp().hessian(Dy);
             tmp<volSymmTensorField> tHessDz = LREInterp().hessian(Dz);
@@ -1401,7 +1401,15 @@ label linGeomTotalDispSolid::formResidual
                         const vector d = patchCf[faceI] - C[ownCellID];
                         const vector normal = n[faceI];
 
-                        const vector extrapOwnVf = ownVf + (d & ownGradVf);
+                        vector extrapOwnVf = ownVf + (d & ownGradVf);
+
+                        // Quadratic part
+                        if (LREInterp().order() >= 2)
+                        {
+                            extrapOwnVf.x() += 0.5 * (d & (hessDxI[ownCellID] & d));
+                            extrapOwnVf.y() += 0.5 * (d & (hessDyI[ownCellID] & d));
+                            extrapOwnVf.z() += 0.5 * (d & (hessDzI[ownCellID] & d));
+                        }
 
                         const scalar denom = max(mag(normal & d), VSMALL);
 
