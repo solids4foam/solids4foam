@@ -50,6 +50,29 @@ const Enum<LRE::weightFunction> LRE::weightFunctionNames_
     {LRE::weightFunction::RAD_SYMM_EXP, "radiallySymmetricExponential"},
 });
 
+scalar LRE::cubicForm
+(
+    const LRE::symmTensor3Order& T,
+    const vector& d,
+    const bool twoD
+)
+{
+    const scalar dx = d.x();
+    const scalar dy = d.y();
+    const scalar dz = twoD ? 0.0 : d.z();
+    return
+        T[0]*pow3(dx)
+      + 3*T[1]*dx*dx*dy
+      + 3*T[2]*dx*dx*dz
+      + 3*T[3]*dx*dy*dy
+      + 6*T[4]*dx*dy*dz
+      + 3*T[5]*dx*dz*dz
+      +   T[6]*pow3(dy)
+      + 3*T[7]*dy*dy*dz
+      + 3*T[8]*dy*dz*dz
+      +   T[9]*pow3(dz);
+}
+
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
@@ -1396,7 +1419,13 @@ void LRE::calcGlobalQRCoeffs() const
             << "start" << endl;
     }
 
-    if (QRInterpCoeffsPtr_ || QRGradCoeffsPtr_)
+    if
+    (
+        QRInterpCoeffsPtr_
+     || QRGradCoeffsPtr_
+     || cellHessianCoeffsPtr_
+     || cellThirdDerivCoeffsPtr_
+    )
     {
         FatalErrorInFunction
             << "Pointers already set!" << abort(FatalError);
@@ -1422,8 +1451,13 @@ void LRE::calcGlobalQRCoeffs() const
     QRGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
     CompactListList<vector>& QRGradCoeffs = *QRGradCoeffsPtr_;
 
+    // To do: make allocation only if order is > 1
     cellHessianCoeffsPtr_.set(new CompactListList<symmTensor>(rowSizes));
     CompactListList<symmTensor>& cellHessianCoeffs = *cellHessianCoeffsPtr_;
+
+    // To do: make allocation only if order is > 2
+    cellThirdDerivCoeffsPtr_.set(new CompactListList<symmTensor3Order>(rowSizes));
+    CompactListList<symmTensor3Order>& cellThirdDerivCoeffs = *cellThirdDerivCoeffsPtr_;
 
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
@@ -1632,7 +1666,7 @@ void LRE::calcGlobalQRCoeffs() const
             QRGradCoeffs[localCellI][i] = vector(cxRow(i), cyRow(i), czRow(i));
         }
 
-        if (N_ >= 2)
+        if (order() >= 2)
         {
             const scalar invh2 = 1.0/(h*h);
 
@@ -1644,7 +1678,7 @@ void LRE::calcGlobalQRCoeffs() const
             const label ixz = twoD ? -1 : rowOf(exponents, 1, 0, 1); // for d^2/dxdz
             const label iyz = twoD ? -1 : rowOf(exponents, 0, 1, 1); // for d^2/dydz
 
-            Eigen::RowVectorXd cxxRow = A.row(ixx) * invh2 ;
+            Eigen::RowVectorXd cxxRow = A.row(ixx) * invh2;
             Eigen::RowVectorXd cyyRow = A.row(iyy) * invh2;
             Eigen::RowVectorXd cxyRow = A.row(ixy) * invh2;
 
@@ -1676,6 +1710,69 @@ void LRE::calcGlobalQRCoeffs() const
                         cyzRow(i),
                         czzRow(i)
                     );
+            }
+        }
+        if (order() >= 3)
+        {
+            const scalar invh3 = 1.0/(h*h*h);
+
+            // Get positions in A matrix
+            const label ixxx = rowOf(exponents, 3,0,0);
+            const label ixxy = rowOf(exponents, 2,1,0);
+            const label iyyy = rowOf(exponents, 0,3,0);
+            const label ixyy = rowOf(exponents, 1,2,0);
+            const label ixyz = twoD ? -1 : rowOf(exponents, 1,1,1);
+            const label ixzz = twoD ? -1 : rowOf(exponents, 1,0,2);
+            const label ixxz = twoD ? -1 : rowOf(exponents, 2,0,1);
+            const label iyyz = twoD ? -1 : rowOf(exponents, 0,2,1);
+            const label iyzz = twoD ? -1 : rowOf(exponents, 0,1,2);
+            const label izzz = twoD ? -1 : rowOf(exponents, 0,0,3);
+
+            Eigen::RowVectorXd cxxxRow = A.row(ixxx) * invh3;
+            Eigen::RowVectorXd cxxyRow = A.row(ixxy) * invh3;
+            Eigen::RowVectorXd cyyyRow = A.row(iyyy) * invh3;
+            Eigen::RowVectorXd cxyyRow = A.row(ixyy) * invh3;
+
+            Eigen::RowVectorXd cxyzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(ixyz) * invh3).eval();
+            Eigen::RowVectorXd cxzzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(ixzz) * invh3).eval();
+            Eigen::RowVectorXd cxxzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(ixxz) * invh3).eval();
+            Eigen::RowVectorXd cyyzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(iyyz) * invh3).eval();
+            Eigen::RowVectorXd cyzzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(iyzz) * invh3).eval();
+            Eigen::RowVectorXd czzzRow =
+                twoD ?
+                Eigen::RowVectorXd::Zero(A.cols()) :
+                (A.row(izzz) * invh3).eval();
+
+            for (label i = 0; i < A.cols(); ++i)
+            {
+                symmTensor3Order t(Zero);
+                t[0] = cxxxRow(i);
+                t[1] = cxxyRow(i);
+                t[2] = cxxzRow(i);
+                t[3] = cxyyRow(i);
+                t[4] = cxyzRow(i);
+                t[5] = cxzzRow(i);
+                t[6] = cyyyRow(i);
+                t[7] = cyyzRow(i);
+                t[8] = cyzzRow(i);
+                t[9] = czzzRow(i);
+
+                cellThirdDerivCoeffs[localCellI][i] = t;
             }
         }
     }
@@ -2867,19 +2964,22 @@ const CompactListList<symmTensor>& LRE::cellHessianCoeffs() const
 {
     if (!cellHessianCoeffsPtr_)
     {
-        if (useGlobalStencils_)
-        {
-            calcGlobalQRCoeffs();
-        }
-        else
-        {
-            calcQRCoeffs();
-        }
+        calcGlobalQRCoeffs();
     }
 
     return cellHessianCoeffsPtr_();
 }
 
+
+const CompactListList<LRE::symmTensor3Order>& LRE::cellThirdDerivCoeffs() const
+{
+    if (!cellThirdDerivCoeffsPtr_)
+    {
+        calcGlobalQRCoeffs();
+    }
+
+    return cellThirdDerivCoeffsPtr_();
+}
 
 
 const List<CompactListList<vector>>&
@@ -3066,6 +3166,7 @@ LRE::LRE
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
     cellHessianCoeffsPtr_(),
+    cellThirdDerivCoeffsPtr_(),
     QRGradFaceGPCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
@@ -3228,6 +3329,77 @@ tmp<volSymmTensorField> LRE::hessian
     }
 
     return tHessian;
+}
+
+
+autoPtr<List<LRE::symmTensor3Order>> LRE::thirdDeriv
+(
+    const volScalarField& s
+) const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    // Prepare the return field
+    autoPtr<List<LRE::symmTensor3Order>> tThirdDeriv(new List<symmTensor3Order>(mesh.nCells()));
+    List<LRE::symmTensor3Order>& thirdDeriv = tThirdDeriv.ref();
+
+    // Initialise thirdDeriv to zero
+    forAll(thirdDeriv, cellI)
+    {
+        for (int k = 0; k < 10; ++k)
+        {
+            thirdDeriv[cellI][k] = 0.0;
+        }
+    }
+
+    const List<labelList>& stencils = globalCellStencils();
+    const CompactListList<LRE::symmTensor3Order>& thirdDerivCoeffs = this->cellThirdDerivCoeffs();
+    const scalarField& sI = s;
+
+    // Collect sfI for off-processor cells in the stencils
+    Map<scalar> globalSI;
+    requestGlobalStencilData(sI, globalSI);
+
+    forAll(stencils, localCellI)
+    {
+        const labelList& curStencil = stencils[localCellI];
+
+        for (label cI = 0; cI < curStencil.size(); cI++)
+        {
+            const label neiGlobalCellI = curStencil[cI];
+            const scalar neighborValue =
+                globalCells_.isLocal(neiGlobalCellI)
+              ? sI[globalCells_.toLocal(neiGlobalCellI)]
+              : globalSI[neiGlobalCellI];
+
+            const symmTensor3Order& currT = thirdDerivCoeffs[localCellI][cI];
+            for (int k = 0; k < 10; ++k)
+            {
+                thirdDeriv[localCellI][k] += currT[k] * neighborValue;
+            }
+
+        }
+        // Add cell centre itself
+        const symmTensor3Order& wC = thirdDerivCoeffs[localCellI][curStencil.size()];
+        for (int k = 0; k < 10; ++k)
+        {
+            thirdDeriv[localCellI][k] += wC[k] * sI[localCellI];
+        }
+    }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+
+    return tThirdDeriv;
 }
 
 
@@ -3547,7 +3719,7 @@ tmp<volTensorField> LRE::gradQR(const volVectorField& D) const
 
 tmp<volTensorField> LRE::gradGlobalQR(const volVectorField& D) const
 {
-    //if (debug)
+    if (debug)
     {
         InfoInFunction
             << "start" << endl;

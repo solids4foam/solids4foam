@@ -63,6 +63,10 @@ namespace Foam
 class LRE
 {
 public:
+
+        // Symmetric third-order tensor with 10 components
+        using symmTensor3Order = FixedList<scalar,10>;
+
         //- Weight functions
         enum weightFunction
         {
@@ -74,6 +78,15 @@ public:
 
         //- Weight funtions names
         static const Enum<weightFunction> weightFunctionNames_;
+
+        //- Evaluates the cubic (third–order) contraction of a fully symmetric
+        //  rank–3 tensor T with a displacement vector d, i.e. T_ijk*d_i*d_j*d_k
+        static scalar cubicForm
+        (
+            const symmTensor3Order& T,
+            const vector& d,
+            const bool twoD
+        );
 
 private:
     // Private data
@@ -154,8 +167,11 @@ private:
         //- Cell centre gradient coefficients
         mutable autoPtr<CompactListList<vector>> QRGradCoeffsPtr_;
 
-        // - Cell centre Hessian tensor
+        //- Cell centre Hessian tensor coefficients
         mutable autoPtr<CompactListList<symmTensor>> cellHessianCoeffsPtr_;
+
+        //- Cell centre third derivative tensor coefficients
+        mutable autoPtr<CompactListList<symmTensor3Order>> cellThirdDerivCoeffsPtr_;
 
         //- QR Gradient face Gauss points coefficients
         mutable autoPtr<List<CompactListList<vector>>> QRGradFaceGPCoeffsPtr_;
@@ -258,6 +274,9 @@ private:
         //- Return the cell centres Hessian coeffs
         const CompactListList<symmTensor>&  cellHessianCoeffs() const;
 
+        //- Return the cell centres third derivatice coeffs
+        const CompactListList<symmTensor3Order>& cellThirdDerivCoeffs() const;
+
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& stencilsBoundaryFaces() const;
 
@@ -357,6 +376,10 @@ public:
             //- Calculate the hessian tensor at the cell centres for the given
             //  scalar field
             tmp<volSymmTensorField> hessian(const volScalarField& s) const;
+
+            //- Calculate the third order tensor at the cell centres for the
+            //  given scalar field
+            autoPtr<List<symmTensor3Order>> thirdDeriv(const volScalarField& s) const;
 
             //- Calculate the face gradient of a volVectorField
             tmp<surfaceTensorField> fGrad(const volVectorField& D) const;

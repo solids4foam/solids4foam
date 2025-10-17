@@ -1320,6 +1320,11 @@ label linGeomTotalDispSolid::formResidual
             volScalarField Dx(D.component(vector::X));
             volScalarField Dy(D.component(vector::Y));
             volScalarField Dz(D.component(vector::Z));
+
+            autoPtr<List<LRE::symmTensor3Order>> tThirdDerDx;
+            autoPtr<List<LRE::symmTensor3Order>> tThirdDerDy;
+            autoPtr<List<LRE::symmTensor3Order>> tThirdDerDz;
+
 // TO_CHECK - what is happening here if i have N < 1?? Just field creation and return?
             tmp<volSymmTensorField> tHessDx = LREInterp().hessian(Dx);
             tmp<volSymmTensorField> tHessDy = LREInterp().hessian(Dy);
@@ -1328,6 +1333,13 @@ label linGeomTotalDispSolid::formResidual
             const symmTensorField& hessDxI = tHessDx->internalField();
             const symmTensorField& hessDyI = tHessDy->internalField();
             const symmTensorField& hessDzI = tHessDz->internalField();
+
+            if (LREInterp().order() >= 3)
+            {
+                tThirdDerDx = LREInterp().thirdDeriv(Dx);
+                tThirdDerDy = LREInterp().thirdDeriv(Dy);;
+                tThirdDerDz = LREInterp().thirdDeriv(Dz);;
+            }
 
             forAll(traction, faceI)
             {
@@ -1360,6 +1372,20 @@ label linGeomTotalDispSolid::formResidual
                     extrapNeiVf.x() += 0.5 * (dNei & (hessDxI[neiCellID] & dNei));
                     extrapNeiVf.y() += 0.5 * (dNei & (hessDyI[neiCellID] & dNei));
                     extrapNeiVf.z() += 0.5 * (dNei & (hessDzI[neiCellID] & dNei));
+                }
+                // Cubic part
+                if (LREInterp().order() >=3)
+                {
+                    const bool twoD = (mesh.nGeometricD() == 2);
+                    const scalar oneOverSix = 1.0/6.0;
+
+                    extrapOwnVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[ownCellID], dOwn, twoD);
+                    extrapOwnVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[ownCellID], dOwn, twoD);
+                    extrapOwnVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[ownCellID], dOwn, twoD);
+
+                    extrapNeiVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[neiCellID], dNei, twoD);
+                    extrapNeiVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[neiCellID], dNei, twoD);
+                    extrapNeiVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[neiCellID], dNei, twoD);
                 }
 
                 const scalar denom = max(mag(n & d), VSMALL);
@@ -1409,6 +1435,16 @@ label linGeomTotalDispSolid::formResidual
                             extrapOwnVf.x() += 0.5 * (d & (hessDxI[ownCellID] & d));
                             extrapOwnVf.y() += 0.5 * (d & (hessDyI[ownCellID] & d));
                             extrapOwnVf.z() += 0.5 * (d & (hessDzI[ownCellID] & d));
+                        }
+                        // Cubic part
+                        if (LREInterp().order() >=3)
+                        {
+                            const bool twoD = (mesh.nGeometricD() == 2);
+                            const scalar oneOverSix = 1.0/6.0;
+
+                            extrapOwnVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[ownCellID], d, twoD);
+                            extrapOwnVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[ownCellID], d, twoD);
+                            extrapOwnVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[ownCellID], d, twoD);
                         }
 
                         const scalar denom = max(mag(normal & d), VSMALL);
