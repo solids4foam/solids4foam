@@ -417,13 +417,19 @@ label newtonIcoFluid::initialiseSolution(Vec& x)
 label newtonIcoFluid::formResidual
 (
     Vec f,         // Residual
-    const Vec x    // Solution
+    const Vec x,   // Solution
+    const bool useExplicitMeshFlux
 )
 {
     if (debug)
     {
         InfoInFunction
             << "start" << endl;
+    }
+
+    if (useExplicitMeshFlux)
+    {
+        notImplemented("Not implemented yet for useExplicitMeshFlux");
     }
 
     // Take references

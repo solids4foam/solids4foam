@@ -318,11 +318,7 @@ bool linGeomTotalDispSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
-#ifdef OPENFOAM_NOT_EXTEND
-            D().primitiveFieldRef(),
-#else
-            D().internalField(),
-#endif
+            D(),
             foamPetscSnesHelper::solution(),
             0, // Location of first component
             solidModel::twoD()

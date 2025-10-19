@@ -216,6 +216,19 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
+            )
+            {
+                return formResidual(f, x, false);
+            }
+
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector, where the mesh flux can be optionally treated
+            //  explicitly
+            virtual label formResidual
+            (
+                Vec f,         // Residual
+                const Vec x,   // Solution
+                const bool useExplicitMeshFlux
             );
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
