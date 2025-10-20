@@ -98,6 +98,15 @@ class nonLinGeomTotalLagVelocitySolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Force at the current time
+        surfaceVectorField forceCurrentTime_;
+
+        //- Force at the future time (extrapolated)
+        surfaceVectorField forceFutureTime_;
+
+        //- Current time index is used for updating the old force fields
+        label curTimeIndex_;
+
 
     // Private Member Functions
 
@@ -113,9 +122,6 @@ class nonLinGeomTotalLagVelocitySolid
             const surfaceVectorField& nCurrent,    // deformed unit normals
             const surfaceScalarField& magSfCurrent // deformed area magnitudes
         ) const;
-
-        //- Evolve the solid solver using the segregated implicit approach
-        bool evolveImplicitSegregated();
 
         //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
         //  A compact approximate Jacobian (same one as used by the segregated
