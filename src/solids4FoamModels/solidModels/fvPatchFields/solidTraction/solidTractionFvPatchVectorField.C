@@ -498,6 +498,55 @@ solidTractionFvPatchVectorField::evaluateQuadrature
     const CompactListList<point>& faceQuadPoints
 ) const
 {
+    if (curTimeIndex_ != db().time().timeIndex())
+    {
+        curTimeIndex_ = db().time().timeIndex();
+
+        // Called once per time-step
+
+        if (pressureFieldPtr_.valid())
+        {
+            // Force the pressure field boundary conditions to update
+            const_cast<volScalarField&>
+            (
+                pressureFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+
+        if (tractionFieldPtr_.valid())
+        {
+            // Force the traction field boundary conditions to update
+            const_cast<volVectorField&>
+            (
+                tractionFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+    }
+
+    if (tractionFieldPtr_.valid())
+    {
+        traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (tractionSeries_.size())
+    {
+        traction_ = tractionSeries_(this->db().time().timeOutputValue());
+    }
+
+    if (pressureFieldPtr_.valid())
+    {
+        pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (pressureSeries_.size())
+    {
+        pressure_ = pressureSeries_(this->db().time().timeOutputValue());
+    }
+
+    // Face unit normals
+    const vectorField n(patch().nf());
+
+    // Patch traction
+    const vectorField traction(traction_ - n*pressure_);
+
     // faceQuadPoints is list for whole mesh.
     labelList nQpPerFace(this->size(), 0);
     const label start = this->patch().start();
@@ -518,7 +567,7 @@ solidTractionFvPatchVectorField::evaluateQuadrature
     forAll(*this, faceI)
     {
         // Get the current face value
-        const vector& faceValue = (*this)[faceI];
+        const vector& faceValue = traction[faceI];
         const label globalFaceID = faceI + start;
 
         // Get the number of quadrature points for this face
