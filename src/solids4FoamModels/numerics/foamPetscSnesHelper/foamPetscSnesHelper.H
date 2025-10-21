@@ -422,7 +422,8 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const bool flipSign = true,
+                const scalar scaleFactor=1.0
             ) const;
 
             //- Insert linearisation of div(phi,U) into a PETSc matrix
@@ -452,7 +453,8 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = false
+                const bool flipSign = false,
+                const scalar scaleFactor =1.0
             ) const;
 
             //- Extract a subset of components a raw scalar array 'x' into the

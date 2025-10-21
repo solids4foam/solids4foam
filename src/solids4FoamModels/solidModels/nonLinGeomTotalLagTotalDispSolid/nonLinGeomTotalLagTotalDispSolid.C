@@ -822,6 +822,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 {
     const fvMesh& mesh = this->mesh();
 
+    //adding a scaling term to try make it easier for the linear solver in these problems.
+    scalar unitsPressureScale = solidModelDict().lookupOrDefault<scalar>("unitsPressureScale", 1.0);
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
@@ -876,7 +878,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         p.correctBoundaryConditions();
 
         // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        sigma() = dev(sigma()) - -(p * unitsPressureScale)*I;
     }
 
     // Unit normal vectors at the faces
@@ -948,19 +950,77 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Divided by bulkModulus form
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
-        const dimensionedScalar omega(solidModelDict().lookup("omega"));
-        scalarField pressureResidual
-        (
-          - p/kappa
-          + fvc::laplacian
-            (
-                omega/sqr(mesh.deltaCoeffs()/impKf_), p, "laplacian(Dp,p)"
-            )
-          - 0.5*(pow(J_, 2.0) - 1.0)/J_
-        );
+
+	const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
+        const word stabilisationType =
+          solidModelDict().lookupOrDefault<word>("stabilisationType", "rhieChow");
+
+
+	scalarField pressureResidual(mesh.nCells(), 0.0);
+	if (stabilisationType == "rhieChow")
+	  {
+	    // Create the diffusivity field properly                                                                                                       \
+
+	    //const volScalarField Dp(pDiffusivity()/impK_);
+	    pressureResidual =
+	    (
+	     - p/kappa
+	     + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+	     - fvc::div
+	     (
+		 (pDiffusivity()/kappaf)*mesh.Sf()
+	       & fvc::interpolate(fvc::grad(p))
+	     )
+	  //-0.5*kappa*(pow(J_, 2.0) - 1.0)/(J_) //*(1e-6))
+	  -0.5*unitsPressureScale*(pow(J_, 2.0) - 1.0)/(J_)
+	     );
+
+	}
+	else if (stabilisationType == "oosterlee")
+	{
+	    // Oosterlee formulation
+	    pressureResidual =
+	      (
+	       - p/kappa +
+	       fvc::laplacian(omega/(impKf_*sqr(mesh.deltaCoeffs())), p, "laplacian(Dp,p)")
+	       //              - fvc::div(((omega/sqr(mesh.deltaCoeffs())))*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+	       // Different stabilisation term(s) here
+	       //- tr(gradD())
+	       -0.5*unitsPressureScale*(pow(J_, 2.0) - 1.0)/(J_)
+	       );
+	}
+	else
+        {
+            FatalError
+                << "stabilisationType unknown: " << stabilisationType
+                << exit(FatalError);
+        }
+
+        // scalarField pressureResidual
+        // (
+        //   - p/kappa
+        //   + fvc::laplacian
+        //     (
+        //         omega/sqr(mesh.deltaCoeffs()/impKf_), p, "laplacian(Dp,p)"
+        //     )
+        //   - 0.5*(pow(J_, 2.0) - 1.0)/J_
+        // );
 
         // Make residual extensive
         pressureResidual *= mesh.V();
+	scalar matrixScale = solidModelDict().lookupOrDefault<scalar>("matrixScale", 1.0);
+	pressureResidual *= matrixScale;
+
+	//adding a switch to look at scale of residuals
+	Switch printResiduals =
+	solidModelDict().lookupOrDefault<Switch>("printResiduals", false);
+	if (printResiduals){
+	  Info << "Displacement Residual:\n" << average(mag(residual)) << endl;
+	Info << "Pressure Residual:\n" << average(mag(pressureResidual)) << endl;
+	// Copy the pressureResidual into the f field as the final equation
+	}
+	
 
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -979,6 +1039,16 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
     const Vec x
 )
 {
+  
+    //This gives freedom to switch between pa and mpa ect by setting the scaling in the dict
+    scalar unitsPressureScale = solidModelDict().lookupOrDefault<scalar>("unitsPressureScale", 1.0);
+
+    //note we only wish to build the preconditioner once.
+    if(preconditionerBuilt_)
+    {
+      Info<< "Skipping pre conditioner build as was done."<< nl <<endl;
+      return 0;
+    }
     // Copy x into the D field
     volVectorField& D = const_cast<volVectorField&>(this->D());
     vectorField& DI = D;
@@ -1039,25 +1109,83 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         const volScalarField rKappa(1.0/kappa);
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
         const dimensionedScalar omega(solidModelDict().lookup("omega"));
+	scalar matrixScale = solidModelDict().lookupOrDefault<scalar>("matrixScale", 1.0);
+        const word stabilisationType =
+          solidModelDict().lookupOrDefault<word>("stabilisationType", "rhieChow");
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
         {
-            // Calculate pressure equation matrix
-            //const dimensionedScalar one("one", dimless, 1);
-            fvScalarMatrix approxPressureJ
-            (
-              - fvm::Sp(rKappa, p)
-              + fvm::laplacian
-                (
-                    omega/sqr(mesh().deltaCoeffs())/impKf_,
-                    p,
-                    "jacobian-laplacian(rAU,p)"
-                )
-            );
+	  // Calculate pressure equation matrix
+	  //const dimensionedScalar one("one", dimless, 1);
+	  if(stabilisationType == "rhieChow")
+	    {
+	      fvScalarMatrix approxPressureJ
+		(
+		 - fvm::Sp(rKappa, p)
+		 //- fvm::Sp(rKappa , p)//*matrixScale
+		 + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+		 //+ fvm::laplacian(
+		 //                omega/(impKf_*sqr(mesh().deltaCoeffs())),
+		 //                p,
+		 //                "jacobian-laplacian(rAU,p)"
+		 //                )//*matrixScale
 
-            // Insert the pressure equation
-            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-            (
-                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-            );
+
+		 );
+	      approxPressureJ *= matrixScale;
+
+	      // Insert the pressure equation
+	      foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+		(
+		 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+		 );
+	    }
+	  else if(stabilisationType == "oosterlee")
+	    {
+	      fvScalarMatrix approxPressureJ
+		(
+		 - fvm::Sp(rKappa, p)
+		 //- fvm::Sp(rKappa , p)//*matrixScale
+		 // + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+		 + fvm::laplacian(
+				  omega/(impKf_*sqr(mesh().deltaCoeffs())),
+				  p,
+				  "jacobian-laplacian(rAU,p)"
+				  )//*matrixScale
+
+		 );
+	      //surfaceScalarField omegaCoeff = fvc::interpolate(omega / mesh().deltaCoeffs());
+
+	      // Insert the pressure equation
+	      approxPressureJ *= matrixScale;
+	      foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+		(
+		 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+		 );
+	    }
+	  else
+	    {
+	      FatalError
+		<< "stabilisationType unknown: " << stabilisationType
+		<< exit(FatalError);
+	    }
+
+	    
+            // fvScalarMatrix approxPressureJ
+            // (
+            //   - fvm::Sp(rKappa, p)
+            //   + fvm::laplacian
+            //     (
+            //         omega/sqr(mesh().deltaCoeffs())/impKf_,
+            //         p,
+            //         "jacobian-laplacian(rAU,p)"
+            //     )
+            // );
+
+            // // Insert the pressure equation
+            // foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            // (
+            //     approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+            // );
         }
 
         // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
@@ -1068,7 +1196,8 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             jac,
             blockSize_ - 1,            // row offset
             0,                         // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar components of D
+            solidModel::twoD() ? 2 : 3, // number of scalar components of D
+            matrixScale*unitsPressureScale //adding a scaling option
         );
 
         // Insert p-in-D term
@@ -1079,9 +1208,11 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             jac,
             0,                         // row offset
             blockSize_ - 1,            // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+            solidModel::twoD() ? 2 : 3, // number of scalar equations to insert
+	    unitsPressureScale
         );
     }
+    preconditionerBuilt_ = true;
 
     return 0;
 }

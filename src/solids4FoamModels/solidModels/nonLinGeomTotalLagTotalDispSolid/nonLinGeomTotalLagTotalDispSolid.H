@@ -100,6 +100,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //Preconditioner option built
+        mutable bool preconditionerBuilt_ = false;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
