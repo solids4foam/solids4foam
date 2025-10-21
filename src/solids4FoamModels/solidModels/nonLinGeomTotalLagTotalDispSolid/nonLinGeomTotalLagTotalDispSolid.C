@@ -878,7 +878,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         p.correctBoundaryConditions();
 
         // Replace the pressure component of stress
-        sigma() = dev(sigma()) - -(p * unitsPressureScale)*I;
+        sigma() = dev(sigma()) - (p * unitsPressureScale)*I;
     }
 
     // Unit normal vectors at the faces
