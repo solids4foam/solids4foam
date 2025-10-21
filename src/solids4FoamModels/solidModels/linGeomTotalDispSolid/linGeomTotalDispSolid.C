@@ -969,16 +969,78 @@ label linGeomTotalDispSolid::formResidual
         //   //- mechanical().bulkModulus()*fvc::div(D)
         // );
 
+	//Adding scalings and switches for stabilisation approaches
+	const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
+        const word stabilisationType =
+          solidModelDict().lookupOrDefault<word>("stabilisationType", "rhieChow");
+	
         // Divided by bulkModulus form
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         const surfaceScalarField kappaf(fvc::interpolate(kappa));
-        scalarField pressureResidual
-        (
-          - p/kappa
-          + fvc::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-          - fvc::div((pDiffusivity()/kappaf)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
-          - tr(gradD())
-        );
+	scalarField pressureResidual(mesh.nCells(), 0.0);
+
+	if (stabilisationType == "rhieChow")
+	  {
+	    // Create the diffusivity field properly
+	    //const volScalarField Dp(pDiffusivity()/impK_);
+	    pressureResidual =
+	    (
+	     - p/kappa
+	     //+ fvc::laplacian(Dp, p, "laplacian(Dp,p)")
+	     + fvc::laplacian(pDiffusivity() / impKf_, p, "laplacian(Dp,p)")
+	     - fvc::div((pDiffusivity()/impKf_)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+	     //- fvc::div((pDiffusivity()/kappaf)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+	     - tr(gradD())
+	     );
+
+	}
+	else if (stabilisationType == "oosterlee")
+	{
+	    // Oosterlee formulation
+	    pressureResidual =
+	      (
+	       - p/kappa +
+	       fvc::laplacian(omega/(impKf_*sqr(mesh.deltaCoeffs())), p, "laplacian(Dp,p)")
+	       //              - fvc::div(((omega/sqr(mesh.deltaCoeffs())))*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+	       // Different stabilisation term(s) here
+	       - tr(gradD())
+	       );
+	}
+	else if(stabilisationType == "JST")
+        {
+          pressureResidual =
+            (
+             - p/kappa
+             -fvc::laplacian
+             (
+              omega/(impKf_*sqr(mesh.deltaCoeffs())),
+              fvc::laplacian(omegaTau, p, "laplacian(rAU,p)"),
+              "laplacian(rAU,p)"
+              )
+             - tr(gradD())
+            );
+        }
+	else if(stabilisationType == "Mixed")
+	{
+          pressureResidual =
+            (
+             - p/kappa
+	     //half rhie chow.. Could add weighting rather than averaging
+	     + 0.5*fvc::laplacian(pDiffusivity() / impKf_, p, "laplacian(Dp,p)")
+             - 0.5*fvc::div((pDiffusivity()/impKf_)*mesh.Sf() & fvc::interpolate(fvc::grad(p)))
+	     //half oosterlee
+	     +0.5*fvc::laplacian(omega/(impKf_*sqr(mesh.deltaCoeffs())), p, "laplacian(Dp,p)")
+             - tr(gradD())
+            );
+        }
+        else
+        {
+            FatalError
+                << "stabilisationType unknown: " << stabilisationType
+                << exit(FatalError);
+        }
+
 
         // Make residual extensive
         pressureResidual *= mesh.V();
@@ -1054,6 +1116,10 @@ label linGeomTotalDispSolid::formJacobian
     if (solvePressure())
     {
         const volScalarField& p = this->p();
+	const dimensionedScalar omega("omega", solidModelDict());
+        const dimensionedScalar omegaTau("omegaTau", solidModelDict());
+	const word stabilisationType =
+          solidModelDict().lookupOrDefault<word>("stabilisationType", "rhieChow");
 
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         //const volScalarField rKappa(1.0/mechanical().bulkModulus());
@@ -1067,17 +1133,87 @@ label linGeomTotalDispSolid::formJacobian
             //   - fvm::Sp(one, p)
             //   + fvm::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
             // );
-            fvScalarMatrix approxPressureJ
-            (
-              - fvm::Sp(rKappa, p)
-              + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-            );
 
-            // Insert the pressure equation
-            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-            (
-                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-            );
+	    if(stabilisationType == "rhieChow"){
+              fvScalarMatrix approxPressureJ
+                (
+                 - fvm::Sp(rKappa, p)
+                 + fvm::laplacian(pDiffusivity()/impKf_, p, "laplacian(Dp,p)")
+                 //+ fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")                                                                            
+                 );
+
+              // Insert the pressure equation                                                                                                               
+              foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+                (
+                 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+                 );
+            }
+
+            else if(stabilisationType == "JST")
+	      {
+		fvScalarMatrix approxPressureJ
+		  (
+		   - fvm::Sp(rKappa, p)
+		   -fvc::laplacian
+		   (
+		    omega/(impKf_*sqr(mesh().deltaCoeffs())),
+		    fvc::laplacian(omegaTau, p, "laplacian(rAU,p)"),
+		    "laplacian(rAU,p)"
+		    )
+
+		   );
+	      }
+	    
+
+	    else if(stabilisationType == "oosterlee")
+	    {
+	      fvScalarMatrix approxPressureJ
+		(
+		 - fvm::Sp(rKappa, p) +
+		  fvm::laplacian(
+				 omega/(impKf_*sqr(mesh().deltaCoeffs())),
+		    p,
+		    "jacobian-laplacian(rAU,p)"
+		  )
+
+		 );
+	      //surfaceScalarField omegaCoeff = fvc::interpolate(omega / mesh().deltaCoeffs());
+	      // Insert the pressure equation
+	      foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+		(
+		 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+		 );
+	    }
+	    else if(stabilisationType == "Mixed")
+            {
+              fvScalarMatrix approxPressureJ
+                (
+                 - fvm::Sp(rKappa, p)
+		 +
+		 0.5*fvc::laplacian(pDiffusivity() / impKf_, p, "laplacian(Dp,p)")
+
+		 +
+		  0.5*fvm::laplacian(
+				 omega/(impKf_*sqr(mesh().deltaCoeffs())),
+		    p,
+		    "jacobian-laplacian(rAU,p)"
+		  )
+
+		 );
+	      //surfaceScalarField omegaCoeff = fvc::interpolate(omega / mesh().deltaCoeffs());
+	      // Insert the pressure equation
+	      foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+		(
+		 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+		 );
+	    }
+	    else
+	    {
+		FatalError
+		  << "stabilisationType unknown: " << stabilisationType
+		  << exit(FatalError);
+	    }
+           
         }
 
         // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
