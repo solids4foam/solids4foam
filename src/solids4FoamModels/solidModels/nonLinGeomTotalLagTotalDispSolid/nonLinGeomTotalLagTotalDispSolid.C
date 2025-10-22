@@ -861,6 +861,12 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Jacobian of the deformation gradient
     J_ = det(F_);
 
+    //    scalar minJ = gMin(J_);
+    //scalar maxJ = gMax(J_);
+
+    //Info << "Nonlinear solid: min(J_) = " << minJ 
+    //	 << ", max(J_) = " << maxJ << endl;
+
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
@@ -960,7 +966,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 	scalarField pressureResidual(mesh.nCells(), 0.0);
 	if (stabilisationType == "rhieChow")
 	  {
-	    // Create the diffusivity field properly                                                                                                       \
+	    // Create the diffusivity field properly
 
 	    //const volScalarField Dp(pDiffusivity()/impK_);
 	    pressureResidual =

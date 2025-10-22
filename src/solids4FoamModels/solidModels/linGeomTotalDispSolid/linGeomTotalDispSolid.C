@@ -1135,19 +1135,19 @@ label linGeomTotalDispSolid::formJacobian
             // );
 
 	    if(stabilisationType == "rhieChow"){
-              fvScalarMatrix approxPressureJ
-                (
-                 - fvm::Sp(rKappa, p)
-                 + fvm::laplacian(pDiffusivity()/impKf_, p, "laplacian(Dp,p)")
-                 //+ fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")                                                                            
-                 );
+	      fvScalarMatrix approxPressureJ
+		(
+		 - fvm::Sp(rKappa, p)
+		 + fvm::laplacian(pDiffusivity()/impKf_, p, "laplacian(Dp,p)")
+		 //+ fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+		 );
 
-              // Insert the pressure equation                                                                                                               
-              foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-                (
-                 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-                 );
-            }
+	      // Insert the pressure equation
+	      foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+		(
+		 approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+		 );
+	    }
 
             else if(stabilisationType == "JST")
 	      {
