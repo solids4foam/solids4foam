@@ -177,41 +177,26 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
 #ifdef USE_PETSC
     Info<< "Solving the momentum equation for U using PETSc SNES" << endl;
 
+    // If needed, update the current time fields from the future time
+    // predictions
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+
+        // Note that forceCurrentTime_.oldTime() is already correctly updated by
+        // the OpenFOAM time object
+
+        // Extrapolated forces at the faces
+        forceCurrentTime_ =
+            surfaceVectorField(forceCurrentTime_.name(), forceFutureTime_);
+
+        // Extrapolated cell displacments
+        D() = volVectorField(D().name(), DFutureTime_);
+    }
+
     // Update D and U boundary conditions
     D().correctBoundaryConditions();
     U().correctBoundaryConditions();
-
-//     // Solution predictor
-//     if (predictor_ && newTimeStep())
-//     {
-//         predict();
-
-//         // Map the D field to the SNES solution vector
-//         foamPetscSnesHelper::InsertFieldComponents<vector>
-//         (
-// #ifdef OPENFOAM_NOT_EXTEND
-//             D().primitiveFieldRef(),
-// #else
-//             D().internalField(),
-// #endif
-//             foamPetscSnesHelper::solution(),
-//             0, // Location of first component
-//             solidModel::twoD()
-//           ? makeList<label>({0,1})
-//           : makeList<label>({0,1,2})
-//         );
-
-//         if (solvePressure())
-//         {
-//             // Map the p field to the SNES solution vector
-//             foamPetscSnesHelper::InsertFieldComponents<scalar>
-//             (
-//                 p(),
-//                 foamPetscSnesHelper::solution(),
-//                 blockSize_ -1 // Location of first component
-//             );
-//         }
-//     }
 
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
@@ -251,18 +236,9 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
         // autoPtrRef(dpdtPtr_) = fvc::ddt(p());
     }
 
-    WarningInFunction
-        << "I need to update D and related fields" << endl;
-
-    // // Interpolate cell displacements to vertices
-    // mechanical().interpolate(D(), gradD(), pointD());
-    // pointD().correctBoundaryConditions();
-
-    // // Increment of displacement
-    // DD() = D() - D().oldTime();
-
-    // // Increment of point displacement
-    // pointDD() = pointD() - pointD().oldTime();
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), gradD(), pointD());
+    pointD().correctBoundaryConditions();
 
     // Acceleration
     A_ = fvc::ddt(U());
@@ -426,6 +402,19 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
+    DFutureTime_
+    (
+        IOobject
+        (
+            "DFutureTime",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("0", dimLength, vector::zero)
+    ),
     forceCurrentTime_
     (
         IOobject
@@ -455,6 +444,9 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     curTimeIndex_(-1)
 {
     DisRequired();
+
+    // Ensure U is created (and possibly read)
+    U();
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
@@ -666,7 +658,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
 )
 {
     const fvMesh& mesh = this->mesh();
-    const scalar deltaT = runTime().deltaTValue();
+    const dimensionedScalar& deltaT = runTime().deltaT();
 
     // Copy x into the U field
     volVectorField& U = const_cast<volVectorField&>(this->U());
@@ -688,16 +680,16 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     //     div(sigma) = 0.5*div(sigma[n-1] + sigma[n+1])
     // where n is the current time, n-1 is the old time, and n+1 is the future
     // time, so sigma[n+1] is calculated using D[n+1], i.e. D at the future time
-    // step (Dnew)
+    // step (DFutureTime_)
     // We approximate D[n+1] using a second-order Adams–Bashforth extrapolation
     // from the current time using the velocity. This is the approach given in
     // Jaiman and Joshi, 2022, in Eq. 6.16.
 
-    // Displacement at the future time step
-    const volVectorField Dnew("Dnew", D() + 0.5*deltaT*(3*U - U.oldTime()));
+    // Approximate the displacement at the future time step
+    DFutureTime_ = D() + 0.5*deltaT*(3*U - U.oldTime());
 
     // Calculate future-time gradient of displacement
-    mechanical().grad(Dnew, gradD());
+    mechanical().grad(DFutureTime_, gradD());
 
     // Total deformation gradient at the future time
     F_ = I + gradD().T();
@@ -754,22 +746,12 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // the traction in the reference configuration)
     // CAREFUL: D may not have corrected BCs with non-ortho corrections; maybe
     // formulate in terms of alpha scheme instead
-    const scalar scaleFactor =
-        readScalar(stabilisation().dict().lookup("scaleFactor"));
-    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-    tractionNew += scaleFactor*impKf_*(fvc::snGrad(Dnew) - (n & gradDf));
-
-    // If needed, update the current time force before we calculate the new time
-    // force
-    if (curTimeIndex_ != runTime().timeIndex())
     {
-        curTimeIndex_ = runTime().timeIndex();
-
-        // Note that forceCurrentTime_.oldTime() is already correctly updated by
-        // the OpenFOAM time object
-
-        forceCurrentTime_ =
-            surfaceVectorField(forceCurrentTime_.name(), forceFutureTime_);
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        tractionNew +=
+            scaleFactor*impKf_*(fvc::snGrad(DFutureTime_) - (n & gradDf));
     }
 
     // Update the future-time force at the faces
@@ -778,9 +760,9 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Enforce traction boundary conditions at the new time
     // TODO: we need to access traction at the new time (if available) ...
     // but how do we extrapolate this consistently ...
-    Warning
-        << "I need to consistently extrapolate the tractions" << endl;
-    enforceTractionBoundaries(forceFutureTime_, Dnew, nNew, magSfNew);
+    // Warning
+    //     << "I need to consistently extrapolate the tractions" << endl;
+    enforceTractionBoundaries(forceFutureTime_, D(), nNew, magSfNew);
 
     // The residual vector is defined as
     // F = 0.5*div(sigma[n-1] + sigma[n+1]) + rho*g
@@ -887,7 +869,8 @@ label nonLinGeomTotalLagVelocitySolid::formJacobian
 
     // Is "impKf_*runTime().deltaT()" the best Laplacian coefficient?
     // We calculate div(sigma) as 0.5*div(sigma[n-1] + sigma[n+1]) where
-    // sigma[n+1] is a function of Dnew = D + 0.5*deltaT*(3*U - U.oldTime())
+    // sigma[n+1] is a function of
+    //     DFutureTime = D + 0.5*deltaT*(3*U - U.oldTime())
     // Since we use the Laplacian(impK,D) as an approximation of div(sigma),
     // then the implicit part (in terms of U) would be 0.5*sigma[n+1] as a
     // function of 0.5*deltaT*3*U, so the implicit Laplacian becomes

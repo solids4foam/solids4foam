@@ -98,6 +98,9 @@ class nonLinGeomTotalLagVelocitySolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Displacement at the future time (extrapolated)
+        volVectorField DFutureTime_;
+
         //- Force at the current time
         surfaceVectorField forceCurrentTime_;
 
