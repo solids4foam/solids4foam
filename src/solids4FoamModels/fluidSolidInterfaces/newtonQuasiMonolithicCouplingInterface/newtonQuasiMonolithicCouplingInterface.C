@@ -25,6 +25,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "fixedValueFvPatchFields.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "newtonIcoFluid.H"
 #include "nonLinGeomTotalLagVelocitySolid.H"
@@ -533,8 +534,8 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
 
     // Check the fluid U patch type is fixedValue (not just derived from it)
     // TODO: use the corrected version of fixedValue
-    // if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
-    if (fluidPatchU.type() != "fixedValue")
+    if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
+    //if (fluidPatchU.type() != "fixedValue")
     {
         FatalErrorInFunction
             << "The fluid interface patch must be of type 'fixedValue'"
@@ -965,6 +966,14 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
             << "Only one interface allowed" << abort(FatalError);
     }
 
+    // fixedDisplacement patches overwrite the value with an internally stored
+    // totalDisp field, so we must set that
+    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
+    {
+        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
+            motionPatchD;
+    }
+
     // Take references to zones
     const standAlonePatch& fluidZone =
         fluid().globalPatches()[0].globalPatch();
@@ -1017,8 +1026,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Set the mesh interface pointD
     // Use "==" to reassign fixedValue
-    motionSolid().pointD().boundaryFieldRef()[fluidPatchID] ==
-        meshPatchPointD;
+    motionSolid().pointD().boundaryFieldRef()[fluidPatchID] == meshPatchPointD;
 
     // Correct boundary conditions to enforce the new patch values on the
     // internal field
@@ -1180,8 +1188,8 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
                 "optionsFile", "petscOptions"
             )
         ),
-        fluid().mesh(), // Not used since solutionLocation is NONE
-        solutionLocation::NONE, // Only used for helper functions
+        fluid().mesh(), // Should not be used
+        solutionLocation::CELLS, // Used by helper functions
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
         true // Will PETSc be used
     ),
@@ -1201,9 +1209,9 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             gAverage(1.0/solid().mechanical().shearModulus()().primitiveField())
         )
     ),
-    fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
-    meshToFluidCoupling_(fsiProperties().lookup("meshToFluidCoupling")),
-    solidToMeshCoupling_(fsiProperties().lookup("solidToMeshCoupling")),
+    // fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
+    // meshToFluidCoupling_(fsiProperties().lookup("meshToFluidCoupling")),
+    // solidToMeshCoupling_(fsiProperties().lookup("solidToMeshCoupling")),
     extrapolateSolidInterfaceDisplacement_
     (
         fsiProperties().lookupOrDefault<Switch>
@@ -1265,6 +1273,9 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << meshMotionSolidModelFvMotionSolver::typeName
             << exit(FatalError);
     }
+
+    Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
+        << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << endl;
 
     // Store old time values
     fluid().U().storeOldTime();
@@ -1435,7 +1446,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     volVectorField& USolid = solid().U();
     volVectorField& D = solid().D();
     volVectorField& DMotion = motionSolid().D();
-    const scalar deltaT = runTime().deltaTValue();
+    const dimensionedScalar& deltaT = runTime().deltaT();
     const bool twoD = fluid().twoD();
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
@@ -1518,6 +1529,8 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     // initialiseJacobian as defined above
     // This could system will be linear so the PETSc option should be selected
     // with this in mind
+    Info<< "Solving the monolithic momentum-continuity system for Up using "
+        << "PETSc SNES" << endl;
     foamPetscSnesHelper::solve();
 
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
@@ -1683,9 +1696,6 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     volVectorField& UFluid = fluid().U();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
-    //volVectorField& D = solid().D();
-    //volVectorField& DMotion = motionSolid().D();
-    //const scalar deltaT = runTime().deltaTValue();
     const label fluidSystemEnd = fluidMesh().nCells()*fluidBlockSize;
     const label solidFirstEqnID = fluidSystemEnd;
 
@@ -1828,8 +1838,8 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     // 5. Update the fluid residual, which now has the correct interface
     //    velocity, using the current (linearised) mesh motion
 
-    // We create a temporary no-copy xSolid and fSolid Vec pointers, which are a
-    // "view" of the solid equations in the full solution vectors x and f
+    // We create a temporary no-copy xFluid and fFluid Vec pointers, which are a
+    // "view" of the fluid equations in the full solution vectors x and f
     {
         Vec xFluid = nullptr;
         Vec fFluid = nullptr;
@@ -1839,7 +1849,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         VecSetBlockSize(fFluid, fluidBlockSize);
         refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
         (
-            fFluid, xFluid, true // use known mesh flux
+            fFluid, xFluid, true // extrapolaed flux
         );
         VecRestoreSubVector(x, isFluid(), &xFluid);
         VecRestoreSubVector(f, isFluid(), &fFluid);
@@ -1928,9 +1938,9 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         Vec xFluid = nullptr;
         VecGetSubVector(x, isFluid(), &xFluid);
         VecSetBlockSize(xFluid, fluidBlockSize);
-        refCast<foamPetscSnesHelper>(fluid()).formJacobian
+        refCast<fluidModels::newtonIcoFluid>(fluid()).formJacobian
         (
-            subMats[0][0], xFluid
+            subMats[0][0], xFluid, true // use explicit flux
         );
         VecRestoreSubVector(x, isFluid(), &xFluid);
     }

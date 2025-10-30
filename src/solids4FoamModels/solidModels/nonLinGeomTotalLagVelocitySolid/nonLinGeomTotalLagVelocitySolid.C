@@ -323,7 +323,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
-        "D",
+        "U",
         fileName
         (
             solidModelDict().lookupOrDefault<fileName>

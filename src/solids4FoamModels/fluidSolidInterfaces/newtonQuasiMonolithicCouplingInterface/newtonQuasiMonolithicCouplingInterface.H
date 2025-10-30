@@ -74,13 +74,13 @@ class newtonQuasiMonolithicCouplingInterface
         const scalar solidSystemScaleFactor_;
 
         //- Flag to enable fluid-to-solid coupling
-        const Switch fluidToSolidCoupling_;
+        // const Switch fluidToSolidCoupling_;
 
         //- Flag to enable mesh-to-fluid coupling
-        const Switch meshToFluidCoupling_;
+        // const Switch meshToFluidCoupling_;
 
         //- Flag to enable solid-to-mesh coupling
-        const Switch solidToMeshCoupling_;
+        // const Switch solidToMeshCoupling_;
 
         //- Flag to extrapolate the displacement at the solid interface
         //  Alternatively, the adjacenet cell centre displacement is used

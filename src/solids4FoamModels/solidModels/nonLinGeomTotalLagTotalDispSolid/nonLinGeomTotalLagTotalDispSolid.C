@@ -708,14 +708,16 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     {
         if (gradDScheme != "leastSquaresS4f")
         {
-            FatalErrorIn(type() + "::" + type())
+            // FatalErrorIn(type() + "::" + type())
+            WarningIn(type() + "::" + type())
                 << "The `leastSquaresS4f` gradScheme should be used for "
                 << "`grad(D)` when using the "
                 << solidModel::solutionAlgorithmNames_
                    [
                        solidModel::solutionAlgorithm::PETSC_SNES
                    ]
-                << " solution algorithm" << abort(FatalError);
+                // << " solution algorithm" << abort(FatalError);
+                << " solution algorithm" << endl;
         }
 
         // Set extrapolateValue to true for solidTraction boundaries

@@ -787,7 +787,8 @@ label foamPetscSnesHelper::initialiseJacobian
     else
     {
         FatalErrorInFunction
-            << "Unknown solution location = " << location_
+            << "Unknown solution location = "
+            << solutionLocationNames_[location_]
             << exit(FatalError);
     }
 

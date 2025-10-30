@@ -418,7 +418,7 @@ label newtonIcoFluid::formResidual
 (
     Vec f,         // Residual
     const Vec x,   // Solution
-    const bool useExplicitMeshFlux
+    const bool extrapolatedFlux
 )
 {
     if (debug)
@@ -427,22 +427,11 @@ label newtonIcoFluid::formResidual
             << "start" << endl;
     }
 
-    if (useExplicitMeshFlux)
-    {
-        notImplemented("Not implemented yet for useExplicitMeshFlux");
-    }
-
     // Take references
-    //const Time& runTime = fluidModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
-    //autoPtr<surfaceVectorField>& Uf = Uf_;
-    //scalar& cumulativeContErr = cumulativeContErr_;
-    //const bool correctPhi = correctPhi_;
-    // const bool checkMeshCourantNo = checkMeshCourantNo_;
-    //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
     // Copy x into the U field
     vectorField& UI = U;
@@ -463,25 +452,33 @@ label newtonIcoFluid::formResidual
     gradU() = fvc::grad(U);
 
     // Update the flux
-    phi = fvc::interpolate(U) & mesh.Sf();
+    if (extrapolatedFlux)
+    {
+        // Extrapolate from old and old-old times
+        phi =
+            fvc::interpolate
+            (
+                2.0*U.oldTime() - U.oldTime().oldTime()
+            ) & mesh.Sf();
+    }
+    else
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
 
     if (mesh.changing())
     {
         // Make the flux relative to the mesh motion
         fvc::makeRelative(phi, U);
-    }
 
-    // Set the flux to zero on walls, including FSI interfaces
-    // makeRelative should do this but may not work as expected
-    forAll(U.boundaryField(), patchI)
-    {
-        if (mesh.boundaryMesh()[patchI].type() == "wall")
+        // Set the flux to zero on walls, including FSI interfaces
+        // makeRelative should do this but may not work as expected
+        forAll(U.boundaryField(), patchI)
         {
-#ifdef OPENFOAM_NOT_EXTEND
-            phi.boundaryFieldRef()[patchI] = 0.0;
-#else
-            phi.boundaryField()[patchI] = 0.0;
-#endif
+            if (mesh.boundaryMesh()[patchI].type() == "wall")
+            {
+                boundaryFieldRef(phi)[patchI] = 0.0;
+            }
         }
     }
 
@@ -647,6 +644,9 @@ label newtonIcoFluid::formResidual
     const solidModel& motion
 )
 {
+    FatalError
+        << "stop" << exit(FatalError);
+
     if (debug)
     {
         InfoInFunction
@@ -899,8 +899,9 @@ label newtonIcoFluid::formResidual
 
 label newtonIcoFluid::formJacobian
 (
-    Mat jac,       // Jacobian
-    const Vec x    // Solution
+    Mat jac,        // Jacobian
+    const Vec x,    // Solution
+    const bool useExplicitFlux
 )
 {
     if (debug)
@@ -972,17 +973,25 @@ label newtonIcoFluid::formJacobian
         UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
     );
 
-    // Insert linearisation of convection term
-    // The linearisation assumes an upwind discretisation
-    foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
-    (
-        U,
-        phi(),
-        jac,
-        0,                         // row offset
-        0,                         // column offset
-        fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
-    );
+    if (useExplicitFlux)
+    {
+        // Insert convection term assuming known flux
+        UEqn -= fvm::div(phi(), U, "jacobian-div(phi,U)");
+    }
+    else
+    {
+        // Insert linearisation of full nonlinear convection term
+        // The linearisation assumes an upwind discretisation
+        foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
+        (
+            U,
+            phi(),
+            jac,
+            0,                         // row offset
+            0,                         // column offset
+            fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        );
+    }
 
     // Add stabilisation
     {
@@ -993,7 +1002,7 @@ label newtonIcoFluid::formJacobian
 
         if (stabType == "laplacian")
         {
-            const dimensionedScalar omega(fluidProperties().lookup("omega"));
+            const dimensionedScalar omega(stabDict.lookup("omega"));
             rAUf() = omega/sqr(mesh.deltaCoeffs());
         }
         else if (stabType == "RhieChow")

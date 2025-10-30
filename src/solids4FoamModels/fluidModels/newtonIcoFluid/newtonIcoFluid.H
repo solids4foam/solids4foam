@@ -222,13 +222,12 @@ public:
             }
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
-            //  array) vector, where the mesh flux can be optionally treated
-            //  explicitly
+            //  array) vector
             virtual label formResidual
             (
                 Vec f,         // Residual
                 const Vec x,   // Solution
-                const bool useExplicitMeshFlux
+                const bool extrapolatedFlux
             );
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
@@ -246,7 +245,19 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
+            )
+            {
+                return formJacobian(jac, x, false);
+            }
+
+            //- Form the Jacobian of the governing equation
+            virtual label formJacobian
+            (
+                Mat jac,                   // Jacobian
+                const Vec x,               // Solution
+                const bool useExplicitFlux // Explicit or implicit flux
             );
+
 #endif // USE_PETSC
 };
 
