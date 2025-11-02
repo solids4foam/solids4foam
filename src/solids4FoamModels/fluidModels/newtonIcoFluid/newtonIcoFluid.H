@@ -253,9 +253,9 @@ public:
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
-                Mat jac,                   // Jacobian
-                const Vec x,               // Solution
-                const bool useExplicitFlux // Explicit or implicit flux
+                Mat jac,                    // Jacobian
+                const Vec x,                // Solution
+                const bool extrapolatedFlux // Extrapolate flux
             );
 
 #endif // USE_PETSC

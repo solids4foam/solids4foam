@@ -454,17 +454,38 @@ label newtonIcoFluid::formResidual
     // Update the flux
     if (extrapolatedFlux)
     {
-        // Extrapolate from old and old-old times
-        phi =
-            fvc::interpolate
+        if
+        (
+            Switch
             (
-                2.0*U.oldTime() - U.oldTime().oldTime()
-            ) & mesh.Sf();
+                fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+            )
+        )
+        {
+            // Equation 6.10
+            phi = fvc::interpolate
+                  (
+                      2.0*U.oldTime() - U.oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
+        else
+        {
+            // Equation 6.30
+            phi = fvc::interpolate
+                  (
+                      2.25*U.oldTime()
+                    - 1.5*U.oldTime().oldTime()
+                    + 0.25*U.oldTime().oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
     }
     else
     {
         phi = fvc::interpolate(U) & mesh.Sf();
     }
+
+    // Absolute flux
+    const surfaceScalarField phiAbs("phiAbs", phi);
 
     if (mesh.changing())
     {
@@ -521,6 +542,11 @@ label newtonIcoFluid::formResidual
       - fvc::ddt(U)
       - fvc::div(phi, U)
     );
+
+    if (Switch(fluidProperties().lookup("addDivPhiUDamping")))
+    {
+        residual -= 0.5*fvc::div(phiAbs)*U;
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
@@ -901,7 +927,7 @@ label newtonIcoFluid::formJacobian
 (
     Mat jac,        // Jacobian
     const Vec x,    // Solution
-    const bool useExplicitFlux
+    const bool extrapolatedFlux
 )
 {
     if (debug)
@@ -929,12 +955,38 @@ label newtonIcoFluid::formJacobian
     U.correctBoundaryConditions();
 
     // Update the flux
-    phi() = fvc::interpolate(U) & mesh.Sf();
+    surfaceScalarField& phi = this->phi();
+    if (extrapolatedFlux)
+    {
+        // Extrapolate from old and old-old times
+        phi =
+            fvc::interpolate
+            (
+                2.0*U.oldTime() - U.oldTime().oldTime()
+            ) & mesh.Sf();
+    }
+    else
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+
+    // Absolute flux
+    const surfaceScalarField phiAbs("phiAbs", phi);
 
     if (mesh.changing())
     {
         // Make the flux relative to the mesh motion
-        fvc::makeRelative(phi(), U);
+        fvc::makeRelative(phi, U);
+
+        // Set the flux to zero on walls, including FSI interfaces
+        // makeRelative should do this but may not work as expected
+        forAll(U.boundaryField(), patchI)
+        {
+            if (mesh.boundaryMesh()[patchI].type() == "wall")
+            {
+                boundaryFieldRef(phi)[patchI] = 0.0;
+            }
+        }
     }
 
     // Copy x into the p field
@@ -967,16 +1019,16 @@ label newtonIcoFluid::formJacobian
         Info<< "Inserting U equation in Afluid" << endl;
     }
 
-    // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    (
-        UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
-    );
-
-    if (useExplicitFlux)
+    if (extrapolatedFlux)
     {
         // Insert convection term assuming known flux
-        UEqn -= fvm::div(phi(), U, "jacobian-div(phi,U)");
+        UEqn -= fvm::div(phi, U, "jacobian-div(phi,U)");
+
+        // Damping term
+        if (Switch(fluidProperties().lookup("addDivPhiUDamping")))
+        {
+            UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), U);
+        }
     }
     else
     {
@@ -985,13 +1037,19 @@ label newtonIcoFluid::formJacobian
         foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         (
             U,
-            phi(),
+            phi,
             jac,
             0,                         // row offset
             0,                         // column offset
             fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
         );
     }
+
+    // Convert fvMatrix matrix to PETSc matrix
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+    (
+        UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
+    );
 
     // Add stabilisation
     {
@@ -1009,7 +1067,7 @@ label newtonIcoFluid::formJacobian
         {
             const scalar scaleFactor(readScalar(stabDict.lookup("scaleFactor")));
 
-            UEqn -= fvm::div(phi(), U);
+            // UEqn -= fvm::div(phi(), U);
 
             rAUf() = -scaleFactor*fvc::interpolate(1.0/UEqn.A());
         }

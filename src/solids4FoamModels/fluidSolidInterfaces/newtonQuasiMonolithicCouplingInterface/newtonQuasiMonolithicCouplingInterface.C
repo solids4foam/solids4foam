@@ -1206,7 +1206,14 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         fsiProperties().lookupOrDefault<scalar>
         (
             "solidSystemScaleFactor",
-            gAverage(1.0/solid().mechanical().shearModulus()().primitiveField())
+            gAverage
+            (
+                1.0
+               /(
+                   solid().mechanical().shearModulus()().primitiveField()
+                  *runTime.deltaTValue()
+                )
+            )
         )
     ),
     // fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
@@ -1280,6 +1287,7 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     // Store old time values
     fluid().U().storeOldTime();
     fluid().U().oldTime().storeOldTime();
+    fluid().U().oldTime().oldTime().storeOldTime();
     fluid().p().storeOldTime();
     solid().U().storeOldTime();
     solid().U().oldTime().storeOldTime();
@@ -1416,9 +1424,9 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     //    (c) Update the fluid mesh motion based on the result from (b),
     //        i.e. fluidMesh.update()
     //
-    //    (d) Evaluate the predicted fluid velocity (UFluid) and
-    //        fluid mesh fluid (phiMotion): these are used for the linearised
-    //        fluid convection term
+    //    (d) Evaluate the predicted fluid fluid (phi) and fluid mesh fluid
+    //        (phiMotion): these are used for the linearised fluid convection
+    //        term
     //
     //    (e) Compute the element-level stabilisation parameters : this step is
     //        not required in our finite volume implementation. Instead, we will
@@ -1442,6 +1450,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
     // Preliminaries
     volVectorField& UFluid = fluid().U();
+    surfaceScalarField& phi = fluid().phi();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
     volVectorField& D = solid().D();
@@ -1493,13 +1502,70 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     // In addition, this function moves the fluid mesh using this D field
     fluidMesh().update();
 
+    // Print the mesh Courant number
+    {
+        const scalarField sumPhi
+        (
+            fvc::surfaceSum(mag(fluidMesh().phi()))().primitiveField()
+        );
 
-    //    (d) Evaluate the predicted fluid velocity (UFluid) and
-    //        fluid mesh fluid (phiMotion): these are used for the linearised
-    //        fluid convection term
+        const scalar meshCoNum =
+            0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
+
+        const scalar meanMeshCoNum =
+            0.5*(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+
+        Info<< "Fluid mesh Courant number mean: " << meanMeshCoNum
+            << " max: " << meshCoNum << endl;
+    }
+
+
+    //    (d) Evaluate the predicted fluid fluid (phi) and fluid mesh fluid
+    //        (phiMotion): these are used for the linearised fluid convection
+    //        term
 
     // Extrapolate the fluid velocity
-    UFluid = (3.0/2.0)*UFluid.oldTime() - (1.0/2.0)*UFluid.oldTime().oldTime();
+    if
+    (
+        Switch
+        (
+            fluid().fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+        )
+    )
+    {
+        // Equation 6.10
+        phi = fvc::interpolate
+              (
+                  2.0*UFluid.oldTime() - UFluid.oldTime().oldTime()
+              ) & fluidMesh().Sf();
+    }
+    else
+    {
+        // Equation 6.30
+        phi = fvc::interpolate
+              (
+                  2.25*UFluid.oldTime()
+                - 1.5*UFluid.oldTime().oldTime()
+                + 0.25*UFluid.oldTime().oldTime().oldTime()
+              ) & fluidMesh().Sf();
+    }
+
+    // Print the Courant number
+    {
+        const scalarField sumPhi
+        (
+            fvc::surfaceSum(mag(phi))().primitiveField()
+        );
+
+        const scalar CoNum =
+            0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
+
+        const scalar meanCoNum =
+            0.5*(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+
+        Info<< "Fluid Courant number mean: " << meanCoNum
+            << " max: " << CoNum << endl;
+    }
 
     // In Jamain and Joshi, they update the motionU (fluid mesh velocity) based
     // on the current, old and old-old fluid mesh positions (or equivalently the
@@ -1726,7 +1792,6 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         fluidBlockSize, solidBlockSize,
         twoD
     );
-
 
     // 2. Map the fluid interface traction to the solid interface
 

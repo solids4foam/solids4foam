@@ -453,6 +453,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     // Store the old time stress
     sigma().storeOldTime();
+    forceCurrentTime_.setOriented(true);
     forceCurrentTime_.storeOldTime();
 
     // It is important to call the stress calculation procedure during the
@@ -657,6 +658,11 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     const Vec x
 )
 {
+    if (solvePressure())
+    {
+        notImplemented("Not checked yet for solvePressure");
+    }
+
     const fvMesh& mesh = this->mesh();
     const dimensionedScalar& deltaT = runTime().deltaT();
 
@@ -691,78 +697,119 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Calculate future-time gradient of displacement
     mechanical().grad(DFutureTime_, gradD());
 
-    // Total deformation gradient at the future time
-    F_ = I + gradD().T();
+    // Lookup linear elastic formulation flag
+    const Switch linearElasticFormulation
+    (
+        solidModelDict().lookup("linearElasticFormulation")
+    );
 
-    // Inverse of the deformation gradient at the future time
-    Finv_ = inv(F_);
-
-    // Jacobian of the deformation gradient at the future time
-    J_ = det(F_);
-
-    // Calculate the stress at the future time using run-time selectable
-    // mechanical law
-    mechanical().correct(sigma());
-
-    if (solvePressure())
+    if (linearElasticFormulation)
     {
-        notImplemented("Not checked yet for solvePressure");
+        // Hard-code linear elasticity
+        const dimensionedScalar mu(solidModelDict().lookup("mu"));
+        const dimensionedScalar lambda(solidModelDict().lookup("lambda"));
+        sigma() = 2*mu*symm(gradD()) + lambda*tr(gradD())*I;
+    }
+    else
+    {
+        // Total deformation gradient at the future time
+        F_ = I + gradD().T();
 
-        // // Copy x into the p field
-        // volScalarField& p = const_cast<volScalarField&>(this->p());
-        // scalarField& pI = p;
-        // foamPetscSnesHelper::ExtractFieldComponents<scalar>
-        // (
-        //     x, pI, blockSize_ - 1
-        // );
+        // Inverse of the deformation gradient at the future time
+        Finv_ = inv(F_);
 
-        // // Enforce the boundary conditions
-        // p.correctBoundaryConditions();
+        // Jacobian of the deformation gradient at the future time
+        J_ = det(F_);
 
-        // // Replace the pressure component of stress
-        // sigma() = dev(sigma()) - p*I;
+        // Calculate the stress at the future time using run-time selectable
+        // mechanical law
+        mechanical().correct(sigma());
+
+        if (solvePressure())
+        {
+            notImplemented("Not checked yet for solvePressure");
+        }
     }
 
-    // Calculate the deformed normals at the future step
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
-    const surfaceVectorField SfNew
-    (
-        fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
-    );
-    const surfaceScalarField magSfNew(mag(SfNew));
-    const surfaceVectorField nNew(SfNew/magSfNew);
 
-    // Future-time traction vectors at the faces
-    surfaceVectorField tractionNew
-    (
-        nNew & fvc::interpolate(sigma())
-    );
-
-    // Add stabilisation to the traction
-    // We add this before enforcing the traction condition as the stabilisation
-    // is set to zero on traction boundaries
-    // Todo: consider stabilisation in the deformed configuration (or formulate
-    // the traction in the reference configuration)
-    // CAREFUL: D may not have corrected BCs with non-ortho corrections; maybe
-    // formulate in terms of alpha scheme instead
+    // Calculate forceFutureTime
+    if (linearElasticFormulation)
     {
+        // Future-time traction vectors at the faces
+        surfaceVectorField traction(n & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+        traction +=
+            scaleFactor*impKf_*(fvc::snGrad(DFutureTime_) - (n & gradDf));
+
+        // Update the future-time force at the faces
+        forceFutureTime_ = mesh.magSf()*traction;
+
+        // Enforce traction boundary conditions at the new time
+        enforceTractionBoundaries(forceFutureTime_, D(), n, mesh.magSf());
+    }
+    else
+    {
+        // Calculate the deformed normals at the future step
+        const surfaceVectorField SfNew
+        (
+            fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
+        );
+        const surfaceScalarField magSfNew(mag(SfNew));
+        const surfaceVectorField nNew(SfNew/magSfNew);
+
+        // Future-time traction vectors at the faces
+        surfaceVectorField tractionNew(nNew & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // Todo: consider stabilisation in the deformed configuration (or formulate
+        // the traction in the reference configuration)
+        // CAREFUL: D may not have corrected BCs with non-ortho corrections; maybe
+        // formulate in terms of alpha scheme instead
         const scalar scaleFactor =
             readScalar(stabilisation().dict().lookup("scaleFactor"));
         const surfaceTensorField gradDf(fvc::interpolate(gradD()));
         tractionNew +=
             scaleFactor*impKf_*(fvc::snGrad(DFutureTime_) - (n & gradDf));
+
+        // Update the future-time force at the faces
+        forceFutureTime_ = magSfNew*tractionNew;
+
+        // Enforce traction boundary conditions at the new time
+        // TODO: we need to access traction at the new time (if available) ...
+        // but how do we extrapolate this consistently ...
+        // Warning
+        //     << "I need to consistently extrapolate the tractions" << endl;
+        enforceTractionBoundaries(forceFutureTime_, D(), nNew, magSfNew);
     }
 
-    // Update the future-time force at the faces
-    forceFutureTime_ = magSfNew*tractionNew;
-
-    // Enforce traction boundary conditions at the new time
-    // TODO: we need to access traction at the new time (if available) ...
-    // but how do we extrapolate this consistently ...
-    // Warning
-    //     << "I need to consistently extrapolate the tractions" << endl;
-    enforceTractionBoundaries(forceFutureTime_, D(), nNew, magSfNew);
+    // TEST - use current traction rather than future at traction boundaries
+    surfaceVectorField forceFutureTimeTracBC
+    (
+        "forceFutureTimeTracBC", forceFutureTime_
+    );
+    const scalar frac
+    (
+        readScalar(solidModelDict().lookup("futureForceFraction"))
+    );
+    if (frac < 1.0)
+    {
+        forAll(forceFutureTimeTracBC.boundaryField(), patchI)
+        {
+            forceFutureTimeTracBC.boundaryFieldRef()[patchI] =
+                frac*forceFutureTimeTracBC.boundaryFieldRef()[patchI]
+              + (1.0 - frac)*forceCurrentTime_.boundaryField()[patchI];
+        }
+    }
 
     // The residual vector is defined as
     // F = 0.5*div(sigma[n-1] + sigma[n+1]) + rho*g
@@ -770,7 +817,13 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // where the stabilisationTerm has been rolled into the div(sigma) terms
     vectorField residual
     (
-        0.5*fvc::div(forceCurrentTime_.oldTime() + forceFutureTime_)
+        0.5*fvc::div(forceCurrentTime_.oldTime() + forceFutureTimeTracBC)
+        // fvc::div
+        // (
+        //     forceCurrentTime_.oldTime()
+        //   + forceCurrentTime_
+        //   + forceFutureTimeTracBC
+        // )/3.0
       + rho()
        *(
             g() - fvc::ddt(U) - dampingCoeff()*U
@@ -798,31 +851,6 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     if (solvePressure())
     {
         notImplemented("Not checked yet for solvePressure");
-
-        // volScalarField& p = const_cast<volScalarField&>(this->p());
-
-        // // Divided by bulkModulus form
-        // const volScalarField kappa("kappa", mechanical().bulkModulus());
-        // const surfaceScalarField kappaf(fvc::interpolate(kappa));
-        // const dimensionedScalar omega(solidModelDict().lookup("omega"));
-        // scalarField pressureResidual
-        // (
-        //   - p/kappa
-        //   + fvc::laplacian
-        //     (
-        //         omega/sqr(mesh.deltaCoeffs()/impKf_), p, "laplacian(Dp,p)"
-        //     )
-        //   - 0.5*(pow(J_, 2.0) - 1.0)/J_
-        // );
-
-        // // Make residual extensive
-        // pressureResidual *= mesh.V();
-
-        // // Copy the pressureResidual into the f field as the final equation
-        // foamPetscSnesHelper::InsertFieldComponents<scalar>
-        // (
-        //     pressureResidual, f, blockSize_ - 1
-        // );
     }
 
     return 0;

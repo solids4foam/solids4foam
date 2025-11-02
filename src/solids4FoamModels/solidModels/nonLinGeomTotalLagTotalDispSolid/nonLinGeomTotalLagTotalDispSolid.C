@@ -822,6 +822,12 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     const Vec x
 )
 {
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
     const fvMesh& mesh = this->mesh();
 
     // Copy x into the D field
@@ -860,6 +866,17 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     // Jacobian of the deformation gradient
     J_ = det(F_);
+
+    if (min(J_).value() < SMALL)
+    {
+        runTime().write();
+        FatalErrorInFunction
+            << "stop: negative J" << nl
+            << "min(J) = " << min(J_).value() << nl
+            << "max(J) = " << max(J_).value() << nl
+            << "Writing intermediate fields to time = " << runTime().value()
+            << exit(FatalError);
+    }
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
@@ -969,6 +986,12 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         (
             pressureResidual, f, blockSize_ - 1
         );
+    }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
     }
 
     return 0;
