@@ -50,6 +50,7 @@ const Enum<LRE::weightFunction> LRE::weightFunctionNames_
     {LRE::weightFunction::RAD_SYMM_EXP, "radiallySymmetricExponential"},
 });
 
+
 scalar LRE::cubicForm
 (
     const LRE::symmTensor3Order& T,

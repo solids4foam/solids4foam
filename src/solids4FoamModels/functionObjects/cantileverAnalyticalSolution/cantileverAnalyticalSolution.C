@@ -168,38 +168,6 @@ bool Foam::cantileverAnalyticalSolution::writeData()
             analyticalD.write();
         }
 
-
-        if (cellStress_ && mesh.foundObject<volSymmTensorField>("sigma"))
-        {
-            const volSymmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>("sigma");
-
-            const volSymmTensorField diff
-            (
-                "cellStressDifference", analyticalStress - sigma
-            );
-            Info<< "Writing cellStressDifference field" << endl;
-            diff.write();
-
-            for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
-            {
-                // Only calculate for XX, XY and YY
-                if (cmpt != 0 && cmpt != 1 && cmpt != 3)
-                {
-                    continue;
-                }
-
-                const scalarField diffI = diff.internalField().component(cmpt);
-
-                Info<< "    Component: " << cmpt << endl;
-                Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                    << "    " << gAverage(mag(diffI))
-                    << " " << Foam::sqrt(gAverage(magSqr(diffI)))
-                    << " " << gMax(mag(diffI))
-                    << nl << endl;
-            }
-        }
-
         if (cellDisplacement_ && mesh.foundObject<volVectorField>("D"))
         {
             const volVectorField& D =
@@ -213,11 +181,56 @@ bool Foam::cantileverAnalyticalSolution::writeData()
             diff.write();
 
             const vectorField& diffI = diff.internalField();
-            Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                << "    " << gAverage(mag(diffI))
+            Info<< "    Displacement error norms: mean L1, mean L2, LInf: " << nl
+                << "    Magnitude: " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << nl << endl;
+                << endl;
+            for (int cmptI = 0; cmptI < 3; cmptI++)
+            {
+                Info<< "    " << cmptI << " "
+                    << gAverage(mag(diffI.component(cmptI)))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffI.component(cmptI))))
+                    << " " << gMax(mag(diffI.component(cmptI)))
+                    << endl;
+            }
+        }
+
+        if (cellStress_ && mesh.foundObject<volSymmTensorField>("sigma"))
+        {
+            const volSymmTensorField& sigma =
+                mesh.lookupObject<volSymmTensorField>("sigma");
+
+            volSymmTensorField diff
+            (
+                "cellStressDifference", analyticalStress - sigma
+            );
+
+	    forAll(diff, cellI)
+	    {
+		diff[cellI].zz() = 0.0;
+		diff[cellI].yz() = 0.0;
+		diff[cellI].xz() = 0.0;
+	    }
+
+            Info<< "Writing sigmaDifference field" << endl;
+            diff.write();
+
+            const symmTensorField& diffI = diff;
+	    Info<< "    Stress error norms: mean L1, mean L2, LInf: " << nl
+                << "    Magnitude: " << gAverage(mag(diffI))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI)))
+                << " " << gMax(mag(diffI))
+                << endl;
+
+	    for (int cmptI = 0; cmptI < 6; cmptI++)
+            {
+                Info<< "    " << cmptI << " "
+                    << gAverage(mag(diffI.component(cmptI)))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffI.component(cmptI))))
+                    << " " << gMax(mag(diffI.component(cmptI)))
+                    << endl;
+            }
         }
     }
 

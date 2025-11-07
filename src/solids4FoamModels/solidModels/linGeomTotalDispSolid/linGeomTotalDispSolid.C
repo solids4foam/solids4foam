@@ -31,6 +31,8 @@ License
 #include "symmetryFvPatchFields.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 
+#include "DynamicList.H"
+#include "mathematicalConstants.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -48,7 +50,6 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
-
 
 void linGeomTotalDispSolid::predict()
 {
@@ -120,7 +121,8 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
                     for (label pointI = 0; pointI < nPoints; ++pointI)
                     {
                         traction.boundaryFieldRef()[patchI][faceI] +=
-                            quadratureValues[faceI][pointI]*facesQuadWeights[faceID][pointI];
+                            quadratureValues[faceI][pointI]
+                          * facesQuadWeights[faceID][pointI];
                     }
                 }
             }
@@ -1406,7 +1408,7 @@ label linGeomTotalDispSolid::formResidual
 
                 const scalarField& impKfPatch = impKf_.boundaryField()[patchI];
 
-                if (isA<fixedValueFvPatchVectorField>(patch))
+                if (isA<fixedValueFvPatchVectorField>(patch) || isA<fixedGradientFvPatchVectorField>(patch))
                 {
                     // Prescribed boundary displacement
                     fvPatchVectorField& Dp = D.boundaryFieldRef()[patchI];
@@ -1455,6 +1457,15 @@ label linGeomTotalDispSolid::formResidual
                         traction.boundaryFieldRef()[patchI][faceI] += faceDamping;
                     }
                 }
+                if (isA<symmetryFvPatchVectorField>(patch))
+                {
+                    // Do nothing
+                }
+                else
+                {
+                    // Do nothing on fixed gradient patches
+                }
+
                 if (Pstream::parRun())
                 {
                     notImplemented
