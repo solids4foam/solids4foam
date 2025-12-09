@@ -101,6 +101,14 @@ function solids4Foam::convertCaseFormat()
         \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
     fi
 
+    # faMeshDefinition
+    if [[ -f "${CASE_DIR}"/constant/faMesh/faMeshDefinition ]]
+    then
+        echo "Moving constant/faMesh/faMeshDefinition to system/finite-area"
+        mkdir -p "${CASE_DIR}"/system/finite-area
+        \mv "${CASE_DIR}"/constant/faMesh/faMeshDefinition "${CASE_DIR}"/system/finite-area
+    fi
+
     # Replace the functions file
     if [[ -f "${CASE_DIR}"/system/functions ]]
     then
@@ -310,6 +318,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
         echo "Moving system/fluid/blockMeshDict to constant/fluid/polyMesh"
         mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
+    fi
+
+    # faMeshDefinition
+    if [[ -f "${CASE_DIR}"/system/finite-area/faMeshDefinition ]]
+    then
+        echo "Moving system/finite-area/faMeshDefinition to constant/faMesh"
+        mkdir -p "${CASE_DIR}"/constant/polyMesh
+        \mv "${CASE_DIR}"/system/finite-area/faMeshDefinition "${CASE_DIR}"/constant/faMesh
     fi
 
     if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
