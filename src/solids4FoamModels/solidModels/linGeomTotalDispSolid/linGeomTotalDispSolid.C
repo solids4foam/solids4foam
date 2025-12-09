@@ -28,9 +28,6 @@ License
 #include "compatibilityFunctions.H"
 
 
-// TEST
-#include "fixedValueFvPatchFields.H"
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
