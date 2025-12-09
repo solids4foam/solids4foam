@@ -29,16 +29,14 @@ boundaryField
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    bottom
+    base
     {
-       type            fixedDisplacement;
-       value           uniform (0 0 0);
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
     }
-    symmetry
+    defaultFaces
     {
-       type            solidSymmetry;
-       patchType       symmetryPlane;
-       value           uniform (0 0 0);
+        type            empty;
     }
 }
 

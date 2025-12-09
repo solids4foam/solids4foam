@@ -17,10 +17,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
-solidModel     nonLinearGeometryUpdatedLagrangian;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     // Maximum number of momentum correctors
     //nCorrectors             1000;

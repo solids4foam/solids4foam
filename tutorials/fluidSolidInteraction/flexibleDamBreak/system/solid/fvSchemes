@@ -28,7 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            pointCellsLeastSquares;
+    default            leastSquares;
 }
 
 divSchemes
@@ -38,12 +38,19 @@ divSchemes
 
 laplacianSchemes
 {
-    default            Gauss linear corrected;
+    default            none;
+    laplacian(DD,D)    Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
+    fvmBlockLaplacian(D)    pointGaussLeastSquaresLaplacian;
+    fvmBlockLaplacianTranspose(D) pointGaussLeastSquaresLaplacianTranspose;
+    fvmBlockLaplacianTrace(D) pointGaussLeastSquaresLaplacianTrace;
 }
 
 snGradSchemes
 {
-    default            corrected;
+    default            none;
+    snGrad(D)          corrected;
+    snGrad(DD)         corrected;
 }
 
 interpolationSchemes

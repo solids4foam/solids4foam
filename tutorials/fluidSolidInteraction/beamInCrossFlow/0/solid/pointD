@@ -11,8 +11,8 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      DD;
+    class       pointVectorField;
+    object      pointD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -24,23 +24,18 @@ boundaryField
 {
     interface
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type           calculated;
+        value          uniform (0 0 0);
     }
-    fixed
+    bottom
     {
-       type            fixedDisplacement;
+       type            fixedValue;
        value           uniform (0 0 0);
     }
-    backPlane
+    symmetry
     {
-       type            empty;
-    }
-    frontPlane
-    {
-       type            empty;
+       type            symmetryPlane;
+       value           uniform (0 0 0);
     }
 }
 
