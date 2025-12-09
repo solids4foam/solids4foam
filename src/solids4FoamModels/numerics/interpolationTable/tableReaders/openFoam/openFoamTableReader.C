@@ -53,7 +53,8 @@ void Foam::openFoamTableReader<Type>::operator()
 #ifdef OPENFOAM_NOT_EXTEND
     fileHandler().NewIFstream(fName)()() >> data;
 #else
-    IFstream(fName)() >> data;
+    IFstream is(fName);
+    is  >> data;
 #endif
 }
 
@@ -67,9 +68,11 @@ void Foam::openFoamTableReader<Type>::operator()
 {
     // Read data from file
 #ifdef OPENFOAM_NOT_EXTEND
-    fileHandler().NewIFstream(fName)()() >> data;
+    fileHandler().NewIFstream(fName)()()
+        >> data;
 #else
-    IFstream(fName)() >> data;
+    IFstream is(fName);
+    is  >> data;
 #endif
 }
 

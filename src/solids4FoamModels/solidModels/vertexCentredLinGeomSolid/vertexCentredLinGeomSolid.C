@@ -28,6 +28,7 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
 #include "compatibilityFunctions.H"
+#include <vector>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

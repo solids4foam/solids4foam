@@ -27,9 +27,7 @@ License
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "compatibilityFunctions.H"
-#ifdef USE_PETSC
-    #include <petscksp.h>
-#endif
+#include <vector>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
