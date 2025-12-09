@@ -884,6 +884,7 @@ void Foam::mechanicalModel::interpolate
         );
     }
 
+    pointD.correctBoundaryConditions();
     correctSymmPlanes(pointD);
 }
 
@@ -937,6 +938,7 @@ void Foam::mechanicalModel::interpolate
     this->interpolate(D, pointD, useVolFieldSigma);
 #endif
 
+    pointD.correctBoundaryConditions();
     correctSymmPlanes(pointD);
 }
 
