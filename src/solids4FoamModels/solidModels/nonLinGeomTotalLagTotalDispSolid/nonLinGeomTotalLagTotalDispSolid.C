@@ -620,7 +620,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
     // It is important to call the stress calculation procedure during the
     // constructor to allow it to correctly initialise fields
-    mechanical().correct(sigma());
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        mechanical().correct(sigma());
+    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
     if (solvePressure())

@@ -23,12 +23,6 @@ internalField   uniform 280;
 
 boundaryField
 {
-<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/pointD
-    plate
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-========
     inlet1
     {
         type            fixedValue;
@@ -39,7 +33,6 @@ boundaryField
     {
         type            fixedValue;
         value           uniform 320;
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/fluid/T
     }
 
     interface
@@ -66,29 +59,8 @@ boundaryField
         type            zeroGradient;
         value           $internalField;
     }
-<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/pointD
-    cylinder
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-    }
-    bottom
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-========
 
     frontAndBack
-    {
-        type            empty;
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/fluid/T
-    }
-    top
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-    }
-    frontAndBackPlanes
     {
         type            empty;
     }

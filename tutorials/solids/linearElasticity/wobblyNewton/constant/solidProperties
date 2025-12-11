@@ -17,12 +17,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-// solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
-solidModel     vertexCentredLinearGeometry;
+solidModel     linearGeometryTotalDisplacement;
+//solidModel     vertexCentredLinearGeometry;
 
-"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs"
 {
     // Solution algorithm (PETScSNES, implicitSegregated, explicit, ...)
     solutionAlgorithm PETScSNES;
@@ -30,11 +28,12 @@ solidModel     vertexCentredLinearGeometry;
     // Compact edge discretisation fraction
     // 0 -> more accurate but oscillations more likely
     // 1 -> less accurate but oscillations less likely
-    zeta           0.1;
+    //zeta           0.1;
 
     // PETSc options
-    optionsFile petscOptions.mumps;
+    //optionsFile petscOptions.mumps;
     //optionsFile petscOptions.hypre;
+    optionsFile petscOptions.mf.hypre;
 }
 
 // ************************************************************************* //

@@ -17,52 +17,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/p
-dimensions      [0 2 -2 0 0 0 0];
-========
 dimensions      [0 0 0 1 0 0 0];
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/solid/T
 
 internalField   uniform 280;
 
 boundaryField
 {
-<<<<<<<< HEAD:tutorials/fluidSolidInteraction/HronTurekFsi3.jfnk/0/fluid/p
-    plate
-    {
-        type zeroGradient;
-        value uniform 0;
-    }
-    outlet
-    {
-        type fixedValue;
-        value uniform 0;
-    }
-    inlet
-    {
-        type zeroGradient;
-        value uniform 0;
-    }
-    cylinder
-    {
-        type zeroGradient;
-        value uniform 0;
-    }
-    bottom
-    {
-        type zeroGradient;
-        value uniform 0;
-    }
-    top
-    {
-        type zeroGradient;
-        value uniform 0;
-    }
-    frontAndBackPlanes
-    {
-        type empty;
-    }
-========
     interface
     {
         type            thermalRobin;
@@ -92,7 +52,6 @@ boundaryField
     {
         type            empty;
     }
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/0/solid/T
 }
 
 // ************************************************************************* //
