@@ -128,14 +128,17 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
 
     // Lookup fvMesh
     // Fix for FSI: this is only correct for
+    // Apologies for this ugliness!
     const fvMesh* vmeshPtr = NULL;
-    if (db().parent().foundObject<fvMesh>("solid"))
+    if (db().parent().parent().foundObject<fvMesh>("solid"))
     {
-        vmeshPtr = &db().parent().lookupObject<fvMesh>("solid");
+        vmeshPtr =
+            &db().parent().parent().parent().lookupObject<fvMesh>("solid");
     }
     else
     {
-        vmeshPtr = &db().parent().lookupObject<fvMesh>("region0");
+        vmeshPtr =
+            &db().parent().parent().parent().lookupObject<fvMesh>("region0");
     }
     const fvMesh& vmesh = *vmeshPtr;
 

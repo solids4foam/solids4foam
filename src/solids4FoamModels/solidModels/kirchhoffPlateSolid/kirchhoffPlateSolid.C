@@ -328,7 +328,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "w",
             runTime.timeName(),
-            mesh(),
+            aMesh_,
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -353,7 +353,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "M",
             runTime.timeName(),
-            mesh(),
+            aMesh_,
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -378,7 +378,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "p",
             runTime.timeName(),
-            mesh(),
+            aMesh_,
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -403,7 +403,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "theta",
             runTime.timeName(),
-            mesh(),
+            aMesh_,
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),

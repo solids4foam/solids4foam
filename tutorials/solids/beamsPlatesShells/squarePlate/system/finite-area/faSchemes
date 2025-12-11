@@ -24,25 +24,14 @@ ddtSchemes
 }
 
 d2dt2Schemes
-{
-}
-
-interpolationSchemes
-{
-}
+{}
 
 divSchemes
-{
-}
+{}
 
 gradSchemes
 {
-    grad(w)    leastSquares;
-    grad(theta) leastSquares;
-}
-
-lnGradSchemes
-{
+    default    leastSquares;
 }
 
 laplacianSchemes
@@ -51,8 +40,13 @@ laplacianSchemes
     laplacian(((E*pow(plateThickness,3))|(12*(1-pow(nu,2)))),w) Gauss linear corrected;
 }
 
+lnGradSchemes
+{}
+
+interpolationSchemes
+{}
+
 fluxRequired
-{
-}
+{}
 
 // ************************************************************************* //
