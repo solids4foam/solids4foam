@@ -1339,8 +1339,8 @@ label linGeomTotalDispSolid::formResidual
             if (LREInterp().order() >= 3)
             {
                 tThirdDerDx = LREInterp().thirdDeriv(Dx);
-                tThirdDerDy = LREInterp().thirdDeriv(Dy);;
-                tThirdDerDz = LREInterp().thirdDeriv(Dz);;
+                tThirdDerDy = LREInterp().thirdDeriv(Dy);
+                tThirdDerDz = LREInterp().thirdDeriv(Dz);
             }
 
             forAll(traction, faceI)

@@ -256,4 +256,53 @@ void Foam::MooneyRivlinElastic::correct
 }
 
 
+void Foam::MooneyRivlinElastic::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    // Initialise outside loop for efficiency
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+    symmTensor isoB = symmTensor::zero;
+    symmTensor sqrB = symmTensor::zero;
+    scalar I1 = 0.0;
+    scalar I2 = 0.0;
+    symmTensor s = symmTensor::zero;
+
+    // We will assume constant distribution of c10, c01 and c11. SigmaQuad
+    // consist of all faces so we can't use surface field.
+    const scalar c10 = c10_.internalField()[0];
+    const scalar c01 = c01_.internalField()[0];
+    const scalar c11 = c11_.internalField()[0];
+    const scalar K = this->K()[0];
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            //F = tensor(0.833129,0,0,0,1.20295,0,0,0, 1);//
+	    F = I + faceGradDQuad[qpI].T();
+            J = det(F);
+
+	    isoB = pow(J, -2.0/3.0)*symm(F & F.T());
+	    sqrB = symm(isoB & isoB);
+
+	    I1 = tr(isoB);
+	    I2 = 0.5*(pow(I1, 2.0) - tr(sqrB));
+
+	    s =
+		2.0*(c10 + c11*(I2 - 3.0))*isoB
+	      - 2.0*(c01 + c11*(I1 - 3.0))*inv(isoB);
+
+	    sigmaQuad[faceI][qpI] = (1.0/J)*(0.5*K*(pow(J, 2.0) - 1)*I + dev(s));
+        }
+    }
+}
+
+
 // ************************************************************************* //

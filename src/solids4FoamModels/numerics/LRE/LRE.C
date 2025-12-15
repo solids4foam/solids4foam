@@ -25,6 +25,7 @@ License
 #include "fixedGradientFvPatchFields.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
+#include "solidTractionFvPatchVectorField.H"
 #include "symmetryPlanePolyPatch.H"
 
 #include "indexedOctree.H"
@@ -3544,13 +3545,40 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
         {
             NotImplemented;
         }
-        else if
+	else if
         (
-            isA<fixedGradientFvPatchVectorField>(D.boundaryField()[patchI])
+            isA<solidTractionFvPatchVectorField>(D.boundaryField()[patchI])
         )
         {
-            // Solid traction is fixed gradient, skip for now.
-        }
+            forAll(mesh.boundaryMesh()[patchI], faceI)
+            {
+                const label globalFaceID = faceI + D.boundaryField()[patchI].patch().start();
+                const labelList& curStencil = stencils[globalFaceID];
+                const List<point>& fGP = faceQP[globalFaceID];
+
+                // Loop over face Gauss point
+                forAll(fGP, pointI)
+                {
+                    // Loop over stencil points
+                    forAll(curStencil, cI)
+                    {
+                        const label neiGlobalCellI = curStencil[cI];
+                        if (globalCells_.isLocal(neiGlobalCellI))
+                        {
+                            const label neiLocalCellI = globalCells_.toLocal(neiGlobalCellI);
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * DI[neiLocalCellI];
+                        }
+                        else
+                        {
+                            // global cell in the stencil
+                            gradDGP[globalFaceID][pointI] +=
+                                pointQRGradCoeffs[globalFaceID][pointI][cI] * globalDI[neiGlobalCellI];
+                        }
+                    }
+                }
+            }
+	}
         else if
         (
             isA<fixedDisplacementFvPatchVectorField>(D.boundaryField()[patchI])

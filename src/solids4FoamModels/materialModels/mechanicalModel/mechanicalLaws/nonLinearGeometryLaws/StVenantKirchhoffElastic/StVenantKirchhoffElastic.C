@@ -181,6 +181,52 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 }
 
 
+void Foam::StVenantKirchhoffElastic::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    // Initialise outside loop for efficiency
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+    symmTensor c = symmTensor::zero;
+    symmTensor S = symmTensor::zero;
+    symmTensor E = symmTensor::zero;
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            F = I + faceGradDQuad[qpI].T();
+            J = det(F);
+            if (J > SMALL)
+            {
+		c = symm(F.T() & F);
+                E = 0.5*(c-I);
+                S = 2.0*mu_.value()*E + lambda_.value()*tr(E)*I;
+
+                sigmaQuad[faceI][qpI] = (1.0/J)*symm(F & S & F.T());
+
+            }
+            else
+            {
+                WarningInFunction
+                    << "Unphysical Jacobian J = " << J << " at face " << faceI
+                    << ", qp " << qpI << "." << nl
+                    << "Falling back to small strain model to prevent crash." << endl;
+
+                // Calculate stress using Hooke's law
+                sigmaQuad[faceI][qpI] = (2.0*mu_*dev(symm(faceGradDQuad[qpI]))).value() + (K_*tr(faceGradDQuad[qpI])*I).value();
+            }
+        }
+    }
+}
+
+
 void Foam::StVenantKirchhoffElastic::setRestart()
 {
     F().writeOpt() = IOobject::AUTO_WRITE;

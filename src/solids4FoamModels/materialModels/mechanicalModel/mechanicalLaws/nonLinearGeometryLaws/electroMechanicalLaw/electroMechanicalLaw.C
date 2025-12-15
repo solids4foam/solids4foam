@@ -173,5 +173,52 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     sigma += J*symm(F & (currentTa*f0f0) & F.T());
 }
 
+void Foam::electroMechanicalLaw::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    // Calculate passive stress
+    passiveMechLawPtr_->correct(sigmaQuad, gradDQuad);
+
+    // Calculate current value of Ta
+    dimensionedScalar currentTa = Ta_;
+    if (mesh().time().value() < rampTime_)
+    {
+        currentTa = (mesh().time().value()/rampTime_)*Ta_;
+    }
+
+    // Lookup the fibre directions
+    // How best should we do this to avoid duplicating the fibre field?
+    // For now, let's hard-code in the field name
+    //    const surfaceSymmTensorField f0f0f =
+    //    mesh().lookupObject<surfaceSymmTensorField>("f0f0f");
+    symmTensor f0f0f(0, 0, 0, 0, 0, 1.0);
+
+    // Initialise outside loop for efficiency
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            F = I + faceGradDQuad[qpI].T();
+            J = det(F);
+            // if (J < SMALL)
+            // {
+	    // 	WarningInFunction
+            //         << "Unphysical Jacobian J = " << J << " at face " << faceI
+            //         << ", qp " << qpI << "." << endl;
+	    // }
+	    sigmaQuad[faceI][qpI] = J * symm(F & (currentTa.value()*f0f0f) & F.T());
+        }
+    }
+}
+
 
 // ************************************************************************* //

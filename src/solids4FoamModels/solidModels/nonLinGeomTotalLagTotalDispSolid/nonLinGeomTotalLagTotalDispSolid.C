@@ -26,7 +26,11 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 
+#include "deltaVectors.H"
+#include "DynamicList.H"
+#include "mathematicalConstants.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -89,14 +93,15 @@ surfaceVectorField nonLinGeomTotalLagTotalDispSolid::currentSf()
             const List<scalar>& faceQuadW = WQuad[globalFaceID];
             const List<tensor>& faceQuadGradD = gradDQuad[globalFaceID];
 
-            tensor avgMapping = tensor::zero;
+            tensor Finv = tensor::zero;
+	    currSfPatch[faceI] = vector::zero;
             forAll(faceQuadW, qpI)
             {
                 F = I + faceQuadGradD[qpI].T();
                 J = det(F);
-                avgMapping += (J * inv(F.T())) * faceQuadW[qpI];
+		Finv = inv(F);
+                currSfPatch[faceI] += faceQuadW[qpI] * J * Finv.T() & Sf[globalFaceID];
             }
-            currSfPatch[faceI] = avgMapping & Sf[faceI];
         }
     }
 
@@ -174,28 +179,105 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
-            // traction.boundaryFieldRef()[patchI] =
-            //     tracPatch.traction() - nPatch*tracPatch.pressure();
-            if (tracPatch.useUndeformedArea())
-            {
-                const scalarField& magSfPatch =
-                    D.mesh().boundary()[patchI].magSf();
+	    // High-order use first Piola for integration: we need to map the
+	    // traction to the reference configuration
+	    if (highOrderResidual_)
+	    {
+		// Face quadrature points and weights
+                const CompactListList<point>& faceQuadPoints =
+                    LREInterp().faceQuadPoints();
+                const CompactListList<scalar>& facesQuadWeights =
+                    LREInterp().faceQuadWeight();
 
-                forceP =
-                    (
-                        tracPatch.traction() - nPatch*tracPatch.pressure()
-                    )*magSfPatch;
-            }
-            else
-            {
-                const scalarField& magSfCurrentPatch =
-                    magSfCurrent.boundaryField()[patchI];
+                // Get value at patch faces quadrature points
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature(faceQuadPoints);
 
-                forceP =
-                    (
-                        tracPatch.traction() - nPatch*tracPatch.pressure()
-                    )*magSfCurrentPatch;
-            }
+		const List<List<tensor>>& gradDQuad = this->gradDQuad();
+
+		const scalarField& magSfPatch =
+			D.mesh().boundary()[patchI].magSf();
+
+		const vectorField N(D.mesh().boundary()[patchI].Sf()/ D.mesh().boundary()[patchI].magSf());
+
+		const scalarField& magSfCurrentPatch =
+			magSfCurrent.mesh().boundary()[patchI].magSf();
+
+		tensor F = tensor::zero;
+		tensor Finv = tensor::zero;
+		scalar J = 0.0;
+
+		const scalarField& pressure = tracPatch.pressure();
+		const vectorField& traction = tracPatch.traction();
+
+                forAll(D.boundaryField()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+
+                    // Get global face index
+                    const label faceID = faceI + start;
+
+                    // Get the number of quadrature points for this face
+                    const label nPoints = faceQuadPoints[faceID].size();
+
+		    const List<tensor>& faceQuadGradD = gradDQuad[faceID];
+
+		    // Traction and pressure are in current configuration, I'm using
+		    // current normal to get total traction
+		    const vector trac = traction[faceI] - nPatch[faceI]*pressure[faceI];
+
+                    // Loop over quadrature points and add their contribution
+                    force.boundaryFieldRef()[patchI][faceI] = vector::zero;
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+			F = I + faceQuadGradD[pointI].T();
+			J = det(F);
+			Finv = inv(F);
+
+			if (tracPatch.useUndeformedArea())
+			{
+			    // Do not map the traction
+			    force.boundaryFieldRef()[patchI][faceI] +=
+				facesQuadWeights[faceID][pointI] * trac;
+			}
+			else
+			{
+			    // Map traction from current to the reference configuration
+			    force.boundaryFieldRef()[patchI][faceI] +=
+				facesQuadWeights[faceID][pointI] * J * mag(Finv.T() & N[faceI]) * trac;
+			    //facesQuadWeights[faceID][pointI] * J * (Finv.T() & trac);
+			}
+                    }
+		    // Integration is performed on the reference configuration
+		    force.boundaryFieldRef()[patchI][faceI] *= magSfPatch[faceI];
+                }
+	    }
+	    else
+	    {
+
+		// traction.boundaryFieldRef()[patchI] =
+		//     tracPatch.traction() - nPatch*tracPatch.pressure();
+		if (tracPatch.useUndeformedArea())
+		{
+		    const scalarField& magSfPatch =
+			D.mesh().boundary()[patchI].magSf();
+
+		    forceP =
+			(
+			    tracPatch.traction() - nPatch*tracPatch.pressure()
+			)*magSfPatch;
+		}
+		else
+		{
+		    const scalarField& magSfCurrentPatch =
+			magSfCurrent.boundaryField()[patchI];
+
+		    forceP =
+			(
+			    tracPatch.traction() - nPatch*tracPatch.pressure()
+			)*magSfCurrentPatch;
+		}
+	    }
         }
         else if
         (
@@ -981,6 +1063,185 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         traction =
             hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), WQuad, mesh);
 
+        const scalar scaleFactor =
+                readScalar(stabilisation().dict().lookup("scaleFactor"));
+
+	if(!(word(stabilisation().dict().lookup("type")) == "alpha"))
+	{
+	    FatalErrorInFunction
+            << "Alpha stabilisation should be used with ho-residual" << nl
+	    << abort(FatalError);
+	}
+
+        const labelList& own = mesh.owner();
+        const labelList& nei = mesh.neighbour();
+        const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+        const vectorField& nI = n.internalField();
+        const vectorField deltaI(deltaVectors(mesh));
+        const surfaceVectorField& Cf = mesh.Cf();
+        const vectorField& C = mesh.C();
+        const vectorField& vfI = D();
+
+        // HO grad at cell centre
+        gradD() = LREInterp().grad(D);
+        const tensorField& gradVfI = gradD().internalField();
+
+        // Decompose the vector field D into its scalar components
+        volScalarField Dx(D.component(vector::X));
+        volScalarField Dy(D.component(vector::Y));
+        volScalarField Dz(D.component(vector::Z));
+
+        autoPtr<List<LRE::symmTensor3Order>> tThirdDerDx;
+        autoPtr<List<LRE::symmTensor3Order>> tThirdDerDy;
+        autoPtr<List<LRE::symmTensor3Order>> tThirdDerDz;
+
+        tmp<volSymmTensorField> tHessDx = LREInterp().hessian(Dx);
+        tmp<volSymmTensorField> tHessDy = LREInterp().hessian(Dy);
+        tmp<volSymmTensorField> tHessDz = LREInterp().hessian(Dz);
+
+        const symmTensorField& hessDxI = tHessDx->internalField();
+        const symmTensorField& hessDyI = tHessDy->internalField();
+        const symmTensorField& hessDzI = tHessDz->internalField();
+
+        if (LREInterp().order() >= 3)
+        {
+            tThirdDerDx = LREInterp().thirdDeriv(Dx);
+            tThirdDerDy = LREInterp().thirdDeriv(Dy);;
+            tThirdDerDz = LREInterp().thirdDeriv(Dz);;
+        }
+
+        forAll(traction, faceI)
+        {
+            const label ownCellID = own[faceI];
+            const label neiCellID = nei[faceI];
+
+            const tensor& ownGradVf = gradVfI[ownCellID];
+            const tensor& neiGradVf = gradVfI[neiCellID];
+
+            const vector& ownVf = vfI[ownCellID];
+            const vector& neiVf = vfI[neiCellID];
+
+            const vector& n = nI[faceI];
+            const vector& d = deltaI[faceI];
+
+            const vector dOwn = Cf[faceI] - C[ownCellID];
+            const vector dNei = Cf[faceI] - C[neiCellID];
+
+            // Linear part
+            vector extrapOwnVf = ownVf + (dOwn & ownGradVf);
+            vector extrapNeiVf = neiVf + (dNei & neiGradVf);
+
+            // Quadratic part
+            if (LREInterp().order() >= 2)
+            {
+                extrapOwnVf.x() += 0.5 * (dOwn & (hessDxI[ownCellID] & dOwn));
+                extrapOwnVf.y() += 0.5 * (dOwn & (hessDyI[ownCellID] & dOwn));
+                extrapOwnVf.z() += 0.5 * (dOwn & (hessDzI[ownCellID] & dOwn));
+
+                extrapNeiVf.x() += 0.5 * (dNei & (hessDxI[neiCellID] & dNei));
+                extrapNeiVf.y() += 0.5 * (dNei & (hessDyI[neiCellID] & dNei));
+                extrapNeiVf.z() += 0.5 * (dNei & (hessDzI[neiCellID] & dNei));
+            }
+            // Cubic part
+            if (LREInterp().order() >=3)
+            {
+                const bool twoD = (mesh.nGeometricD() == 2);
+                const scalar oneOverSix = 1.0/6.0;
+
+                extrapOwnVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[ownCellID], dOwn, twoD);
+                extrapOwnVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[ownCellID], dOwn, twoD);
+                extrapOwnVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[ownCellID], dOwn, twoD);
+
+                extrapNeiVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[neiCellID], dNei, twoD);
+                extrapNeiVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[neiCellID], dNei, twoD);
+                extrapNeiVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[neiCellID], dNei, twoD);
+            }
+
+            const scalar denom = max(mag(n & d), VSMALL);
+
+            const vector faceDamping =
+                scaleFactor*impKf_[faceI]*(extrapNeiVf - extrapOwnVf)/denom;
+
+            traction[faceI] += faceDamping;
+        }
+
+        // Loop over patches
+        forAll(traction.boundaryField(), patchI)
+        {
+            const fvPatchVectorField& patch = D.boundaryField()[patchI];
+            const fvPatch& p = mesh.boundary()[patchI];
+            const labelList& faceCells = p.faceCells();
+            vectorField n(p.nf());
+
+            const scalarField& impKfPatch = impKf_.boundaryField()[patchI];
+
+            if (isA<fixedValueFvPatchVectorField>(patch))// || isA<fixedGradientFvPatchVectorField>(patch))
+            {
+                // Prescribed boundary displacement
+                fvPatchVectorField& Dp = D.boundaryFieldRef()[patchI];
+                Dp.updateCoeffs();
+                vectorField patchD(Dp.size());
+                patchD = Dp;
+
+                const vectorField& patchCf = mesh.Cf().boundaryField()[patchI];
+
+                forAll(traction.boundaryField()[patchI], faceI)
+                {
+                    const label ownCellID = faceCells[faceI];
+
+                    const tensor& ownGradVf = gradVfI[ownCellID];
+                    const vector& ownVf = vfI[ownCellID];
+                    const vector& patchFaceD = patchD[faceI];
+
+                    const vector d = patchCf[faceI] - C[ownCellID];
+                    const vector normal = n[faceI];
+
+                    vector extrapOwnVf = ownVf + (d & ownGradVf);
+
+                    // Quadratic part
+                    if (LREInterp().order() >= 2)
+                    {
+                        extrapOwnVf.x() += 0.5 * (d & (hessDxI[ownCellID] & d));
+                        extrapOwnVf.y() += 0.5 * (d & (hessDyI[ownCellID] & d));
+                        extrapOwnVf.z() += 0.5 * (d & (hessDzI[ownCellID] & d));
+                    }
+                    // Cubic part
+                    if (LREInterp().order() >=3)
+                    {
+                        const bool twoD = (mesh.nGeometricD() == 2);
+                        const scalar oneOverSix = 1.0/6.0;
+
+                        extrapOwnVf.x() += oneOverSix * LRE::cubicForm((*tThirdDerDx)[ownCellID], d, twoD);
+                        extrapOwnVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[ownCellID], d, twoD);
+                        extrapOwnVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[ownCellID], d, twoD);
+                    }
+
+                    const scalar denom = max(mag(normal & d), VSMALL);
+
+                    const vector faceDamping =
+                        scaleFactor*impKfPatch[faceI]*(patchFaceD - extrapOwnVf)/denom;
+
+                    traction.boundaryFieldRef()[patchI][faceI] += faceDamping;
+                }
+            }
+            if (isA<symmetryFvPatchVectorField>(patch))
+            {
+                // Do nothing
+            }
+            else
+            {
+                // Do nothing on fixed gradient patches
+            }
+
+            if (Pstream::parRun())
+            {
+                notImplemented
+                (
+                    "Parallel boundaries for alpha scheme have to be implemented"
+                );
+            }
+        }
+
         // Calculate the force at the faces
         surfaceVectorField force(mesh.magSf()*traction);
 
@@ -989,7 +1250,11 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
 
         // Enforce traction boundary conditions
-         enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+	enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
+
+	//const surfaceScalarField magSf_(mag(mesh.Sf()));
+	//const surfaceVectorField n_(mesh.Sf()/magSf_);
+	//	        enforceTractionBoundaries(force, D, n_, magSf_);
 
         // Add div(sigma) calculated in reference configuration to the residual
         residual += fvc::div(force);

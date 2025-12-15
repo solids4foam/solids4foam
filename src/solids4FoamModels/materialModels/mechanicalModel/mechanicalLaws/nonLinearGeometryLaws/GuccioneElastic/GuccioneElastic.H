@@ -179,6 +179,14 @@ public:
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
 
+         //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+        virtual void correct
+        (
+            List<List<symmTensor>>& sigmaQuad,
+            const List<List<tensor>>& gradDQuad
+        );
+
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly
         virtual void setRestart();

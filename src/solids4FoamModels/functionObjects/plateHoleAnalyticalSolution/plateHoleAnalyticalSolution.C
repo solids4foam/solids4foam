@@ -253,30 +253,35 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             const volSymmTensorField& sigma =
                 mesh.lookupObject<volSymmTensorField>("sigma");
 
-            const volSymmTensorField diff
+            volSymmTensorField diff
             (
                 "cellStressDifference", analyticalStress - sigma
             );
-            Info<< "Writing cellStressDifference field" << endl;
+
+	    forAll(diff, cellI)
+	    {
+		diff[cellI].zz() = 0.0;
+		diff[cellI].yz() = 0.0;
+		diff[cellI].xz() = 0.0;
+	    }
+
+            Info<< "Writing sigmaDifference field" << endl;
             diff.write();
 
-            for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
+            const symmTensorField& diffI = diff;
+	    Info<< "    Stress error norms: mean L1, mean L2, LInf: " << nl
+                << "    Magnitude: " << gAverage(mag(diffI))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI)))
+                << " " << gMax(mag(diffI))
+                << endl;
+
+	    for (int cmptI = 0; cmptI < 6; cmptI++)
             {
-                // Only calculate for XX, XY and ZZ
-                if (cmpt != 0 && cmpt != 1 && cmpt != 3)
-                {
-                    continue;
-                }
-
-                const symmTensorField& diffI = diff;
-                const scalarField diffIcmptI(diffI.component(cmpt));
-
-                Info<< "    Component: " << cmpt << endl;
-                Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                    << "    " << gAverage(mag(diffIcmptI))
-                    << " " << Foam::sqrt(gAverage(magSqr(diffIcmptI)))
-                    << " " << gMax(mag(diffIcmptI))
-                    << nl << endl;
+                Info<< "    " << cmptI << " "
+                    << gAverage(mag(diffI.component(cmptI)))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffI.component(cmptI))))
+                    << " " << gMax(mag(diffI.component(cmptI)))
+                    << endl;
             }
         }
 
@@ -293,11 +298,19 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             diff.write();
 
             const vectorField& diffI = diff;
-            Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                << "    " << gAverage(mag(diffI))
+            Info<< "    Displacement error norms: mean L1, mean L2, LInf: " << nl
+                << "    Magnitude: " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << nl << endl;
+                << endl;
+            for (int cmptI = 0; cmptI < 3; cmptI++)
+            {
+                Info<< "    " << cmptI << " "
+                    << gAverage(mag(diffI.component(cmptI)))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffI.component(cmptI))))
+                    << " " << gMax(mag(diffI.component(cmptI)))
+                    << endl;
+            }
         }
     }
 

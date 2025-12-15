@@ -19,6 +19,7 @@ License
 
 #include "GuccioneElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -969,6 +970,91 @@ void Foam::GuccioneElastic::correct(surfaceSymmTensorField& sigma)
     // // Convert the second Piola-Kirchhoff deviatoric stress to the Cauchy stress
     // // and add hydrostatic stress term
     // sigma = s + sigmaHyd*I;
+}
+
+
+void Foam::GuccioneElastic::correct
+(
+    List<List<symmTensor>>& sigmaQuad,
+    const List<List<tensor>>& gradDQuad
+)
+{
+    const Switch useLocalCoordSys
+    (
+        dict().lookupOrDefault<Switch>
+        (
+            "calculateStressInLocalCoordinateSystem",
+            Switch(false)
+        )
+    );
+
+    if (useLocalCoordSys)
+    {
+	notImplemented("using localCoordSystem in ho-correct not implemented");
+    }
+
+    // Initialise outside loop for efficiency
+    tensor F = tensor::zero;
+    scalar J = 0.0;
+    symmTensor S = symmTensor::zero;
+    symmTensor s = symmTensor::zero;
+    symmTensor C = symmTensor::zero;
+    symmTensor E = symmTensor::zero;
+    symmTensor sqrE = symmTensor::zero;
+    symmTensor dQdE = symmTensor::zero;
+
+    scalar I1 = 0.0;
+    scalar I2 = 0.0;
+    scalar I4 = 0.0;
+    scalar I5 = 0.0;
+    scalar Q = 0.0;
+    scalar sigmaHyd = 0.0;
+
+    // Hard-coded
+    symmTensor f0f0f(0, 0, 0, 0, 0, 1.0);
+
+    forAll(sigmaQuad, faceI)
+    {
+        List<symmTensor>& faceSigmaQuad = sigmaQuad[faceI];
+        const List<tensor>& faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            F = I + faceGradDQuad[qpI].T();
+            J = det(F);
+	    C = symm(F.T() & F);
+            // if (J < SMALL)
+            // {
+	    // 	WarningInFunction
+            //         << "Unphysical Jacobian J = " << J << " at face " << faceI
+            //         << ", qp " << qpI << "." << endl;
+            // }
+
+	    E = 0.5*(C-I);
+	    sqrE = symm(E & E);
+	    I1 = tr(E);
+	    I2 = 0.5*(sqr(tr(E)) - tr(sqrE));
+	    I4 = (E && f0f0f);
+	    I5 = (sqrE && f0f0f);
+
+	    Q =
+		ct_*sqr(I1)
+	      - 2.0*ct_*I2
+	      + (cf_ - 2.0*cfs_ + ct_)*sqr(I4)
+	      + 2.0*(cfs_ - ct_)*I5;
+
+	    dQdE =
+		2.0*ct_*E
+              + 2.0*(cf_ - 2.0*cfs_ + ct_)*I4*f0f0f
+		+ 2.0*(cfs_ - ct_)*symm((E & f0f0f) + (f0f0f & E));
+
+	    S = 0.5*dQdE*k_.value()*exp(Q);
+	    s = dev(symm(F & S & F.T()))/J;
+	    sigmaHyd = 0.5*bulkModulus_.value()*(pow(J, 2.0) - 1.0)/J;
+
+	    sigmaQuad[faceI][qpI] = s + sigmaHyd*I;
+        }
+    }
 }
 
 

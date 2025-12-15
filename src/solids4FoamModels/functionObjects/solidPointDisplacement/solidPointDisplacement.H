@@ -69,8 +69,17 @@ class solidPointDisplacement
         //  to preserve backwards compatibility
         word region_;
 
+        //- Point location
+        const vector point_;
+
         //- Point ID
         label pointID_;
+
+        //- Closest cell ID
+        label cellID_;
+
+        //- Extrapolate displacement from cell centre using gradient
+        const bool extrapolate_;
 
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;
@@ -79,6 +88,12 @@ class solidPointDisplacement
 
         //- Write data
         bool writeData();
+
+        //- Point displacement from closest point
+        void closestPointDisplacement();
+
+        //- Extrapolate point displacement from cell containing point
+        void extrapolatedPointDisplacement();
 
         //- Disallow default bitwise copy construct
         solidPointDisplacement
