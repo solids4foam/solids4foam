@@ -533,9 +533,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     fvm::d2dt2(rho_, DD());
     fvc::d2dt2(rho_, D().oldTime());
 
-    // It is important to call the stress calculation procedure during the
-    // constructor to allow it to correctly initialise fields
-    mechanical().correct(sigma());
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        // It is important to call the stress calculation procedure during the
+        // constructor to allow it to correctly initialise fields
+        mechanical().correct(sigma());
+    }
 
     if (predictor_)
     {

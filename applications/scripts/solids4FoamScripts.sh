@@ -71,6 +71,12 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+        echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+    fi
+
     # Check all files in the 0 directory
     for FILE in $(find "${CASE_DIR}/0" -type f)
     do
@@ -286,6 +292,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
     echo "Changing symmetry to symmetryPlane in boundary"; echo
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+    fi
+
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+    echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
     for FILE in $(find "${CASE_DIR}/0" -type f)
