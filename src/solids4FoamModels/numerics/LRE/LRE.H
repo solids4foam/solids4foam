@@ -194,6 +194,12 @@ private:
         //- Face quadrature points weights
         mutable autoPtr<CompactListList<scalar>> faceQuadWeightPtr_;
 
+        //- Cell quadrature points
+        mutable autoPtr<CompactListList<point>> cellQuadPointsPtr_;
+
+        //- Cell quadrature points weights
+        mutable autoPtr<CompactListList<scalar>> cellQuadWeightPtr_;
+
     // Private Member Functions
 
         //- Make the least squares cell stencils
@@ -256,14 +262,23 @@ private:
         //  the global cell stencils
         void calcGlobalCholeskyCoeffs() const;
 
-        //- Calculate Gauss points and corresponding weights in 3D
-        void calcQuadPointsAndWeights3D() const;
+        //- Calculate face quadrature points and corresponding weights in 3D
+        void calcFaceQuadPointsAndWeights3D() const;
 
-        //- Calculate Gauss points and corresponding weights in 2D
-        void calcQuadPointsAndWeights2D() const;
+        //- Calculate face quadrature points and corresponding weights in 2D
+        void calcFaceQuadPointsAndWeights2D() const;
 
-        //- Calls the same funtion implemented for 3D or for 2D meshes
-        void calcQuadPointsAndWeights() const;
+        //- Calls the corresponding funtion for 3D or for 2D meshes
+        void calcFaceQuadPointsAndWeights() const;
+
+        //- Calculate cell quadrature points and corresponding weights in 3D
+        void calcCellQuadPointsAndWeights3D() const;
+
+        //- Calculate cell quadrature points and corresponding weights in 2D
+        void calcCellQuadPointsAndWeights2D() const;
+
+        //- Calls the corresponding funtion for 3D or for 2D meshes
+        void calcCellQuadPointsAndWeights() const;
 
         //- Return the interpolation coefficients
         const CompactListList<scalar>& QRInterpCoeffs() const;
@@ -344,6 +359,12 @@ public:
 
     // Member Functions
 
+            //- Return reference to mesh
+            const fvMesh& mesh() const
+            {
+		return mesh_;
+	    }
+
             //- Const access tot he weight function enum
             const weightFunction& weightFunc() const
             {
@@ -361,6 +382,12 @@ public:
 
             //- Return the face quadrature points
             const CompactListList<point>& faceQuadPoints() const;
+
+            //- Return the cell quadrature weights
+            const CompactListList<scalar>& cellQuadWeight() const;
+
+            //- Return the cell quadrature points
+            const CompactListList<point>& cellQuadPoints() const;
 
             //- Return the least squares face cell stencils
             const labelListList& globalFaceStencils() const;

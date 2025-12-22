@@ -34,6 +34,7 @@ License
 #include "triangle.H"
 #include "triFace.H"
 #include "triQuadrature.H"
+#include "tetQuadrature.H"
 #include "lineQuadrature.H"
 
 namespace Foam
@@ -1923,8 +1924,8 @@ void LRE::calcGlobalQRFaceGPCoeffs() const
         }
 
         // Face quadrature points
-        const List<point>& fGP = faceGP[faceI];
-        const label nGP = fGP.size();
+        const List<point> fGP = faceGP[faceI];
+        const label nGP = faceGP[faceI].size();
 
         // Allocate CompactListList for this face
         labelList rowSizes(nGP, Nn);
@@ -2623,36 +2624,69 @@ void LRE::calcGlobalCholeskyCoeffs() const
 }
 
 
-void LRE::calcQuadPointsAndWeights() const
+void LRE::calcFaceQuadPointsAndWeights() const
 {
     if (mesh_.nGeometricD() == 2)
     {
         if (mesh_.solutionD()[vector::Z] > -1)
         {
-            FatalErrorIn("calcQuadPointsAndWeights()")
+            FatalErrorIn("calcFaceQuadPointsAndWeights()")
                 << "For 2-D models, the empty direction "
                 << "must be z!" << abort(FatalError);
         }
         else
         {
-            calcQuadPointsAndWeights2D();
+            calcFaceQuadPointsAndWeights2D();
         }
     }
     else if (mesh_.nGeometricD() == 3)
     {
-        calcQuadPointsAndWeights3D();
+        calcFaceQuadPointsAndWeights3D();
     }
     else
     {
-        FatalErrorIn("calcQuadPointsAndWeights()")
+        FatalErrorIn("calcFaceQuadPointsAndWeights()")
+            << "Only implemented for 2-D and 3-D models!"
+            << abort(FatalError);
+    }
+}
+
+void LRE::calcCellQuadPointsAndWeights() const
+{
+    if (mesh_.nGeometricD() == 2)
+    {
+        if (mesh_.solutionD()[vector::Z] > -1)
+        {
+            FatalErrorIn("calcCellQuadPointsAndWeights()")
+                << "For 2-D models, the empty direction "
+                << "must be z!" << abort(FatalError);
+        }
+        else
+        {
+            calcCellQuadPointsAndWeights2D();
+        }
+    }
+    else if (mesh_.nGeometricD() == 3)
+    {
+        calcCellQuadPointsAndWeights3D();
+    }
+    else
+    {
+        FatalErrorIn("calcCellQuadPointsAndWeights()")
             << "Only implemented for 2-D and 3-D models!"
             << abort(FatalError);
     }
 }
 
 
-void LRE::calcQuadPointsAndWeights2D() const
+void LRE::calcFaceQuadPointsAndWeights2D() const
 {
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
     if (faceQuadPointsPtr_ || faceQuadWeightPtr_)
     {
         FatalErrorInFunction
@@ -2683,7 +2717,7 @@ void LRE::calcQuadPointsAndWeights2D() const
 
             if (pp.type() == "wedge")
             {
-                FatalErrorIn("calcQuadPointsAndWeights2D()")
+                FatalErrorIn("calcFaceQuadPointsAndWeights2D()")
                     << "Not implemented for axisymmetric case, to do..."
                     << abort(FatalError);
             }
@@ -2751,10 +2785,16 @@ void LRE::calcQuadPointsAndWeights2D() const
             }
         }
     }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
 }
 
 
-void LRE::calcQuadPointsAndWeights3D() const
+void LRE::calcFaceQuadPointsAndWeights3D() const
 {
     if (debug)
     {
@@ -2901,6 +2941,192 @@ void LRE::calcQuadPointsAndWeights3D() const
             }
         }
     }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+}
+
+void LRE::calcCellQuadPointsAndWeights2D() const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    if (cellQuadPointsPtr_ || cellQuadWeightPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointers already set!" << abort(FatalError);
+    }
+
+    FatalErrorInFunction << "Not implemented!" << abort(FatalError);
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+}
+
+void LRE::calcCellQuadPointsAndWeights3D() const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    if (cellQuadPointsPtr_ || cellQuadWeightPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointers already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const List<cell>& cells = mesh.cells();
+    const pointField& pts = mesh.points();
+
+    // Calculate number of quadrature points per cell, we need this to
+    // initialise CompactListList
+    labelList nQpPerCell(mesh.nCells(), 0);
+    forAll(nQpPerCell, cellI)
+    {
+        const cellShape& shape = mesh.cellShapes()[cellI];
+        if (shape.model() == cellModel::ref(cellModel::TET))
+        {
+	    nQpPerCell[cellI] = tetQuadrature::nPoints(N_);
+	}
+	else
+	{
+	    const cell& c = cells[cellI];
+
+	    label cellTets = 0;
+	    forAll(c, faceI)
+	    {
+		cellTets += mesh.faces()[faceI].size() - 2;
+	    }
+	    nQpPerCell[cellI] = tetQuadrature::nPoints(N_) * cellTets;
+	}
+    }
+
+    // Allocate memory for compactListList for points and weights
+    cellQuadPointsPtr_.set(new CompactListList<point>(nQpPerCell));
+    cellQuadWeightPtr_.set(new CompactListList<scalar>(nQpPerCell));
+
+    CompactListList<point>&  cellQuadP = *cellQuadPointsPtr_;
+    CompactListList<scalar>& cellQuadW = *cellQuadWeightPtr_;
+
+    // Loop over cells
+    forAll (cells, cellI)
+    {
+        const cellShape& shape = mesh.cellShapes()[cellI];
+
+        // Get the vertices (points) of the current cell
+        const labelList& cellPoints = mesh.cellPoints()[cellI];
+        const point& cellC = mesh.C()[cellI];
+        const cell& c = mesh.cells()[cellI];
+
+        // Handle tetrahedral cells
+        if (shape.model() == cellModel::ref(cellModel::TET))
+        {
+            const tetPoints tet =
+                tetPoints
+                (
+                    pts[cellPoints[0]],
+                    pts[cellPoints[1]],
+                    pts[cellPoints[2]],
+                    pts[cellPoints[3]]
+                 );
+
+            // Get tet quadrature points and their weight
+            const tetQuadrature tq(tet, N_);
+            const List<point>& tetQP = tq.points();
+            const List<scalar>& tetQW = tq.weights();
+
+            // Loop over points and store data
+            forAll(tetQP, i)
+            {
+		cellQuadP[cellI][i] = tetQP[i];
+		cellQuadW[cellI][i] = tetQW[i];
+            }
+        }
+        else
+        {
+	    // We need to get consistent cell volume when scaling weights
+            scalar cellV = 0.0;
+
+            // Storage for per-cell tets
+            DynamicList<tetPoints> cellTets;
+
+            // Loop over faces of the cell
+            forAll(c, fI)
+            {
+                const label faceI = c[fI];
+                const face& f = mesh.faces()[faceI];
+                const label nTri = f.nTriangles();
+
+                faceList triFaces(nTri);
+                label t2 = 0;
+                const label t1 = f.triangles(mesh.points(), t2, triFaces);
+
+                if (nTri != t1 || nTri != t2)
+                {
+                    FatalErrorInFunction
+                        << "Face triangulation mismatch on cell " << cellI
+                        << exit(FatalError);
+                }
+
+                // For each triangular face, make a tet with the cell centroid
+                forAll(triFaces, triI)
+                {
+                    const face& triF = triFaces[triI];
+
+                    // Build tet: (cell centroid + triangle)
+                    tetPoints t
+		    (
+		        cellC,
+			mesh.points()[triF[0]],
+			mesh.points()[triF[1]],
+			mesh.points()[triF[2]]
+		    );
+                    tetPointRef tet(t);
+                    cellV += mag(tet.mag());
+
+                    cellTets.append(t);
+                }
+            }
+
+            // Now store quadrature points and weights
+            forAll(cellTets, tetI)
+            {
+		// Scale weights by tet volume relative to cell volume
+		const tetPoints& subTet = cellTets[tetI];
+                tetPointRef subRef(subTet);
+                const scalar scaleW = mag(subRef.mag()) / cellV;
+
+                tetQuadrature tq(subTet, N_);
+                const List<point>& tetQP = tq.points();
+                const List<scalar>& tetQW = tq.weights();
+
+                forAll(tetQP, i)
+                {
+		    const label pos = tetI*tq.nPoints() + i;
+		    cellQuadP[cellI][pos] = tetQP[i];
+		    cellQuadW[cellI][pos] = tetQW[i]* scaleW;
+                }
+            }
+        }
+    }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
 }
 
 
@@ -2908,7 +3134,7 @@ const CompactListList<point>& LRE::faceQuadPoints() const
 {
     if (!faceQuadPointsPtr_)
     {
-        calcQuadPointsAndWeights();
+        calcFaceQuadPointsAndWeights();
     }
 
     return faceQuadPointsPtr_();
@@ -2919,10 +3145,31 @@ const CompactListList<scalar>& LRE::faceQuadWeight() const
 {
     if (!faceQuadWeightPtr_)
     {
-        calcQuadPointsAndWeights();
+        calcFaceQuadPointsAndWeights();
     }
 
     return faceQuadWeightPtr_();
+}
+
+const CompactListList<point>& LRE::cellQuadPoints() const
+{
+    if (!cellQuadPointsPtr_)
+    {
+        calcCellQuadPointsAndWeights();
+    }
+
+    return cellQuadPointsPtr_();
+}
+
+
+const CompactListList<scalar>& LRE::cellQuadWeight() const
+{
+    if (!cellQuadWeightPtr_)
+    {
+        calcCellQuadPointsAndWeights();
+    }
+
+    return cellQuadWeightPtr_();
 }
 
 
@@ -3174,7 +3421,9 @@ LRE::LRE
     QhatPtr_(),
     sqrtWPtr_(),
     faceQuadPointsPtr_(),
-    faceQuadWeightPtr_()
+    faceQuadWeightPtr_(),
+    cellQuadPointsPtr_(),
+    cellQuadWeightPtr_()
 {
     if (calcConditionNumber_)
     {
@@ -3428,9 +3677,9 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     forAll(gradDGP, i)
     {
         List<tensor>& faceGradGP = gradDGP[i];
-        const List<point>& faceGaussPts = faceQP[i];
+        //const List<point>& faceGaussPts = faceQP[i];
 
-        faceGradGP.setSize(faceGaussPts.size());
+        faceGradGP.setSize(faceQP[i].size());
 
         forAll(faceGradGP, gradI)
         {
@@ -3454,7 +3703,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
     forAll(mesh.owner(), faceI)
     {
         const labelList& curStencil = stencils[faceI];
-        const List<point>& fGP = faceQP[faceI];
+        const List<point> fGP = faceQP[faceI];
 
         // Loop over face Gauss point
         forAll(fGP, pointI)
@@ -3554,7 +3803,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
             {
                 const label globalFaceID = faceI + D.boundaryField()[patchI].patch().start();
                 const labelList& curStencil = stencils[globalFaceID];
-                const List<point>& fGP = faceQP[globalFaceID];
+                const List<point> fGP = faceQP[globalFaceID];
 
                 // Loop over face Gauss point
                 forAll(fGP, pointI)
@@ -3606,7 +3855,7 @@ autoPtr<List<List<tensor>>> LRE::gradDQuad
             {
                 const label globalFaceID = faceI + D.boundaryField()[patchI].patch().start();
                 const labelList& curStencil = stencils[globalFaceID];
-                const List<point>& fGP = faceQP[globalFaceID];
+                const List<point> fGP = faceQP[globalFaceID];
 
                 // Loop over face Gauss point
                 forAll(fGP, pointI)

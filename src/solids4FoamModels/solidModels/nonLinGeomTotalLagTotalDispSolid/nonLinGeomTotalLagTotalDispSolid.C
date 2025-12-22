@@ -89,18 +89,17 @@ surfaceVectorField nonLinGeomTotalLagTotalDispSolid::currentSf()
         {
             const label globalFaceID =
                 mesh().boundaryMesh()[patchI].start() + faceI;
-
-            const List<scalar>& faceQuadW = WQuad[globalFaceID];
             const List<tensor>& faceQuadGradD = gradDQuad[globalFaceID];
 
             tensor Finv = tensor::zero;
 	    currSfPatch[faceI] = vector::zero;
-            forAll(faceQuadW, qpI)
+
+            forAll(WQuad[globalFaceID], qpI)
             {
                 F = I + faceQuadGradD[qpI].T();
                 J = det(F);
 		Finv = inv(F);
-                currSfPatch[faceI] += faceQuadW[qpI] * J * Finv.T() & Sf[globalFaceID];
+                currSfPatch[faceI] += WQuad[globalFaceID][qpI] * J * Finv.T() & Sf.boundaryField()[patchI][faceI];
             }
         }
     }
@@ -199,9 +198,6 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 			D.mesh().boundary()[patchI].magSf();
 
 		const vectorField N(D.mesh().boundary()[patchI].Sf()/ D.mesh().boundary()[patchI].magSf());
-
-		const scalarField& magSfCurrentPatch =
-			magSfCurrent.mesh().boundary()[patchI].magSf();
 
 		tensor F = tensor::zero;
 		tensor Finv = tensor::zero;
@@ -1043,9 +1039,18 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     (
         rho()
        *(
-            g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+            g() - dampingCoeff()*fvc::ddt(D)
         )
     );
+
+    if (highOrderResidual_)
+    {
+        residual -= rho() * hofvc::d2dt2(D, LREInterp());
+    }
+    else
+    {
+	residual -= rho() * fvc::d2dt2(D);
+    }
 
     if (highOrderResidual_)
     {
@@ -1156,7 +1161,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
                 extrapNeiVf.y() += oneOverSix * LRE::cubicForm((*tThirdDerDy)[neiCellID], dNei, twoD);
                 extrapNeiVf.z() += oneOverSix * LRE::cubicForm((*tThirdDerDz)[neiCellID], dNei, twoD);
             }
-
             const scalar denom = max(mag(n & d), VSMALL);
 
             const vector faceDamping =

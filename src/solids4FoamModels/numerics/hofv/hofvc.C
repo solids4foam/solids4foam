@@ -63,21 +63,19 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     surfaceVectorField& tf = tsf.ref();
 
+    const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
+
     forAll (tf, faceI)
     {
         // Sigma at the quadrature points on the face
         const List<symmTensor>& faceQuadStress = quadSigma[faceI];
 
-        // Weights for the quadrature points on the face
-        const List<scalar>& faceQuadW = quadW[faceI];
-
-        const vector& faceNormal =
-            mesh.faceAreas()[faceI]/mag(mesh.faceAreas()[faceI]);
+        const vector& faceNormal = normal[faceI];
 
         forAll(faceQuadStress, pI)
         {
             // Add traction contribution of this quadrature point
-            tf[faceI] += faceNormal & (faceQuadStress[pI] * faceQuadW[pI]);
+            tf[faceI] += faceNormal & (faceQuadStress[pI] * quadW[faceI][pI]);
         }
     }
 
@@ -92,18 +90,13 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
             // Sigma at the Gauss quadrature points on the face
             const List<symmTensor>& faceQuadStress = quadSigma[globalFaceID];
 
-            // Gauss quadrature weights on the face
-            const List<scalar>& faceQuadW = quadW[globalFaceID];
-
-            const vector& faceNormal =
-                mesh.faceAreas()[globalFaceID]
-              / mag(mesh.faceAreas()[globalFaceID]);
+            const vector& faceNormal =  normal[globalFaceID];
 
             forAll(faceQuadStress, pI)
             {
                 // Add traction contribution of this quadrature point
                 tfPatch[faceI] +=
-                    faceNormal & (faceQuadStress[pI] * faceQuadW[pI]);
+                    faceNormal & (faceQuadStress[pI] * quadW[faceI][pI]);
             }
         }
     }
@@ -139,6 +132,8 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     surfaceVectorField& tf = tsf.ref();
 
+    const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
+
     forAll (tf, faceI)
     {
         // Sigma at the quadrature points on the face
@@ -147,22 +142,18 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         // Grad of displacement for the quadrature points on the face
         const List<tensor>& faceQuadGradD = gradDQuad[faceI];
 
-        // Weights for the quadrature points on the face
-        const List<scalar>& faceQuadW = quadW[faceI];
-
-        const vector& faceNormal =
-            mesh.faceAreas()[faceI]/mag(mesh.faceAreas()[faceI]);
+        const vector& faceNormal = normal[faceI];
 
         forAll(faceQuadSigma, pI)
         {
-            const tensor& gradD = faceQuadGradD[pI];
+            const tensor& gradD = gradDQuad[faceI][pI];
             const tensor F = I + gradD.T();
             const tensor invFT = inv(F.T());
             const scalar J = det(F);
 
             // Add traction contribution of this quadrature point
             tf[faceI] +=
-                faceQuadW[pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
+                quadW[faceI][pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
         }
     }
 
@@ -180,12 +171,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
             // Grad of displacement for the quadrature points on the face
             const List<tensor>& faceQuadGradD = gradDQuad[globalFaceID];
 
-            // Gauss quadrature weights on the face
-            const List<scalar>& faceQuadW = quadW[globalFaceID];
-
-            const vector& faceNormal =
-                mesh.faceAreas()[globalFaceID]
-              / mag(mesh.faceAreas()[globalFaceID]);
+            const vector& faceNormal = normal[globalFaceID];
 
             forAll(faceQuadSigma, pI)
             {
@@ -196,7 +182,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
                 // Add traction contribution of this quadrature point
                 tfPatch[faceI] +=
-                    faceQuadW[pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
+                    quadW[faceI][pI] * J * ((faceQuadSigma[pI] & invFT) & faceNormal);
             }
         }
     }
@@ -204,6 +190,269 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     return tsf;
 };
 
+
+autoPtr<CompactListList<vector>> hofvc::cellToQuad
+(
+    const volVectorField& D,
+    const LRE& LREInterp
+)
+{
+    const fvMesh& mesh = LREInterp.mesh();
+    const bool twoD = (mesh.nGeometricD() == 2);
+
+    // Cell quadrature points
+    const CompactListList<point>& quadPts = LREInterp.cellQuadPoints();
+
+    labelList nQpPerCell(mesh.nCells(), 0);
+    forAll(nQpPerCell, cellI)
+    {
+	nQpPerCell[cellI] = quadPts[cellI].size();
+    }
+
+    autoPtr<CompactListList<vector>> DQuadPtr;
+    DQuadPtr.set(new CompactListList<vector>(nQpPerCell));
+
+    CompactListList<vector>& DQuad  = DQuadPtr();
+
+    const vectorField& C = mesh.C();
+
+    tmp<volTensorField> tGradD = LREInterp.grad(D);
+    const volTensorField& gradD = tGradD();
+    const tensorField& gradDI = gradD.internalField();
+
+    // Decompose the vector field D into its scalar components
+    volScalarField Dx(D.component(vector::X));
+    volScalarField Dy(D.component(vector::Y));
+    volScalarField Dz(D.component(vector::Z));
+
+    tmp<volSymmTensorField> tHessDx = LREInterp.hessian(Dx);
+    tmp<volSymmTensorField> tHessDy = LREInterp.hessian(Dy);
+    tmp<volSymmTensorField> tHessDz = LREInterp.hessian(Dz);
+
+    const symmTensorField& hessDxI = tHessDx->internalField();
+    const symmTensorField& hessDyI = tHessDy->internalField();
+    const symmTensorField& hessDzI = tHessDz->internalField();
+
+    autoPtr<List<LRE::symmTensor3Order>> tThirdDerDx;
+    autoPtr<List<LRE::symmTensor3Order>> tThirdDerDy;
+    autoPtr<List<LRE::symmTensor3Order>> tThirdDerDz;
+    if (LREInterp.order() >= 3)
+    {
+	tThirdDerDx = LREInterp.thirdDeriv(Dx);
+	tThirdDerDy = LREInterp.thirdDeriv(Dy);
+	tThirdDerDz = LREInterp.thirdDeriv(Dz);
+    }
+
+    // Displacement at quadrature points
+    forAll(DQuad, cellI)
+    {
+	const vector& cellCentreD = D[cellI];
+	const vector& centre = C[cellI];
+
+	// Loop over quadrature points
+	forAll(DQuad[cellI], ptI)
+	{
+	    // Distance from quadrature point to the cell centre
+	    const vector d = quadPts[cellI][ptI] - centre;
+
+	    // Set to zero
+	    DQuad[cellI][ptI] = vector::zero;
+
+	    // Linear part
+	    DQuad[cellI][ptI] += cellCentreD + (d & gradDI[cellI]);
+
+	    // Quadratic part
+	    if (LREInterp.order() >= 2)
+	    {
+		DQuad[cellI][ptI].x() += 0.5 * (d & (hessDxI[cellI] & d));
+		DQuad[cellI][ptI].y() += 0.5 * (d & (hessDyI[cellI] & d));
+		DQuad[cellI][ptI].z() += 0.5 * (d & (hessDzI[cellI] & d));
+	    }
+
+	    // Cubic part
+	    if (LREInterp.order() >= 3)
+	    {
+		DQuad[cellI][ptI].x() += (1.0/6.0) * LRE::cubicForm((*tThirdDerDx)[cellI], d, twoD);
+		DQuad[cellI][ptI].y() += (1.0/6.0) * LRE::cubicForm((*tThirdDerDy)[cellI], d, twoD);
+		DQuad[cellI][ptI].z() += (1.0/6.0) * LRE::cubicForm((*tThirdDerDz)[cellI], d, twoD);
+	    }
+	}
+    }
+
+    return DQuadPtr;
+}
+
+
+autoPtr<CompactListList<vector>> hofvc::ddt
+(
+    const volVectorField& D,
+    const LRE& LREInterp
+)
+{
+    const fvMesh& mesh = LREInterp.mesh();
+
+    // Check what scheme is prescribed, continue only in the case of backward
+    // if (mesh.ddtSchemes().name() != "backward")
+    // {
+    // 	FatalErrorInFunction
+    //         << "ddt scheme should be backward!" << abort(FatalError);
+    // }
+
+    // Cell quadrature points
+    const CompactListList<scalar>& quadW = LREInterp.cellQuadWeight();
+
+    // Construct acceleration field
+    labelList nQpPerCell(mesh.nCells(), 0);
+    forAll(nQpPerCell, cellI)
+    {
+	nQpPerCell[cellI] = quadW[cellI].size();
+    }
+
+    autoPtr<CompactListList<vector>> velocityPtr;
+    velocityPtr.set(new CompactListList<vector>(nQpPerCell));
+
+    CompactListList<vector>& velocity  = velocityPtr();
+
+    // Extrapolate D, D0, D00 to quad points
+    autoPtr<CompactListList<vector>> DQuadPtr = hofvc::cellToQuad(D, LREInterp);
+    autoPtr<CompactListList<vector>> DQuad0Ptr = hofvc::cellToQuad(D.oldTime(), LREInterp);
+    autoPtr<CompactListList<vector>> DQuad00Ptr = hofvc::cellToQuad(D.oldTime().oldTime(), LREInterp);
+
+    const CompactListList<vector>& DQuad = DQuadPtr();
+    const CompactListList<vector>& DQuad0 = DQuad0Ptr();
+    const CompactListList<vector>& DQuad00 = DQuad00Ptr();
+
+    const scalar rDeltaT = 1.0/mesh.time().deltaT().value();
+
+    const bool oldOldTime =
+	(D.oldTime().timeIndex() == D.oldTime().oldTime().timeIndex());
+    const scalar deltaT = mesh.time().deltaT().value();
+    const scalar deltaT0 = oldOldTime ? GREAT : mesh.time().deltaT0().value();
+
+    const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+    const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+    const scalar coefft0 = coefft + coefft00;
+
+    // Velocity at quadrature points, BDF2 scheme
+    forAll(velocity, cellI)
+    {
+	// Loop over quadrature points
+	forAll(velocity[cellI], ptI)
+	{
+	    velocity[cellI][ptI] =
+   		rDeltaT*
+		(
+		    coefft*DQuad[cellI][ptI]
+		  - coefft0*DQuad0[cellI][ptI]
+		  + coefft00*DQuad00[cellI][ptI]
+	        );
+	}
+    }
+
+    return velocityPtr;
+}
+
+tmp<volVectorField> hofvc::d2dt2
+(
+    const volVectorField& D,
+    const LRE& LREInterp
+)
+{
+    // Hard-coded BDF2 scheme
+
+    const fvMesh& mesh = LREInterp.mesh();
+
+    tmp<volVectorField> tvf
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+	         "d2dt2(" + D.name() + ")",
+                 mesh.time().timeName(),
+                 mesh,
+                 IOobject::NO_READ,
+                 IOobject::NO_WRITE
+            ),
+            mesh,
+	    dimensionedVector
+	    (
+	        "zero",
+		D.dimensions()/(dimTime*dimTime),
+		vector::zero
+	    )
+	 )
+    );
+
+    volVectorField& tf = tvf.ref();
+
+    // Check what scheme is prescribed, continue only in the case of backward
+    // if (mesh.d2dt2Schemes().name() != "backward")
+    // {
+    // 	Info<<mesh.d2dt2Schemes().name()<<endl;
+    // 	return tvf;
+    // }
+
+    // Cell quadrature points weights
+    const CompactListList<scalar>& quadW = LREInterp.cellQuadWeight();
+
+    // Construct acceleration field
+    labelList nQpPerCell(mesh.nCells(), 0);
+    forAll(nQpPerCell, cellI)
+    {
+	nQpPerCell[cellI] = quadW[cellI].size();
+    }
+    CompactListList<vector> a(nQpPerCell);
+
+    autoPtr<CompactListList<vector>> vPtr = hofvc::ddt(D, LREInterp);
+    autoPtr<CompactListList<vector>> v0Ptr = hofvc::ddt(D.oldTime(), LREInterp);
+    autoPtr<CompactListList<vector>> v00Ptr = hofvc::ddt(D.oldTime().oldTime(), LREInterp);
+
+    const CompactListList<vector>& v = vPtr();
+    const CompactListList<vector>& v0 = v0Ptr();
+    const CompactListList<vector>& v00 = v00Ptr();
+
+    const scalar rDeltaT = 1.0/mesh.time().deltaT().value();
+
+    const bool oldOldTime =
+	(D.oldTime().timeIndex() == D.oldTime().oldTime().timeIndex());
+    const scalar deltaT = mesh.time().deltaT().value();
+    const scalar deltaT0 = oldOldTime ? GREAT : mesh.time().deltaT0().value();
+
+    const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+    const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+    const scalar coefft0 = coefft + coefft00;
+
+    // Acceleration at quadrature points, BDF2 scheme
+    forAll(a, cellI)
+    {
+	// Loop over quadrature points
+	forAll(a[cellI], ptI)
+	{
+	    a[cellI][ptI] =
+		rDeltaT*
+		(
+		    coefft*v[cellI][ptI]
+		  - coefft0*v0[cellI][ptI]
+		  + coefft00*v00[cellI][ptI]
+	        );
+	}
+    }
+
+    const scalarField& V = mesh.V();
+
+    // Integrate inertia term
+    forAll(tf, cellI)
+    {
+	forAll(a[cellI], ptI)
+	{
+	    tf[cellI] += a[cellI][ptI] * quadW[cellI][ptI];
+	}
+	tf[cellI] *= V[cellI];
+    }
+
+    return tvf;
+}
 
 // ************************************************************************* //
 

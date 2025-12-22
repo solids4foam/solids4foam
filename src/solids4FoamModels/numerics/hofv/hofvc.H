@@ -45,6 +45,7 @@ Author
 #include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "SparseMatrixTemplate.H"
+#include "LRE.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,6 +72,24 @@ namespace hofvc
         const List<List<tensor>>& gradDQuad,
         const CompactListList<scalar>& quadW,
         const fvMesh& mesh
+    );
+
+    tmp<volVectorField> d2dt2
+    (
+        const volVectorField& D,
+        const LRE& LREInterp
+    );
+
+    autoPtr<CompactListList<vector>> ddt
+    (
+        const volVectorField& D,
+	const LRE& LREInterp
+    );
+
+    autoPtr<CompactListList<vector>> cellToQuad
+    (
+        const volVectorField& D,
+	const LRE& LREInterp
     );
 
 } // End namespace hofvc
