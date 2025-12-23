@@ -94,7 +94,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                     jac, 1, &globalBlockRowI, 1, &globalBlockRowI,
                     values.cdata(),
                     ADD_VALUES
-                );
+                )
             );
         }
     }
