@@ -596,10 +596,7 @@ function solids4Foam::removeEmptyDirs()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 function solids4Foam::runApplication()
 {
-    local appName appRun logFile logMode
-
-    # Any additional parsed arguments (eg, decomposeParDict)
-    local appArgs
+    local appName="" appRun="" logFile="" logMode="" appArgs=""
 
     # Parse options until executable is encountered
     while [ "$#" -gt 0 ] && [ -z "$appRun" ]
