@@ -1,6 +1,4 @@
 #!/bin/bash
-
-#!/bin/bash
 set -Eeuo pipefail
 IFS=$'\n\t'
 
@@ -36,6 +34,8 @@ EOF
 # -------------------------------------------------------------------------
 
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# -------------------------------------------------------------------------
+# solids4Foam regression test driver
+#
+# Runs selected physics-based regression tests.
+# These tests are slower and deeper than the standard Alltest smoke tests.
+# -------------------------------------------------------------------------
+
+echo "============================================================"
+echo "solids4Foam regression tests"
+echo "============================================================"
+
+ROOT_DIR="$(pwd)"
+
+# List of regression test directories (relative to tutorials/)
+REGRESSION_TESTS=(
+    "solids/hyperelasticity/rigidRotation/rotatingSphere"
+)
+
+failures=0
+
+for testCase in "${REGRESSION_TESTS[@]}"; do
+    echo
+    echo "------------------------------------------------------------"
+    echo "Running regression test: ${testCase}"
+    echo "------------------------------------------------------------"
+
+    cd "${ROOT_DIR}/${testCase}"
+
+    if [[ ! -x ./regressionTest.sh ]]; then
+        echo "FAIL: regressionTest.sh not found or not executable in ${testCase}"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if ! ./regressionTest.sh; then
+        echo "FAIL: regression test failed in ${testCase}"
+        failures=$((failures + 1))
+    else
+        echo "PASS: regression test passed in ${testCase}"
+    fi
+done
+
+echo
+echo "============================================================"
+
+if (( failures > 0 )); then
+    echo "Regression tests FAILED (${failures} failing case(s))"
+    exit 1
+else
+    echo "All regression tests PASSED"
+    exit 0
+fi
