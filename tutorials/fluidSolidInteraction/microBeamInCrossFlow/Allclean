@@ -6,6 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 cleanCase
 cleanCase fluid
 cleanCase solid
