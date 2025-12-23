@@ -74,14 +74,14 @@ PetscErrorCode formResidualFoamPetscSnesHelper
         PetscCall(SNESSetFunctionDomainError(snes));
 
         // Exit without an error code so SNES can exit "softly"
-        PetscFunctionReturn(PETSC_SUCCESS);
+        PetscFunctionReturn(0);
     }
 
     // Restore the solution and residual vectors
     CHKERRQ(VecRestoreArrayRead(x, &xx));
     CHKERRQ(VecRestoreArray(f, &ff));
 
-    PetscFunctionReturn(PETSC_SUCCESS);
+    PetscFunctionReturn(0);
 }
 
 

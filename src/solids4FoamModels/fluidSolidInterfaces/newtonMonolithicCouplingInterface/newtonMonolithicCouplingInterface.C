@@ -2809,7 +2809,7 @@ label newtonMonolithicCouplingInterface::formResidual
 
     VecRestoreArray(f, &ff);
 
-    PetscFunctionReturn(PETSC_SUCCESS);
+    PetscFunctionReturn(0);
 }
 
 
