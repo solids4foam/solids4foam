@@ -623,11 +623,10 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
-    meshWasCreated_(runTime.foundObject<dynamicFvMesh>(region) ? false : true),
-    meshPtr_
+    meshOwnerPtr_
     (
         runTime.foundObject<dynamicFvMesh>(region)
-      ? &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
+      ? Foam::autoPtr<Foam::dynamicFvMesh>()
       : dynamicFvMesh::New
         (
             IOobject
@@ -637,7 +636,13 @@ Foam::solidModel::solidModel
                 runTime,
                 IOobject::MUST_READ
             )
-        ).ptr()
+        )
+    ),
+    meshPtr_
+    (
+        meshOwnerPtr_.valid()
+      ? meshOwnerPtr_.ptr()
+      : &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
     ),
     dualMeshPtr_(),
     solidProperties_
@@ -1015,11 +1020,6 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
-
-    if (meshWasCreated_)
-    {
-        free(meshPtr_);
-    }
 }
 
 

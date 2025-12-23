@@ -98,11 +98,11 @@ private:
 
     // Private data
 
-        //- Flag to record whether the mesh was created (and is owned by this
-        //  class) or was looked up from meory
-        const bool meshWasCreated_;
+        //- Pointer to the mesh if we created it
+        autoPtr<dynamicFvMesh> meshOwnerPtr_;
 
         //- Pointer to the mesh
+        //  This always points to the mesh we use (owned or borrowed)
         dynamicFvMesh* meshPtr_;
 
         //- Dual mesh
