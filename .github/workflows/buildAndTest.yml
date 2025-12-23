@@ -27,11 +27,6 @@ jobs:
             source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
             buildflags: "-j"
 
-          - name: "OpenFOAM-v2012"
-            image: "philippic/openfoam-v2012-ubuntu20.04:latest"
-            source: "/usr/lib/openfoam/openfoam2012/etc/bashrc"
-            buildflags: "-j"
-
           - name: "OpenFOAM-9"
             image: "philippic/openfoam-9-ubuntu20.04:latest"
             source: "/opt/openfoam9/etc/bashrc"
