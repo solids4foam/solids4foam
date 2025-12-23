@@ -877,39 +877,6 @@ Foam::solidModel::solidModel
         *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    QuasiNewtonRestartFreq_
-    (
-        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
-    ),
-    QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonT_(QuasiNewtonRestartFreq_ + 2),
-    DRef_
-    (
-        IOobject
-        (
-            "DRef",
-            runTime.constant(),
-            *meshPtr_,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        *meshPtr_,
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
-    unrelaxedDRef_
-    (
-        IOobject
-        (
-            "unrelaxedDRef",
-            runTime.constant(),
-            *meshPtr_,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        *meshPtr_,
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
     restart_
@@ -993,10 +960,6 @@ Foam::solidModel::solidModel
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
-    if (relaxationMethod_ == "QuasiNewton")
-    {
-        Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
-    }
 
     // If requested, create the residual file
     if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))

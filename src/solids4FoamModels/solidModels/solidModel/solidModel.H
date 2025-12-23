@@ -220,7 +220,7 @@ private:
         Switch enforceLinear_;
 
         //- Under-relaxation method
-        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
+        //  It can be 'fixed' or 'Aitken'
         const word relaxationMethod_;
 
         //- Aitken's under-relaxation factor field
@@ -228,24 +228,6 @@ private:
 
         //- Aitken's residual field
         volVectorField aitkenResidual_;
-
-        //- Restart frequency for the Quasi-Newton method
-        const int QuasiNewtonRestartFreq_;
-
-        //- Quasi-Newton method input vector field
-        DynamicList<vectorField> QuasiNewtonV_;
-
-        //- Quasi-Newton method output vector field
-        DynamicList<vectorField> QuasiNewtonW_;
-
-        //- Quasi-Newton method time indices for the input-ouput fields
-        DynamicList<scalar> QuasiNewtonT_;
-
-        //- Reference D field used for Quasi-Newton method
-        volVectorField DRef_;
-
-        //- Reference D (without relaxation) field used for Quasi-Newton method
-        volVectorField unrelaxedDRef_;
 
         //- Ptr list of global poly patches
         //  This is a copy of a patch which is reconstructed in full on each
