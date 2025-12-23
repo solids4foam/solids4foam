@@ -6,6 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 cleanCase
 \rm -rf constant/polyMesh case.foam postProcessing 0/polyMesh 0/cellToRegion
 \rm -rf constant/punch_top constant/punch_bottom system/meshDict
