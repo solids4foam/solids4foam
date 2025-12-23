@@ -6,6 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
