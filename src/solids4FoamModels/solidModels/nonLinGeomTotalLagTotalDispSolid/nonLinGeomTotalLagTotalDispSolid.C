@@ -487,7 +487,7 @@ void nonLinGeomTotalLagTotalDispSolid::makePDiffusivity() const
 
     if (dampingCoeff().value() > SMALL)
     {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(D());
+        approxJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D());
     }
 
     // Optional: under-relaxation of the linear system
