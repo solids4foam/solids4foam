@@ -328,7 +328,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "w",
             runTime.timeName(),
-#ifdef OPENFOAM_COM
+#if (OPENFOAM > 2312)
             aMesh_,
 #else
             mesh(),
@@ -357,7 +357,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "M",
             runTime.timeName(),
-#ifdef OPENFOAM_COM
+#if (OPENFOAM > 2312)
             aMesh_,
 #else
             mesh(),
@@ -386,7 +386,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "p",
             runTime.timeName(),
-#ifdef OPENFOAM_COM
+#if (OPENFOAM > 2312)
             aMesh_,
 #else
             mesh(),
@@ -415,7 +415,7 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "theta",
             runTime.timeName(),
-#ifdef OPENFOAM_COM
+#if (OPENFOAM > 2312)
             aMesh_,
 #else
             mesh(),
