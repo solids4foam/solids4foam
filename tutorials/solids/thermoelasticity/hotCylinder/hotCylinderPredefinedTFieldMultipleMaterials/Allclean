@@ -15,6 +15,6 @@ solids4Foam::convertCaseFormatFoamExtend .
 # Fix for symmetry type
 if [[ $WM_PROJECT != "foam" ]]
 then
-    echo "Replacing symmetry with symmetryPlane for T files in hotCylinderTemperatureField"    
+    echo "Replacing symmetry with symmetryPlane for T files in hotCylinderTemperatureField"
     find hotCylinderTemperatureField -name T | xargs sed -i 's\symmetry\symmetryPlane\g'
 fi
