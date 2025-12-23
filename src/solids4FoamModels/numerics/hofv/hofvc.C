@@ -139,9 +139,6 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         // Sigma at the quadrature points on the face
         const List<symmTensor>& faceQuadSigma = quadSigma[faceI];
 
-        // Grad of displacement for the quadrature points on the face
-        const List<tensor>& faceQuadGradD = gradDQuad[faceI];
-
         const vector& faceNormal = normal[faceI];
 
         forAll(faceQuadSigma, pI)
@@ -291,12 +288,17 @@ autoPtr<CompactListList<vector>> hofvc::ddt
 {
     const fvMesh& mesh = LREInterp.mesh();
 
-    // Check what scheme is prescribed, continue only in the case of backward
-    // if (mesh.ddtSchemes().name() != "backward")
-    // {
-    // 	FatalErrorInFunction
-    //         << "ddt scheme should be backward!" << abort(FatalError);
-    // }
+    //Check what scheme is prescribed, continue only in the case of backward
+    word schemeName;
+    (mesh.ddtSchemes().found(D.name())
+      ? mesh.ddtSchemes().lookup(D.name())
+      : mesh.ddtSchemes().lookup("default")) >> schemeName;
+
+    if (schemeName != "backward")
+    {
+	FatalErrorInFunction
+            << "Unsupported ddt scheme" << abort(FatalError);
+    }
 
     // Cell quadrature points
     const CompactListList<scalar>& quadW = LREInterp.cellQuadWeight();
@@ -386,12 +388,16 @@ tmp<volVectorField> hofvc::d2dt2
 
     volVectorField& tf = tvf.ref();
 
-    // Check what scheme is prescribed, continue only in the case of backward
-    // if (mesh.d2dt2Schemes().name() != "backward")
-    // {
-    // 	Info<<mesh.d2dt2Schemes().name()<<endl;
-    // 	return tvf;
-    // }
+    //Check what scheme is prescribed, continue only in the case of backward
+    word schemeName;
+    (mesh.d2dt2Schemes().found(D.name())
+      ? mesh.d2dt2Schemes().lookup(D.name())
+      : mesh.d2dt2Schemes().lookup("default")) >> schemeName;
+
+    if (schemeName != "backward")
+    {
+	return tvf;
+    }
 
     // Cell quadrature points weights
     const CompactListList<scalar>& quadW = LREInterp.cellQuadWeight();
@@ -439,8 +445,6 @@ tmp<volVectorField> hofvc::d2dt2
 	}
     }
 
-    const scalarField& V = mesh.V();
-
     // Integrate inertia term
     forAll(tf, cellI)
     {
@@ -448,7 +452,6 @@ tmp<volVectorField> hofvc::d2dt2
 	{
 	    tf[cellI] += a[cellI][ptI] * quadW[cellI][ptI];
 	}
-	tf[cellI] *= V[cellI];
     }
 
     return tvf;
