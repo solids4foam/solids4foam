@@ -38,7 +38,7 @@ Several top-level helper scripts are provided to manage and test the tutorials.
 
 ### `Allrun`
 
-Runs the tutorial cases.  
+Runs the tutorial cases.
 Depending on the subdirectory, this may involve mesh generation and solver
 execution. Individual tutorial directories may also provide their own `Allrun`
 scripts with additional options.
@@ -56,7 +56,7 @@ and log files, returning cases to a clean state.
 
 ### `Alltest` (Smoke Tests)
 
-Runs a **fast smoke test** across the tutorials.  
+Runs a **fast smoke test** across the tutorials.
 The purpose of this script is to verify that:
 
 - The tutorials start correctly.
@@ -65,6 +65,7 @@ The purpose of this script is to verify that:
 No attempt is made to validate the numerical correctness of the results.
 
 This script is:
+
 - **Fast**
 - Used routinely in **GitHub Actions CI**
 - Intended to catch build, linking, and obvious runtime failures
@@ -78,10 +79,12 @@ cases. These tests go beyond simply checking that a case runs, and instead verif
 that key numerical quantities remain within expected bounds.
 
 For example, some regression tests:
+
 - Extract scalar values from solver logs (e.g. stresses or residuals)
 - Check that these values are below or close to known reference thresholds
 
 Regression tests are:
+
 - **More expensive** than smoke tests
 - Intended primarily for **developers**
 - Useful when modifying solvers, material models, or coupling algorithms
@@ -114,5 +117,5 @@ making significant changes to solver logic or numerical methods.
   the physical problem being solved.
 
 For detailed descriptions of specific tutorial cases, see the documentation in
-the corresponding subdirectories or on  
+the corresponding subdirectories or on
 <https://www.solids4foam.com>.
