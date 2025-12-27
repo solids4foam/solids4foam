@@ -17,6 +17,7 @@ ROOT_DIR="$(pwd)"
 
 # List of regression test directories (relative to tutorials/)
 REGRESSION_TESTS=(
+    "solids/linearElasticity/plateHole"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
 )
 
