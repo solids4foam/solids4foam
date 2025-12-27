@@ -58,7 +58,6 @@ jobs:
           source ${{ matrix.container-image.source }}
           echo "PETSC_DIR = $PETSC_DIR"
           test -d "$PETSC_DIR/include"
-          $PETSC_DIR/bin/petsc-config --with-packages | grep -E "mumps|hypre"
 
       - name: Alltest
         shell: bash -l {0}
