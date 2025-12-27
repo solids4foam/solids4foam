@@ -75,6 +75,19 @@ link_files_for_suffix() {
     fi
 }
 
+require_petsc_or_exit_silently() {
+    case "$APPROACH" in
+        petscSnes|vertexCentred)
+            if [[ -z "${PETSC_DIR:-}" ]]
+            then
+                echo; echo "Skipping this case as PETSc is not installed"
+                echo "Please set the PETSC_DIR variable"; echo
+                exit 0
+            fi
+            ;;
+    esac
+}
+
 select_approach() {
     case "$APPROACH" in
         vertexCentred)
@@ -100,6 +113,8 @@ select_approach() {
 # -------------------------------------------------------------------------
 # Main workflow
 # -------------------------------------------------------------------------
+
+require_petsc_or_exit_silently
 
 select_approach
 
