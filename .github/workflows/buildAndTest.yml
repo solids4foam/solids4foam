@@ -38,6 +38,9 @@ jobs:
             buildflags: ""
     container:
       image: ${{ matrix.container-image.image }}
+      options: --user 1001
+      env:
+        HOME: ${{ github.workspace }}
 
     steps:
       - uses: actions/checkout@v4
