@@ -49,8 +49,7 @@ jobs:
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
-          (cd optionalFixes && ./Allreplace)
-          ./Allwmake ${{ matrix.container-image.buildflags }}
+          export S4F_NO_FILE_FIXES=1; ./Allwmake ${{ matrix.container-image.buildflags }}
 
       - name: PETSc sanity check
         if: contains(matrix.container-image.name, 'PETSc')
