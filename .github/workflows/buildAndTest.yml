@@ -12,13 +12,11 @@ jobs:
     strategy:
       matrix:
         container-image:
+          # --------------------------------------------------
+          # OpenFOAM.com (no PETSc)
+          # --------------------------------------------------
           - name: "OpenFOAM-v2412"
             image: "philippic/openfoam-v2412:ubuntu-22.04"
-            source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
-            buildflags: "-j"
-
-          - name: "OpenFOAM-v2412-PETSc"
-            image: "philippic/openfoam-v2412:ubuntu-22.04-petsc"
             source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
             buildflags: "-j"
 
@@ -34,6 +32,29 @@ jobs:
 
           - name: "foam-extend-4.1"
             image: "philippic/foam-extend-4.1-ubuntu20.04:latest"
+            source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+            buildflags: ""
+
+          # --------------------------------------------------
+          # OpenFOAM.com + PETSc
+          # --------------------------------------------------
+          - name: "OpenFOAM-v2412-PETSc"
+            image: "philippic/openfoam-v2412:ubuntu-22.04-petsc-v3.24"
+            source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-v2312-PETSc"
+            image: "philippic/openfoam-v2312:ubuntu-22.04-petsc-v3.24"
+            source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-9-PETSc"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-v3.24"
+            source: "/opt/openfoam9/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "foam-extend-4.1-PETSc"
+            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-v3.24"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
     container:
