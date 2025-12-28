@@ -54,7 +54,7 @@ jobs:
             buildflags: "-j"
 
           - name: "foam-extend-4.1-PETSc"
-            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-v3.24"
+            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-v3.24.0"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
     container:
