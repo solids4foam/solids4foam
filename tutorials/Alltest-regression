@@ -20,6 +20,7 @@ REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
     "solids/linearElasticity/plateHole"
+    "solids/poroelasticity/rodAndSeabed"
     "solids/thermoelasticity/slabCooling"
     "solids/viscoelasticity/viscoTube"
 )
