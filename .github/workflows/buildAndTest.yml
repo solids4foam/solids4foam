@@ -44,7 +44,7 @@ jobs:
             buildflags: "-j"
 
           - name: "OpenFOAM-v2312-PETSc"
-            image: "philippic/openfoam-v2312:ubuntu-22.04-petsc-v3.24"
+            image: "philippic/openfoam-v2312:ubuntu-22.04-petsc-no-openmp-system-blas"
             source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
             buildflags: "-j"
 
