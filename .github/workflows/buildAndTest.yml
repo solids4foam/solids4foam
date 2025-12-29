@@ -49,7 +49,7 @@ jobs:
             buildflags: "-j"
 
           - name: "OpenFOAM-9-PETSc"
-            image: "philippic/openfoam-9:ubuntu20.04-petsc-v3.24"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-v3.24-r1"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
 
