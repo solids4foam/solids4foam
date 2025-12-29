@@ -49,7 +49,7 @@ jobs:
             buildflags: "-j"
 
           - name: "OpenFOAM-9-PETSc"
-            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
 
@@ -85,7 +85,7 @@ jobs:
         run: |
           source ${{ matrix.container-image.source }}
           cd tutorials
-          export OMP_NUM_THREADS=1; ./Alltest
+          export OMP_NUM_THREADS=1; export OPENBLAS_NUM_THREADS=1; export MKL_NUM_THREADS=1; ./Alltest
 
       - name: Upload test logs
         if: ${{ failure() }}
