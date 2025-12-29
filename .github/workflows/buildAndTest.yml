@@ -39,7 +39,7 @@ jobs:
           # OpenFOAM.com + PETSc
           # --------------------------------------------------
           - name: "OpenFOAM-v2412-PETSc"
-            image: "philippic/openfoam-v2412:ubuntu-22.04-petsc-v3.24"
+            image: "philippic/openfoam-v2412:ubuntu-22.04-petsc-no-openmp-system-blas"
             source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
             buildflags: "-j"
 
