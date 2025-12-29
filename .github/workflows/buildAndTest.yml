@@ -85,7 +85,7 @@ jobs:
         run: |
           source ${{ matrix.container-image.source }}
           cd tutorials
-          ./Alltest
+          export OMP_NUM_THREADS=1; ./Alltest
 
       - name: Upload test logs
         if: ${{ failure() }}
