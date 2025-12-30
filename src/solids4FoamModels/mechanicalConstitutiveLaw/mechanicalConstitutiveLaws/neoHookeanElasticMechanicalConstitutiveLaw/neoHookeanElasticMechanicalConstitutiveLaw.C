@@ -25,18 +25,18 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "linearElasticMechanicalConstitutiveLaw.H"
+#include "neoHookeanElasticMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(linearElasticMechanicalConstitutiveLaw, 0);
+    defineTypeNameAndDebug(neoHookeanElasticMechanicalConstitutiveLaw, 0);
     addToRunTimeSelectionTable
     (
         mechanicalConstitutiveLaw,
-        linearElasticMechanicalConstitutiveLaw,
+        neoHookeanElasticMechanicalConstitutiveLaw,
         mechanicalConstitutiveLaw
     );
 }
@@ -44,8 +44,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::linearElasticMechanicalConstitutiveLaw::
-linearElasticMechanicalConstitutiveLaw
+Foam::neoHookeanElasticMechanicalConstitutiveLaw::
+neoHookeanElasticMechanicalConstitutiveLaw
 (
     const dictionary& dict
 )
@@ -54,7 +54,8 @@ linearElasticMechanicalConstitutiveLaw
     E_("E", dict),
     nu_("nu", dict),
     lambda_("lambda", E_.dimensions(), 0.0),
-    mu_("mu", E_.dimensions(), 0.0)
+    mu_("mu", E_.dimensions(), 0.0),
+    kappa_("kappa", E_.dimensions(), 0.0)
 {
     if (E_.dimensions() != dimPressure)
     {
@@ -89,40 +90,55 @@ linearElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Set lambda and mu
+    // Set lambda, mu and kappa
     lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_));
     mu_ = E_/(2.0*(1.0 + nu_));
+    kappa_ = E_/(3.0*(1 - 2*nu_));
 }
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
+void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
 (
-    const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const finiteStrainMechanicalConstitutiveLawKinematics& kin,
     mechanicalConstitutiveLawState& /*state*/,
     mechanicalConstitutiveLawResponse& response
 ) const
 {
     UIndirectList<symmTensor>& sigma = response.stress();
 
-    const UIndirectList<tensor>& gradD = kin.gradD();
+    const UIndirectList<tensor>& F = kin.F();
+    const UIndirectList<scalar>& J = kin.J();
 
-    // Field approach: this creates intermiedate temporary fields
-    // sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
-
-    // Element-by-element approach: faster as it avoid intermediate fields
     const scalar muVal = mu_.value();
-    const scalar lambdaVal = lambda_.value();
+    const scalar kappaVal = kappa_.value();
+
+    const scalar Jmin = sqrt(SMALL);
+
+    // Fast element-by-element approach
     forAll(sigma, i)
     {
-        sigma[i] = muVal*twoSymm(gradD[i]) + lambdaVal*tr(gradD[i])*I;
+        const scalar Ji = J[i];
+
+        if (Ji <= Jmin)
+        {
+            FatalErrorInFunction
+                << "Invalid deformation gradient determinant J = " << Ji
+                << " at index " << i
+                << ". J must be positive for log(J)."
+                << exit(FatalError);
+        }
+
+        const symmTensor bEbar = pow(Ji, -2.0/3.0)*symm(F[i] & F[i].T());
+
+        sigma[i] = (muVal/Ji)*dev(bEbar) + (kappaVal/Ji)*log(Ji)*I;
     }
 
     // Scalar tangent: only if explicitly requested
     if (response.wantsScalarTangent())
     {
         UIndirectList<scalar>& impK = response.scalarTangent();
-        const scalar Keff = lambdaVal + 2.0*muVal;
+        const scalar Keff = (4.0/3.0)*muVal + kappaVal;
 
         forAll(impK, i)
         {

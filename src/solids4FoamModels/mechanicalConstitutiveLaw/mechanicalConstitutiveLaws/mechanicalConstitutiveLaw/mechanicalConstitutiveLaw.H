@@ -134,12 +134,18 @@ public:
     // Edit
 
         //- Small-strain constitutive evaluation
+        //  Default implementation indicates unsupported formulation.
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
-        ) const = 0;
+        ) const
+        {
+            FatalErrorInFunction
+                << "Small-strain evaluation is not implemented for this "
+                << "mechanicalConstitutiveLaw." << exit(FatalError);
+        }
 
         //- Finite-strain constitutive evaluation (optional for a given law)
         //  Default implementation indicates unsupported formulation.

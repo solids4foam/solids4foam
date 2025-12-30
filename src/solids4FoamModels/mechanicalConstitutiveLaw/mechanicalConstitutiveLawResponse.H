@@ -76,7 +76,7 @@ Author
 #include "mechanicalConstitutiveLawResponse.H"
 #include "UIndirectList.H"
 #include "symmTensor.H"
-
+#include "mechanicalConstitutiveLawTangentRequest.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -99,6 +99,9 @@ class mechanicalConstitutiveLawResponse
         //  Only allocated if not requested
         UIndirectList<scalar>* scalarTangentPtr_;
 
+        //- What type, if any, material tangent is requested
+        tangentRequest tangentRequest_;
+
 
     // Private Member Functions
 
@@ -117,21 +120,28 @@ public:
     // Constructors
 
         //- Construct with stress view only
-        explicit mechanicalConstitutiveLawResponse(UIndirectList<symmTensor>& stress)
+        explicit mechanicalConstitutiveLawResponse
+        (
+            UIndirectList<symmTensor>& stress,
+            tangentRequest tangentReq = tangentRequest::none
+        )
         :
             stress_(stress),
-            scalarTangentPtr_(nullptr)
+            scalarTangentPtr_(nullptr),
+            tangentRequest_(tangentReq)
         {}
 
         //- Construct with stress view and scalar tangent view
         mechanicalConstitutiveLawResponse
         (
             UIndirectList<symmTensor>& stress,
-            UIndirectList<scalar>& scalarTangent
+            UIndirectList<scalar>& scalarTangent,
+            tangentRequest tangentReq
         )
         :
             stress_(stress),
-            scalarTangentPtr_(&scalarTangent)
+            scalarTangentPtr_(&scalarTangent),
+            tangentRequest_(tangentReq)
         {}
 
 
@@ -162,6 +172,12 @@ public:
         bool hasScalarTangent() const
         {
             return scalarTangentPtr_ != nullptr;
+        }
+
+        //- Does this reponse want a scalar tangent calculated
+        bool wantsScalarTangent() const
+        {
+            return tangentRequest_ == tangentRequest::scalar;
         }
 
     // Edit

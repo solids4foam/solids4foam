@@ -150,19 +150,45 @@ public:
 
     // Edit
 
-        //- Update the Cauchy stress field using the configured mechanical
-        //  constitutive laws for a small-strain formulation.
+        //- Update the engineering (small strain) stress field using the
+        //  configured mechanical constitutive laws for a small-strain
+        //  formulation.
         //  The stress is computed from the current and previous displacement
         //  gradients and the supplied time increment. The stress field is
         //  updated in-place. Constitutive history variables are stored and
         //  updated internally via mechanicalConstitutiveLawState objects.
-        void updateStress
+        void updateStressSmallStrain
         (
             const volTensorField& gradD,
             const volTensorField& gradD0,
             const scalar dt,
-            volSymmTensorField& stress
+            volSymmTensorField& stress,
+            volScalarField* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
         );
+
+       //- Update the true (Cauchy) stress field using the configured
+       //  mechanical constitutive laws for a finite-strain formulation.
+       //  The stress is computed from the current and previous deformation
+       //  gradients and associated finite-strain kinematic measures
+       //  (e.g. F, F0, Finv, Finv0, J, J0), together with the supplied time
+       //  increment.
+       //  The stress field is updated in-place. Constitutive history variables
+       //  are stored and updated internally via mechanicalConstitutiveLawState
+       //  objects.
+       void updateStressFiniteStrain
+       (
+           const volTensorField& F,
+           const volTensorField& F0,
+           const volScalarField& J,
+           const volScalarField& J0,
+           const volTensorField& Finv,
+           const volTensorField& Finv0,
+           const scalar dt,
+           volSymmTensorField& sigma,
+           volScalarField* scalarTangentPtr = nullptr,
+           const tangentRequest tReq = tangentRequest::none
+       );
 };
 
 

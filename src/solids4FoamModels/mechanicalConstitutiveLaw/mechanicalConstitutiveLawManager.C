@@ -183,12 +183,14 @@ Foam::mechanicalConstitutiveLawManager::~mechanicalConstitutiveLawManager()
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStress
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
     const volTensorField& gradD,
     const volTensorField& gradD0,
     const scalar dt,
-    volSymmTensorField& stress
+    volSymmTensorField& stress,
+    volScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq
 )
 {
     forAll(laws_, lawI)
@@ -222,15 +224,42 @@ void Foam::mechanicalConstitutiveLawManager::updateStress
                 gradDView, gradD0View, dt
             );
 
-            // Create wrapper for material: output from material law
-            // This does not copy data
-            mechanicalConstitutiveLawResponse response(stressView);
+            // Create wrapper for output
+            if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+            {
+                // "View" into the tangent for this material => does not copy
+                // data
+                UIndirectList<scalar> tangentView
+                (
+                    scalarTangentPtr->internalField(),
+                    cells
+                );
 
-            // Update the material response, e.g. update the stress
-            laws_[lawI].evaluate
-            (
-                kin, states_[lawI], response
-            );
+                // Create wrapper for material: output from material law
+                // This does not copy data
+                mechanicalConstitutiveLawResponse response
+                (
+                    stressView,
+                    tangentView,
+                    tangentReq
+                );
+
+                // Update the material response, e.g. update the stress
+                laws_[lawI].evaluate(kin, states_[lawI], response);
+            }
+            else
+            {
+                // Create wrapper for material: output from material law
+                // This does not copy data
+                mechanicalConstitutiveLawResponse response
+                (
+                    stressView,
+                    tangentReq
+                );
+
+                // Update the material response, e.g. update the stress
+                laws_[lawI].evaluate(kin, states_[lawI], response);
+            }
         }
 
         // Update the boundary field
@@ -269,15 +298,243 @@ void Foam::mechanicalConstitutiveLawManager::updateStress
                     gradDView, gradD0View, dt
                 );
 
+                // Create wrapper for output
+                if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+                {
+                    // "View" into the tangent for this material => does not copy
+                    // data
+                    UIndirectList<scalar> tangentView
+                    (
+                        scalarTangentPtr->boundaryField()[patchI],
+                        faces
+                    );
+
+                    // Create wrapper for material: output from material law
+                    // This does not copy data
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView,
+                        tangentView,
+                        tangentReq
+                    );
+
+                    // Update the material response, e.g. update the stress
+                    laws_[lawI].evaluate
+                    (
+                        kin, boundaryStates_[lawI][patchI], response
+                    );
+                }
+                else
+                {
+                    // Create wrapper for material: output from material law
+                    // This does not copy data
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tangentReq
+                    );
+
+                    // Update the material response, e.g. update the stress
+                    laws_[lawI].evaluate
+                    (
+                        kin, boundaryStates_[lawI][patchI], response
+                    );
+                }
+            }
+        }
+    }
+
+    // Update boundaries including syncing coupled boundaries
+    stress.correctBoundaryConditions();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+(
+    const volTensorField& F,
+    const volTensorField& F0,
+    const volScalarField& J,
+    const volScalarField& J0,
+    const volTensorField& Finv,
+    const volTensorField& Finv0,
+    const scalar dt,
+    volSymmTensorField& stress,
+    volScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    forAll(laws_, lawI)
+    {
+        const labelList& cells = lawCells_[lawI];
+
+        // Update the internal field
+        {
+            // "View" into the F for this material => does not copy data
+            const UIndirectList<tensor> FView(F.internalField(), cells);
+
+            // "View" into the F0 for this material => does not copy data
+            const UIndirectList<tensor> F0View(F0.internalField(), cells);
+
+            // "View" into the J for this material => does not copy data
+            const UIndirectList<scalar> JView(J.internalField(), cells);
+
+            // "View" into the J0 for this material => does not copy data
+            const UIndirectList<scalar> J0View(J0.internalField(), cells);
+
+            // "View" into the Finv for this material => does not copy data
+            const UIndirectList<tensor> FinvView(Finv.internalField(), cells);
+
+            // "View" into the Finv0 for this material => does not copy data
+            const UIndirectList<tensor> Finv0View(Finv0.internalField(), cells);
+
+            // "View" into the stress for this material => does not copy data
+            UIndirectList<symmTensor> stressView(stress.internalField(), cells);
+
+            // Create wrapper for kinematic data: input to material law
+            // This does not copy data
+            finiteStrainMechanicalConstitutiveLawKinematics kin
+            (
+                FView, F0View, JView, J0View, FinvView, Finv0View, dt
+            );
+
+            // Create wrapper for output
+            if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+            {
+                // "View" into the tangent for this material => does not copy
+                // data
+                UIndirectList<scalar> tangentView
+                (
+                    scalarTangentPtr->internalField(),
+                    cells
+                );
+
                 // Create wrapper for material: output from material law
                 // This does not copy data
-                mechanicalConstitutiveLawResponse response(stressView);
+                mechanicalConstitutiveLawResponse response
+                (
+                    stressView,
+                    tangentView,
+                    tangentReq
+                );
 
                 // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate
+                laws_[lawI].evaluate(kin, states_[lawI], response);
+            }
+            else
+            {
+                // Create wrapper for material: output from material law
+                // This does not copy data
+                mechanicalConstitutiveLawResponse response
                 (
-                    kin, boundaryStates_[lawI][patchI], response
+                    stressView,
+                    tangentReq
                 );
+
+                // Update the material response, e.g. update the stress
+                laws_[lawI].evaluate(kin, states_[lawI], response);
+            }
+        }
+
+        // Update the boundary field
+        // Boundary constitutive response uses independent state objects,
+        // allowing history-dependent laws to operate correctly on boundary faces.
+        forAll(F.boundaryField(), patchI)
+        {
+            if (!F.boundaryField()[patchI].coupled())
+            {
+                // Select all faces on the patch for which the adjacent cell is
+                // in this material
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                // "View" into the J for this material => does not copy data
+                const UIndirectList<scalar> JView
+                (
+                    J.boundaryField()[patchI], faces
+                );
+
+                // "View" into the J0 for this material => does not copy data
+                const UIndirectList<scalar> J0View
+                (
+                    J0.boundaryField()[patchI], faces
+                );
+
+                // "View" into the F for this material => does not copy data
+                const UIndirectList<tensor> FView
+                (
+                    F.boundaryField()[patchI], faces
+                );
+
+                // "View" into the F0 for this material => does not copy data
+                const UIndirectList<tensor> F0View
+                (
+                    F0.boundaryField()[patchI], faces
+                );
+
+                // "View" into the Finv for this material => does not copy data
+                const UIndirectList<tensor> FinvView
+                (
+                    Finv.boundaryField()[patchI], faces
+                );
+
+                // "View" into the Finv0 for this material => does not copy data
+                const UIndirectList<tensor> Finv0View
+                (
+                    Finv0.boundaryField()[patchI], faces
+                );
+
+                // "View" into the stress for this material => does not copy data
+                UIndirectList<symmTensor> stressView
+                (
+                    stress.boundaryFieldRef()[patchI], faces
+                );
+
+                // Create wrapper for kinematic data: input to material law
+                // This does not copy data
+                finiteStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    FView, F0View, JView, J0View, FinvView, Finv0View, dt
+                );
+
+                // Create wrapper for output
+                if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+                {
+                    // "View" into the tangent for this material => does not copy
+                    // data
+                    UIndirectList<scalar> tangentView
+                    (
+                        scalarTangentPtr->boundaryField()[patchI],
+                        faces
+                    );
+
+                    // Create wrapper for material: output from material law
+                    // This does not copy data
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView,
+                        tangentView,
+                        tangentReq
+                    );
+
+                    // Update the material response, e.g. update the stress
+                    laws_[lawI].evaluate
+                    (
+                        kin, boundaryStates_[lawI][patchI], response
+                    );
+                }
+                else
+                {
+                    // Create wrapper for material: output from material law
+                    // This does not copy data
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tangentReq
+                    );
+
+                    // Update the material response, e.g. update the stress
+                    laws_[lawI].evaluate
+                    (
+                        kin, boundaryStates_[lawI][patchI], response
+                    );
+                }
             }
         }
     }
