@@ -68,7 +68,10 @@ Author
 namespace Foam
 {
 
-/*---------------------------------------------------------------------------*\
+// Forward Declarations
+class integrationPointTopology;
+
+/*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -78,6 +81,10 @@ class mechanicalConstitutiveLawManager
 
         //- Reference to mesh
         const fvMesh& mesh_;
+
+        //- Integration-point topology used to map mesh cells to constitutive
+        //  integration-point indices
+        const integrationPointTopology& ipTopology_;
 
         //- Constitutive laws
         PtrList<mechanicalConstitutiveLaw> laws_;
@@ -90,11 +97,13 @@ class mechanicalConstitutiveLawManager
         //  boundary faces on patch patchI belonging to law lawI
         List<PtrList<mechanicalConstitutiveLawState>> boundaryStates_;
 
-        //- Cell indices per mechanical constitutive law
-        //  Each entry corresponds to one mechanicalConstitutiveLaw and contains
-        //  the list of local cell indices to which that law applies. The union of
-        //  all lists must cover all cells in the mesh, and no cell may appear in
-        //  more than one list.
+        //- Cell indices defining the material support for each mechanical
+        //  constitutive law.
+        //  Materials in solids4foam are always defined per cell (via cellZones),
+        //  independent of the discretisation order or the locations at which
+        //  stresses or strains are evaluated.
+        //  These lists are used to construct integration-point mappings and to
+        //  assemble cell-based material properties (e.g. density, bulk modulus).
         List<labelList> lawCells_;
 
         //- Boundary patch face indices per mechanical constitutive law.
@@ -106,6 +115,22 @@ class mechanicalConstitutiveLawManager
         //    patch patchI whose adjacent cell is assigned to law lawI.
         List<List<labelList>> lawBoundaryFaces_;
 
+        //- Integration-point indices per mechanical constitutive law.
+        //  Each entry corresponds to one mechanicalConstitutiveLaw and contains
+        //  the list of integration-point indices to which that law applies.
+        //  The indices refer to the constitutive working set, i.e.
+        //    - cell/face/point indices for low-order finite-volume formulations,
+        //      or
+        //    - integration-point indices into CompactListList::values() for
+        //      higher-order formulations, e.g. multiple integrations points per
+        //      cell/face/point.
+        //  The meaning and possible overlap of these indices depend on the
+        //  underlying integration-point topology (e.g. cell-, face-, or
+        //  vertex-based discretisations).
+        //  For cell-based nodes with one integration point,
+        //  lawIntegrationPointIDs is the same as lawCells
+        List<labelList> lawIntegrationPointIDs_;
+
         //- Density field
         mutable autoPtr<volScalarField> rhoPtr_;
 
@@ -114,6 +139,14 @@ class mechanicalConstitutiveLawManager
 
 
     // Private Member Functions
+
+        //- Check if the provided tangent request is scalar or scalarDeviatoric
+        inline bool needsScalarTangent(const tangentRequest req)
+        {
+            return
+                req == tangentRequest::scalar
+             || req == tangentRequest::scalarDeviatoric;
+        }
 
         //- No copy construct
         mechanicalConstitutiveLawManager
@@ -134,7 +167,8 @@ public:
         mechanicalConstitutiveLawManager
         (
             const fvMesh& mesh,
-            const dictionary& dict
+            const dictionary& dict,
+            const integrationPointTopology& ipTopology
         );
 
 
@@ -160,13 +194,15 @@ public:
         //  rebuilt on next access.
         void resetMaterialPropertyFields();
 
-        //- Update the engineering (small strain) stress field using the
-        //  configured mechanical constitutive laws for a small-strain
-        //  formulation.
-        //  The stress is computed from the current and previous displacement
-        //  gradients and the supplied time increment. The stress field is
-        //  updated in-place. Constitutive history variables are stored and
-        //  updated internally via mechanicalConstitutiveLawState objects.
+        //- Update the engineering (small-strain) stress field using the
+        //  configured mechanical constitutive laws.
+        //  The stress is evaluated from the current and previous displacement
+        //  gradients and the supplied time increment, and is updated in-place.
+        //  Constitutive history variables are stored and updated internally via
+        //  mechanicalConstitutiveLawState objects.
+        //  Optionally computes an approximate scalar material tangent when
+        //  requested, e.g. for segregated or mixed displacement–pressure
+        //  formulations.
         void updateStressSmallStrain
         (
             const volTensorField& gradD,
@@ -177,28 +213,84 @@ public:
             const tangentRequest tangentReq = tangentRequest::none
         );
 
-       //- Update the true (Cauchy) stress field using the configured
-       //  mechanical constitutive laws for a finite-strain formulation.
-       //  The stress is computed from the current and previous deformation
-       //  gradients and associated finite-strain kinematic measures
-       //  (e.g. F, F0, Finv, Finv0, J, J0), together with the supplied time
-       //  increment.
-       //  The stress field is updated in-place. Constitutive history variables
-       //  are stored and updated internally via mechanicalConstitutiveLawState
-       //  objects.
-       void updateStressFiniteStrain
-       (
-           const volTensorField& F,
-           const volTensorField& F0,
-           const volScalarField& J,
-           const volScalarField& J0,
-           const volTensorField& Finv,
-           const volTensorField& Finv0,
-           const scalar dt,
-           volSymmTensorField& sigma,
-           volScalarField* scalarTangentPtr = nullptr,
-           const tangentRequest tReq = tangentRequest::none
-       );
+        //- Update the engineering (small-strain) stress values stored in a
+        //  compact integration-point layout using the configured mechanical
+        //  constitutive laws.
+        //  Stress is evaluated from the current and previous displacement
+        //  gradients and the supplied time increment, and written in-place to
+        //  the packed integration-point storage.
+        //  Constitutive history variables are updated internally via
+        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  This interface is intended for higher-order or multi-point
+        //  formulations, e.g. Gauss-point-based discretisations.
+        //  Optionally computes an approximate scalar material tangent defined
+        //  per integration point when requested.
+        //  Requirement:
+        //    - All CompactListList inputs must share identical offsets and total
+        //      size.
+        void updateStressSmallStrain
+        (
+            const CompactListList<tensor>& gradD,
+            const CompactListList<tensor>& gradD0,
+            const scalar dt,
+            CompactListList<symmTensor>& stress,
+            List<scalar>* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Update the true (Cauchy) stress field using the configured
+        //  mechanical constitutive laws for a finite-strain formulation.
+        //  The stress is evaluated from the current and previous deformation
+        //  gradients, their inverses, determinants, and the supplied time
+        //  increment, and is updated in-place.
+        //  Constitutive history variables are stored and updated internally via
+        //  mechanicalConstitutiveLawState objects.
+        //  Optionally computes an approximate scalar material tangent when
+        //  requested, e.g. for segregated or mixed displacement–pressure
+        //  formulations
+        void updateStressFiniteStrain
+        (
+            const volTensorField& F,
+            const volTensorField& F0,
+            const volScalarField& J,
+            const volScalarField& J0,
+            const volTensorField& Finv,
+            const volTensorField& Finv0,
+            const scalar dt,
+            volSymmTensorField& stress,
+            volScalarField* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Update the true (Cauchy) stress values stored in a compact
+        //  integration-point layout using the configured mechanical
+        //  constitutive laws for a finite-strain formulation.
+        //  Stress is evaluated from the current and previous deformation
+        //  gradients, their inverses, determinants, and the supplied time
+        //  increment, and written in-place to the packed integration-point
+        //  storage.
+        //  Constitutive history variables are updated internally via
+        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  This interface is intended for higher-order or multi-point
+        //  formulations, e.g. Gauss-point-based discretisations.
+        //  Optionally computes an approximate scalar material tangent defined
+        //  per integration point when requested.
+        //  Requirement:
+        //    - All CompactListList inputs must share identical offsets and
+        //      total size.
+        void updateStressFiniteStrain
+        (
+            const CompactListList<tensor>& F,
+            const CompactListList<tensor>& F0,
+            const CompactListList<tensor>& Finv,
+            const CompactListList<tensor>& Finv0,
+            const CompactListList<scalar>& J,
+            const CompactListList<scalar>& J0,
+            const scalar dt,
+            CompactListList<symmTensor>& stress,
+            List<scalar>* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
 };
 
 
