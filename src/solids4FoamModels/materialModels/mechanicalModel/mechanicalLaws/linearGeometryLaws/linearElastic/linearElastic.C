@@ -171,9 +171,6 @@ Foam::linearElastic::linearElastic
     {
         Info<< "Reading sigma0 stress field" << endl;
     }
-
-    Info<< "mu = " << mu_ << nl
-        << "lambda = " << lambda_ << endl;
 }
 
 

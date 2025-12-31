@@ -614,6 +614,21 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
+const Foam::enhancedVolPointInterpolation& Foam::solidModel::volToPoint() const
+{
+    return enhancedVolPointInterpolation::New(mesh());
+}
+
+
+#ifdef FOAM_EXTEND
+const Foam::newLeastSquaresVolPointInterpolation&
+Foam::solidModel::volToPointLeastSquares() const
+{
+    return newLeastSquaresVolPointInterpolation::New(mesh());
+}
+#endif
+
+
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
     if (dualMeshPtr_.empty())

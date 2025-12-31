@@ -132,7 +132,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     {
         lawBoundaryFaces_[lawI].resize(mesh.boundary().size());
 
-        forAll(lawBoundaryFaces_, patchI)
+        forAll(lawBoundaryFaces_[lawI], patchI)
         {
             const labelList& faceCells = mesh.boundary()[patchI].faceCells();
 
@@ -193,7 +193,8 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
                     IOobject::NO_WRITE
                 ),
                 mesh_,
-                dimensionedScalar("rho", dimDensity, 0.0)
+                dimensionedScalar("rho", dimDensity, 0.0),
+                "zeroGradient"
             )
         );
 
@@ -235,7 +236,8 @@ Foam::mechanicalConstitutiveLawManager::kappa() const
                     IOobject::NO_WRITE
                 ),
                 mesh_,
-                dimensionedScalar("kappa", dimDensity, 0.0)
+                dimensionedScalar("kappa", dimDensity, 0.0),
+                "zeroGradient"
             )
         );
 
@@ -308,7 +310,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             );
 
             // Create wrapper for output
-            if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+            if
+            (
+                scalarTangentPtr
+             && (
+                    tangentReq == tangentRequest::scalar
+                 || tangentReq == tangentRequest::scalarDeviatoric
+                )
+            )
             {
                 // "View" into the tangent for this material => does not copy
                 // data
@@ -382,7 +391,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 );
 
                 // Create wrapper for output
-                if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+                if
+                (
+                    scalarTangentPtr
+                 && (
+                        tangentReq == tangentRequest::scalar
+                     || tangentReq == tangentRequest::scalarDeviatoric
+                    )
+                )
                 {
                     // "View" into the tangent for this material => does not copy
                     // data
@@ -428,6 +444,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     // Update boundaries including syncing coupled boundaries
     stress.correctBoundaryConditions();
+
+    if
+    (
+        scalarTangentPtr
+     && (
+            tangentReq == tangentRequest::scalar
+         || tangentReq == tangentRequest::scalarDeviatoric
+        )
+    )
+    {
+        scalarTangentPtr->correctBoundaryConditions();
+    }
 }
 
 
@@ -480,7 +508,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             );
 
             // Create wrapper for output
-            if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+            if
+            (
+                scalarTangentPtr
+             && (
+                    tangentReq == tangentRequest::scalar
+                 || tangentReq == tangentRequest::scalarDeviatoric
+                )
+            )
             {
                 // "View" into the tangent for this material => does not copy
                 // data
@@ -578,7 +613,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 );
 
                 // Create wrapper for output
-                if (scalarTangentPtr && tangentReq == tangentRequest::scalar)
+                if
+                (
+                    scalarTangentPtr
+                 && (
+                        tangentReq == tangentRequest::scalar
+                     || tangentReq == tangentRequest::scalarDeviatoric
+                    )
+                )
                 {
                     // "View" into the tangent for this material => does not copy
                     // data
@@ -624,6 +666,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     // Update boundaries including syncing coupled boundaries
     stress.correctBoundaryConditions();
+
+    if
+    (
+        scalarTangentPtr
+     && (
+            tangentReq == tangentRequest::scalar
+         || tangentReq == tangentRequest::scalarDeviatoric
+        )
+    )
+    {
+        scalarTangentPtr->correctBoundaryConditions();
+    }
 }
 
 

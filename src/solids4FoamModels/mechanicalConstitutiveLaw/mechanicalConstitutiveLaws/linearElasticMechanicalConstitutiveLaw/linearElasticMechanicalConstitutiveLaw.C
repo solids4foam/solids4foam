@@ -116,12 +116,27 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     // Scalar tangent: only if explicitly requested
     if (response.wantsScalarTangent())
     {
-        UIndirectList<scalar>& impK = response.scalarTangent();
-        const scalar Keff = lambdaVal + 2.0*muVal;
+        UIndirectList<scalar>& K = response.scalarTangent();
 
-        forAll(impK, i)
+        scalar Keff = 0.0;
+
+        switch (response.tangentReq())
         {
-            impK[i] = Keff;
+            case tangentRequest::scalar:
+                Keff = 2.0*mu_.value() + lambda_.value();
+                break;
+
+            case tangentRequest::scalarDeviatoric:
+                Keff = 2.0*mu_.value();
+                break;
+
+            default:
+                break;
+        }
+
+        forAll(K, i)
+        {
+            K[i] = Keff;
         }
     }
 }

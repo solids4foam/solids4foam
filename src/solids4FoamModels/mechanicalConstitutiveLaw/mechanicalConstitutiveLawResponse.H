@@ -158,6 +158,12 @@ public:
             return stress_;
         }
 
+        //- Return the tangentRequest enum, e.g. none, scalar, etc.
+        tangentRequest tangentReq() const
+        {
+            return tangentRequest_;
+        }
+
     // Check
 
         //- Is a scalar tangent view available?
@@ -169,7 +175,9 @@ public:
         //- Does this reponse want a scalar tangent calculated
         bool wantsScalarTangent() const
         {
-            return tangentRequest_ == tangentRequest::scalar;
+            return
+                tangentRequest_ == tangentRequest::scalar
+             || tangentRequest_ == tangentRequest::scalarDeviatoric;
         }
 
     // Edit

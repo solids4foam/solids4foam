@@ -106,7 +106,7 @@ class neoHookeanElasticMechanicalConstitutiveLaw
 public:
 
     //- Runtime type information
-    TypeName("linearElastic");
+    TypeName("neoHookeanElastic");
 
     // Constructors
 
