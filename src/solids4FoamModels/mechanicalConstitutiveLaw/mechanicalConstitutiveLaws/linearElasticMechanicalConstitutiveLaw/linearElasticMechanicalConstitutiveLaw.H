@@ -73,6 +73,9 @@ class linearElasticMechanicalConstitutiveLaw
 {
     // Private Data
 
+        //- Density
+        const dimensionedScalar rho_;
+
         //- Young's modulus
         const dimensionedScalar E_;
 
@@ -84,6 +87,9 @@ class linearElasticMechanicalConstitutiveLaw
 
         //- Second Lamé parameter (shear modulus)
         dimensionedScalar mu_;
+
+        //- Bulk modulus
+        dimensionedScalar kappa_;
 
 
     // Private Member Functions
@@ -120,6 +126,20 @@ public:
 
 
     // Member Functions
+
+    // Access
+
+        //- Return the density
+        virtual dimensionedScalar rho() const override
+        {
+            return rho_;
+        }
+
+        //- Return the bulk modulus
+        virtual dimensionedScalar kappa() const override
+        {
+            return kappa_;
+        }
 
     // Edit
 

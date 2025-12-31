@@ -69,6 +69,9 @@ class neoHookeanElasticMechanicalConstitutiveLaw
 {
     // Private Data
 
+        //- Density
+        const dimensionedScalar rho_;
+
         //- Young's modulus
         const dimensionedScalar E_;
 
@@ -119,6 +122,20 @@ public:
 
 
     // Member Functions
+
+    // Access
+
+        //- Return the density
+        virtual dimensionedScalar rho() const override
+        {
+            return rho_;
+        }
+
+        //- Return the bulk modulus
+        virtual dimensionedScalar kappa() const override
+        {
+            return kappa_;
+        }
 
     // Edit
 

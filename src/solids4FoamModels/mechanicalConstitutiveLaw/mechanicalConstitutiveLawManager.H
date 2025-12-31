@@ -98,15 +98,19 @@ class mechanicalConstitutiveLawManager
         List<labelList> lawCells_;
 
         //- Boundary patch face indices per mechanical constitutive law.
-        //
         //  For each mechanicalConstitutiveLaw, this stores a list over boundary
         //  patches, where each entry contains the local face indices (within that
         //  patch) whose owner cell belongs to the corresponding law.
-        //
         //  In other words:
         //    lawBoundaryFaces_[lawI][patchI] gives the list of boundary faces on
         //    patch patchI whose adjacent cell is assigned to law lawI.
         List<List<labelList>> lawBoundaryFaces_;
+
+        //- Density field
+        mutable autoPtr<volScalarField> rhoPtr_;
+
+        //- Bulk modulus field
+        mutable autoPtr<volScalarField> kappaPtr_;
 
 
     // Private Member Functions
@@ -140,7 +144,21 @@ public:
 
     // Member Functions
 
+    // Access
+
+        //- Const-access to the density field
+        const volScalarField& rho() const;
+
+        //- Const-access to the bulk modulus field
+        const volScalarField& kappa() const;
+
     // Edit
+
+        //- Reset cached material property fields (e.g. rho, bulk modulus).
+        //  This does not modify constitutive laws or their state; it only
+        //  clears cached volScalarField representations so they will be
+        //  rebuilt on next access.
+        void resetMaterialPropertyFields();
 
         //- Update the engineering (small strain) stress field using the
         //  configured mechanical constitutive laws for a small-strain

@@ -66,6 +66,7 @@ Author
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawResponse.H"
+#include "dimensionedScalar.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -130,6 +131,32 @@ public:
 
 
     // Member Functions
+
+    // Access
+
+        //- Return the density for this constitutive law
+        //  Default: not specified
+        virtual dimensionedScalar rho() const
+        {
+            FatalErrorInFunction
+                << "Density (rho) not defined for mechanical constitutive "
+                << "law of type " << type() << exit(FatalError);
+
+            // Keep the compiler happy
+            return dimensionedScalar();
+        }
+
+        //- Return the bulk modulus for this constitutive law
+        //  Default: not specified
+        virtual dimensionedScalar kappa() const
+        {
+            FatalErrorInFunction
+                << "Bulk modulus (kapp) not defined for mechanical constitutive "
+                << "law of type " << type() << exit(FatalError);
+
+            // Keep the compiler happy
+            return dimensionedScalar();
+        }
 
     // Edit
 

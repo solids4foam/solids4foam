@@ -43,6 +43,7 @@ neoHookeanElasticMechanicalConstitutiveLaw
 )
 :
     mechanicalConstitutiveLaw(dict),
+    rho_("rho", dict),
     E_("E", dict),
     nu_("nu", dict),
     lambda_("lambda", E_.dimensions(), 0.0),

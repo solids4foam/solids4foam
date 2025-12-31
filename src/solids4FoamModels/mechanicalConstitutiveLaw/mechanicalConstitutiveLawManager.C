@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "mechanicalConstitutiveLawManager.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -173,6 +174,96 @@ Foam::mechanicalConstitutiveLawManager::~mechanicalConstitutiveLawManager()
 
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
+
+
+const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
+{
+    if (!rhoPtr_.valid())
+    {
+        rhoPtr_.reset
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "rho",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh_,
+                dimensionedScalar("rho", dimDensity, 0.0)
+            )
+        );
+
+        volScalarField& rhoField = autoPtrRef(rhoPtr_);
+
+        forAll(laws_, lawI)
+        {
+            const dimensionedScalar rhoLaw = laws_[lawI].rho();
+            const labelList& cells = lawCells_[lawI];
+
+            forAll(cells, i)
+            {
+                rhoField[cells[i]] = rhoLaw.value();
+            }
+        }
+
+        rhoField.correctBoundaryConditions();
+    }
+
+    return rhoPtr_();
+}
+
+
+const Foam::volScalarField&
+Foam::mechanicalConstitutiveLawManager::kappa() const
+{
+    if (!kappaPtr_.valid())
+    {
+        kappaPtr_.reset
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "kappa",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh_,
+                dimensionedScalar("kappa", dimDensity, 0.0)
+            )
+        );
+
+        volScalarField& kappaField = autoPtrRef(kappaPtr_);
+
+        forAll(laws_, lawI)
+        {
+            const dimensionedScalar kappaLaw = laws_[lawI].kappa();
+            const labelList& cells = lawCells_[lawI];
+
+            forAll(cells, i)
+            {
+                kappaField[cells[i]] = kappaLaw.value();
+            }
+        }
+
+        kappaField.correctBoundaryConditions();
+    }
+
+    return kappaPtr_();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::resetMaterialPropertyFields()
+{
+    rhoPtr_.clear();
+    kappaPtr_.clear();
+}
 
 
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain

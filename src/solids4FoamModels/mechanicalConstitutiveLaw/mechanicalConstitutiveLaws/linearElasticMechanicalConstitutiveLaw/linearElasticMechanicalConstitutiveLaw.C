@@ -43,10 +43,12 @@ linearElasticMechanicalConstitutiveLaw
 )
 :
     mechanicalConstitutiveLaw(dict),
+    rho_("rho", dict),
     E_("E", dict),
     nu_("nu", dict),
     lambda_("lambda", E_.dimensions(), 0.0),
-    mu_("mu", E_.dimensions(), 0.0)
+    mu_("mu", E_.dimensions(), 0.0),
+    kappa_("kappa", E_.dimensions(), 0.0)
 {
     if (E_.dimensions() != dimPressure)
     {
@@ -81,9 +83,10 @@ linearElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Set lambda and mu
+    // Set lambda, mu and kappa
     lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_));
     mu_ = E_/(2.0*(1.0 + nu_));
+    kappa_ = E_/(3.0*(1 - 2*nu_));
 }
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //

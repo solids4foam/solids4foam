@@ -53,8 +53,9 @@ namespace Foam
 //  advisory: a law may choose to ignore unsupported requests.
 enum class tangentRequest
 {
-    none,       //- Stress only
-    scalar      //- Scalar approximate tangent
+    none,               // Stress only
+    scalar,             // Scalar approximate tangent
+    scalarDeviatoric    // Deviatoric-only scalar tangent (mixed u–p)
     // future:
     // symmTensor,
     // fourthOrder
