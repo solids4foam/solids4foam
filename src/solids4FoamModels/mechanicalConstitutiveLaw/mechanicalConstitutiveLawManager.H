@@ -294,6 +294,11 @@ public:
             List<scalar>* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
+
+        //- Let each material law know the end of each time step has been
+        //  reached.
+        //  Can be used for diagnostics, logging, or state bookkeeping.
+        void endTimeStep();
 };
 
 

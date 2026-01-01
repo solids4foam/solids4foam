@@ -196,6 +196,14 @@ public:
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const override;
+
+        //- Optional hook called once at the end of each time step.
+        virtual void endTimeStep
+        (
+            const mechanicalConstitutiveLawState& state,
+            const scalar time,
+            const label timeIndex
+        ) const override;
 };
 
 

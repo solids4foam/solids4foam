@@ -198,6 +198,17 @@ public:
                 << "Finite-strain evaluation is not implemented for this "
                 << "mechanicalConstitutiveLaw." << exit(FatalError);
         }
+
+        //- Optional hook called once at the end of each time step.
+        //  Default implementation does nothing.
+        //  Can be used for diagnostics, logging, or state bookkeeping.
+        virtual void endTimeStep
+        (
+            const mechanicalConstitutiveLawState& state,
+            const scalar time,
+            const label timeIndex
+        ) const
+        {}
 };
 
 

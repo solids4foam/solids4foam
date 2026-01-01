@@ -420,4 +420,42 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 }
 
 
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
+(
+    const mechanicalConstitutiveLawState& state,
+    const scalar time,
+    const label timeIndex
+) const
+{
+    const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
+    const Field<scalar>& epsilonPEq0 = state.scalarField0("epsilonPEq");
+
+    label nYielding = 0;
+    scalar curDEpsilonPEq = 0.0;
+    scalar maxDEpsilonPEq = 0.0;
+    forAll(epsilonPEq, i)
+    {
+        curDEpsilonPEq = epsilonPEq[i] - epsilonPEq0[i];
+
+        if (curDEpsilonPEq > SMALL)
+        {
+            ++nYielding;
+
+            maxDEpsilonPEq = max(maxDEpsilonPEq, curDEpsilonPEq);
+        }
+    }
+
+    reduce(nYielding, sumOp<label>());
+    reduce(maxDEpsilonPEq, maxOp<scalar>());
+
+    const int nTotalCells = returnReduce(mesh().nCells(), sumOp<int>());
+
+    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << nl
+        << "    " << nYielding << " cells ("
+        << 100.0*scalar(nYielding)/scalar(nTotalCells)
+        << "% of the cells in this material) are actively yielding"
+        << nl << endl;
+}
+
+
 // ************************************************************************* //

@@ -975,4 +975,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 }
 
 
+void Foam::mechanicalConstitutiveLawManager::endTimeStep()
+{
+    const scalar time = mesh_.time().value();
+    const label timeIndex = mesh_.time().timeIndex();
+
+    forAll(laws_, lawI)
+    {
+        laws_[lawI].endTimeStep(states_[lawI], time, timeIndex);
+    }
+}
+
+
 // ************************************************************************* //
