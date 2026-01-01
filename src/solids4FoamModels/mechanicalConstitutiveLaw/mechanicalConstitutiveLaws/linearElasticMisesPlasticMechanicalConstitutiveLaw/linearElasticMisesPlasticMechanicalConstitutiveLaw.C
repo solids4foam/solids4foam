@@ -62,7 +62,7 @@ Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::yieldFunction
     const scalar sigmaY =
         yieldStress(epsilonPEq0 + sqrt(2.0/3.0)*DLambda);
 
-    return qTrial - 3.0*muBar*DLambda - sigmaY;
+    return qTrial - 3.0*muBar*sqrt(3.0/2.0)*DLambda - sigmaY;
 }
 
 
@@ -131,21 +131,7 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     kappa_("kappa", E_.dimensions(), 0.0),
     stressPlasticStrainSeries_(dict),
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
-    Hp_
-    (
-        stressPlasticStrainSeries_.size() == 2
-      ? (
-            (
-                stressPlasticStrainSeries_[1].second()
-              - stressPlasticStrainSeries_[0].second()
-            )
-           /(
-                stressPlasticStrainSeries_[1].first()
-              - stressPlasticStrainSeries_[0].first()
-           )
-        )
-      : 0.0
-    ),
+    Hp_(0),
     loopTol_(dict.lookupOrDefault<scalar>("NewtonLoopTol", 1e-8)),
     maxNewtonIter_(dict.lookupOrDefault<label>("NewtonMaxIter", 200)),
     finiteDiff_(dict.lookupOrDefault<scalar>("NewtonFiniteDiffEps", 0.25e-6))
@@ -186,6 +172,20 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     // Set mu and kappa
     mu_ = E_/(2.0*(1.0 + nu_));
     kappa_ = E_/(3.0*(1 - 2*nu_));
+
+    // Set Hp for linear hardening
+    if (stressPlasticStrainSeries_.size() == 2)
+    {
+        Hp_ =
+            (
+                stressPlasticStrainSeries_[1].second()
+              - stressPlasticStrainSeries_[0].second()
+            )
+           /(
+                stressPlasticStrainSeries_[1].first()
+              - stressPlasticStrainSeries_[0].first()
+            );
+    }
 }
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
@@ -352,9 +352,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             // Linear hardening: sigmaY = sigmaY0 + Hp*(sqrt(2/3)dLambda)
             // => qTrial - 3 mu dLambda - (sigmaY0 + Hp*sqrt(2/3)dLambda) = 0
             // => dLambda = (qTrial - sigmaY0) / (3 mu + Hp*sqrt(2/3))
-            const scalar denom = 3.0*mu + Hp_*sqrt(2.0/3.0);
+            const scalar denom = 3.0*mu*sqrt(3.0/2.0) + Hp_*sqrt(2.0/3.0);
             dLambda = fTrial/max(denom, SMALL);
-
             curSigmaY = sigmaYTrial + Hp_*sqrt(2.0/3.0)*dLambda;
         }
 
@@ -391,11 +390,13 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             if (response.tangentReq() == tangentRequest::scalarDeviatoric)
             {
                 // (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu;
-                (*scalarTanPtr)[i] = theta*2.0*mu;
+                //(*scalarTanPtr)[i] = theta*2.0*mu;
+                (*scalarTanPtr)[i] = 2.0*mu;
             }
             else
             {
-                (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu + kappa;
+                // (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu + kappa;
+                (*scalarTanPtr)[i] = (4.0/3.0)*mu + kappa;
             }
         }
     }

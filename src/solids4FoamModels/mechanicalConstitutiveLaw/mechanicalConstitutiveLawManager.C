@@ -322,6 +322,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
+        InfoInFunction
+            << "Updating old-time states" << endl;
+
         forAll(states_, sI)
         {
             states_[sI].storeOldTime();
@@ -511,6 +514,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
+        InfoInFunction
+            << "Updating old-time states" << endl;
+
         forAll(states_, sI)
         {
             states_[sI].storeOldTime();
@@ -630,6 +636,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
+        InfoInFunction
+            << "Updating old-time states" << endl;
+
         forAll(states_, sI)
         {
             states_[sI].storeOldTime();
@@ -850,6 +859,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
+        InfoInFunction
+            << "Updating old-time states" << endl;
+
         forAll(states_, sI)
         {
             states_[sI].storeOldTime();
