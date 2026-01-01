@@ -82,6 +82,9 @@ class mechanicalConstitutiveLawManager
         //- Reference to mesh
         const fvMesh& mesh_;
 
+        //- Current time index so we can track when there is a new time step
+        label curTimeIndex_;
+
         //- Integration-point topology used to map mesh cells to constitutive
         //  integration-point indices
         const integrationPointTopology& ipTopology_;

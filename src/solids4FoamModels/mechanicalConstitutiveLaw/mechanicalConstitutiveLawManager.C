@@ -32,6 +32,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 )
 :
     mesh_(mesh),
+    curTimeIndex_(-1),
     ipTopology_(ipTopology),
     laws_(),
     states_(),
@@ -161,6 +162,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
                 patchI,
                 new mechanicalConstitutiveLawState(nFaces)
             );
+
+            // Initialise state (law-specific)
+            laws_[lawI].initialiseState(boundaryStates_[lawI][patchI]);
         }
     }
 
@@ -197,6 +201,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
                 lawIntegrationPointIDs_[lawI].size()
             )
         );
+
+        // Initialise state (law-specific)
+        laws_[lawI].initialiseState(states_[lawI]);
     }
 }
 
@@ -312,6 +319,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Update the old state if it is a new time step
+    if (mesh_.time().timeIndex() != curTimeIndex_)
+    {
+        forAll(states_, sI)
+        {
+            states_[sI].storeOldTime();
+        }
+
+        forAll(boundaryStates_, sI)
+        {
+            forAll(boundaryStates_[sI], patchI)
+            {
+                boundaryStates_[sI][patchI].storeOldTime();
+            }
+        }
+
+        curTimeIndex_ = mesh_.time().timeIndex();
+    }
+
     forAll(laws_, lawI)
     {
         const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
@@ -482,6 +508,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Update the old state if it is a new time step
+    if (mesh_.time().timeIndex() != curTimeIndex_)
+    {
+        forAll(states_, sI)
+        {
+            states_[sI].storeOldTime();
+        }
+
+        curTimeIndex_ = mesh_.time().timeIndex();
+    }
+
     // Access packed integration-point storage
     const List<tensor>& gradDVals  = gradD.values();
     const List<tensor>& gradD0Vals = gradD0.values();
@@ -590,6 +627,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    // Update the old state if it is a new time step
+    if (mesh_.time().timeIndex() != curTimeIndex_)
+    {
+        forAll(states_, sI)
+        {
+            states_[sI].storeOldTime();
+        }
+
+        forAll(boundaryStates_, sI)
+        {
+            forAll(boundaryStates_[sI], patchI)
+            {
+                boundaryStates_[sI][patchI].storeOldTime();
+            }
+        }
+
+        curTimeIndex_ = mesh_.time().timeIndex();
+    }
+
     forAll(laws_, lawI)
     {
         const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
@@ -791,6 +847,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    // Update the old state if it is a new time step
+    if (mesh_.time().timeIndex() != curTimeIndex_)
+    {
+        forAll(states_, sI)
+        {
+            states_[sI].storeOldTime();
+        }
+
+        curTimeIndex_ = mesh_.time().timeIndex();
+    }
+
     // Access packed integration-point storage
     const List<tensor>& FVals = F.values();
     const List<tensor>& F0Vals = F0.values();

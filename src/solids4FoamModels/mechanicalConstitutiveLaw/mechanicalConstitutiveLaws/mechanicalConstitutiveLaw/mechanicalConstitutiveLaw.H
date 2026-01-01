@@ -160,6 +160,17 @@ public:
 
     // Edit
 
+        //- Initialise constitutive state variables
+        //  Called once after state allocation.
+        //  Default implementation does nothing.
+        virtual void initialiseState
+        (
+            mechanicalConstitutiveLawState& state
+        ) const
+        {
+            // Do nothing by default
+        }
+
         //- Small-strain constitutive evaluation
         //  Default implementation indicates unsupported formulation.
         virtual void evaluate

@@ -98,6 +98,13 @@ class mechanicalConstitutiveLawState
         HashTable<autoPtr<Field<tensor>>> tensorFields_;
         HashTable<autoPtr<Field<symmTensor>>> symmTensorFields_;
 
+        // Storage for old-time state fields, indexed by name.
+        // Each entry owns a Field<T> of size nCells (per material).
+        HashTable<autoPtr<Field<scalar>>> scalarFields0_;
+        HashTable<autoPtr<Field<vector>>> vectorFields0_;
+        HashTable<autoPtr<Field<tensor>>> tensorFields0_;
+        HashTable<autoPtr<Field<symmTensor>>> symmTensorFields0_;
+
         // Number of entries (e.g. cells) for this state
         label size_;
 
@@ -150,6 +157,8 @@ public:
         {
             size_ = newSize;
 
+            // Current-time fields
+
             forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
             {
                 iter()->setSize(newSize, Zero);
@@ -165,6 +174,145 @@ public:
             forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields_, iter)
             {
                 iter()->setSize(newSize, Zero);
+            }
+
+            // Old-time fields
+
+            forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields0_, iter)
+            {
+                iter()->setSize(newSize, Zero);
+            }
+            forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields0_, iter)
+            {
+                iter()->setSize(newSize, Zero);
+            }
+            forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields0_, iter)
+            {
+                iter()->setSize(newSize, Zero);
+            }
+            forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields0_, iter)
+            {
+                iter()->setSize(newSize, Zero);
+            }
+        }
+
+        // Copy current state into old-time storage (commit)
+        void storeOldTime()
+        {
+            // Check all old fields have a corresponding current field
+
+            // Scalars
+            forAllConstIters(scalarFields0_, iter)
+            {
+                const word& name = iter.key();
+
+                if (!scalarFields_.found(name))
+                {
+                    FatalErrorInFunction
+                        << "Old-time scalar state field '" << name
+                        << "' exists but no corresponding current field is "
+                        << "present. This indicates inconsistent state "
+                        << "initialisation."
+                        << exit(FatalError);
+                }
+            }
+
+            // Vectors
+            forAllConstIters(vectorFields0_, iter)
+            {
+                const word& name = iter.key();
+
+                if (!vectorFields_.found(name))
+                {
+                    FatalErrorInFunction
+                        << "Old-time vector state field '" << name
+                        << "' exists but no corresponding current field is "
+                        << "present. This indicates inconsistent state "
+                        << "initialisation."
+                        << exit(FatalError);
+                }
+            }
+
+            // Tensors
+            forAllConstIters(tensorFields0_, iter)
+            {
+                const word& name = iter.key();
+
+                if (!tensorFields_.found(name))
+                {
+                    FatalErrorInFunction
+                        << "Old-time tensor state field '" << name
+                        << "' exists but no corresponding current field is "
+                        << "present. This indicates inconsistent state "
+                        << "initialisation."
+                        << exit(FatalError);
+                }
+            }
+
+            // SymmTensors
+            forAllConstIters(symmTensorFields0_, iter)
+            {
+                const word& name = iter.key();
+
+                if (!symmTensorFields_.found(name))
+                {
+                    FatalErrorInFunction
+                        << "Old-time symmTensor state field '" << name
+                        << "' exists but no corresponding current field is "
+                        << "present. This indicates inconsistent state "
+                        << "initialisation."
+                        << exit(FatalError);
+                }
+            }
+
+            // Update old time fields
+
+            // Scalars
+            forAllConstIters(scalarFields_, iter)
+            {
+                const word& name = iter.key();
+                const Field<scalar>& cur = iter.val()();
+
+                if (scalarFields0_.found(name))
+                {
+                    scalarFields0_[name]() = cur;
+                }
+            }
+
+            // Vectors
+            forAllConstIters(vectorFields_, iter)
+            {
+                const word& name = iter.key();
+                const Field<vector>& cur = iter.val()();
+
+                if (vectorFields0_.found(name))
+                {
+                    vectorFields0_[name]() = cur;
+                }
+            }
+
+            // Tensors
+            forAllConstIters(tensorFields_, iter)
+            {
+                const word& name = iter.key();
+                const Field<tensor>& cur = iter.val()();
+
+                if (tensorFields0_.found(name))
+                {
+                    tensorFields0_[name]() = cur;
+                }
+            }
+
+            // SymmTensors
+            forAllConstIters(symmTensorFields_, iter)
+            {
+                const word& name = iter.key();
+                const Field<symmTensor>& cur = iter.val()();
+
+                if (symmTensorFields0_.found(name))
+                {
+                    symmTensorFields0_[name]() = cur;
+                }
             }
         }
 
@@ -183,6 +331,21 @@ public:
             return scalarFields_[name]();
         }
 
+        //- Access or create scalar old-time state field
+        Field<scalar>& scalarField0(const word& name)
+        {
+            if (!scalarFields0_.found(name))
+            {
+                scalarFields0_.insert
+                (
+                    name,
+                    autoPtr<Field<scalar>>(new Field<scalar>(size_, Zero))
+                );
+            }
+
+            return scalarFields0_[name]();
+        }
+
         //- Access or create vector state field
         Field<vector>& vectorField(const word& name)
         {
@@ -196,6 +359,21 @@ public:
             }
 
             return vectorFields_[name]();
+        }
+
+        //- Access or create vector old-time state field
+        Field<vector>& vectorField0(const word& name)
+        {
+            if (!vectorFields0_.found(name))
+            {
+                vectorFields0_.insert
+                (
+                    name,
+                    autoPtr<Field<vector>>(new Field<vector>(size_, Zero))
+                );
+            }
+
+            return vectorFields0_[name]();
         }
 
         //- Access or create tensor state field
@@ -213,6 +391,21 @@ public:
             return tensorFields_[name]();
         }
 
+        //- Access or create tensor old-time state field
+        Field<tensor>& tensorField0(const word& name)
+        {
+            if (!tensorFields0_.found(name))
+            {
+                tensorFields0_.insert
+                (
+                    name,
+                    autoPtr<Field<tensor>>(new Field<tensor>(size_, Zero))
+                );
+            }
+
+            return tensorFields0_[name]();
+        }
+
         //- Access or create symmTensor state field
         Field<symmTensor>& symmTensorField(const word& name)
         {
@@ -226,6 +419,21 @@ public:
             }
 
             return symmTensorFields_[name]();
+        }
+
+        //- Access or create scalar old-time state field
+        Field<symmTensor>& symmTensorField0(const word& name)
+        {
+            if (!symmTensorFields0_.found(name))
+            {
+                symmTensorFields0_.insert
+                (
+                    name,
+                    autoPtr<Field<symmTensor>>(new Field<symmTensor>(size_, Zero))
+                );
+            }
+
+            return symmTensorFields0_[name]();
         }
 };
 
