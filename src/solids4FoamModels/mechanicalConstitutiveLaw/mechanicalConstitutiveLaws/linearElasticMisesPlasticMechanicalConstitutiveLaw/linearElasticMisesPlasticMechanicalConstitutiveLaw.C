@@ -345,13 +345,38 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         }
         else
         {
-            // Linear / perfect plasticity
-            // For perfect plasticity Hp_ = 0
-            // Consistent with radial return:
-            // q = qTrial - 3 mu dLambda = sigmaY(epsp_eq0 + sqrt(2/3)dLambda)
-            // Linear hardening: sigmaY = sigmaY0 + Hp*(sqrt(2/3)dLambda)
-            // => qTrial - 3 mu dLambda - (sigmaY0 + Hp*sqrt(2/3)dLambda) = 0
-            // => dLambda = (qTrial - sigmaY0) / (3 mu + Hp*sqrt(2/3))
+            // Linear / perfect plasticity (closed-form radial return)
+            //
+            // Yield function is written in terms of the equivalent (von Mises)
+            // stress:
+            //
+            //     q = sqrt(3/2) * |s|
+            //
+            // For associative J2 plasticity with plastic multiplier increment
+            // Δλ, the radial return mapping gives:
+            //
+            //     q = qTrial - 3 μ sqrt(3/2) Δλ
+            //
+            // The equivalent plastic strain evolves as:
+            //
+            //     εp_eq = εp_eq0 + sqrt(2/3) Δλ
+            //
+            // For linear isotropic hardening:
+            //
+            //     σY = σY0 + Hp * (sqrt(2/3) Δλ)
+            //
+            // Substituting into the consistency condition f = q − σY = 0:
+            //
+            //     qTrial
+            //   − 3 μ sqrt(3/2) Δλ
+            //   − (σY0 + Hp sqrt(2/3) Δλ) = 0
+            //
+            // which gives the closed-form solution:
+            //
+            //     Δλ = (qTrial − σY0)
+            //           / (3 μ sqrt(3/2) + Hp sqrt(2/3))
+            //
+            // Perfect plasticity is recovered by setting Hp = 0.
             const scalar denom = 3.0*mu*sqrt(3.0/2.0) + Hp_*sqrt(2.0/3.0);
             dLambda = fTrial/max(denom, SMALL);
             curSigmaY = sigmaYTrial + Hp_*sqrt(2.0/3.0)*dLambda;
@@ -374,29 +399,21 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         if (needScalarTan)
         {
-            // Approximate scalar tangent (segregated solver friendly)
-            // We reuse your old scaling idea:
-            // theta = 1 - (2mu dLambda)/|sTrial|
-            // or equivalently 1 - (3mu dLambda)/qTrial*sqrt(3/2) etc
+            // Approximate scalar tangent
             scalar theta = 1.0;
-
             if (magSTrial > SMALL)
             {
-                // This matches your old form: 1 - (2 mu dLambda / |sTrial|)
-                theta = 1.0 - (2.0*mu*dLambda)/magSTrial;
-                theta = max(theta, 0.0); // defensive clamp
+                theta = 1.0 - (3.0*mu*dLambda)/magSTrial;
+                theta = max(theta, 0.0);
             }
 
             if (response.tangentReq() == tangentRequest::scalarDeviatoric)
             {
-                // (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu;
-                //(*scalarTanPtr)[i] = theta*2.0*mu;
-                (*scalarTanPtr)[i] = 2.0*mu;
+                (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu;
             }
             else
             {
-                // (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu + kappa;
-                (*scalarTanPtr)[i] = (4.0/3.0)*mu + kappa;
+                (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu + kappa;
             }
         }
     }
