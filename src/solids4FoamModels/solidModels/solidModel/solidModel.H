@@ -390,9 +390,6 @@ protected:
         //- Return non-const reference to the thermal model
         thermalModel& thermal();
 
-        //- Return non-const reference to the density
-        volScalarField& rho();
-
         //- Optional: cells can be forced to a specified displacement in the
         //  linear system
         void setCellDisps(fvVectorMatrix& DEqn);

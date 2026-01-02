@@ -22,6 +22,13 @@ License
 #include "integrationPointTopology.H"
 
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(mechanicalConstitutiveLawManager, 0);
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
@@ -322,8 +329,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
-        InfoInFunction
-            << "Updating old-time states" << endl;
+        if (debug)
+        {
+            InfoInFunction
+                << "Updating old-time states" << endl;
+        }
 
         forAll(states_, sI)
         {

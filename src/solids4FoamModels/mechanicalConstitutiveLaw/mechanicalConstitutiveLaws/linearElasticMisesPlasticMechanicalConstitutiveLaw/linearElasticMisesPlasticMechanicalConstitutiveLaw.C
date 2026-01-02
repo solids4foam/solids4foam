@@ -26,7 +26,7 @@ namespace Foam
 {
     defineTypeNameAndDebug
     (
-        linearElasticMisesPlasticMechanicalConstitutiveLaw, 0
+        linearElasticMisesPlasticMechanicalConstitutiveLaw, 1
     );
     addToRunTimeSelectionTable
     (
@@ -450,11 +450,13 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
 
     const int nTotalCells = returnReduce(epsilonPEq.size(), sumOp<int>());
 
-    Info<< "    Max DEpsilonPEq is " << maxDEpsilonPEq << nl
-        << "    " << nYielding << " integration points ("
-        << 100.0*scalar(nYielding)/scalar(nTotalCells)
-        << "% of the integration points in this material) are actively yielding"
-        << nl << endl;
+    if (debug)
+    {
+        Info<< nl << "Max DEpsilonPEq is " << maxDEpsilonPEq << nl
+            << "Number of yielding integration points = " << nYielding
+            << "/" << nTotalCells
+            << nl << endl;
+    }
 }
 
 

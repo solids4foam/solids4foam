@@ -163,6 +163,9 @@ class mechanicalConstitutiveLawManager
 
 public:
 
+    //- Runtime type information
+    TypeName("mechanicalConstitutiveLawManager");
+
 
     // Constructors
 
@@ -176,7 +179,7 @@ public:
 
 
     //- Destructor
-    ~mechanicalConstitutiveLawManager();
+    virtual ~mechanicalConstitutiveLawManager();
 
 
     // Member Functions
