@@ -1750,7 +1750,19 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 
 void Foam::solidModel::updateTotalFields()
 {
-    mechanical().updateTotalFields();
+    Info<< __LINE__ << endl;
+    if (mechanicalPtr_.valid())
+    {
+    Info<< __LINE__ << endl;
+        mechanicalPtr_->updateTotalFields();
+    }
+
+    if (mechManagerPtr_.valid())
+    {
+    Info<< __LINE__ << endl;
+        mechManagerPtr_->endTimeStep();
+    }
+    Info<< __LINE__ << endl;
 }
 
 

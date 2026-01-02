@@ -86,6 +86,7 @@ $(thermalLaws)/thermalLaw/thermalLaw.C
 $(thermalLaws)/constantThermal/constantThermal.C
 
 mechanicalConstitutiveLaw/mechanicalConstitutiveLawManager.C
+mechanicalConstitutiveLaw/mechanicalConstitutiveLawState.C
 mechanicalConstitutiveLaw = mechanicalConstitutiveLaw/mechanicalConstitutiveLaws
 $(mechanicalConstitutiveLaw)/mechanicalConstitutiveLaw/mechanicalConstitutiveLaw.C
 $(mechanicalConstitutiveLaw)/mechanicalConstitutiveLaw/mechanicalConstitutiveLawNew.C

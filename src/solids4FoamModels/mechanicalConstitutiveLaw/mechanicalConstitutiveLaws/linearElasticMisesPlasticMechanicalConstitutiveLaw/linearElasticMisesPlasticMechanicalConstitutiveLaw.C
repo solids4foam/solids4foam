@@ -448,12 +448,12 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
     reduce(nYielding, sumOp<label>());
     reduce(maxDEpsilonPEq, maxOp<scalar>());
 
-    const int nTotalCells = returnReduce(mesh().nCells(), sumOp<int>());
+    const int nTotalCells = returnReduce(epsilonPEq.size(), sumOp<int>());
 
-    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << nl
-        << "    " << nYielding << " cells ("
+    Info<< "    Max DEpsilonPEq is " << maxDEpsilonPEq << nl
+        << "    " << nYielding << " integration points ("
         << 100.0*scalar(nYielding)/scalar(nTotalCells)
-        << "% of the cells in this material) are actively yielding"
+        << "% of the integration points in this material) are actively yielding"
         << nl << endl;
 }
 
