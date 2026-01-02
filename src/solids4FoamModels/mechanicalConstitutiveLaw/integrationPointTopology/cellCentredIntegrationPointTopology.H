@@ -64,6 +64,9 @@ class cellCentredIntegrationPointTopology
 
 public:
 
+    //- Runtime type information
+    TypeName("cellCentredIntegrationPointTopology");
+
     //- Construct from mesh
     explicit cellCentredIntegrationPointTopology(const fvMesh& mesh)
     :
@@ -87,7 +90,7 @@ public:
     }
 
     //- Integration-point indices associated with a given cell
-    virtual const labelUList& cellIntegrationPointIDs
+    virtual const labelUList cellIntegrationPointIDs
     (
         const label cellI
     ) const override

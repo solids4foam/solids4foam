@@ -65,6 +65,9 @@ class compactCellIntegrationPointTopology
 
 public:
 
+    //- Runtime type information
+    TypeName("cellCentredIntegrationPointTopology");
+
     //- Construct from mesh and cell-to-integration-point addressing
     compactCellIntegrationPointTopology
     (
@@ -97,7 +100,7 @@ public:
     }
 
     //- Integration-point indices associated with a given cell
-    virtual const labelUList& cellIntegrationPointIDs
+    virtual const labelUList cellIntegrationPointIDs
     (
         const label cellI
     ) const override

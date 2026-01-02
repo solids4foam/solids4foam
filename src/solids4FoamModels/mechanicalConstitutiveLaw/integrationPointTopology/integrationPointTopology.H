@@ -72,20 +72,27 @@ protected:
 
 public:
 
+    //- Runtime type information
+    TypeName("integrationPointTopology");
+
+    //- Constructor
     explicit integrationPointTopology(const fvMesh& mesh)
     :
         mesh_(mesh)
     {}
 
+    //- Destructor
     virtual ~integrationPointTopology() = default;
 
     //- Total number of integration points in the constitutive working set
     virtual label nIntegrationPoints() const = 0;
 
     //- Integration-point indices associated with a given cell
-    //  The returned list is a non-owning reference that remains valid for the
-    //  lifetime of the topology object.
-    virtual const labelUList& cellIntegrationPointIDs
+    //  The returned object is a lightweight, non-owning view (labelUList)
+    //  into integration-point addressing stored by the topology.
+    //  No data is copied; the underlying storage remains owned by the
+    //  topology object and must outlive the use of the returned view.
+    virtual const labelUList cellIntegrationPointIDs
     (
         const label cellI
     ) const = 0;

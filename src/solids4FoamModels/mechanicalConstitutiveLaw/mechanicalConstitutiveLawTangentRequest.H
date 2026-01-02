@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::mechanicalConstitutiveLawResponse
+    Foam::mechanicalConstitutiveLawTangentRequest
 
 Description
     Enumeration defining requests for constitutive tangent information.
@@ -60,6 +60,23 @@ enum class tangentRequest
     // symmTensor,
     // fourthOrder
 };
+
+
+// Return the string name of a tangent request
+inline const word tangentRequestName
+(
+    const tangentRequest r
+)
+{
+    switch (r)
+    {
+        case tangentRequest::none:              return "none";
+        case tangentRequest::scalar:            return "scalar";
+        case tangentRequest::scalarDeviatoric:  return "scalarDeviatoric";
+    }
+
+    return "unknown";
+}
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

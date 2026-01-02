@@ -23,7 +23,8 @@ Description
     small rotations are assumed, and the total displacement is the primary
     unknown.
 
-    The stress is calculated by the run-time selectable mechanical law.
+    The stress is calculated by run-time selectable mechanical laws controlled
+    mechanical law manager.
 
 Author
     Philip Cardiff, UCD.

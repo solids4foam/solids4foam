@@ -58,10 +58,14 @@ Author
 
 #include "fvMesh.H"
 #include "volFields.H"
+#include "surfaceFields.H"
+#include "pointFields.H"
 #include "dictionary.H"
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
+#include "mechanicalConstitutiveLawStressCollapseRule.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -134,6 +138,11 @@ class mechanicalConstitutiveLawManager
         //  lawIntegrationPointIDs is the same as lawCells
         List<labelList> lawIntegrationPointIDs_;
 
+        //- Scratch fields for stress accumulation on surface fields
+        mutable autoPtr<surfaceSymmTensorField> surfaceStressSumPtr_;
+        mutable autoPtr<surfaceScalarField> surfaceStressWeightPtr_;
+        mutable autoPtr<surfaceScalarField> surfaceTangentWeightPtr_;
+
         //- Density field
         mutable autoPtr<volScalarField> rhoPtr_;
 
@@ -149,6 +158,19 @@ class mechanicalConstitutiveLawManager
             return
                 req == tangentRequest::scalar
              || req == tangentRequest::scalarDeviatoric;
+        }
+
+        //- Create scratch containers for surface fields
+        surfaceSymmTensorField& surfaceStressSum() const;
+        surfaceScalarField& surfaceStressWeight() const;
+        surfaceScalarField& surfaceTangentWeight() const;
+
+        //- Clear surface scratch fields
+        inline void clearScratchFields() const
+        {
+            surfaceStressSumPtr_.clear();
+            surfaceStressWeightPtr_.clear();
+            surfaceTangentWeightPtr_.clear();
         }
 
         //- No copy construct
@@ -219,6 +241,29 @@ public:
             const tangentRequest tangentReq = tangentRequest::none
         );
 
+        //- Update the engineering (small-strain) stress field stored on mesh faces
+        //  using the configured mechanical constitutive laws.
+        //  This interface is  discretisations where stresses are evaluated at
+        //  face-based integration points.
+        //  The stress is evaluated from the current and previous displacement
+        //  gradients defined on faces and the supplied time increment, and is
+        //  updated in-place.
+        //  Constitutive history variables are stored and updated internally via
+        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  Optionally computes an approximate scalar material tangent when
+        //  requested, e.g. for segregated or mixed displacement–pressure
+        //  formulations.
+        void updateStressSmallStrain
+        (
+            const surfaceTensorField& gradD,
+            const surfaceTensorField& gradD0,
+            const scalar dt,
+            surfaceSymmTensorField& stress,
+            const stressCollapseRule collapseRule = stressCollapseRule::none,
+            surfaceScalarField* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
         //- Update the engineering (small-strain) stress values stored in a
         //  compact integration-point layout using the configured mechanical
         //  constitutive laws.
@@ -267,6 +312,31 @@ public:
             volScalarField* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
+
+        //- Update the true (Cauchy) stress field stored on mesh faces using the
+        //  configured mechanical constitutive laws for a finite-strain formulation.
+        //  This interface is intended for  discretisations where stresses are
+        //  evaluated at face-based integration points.
+        //  The stress is evaluated from the current and previous deformation
+        //  gradients, their inverses, determinants, and the supplied time
+        //  increment, and is updated in-place.
+        //  Constitutive history variables are stored and updated internally via
+        //  mechanicalConstitutiveLawState objects.
+        //  Optionally computes an approximate scalar material tangent when
+        //  requested.
+        // void updateStressFiniteStrain
+        // (
+        //     const surfaceTensorField& F,
+        //     const surfaceTensorField& F0,
+        //     const surfaceScalarField& J,
+        //     const surfaceScalarField& J0,
+        //     const surfaceTensorField& Finv,
+        //     const surfaceTensorField& Finv0,
+        //     const scalar dt,
+        //     surfaceSymmTensorField& stress,
+        //     surfaceScalarField* scalarTangentPtr = nullptr,
+        //     const tangentRequest tangentReq = tangentRequest::none
+        // );
 
         //- Update the true (Cauchy) stress values stored in a compact
         //  integration-point layout using the configured mechanical

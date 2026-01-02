@@ -20,6 +20,7 @@ License
 #include "mechanicalConstitutiveLawManager.H"
 #include "compatibilityFunctions.H"
 #include "integrationPointTopology.H"
+#include "cellCentredIntegrationPointTopology.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -28,6 +29,89 @@ namespace Foam
 {
     defineTypeNameAndDebug(mechanicalConstitutiveLawManager, 0);
 }
+
+// * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
+
+Foam::surfaceSymmTensorField&
+Foam::mechanicalConstitutiveLawManager::surfaceStressSum() const
+{
+    if (!surfaceStressSumPtr_.valid())
+    {
+        surfaceStressSumPtr_.reset
+        (
+            new surfaceSymmTensorField
+            (
+                IOobject
+                (
+                    "surfaceStressSum",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh_,
+                dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+            )
+        );
+    }
+
+    return autoPtrRef(surfaceStressSumPtr_);
+}
+
+
+Foam::surfaceScalarField&
+Foam::mechanicalConstitutiveLawManager::surfaceStressWeight() const
+{
+    if (!surfaceStressWeightPtr_.valid())
+    {
+        surfaceStressWeightPtr_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "surfaceStressWeight",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh_,
+                dimensionedScalar("zero", dimless, 0.0)
+            )
+        );
+    }
+
+    return autoPtrRef(surfaceStressWeightPtr_);
+}
+
+
+Foam::surfaceScalarField&
+Foam::mechanicalConstitutiveLawManager::surfaceTangentWeight() const
+{
+    if (!surfaceTangentWeightPtr_.valid())
+    {
+        surfaceTangentWeightPtr_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "surfaceTangentWeight",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh_,
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return autoPtrRef(surfaceTangentWeightPtr_);
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -46,7 +130,12 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     boundaryStates_(),
     lawCells_(),
     lawBoundaryFaces_(),
-    lawIntegrationPointIDs_()
+    lawIntegrationPointIDs_(),
+    surfaceStressSumPtr_(),
+    surfaceStressWeightPtr_(),
+    surfaceTangentWeightPtr_(),
+    rhoPtr_(),
+    kappaPtr_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -187,7 +276,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
             const label cellI = cells[i];
 
             // Append all integration points associated with this cell
-            const labelUList& cellIPs =
+            const labelUList cellIPs =
                 ipTopology_.cellIntegrationPointIDs(cellI);
 
             ipIDs.append(cellIPs);
@@ -326,6 +415,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
+    {
+        FatalErrorInFunction
+            << "updateStressSmallStrain(volField) requires "
+            << "cell-centred integration points, but topology is "
+            << ipTopology_.type()
+            << exit(FatalError);
+    }
+
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
@@ -513,6 +611,246 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
+    const surfaceTensorField& gradD,
+    const surfaceTensorField& gradD0,
+    const scalar dt,
+    surfaceSymmTensorField& stress,
+    const stressCollapseRule collapseRule,
+    surfaceScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    FatalError
+        << "face integration points not yet available" << exit(FatalError);
+    // if (!isA<faceCentredIntegrationPointTopology>(ipTopology_))
+    // {
+    //     FatalErrorInFunction
+    //         << "updateStressSmallStrain(surfaceField) requires "
+    //         << "face-centred integration points, but topology is "
+    //         << ipTopology_.type()
+    //         << exit(FatalError);
+    // }
+
+    // Update the old state if it is a new time step
+    if (mesh_.time().timeIndex() != curTimeIndex_)
+    {
+        forAll(states_, sI)
+        {
+            states_[sI].storeOldTime();
+        }
+
+        forAll(boundaryStates_, sI)
+        {
+            forAll(boundaryStates_[sI], patchI)
+            {
+                boundaryStates_[sI][patchI].storeOldTime();
+            }
+        }
+
+        curTimeIndex_ = mesh_.time().timeIndex();
+    }
+
+    // Collapse rule: none → direct write, no accumulation allowed
+    if (collapseRule == stressCollapseRule::none)
+    {
+        stress = symmTensor::zero;
+
+        forAll(laws_, lawI)
+        {
+            const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+
+            const UIndirectList<tensor> gradDView
+            (
+                gradD.internalField(),
+                ipIDs
+            );
+
+            const UIndirectList<tensor> gradD0View
+            (
+                gradD0.internalField(),
+                ipIDs
+            );
+
+            UIndirectList<symmTensor> stressView
+            (
+                stress.internalField(),
+                ipIDs
+            );
+
+            smallStrainMechanicalConstitutiveLawKinematics kin
+            (
+                gradDView,
+                gradD0View,
+                dt
+            );
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView,
+                tangentReq
+            );
+
+            laws_[lawI].evaluate
+            (
+                kin,
+                states_[lawI],
+                response
+            );
+        }
+
+        stress.correctBoundaryConditions();
+        return;
+    }
+
+    // Accumulation path with stress "collapse" given by collapse rule, e.g.
+    // average, harmonic
+
+    surfaceSymmTensorField& stressSum = surfaceStressSum();
+    surfaceScalarField& weightSum = surfaceStressWeight();
+
+    stressSum = symmTensor::zero;
+    weightSum = 0.0;
+
+    surfaceScalarField* tangentWeightPtr = nullptr;
+
+    if (scalarTangentPtr && needsScalarTangent(tangentReq))
+    {
+        surfaceScalarField& tangentWeight = surfaceTangentWeight();
+        tangentWeight = 0.0;
+        tangentWeightPtr = &tangentWeight;
+    }
+
+    // Loop over constitutive laws
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> gradDView
+        (
+            gradD.internalField(),
+            ipIDs
+        );
+
+        const UIndirectList<tensor> gradD0View
+        (
+            gradD0.internalField(),
+            ipIDs
+        );
+
+        UIndirectList<symmTensor> stressView
+        (
+            stressSum.internalField(),
+            ipIDs
+        );
+
+        smallStrainMechanicalConstitutiveLawKinematics kin
+        (
+            gradDView,
+            gradD0View,
+            dt
+        );
+
+        if (scalarTangentPtr && needsScalarTangent(tangentReq))
+        {
+            UIndirectList<scalar> tangentView
+            (
+                *tangentWeightPtr,
+                ipIDs
+            );
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView,
+                tangentView,
+                tangentReq
+            );
+
+            laws_[lawI].evaluate
+            (
+                kin,
+                states_[lawI],
+                response
+            );
+        }
+        else
+        {
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView,
+                tangentReq
+            );
+
+            laws_[lawI].evaluate
+            (
+                kin,
+                states_[lawI],
+                response
+            );
+        }
+
+        // Accumulate weights
+        forAll(ipIDs, i)
+        {
+            weightSum[ipIDs[i]] += 1.0;
+        }
+    }
+
+    // Collapse accumulated stress
+
+    forAll(stress.internalField(), faceI)
+    {
+        const scalar w = weightSum[faceI];
+
+        if (w > SMALL)
+        {
+            if (collapseRule == stressCollapseRule::average)
+            {
+                stress[faceI] = stressSum[faceI]/w;
+            }
+            else if
+            (
+                collapseRule == stressCollapseRule::harmonic
+             && scalarTangentPtr
+             && needsScalarTangent(tangentReq)
+            )
+            {
+                stress[faceI] = stressSum[faceI]/max(w, SMALL);
+                (*scalarTangentPtr)[faceI] =
+                    w/max((*tangentWeightPtr)[faceI], SMALL);
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "Invalid stress collapse rule combination:\n"
+                    << "collapseRule = " << stressCollapseRuleName(collapseRule)
+                    << nl
+                    << "tangentReq   = " << tangentRequestName(tangentReq) << nl
+                    << "scalarTangentPtr = "
+                    << (scalarTangentPtr ? "set" : "null")
+                    << exit(FatalError);
+            }
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "At least one mesh face does not have a material law!\n"
+                << "faceI = " << faceI << nl
+                << "Check cellZones and integrationPointTopology."
+                << exit(FatalError);
+        }
+    }
+
+    stress.correctBoundaryConditions();
+
+    if (scalarTangentPtr && needsScalarTangent(tangentReq))
+    {
+        scalarTangentPtr->correctBoundaryConditions();
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
     const CompactListList<tensor>& gradD,
     const CompactListList<tensor>& gradD0,
     const scalar dt,
@@ -521,6 +859,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
+    {
+        FatalErrorInFunction
+            << "updateStressSmallStrain(volField) requires "
+            << "cell-centred integration points, but topology is "
+            << ipTopology_.type()
+            << exit(FatalError);
+    }
+
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
@@ -643,6 +990,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
+    {
+        FatalErrorInFunction
+            << "updateStressSmallStrain(volField) requires "
+            << "cell-centred integration points, but topology is "
+            << ipTopology_.type()
+            << exit(FatalError);
+    }
+
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
@@ -866,6 +1222,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
+    {
+        FatalErrorInFunction
+            << "updateStressSmallStrain(volField) requires "
+            << "cell-centred integration points, but topology is "
+            << ipTopology_.type()
+            << exit(FatalError);
+    }
+
     // Update the old state if it is a new time step
     if (mesh_.time().timeIndex() != curTimeIndex_)
     {
