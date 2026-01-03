@@ -83,8 +83,15 @@ private:
 
     // Private Data
 
-        //- Mechanical model for dual mesh
-        autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+        //- Mechanical model for dual mesh (OLD APPROACH)
+        mutable autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+
+        //- Integration-point topology used by the dual mesh constitutive law
+        //  manager
+        mutable autoPtr<integrationPointTopology> dualIpTopologyPtr_;
+
+        //- Mechanical constitutive law manager for dual mesh (NEW APPROACH)
+        mutable autoPtr<mechanicalConstitutiveLawManager> dualMechManagerPtr_;
 
         //- Implicit stiffness used by segregated algorithm
         //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
@@ -159,6 +166,18 @@ private:
 
 
     // Private Member Functions
+
+        //- Make the dual mesh mechanical model
+        void makeDualMechanical() const;
+
+        //- Return non-const reference to the dual mesh mechanical model
+        dualMechanicalModel& dualMechanical();
+
+        //- Make the dual mechanical model manager
+        void makeMechManager() const;
+
+        //- Return non-const reference to the dual mechanical model manager
+        mechanicalConstitutiveLawManager& dualMechManager();
 
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma

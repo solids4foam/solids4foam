@@ -89,20 +89,8 @@ class mechanicalConstitutiveLawManager
         //- Current time index so we can track when there is a new time step
         label curTimeIndex_;
 
-        //- Integration-point topology used to map mesh cells to constitutive
-        //  integration-point indices
-        const integrationPointTopology& ipTopology_;
-
         //- Constitutive laws
         PtrList<mechanicalConstitutiveLaw> laws_;
-
-        //- Constitutive states
-        PtrList<mechanicalConstitutiveLawState> states_;
-
-        //- Constitutive state per law per boundary patch
-        //  boundaryStates_[lawI][patchI] has size equal to the number of
-        //  boundary faces on patch patchI belonging to law lawI
-        List<PtrList<mechanicalConstitutiveLawState>> boundaryStates_;
 
         //- Cell indices defining the material support for each mechanical
         //  constitutive law.
@@ -122,22 +110,6 @@ class mechanicalConstitutiveLawManager
         //    patch patchI whose adjacent cell is assigned to law lawI.
         List<List<labelList>> lawBoundaryFaces_;
 
-        //- Integration-point indices per mechanical constitutive law.
-        //  Each entry corresponds to one mechanicalConstitutiveLaw and contains
-        //  the list of integration-point indices to which that law applies.
-        //  The indices refer to the constitutive working set, i.e.
-        //    - cell/face/point indices for low-order finite-volume formulations,
-        //      or
-        //    - integration-point indices into CompactListList::values() for
-        //      higher-order formulations, e.g. multiple integrations points per
-        //      cell/face/point.
-        //  The meaning and possible overlap of these indices depend on the
-        //  underlying integration-point topology (e.g. cell-, face-, or
-        //  vertex-based discretisations).
-        //  For cell-based nodes with one integration point,
-        //  lawIntegrationPointIDs is the same as lawCells
-        List<labelList> lawIntegrationPointIDs_;
-
         //- Scratch fields for stress accumulation on surface fields
         mutable autoPtr<surfaceSymmTensorField> surfaceStressSumPtr_;
         mutable autoPtr<surfaceScalarField> surfaceStressWeightPtr_;
@@ -149,8 +121,61 @@ class mechanicalConstitutiveLawManager
         //- Bulk modulus field
         mutable autoPtr<volScalarField> kappaPtr_;
 
+        //- Topology-specific constitutive data owned by the manager.
+        //  A topologyEntry groups together all data that depends on the *location*
+        //  of integration points (e.g. cell-centred, face-centred, vertex-centred,
+        //  or higher-order multi-point layouts).
+        //  For a given integrationPointTopology, this includes:
+        //    - the mapping from mechanical laws to integration-point indices
+        //      (lawIntegrationPointIDs),
+        //    - the constitutive state objects storing history variables at those
+        //      integration points, and
+        //    - optional boundary constitutive states where applicable.
+        //  This indirection allows a single mechanicalConstitutiveLawManager to
+        //  evaluate stresses at multiple locations (cells, faces, points, etc.)
+        //  using the same material definitions, while keeping state variables
+        //  strictly separated per topology.
+        //  Topology entries are constructed lazily on first use and cached for the
+        //  lifetime of the manager.
+        struct topologyEntry
+        {
+            //- Integration-point indices per mechanical law
+            List<labelList> lawIntegrationPointIDs_;
+
+            //- Constitutive state per mechanical law
+            PtrList<mechanicalConstitutiveLawState> states_;
+
+            //- Boundary constitutive state per law per patch (optional)
+            List<PtrList<mechanicalConstitutiveLawState>> boundaryStates_;
+
+            //- True if this topology supports boundary integration points
+            bool boundaryAware_;
+
+            //- Constructor
+            topologyEntry()
+            :
+                lawIntegrationPointIDs_(),
+                states_(),
+                boundaryStates_(),
+                boundaryAware_(false)
+            {}
+        };
+
+        //- Cache of topology-specific integration-point data and state
+        //  Keyed by the address of the integrationPointTopology instance
+        mutable HashTable<topologyEntry> topologyEntries_;
+
 
     // Private Member Functions
+
+        //- Ensure a topology entry exists and return it
+        topologyEntry& topology
+        (
+            const integrationPointTopology& topo
+        );
+
+        //- Commit old-time state for all topology entries if needed
+        void updateOldTimeIfNeeded();
 
         //- Check if the provided tangent request is scalar or scalarDeviatoric
         inline bool needsScalarTangent(const tangentRequest req)
@@ -195,8 +220,7 @@ public:
         mechanicalConstitutiveLawManager
         (
             const fvMesh& mesh,
-            const dictionary& dict,
-            const integrationPointTopology& ipTopology
+            const dictionary& dict
         );
 
 

@@ -96,6 +96,19 @@ public:
     (
         const label cellI
     ) const = 0;
+
+    //- Does this topology store boundary integration points per patch
+    virtual bool boundaryAware() const = 0;
+
+    //- Should integration-point indices be unique when aggregating across
+    //  multiple cells belonging to the same material.
+    //  For cell-centred topologies, each cell maps to a unique integration
+    //  point and duplicates cannot arise, so this should return false.
+    //  For face- or point-centred topologies, the same integration point may
+    //  be associated with multiple cells. In such cases, this function should
+    //  return true to ensure that each integration point is evaluated exactly
+    //  once per material law.
+    virtual bool requiresUniqueIntegrationPointsPerMaterial() const = 0;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

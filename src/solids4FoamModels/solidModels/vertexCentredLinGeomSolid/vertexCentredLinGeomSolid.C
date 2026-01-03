@@ -28,7 +28,9 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
 #include "compatibilityFunctions.H"
-#include <vector>
+#include "integrationPointTopologies.H"
+//#include <vector>
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -48,6 +50,85 @@ addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+void vertexCentredLinGeomSolid::makeDualMechanical() const
+{
+    if (!dualMechanicalPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    dualMechanicalPtr_.set
+    (
+        new dualMechanicalModel
+        (
+            dualMesh(),
+            nonLinGeom(),
+            incremental(),
+            mechanical(),
+            dualMeshMap().dualFaceToCell()
+        )
+    );
+}
+
+
+dualMechanicalModel& vertexCentredLinGeomSolid::dualMechanical()
+{
+    if (dualMechanicalPtr_.empty())
+    {
+        makeDualMechanical();
+    }
+
+    return autoPtrRef(dualMechanicalPtr_);
+}
+
+
+void vertexCentredLinGeomSolid::makeMechManager() const
+{
+    if (!dualMechManagerPtr_.empty() || !dualIpTopologyPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    FatalError
+        << "This should be face-based not cell-based!" << exit(FatalError);
+    dualIpTopologyPtr_.set(new cellCentredIntegrationPointTopology(dualMesh()));
+
+    dualMechManagerPtr_.set
+    (
+        new mechanicalConstitutiveLawManager
+        (
+            dualMesh(),
+            IOdictionary
+            (
+                IOobject
+                (
+                    "mechanicalProperties",
+                    mesh().time().constant(),
+                    mesh(),
+                    IOobject::MUST_READ,
+                    IOobject::NO_WRITE,
+                    false // do not register
+                )
+            ),
+            dualIpTopologyPtr_()
+        )
+    );
+}
+
+
+mechanicalConstitutiveLawManager& vertexCentredLinGeomSolid::dualMechManager()
+{
+    if (dualMechManagerPtr_.empty())
+    {
+        makeMechManager();
+    }
+
+    return autoPtrRef(dualMechManagerPtr_);
+}
+
 
 void vertexCentredLinGeomSolid::updatePointDivSigma
 (
@@ -791,17 +872,9 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
 #endif
-    dualMechanicalPtr_
-    (
-        new dualMechanicalModel
-        (
-            dualMesh(),
-            nonLinGeom(),
-            incremental(),
-            mechanical(),
-            dualMeshMap().dualFaceToCell()
-        )
-    ),
+    dualMechanicalPtr_(),
+    dualIpTopologyPtr_(),
+    dualMechManagerPtr_(),
     blockSize_
     (
         solvePressure()

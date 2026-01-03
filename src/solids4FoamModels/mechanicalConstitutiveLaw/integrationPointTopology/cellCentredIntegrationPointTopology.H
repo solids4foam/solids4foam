@@ -97,6 +97,19 @@ public:
     {
         return cellToIntegrationPointIDs_[cellI];
     }
+
+    //- Does this topology store boundary integration points per patch
+    virtual bool boundaryAware() const override
+    {
+        return true;
+    }
+
+    //- Should integration-point indices be unique when aggregating across
+    //  multiple cells belonging to the same material.
+    virtual bool requiresUniqueIntegrationPointsPerMaterial() const override
+    {
+        return false;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
