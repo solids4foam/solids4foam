@@ -27,4 +27,29 @@ namespace Foam
     defineTypeNameAndDebug(integrationPointTopology, 0);
 }
 
+// * * * * * * * * * * * * * * * Selectors * * * * * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::integrationPointTopology>
+Foam::integrationPointTopology::New
+(
+    const word& topologyType,
+    const fvMesh& mesh
+)
+{
+    auto* ctorPtr = fvMeshConstructorTable(topologyType);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInFunction
+            << "Unknown integrationPointTopology type: "
+            << topologyType << nl << nl
+            << "Valid integrationPointTopology types are:" << nl
+            << fvMeshConstructorTablePtr_->sortedToc()
+            << exit(FatalError);
+    }
+
+    return autoPtr<integrationPointTopology>(ctorPtr(mesh));
+}
+
+
 // ************************************************************************* //

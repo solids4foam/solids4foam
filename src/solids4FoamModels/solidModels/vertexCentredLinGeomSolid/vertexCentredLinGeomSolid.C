@@ -86,15 +86,11 @@ dualMechanicalModel& vertexCentredLinGeomSolid::dualMechanical()
 
 void vertexCentredLinGeomSolid::makeMechManager() const
 {
-    if (!dualMechManagerPtr_.empty() || !dualIpTopologyPtr_.empty())
+    if (!dualMechManagerPtr_.empty())
     {
         FatalErrorInFunction
             << "pointer already set!" << abort(FatalError);
     }
-
-    FatalError
-        << "This should be face-based not cell-based!" << exit(FatalError);
-    dualIpTopologyPtr_.set(new cellCentredIntegrationPointTopology(dualMesh()));
 
     dualMechManagerPtr_.set
     (
@@ -112,8 +108,7 @@ void vertexCentredLinGeomSolid::makeMechManager() const
                     IOobject::NO_WRITE,
                     false // do not register
                 )
-            ),
-            dualIpTopologyPtr_()
+            )
         )
     );
 }
@@ -873,7 +868,6 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     ),
 #endif
     dualMechanicalPtr_(),
-    dualIpTopologyPtr_(),
     dualMechManagerPtr_(),
     blockSize_
     (

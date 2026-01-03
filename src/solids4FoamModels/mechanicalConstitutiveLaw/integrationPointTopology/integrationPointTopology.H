@@ -53,6 +53,8 @@ Author
 
 #include "labelList.H"
 #include "fvMesh.H"
+#include "autoPtr.H"
+#include "runTimeSelectionTables.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -74,6 +76,23 @@ public:
 
     //- Runtime type information
     TypeName("integrationPointTopology");
+
+    //- Declare run-time constructor selection table
+    declareRunTimeSelectionTable
+    (
+        autoPtr,
+        integrationPointTopology,
+        fvMesh,
+        (const fvMesh& mesh),
+        (mesh)
+    );
+
+    //- Selector
+    static autoPtr<integrationPointTopology> New
+    (
+        const word& topologyType,
+        const fvMesh& mesh
+    );
 
     //- Constructor
     explicit integrationPointTopology(const fvMesh& mesh)

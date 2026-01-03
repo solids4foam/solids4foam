@@ -19,8 +19,7 @@ License
 
 #include "mechanicalConstitutiveLawManager.H"
 #include "compatibilityFunctions.H"
-#include "integrationPointTopology.H"
-#include "cellCentredIntegrationPointTopology.H"
+#include "integrationPointTopologies.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -32,11 +31,44 @@ namespace Foam
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
+const Foam::integrationPointTopology&
+Foam::mechanicalConstitutiveLawManager::topologyFor
+(
+    const word& topologyTypeName
+) const
+{
+    // Already constructed?
+    if (topologyCache_.found(topologyTypeName))
+    {
+        return topology(*topologyCache_[topologyTypeName]).topology_;
+    }
+
+    // Lazily construct via OpenFOAM runtime selection
+    autoPtr<integrationPointTopology> topoPtr
+    (
+        integrationPointTopology::New(topologyTypeName, mesh_)
+    );
+
+    if (!topoPtr.valid())
+    {
+        FatalErrorInFunction
+            << "Failed to construct integrationPointTopology of type "
+            << topologyTypeName
+            << exit(FatalError);
+    }
+
+    // Cache and return
+    topologyCache_.insert(topologyTypeName, topoPtr);
+
+    return topology(*topologyCache_[topologyTypeName]).topology_;
+}
+
+
 Foam::mechanicalConstitutiveLawManager::topologyEntry&
 Foam::mechanicalConstitutiveLawManager::topology
 (
     const integrationPointTopology& topo
-)
+) const
 {
     // Use the address of the topology object as a unique key
     const word key = Foam::name(reinterpret_cast<std::uintptr_t>(&topo));
@@ -54,7 +86,7 @@ Foam::mechanicalConstitutiveLawManager::topology
     DebugInfo
         << "Creating topologyEntry for " << key << endl;
 
-    topologyEntries_.insert(key, topologyEntry());
+    topologyEntries_.insert(key, topologyEntry(topo));
     topologyEntry& entry = topologyEntries_[key];
 
     const label nLaws = laws_.size();
@@ -300,6 +332,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     surfaceTangentWeightPtr_(),
     rhoPtr_(),
     kappaPtr_(),
+    topologyCache_(),
     topologyEntries_()
 {
     // Read the mechanical laws
@@ -526,7 +559,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Look up the cell map and state for cell-based topologies
+    // Look up the map and state for cell-based topologies
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
     topologyEntry& tp = topology(topo);
 
     forAll(laws_, lawI)
@@ -694,7 +730,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
-    const integrationPointTopology& topo,
     const surfaceTensorField& gradD,
     const surfaceTensorField& gradD0,
     const scalar dt,
@@ -706,6 +741,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 {
     FatalError
         << "face integration points not yet available" << exit(FatalError);
+
+    // Look up the map and state for face-based topologies
+    // const integrationPointTopology& topo =
+    //     topologyFor(faceCentredIntegrationPointTopology::typeName);
+
+    // topologyEntry& tp = topology(topo);
+
     /*
     if (!isA<faceCentredIntegrationPointTopology>(ipTopology_))
     {
@@ -921,7 +963,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
-    const integrationPointTopology& topo,
     const CompactListList<tensor>& gradD,
     const CompactListList<tensor>& gradD0,
     const scalar dt,
@@ -930,14 +971,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
-    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
-    {
-        FatalErrorInFunction
-            << "updateStressSmallStrain(volField) requires "
-            << "cell-centred integration points, but topology is "
-            << ipTopology_.type()
-            << exit(FatalError);
-    }
+    // Look up the map and state for compact list cell-based topologies
+    const integrationPointTopology& topo =
+        topologyFor(compactCellIntegrationPointTopology::typeName);
+
+    topologyEntry& tp = topology(topo);
 
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
@@ -947,7 +985,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const List<tensor>& gradD0Vals = gradD0.values();
     List<symmTensor>& stressVals   = stress.values();
 
-    // Consistency check
+    // Consistency check => encapusate in a function: should be called in all
+    // update stress functions!
+    FatalError
+        << "Consistency check => encapusate" << exit(FatalError);
     if
     (
         gradD.totalSize()  != stress.totalSize()
@@ -979,7 +1020,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
 
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> gradDView(gradDVals, ipIDs);
@@ -999,37 +1040,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         {
             UIndirectList<scalar> tangentView
             (
-                *scalarTangentPtr,
-                ipIDs
+                *scalarTangentPtr, ipIDs
             );
 
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentView,
-                tangentReq
+                stressView, tangentView, tangentReq
             );
 
             laws_[lawI].evaluate
             (
-                kin,
-                states_[lawI],
-                response
+                kin, tp.states_[lawI], response
             );
         }
         else
         {
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentReq
+                stressView, tangentReq
             );
 
             laws_[lawI].evaluate
             (
-                kin,
-                states_[lawI],
-                response
+                kin, tp.states_[lawI], response
             );
         }
     }
@@ -1038,7 +1071,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 (
-    const integrationPointTopology& topo,
     const volTensorField& F,
     const volTensorField& F0,
     const volScalarField& J,
@@ -1051,21 +1083,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
-    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
-    {
-        FatalErrorInFunction
-            << "updateStressSmallStrain(volField) requires "
-            << "cell-centred integration points, but topology is "
-            << ipTopology_.type()
-            << exit(FatalError);
-    }
-
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Look up the map and state for cell-based topologies
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    topologyEntry& tp = topology(topo);
+
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
 
         // Update the internal field
         {
@@ -1104,21 +1133,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 // data
                 UIndirectList<scalar> tangentView
                 (
-                    scalarTangentPtr->internalField(),
-                    ipIDs
+                    scalarTangentPtr->internalField(), ipIDs
                 );
 
                 // Create wrapper for material: output from material law
                 // This does not copy data
                 mechanicalConstitutiveLawResponse response
                 (
-                    stressView,
-                    tangentView,
-                    tangentReq
+                    stressView, tangentView, tangentReq
                 );
 
                 // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, states_[lawI], response);
+                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
             }
             else
             {
@@ -1126,12 +1152,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 // This does not copy data
                 mechanicalConstitutiveLawResponse response
                 (
-                    stressView,
-                    tangentReq
+                    stressView, tangentReq
                 );
 
                 // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, states_[lawI], response);
+                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
             }
         }
 
@@ -1210,15 +1235,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     // This does not copy data
                     mechanicalConstitutiveLawResponse response
                     (
-                        stressView,
-                        tangentView,
-                        tangentReq
+                        stressView, tangentView, tangentReq
                     );
 
                     // Update the material response, e.g. update the stress
                     laws_[lawI].evaluate
                     (
-                        kin, boundaryStates_[lawI][patchI], response
+                        kin, tp.boundaryStates_[lawI][patchI], response
                     );
                 }
                 else
@@ -1233,7 +1256,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     // Update the material response, e.g. update the stress
                     laws_[lawI].evaluate
                     (
-                        kin, boundaryStates_[lawI][patchI], response
+                        kin, tp.boundaryStates_[lawI][patchI], response
                     );
                 }
             }
@@ -1252,7 +1275,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 (
-    const integrationPointTopology& topo,
     const CompactListList<tensor>& F,
     const CompactListList<tensor>& F0,
     const CompactListList<tensor>& Finv,
@@ -1265,17 +1287,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
-    if (!isA<cellCentredIntegrationPointTopology>(ipTopology_))
-    {
-        FatalErrorInFunction
-            << "updateStressSmallStrain(volField) requires "
-            << "cell-centred integration points, but topology is "
-            << ipTopology_.type()
-            << exit(FatalError);
-    }
-
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
+
+    // Look up the map and state for compact list cell-based topologies
+    const integrationPointTopology& topo =
+        topologyFor(compactCellIntegrationPointTopology::typeName);
+
+    topologyEntry& tp = topology(topo);
 
     // Access packed integration-point storage
     const List<tensor>& FVals = F.values();
@@ -1316,7 +1335,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
 
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> FView(FVals, ipIDs);
@@ -1345,37 +1364,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         {
             UIndirectList<scalar> tangentView
             (
-                *scalarTangentPtr,
-                ipIDs
+                *scalarTangentPtr, ipIDs
             );
 
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentView,
-                tangentReq
+                stressView, tangentView, tangentReq
             );
 
             laws_[lawI].evaluate
             (
-                kin,
-                states_[lawI],
-                response
+                kin, tp.states_[lawI], response
             );
         }
         else
         {
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentReq
+                stressView, tangentReq
             );
 
             laws_[lawI].evaluate
             (
-                kin,
-                states_[lawI],
-                response
+                kin, tp.states_[lawI], response
             );
         }
     }
@@ -1387,9 +1398,19 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     const scalar time = mesh_.time().value();
     const label timeIndex = mesh_.time().timeIndex();
 
-    forAll(laws_, lawI)
+    // Loop over all topology entries
+    forAllIter
+    (
+        HashTable<topologyEntry>, topologyEntries_, topoIter
+    )
     {
-        laws_[lawI].endTimeStep(states_[lawI], time, timeIndex);
+        topologyEntry& tp = topoIter();
+
+        forAll(laws_, lawI)
+        {
+            // Call endTimeStep with each topo type for each law
+            laws_[lawI].endTimeStep(tp.states_[lawI], time, timeIndex);
+        }
     }
 }
 

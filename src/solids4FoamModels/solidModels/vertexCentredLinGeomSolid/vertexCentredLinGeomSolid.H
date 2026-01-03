@@ -86,10 +86,6 @@ private:
         //- Mechanical model for dual mesh (OLD APPROACH)
         mutable autoPtr<dualMechanicalModel> dualMechanicalPtr_;
 
-        //- Integration-point topology used by the dual mesh constitutive law
-        //  manager
-        mutable autoPtr<integrationPointTopology> dualIpTopologyPtr_;
-
         //- Mechanical constitutive law manager for dual mesh (NEW APPROACH)
         mutable autoPtr<mechanicalConstitutiveLawManager> dualMechManagerPtr_;
 

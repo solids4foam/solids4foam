@@ -121,6 +121,9 @@ class mechanicalConstitutiveLawManager
         //- Bulk modulus field
         mutable autoPtr<volScalarField> kappaPtr_;
 
+        //- Cache of integration-point topologies, owned by the manager
+        mutable HashTable<autoPtr<integrationPointTopology>> topologyCache_;
+
         //- Topology-specific constitutive data owned by the manager.
         //  A topologyEntry groups together all data that depends on the *location*
         //  of integration points (e.g. cell-centred, face-centred, vertex-centred,
@@ -139,6 +142,9 @@ class mechanicalConstitutiveLawManager
         //  lifetime of the manager.
         struct topologyEntry
         {
+            //- The topology that defines this entry (non-owning)
+            const integrationPointTopology& topology_;
+
             //- Integration-point indices per mechanical law
             List<labelList> lawIntegrationPointIDs_;
 
@@ -152,8 +158,9 @@ class mechanicalConstitutiveLawManager
             bool boundaryAware_;
 
             //- Constructor
-            topologyEntry()
+            topologyEntry(const integrationPointTopology& topo)
             :
+                topology_(topo),
                 lawIntegrationPointIDs_(),
                 states_(),
                 boundaryStates_(),
@@ -168,11 +175,18 @@ class mechanicalConstitutiveLawManager
 
     // Private Member Functions
 
+        //- Return (and lazily construct) an integration-point topology by type
+        //  name
+        const integrationPointTopology& topologyFor
+        (
+            const word& topologyTypeName
+        ) const;
+
         //- Ensure a topology entry exists and return it
         topologyEntry& topology
         (
             const integrationPointTopology& topo
-        );
+        ) const;
 
         //- Commit old-time state for all topology entries if needed
         void updateOldTimeIfNeeded();
