@@ -281,6 +281,15 @@ class mechanicalConstitutiveLawManager
              || req == tangentRequest::scalarDeviatoric;
         }
 
+        //- Check if the provided tangent request is fourthOrder or
+        //  fourthOrderFiniteDifference
+        inline bool needsFourthOrderTangent(const tangentRequest req)
+        {
+            return
+                req == tangentRequest::fourthOrder
+             || req == tangentRequest::fourthOrderFiniteDifference;
+        }
+
         //- Create (if required) and return scratch containers for surface
         //  fields
         surfaceSymmTensorField& surfaceStressSum() const;

@@ -157,16 +157,66 @@ public:
 
     // Edit
 
-        //- Small strain tensor: epsilon = symm(gradD)
-        inline symmTensor epsilon(const label i) const
+        //- Return a perturbed copy of gradD at ipI
+        //  Voigt strain perturbation to integration point ipI
+        //  j = Voigt index [0..5]
+        //  h = perturbation magnitude
+        //  This can be used for calculating material tangents with finite
+        //  differences
+        inline tensor gradDPerturbed
+        (
+            const label ipI, const label j, const scalar h
+        ) const
         {
-            return symm(gradD_[i]);
-        }
+            #ifdef FULLDEBUG
+            if (j < 0 || j >= 6)
+            {
+                FatalErrorInFunction
+                    << "Invalid Voigt index j = " << j
+                    << " (expected 0..5)"
+                    << exit(FatalError);
+            }
+            #endif
 
-        //- Strain increment: delta epsilon
-        inline symmTensor deltaEpsilon(const label i) const
-        {
-            return symm(gradD_[i] - gradD0_[i]);
+            // Copy of gradD
+            tensor g = gradD_[ipI];
+
+            switch (j)
+            {
+                case symmTensor::XX:
+                    g.xx() += h;
+                    break;
+
+                case symmTensor::YY:
+                    g.yy() += h;
+                    break;
+
+                case symmTensor::ZZ:
+                    g.zz() += h;
+                    break;
+
+                case symmTensor::YZ:
+                    g.yz() += h;
+                    g.zy() += h;
+                    break;
+
+                case symmTensor::XZ:
+                    g.xz() += h;
+                    g.zx() += h;
+                    break;
+
+                case symmTensor::XY:
+                    g.xy() += h;
+                    g.yx() += h;
+                    break;
+
+                default:
+                    FatalErrorInFunction
+                        << "Invalid Voigt component index j = " << j
+                            << exit(FatalError);
+            }
+
+            return g;
         }
 };
 

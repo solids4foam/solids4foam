@@ -48,17 +48,28 @@ namespace Foam
 
 //- Requested level of constitutive tangent information.
 //
-//  This enum specifies which (if any) tangent quantities a mechanical
-//  constitutive law should compute during evaluation. The request is
-//  advisory: a law may choose to ignore unsupported requests.
+//  Specifies which (if any) tangent quantities a mechanical constitutive
+//  law should provide during evaluation. The request is advisory: a law
+//  may ignore requests it does not support.
+//  Tangent quantities are intended for use in implicit or mixed
+//  formulations (e.g. Newton–Raphson schemes or mixed u–p methods).
 enum class tangentRequest
 {
-    none,               // Stress only
-    scalar,             // Scalar approximate tangent
-    scalarDeviatoric,   // Deviatoric-only scalar tangent (mixed u–p)
-    fourthOrder         // Full fourth-order tangent defined as a 6x6 matrix
-};
+    none,                       // Stress only; no tangent information
 
+    scalar,                     // Scalar approximate tangent
+
+    scalarDeviatoric,           // Deviatoric-only scalar tangent
+                                // (e.g. for mixed displacement–pressure
+                                // formulations)
+
+    fourthOrder,                // Full fourth-order material tangent,
+                                // represented as a 6x6 matrix in Voigt form
+
+    fourthOrderFiniteDifference // Full fourth-order material tangent,
+                                // represented as a 6x6 Voigt matrix and
+                                // computed using finite differences
+};
 
 // Return the string name of a tangent request
 inline const word tangentRequestName
@@ -72,6 +83,8 @@ inline const word tangentRequestName
         case tangentRequest::scalar:            return "scalar";
         case tangentRequest::scalarDeviatoric:  return "scalarDeviatoric";
         case tangentRequest::fourthOrder:       return "fourthOrder";
+        case tangentRequest::fourthOrderFiniteDifference:
+            return "fourthOrderFiniteDifference";
     }
 
     return "unknown";

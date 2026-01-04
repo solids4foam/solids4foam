@@ -971,7 +971,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     }
 
     // We need to introduce weights for the fourthOrderTangent
-    if (tangentReq == tangentRequest::fourthOrder && laws_.size() > 1)
+    if (needsFourthOrderTangent(tangentReq) && laws_.size() > 1)
     {
         notImplemented
         (
@@ -1021,7 +1021,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
         else if
         (
-            fourthOrderTangentPtr && tangentReq == tangentRequest::fourthOrder
+            fourthOrderTangentPtr && needsFourthOrderTangent(tangentReq)
         )
         {
             UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
@@ -1152,7 +1152,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         // This does not copy data
                         mechanicalConstitutiveLawResponse response
                         (
-                            stressView, tangentReq
+                            stressView, tangentRequest::none
                         );
 
                         // Update the material response, e.g. update the stress

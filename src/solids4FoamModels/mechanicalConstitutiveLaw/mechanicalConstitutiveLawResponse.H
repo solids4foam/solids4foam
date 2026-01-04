@@ -169,7 +169,11 @@ public:
             fourthOrderTangentPtr_(&fourthOrderTangent),
             tangentRequest_(tangentReq)
         {
-            if (tangentReq != tangentRequest::fourthOrder)
+            if
+            (
+                tangentReq != tangentRequest::fourthOrder
+             && tangentReq != tangentRequest::fourthOrderFiniteDifference
+            )
             {
                 FatalErrorInFunction
                     << "Fourth-order tangent supplied but tangentReq = "
@@ -226,6 +230,14 @@ public:
             return
                 tangentRequest_ == tangentRequest::scalar
              || tangentRequest_ == tangentRequest::scalarDeviatoric;
+        }
+
+        //- Does this reponse want a fourth order tangent calculated
+        bool wantsFourthOrderTangent() const
+        {
+            return
+                tangentRequest_ == tangentRequest::fourthOrder
+             || tangentRequest_ == tangentRequest::fourthOrderFiniteDifference;
         }
 
     // Edit

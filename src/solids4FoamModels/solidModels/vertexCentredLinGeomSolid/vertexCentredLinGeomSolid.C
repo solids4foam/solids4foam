@@ -1413,6 +1413,15 @@ label vertexCentredLinGeomSolid::formJacobian
     }
     else
     {
+        // Set the type of material tangent to be requested
+        const tangentRequest tangentReq =
+            solidModelDict().lookupOrDefault<Switch>
+            (
+                "finiteDifferenceMaterialTangent", false
+            )
+          ? tangentRequest::fourthOrderFiniteDifference
+          : tangentRequest::fourthOrder;
+
         // Calculate stress and material tangent at dual faces
         dualMechManager().updateStressSmallStrain
         (
@@ -1423,7 +1432,7 @@ label vertexCentredLinGeomSolid::formJacobian
             stressCollapseRule::average,
             nullptr,
             &dualMaterialTangent_,
-            tangentRequest::fourthOrder
+            tangentReq
         );
 
         // Add linearisation of div(sigma) to jac

@@ -95,7 +95,7 @@ linearElasticMechanicalConstitutiveLaw
 void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
-    mechanicalConstitutiveLawState& /*state*/,
+    mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
 {
@@ -140,35 +140,69 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
             K[i] = Keff;
         }
     }
-    else if (response.hasFourthOrderTangent())
+    else if
+    (
+        response.tangentReq()
+     == tangentRequest::fourthOrderFiniteDifference
+    )
     {
-        UIndirectList<mat66>& C = response.fourthOrderTangent();
+        if (!response.hasFourthOrderTangent())
+        {
+            FatalErrorInFunction
+                << "Finite difference fourth order tangent requested but the "
+                << "response was not provided the with field"
+                << exit(FatalError);
+        }
 
-        forAll(C, i)
+        // Base-class finite difference implementation
+        finiteDifferenceFourthOrder(kin, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        if (!response.hasFourthOrderTangent())
+        {
+            FatalErrorInFunction
+                << "Fourth order tangent requested but the "
+                << "response was not provided with the field"
+                << exit(FatalError);
+        }
+
+        UIndirectList<mat66>& Cfield = response.fourthOrderTangent();
+
+        // Define matrix indices for readability
+        const label XX = symmTensor::XX;
+        const label YY = symmTensor::YY;
+        const label ZZ = symmTensor::ZZ;
+        const label XY = symmTensor::XY;
+        const label YZ = symmTensor::YZ;
+        const label XZ = symmTensor::XZ;
+
+        // Analytical calculate the tangent
+        forAll(Cfield, i)
         {
             // Take a reference to C for the current integration point
-            mat66& curC = C[i];
+            mat66& C = Cfield[i];
 
             // Important: zero everything first as mat66 is not initialised by
             // default
-            curC.clear();
+            C.clear();
 
             // Normal-normal blocks
-            curC(0,0) = lambdaVal + 2.0*muVal;
-            curC(1,1) = lambdaVal + 2.0*muVal;
-            curC(2,2) = lambdaVal + 2.0*muVal;
+            C(XX,XX) = lambdaVal + 2.0*muVal;
+            C(YY,YY) = lambdaVal + 2.0*muVal;
+            C(ZZ,ZZ) = lambdaVal + 2.0*muVal;
 
-            curC(0,1) = lambdaVal;
-            curC(0,2) = lambdaVal;
-            curC(1,0) = lambdaVal;
-            curC(1,2) = lambdaVal;
-            curC(2,0) = lambdaVal;
-            curC(2,1) = lambdaVal;
+            C(XX,YY) = lambdaVal;
+            C(XX,ZZ) = lambdaVal;
+            C(YY,XX) = lambdaVal;
+            C(YY,ZZ) = lambdaVal;
+            C(ZZ,XX) = lambdaVal;
+            C(ZZ,YY) = lambdaVal;
 
             // Shear terms (engineering shear)
-            curC(3,3) = muVal;
-            curC(4,4) = muVal;
-            curC(5,5) = muVal;
+            C(XY,XY) = muVal;
+            C(YZ,YZ) = muVal;
+            C(XZ,XZ) = muVal;
         }
     }
 }

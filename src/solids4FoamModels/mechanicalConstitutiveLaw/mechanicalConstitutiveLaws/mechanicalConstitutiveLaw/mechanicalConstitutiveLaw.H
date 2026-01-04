@@ -89,6 +89,19 @@ class mechanicalConstitutiveLaw
         void operator=(const mechanicalConstitutiveLaw&);
 
 
+protected:
+
+    //- Finite-difference fourth-order tangent (small strain)
+    //  Finite-difference tangent evaluation is guaranteed to leave
+    //  the supplied constitutive state unmodified.
+    void finiteDifferenceFourthOrder
+    (
+        const smallStrainMechanicalConstitutiveLawKinematics& kin,
+        mechanicalConstitutiveLawState& state,
+        mechanicalConstitutiveLawResponse& response
+    ) const;
+
+
 public:
 
     //- Runtime type information
