@@ -800,7 +800,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
-    FatalError
+    FatalErrorInFunction
         << "face integration points not yet available" << exit(FatalError);
 
     // Look up the map and state for face-based topologies
@@ -1019,6 +1019,23 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         scalarTangentPtr->correctBoundaryConditions();
     }
         */
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
+    const pointTensorField& gradD,
+    const pointTensorField& gradD0,
+    const scalar dt,
+    pointSymmTensorField& stress,
+    const stressCollapseRule collapseRule,
+    pointScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    FatalErrorInFunction
+        << "point-based integration points not yet available"
+        << exit(FatalError);
 }
 
 

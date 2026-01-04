@@ -299,18 +299,11 @@ public:
             const tangentRequest tangentReq = tangentRequest::none
         );
 
-        //- Update the engineering (small-strain) stress field stored on mesh faces
-        //  using the configured mechanical constitutive laws.
-        //  This interface is  discretisations where stresses are evaluated at
-        //  face-based integration points.
-        //  The stress is evaluated from the current and previous displacement
-        //  gradients defined on faces and the supplied time increment, and is
-        //  updated in-place.
-        //  Constitutive history variables are stored and updated internally via
-        //  mechanicalConstitutiveLawState objects associated with each material.
-        //  Optionally computes an approximate scalar material tangent when
-        //  requested, e.g. for segregated or mixed displacement–pressure
-        //  formulations.
+        //- Update the engineering (small-strain) stress field stored on mesh
+        //  faces using the configured mechanical constitutive laws.
+        //  Unlike cell-based approach, faces can appear in more than one
+        //  material law (e.g., material interface), so a stress "collapse" rule
+        //  must be defined to specify how the multiple stresses are combined
         void updateStressSmallStrain
         (
             const surfaceTensorField& gradD,
@@ -319,6 +312,22 @@ public:
             surfaceSymmTensorField& stress,
             const stressCollapseRule collapseRule = stressCollapseRule::none,
             surfaceScalarField* scalarTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Update the engineering (small-strain) stress field stored on mesh
+        //  faces using the configured mechanical constitutive laws.
+        //  Unlike cell-based approach, points can appear in more than one
+        //  material law (e.g., material interface), so a stress "collapse" rule
+        //  must be defined to specify how the multiple stresses are combined
+        void updateStressSmallStrain
+        (
+            const pointTensorField& gradD,
+            const pointTensorField& gradD0,
+            const scalar dt,
+            pointSymmTensorField& stress,
+            const stressCollapseRule collapseRule = stressCollapseRule::none,
+            pointScalarField* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
 

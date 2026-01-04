@@ -93,7 +93,7 @@ private:
         //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
+        surfaceScalarField dualImpKf_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -118,7 +118,7 @@ private:
 
         //- Scale factor for the fixed degree of freedom equations to improve
         //  the matrix conditioning
-        const scalar fixedDofScale_;
+        scalar fixedDofScale_;
 
 #ifdef USE_PETSC
         //- Pointer to PETSc indexing object used for identifying fixed degrees
@@ -163,14 +163,14 @@ private:
 
     // Private Member Functions
 
-        //- Make the dual mesh mechanical model
-        void makeDualMechanical() const;
+        // //- Make the dual mesh mechanical model
+        // void makeDualMechanical() const;
 
-        //- Return non-const reference to the dual mesh mechanical model
-        dualMechanicalModel& dualMechanical();
+        // //- Return non-const reference to the dual mesh mechanical model
+        // dualMechanicalModel& dualMechanical();
 
         //- Make the dual mechanical model manager
-        void makeMechManager() const;
+        void makeDualMechManager() const;
 
         //- Return non-const reference to the dual mechanical model manager
         mechanicalConstitutiveLawManager& dualMechManager();
@@ -219,11 +219,11 @@ private:
         }
 #endif
 
-        //- Make dualImpKf field
-        void makeDualImpKf() const;
+        // //- Make dualImpKf field
+        // void makeDualImpKf() const;
 
-        //- Return dualImpK field
-        const surfaceScalarField& dualImpKf() const;
+        // //- Return dualImpK field
+        // const surfaceScalarField& dualImpKf() const;
 
         //- Predict displacement field using the velocity field
         void predict();
