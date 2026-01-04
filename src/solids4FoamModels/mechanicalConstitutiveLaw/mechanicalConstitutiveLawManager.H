@@ -176,6 +176,59 @@ class mechanicalConstitutiveLawManager
 
     // Private Member Functions
 
+        //- Check the provided mesh is the same as the mesh used during
+        //  construction
+        inline void checkMeshConsistency
+        (
+            const polyMesh& expectedMesh,
+            const polyMesh& fieldMesh,
+            const word& fieldName
+        )
+        {
+            if (&fieldMesh != &expectedMesh)
+            {
+                FatalError
+                    << "Field '" << fieldName << "' is associated with a "
+                    << "different mesh." << nl
+                    << "Expected mesh address: " << expectedMesh.name() << nl
+                    << "Field mesh address:    " << fieldMesh.name()
+                    << exit(FatalError);
+            }
+        }
+
+        //- Check the provided compact list sizes are consistent
+        inline void checkCompactLayoutConsistency
+        (
+            const CompactListList<tensor>& a,
+            const CompactListList<tensor>& b,
+            const CompactListList<symmTensor>& out,
+            const List<scalar>* tangentPtr,
+            const word& context
+        )
+        {
+            const label nIP = out.totalSize();
+
+            if (a.totalSize() != nIP || b.totalSize() != nIP)
+            {
+                FatalError
+                    << "Inconsistent CompactListList sizes in " << context << nl
+                    << "Expected totalSize = " << nIP << nl
+                    << "Got: grad = " << a.totalSize()
+                    << ", grad0 = " << b.totalSize()
+                    << exit(FatalError);
+            }
+
+            if (tangentPtr && tangentPtr->size() != nIP)
+            {
+                FatalError
+                    << "Scalar tangent list has incorrect size in " << context
+                    << nl
+                    << "Expected: " << nIP
+                    << ", got: " << tangentPtr->size()
+                    << exit(FatalError);
+            }
+        }
+
         //- Return (and lazily construct) an integration-point topology by type
         //  name
         const integrationPointTopology& topologyFor

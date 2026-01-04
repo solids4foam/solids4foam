@@ -31,6 +31,7 @@ namespace Foam
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
+
 const Foam::integrationPointTopology&
 Foam::mechanicalConstitutiveLawManager::topologyFor
 (
@@ -617,6 +618,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Check gradD is defined on the correct mesh
+    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
+    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
+    checkMeshConsistency(mesh_, stress.mesh(), stress.name());
+    if (scalarTangentPtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
+        );
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -800,6 +813,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Check gradD is defined on the correct mesh
+    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
+    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
+    checkMeshConsistency(mesh_, stress.mesh(), stress.name());
+    if (scalarTangentPtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
+        );
+    }
+
     FatalErrorInFunction
         << "face integration points not yet available" << exit(FatalError);
 
@@ -1033,6 +1058,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Check gradD is defined on the correct mesh
+    checkMeshConsistency(mesh_, gradD.mesh()(), gradD.name());
+    checkMeshConsistency(mesh_, gradD0.mesh()(), gradD0.name());
+    checkMeshConsistency(mesh_, stress.mesh()(), stress.name());
+    if (scalarTangentPtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_, scalarTangentPtr->mesh()(), scalarTangentPtr->name()
+        );
+    }
+
     FatalErrorInFunction
         << "point-based integration points not yet available"
         << exit(FatalError);
@@ -1049,6 +1086,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // Check field sizes are consistent
+    checkCompactLayoutConsistency
+    (
+        gradD,
+        gradD0,
+        stress,
+        scalarTangentPtr,
+        "updateStressSmallStrain (CompactListList)"
+    );
+
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(gradD);
 
@@ -1061,38 +1108,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const List<tensor>& gradDVals  = gradD.values();
     const List<tensor>& gradD0Vals = gradD0.values();
     List<symmTensor>& stressVals   = stress.values();
-
-    // Consistency check => encapusate in a function: should be called in all
-    // update stress functions!
-    FatalError
-        << "Consistency check => encapusate" << exit(FatalError);
-    if
-    (
-        gradD.totalSize()  != stress.totalSize()
-     || gradD0.totalSize() != stress.totalSize()
-    )
-    {
-        FatalErrorInFunction
-            << "Inconsistent CompactListList sizes supplied to "
-            << "updateStressSmallStrain." << nl
-            << "gradD size:  " << gradD.totalSize()  << nl
-            << "gradD0 size: " << gradD0.totalSize() << nl
-            << "stress size:" << stress.totalSize()
-            << exit(FatalError);
-    }
-
-    if
-    (
-        scalarTangentPtr
-     && scalarTangentPtr->size() != stress.totalSize()
-    )
-    {
-        FatalErrorInFunction
-            << "Scalar tangent list has incorrect size. Expected "
-            << stress.totalSize() << " but got "
-            << scalarTangentPtr->size()
-            << exit(FatalError);
-    }
 
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
@@ -1160,6 +1175,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    // Check F is defined on the correct mesh
+    checkMeshConsistency(mesh_, F.mesh(), F.name());
+    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
+    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
+    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
+    checkMeshConsistency(mesh_, J.mesh(), J.name());
+    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
+    checkMeshConsistency(mesh_, stress.mesh(), stress.name());
+    if (scalarTangentPtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
+        );
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -1364,6 +1395,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
+    // Check field sizes are consistent
+    checkCompactLayoutConsistency
+    (
+        F,
+        F0,
+        stress,
+        scalarTangentPtr,
+        "updateStressFiniteStrain (CompactListList)"
+    );
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -1380,33 +1421,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const List<scalar>& JVals = J.values();
     const List<scalar>& J0Vals = J0.values();
     List<symmTensor>& stressVals = stress.values();
-
-    // Consistency checks
-    const label nIP = stress.totalSize();
-
-    if
-    (
-        F.totalSize() != nIP
-     || F0.totalSize() != nIP
-     || Finv.totalSize() != nIP
-     || Finv0.totalSize() != nIP
-     || J.totalSize() != nIP
-     || J0.totalSize() != nIP
-    )
-    {
-        FatalErrorInFunction
-            << "Inconsistent CompactListList sizes supplied to "
-            << "updateStressFiniteStrain." << nl
-            << "Expected totalSize = " << nIP << exit(FatalError);
-    }
-
-    if (scalarTangentPtr && scalarTangentPtr->size() != nIP)
-    {
-        FatalErrorInFunction
-            << "Scalar tangent list has incorrect size. Expected "
-            << nIP << " but got " << scalarTangentPtr->size()
-            << exit(FatalError);
-    }
 
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
