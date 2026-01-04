@@ -721,7 +721,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     // cell is in this material
                     const labelList& faces = lawBoundaryFaces_[lawI][patchI];
 
-                    if (faces.empty())
+                    if
+                    (
+                        faces.empty()
+                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                    )
                     {
                         continue;
                     }
@@ -825,87 +829,19 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         );
     }
 
-    FatalErrorInFunction
-        << "face integration points not yet available" << exit(FatalError);
-
     // Look up the map and state for face-based topologies
-    // const integrationPointTopology& topo =
-    //     topologyFor(faceCentredIntegrationPointTopology::typeName);
+    const integrationPointTopology& topo =
+        topologyFor(faceCentredIntegrationPointTopology::typeName);
 
-    // topologyEntry& tp = topology(topo);
-
-    /*
-    if (!isA<faceCentredIntegrationPointTopology>(ipTopology_))
-    {
-        FatalErrorInFunction
-            << "updateStressSmallStrain(surfaceField) requires "
-            << "face-centred integration points, but topology is "
-            << ipTopology_.type()
-            << exit(FatalError);
-    }
+    topologyEntry& tp = topology(topo);
 
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Collapse rule: none → direct write, no accumulation allowed
-    if (collapseRule == stressCollapseRule::none)
-    {
-        stress = symmTensor::zero;
-
-        forAll(laws_, lawI)
-        {
-            const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
-
-            const UIndirectList<tensor> gradDView
-            (
-                gradD.internalField(),
-                ipIDs
-            );
-
-            const UIndirectList<tensor> gradD0View
-            (
-                gradD0.internalField(),
-                ipIDs
-            );
-
-            UIndirectList<symmTensor> stressView
-            (
-                stress.internalField(),
-                ipIDs
-            );
-
-            smallStrainMechanicalConstitutiveLawKinematics kin
-            (
-                gradDView,
-                gradD0View,
-                dt
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView,
-                tangentReq
-            );
-
-            laws_[lawI].evaluate
-            (
-                kin,
-                states_[lawI],
-                response
-            );
-        }
-
-        stress.correctBoundaryConditions();
-        return;
-    }
-
-    // Accumulation path with stress "collapse" given by collapse rule, e.g.
-    // average, harmonic
-
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
 
-    stressSum = symmTensor::zero;
+    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
     weightSum = 0.0;
 
     surfaceScalarField* tangentWeightPtr = nullptr;
@@ -913,107 +849,209 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         surfaceScalarField& tangentWeight = surfaceTangentWeight();
-        tangentWeight = 0.0;
+        tangentWeight = dimensionedScalar("0", dimPressure, 0.0);
         tangentWeightPtr = &tangentWeight;
     }
 
     // Loop over constitutive laws
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = lawIntegrationPointIDs_[lawI];
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
 
         const UIndirectList<tensor> gradDView
         (
-            gradD.internalField(),
-            ipIDs
+            gradD.internalField(), ipIDs
         );
 
         const UIndirectList<tensor> gradD0View
         (
-            gradD0.internalField(),
-            ipIDs
+            gradD0.internalField(), ipIDs
         );
 
         UIndirectList<symmTensor> stressView
         (
-            stressSum.internalField(),
-            ipIDs
+            stress.internalField(), ipIDs
         );
 
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView,
-            gradD0View,
-            dt
+            gradDView, gradD0View, dt
         );
 
         if (scalarTangentPtr && needsScalarTangent(tangentReq))
         {
             UIndirectList<scalar> tangentView
             (
-                *tangentWeightPtr,
-                ipIDs
+                *scalarTangentPtr, ipIDs
             );
 
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentView,
-                tangentReq
+                stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate
-            (
-                kin,
-                states_[lawI],
-                response
-            );
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
         }
         else
         {
             mechanicalConstitutiveLawResponse response
             (
-                stressView,
-                tangentReq
+                stressView, tangentReq
             );
 
-            laws_[lawI].evaluate
-            (
-                kin,
-                states_[lawI],
-                response
-            );
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
         }
 
-        // Accumulate weights
+        // Update stress accumulation fields used for stress collapse
         forAll(ipIDs, i)
         {
-            weightSum[ipIDs[i]] += 1.0;
+            const label faceI = ipIDs[i];
+
+            stressSum[faceI] += stress[faceI];
+            weightSum[faceI] += 1.0;
+
+            if (scalarTangentPtr && needsScalarTangent(tangentReq))
+            {
+                const scalar K = (*scalarTangentPtr)[faceI];
+                if (collapseRule == stressCollapseRule::average)
+                {
+                    (*tangentWeightPtr)[faceI] += K;
+                }
+                else if (collapseRule == stressCollapseRule::harmonic)
+                {
+                    (*tangentWeightPtr)[faceI] += 1.0/K;
+                }
+                else
+                {
+                    FatalErrorInFunction
+                        << "Invalid stress collapse rule combination:\n"
+                        << "collapseRule = "
+                        << stressCollapseRuleName(collapseRule)
+                        << nl
+                        << "tangentReq   = " << tangentRequestName(tangentReq)
+                        << nl
+                        << "scalarTangentPtr = "
+                        << (scalarTangentPtr ? "set" : "null")
+                        << exit(FatalError);
+                }
+            }
+        }
+
+        // Optionally, update the boundary field
+        // Boundary constitutive response uses independent state objects,
+        // allowing history-dependent laws to operate correctly on boundary faces.
+        if (tp.boundaryAware_)
+        {
+            forAll(gradD.boundaryField(), patchI)
+            {
+                if (!gradD.boundaryField()[patchI].coupled())
+                {
+                    // Select all faces on the patch for which the adjacent
+                    // cell is in this material
+                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                    if
+                    (
+                        faces.empty()
+                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                    )
+                    {
+                        continue;
+                    }
+
+                    // "View" into the kinematic and stress fields for this
+                    // material => does not copy data
+                    const UIndirectList<tensor> gradDView
+                    (
+                        gradD.boundaryField()[patchI], faces
+                    );
+                    const UIndirectList<tensor> gradD0View
+                    (
+                        gradD0.boundaryField()[patchI], faces
+                    );
+                    UIndirectList<symmTensor> stressView
+                    (
+                        stress.boundaryFieldRef()[patchI], faces
+                    );
+
+                    // Create wrapper for kinematic data: input to material law
+                    // This does not copy data
+                    smallStrainMechanicalConstitutiveLawKinematics kin
+                    (
+                        gradDView, gradD0View, dt
+                    );
+
+                    // Create wrapper for output
+                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
+                    {
+                        // "View" into the tangent for this material => does not copy
+                        // data
+                        UIndirectList<scalar> tangentView
+                        (
+                            scalarTangentPtr->boundaryField()[patchI],
+                            faces
+                        );
+
+                        // Create wrapper for material: output from material law
+                        // This does not copy data
+                        mechanicalConstitutiveLawResponse response
+                        (
+                            stressView, tangentView, tangentReq
+                        );
+
+                        // Update the material response, e.g. update the stress
+                        laws_[lawI].evaluate
+                        (
+                            kin, tp.boundaryStates_[lawI][patchI], response
+                        );
+                    }
+                    else
+                    {
+                        // Create wrapper for material: output from material law
+                        // This does not copy data
+                        mechanicalConstitutiveLawResponse response
+                        (
+                            stressView, tangentReq
+                        );
+
+                        // Update the material response, e.g. update the stress
+                        laws_[lawI].evaluate
+                        (
+                            kin, tp.boundaryStates_[lawI][patchI], response
+                        );
+                    }
+                }
+            }
         }
     }
 
-    // Collapse accumulated stress
+    // Collapse accumulated stress on internal faces
 
     forAll(stress.internalField(), faceI)
     {
         const scalar w = weightSum[faceI];
 
-        if (w > SMALL)
+        if (w <= SMALL)
+        {
+            FatalErrorInFunction
+                << "Face " << faceI << " received no constitutive contributions"
+                << exit(FatalError);
+        }
+
+        // Stress collapse as arithmetic mean
+        stress[faceI] = stressSum[faceI]/w;
+
+        // Tangent collapse, if requested
+        if (scalarTangentPtr && needsScalarTangent(tangentReq))
         {
             if (collapseRule == stressCollapseRule::average)
             {
-                stress[faceI] = stressSum[faceI]/w;
+                (*scalarTangentPtr)[faceI] = w/(*tangentWeightPtr)[faceI];
             }
-            else if
-            (
-                collapseRule == stressCollapseRule::harmonic
-             && scalarTangentPtr
-             && needsScalarTangent(tangentReq)
-            )
+            else if (collapseRule == stressCollapseRule::harmonic)
             {
-                stress[faceI] = stressSum[faceI]/max(w, SMALL);
-                (*scalarTangentPtr)[faceI] =
-                    w/max((*tangentWeightPtr)[faceI], SMALL);
+                // Harmonicaly average the tangent
+                (*scalarTangentPtr)[faceI] = w/(*tangentWeightPtr)[faceI];
             }
             else
             {
@@ -1027,14 +1065,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     << exit(FatalError);
             }
         }
-        else
-        {
-            FatalErrorInFunction
-                << "At least one mesh face does not have a material law!\n"
-                << "faceI = " << faceI << nl
-                << "Check cellZones and integrationPointTopology."
-                << exit(FatalError);
-        }
     }
 
     stress.correctBoundaryConditions();
@@ -1043,7 +1073,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
-        */
 }
 
 
