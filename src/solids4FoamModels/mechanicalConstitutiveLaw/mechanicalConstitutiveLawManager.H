@@ -87,6 +87,9 @@ class mechanicalConstitutiveLawManager
         //- Reference to mesh
         const fvMesh& mesh_;
 
+        //- Pointer to the ooint mesh, if needed
+        mutable const pointMesh* pMeshPtr_;
+
         //- Current time index so we can track when there is a new time step
         label curTimeIndex_;
 
@@ -115,6 +118,11 @@ class mechanicalConstitutiveLawManager
         mutable autoPtr<surfaceSymmTensorField> surfaceStressSumPtr_;
         mutable autoPtr<surfaceScalarField> surfaceStressWeightPtr_;
         mutable autoPtr<surfaceScalarField> surfaceTangentWeightPtr_;
+
+        //- Scratch fields for stress accumulation on point fields
+        mutable autoPtr<pointSymmTensorField> pointStressSumPtr_;
+        mutable autoPtr<pointScalarField>     pointStressWeightPtr_;
+        mutable autoPtr<pointScalarField>     pointTangentWeightPtr_;
 
         //- Density field
         mutable autoPtr<volScalarField> rhoPtr_;
@@ -272,10 +280,17 @@ class mechanicalConstitutiveLawManager
              || req == tangentRequest::scalarDeviatoric;
         }
 
-        //- Create scratch containers for surface fields
+        //- Create (if required) and return scratch containers for surface
+        //  fields
         surfaceSymmTensorField& surfaceStressSum() const;
         surfaceScalarField& surfaceStressWeight() const;
         surfaceScalarField& surfaceTangentWeight() const;
+
+        //- Create (if required) and return scratch containers for point
+        //  fields
+        pointSymmTensorField& pointStressSum() const;
+        pointScalarField& pointStressWeight() const;
+        pointScalarField& pointTangentWeight() const;
 
         //- Clear surface scratch fields
         inline void clearScratchFields() const
@@ -283,6 +298,10 @@ class mechanicalConstitutiveLawManager
             surfaceStressSumPtr_.clear();
             surfaceStressWeightPtr_.clear();
             surfaceTangentWeightPtr_.clear();
+
+            pointStressSumPtr_.clear();
+            pointStressWeightPtr_.clear();
+            pointTangentWeightPtr_.clear();
         }
 
         //- No copy construct

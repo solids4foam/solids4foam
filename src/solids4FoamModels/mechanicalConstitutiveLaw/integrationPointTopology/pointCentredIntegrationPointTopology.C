@@ -15,26 +15,23 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
-Description
-    Standard integrationPointTopology types.
-
-Author
-    Philip Cardiff, UCD.
-
 \*---------------------------------------------------------------------------*/
 
-#ifndef integrationPointTopologies_H
-#define integrationPointTopologies_H
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-#include "cellCentredIntegrationPointTopology.H"
-#include "compactCellIntegrationPointTopology.H"
-#include "faceCentredIntegrationPointTopology.H"
 #include "pointCentredIntegrationPointTopology.H"
+#include "addToRunTimeSelectionTable.H"
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#endif
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(pointCentredIntegrationPointTopology, 0);
+    addToRunTimeSelectionTable
+    (
+        integrationPointTopology,
+        pointCentredIntegrationPointTopology,
+        fvMesh
+    );
+}
 
 // ************************************************************************* //

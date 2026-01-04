@@ -20,6 +20,7 @@ License
 #include "mechanicalConstitutiveLawManager.H"
 #include "compatibilityFunctions.H"
 #include "integrationPointTopologies.H"
+#include "emptyFvPatch.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -376,6 +377,105 @@ Foam::mechanicalConstitutiveLawManager::surfaceTangentWeight() const
 }
 
 
+Foam::pointSymmTensorField&
+Foam::mechanicalConstitutiveLawManager::pointStressSum() const
+{
+    if (!pointStressSumPtr_.valid())
+    {
+        // Allocate the point mesh pointer, if needed
+        if (!pMeshPtr_)
+        {
+            pMeshPtr_ = &pointMesh::New(mesh_);
+        }
+
+        pointStressSumPtr_.reset
+        (
+            new pointSymmTensorField
+            (
+                IOobject
+                (
+                    "pointStressSum",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                *pMeshPtr_,
+                dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+            )
+        );
+    }
+
+    return autoPtrRef(pointStressSumPtr_);
+}
+
+
+Foam::pointScalarField&
+Foam::mechanicalConstitutiveLawManager::pointStressWeight() const
+{
+    if (!pointStressWeightPtr_.valid())
+    {
+        // Allocate the point mesh pointer, if needed
+        if (!pMeshPtr_)
+        {
+            pMeshPtr_ = &pointMesh::New(mesh_);
+        }
+
+        pointStressWeightPtr_.reset
+        (
+            new pointScalarField
+            (
+                IOobject
+                (
+                    "pointStressWeight",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                *pMeshPtr_,
+                dimensionedScalar("zero", dimless, 0.0)
+            )
+        );
+    }
+
+    return autoPtrRef(pointStressWeightPtr_);
+}
+
+
+Foam::pointScalarField&
+Foam::mechanicalConstitutiveLawManager::pointTangentWeight() const
+{
+    if (!pointTangentWeightPtr_.valid())
+    {
+        // Allocate the point mesh pointer, if needed
+        if (!pMeshPtr_)
+        {
+            pMeshPtr_ = &pointMesh::New(mesh_);
+        }
+
+        pointTangentWeightPtr_.reset
+        (
+            new pointScalarField
+            (
+                IOobject
+                (
+                    "pointTangentWeight",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                *pMeshPtr_,
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return autoPtrRef(pointTangentWeightPtr_);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
@@ -385,6 +485,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 )
 :
     mesh_(mesh),
+    pMeshPtr_(nullptr),
     curTimeIndex_(-1),
     laws_(),
     lawCells_(),
@@ -392,6 +493,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     surfaceStressSumPtr_(),
     surfaceStressWeightPtr_(),
     surfaceTangentWeightPtr_(),
+    pointStressSumPtr_(),
+    pointStressWeightPtr_(),
+    pointTangentWeightPtr_(),
     rhoPtr_(),
     kappaPtr_(),
     topologyCache_(),
@@ -1099,9 +1203,149 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         );
     }
 
-    FatalErrorInFunction
-        << "point-based integration points not yet available"
-        << exit(FatalError);
+    // Topology + state
+
+    const integrationPointTopology& topo =
+        topologyFor(pointCentredIntegrationPointTopology::typeName);
+
+    topologyEntry& tp = topology(topo);
+
+    updateOldTimeIfNeeded();
+
+    // Accumulation fields
+
+    pointSymmTensorField& stressSum = pointStressSum();
+    pointScalarField& weightSum = pointStressWeight();
+
+    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
+    weightSum = 0.0;
+
+    pointScalarField* tangentWeightPtr = nullptr;
+
+    if (scalarTangentPtr && needsScalarTangent(tangentReq))
+    {
+        pointScalarField& tangentWeight = pointTangentWeight();
+        tangentWeight = dimensionedScalar("zero", dimPressure, 0.0);
+        tangentWeightPtr = &tangentWeight;
+    }
+
+    // Constitutive evaluation
+
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> gradDView
+        (
+            gradD.internalField(), ipIDs
+        );
+
+        const UIndirectList<tensor> gradD0View
+        (
+            gradD0.internalField(), ipIDs
+        );
+
+        UIndirectList<symmTensor> stressView
+        (
+            stress.internalField(), ipIDs
+        );
+
+        smallStrainMechanicalConstitutiveLawKinematics kin
+        (
+            gradDView, gradD0View, dt
+        );
+
+        if (scalarTangentPtr && needsScalarTangent(tangentReq))
+        {
+            UIndirectList<scalar> tangentView
+            (
+                scalarTangentPtr->internalField(), ipIDs
+            );
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else
+        {
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+
+        // Accumulate per point
+
+        forAll(ipIDs, i)
+        {
+            const label pointI = ipIDs[i];
+
+            stressSum[pointI] += stress[pointI];
+            weightSum[pointI] += 1.0;
+
+            if (tangentWeightPtr && scalarTangentPtr)
+            {
+                const scalar K = (*scalarTangentPtr)[pointI];
+
+                if (collapseRule == stressCollapseRule::average)
+                {
+                    (*tangentWeightPtr)[pointI] += K;
+                }
+                else if (collapseRule == stressCollapseRule::harmonic)
+                {
+                    (*tangentWeightPtr)[pointI] += 1.0/max(K, SMALL);
+                }
+                else
+                {
+                    FatalErrorInFunction
+                        << "Invalid stress collapse rule"
+                        << exit(FatalError);
+                }
+            }
+        }
+    }
+
+    // Collapse
+
+    forAll(stress.internalField(), pointI)
+    {
+        const scalar w = weightSum[pointI];
+
+        if (w <= SMALL)
+        {
+            FatalErrorInFunction
+                << "Point " << pointI
+                << " received no constitutive contributions"
+                << exit(FatalError);
+        }
+
+        stress[pointI] = stressSum[pointI]/w;
+
+        if (scalarTangentPtr && needsScalarTangent(tangentReq))
+        {
+            if (collapseRule == stressCollapseRule::average)
+            {
+                (*scalarTangentPtr)[pointI] =
+                    (*tangentWeightPtr)[pointI]/w;
+            }
+            else if (collapseRule == stressCollapseRule::harmonic)
+            {
+                (*scalarTangentPtr)[pointI] =
+                    w/max((*tangentWeightPtr)[pointI], SMALL);
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "Invalid stress collapse rule"
+                    << exit(FatalError);
+            }
+        }
+    }
 }
 
 

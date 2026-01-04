@@ -16,12 +16,13 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Description
-    Integration-point topology for face-centred solid mechanics formulations.
+    Integration-point topology for point-centred (vertex-centred solid
+    mechanics formulations.
 
-    This topology defines one integration point per mesh face. Each cell
-    maps to the integration points associated with its faces.
+    This topology defines one integration point per mesh point (vertex).
+    Each cell maps to the integration points associated with its points.
 
-    Internal faces are shared by two cells and therefore appear in the
+    Mesh points are shared by two or more cells and therefore appear in the
     integration-point lists of both adjacent cells. As a result,
     integration-point indices must be deduplicated when aggregating
     per-material working sets.
@@ -31,8 +32,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef faceCentredIntegrationPointTopology_H
-#define faceCentredIntegrationPointTopology_H
+#ifndef pointCentredIntegrationPointTopology_H
+#define pointCentredIntegrationPointTopology_H
 
 #include "integrationPointTopology.H"
 #include "labelList.H"
@@ -43,50 +44,46 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-              Class faceCentredIntegrationPointTopology
+              Class pointCentredIntegrationPointTopology
 \*---------------------------------------------------------------------------*/
 
-class faceCentredIntegrationPointTopology
+class pointCentredIntegrationPointTopology
 :
     public integrationPointTopology
 {
-    //- Mapping from cell index to face-based integration-point indices
-    //  The indices refer to global face indices:
-    //    - internal faces: [0 .. nInternalFaces-1]
-    //    - boundary faces: offset internally per patch
-    List<labelList> cellToIntegrationPointIDs_;
+    //- Mapping from cells to point-based integration-point indices
+    //  Built once at construction
+    labelListList cellToIntegrationPointIDs_;
 
 public:
 
     //- Runtime type information
-    TypeName("faceCentredIntegrationPointTopology");
+    TypeName("pointCentredIntegrationPointTopology");
 
     //- Construct from mesh
-    explicit faceCentredIntegrationPointTopology(const fvMesh& mesh)
+    explicit pointCentredIntegrationPointTopology(const fvMesh& mesh)
     :
         integrationPointTopology(mesh),
         cellToIntegrationPointIDs_(mesh.nCells())
     {
-        // Internal faces
-        forAll(mesh_.owner(), faceI)
-        {
-            const label owner = mesh_.owner()[faceI];
-            const label neigh = mesh_.neighbour()[faceI];
+        const labelListList& cellPoints = mesh.cellPoints();
 
-            cellToIntegrationPointIDs_[owner].append(faceI);
-            cellToIntegrationPointIDs_[neigh].append(faceI);
+        forAll(cellPoints, cellI)
+        {
+            const labelList& pts = cellPoints[cellI];
+            cellToIntegrationPointIDs_[cellI] = pts;
         }
 
         // Boundary faces are dealt separately and should not be included here
     }
 
     //- Destructor
-    virtual ~faceCentredIntegrationPointTopology() = default;
+    virtual ~pointCentredIntegrationPointTopology() = default;
 
-    //- Total number of integration points (one per face)
+    //- Total number of integration points (one per point)
     virtual label nIntegrationPoints() const override
     {
-        return mesh_.nFaces();
+        return mesh_.nPoints();
     }
 
     //- Integration-point indices associated with a given cell
@@ -98,13 +95,13 @@ public:
         return cellToIntegrationPointIDs_[cellI];
     }
 
-    //- Boundary integration points are supported
+    //- Boundary integration patches not dealt with
     virtual bool boundaryAware() const override
     {
-        return true;
+        return false;
     }
 
-    //- Faces are shared between cells → uniqueness required
+    //- Points are shared between cells → uniqueness required
     virtual bool requiresUniqueIntegrationPointsPerMaterial() const override
     {
         return true;

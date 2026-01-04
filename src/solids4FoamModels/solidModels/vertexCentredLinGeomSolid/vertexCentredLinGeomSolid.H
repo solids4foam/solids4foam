@@ -149,6 +149,12 @@ private:
         //- Divergence of sigma at each primary point
         pointVectorField pointDivSigma_;
 
+        //- Displacement gradient at each primary point 
+        pointTensorField pGradD_;
+
+        //- Sigma at each primary point 
+        pointSymmTensorField pSigma_;
+
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 

@@ -1011,6 +1011,32 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         pMesh(),
         dimensionedVector("0", dimForce/dimVolume, vector::zero)
     ),
+    pGradD_
+    (
+        IOobject
+        (
+            "pGradD",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedTensor("zero", dimless, tensor::zero)
+    ),
+    pSigma_
+    (
+        IOobject
+        (
+            "pSigma",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    ),
     dualGradDf_
     (
         IOobject
@@ -1604,9 +1630,8 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
         gradD(), gradD().oldTime(), runTime.deltaTValue(), sigma()
     );
 
-    // Calculate gradD at the primary points using least squares: this should
-    // be second-order accurate (... I think).
-    const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
+    // Update gradD at the primary points
+    pGradD_ = vfvc::pGrad(pointD(), mesh());
 
     // Calculate strain at the primary points based on pGradD
     // Note: the symm operator is not defined for pointTensorFields so we will
@@ -1626,7 +1651,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
 
-    primitiveFieldRef(pEpsilon) = symm(primitiveField(pGradD));
+    primitiveFieldRef(pEpsilon) = symm(primitiveField(pGradD_));
     pEpsilon.write();
 
     // Equivalent strain at the points
@@ -1644,39 +1669,20 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
         dimensionedScalar("0", dimless, 0.0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    pEpsilonEq.primitiveFieldRef() =
-        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
-#else
-    pEpsilonEq.internalField() =
-        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
-#endif
+    primitiveFieldRef(pEpsilonEq) =
+        sqrt((2.0/3.0)*magSqr(dev(primitiveField(pEpsilon))));
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
 
-    // Stress at points
-    pointSymmTensorField pSigma
-    (
-        IOobject
-        (
-            "pSigma",
-            runTime.timeName(),
-            runTime,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh(),
-        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
-    );
-
-    // To-do: add a general interface for calculating point stresses
-    FatalError
-        << "store pGradD as member as we need the old time"
-        << exit(FatalError);
+    // Update point stresses
     mechManager().updateStressSmallStrain
     (
-        pGradD, pGradD.oldTime(), runTime.deltaTValue(), pSigma
+        pGradD_,
+        pGradD_.oldTime(),
+        runTime.deltaTValue(),
+        pSigma_,
+        stressCollapseRule::average
     );
 
     solidModel::writeFields(runTime);
