@@ -51,44 +51,6 @@ addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-// void vertexCentredLinGeomSolid::makeDualMechanical() const
-// {
-//     FatalErrorInFunction
-//         << "Deprecated!" << exit(FatalError);
-
-//     if (!dualMechanicalPtr_.empty())
-//     {
-//         FatalErrorInFunction
-//             << "pointer already set!" << abort(FatalError);
-//     }
-
-//     dualMechanicalPtr_.set
-//     (
-//         new dualMechanicalModel
-//         (
-//             dualMesh(),
-//             nonLinGeom(),
-//             incremental(),
-//             mechanical(),
-//             dualMeshMap().dualFaceToCell()
-//         )
-//     );
-// }
-
-
-// dualMechanicalModel& vertexCentredLinGeomSolid::dualMechanical()
-// {
-//     FatalErrorInFunction
-//         << "Deprecated!" << exit(FatalError);
-
-//     if (dualMechanicalPtr_.empty())
-//     {
-//         makeDualMechanical();
-//     }
-
-//     return autoPtrRef(dualMechanicalPtr_);
-// }
-
 
 void vertexCentredLinGeomSolid::makeDualMechManager() const
 {
@@ -601,32 +563,6 @@ void vertexCentredLinGeomSolid::makeFixedDofRowsIS() const
 #endif // USE_PETSC
 
 
-// void vertexCentredLinGeomSolid::makeDualImpKf() const
-// {
-//     if (dualImpKfPtr_.valid())
-//     {
-//         FatalErrorIn("void vertexCentredLinGeomSolid::makeDualImpKf() const")
-//             << "Pointer already set!" << abort(FatalError);
-//     }
-
-//     dualImpKfPtr_.set
-//     (
-//         new surfaceScalarField(dualMechanicalPtr_().impKf())
-//     );
-// }
-
-
-// const surfaceScalarField& vertexCentredLinGeomSolid::dualImpKf() const
-// {
-//     if (dualImpKfPtr_.empty())
-//     {
-//         makeDualImpKf();
-//     }
-
-//     return dualImpKfPtr_();
-// }
-
-
 void vertexCentredLinGeomSolid::predict()
 {
     Info<< "Predicting pointD" << endl;
@@ -737,14 +673,7 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
-    // Map primary cell gradD field to sub-meshes for multi-material cases
-    // if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    // {
-    //     mechanical().mapGradToSubMeshes(gradD());
-    // }
-
     // Update dual face stress field
-    //dualMechanicalPtr_().correct(dualSigmaf_);
     dualMechManager().updateStressSmallStrain
     (
         dualGradDf_,
@@ -757,7 +686,6 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
     // This stress will be first-order accurate
-    //mechanical().correct(sigma());
     mechManager().updateStressSmallStrain
     (
         gradD(), gradD().oldTime(), runTime().deltaTValue(), sigma()
@@ -892,7 +820,6 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
 #endif
-    dualMechanicalPtr_(),
     dualMechManagerPtr_(),
     dualImpKf_
     (
@@ -908,6 +835,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         dimensionedScalar("zero", dimPressure, 0.0),
         "calculated"
     ),
+    dualMaterialTangent_(dualMesh().nInternalFaces()),
     blockSize_
     (
         solvePressure()
@@ -920,16 +848,6 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
     fixedDofDirectionsVec_(fixedDofs_.size(), vector::zero),
     fixedDofScale_(1.0),
-    // (
-    //     solidModelDict().lookupOrDefault<scalar>
-    //     (
-    //         "fixedDofScale",
-    //         (
-    //             average(mechanical().impK())
-    //            *Foam::sqrt(gAverage(mesh().magSf()))
-    //         ).value()
-    //     )
-    // ),
 #ifdef USE_PETSC
     fixedDofRowsISPtr_(nullptr),
 #endif
@@ -1090,6 +1008,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         dualSigmaf_,
         stressCollapseRule::average,
         &dualImpKf_,
+        nullptr,
         tangentReq
     );
 
@@ -1466,19 +1385,18 @@ label vertexCentredLinGeomSolid::formJacobian
         debug
     );
 
-    // Calculate stress at dual faces
-    //dualMechanicalPtr_().correct(dualSigmaf_);
-    dualMechManager().updateStressSmallStrain
-    (
-        dualGradDf_,
-        dualGradDf_.oldTime(),
-        runTime().deltaTValue(),
-        dualSigmaf_,
-        stressCollapseRule::average
-    );
-
     if (solidModelDict().lookupOrDefault<Switch>("approximateJacobian", false))
     {
+        // Calculate stress at dual faces
+        dualMechManager().updateStressSmallStrain
+        (
+            dualGradDf_,
+            dualGradDf_.oldTime(),
+            runTime().deltaTValue(),
+            dualSigmaf_,
+            stressCollapseRule::average
+        );
+
         // Add laplacian term as a compact approximate linearisation of
         // div(sigma)
         vfvm::laplacian
@@ -1495,11 +1413,18 @@ label vertexCentredLinGeomSolid::formJacobian
     }
     else
     {
-        // Calculate the material tangent
-        FatalError
-            << "move mat66 tangent to new mech law" << exit(FatalError);
-        List<mat66> materialTangent(mesh.nFaces());
-        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
+        // Calculate stress and material tangent at dual faces
+        dualMechManager().updateStressSmallStrain
+        (
+            dualGradDf_,
+            dualGradDf_.oldTime(),
+            runTime().deltaTValue(),
+            dualSigmaf_,
+            stressCollapseRule::average,
+            nullptr,
+            &dualMaterialTangent_,
+            tangentRequest::fourthOrder
+        );
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma
@@ -1512,7 +1437,7 @@ label vertexCentredLinGeomSolid::formJacobian
             globalPoints().localToGlobalPointMap(),
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
-            materialTangent,
+            dualMaterialTangent_,
             zetaImplicit,
             false           // flip sign
         );
@@ -1535,7 +1460,7 @@ label vertexCentredLinGeomSolid::formJacobian
         d2dt2Scheme,
         blockSize_,     // nScalarEqns
         globalPoints().localToGlobalPointMap(),
-        true           // flip sign
+        true            // flip sign
     );
 
     // Complete matrix assembly: this is required before we call
@@ -1547,7 +1472,6 @@ label vertexCentredLinGeomSolid::formJacobian
     // Zero all rows and columns of fixed DOFs and set -fixedDofScale_ on
     // the diagonal
     MatZeroRowsColumnsIS(jac, fixedDofRowsIS(), -fixedDofScale_, NULL, NULL);
-
 
     if (solvePressure())
     {
@@ -1611,20 +1535,10 @@ void vertexCentredLinGeomSolid::setTraction
 void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 {
     // Calculate cell gradient
-    // This assumes a constant gradient within each primary mesh cell
-    // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
-
-    // // Map primary cell gradD field to sub-meshes for multi-material cases
-    // if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    // {
-    //     mechanical().mapGradToSubMeshes(gradD());
-    // }
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
-    // This stress will be first-order accurate
-    // mechanical().correct(sigma());
     mechManager().updateStressSmallStrain
     (
         gradD(), gradD().oldTime(), runTime.deltaTValue(), sigma()

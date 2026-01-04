@@ -19,6 +19,7 @@ License
 
 #include "linearElasticMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
+#include "mat66.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -137,6 +138,37 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         forAll(K, i)
         {
             K[i] = Keff;
+        }
+    }
+    else if (response.hasFourthOrderTangent())
+    {
+        UIndirectList<mat66>& C = response.fourthOrderTangent();
+
+        forAll(C, i)
+        {
+            // Take a reference to C for the current integration point
+            mat66& curC = C[i];
+
+            // Important: zero everything first as mat66 is not initialised by
+            // default
+            curC.clear();
+
+            // Normal-normal blocks
+            curC(0,0) = lambdaVal + 2.0*muVal;
+            curC(1,1) = lambdaVal + 2.0*muVal;
+            curC(2,2) = lambdaVal + 2.0*muVal;
+
+            curC(0,1) = lambdaVal;
+            curC(0,2) = lambdaVal;
+            curC(1,0) = lambdaVal;
+            curC(1,2) = lambdaVal;
+            curC(2,0) = lambdaVal;
+            curC(2,1) = lambdaVal;
+
+            // Shear terms (engineering shear)
+            curC(3,3) = muVal;
+            curC(4,4) = muVal;
+            curC(5,5) = muVal;
         }
     }
 }

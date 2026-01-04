@@ -63,12 +63,15 @@ SourceFiles
 namespace Foam
 {
 
+// Forward Declarations
+class mat66;
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace solidModels
 {
 
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                   Class vertexCentredLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -83,10 +86,7 @@ private:
 
     // Private Data
 
-        //- Mechanical model for dual mesh (OLD APPROACH)
-        mutable autoPtr<dualMechanicalModel> dualMechanicalPtr_;
-
-        //- Mechanical constitutive law manager for dual mesh (NEW APPROACH)
+        //- Mechanical constitutive law manager for dual mesh
         mutable autoPtr<mechanicalConstitutiveLawManager> dualMechManagerPtr_;
 
         //- Implicit stiffness used by segregated algorithm
@@ -94,6 +94,10 @@ private:
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         surfaceScalarField dualImpKf_;
+
+        //- Fourth order material tangent defined at dual mesh faces
+        //  This is only populated if requested
+        List<mat66> dualMaterialTangent_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -168,12 +172,6 @@ private:
 
 
     // Private Member Functions
-
-        // //- Make the dual mesh mechanical model
-        // void makeDualMechanical() const;
-
-        // //- Return non-const reference to the dual mesh mechanical model
-        // dualMechanicalModel& dualMechanical();
 
         //- Make the dual mechanical model manager
         void makeDualMechManager() const;

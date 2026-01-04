@@ -55,10 +55,8 @@ enum class tangentRequest
 {
     none,               // Stress only
     scalar,             // Scalar approximate tangent
-    scalarDeviatoric    // Deviatoric-only scalar tangent (mixed u–p)
-    // future:
-    // symmTensor,
-    // fourthOrder
+    scalarDeviatoric,   // Deviatoric-only scalar tangent (mixed u–p)
+    fourthOrder         // Full fourth-order tangent defined as a 6x6 matrix
 };
 
 
@@ -73,6 +71,7 @@ inline const word tangentRequestName
         case tangentRequest::none:              return "none";
         case tangentRequest::scalar:            return "scalar";
         case tangentRequest::scalarDeviatoric:  return "scalarDeviatoric";
+        case tangentRequest::fourthOrder:       return "fourthOrder";
     }
 
     return "unknown";

@@ -75,8 +75,10 @@ Author
 namespace Foam
 {
 
+// Forward Declarations
+class mat66;
 
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                Class mechanicalConstitutiveLawResponse Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -90,6 +92,10 @@ class mechanicalConstitutiveLawResponse
         //- Optional scalar tangent view:
         //  Only allocated if not requested
         UIndirectList<scalar>* scalarTangentPtr_;
+
+        //- Optional mat66 (6x6 matrix) tangent view:
+        //  Only allocated if not requested
+        UIndirectList<mat66>* fourthOrderTangentPtr_;
 
         //- What type, if any, material tangent is requested
         tangentRequest tangentRequest_;
@@ -120,6 +126,7 @@ public:
         :
             stress_(stress),
             scalarTangentPtr_(nullptr),
+            fourthOrderTangentPtr_(nullptr),
             tangentRequest_(tangentReq)
         {}
 
@@ -133,8 +140,43 @@ public:
         :
             stress_(stress),
             scalarTangentPtr_(&scalarTangent),
+            fourthOrderTangentPtr_(nullptr),
             tangentRequest_(tangentReq)
-        {}
+        {
+            if
+            (
+                tangentReq != tangentRequest::scalar
+             && tangentReq != tangentRequest::scalarDeviatoric
+            )
+            {
+                FatalErrorInFunction
+                    << "Scalar tangent supplied but tangentReq = "
+                    << tangentRequestName(tangentReq)
+                    << exit(FatalError);
+            }
+        }
+
+        //- Construct with stress view and fourth order tangent view
+        mechanicalConstitutiveLawResponse
+        (
+            UIndirectList<symmTensor>& stress,
+            UIndirectList<mat66>& fourthOrderTangent,
+            tangentRequest tangentReq
+        )
+        :
+            stress_(stress),
+            scalarTangentPtr_(nullptr),
+            fourthOrderTangentPtr_(&fourthOrderTangent),
+            tangentRequest_(tangentReq)
+        {
+            if (tangentReq != tangentRequest::fourthOrder)
+            {
+                FatalErrorInFunction
+                    << "Fourth-order tangent supplied but tangentReq = "
+                    << tangentRequestName(tangentReq)
+                    << exit(FatalError);
+            }
+        }
 
 
     //- Destructor
@@ -172,6 +214,12 @@ public:
             return scalarTangentPtr_ != nullptr;
         }
 
+        //- Is a fourth order tangent view available?
+        bool hasFourthOrderTangent() const
+        {
+            return fourthOrderTangentPtr_ != nullptr;
+        }
+
         //- Does this reponse want a scalar tangent calculated
         bool wantsScalarTangent() const
         {
@@ -204,6 +252,32 @@ public:
             }
 
             return *scalarTangentPtr_;
+        }
+
+        //- Non-const access to the fourthOrder tangent view
+        UIndirectList<mat66>& fourthOrderTangent()
+        {
+            if (!hasFourthOrderTangent())
+            {
+                FatalErrorInFunction
+                    << "The fourthOrderTangent is unavailable!"
+                    << exit(FatalError);
+            }
+
+            return *fourthOrderTangentPtr_;
+        }
+
+        //- Const access to the fourthOrder tangent view
+        const UIndirectList<mat66>& fourthOrderTangent() const
+        {
+            if (!hasFourthOrderTangent())
+            {
+                FatalErrorInFunction
+                    << "The fourthOrderTangent is unavailable!"
+                    << exit(FatalError);
+            }
+
+            return *fourthOrderTangentPtr_;
         }
 };
 

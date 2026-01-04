@@ -75,6 +75,7 @@ namespace Foam
 // Forward Declarations
 class integrationPointTopology;
 class CompactListListBase;
+class mat66;
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
@@ -384,6 +385,7 @@ public:
             surfaceSymmTensorField& stress,
             const stressCollapseRule collapseRule = stressCollapseRule::none,
             surfaceScalarField* scalarTangentPtr = nullptr,
+            List<mat66>* fourthOrderTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
 

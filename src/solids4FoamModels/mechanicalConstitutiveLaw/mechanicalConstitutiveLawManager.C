@@ -21,6 +21,7 @@ License
 #include "compatibilityFunctions.H"
 #include "integrationPointTopologies.H"
 #include "emptyFvPatch.H"
+#include "mat66.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -918,6 +919,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     surfaceSymmTensorField& stress,
     const stressCollapseRule collapseRule,
     surfaceScalarField* scalarTangentPtr,
+    List<mat66>* fourthOrderTangentPtr,
     const tangentRequest tangentReq
 )
 {
@@ -931,6 +933,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         (
             mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
         );
+    }
+    else if (fourthOrderTangentPtr)
+    {
+        if (fourthOrderTangentPtr->size() != gradD.mesh().nInternalFaces())
+        {
+            FatalErrorInFunction
+                << "Inconsistent fourthOrderTangent size" << nl
+                << "Expected size = " << gradD.mesh().nInternalFaces() << nl
+                << "Got: " << fourthOrderTangentPtr->size()
+                << exit(FatalError);
+        }
     }
 
     // Look up the map and state for face-based topologies
@@ -955,6 +968,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         surfaceScalarField& tangentWeight = surfaceTangentWeight();
         tangentWeight = dimensionedScalar("0", dimPressure, 0.0);
         tangentWeightPtr = &tangentWeight;
+    }
+
+    // We need to introduce weights for the fourthOrderTangent
+    if (tangentReq == tangentRequest::fourthOrder && laws_.size() > 1)
+    {
+        notImplemented
+        (
+            "Currently the fourth order tangent can only be used with one "
+            "material"
+        );
     }
 
     // Loop over constitutive laws
@@ -988,6 +1011,20 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             (
                 *scalarTangentPtr, ipIDs
             );
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else if
+        (
+            fourthOrderTangentPtr && tangentReq == tangentRequest::fourthOrder
+        )
+        {
+            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
 
             mechanicalConstitutiveLawResponse response
             (
@@ -1109,7 +1146,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                             kin, tp.boundaryStates_[lawI][patchI], response
                         );
                     }
-                    else
+                    else // Note: fourth order tangents not needed on the boundary
                     {
                         // Create wrapper for material: output from material law
                         // This does not copy data
