@@ -64,6 +64,67 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
 }
 
 
+const Foam::integrationPointTopology&
+Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
+(
+    const CompactListList<tensor>& layout
+) const
+{
+    // Unique key per layout instance
+    const word key =
+        "compactCell:" + Foam::name(reinterpret_cast<std::uintptr_t>(&layout));
+
+    // Already constructed?
+    if (topologyCache_.found(key))
+    {
+        return topology(*topologyCache_[key]).topology_;
+    }
+
+    // Construct topology lazily
+
+    // We know this is cell-based compact storage:
+    //  - one sub-list per cell
+    //  - integration-point counts encoded in sub-list sizes
+
+    // Build cell → IP addressing
+    CompactListList<label> cellToIP(layout.size(), layout.totalSize());
+
+    for (label cellI = 0; cellI < layout.size(); ++cellI)
+    {
+        const label n = layout.localSize(cellI);
+        for (label j = 0; j < n; ++j)
+        {
+            cellToIP(cellI, j) = layout.toGlobal(cellI, j);
+        }
+    }
+
+    autoPtr<integrationPointTopology> topoPtr
+    (
+        new compactCellIntegrationPointTopology(mesh_, std::move(cellToIP))
+    );
+
+    // Cache and return
+    topologyCache_.insert(key, topoPtr);
+
+    return topology(*topologyCache_[key]).topology_;
+}
+
+
+const Foam::integrationPointTopology&
+Foam::mechanicalConstitutiveLawManager::compactFaceTopologyFor
+(
+    const CompactListList<tensor>& layout
+) const
+{
+    FatalErrorInFunction
+        << "compactFaceTopologyFor is not yet implemented"
+        << exit(FatalError);
+
+    // Dummy return to silence compiler warnings
+    return topologyFor(cellCentredIntegrationPointTopology::typeName);
+}
+
+
 Foam::mechanicalConstitutiveLawManager::topologyEntry&
 Foam::mechanicalConstitutiveLawManager::topology
 (
@@ -972,8 +1033,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 )
 {
     // Look up the map and state for compact list cell-based topologies
-    const integrationPointTopology& topo =
-        topologyFor(compactCellIntegrationPointTopology::typeName);
+    const integrationPointTopology& topo = compactCellTopologyFor(gradD);
 
     topologyEntry& tp = topology(topo);
 
@@ -1291,8 +1351,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     updateOldTimeIfNeeded();
 
     // Look up the map and state for compact list cell-based topologies
-    const integrationPointTopology& topo =
-        topologyFor(compactCellIntegrationPointTopology::typeName);
+    const integrationPointTopology& topo = compactCellTopologyFor(F);
 
     topologyEntry& tp = topology(topo);
 

@@ -25,6 +25,10 @@ License
 namespace Foam
 {
     defineTypeNameAndDebug(compactCellIntegrationPointTopology, 0);
+
+    // Note: we do not add cellCentredIntegrationPointTopology to the run-time
+    // selection table as it requires information about the mapping of local
+    // integration points via cellToIntegrationPointIDs
 }
 
 // ************************************************************************* //

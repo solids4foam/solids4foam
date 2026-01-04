@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "cellCentredIntegrationPointTopology.H"
+#include "addToRunTimeSelectionTable.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -25,6 +26,12 @@ License
 namespace Foam
 {
     defineTypeNameAndDebug(cellCentredIntegrationPointTopology, 0);
+    addToRunTimeSelectionTable
+    (
+        integrationPointTopology,
+        cellCentredIntegrationPointTopology,
+        fvMesh
+    );
 }
 
 // ************************************************************************* //

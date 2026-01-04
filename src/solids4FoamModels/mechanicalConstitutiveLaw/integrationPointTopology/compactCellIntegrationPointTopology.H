@@ -61,7 +61,7 @@ class compactCellIntegrationPointTopology
     //- Mapping from cells to integration-point indices.
     //  The integration-point indices refer to positions in the packed
     //  constitutive working set (e.g. CompactListList<Type>::values()).
-    const CompactListList<label>& cellToIntegrationPointIDs_;
+    CompactListList<label> cellToIntegrationPointIDs_;
 
 public:
 
@@ -72,11 +72,11 @@ public:
     compactCellIntegrationPointTopology
     (
         const fvMesh& mesh,
-        const CompactListList<label>& cellToIntegrationPointIDs
+        CompactListList<label>&& cellToIntegrationPointIDs
     )
     :
         integrationPointTopology(mesh),
-        cellToIntegrationPointIDs_(cellToIntegrationPointIDs)
+        cellToIntegrationPointIDs_(std::move(cellToIntegrationPointIDs))
     {
         // Basic consistency check: one entry per mesh cell
         if (cellToIntegrationPointIDs_.size() != mesh_.nCells())

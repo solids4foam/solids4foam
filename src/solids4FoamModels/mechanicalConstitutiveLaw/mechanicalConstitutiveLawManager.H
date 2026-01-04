@@ -74,6 +74,7 @@ namespace Foam
 
 // Forward Declarations
 class integrationPointTopology;
+class CompactListListBase;
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
@@ -180,6 +181,25 @@ class mechanicalConstitutiveLawManager
         const integrationPointTopology& topologyFor
         (
             const word& topologyTypeName
+        ) const;
+
+        //- Return (and lazily construct) a compact cell-based integration-point
+        //  topology inferred from a CompactListList layout.
+        //  The topology is owned and cached by the manager and remains valid
+        //  for the lifetime of the manager.
+        //  The layout is used only for addressing; the value type is irrelevant
+        const integrationPointTopology& compactCellTopologyFor
+        (
+            const CompactListList<tensor>& layout
+        ) const;
+
+        //- Return (and lazily construct) a compact face-based integration-point
+        //  topology inferred from a CompactListList layout.
+        //  Intended for discretisations with face-based integration points.
+        //  The layout is used only for addressing; the value type is irrelevant
+        const integrationPointTopology& compactFaceTopologyFor
+        (
+            const CompactListList<tensor>& layout
         ) const;
 
         //- Ensure a topology entry exists and return it

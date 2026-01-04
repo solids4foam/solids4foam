@@ -25,6 +25,10 @@ License
 namespace Foam
 {
     defineTypeNameAndDebug(integrationPointTopology, 0);
+    defineRunTimeSelectionTable
+    (
+        integrationPointTopology, fvMesh
+    );
 }
 
 // * * * * * * * * * * * * * * * Selectors * * * * * * * * * * * * * * * * * //
