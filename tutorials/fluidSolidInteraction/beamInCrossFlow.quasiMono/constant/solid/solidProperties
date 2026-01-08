@@ -20,6 +20,14 @@ solidModel    nonLinearGeometryTotalLagrangianVelocity;
 
 nonLinearGeometryTotalLagrangianVelocityCoeffs
 {
+    linearElasticFormulation yes;
+    // E           E [1 -1 -2 0 0 0 0] 1e4;
+    // nu          nu [0 0 0 0 0 0 0] 0.4;
+    mu           mu [1 -1 -2 0 0 0 0] 3846.1538461538;
+    lambda       lambda [1 -1 -2 0 0 0 0] 5769.2307692308;
+
+    futureForceFraction 0.5;
+
 }
 
 

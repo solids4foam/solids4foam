@@ -6,8 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# Check case version is correct
-solids4Foam::convertCaseFormat .
+# Check case version is correct: DISABLE
+#solids4Foam::convertCaseFormat .
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid

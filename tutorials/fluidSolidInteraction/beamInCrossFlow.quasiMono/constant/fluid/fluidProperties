@@ -20,6 +20,9 @@ fluidModel    newtonIcoFluid;
 
 newtonIcoFluidCoeffs
 {
+    fluidFluxExtrapolationAlgorithm1 yes;
+    addDivPhiUDamping no;
+
     stabilisation
     {
         type RhieChow;

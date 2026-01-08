@@ -16,5 +16,5 @@ else
 fi
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Convert case version to FOAM EXTEND: DISABLE
+#solids4Foam::convertCaseFormatFoamExtend .
