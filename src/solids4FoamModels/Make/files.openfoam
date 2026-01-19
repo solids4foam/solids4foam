@@ -227,6 +227,7 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/meshDual/meshDual.C
 numerics/meshDual/dualMeshToMeshMap.C
 numerics/meshDual/meshDualiser.C
+numerics/movingLeastSquaresStencil/movingLeastSquaresStencil.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/multiplyCoeff/multiplyCoeff.C
 
