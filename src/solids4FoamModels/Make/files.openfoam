@@ -243,6 +243,9 @@ numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 
-
+numerics/quadrature/quadrature.C
+numerics/quadrature/tetQuadrature.C
+numerics/quadrature/triQuadrature.C
+numerics/quadrature/lineQuadrature.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
