@@ -19,8 +19,10 @@ Class
     movingLeastSquaresStencil
 
 Description
-    Build cell and face stencils using neirest N neighbbours phylosophy.
-    Remote cells are stored using global coordinates.
+    Build cell and face centered stencils using neirest N neighbbours
+    approach. Remote cells are stored using global coordinates. Local cells
+    are collected using layer technique while linear search is conducted for
+    remote cells.
 
 SourceFile
     movingLeastSquaresStencil.C
@@ -43,7 +45,9 @@ Author
 #include "PstreamBuffers.H"
 #include "treeBoundBox.H"
 #include "processorPolyPatch.H"
+#include "surfaceFields.H"
 #include "volFields.H"
+#include <cmath>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,17 +70,23 @@ class movingLeastSquaresStencil
         //  of multi-layer thickness
         const scalar haloDepthScale_;
 
-        //- Remote cells from all processor boundaries
-        //labelList remoteGlobalCells_;
-
         //- Stencil size
         const label N_;
 
-        //- Face stencils
+        //- Marked cells at processor boundary
+        boolList procPatchesCells_;
+
+        //- Face stencils (global IDs)
         CompactListList<label> facesStencil_;
 
-         //- Cell centre stencils
+         //- Cell centre stencils (global IDs)
         CompactListList<label> cellsStencil_;
+
+        //- Remote cells used by stencils (global IDs), grouped by proc
+        List<labelList> remoteCellsPerProc_;
+
+        //- Matching cell centres for remoteCellsPerProc
+        List<vectorField> remoteCentresPerProc_;
 
 
     // Private Member Functions
@@ -121,18 +131,22 @@ class movingLeastSquaresStencil
         //- Build face stencil
         labelList buildFacesStencil
         (
-          const label faceI,
-          const List<labelList>& remoteCells,
-          const List<vectorField>& remoteCellsCentres
+             const label faceI,
+             const List<labelList>& remoteCells,
+             const List<vectorField>& remoteCellsCentres,
+             const scalar relTol = 1e-10,
+             const scalar overSampleFactor = 1.5
         ) const;
+
+        //- Filter unused cells and store cells IDs and their cell centres
+        void filterUnusedCandidates
+        (
+            const List<labelList>& remoteCellsPerProc,
+            const List<vectorField>& remoteCellsCentresPerProc
+         );
 
         //- Calculate faces stencil
         void calcFacesStencil();
-
-    // Static data
-
-
-    // Static Member Functions
 
 
 public:
@@ -159,7 +173,7 @@ public:
         }
 
         //- Return stencil for faceI
-        inline const labelUList& faceStencil(const label faceI) const
+        inline const labelUList faceStencil(const label faceI) const
         {
             return facesStencil_[faceI];
         }

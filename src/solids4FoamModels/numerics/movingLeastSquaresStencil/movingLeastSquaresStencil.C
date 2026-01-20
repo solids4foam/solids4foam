@@ -26,13 +26,6 @@ namespace Foam
 
 defineTypeNameAndDebug(movingLeastSquaresStencil, 0);
 
-// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
-
-
-// * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
-
-
-
 
 // * * * * * * * * * * * * * Private Member Functions * * * * * * * * * * * * //
 
@@ -41,7 +34,6 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
     // 1. Step: get local depth
     const scalarField& V = mesh_.V();
 
-    labelHashSet haloCells;
     scalar procPatchArea = 0.0;
     scalar haloVol = 0.0;
 
@@ -58,7 +50,6 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
             {
                 const label cellID = faceCells[i];
 
-                haloCells.insert(cellID);
                 haloVol += V[cellID];
                 procPatchArea += mag(Sf[i]);
             }
@@ -141,7 +132,7 @@ treeBoundBox movingLeastSquaresStencil::calcOwnedCellsBox() const
     vector minPt(GREAT, GREAT, GREAT);
     vector maxPt(-GREAT, -GREAT, -GREAT);
 
-    const pointField& C = mesh_.C();
+    const pointField& C = mesh_.C().primitiveField();
 
     forAll(C, cellI)
     {
@@ -175,7 +166,7 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
     const labelList& procToQuery
 ) const
 {
-    const vectorField& C = mesh_.C();
+    const vectorField& C = mesh_.C().primitiveField();
 
     List<labelList> remoteCandidatesPerProc;
 
@@ -274,7 +265,7 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
     const labelList& procToQuery
 ) const
 {
-    const vectorField& C = mesh_.C();
+    const vectorField& C = mesh_.C().primitiveField();
 
     List<vectorField> remoteCellCentres(Pstream::nProcs());
 
@@ -382,17 +373,319 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
     return remoteCellCentres;
 }
 
+
 labelList movingLeastSquaresStencil::buildFacesStencil
 (
     const label faceI,
     const List<labelList>& remoteCells,
-    const List<vectorField>& remoteCellsCentres
+    const List<vectorField>& remoteCellsCentres,
+    const scalar relTol,
+    const scalar overSampleFactor
 ) const
 {
+    // When this number of cell is reached, layer approach stops
+    const label nbOfCandidates =
+        label(std::ceil(overSampleFactor * scalar(N_)));
 
-    labelList  faceStencil;
+    // When building stencils, stencil is larger than N if there are cells with
+    // equall distance. We use relTol to detect such cases. This results in
+    // symmetric stencils on regular meshes.
+
+    // Get potential candidates using complete layers looping.
+    // Cell ID is in local indexing format.
+    labelHashSet localCandidates;
+
+    localCandidates.clear();
+
+    labelHashSet currentLayer;
+    labelHashSet nextLayer;
+
+    const label ownerCell = mesh_.faceOwner()[faceI];
+    currentLayer.insert(ownerCell);
+    localCandidates.insert(ownerCell);
+
+    if (faceI < mesh_.nInternalFaces())
+    {
+        const label nei = mesh_.faceNeighbour()[faceI];
+        currentLayer.insert(nei);
+        localCandidates.insert(nei);
+    }
+
+    const labelListList& cellCells = mesh_.cellCells();
+
+    while
+    (
+        !currentLayer.empty()
+     && localCandidates.size() < nbOfCandidates
+    )
+    {
+        nextLayer.clear();
+
+        forAllConstIter(labelHashSet, currentLayer, it)
+        {
+            const label c = it.key();
+            const labelList& neighbours = cellCells[c];
+
+            forAll(neighbours, i)
+            {
+                const label cellID = neighbours[i];
+                if (localCandidates.insert(cellID))
+                {
+                    nextLayer.insert(cellID);
+                }
+            }
+        }
+
+        currentLayer.transfer(nextLayer);
+    }
+
+    // Above algorithm works only on owned faces since for remote cells we did
+    // not transfered cellCells structure.
+
+    // Algorithm: 1) Sort current candidates (distance based)
+    //            2) Loop over existing candidates and check if some cell is
+    //               at processor boundary. Looping is done up to N position.
+    //            3) Get radius of the cell that is at position 1.3*N
+    //            4) Check if any remote cell fits into this radius, in case it
+    //               is inside this radius add it to the candidates list.
+    //            5) Sort again and take first N cells into stencil
+
+    // Phase 1: Build distance list for local candidates
+    //          Using squared distance for efficiency
+
+    const vector faceCentre = mesh_.faceCentres()[faceI];
+    const vectorField& C = mesh_.C().primitiveField();;
+
+    labelList localList(localCandidates.size());
+    {
+        label k = 0;
+        forAllConstIter(labelHashSet, localCandidates, it)
+        {
+            localList[k++] = it.key();
+        }
+    }
+
+    List<Tuple2<label, scalar>> localDist(localList.size());
+
+    forAll(localList, i)
+    {
+        const label cI = localList[i];
+        localDist[i] = Tuple2<label, scalar>(cI, magSqr(C[cI] - faceCentre));
+    }
+
+    Foam::sort
+    (
+        localDist,
+        [](auto& A, auto& B)
+        {
+            return A.second() < B.second();
+        }
+    );
+
+    // Phase 2: Check first N local candidates if internal cells is at processor
+    //          boundary to activate looping over remote cells
+
+    bool localStencil = true;
+    const label nCheck = min(N_, localDist.size());
+
+    for (label pos = 0; pos < nCheck; ++pos)
+    {
+        const label& cellID = localDist[pos].first();
+        if (procPatchesCells_[cellID])
+        {
+            localStencil = false;
+            break;
+        }
+    }
+
+    // If stencil is local we can already return the stencil
+    if (localStencil)
+    {
+        if ( localList.size() < N_ )
+        {
+            FatalErrorInFunction
+                << "Local candidates for stencil have size of: "
+                << localList.size()
+                << " but required minimum  stencil size is larger: " << N_ << nl
+                << "Increase the mesh size!"
+                << exit(FatalError);
+        }
+
+        // When building stencils, stencil is larger than N if there are cells
+        // with equall distance. We use relTol to detect such cases.
+        // This results in symmetric stencils on regular meshes.
+        const scalar cut = localDist[N_-1].second();
+        const scalar cutTol = cut*(1.0 + relTol);
+
+        label nPick = N_;
+        while (nPick < localDist.size() && localDist[nPick].second() <= cutTol)
+        {
+            ++nPick;
+        }
+
+        labelList stencil(nPick);
+        for (label i = 0; i < nPick; ++i)
+        {
+            const label localCellID = localDist[i].first();
+            stencil[i] = globalCells_.toGlobal(localCellID);
+        }
+
+        return stencil;
+    }
+
+    // Phase 3: Radius from position posR = ceil(1.3*N)
+    //          Assuming 1.3 is guess that should work
+    label posR = label(std::ceil(1.3 * scalar(N_)));
+    posR = min(max(posR, 0), localDist.size()-1);
+
+    const scalar R2 = localDist[posR].second();
+
+    DynamicList<Tuple2<label, scalar>> allDist;
+    allDist.reserve((posR + 1) + 100);
+
+    // Local cells within extended stencil radius squared R2
+    for (label i = 0; i <= posR; ++i)
+    {
+        const label cellID = localDist[i].first();
+        const label globalCellID = globalCells_.toGlobal(cellID);
+        allDist.append
+        (
+            Tuple2<label, scalar>(globalCellID, localDist[i].second())
+        );
+    }
+
+    // Phase 4: Add remote cells within radius squared R2
+    forAll(remoteCells, p)
+    {
+        const labelList& procCells = remoteCells[p];
+        const vectorField& procCellCentres = remoteCellsCentres[p];
+
+        if (procCells.empty())
+        {
+            continue;
+        }
+
+        forAll(procCells, i)
+        {
+            const scalar d2 = magSqr(procCellCentres[i] - faceCentre);
+            if (d2 <= R2)
+            {
+                allDist.append(Tuple2<label, scalar>(procCells[i], d2));
+            }
+        }
+    }
+
+    // Phase 5: Sort again local and remote cells together
+    Foam::sort
+    (
+        allDist,
+        [](const Tuple2<label, scalar>& A, const Tuple2<label, scalar>& B)
+        {
+            return A.second() < B.second();
+        }
+    );
+
+    // Check minimum stencil size
+    if ( allDist.size() < N_ )
+    {
+        FatalErrorInFunction
+            << "Candidates for stencil have size of: " << allDist.size()
+            << " but required minimum stencil size is larger: " << N_ << nl
+            << "Increase the mesh size!"
+            << exit(FatalError);
+    }
+
+    // Enlarge stencil to include cells with the same distance
+    const scalar cut = allDist[N_-1].second();
+    const scalar cutTol = cut*(1.0 + relTol);
+
+    label nPick = N_;
+    while (nPick < allDist.size() && allDist[nPick].second() <= cutTol)
+    {
+        ++nPick;
+    }
+
+    labelList faceStencil(nPick);
+    for (label i = 0; i < nPick; ++i)
+    {
+        faceStencil[i] = allDist[i].first();
+    }
 
     return faceStencil;
+}
+
+void movingLeastSquaresStencil::filterUnusedCandidates
+(
+    const List<labelList>& remoteCellsPerProc,
+    const List<vectorField>& remoteCellsCentresPerProc
+)
+{
+    // Initialise storage
+    remoteCellsPerProc_.setSize(Pstream::nProcs());
+    remoteCentresPerProc_.setSize(Pstream::nProcs());
+
+    labelHashSet usedRemoteCells;
+
+    label totalRemote = 0;
+    forAll(remoteCellsPerProc, p)
+    {
+        totalRemote += remoteCellsPerProc[p].size();
+    }
+    usedRemoteCells.reserve(totalRemote);
+
+    forAll(facesStencil_, faceI)
+    {
+        const labelUList faceStencil = facesStencil_[faceI];
+
+        forAll(faceStencil, cellI)
+        {
+            const label gCellID = faceStencil[cellI];
+            if (!globalCells_.isLocal(gCellID))
+            {
+                usedRemoteCells.insert(gCellID);
+            }
+        }
+    }
+
+    forAll(remoteCellsPerProc, procI)
+    {
+        const labelList& globalIDs = remoteCellsPerProc[procI];
+        const vectorField& cellCentres = remoteCellsCentresPerProc[procI];
+
+        remoteCellsPerProc_[procI].clear();
+        remoteCentresPerProc_[procI].clear();
+
+        if (globalIDs.empty())
+        {
+            continue;
+        }
+
+        if (globalIDs.size() != cellCentres.size())
+        {
+            FatalErrorInFunction
+                << "Size for remote lists of cell centres and global IDs "
+                << "are in mismatch for processor " << procI
+                << exit(FatalError);
+        }
+
+        DynamicList<label> filteredGlobalIDs;
+        DynamicList<vector> filteredCellCentres;
+        filteredGlobalIDs.reserve(globalIDs.size());
+        filteredCellCentres.reserve(globalIDs.size());
+
+        forAll(globalIDs, i)
+        {
+            const label globalID = globalIDs[i];
+            if (usedRemoteCells.found(globalID))
+            {
+                filteredGlobalIDs.append(globalID);
+                filteredCellCentres.append(cellCentres[i]);
+            }
+        }
+
+        remoteCellsPerProc_[procI].transfer(filteredGlobalIDs.shrink());
+        remoteCentresPerProc_[procI].transfer(filteredCellCentres.shrink());
+    }
 }
 
 
@@ -481,15 +774,28 @@ void movingLeastSquaresStencil::calcFacesStencil()
         }
     }
 
-    // labelList sizes(facesStencil.size());
-    // forAll(facesStencil, faceI)
-    // {
-    //     sizes[faceI] = facesStencil[faceI].size();
-    // }
+    // Allocate compact storage  and store into it
+    labelList sizes(facesStencil.size());
+    forAll(facesStencil, faceI)
+    {
+        sizes[faceI] = facesStencil[faceI].size();
+    }
 
+    facesStencil_ = CompactListList<label>(sizes);
 
-    // // Store face stencils using contigous compact storage
-    // facesStencil_ = CompactListList<label>(facesStencil);
+    forAll(facesStencil, faceI)
+    {
+        const labelList& src = facesStencil[faceI];
+        labelUList dst = facesStencil_[faceI];
+
+        forAll(src, j)
+        {
+            dst[j] = src[j];
+        }
+    }
+
+    // Filter and store remote cells and cell centres
+    filterUnusedCandidates(remoteCells, remoteCellsCentres);
 }
 
 
@@ -507,10 +813,25 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
     globalCells_(mesh.nCells()),
     haloDepthScale_(haloDepthScale),
     N_(N),
+    procPatchesCells_(mesh.nCells(), false),
     facesStencil_(),
     cellsStencil_()
 {
-    // Build face stencils at construction
+    // Mark cells at processor boundary
+    forAll(mesh_.boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+        if (isA<processorPolyPatch>(pp))
+        {
+            const labelUList& faceCells = pp.faceCells();
+            forAll(faceCells, i)
+            {
+                procPatchesCells_[faceCells[i]] = true;
+            }
+        }
+    }
+
+    // Build face stencils at construction.
     calcFacesStencil();
 }
 
