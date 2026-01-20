@@ -70,23 +70,26 @@ class movingLeastSquaresStencil
         //  of multi-layer thickness
         const scalar haloDepthScale_;
 
-        //- Stencil size
+        //- Stencil size for faces
         const label N_;
 
+         //- Stencil size for cells
+        const label Nc_;
+
         //- Marked cells at processor boundary
-        boolList procPatchesCells_;
+        bitSet procPatchesCells_;
 
         //- Face stencils (global IDs)
-        CompactListList<label> facesStencil_;
+        mutable autoPtr<CompactListList<label>> facesStencilPtr_;
 
          //- Cell centre stencils (global IDs)
-        CompactListList<label> cellsStencil_;
+        mutable autoPtr<CompactListList<label>> cellsStencilPtr_;
 
         //- Remote cells used by stencils (global IDs), grouped by proc
-        List<labelList> remoteCellsPerProc_;
+        mutable autoPtr<List<labelList>> remoteCellsPerProcPtr_;
 
         //- Matching cell centres for remoteCellsPerProc
-        List<vectorField> remoteCentresPerProc_;
+         mutable autoPtr<List<vectorField>> remoteCentresPerProcPtr_;
 
 
     // Private Member Functions
@@ -112,7 +115,7 @@ class movingLeastSquaresStencil
         (
             const List<treeBoundBox>& allOwnedCellsBox,
             const treeBoundBox& ownedFacesBox
-        );
+        ) const;
 
         //- Get remote cells candidates for stencil construction
         List<labelList> remoteCandidates
@@ -134,8 +137,9 @@ class movingLeastSquaresStencil
              const label faceI,
              const List<labelList>& remoteCells,
              const List<vectorField>& remoteCellsCentres,
-             const scalar relTol = 1e-10,
-             const scalar overSampleFactor = 1.5
+             const scalar relTol = 1e-8,
+             const scalar overSampleFactor = 1.5,
+             const scalar searchExpansionFactor = 1.3
         ) const;
 
         //- Filter unused cells and store cells IDs and their cell centres
@@ -143,11 +147,13 @@ class movingLeastSquaresStencil
         (
             const List<labelList>& remoteCellsPerProc,
             const List<vectorField>& remoteCellsCentresPerProc
-         );
+        ) const;
 
         //- Calculate faces stencil
-        void calcFacesStencil();
+        void calcFacesStencil() const;
 
+        //- Calculate cells stencil
+        void calcCellsStencil() const;
 
 public:
 
@@ -157,8 +163,9 @@ public:
     movingLeastSquaresStencil
     (
         const fvMesh& mesh,
-        const scalar& haloDepthScale,
-        const label& N
+        const scalar haloDepthScale,
+        const label N,
+        const label Nc
     );
 
     // Desctructor
@@ -167,17 +174,16 @@ public:
     // Member Functions
 
         //- Returns face stencils
-        inline const CompactListList<label>& facesStencil() const
-        {
-            return facesStencil_;
-        }
+        const CompactListList<label>& facesStencil() const;
 
-        //- Return stencil for faceI
-        inline const labelUList faceStencil(const label faceI) const
-        {
-            return facesStencil_[faceI];
-        }
+        //- Returns cell stencils
+            const CompactListList<label>& cellsStencil() const;
 
+        //- Return remote cells per processor written in global indexing
+        const List<labelList>& remoteCellsPerProc() const;
+
+        //- Return remote cell centres per processor, same order as remoteCells
+        const List<vectorField>& remoteCentresPerProc() const;
 
 };
 

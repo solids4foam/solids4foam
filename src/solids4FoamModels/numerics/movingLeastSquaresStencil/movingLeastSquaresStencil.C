@@ -108,7 +108,7 @@ labelList movingLeastSquaresStencil::checkProcessorOverlap
 (
     const List<treeBoundBox>& allOwnedCellsBox,
     const treeBoundBox& ownedFacesBox
-)
+) const
 {
     DynamicList<label> overlappingProcessor;
 
@@ -380,7 +380,8 @@ labelList movingLeastSquaresStencil::buildFacesStencil
     const List<labelList>& remoteCells,
     const List<vectorField>& remoteCellsCentres,
     const scalar relTol,
-    const scalar overSampleFactor
+    const scalar overSampleFactor,
+    const scalar searchExpansionFactor
 ) const
 {
     // When this number of cell is reached, layer approach stops
@@ -491,7 +492,7 @@ labelList movingLeastSquaresStencil::buildFacesStencil
     for (label pos = 0; pos < nCheck; ++pos)
     {
         const label& cellID = localDist[pos].first();
-        if (procPatchesCells_[cellID])
+        if (procPatchesCells_.test(cellID))
         {
             localStencil = false;
             break;
@@ -533,9 +534,9 @@ labelList movingLeastSquaresStencil::buildFacesStencil
         return stencil;
     }
 
-    // Phase 3: Radius from position posR = ceil(1.3*N)
-    //          Assuming 1.3 is guess that should work
-    label posR = label(std::ceil(1.3 * scalar(N_)));
+    // Phase 3: Radius from position posR = ceil(searchExpansionFactor*N)
+
+    label posR = label(std::ceil(searchExpansionFactor * scalar(N_)));
     posR = min(max(posR, 0), localDist.size()-1);
 
     const scalar R2 = localDist[posR].second();
@@ -618,11 +619,11 @@ void movingLeastSquaresStencil::filterUnusedCandidates
 (
     const List<labelList>& remoteCellsPerProc,
     const List<vectorField>& remoteCellsCentresPerProc
-)
+) const
 {
     // Initialise storage
-    remoteCellsPerProc_.setSize(Pstream::nProcs());
-    remoteCentresPerProc_.setSize(Pstream::nProcs());
+    remoteCellsPerProcPtr_.reset(new List<labelList>(Pstream::nProcs()));
+    remoteCentresPerProcPtr_.reset(new List<vectorField>(Pstream::nProcs()));
 
     labelHashSet usedRemoteCells;
 
@@ -633,9 +634,11 @@ void movingLeastSquaresStencil::filterUnusedCandidates
     }
     usedRemoteCells.reserve(totalRemote);
 
-    forAll(facesStencil_, faceI)
+    const CompactListList<label>& facesStencil = this->facesStencil();
+
+    forAll(facesStencil, faceI)
     {
-        const labelUList faceStencil = facesStencil_[faceI];
+        const labelUList faceStencil = facesStencil[faceI];
 
         forAll(faceStencil, cellI)
         {
@@ -651,9 +654,6 @@ void movingLeastSquaresStencil::filterUnusedCandidates
     {
         const labelList& globalIDs = remoteCellsPerProc[procI];
         const vectorField& cellCentres = remoteCellsCentresPerProc[procI];
-
-        remoteCellsPerProc_[procI].clear();
-        remoteCentresPerProc_[procI].clear();
 
         if (globalIDs.empty())
         {
@@ -683,13 +683,13 @@ void movingLeastSquaresStencil::filterUnusedCandidates
             }
         }
 
-        remoteCellsPerProc_[procI].transfer(filteredGlobalIDs.shrink());
-        remoteCentresPerProc_[procI].transfer(filteredCellCentres.shrink());
+        remoteCellsPerProcPtr_()[procI].transfer(filteredGlobalIDs.shrink());
+        remoteCentresPerProcPtr_()[procI].transfer(filteredCellCentres.shrink());
     }
 }
 
 
-void movingLeastSquaresStencil::calcFacesStencil()
+void movingLeastSquaresStencil::calcFacesStencil() const
 {
     // Get average first halo depth per processor boundary
     const List<scalar> neighbourHaloDepth = calcFirstHaloDepth();
@@ -781,12 +781,13 @@ void movingLeastSquaresStencil::calcFacesStencil()
         sizes[faceI] = facesStencil[faceI].size();
     }
 
-    facesStencil_ = CompactListList<label>(sizes);
+    facesStencilPtr_.reset(new CompactListList<label>(sizes));
+    CompactListList<label>& facesStencilRef = facesStencilPtr_();
 
     forAll(facesStencil, faceI)
     {
         const labelList& src = facesStencil[faceI];
-        labelUList dst = facesStencil_[faceI];
+        labelUList dst = facesStencilRef[faceI];
 
         forAll(src, j)
         {
@@ -799,45 +800,100 @@ void movingLeastSquaresStencil::calcFacesStencil()
 }
 
 
+void movingLeastSquaresStencil::calcCellsStencil() const
+{
+    // To be added..
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 
 movingLeastSquaresStencil::movingLeastSquaresStencil
 (
     const fvMesh& mesh,
-    const scalar& haloDepthScale,
-    const label& N
+    const scalar haloDepthScale,
+    const label N,
+    const label Nc
 )
 :
     mesh_(mesh),
     globalCells_(mesh.nCells()),
     haloDepthScale_(haloDepthScale),
     N_(N),
-    procPatchesCells_(mesh.nCells(), false),
-    facesStencil_(),
-    cellsStencil_()
+    Nc_(Nc),
+    procPatchesCells_(mesh.nCells()),
+    facesStencilPtr_(),
+    cellsStencilPtr_()
 {
     // Mark cells at processor boundary
     forAll(mesh_.boundaryMesh(), patchI)
     {
         const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+
         if (isA<processorPolyPatch>(pp))
         {
             const labelUList& faceCells = pp.faceCells();
             forAll(faceCells, i)
             {
-                procPatchesCells_[faceCells[i]] = true;
+                procPatchesCells_.set(faceCells[i]);
             }
         }
     }
-
-    // Build face stencils at construction.
-    calcFacesStencil();
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+
+const CompactListList<label>& movingLeastSquaresStencil::facesStencil() const
+{
+    if (!facesStencilPtr_.valid())
+    {
+         calcFacesStencil();
+    }
+
+    return facesStencilPtr_();
+}
+
+
+const CompactListList<label>& movingLeastSquaresStencil::cellsStencil() const
+{
+    // Cells stencils are constructed from faces stencils
+    if (!facesStencilPtr_.valid())
+    {
+         calcFacesStencil();
+    }
+
+    if (!cellsStencilPtr_.valid())
+    {
+        calcCellsStencil();
+    }
+
+    return cellsStencilPtr_();
+}
+
+
+const List<labelList>& movingLeastSquaresStencil::remoteCellsPerProc() const
+{
+    if (!remoteCellsPerProcPtr_.valid())
+    {
+         calcFacesStencil();
+    }
+
+    return remoteCellsPerProcPtr_();
+}
+
+
+const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
+{
+    if (!remoteCentresPerProcPtr_.valid())
+    {
+        calcFacesStencil();
+    }
+
+    return remoteCentresPerProcPtr_();
+}
 
 
 } // End namespace Foam
