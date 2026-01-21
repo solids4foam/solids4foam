@@ -800,9 +800,161 @@ void movingLeastSquaresStencil::calcFacesStencil() const
 }
 
 
-void movingLeastSquaresStencil::calcCellsStencil() const
+void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
 {
-    // To be added..
+    // Prerequisites
+    const CompactListList<label>& faceStencils = this->facesStencil();
+
+    const List<labelList>& remoteCellsPerProc = this->remoteCellsPerProc();
+
+    const List<vectorField>& remoteCentresPerProc =
+        this->remoteCentresPerProc();
+
+    // Collect remote cells and their location in one hash table
+    label totalRemote = 0;
+    forAll(remoteCellsPerProc, p)
+    {
+        totalRemote += remoteCellsPerProc[p].size();
+    }
+
+    HashTable<vector, label> remoteCellsData;
+    remoteCellsData.resize(2*totalRemote + 1);
+
+    forAll(remoteCellsPerProc, p)
+    {
+        const labelList& globalIDs = remoteCellsPerProc[p];
+        const vectorField& cellCentres = remoteCentresPerProc[p];
+
+        forAll(globalIDs, i)
+        {
+            remoteCellsData.insert(globalIDs[i], cellCentres[i]);
+        }
+    }
+
+    // Loop over cells, collect cells from face stencils, sort them by distance
+    // and construct cell stencil by taking first Nc_ cells
+    const vectorField& C = mesh_.C();
+    const cellList& cellFaces = mesh_.cells();
+
+    List<labelList> cellStencils(mesh_.nCells());
+
+    DynamicList<Tuple2<label, scalar>> dist;
+    dist.reserve(label(std::ceil(1.5 * scalar(N_))));
+
+    labelHashSet candidates;
+    for (label cellI = 0; cellI < mesh_.nCells(); ++cellI)
+    {
+        candidates.clear();
+
+        const labelList& faces = cellFaces[cellI];
+
+        // Loop over cell faces and include stencil cells to candidates
+        forAll(faces, fI)
+        {
+            const label faceID = faces[fI];
+            const labelUList faceStencil = faceStencils[faceID];
+
+            forAll(faceStencil, j)
+            {
+                candidates.insert(faceStencil[j]);
+            }
+        }
+
+        // Build distance list (squared distance to cell centre)
+        dist.clear();
+        if (dist.capacity() < candidates.size())
+        {
+            // Do reserve only if needed
+            dist.reserve(candidates.size());
+        }
+
+        const vector& cellCentre = C[cellI];
+
+        forAllConstIter(labelHashSet, candidates, iter)
+        {
+            scalar d2 = GREAT;
+
+            const label globalID = iter.key();
+
+            if (globalCells_.isLocal(globalID))
+            {
+                const label localID = globalCells_.toLocal(globalID);
+                d2 = magSqr(C[localID] - cellCentre);
+            }
+            else
+            {
+                const auto it = remoteCellsData.find(globalID);
+                if (!it.good())
+                {
+                    FatalErrorInFunction
+                        << "Remote cell globalID " << globalID
+                        << " is not in the remoteCellsData."
+                        << exit(FatalError);
+                }
+                d2 = magSqr(it() - cellCentre);
+            }
+
+            dist.append(Tuple2<label, scalar>(globalID, d2));
+        }
+
+        // Sort cells based on squared distance
+        Foam::sort
+        (
+            dist,
+            [](const Tuple2<label, scalar>& A, const Tuple2<label, scalar>& B)
+            {
+                return A.second() < B.second();
+            }
+        );
+
+        if (dist.size() < Nc_)
+        {
+            FatalErrorInFunction
+                << "Cell " << cellI << " has only " << dist.size()
+                << " candidates but requred minimum number is " << Nc_
+                << exit(FatalError);
+        }
+
+        // Enlarge stencil to include cells with the same distance
+        const scalar cut = dist[Nc_-1].second();
+        const scalar cutTol = cut*(1.0 + relTol);
+
+        label nPick = Nc_;
+        while (nPick < dist.size() && dist[nPick].second() <= cutTol)
+        {
+            ++nPick;
+        }
+
+        labelList st(nPick);
+        for (label i = 0; i < nPick; ++i)
+        {
+            st[i] = dist[i].first();
+        }
+
+        cellStencils[cellI].transfer(st);
+    }
+
+    // Allocate compact storage  and store into it
+    labelList sizes(cellStencils.size());
+    forAll(cellStencils, i)
+    {
+        sizes[i] = cellStencils[i].size();
+    }
+
+    cellsStencilPtr_.reset(new CompactListList<label>(sizes));
+
+    CompactListList<label>& cellsStencilRef = cellsStencilPtr_();
+
+    forAll(cellStencils, c)
+    {
+        const labelList& src = cellStencils[c];
+        labelUList dst = cellsStencilRef[c];
+
+        forAll(src, j)
+        {
+            dst[j] = src[j];
+        }
+    }
 }
 
 
@@ -895,6 +1047,14 @@ const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
     return remoteCentresPerProcPtr_();
 }
 
+
+void Foam::movingLeastSquaresStencil::clear() const
+{
+    facesStencilPtr_.clear();
+    cellsStencilPtr_.clear();
+    remoteCellsPerProcPtr_.clear();
+    remoteCentresPerProcPtr_.clear();
+}
 
 } // End namespace Foam
 

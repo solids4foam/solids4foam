@@ -24,6 +24,14 @@ Description
     are collected using layer technique while linear search is conducted for
     remote cells.
 
+    Stencils are currently constructed for faces, and cell stencils are then
+    assembled from the corresponding face stencils. Since the number of cells
+    is lower than the number of faces, the opposite strategy—constructing cell
+    stencils first and deriving face stencils from them—should be considered in
+    future refactoring. The present approach was chosen because it is expected
+    to be more robust in handling borderline cases.
+
+
 SourceFile
     movingLeastSquaresStencil.C
 
@@ -153,7 +161,7 @@ class movingLeastSquaresStencil
         void calcFacesStencil() const;
 
         //- Calculate cells stencil
-        void calcCellsStencil() const;
+        void calcCellsStencil(const scalar relTol = 1e-8) const;
 
 public:
 
@@ -185,6 +193,8 @@ public:
         //- Return remote cell centres per processor, same order as remoteCells
         const List<vectorField>& remoteCentresPerProc() const;
 
+        //- Clear all data, call after mesh topology change
+        void clear() const;
 };
 
 } // End namespace Foam
