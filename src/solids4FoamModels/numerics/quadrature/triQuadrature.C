@@ -446,9 +446,9 @@ tmp<Field<point>> triQuadrature::barycentricToPoint
     forAll(globalPts, pointI)
     {
         globalPts[pointI] =
-            localPts[pointI].a()*this->a()
-          + localPts[pointI].b()*this->b()
-          + localPts[pointI].c()*this->c();
+            localPts[pointI].a()*tri_.a()
+          + localPts[pointI].b()*tri_.b()
+          + localPts[pointI].c()*tri_.c();
     }
 
     return tglobalPts;
@@ -459,12 +459,14 @@ tmp<Field<point>> triQuadrature::barycentricToPoint
 
 triQuadrature::triQuadrature
 (
-    const triPoints& pts,
+    const point& a,
+    const point& b,
+    const point& c,
     const label& order
 )
 :
     quadrature(order),
-    triPoints(pts)
+    tri_(a, b, c)
 {
     const label chosen = chooseOrder(order);
     const auto& rule = rules()[chosen];
@@ -473,6 +475,22 @@ triQuadrature::triQuadrature
     points_ = barycentricToPoint(rule.points);
 }
 
+
+triQuadrature::triQuadrature
+(
+    const triangle<point, const point&>& tri,
+    const label& order
+)
+:
+    quadrature(order),
+    tri_(tri.a(), tri.b(), tri.c())
+{
+    const label chosen = chooseOrder(order);
+    const auto& rule = rules()[chosen];
+
+    weights_ = rule.weights;
+    points_ = barycentricToPoint(rule.points);
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

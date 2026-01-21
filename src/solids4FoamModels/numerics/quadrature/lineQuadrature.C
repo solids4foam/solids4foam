@@ -342,7 +342,7 @@ tmp<Field<point>> lineQuadrature::parametricToPoint
     {
         // Map from [-1,1] to [0,1]
         const scalar t = 0.5*x[pointI] + 0.5;
-        globalPts[pointI] = this->start() + t * this->vec();
+        globalPts[pointI] = line_.start() + t * line_.vec();
     }
 
     return tglobalPts;
@@ -373,12 +373,13 @@ tmp<Field<scalar>> lineQuadrature::normaliseWeights
 
 lineQuadrature::lineQuadrature
 (
-    const linePointRef& l,
+    const point& start,
+    const point& end,
     const label& order
 )
 :
     quadrature(order),
-    linePointRef(l)
+    line_(start, end)
 {
     const label chosen = chooseOrder(order);
     const auto& rule = rules()[chosen];
@@ -387,6 +388,21 @@ lineQuadrature::lineQuadrature
     points_ = parametricToPoint(rule.points);
 }
 
+lineQuadrature::lineQuadrature
+(
+    const line<point, const point&>& l,
+    const label& order
+)
+:
+    quadrature(order),
+    line_(l.start(), l.end())
+{
+    const label chosen = chooseOrder(order);
+    const auto& rule = rules()[chosen];
+
+    weights_ = rule.weights;
+    points_ = parametricToPoint(rule.points);
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

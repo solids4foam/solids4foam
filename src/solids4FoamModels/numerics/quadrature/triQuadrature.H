@@ -40,7 +40,7 @@ Author
 #ifndef triQuadrature_H
 #define triQuadrature_H
 
-#include "triPoints.H"
+#include "triangle.H"
 #include "quadrature.H"
 #include "barycentric2D.H"
 #include "Map.H"
@@ -54,11 +54,13 @@ namespace Foam
 
 class triQuadrature
 :
-    public quadrature,
-    public triPoints
+    public quadrature
 {
 
     // Private data
+
+        //- Store triangle using triangle template
+        triangle<point, point> tri_;
 
         //- Quadrature points in Cartesian coordinates
         List<point> points_;
@@ -103,18 +105,33 @@ class triQuadrature
 public:
 
     // Constructors
-    triQuadrature(const triPoints& pts, const label& order);
+
+        //- Construct from three points
+        triQuadrature
+        (
+            const point& a,
+            const point& b,
+            const point& c,
+            const label& order
+        );
+
+        //- Construct from a standard triangle object
+        triQuadrature
+        (
+            const triangle<point, const point&>& tri,
+            const label& order
+        );
 
     // Member Functions
 
         //- Get reference to quadrature points in global Cartesian coordinates
-        virtual const List<point>& points() const;
+        virtual const List<point>& points() const override;
 
         //- Get reference to quadrature points weights
-        virtual const List<scalar>& weights() const;
+        virtual const List<scalar>& weights() const override;
 
         //- Number of quadrature points
-        virtual label nPoints() const;
+        virtual label nPoints() const override;
 
         //- Return number of quadrature points without making instance
         static label nPoints(label order);

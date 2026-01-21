@@ -433,10 +433,10 @@ tmp<Field<point>> tetQuadrature::barycentricToPoint
     forAll(globalPts, pointI)
     {
          globalPts[pointI] =
-             localPts[pointI].a()*this->a()
-           + localPts[pointI].b()*this->b()
-           + localPts[pointI].c()*this->c()
-           + localPts[pointI].d()*this->d();
+             localPts[pointI].a()*tet_.a()
+           + localPts[pointI].b()*tet_.b()
+           + localPts[pointI].c()*tet_.c()
+           + localPts[pointI].d()*tet_.d();
     }
     return tglobalPts;
 }
@@ -446,12 +446,32 @@ tmp<Field<point>> tetQuadrature::barycentricToPoint
 
 tetQuadrature::tetQuadrature
 (
-    const tetPoints& pts,
+    const point& a,
+    const point& b,
+    const point& c,
+    const point& d,
     const label& order
 )
 :
     quadrature(order),
-    tetPoints(pts.tet())
+    tet_(a, b, c, d)
+{
+    const label chosen = chooseOrder(order);
+    const auto& rule = rules()[chosen];
+
+    weights_ = rule.weights;
+    points_ = barycentricToPoint(rule.points);
+}
+
+
+tetQuadrature::tetQuadrature
+(
+    const tetrahedron<point, const point&>& tet,
+    const label& order
+)
+:
+    quadrature(order),
+    tet_(tet.a(), tet.b(), tet.c(), tet.d())
 {
     const label chosen = chooseOrder(order);
     const auto& rule = rules()[chosen];

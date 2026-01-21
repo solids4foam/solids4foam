@@ -39,7 +39,7 @@ Author
 
 #include "quadrature.H"
 #include "Map.H"
-#include "linePointRef.H"
+#include "line.H"
 #include "Field.H"
 #include "tmp.H"
 
@@ -50,11 +50,13 @@ namespace Foam
 
 class lineQuadrature
 :
-    public quadrature,
-    public linePointRef
+    public quadrature
 {
 
     // Private data
+
+        //- Store triangle using triangle template
+        line<point, point> line_;
 
         //- Quadrature points in Cartesian coordinates
         List<point> points_;
@@ -105,18 +107,33 @@ class lineQuadrature
 public:
 
     // Constructors
-    lineQuadrature(const linePointRef& l, const label& order);
+
+        //- Construct from two points
+        lineQuadrature
+        (
+            const point& start,
+            const point& end,
+            const label& order
+        );
+
+        //- Construct from a standard line object
+        lineQuadrature
+        (
+            const line<point,
+            const point&>& l,
+            const label& order
+        );
 
     // Member Functions
 
         //- Get reference to quadrature points in global Cartesian coordinates
-        virtual const List<point>& points() const;
+        virtual const List<point>& points() const override;
 
         //- Get reference to quadrature points weights
-        virtual const List<scalar>& weights() const;
+        virtual const List<scalar>& weights() const override;
 
         //- Number of quadrature points
-        virtual label nPoints() const;
+        virtual label nPoints() const override;
 
         //- Return number of quadrature points without making instance
         static label nPoints(label order);

@@ -39,7 +39,7 @@ Author
 #ifndef tetQuadrature_H
 #define tetQuadrature_H
 
-#include "tetPoints.H"
+#include "tetrahedron.H"
 #include "barycentric.H"
 #include "quadrature.H"
 #include "Map.H"
@@ -53,11 +53,13 @@ namespace Foam
 
 class tetQuadrature
 :
-    public quadrature,
-    public tetPoints
+    public quadrature
 {
 
     // Private data
+
+        //- Store tetrahedron using tetrahedron template
+        tetrahedron<point, point> tet_;
 
         //- Quadrature points in Cartesian coordinates
         List<point> points_;
@@ -102,18 +104,34 @@ class tetQuadrature
 public:
 
     // Constructors
-    tetQuadrature(const tetPoints& pts, const label& order);
+
+        //- Construct from four points
+        tetQuadrature
+        (
+            const point& a,
+            const point& b,
+            const point& c,
+            const point& d,
+            const label& order
+        );
+
+        //- Construct from a standard tetrahedron object
+        tetQuadrature
+        (
+            const tetrahedron<point, const point&>& tet,
+            const label& order
+        );
 
     // Member Functions
 
         //- Get reference to quadrature points in global Cartesian coordinates
-        virtual const List<point>& points() const;
+        virtual const List<point>& points() const override;
 
         //- Get reference to quadrature points weights
-        virtual const List<scalar>& weights() const;
+        virtual const List<scalar>& weights() const override;
 
         //- Number of quadrature points
-        virtual label nPoints() const;
+        virtual label nPoints() const override;
 
         //- Return number of quadrature points without making instance
         static label nPoints(label order);
