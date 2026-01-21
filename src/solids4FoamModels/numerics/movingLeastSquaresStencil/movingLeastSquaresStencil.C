@@ -91,9 +91,13 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
     forAll(nbrs, i)
     {
         const label from = nbrs[i];
+
+#ifdef OPENFOAM_COM
         if (pBufs.recvDataCount(from))
+#endif
         {
             UIPstream is(from, pBufs);
+
             scalar lenN;
             is >> lenN;
             neighbourHaloDepth[from] = lenN;
@@ -191,17 +195,20 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
 
         sBufs.finishedSends();
 
-        for (label p = 0; p < Pstream::nProcs(); ++p)
+        forAll(procToQuery, i)
         {
-            if (!sBufs.recvDataCount(p) || p == Pstream::myProcNo())
+            const label from = procToQuery[i];
+#ifdef OPENFOAM_COM
+            if (sBufs.recvDataCount(from) && from == Pstream::myProcNo())
+#endif
             {
                 continue;
             }
-            UIPstream is(p, sBufs);
+            UIPstream is(from, sBufs);
             treeBoundBox qb;
             is >> qb;
 
-            incomingBoxesFromProc.insert(p, qb);
+            incomingBoxesFromProc.insert(from, qb);
         }
     }
 
@@ -243,7 +250,9 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
         forAll(procToQuery, i)
         {
             const label fromProc = procToQuery[i];
-            if (!rBufs.recvDataCount(fromProc))
+#ifdef OPENFOAM_COM
+            if (rBufs.recvDataCount(fromProc))
+#endif
             {
                 continue;
             }
@@ -274,6 +283,11 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
         remoteCellCentres[procI].clear();
     }
 
+    if (!Pstream::parRun())
+    {
+        return remoteCellCentres;
+    }
+
     PstreamBuffers reqBufs(Pstream::commsTypes::nonBlocking);
 
     // Phase 1: send cell global IDs to each processor in contact
@@ -293,12 +307,16 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
     // Phase 2: respond with cell centre coordinates
     PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
 
-    for (label fromProc = 0; fromProc < Pstream::nProcs(); ++fromProc)
+    forAll (procToQuery, i)
     {
+        const label fromProc = procToQuery[i];
+
         if
         (
+#ifdef OPENFOAM_COM
+            reqBufs.recvDataCount(fromProc) ||
+#endif
             fromProc == Pstream::myProcNo()
-         || !reqBufs.recvDataCount(fromProc)
         )
         {
             continue;
@@ -346,7 +364,9 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
             continue;
         }
 
-        if (!repBufs.recvDataCount(p))
+#ifdef OPENFOAM_COM
+        if (repBufs.recvDataCount(p))
+#endif
         {
             FatalErrorInFunction
                 << "Did not receive centres from proc " << p << nl
@@ -492,7 +512,7 @@ labelList movingLeastSquaresStencil::buildFacesStencil
     for (label pos = 0; pos < nCheck; ++pos)
     {
         const label& cellID = localDist[pos].first();
-        if (procPatchesCells_.test(cellID))
+        if (procPatchesCells_[cellID])
         {
             localStencil = false;
             break;
@@ -627,12 +647,14 @@ void movingLeastSquaresStencil::filterUnusedCandidates
 
     labelHashSet usedRemoteCells;
 
+#ifdef OPENFOAM_COM
     label totalRemote = 0;
     forAll(remoteCellsPerProc, p)
     {
         totalRemote += remoteCellsPerProc[p].size();
     }
     usedRemoteCells.reserve(totalRemote);
+#endif
 
     const CompactListList<label>& facesStencil = this->facesStencil();
 
@@ -699,12 +721,25 @@ void movingLeastSquaresStencil::calcFacesStencil() const
 
     // Box for faces, augmented with expected multi-halo depth
     treeBoundBox ownedFacesBox = calcOwnedFacesBox();
+#ifdef OPENFOAM_COM
     ownedFacesBox.grow(scaledHaloDepth);
+#endif
+#ifdef OPENFOAM_ORG
+    ownedFacesBox.inflate(scaledHaloDepth);
+#endif
+
 
     // Box for remote processors cells
     List<treeBoundBox> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
+
+#ifdef OPENFOAM_COM
     Pstream::allGatherList(allOwnedCellsBox);
+#endif
+#ifdef OPENFOAM_ORG
+    Pstream::gatherList(allOwnedCellsBox);
+    Pstream::scatterList(allOwnedCellsBox);
+#endif
 
     // Get processors that may have stencil cells, detected using overlap test
     labelList procToQuery =
@@ -884,13 +919,6 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
             else
             {
                 const auto it = remoteCellsData.find(globalID);
-                if (!it.good())
-                {
-                    FatalErrorInFunction
-                        << "Remote cell globalID " << globalID
-                        << " is not in the remoteCellsData."
-                        << exit(FatalError);
-                }
                 d2 = magSqr(it() - cellCentre);
             }
 
@@ -974,7 +1002,7 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
     haloDepthScale_(haloDepthScale),
     N_(N),
     Nc_(Nc),
-    procPatchesCells_(mesh.nCells()),
+    procPatchesCells_(mesh.nCells(), false),
     facesStencilPtr_(),
     cellsStencilPtr_()
 {
@@ -988,7 +1016,7 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
             const labelUList& faceCells = pp.faceCells();
             forAll(faceCells, i)
             {
-                procPatchesCells_.set(faceCells[i]);
+                procPatchesCells_[faceCells[i]] = true;
             }
         }
     }

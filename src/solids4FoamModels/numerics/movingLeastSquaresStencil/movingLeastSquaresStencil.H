@@ -55,6 +55,7 @@ Author
 #include "processorPolyPatch.H"
 #include "surfaceFields.H"
 #include "volFields.H"
+#include "CompactListList.H"
 #include <cmath>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -85,7 +86,7 @@ class movingLeastSquaresStencil
         const label Nc_;
 
         //- Marked cells at processor boundary
-        bitSet procPatchesCells_;
+        boolList procPatchesCells_;
 
         //- Face stencils (global IDs)
         mutable autoPtr<CompactListList<label>> facesStencilPtr_;
