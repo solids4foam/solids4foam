@@ -393,6 +393,25 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
     return remoteCellCentres;
 }
 
+void  movingLeastSquaresStencil::calcProcessorCells() const
+{
+    procCellsPtr_.reset(new boolList(mesh_.nCells(), false));
+    boolList& procCells = procCellsPtr_();
+
+    forAll(mesh_.boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+
+        if (isA<processorPolyPatch>(pp))
+        {
+            const labelUList& faceCells = pp.faceCells();
+            forAll(faceCells, i)
+            {
+                procCells[faceCells[i]] = true;
+            }
+        }
+    }
+}
 
 labelList movingLeastSquaresStencil::buildFacesStencil
 (
@@ -512,7 +531,7 @@ labelList movingLeastSquaresStencil::buildFacesStencil
     for (label pos = 0; pos < nCheck; ++pos)
     {
         const label& cellID = localDist[pos].first();
-        if (procPatchesCells_[cellID])
+        if (procCells()[cellID])
         {
             localStencil = false;
             break;
@@ -1002,24 +1021,10 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
     haloDepthScale_(haloDepthScale),
     N_(N),
     Nc_(Nc),
-    procPatchesCells_(mesh.nCells(), false),
+    procCellsPtr_(),
     facesStencilPtr_(),
     cellsStencilPtr_()
 {
-    // Mark cells at processor boundary
-    forAll(mesh_.boundaryMesh(), patchI)
-    {
-        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
-
-        if (isA<processorPolyPatch>(pp))
-        {
-            const labelUList& faceCells = pp.faceCells();
-            forAll(faceCells, i)
-            {
-                procPatchesCells_[faceCells[i]] = true;
-            }
-        }
-    }
 }
 
 
@@ -1076,12 +1081,24 @@ const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
 }
 
 
+const boolList& movingLeastSquaresStencil::procCells() const
+{
+    if (!procCellsPtr_.valid())
+    {
+        calcProcessorCells();
+    }
+
+    return procCellsPtr_();
+}
+
+
 void Foam::movingLeastSquaresStencil::clear() const
 {
     facesStencilPtr_.clear();
     cellsStencilPtr_.clear();
     remoteCellsPerProcPtr_.clear();
     remoteCentresPerProcPtr_.clear();
+    procCellsPtr_.clear();
 }
 
 } // End namespace Foam

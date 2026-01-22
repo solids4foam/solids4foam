@@ -86,7 +86,7 @@ class movingLeastSquaresStencil
         const label Nc_;
 
         //- Marked cells at processor boundary
-        boolList procPatchesCells_;
+        mutable autoPtr<boolList> procCellsPtr_;
 
         //- Face stencils (global IDs)
         mutable autoPtr<CompactListList<label>> facesStencilPtr_;
@@ -117,6 +117,9 @@ class movingLeastSquaresStencil
 
         //- Get average depth of first-halo cells for each processors
         List<scalar> calcFirstHaloDepth() const;
+
+        //- Mark cells at processor boundary
+        void calcProcessorCells() const;
 
         //- Check processor overlap between bounding box for remote processors
         /// cells and bounding box for local processor faces
@@ -182,11 +185,14 @@ public:
 
     // Member Functions
 
+        //- Marked cells at processor boundary
+        const boolList& procCells() const;
+
         //- Returns face stencils
         const CompactListList<label>& facesStencil() const;
 
         //- Returns cell stencils
-            const CompactListList<label>& cellsStencil() const;
+        const CompactListList<label>& cellsStencil() const;
 
         //- Return remote cells per processor written in global indexing
         const List<labelList>& remoteCellsPerProc() const;
