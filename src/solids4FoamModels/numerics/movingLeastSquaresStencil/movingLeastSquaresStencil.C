@@ -18,6 +18,11 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "movingLeastSquaresStencil.H"
+#include "fvMesh.H"
+#include "PstreamBuffers.H"
+#include "processorPolyPatch.H"
+#include "volFields.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

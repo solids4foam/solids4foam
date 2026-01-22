@@ -19,18 +19,26 @@ Class
     movingLeastSquaresStencil
 
 Description
-    Build cell and face centered stencils using neirest N neighbbours
-    approach. Remote cells are stored using global coordinates. Local cells
-    are collected using layer technique while linear search is conducted for
-    remote cells.
+    Constructs cell- and face-centred stencils for Moving Least Squares (MLS)
+    reconstruction using a nearest-neighbour strategy.
 
-    Stencils are currently constructed for faces, and cell stencils are then
-    assembled from the corresponding face stencils. Since the number of cells
-    is lower than the number of faces, the opposite strategy—constructing cell
-    stencils first and deriving face stencils from them—should be considered in
-    future refactoring. The present approach was chosen because it is expected
-    to be more robust in handling borderline cases.
+    For local stencils, neighbouring cells are identified using layered
+    topological searches on the fvMesh. For non-local (remote) contributions
+    in parallel runs, candidate cells are identified using spatial bounding
+    boxes and exchanged between processors via MPI. Remote stencil entries
+    are stored using global indices and geometric information to ensure
+    consistency across processor boundaries.
 
+    Face-centred stencils are constructed first, and corresponding
+    cell-centred stencils are subsequently assembled by combining the
+    surrounding face stencils. Although constructing cell stencils directly
+    would reduce the total number of stencil builds, the current approach
+    was chosen for improved robustness, particularly for faces near
+    processor boundaries and other geometrically challenging regions.
+
+    The resulting stencils are intended for high-order MLS-based gradient
+    and reconstruction operators in solids4foam, with explicit support for
+    parallel execution.
 
 SourceFile
     movingLeastSquaresStencil.C
@@ -47,21 +55,19 @@ Author
 #include "Map.H"
 #include "Field.H"
 #include "tmp.H"
-#include "fvMesh.H"
 #include "globalIndex.H"
-#include "Pstream.H"
-#include "PstreamBuffers.H"
 #include "treeBoundBox.H"
-#include "processorPolyPatch.H"
-#include "surfaceFields.H"
-#include "volFields.H"
 #include "CompactListList.H"
-#include <cmath>
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// Forward Declarations
+class fvMesh;
+
 
 class movingLeastSquaresStencil
 {
