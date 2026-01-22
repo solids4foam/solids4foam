@@ -58,6 +58,7 @@ Author
 #include "globalIndex.H"
 #include "treeBoundBox.H"
 #include "CompactListList.H"
+#include "boolList.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
