@@ -94,26 +94,26 @@ class movingLeastSquaresStencil
         //- Marked cells at processor boundary
         mutable autoPtr<boolList> procCellsPtr_;
 
-        //- Face stencils (global IDs)
+        //- Face-centred MLS stencils (global cell IDs)
         mutable autoPtr<CompactListList<label>> facesStencilPtr_;
 
-         //- Cell centre stencils (global IDs)
+        //- Cell-centred MLS stencils assembled from face stencils (global cell IDs)
         mutable autoPtr<CompactListList<label>> cellsStencilPtr_;
 
-        //- Remote cells used by stencils (global IDs), grouped by proc
+        //- Remote (off-processor) cells referenced by stencils, grouped per processor
         mutable autoPtr<List<labelList>> remoteCellsPerProcPtr_;
 
-        //- Matching cell centres for remoteCellsPerProc
-         mutable autoPtr<List<vectorField>> remoteCentresPerProcPtr_;
+        //- Geometric centres corresponding to remoteCellsPerProc
+        mutable autoPtr<List<vectorField>> remoteCentresPerProcPtr_;
 
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        movingLeastSquaresStencil(const movingLeastSquaresStencil&);
+        movingLeastSquaresStencil(const movingLeastSquaresStencil&) = delete;
 
         //- Disallow default bitwise assignment
-        void operator=(const movingLeastSquaresStencil&);
+        void operator=(const movingLeastSquaresStencil&) = delete;
 
         //- Calculate axis-aligned bounding box for owned cells
         treeBoundBox calcOwnedCellsBox() const;
