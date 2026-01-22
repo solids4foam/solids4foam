@@ -227,7 +227,6 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/meshDual/meshDual.C
 numerics/meshDual/dualMeshToMeshMap.C
 numerics/meshDual/meshDualiser.C
-numerics/movingLeastSquaresStencil/movingLeastSquaresStencil.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/multiplyCoeff/multiplyCoeff.C
 
@@ -244,9 +243,11 @@ numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 
-numerics/quadrature/quadrature.C
-numerics/quadrature/tetQuadrature.C
-numerics/quadrature/triQuadrature.C
-numerics/quadrature/lineQuadrature.C
+higherOrderHelpers/movingLeastSquaresStencil/movingLeastSquaresStencil.C
+higherOrderHelpers/quadrature/quadrature.C
+higherOrderHelpers/quadrature/tetQuadrature.C
+higherOrderHelpers/quadrature/triQuadrature.C
+higherOrderHelpers/quadrature/lineQuadrature.C
+
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

@@ -16,30 +16,45 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Function
-    lineQuadrature
+    tetQuadrature
 
 Description
-    Gauss-Legendre quadrature for 1D interval [-1,1].
+    Numerical quadrature rules for integration over a three-dimensional
+    reference tetrahedral element.
 
-    Table data is taken from slide on this presentation:
-    https://www.to.infn.it/~mignone/Numerical_Algorithms/
-    ch03_numerical_quadrature.pdf
+    This class implements Gaussian-type quadrature rules for tetrahedra,
+    providing quadrature points in the local reference coordinate system
+    together with the corresponding weights. The quadrature order
+    controls the degree of polynomial fields that can be integrated
+    accurately.
+
+    The tetQuadrature class is primarily intended for volume
+    integrations in three-dimensional finite-volume and finite-element
+    formulations, including high-order reconstruction and weak-form
+    assembly.
+
+    Source:
+    Lee Shunn, Frank Ham,
+    Symmetric quadrature rules for tetrahedra based on a cubic close-packed
+    lattice arrangement, Journal of Computational and Applied Mathematics, 2012
 
 SourceFile
-    lineQuadrature.C
+    tetQuadrature.C
 
 Author
     Ivan Batistic, UCD. All rights reserved.
+    Pablo Castrillo, UCD. All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef lineQuadrature_H
-#define lineQuadrature_H
+#ifndef tetQuadrature_H
+#define tetQuadrature_H
 
+#include "tetrahedron.H"
+#include "barycentric.H"
 #include "quadrature.H"
 #include "Map.H"
-#include "line.H"
 #include "Field.H"
 #include "tmp.H"
 
@@ -48,15 +63,15 @@ Author
 namespace Foam
 {
 
-class lineQuadrature
+class tetQuadrature
 :
     public quadrature
 {
 
     // Private data
 
-        //- Store triangle using triangle template
-        line<point, point> line_;
+        //- Store tetrahedron using tetrahedron template
+        tetrahedron<point, point> tet_;
 
         //- Quadrature points in Cartesian coordinates
         List<point> points_;
@@ -67,26 +82,20 @@ class lineQuadrature
     // Private Member Functions
 
         //- Map integration points from barycentric to cartesian coordinates
-        tmp<Field<point>> parametricToPoint
+        tmp<Field<point>> barycentricToPoint
         (
-            const List<scalar>& x
-        ) const;
-
-        //- Normalise weights to make sum of weights equal to 1
-        tmp<Field<scalar>> normaliseWeights
-        (
-            const List<scalar>& w
+            const List<barycentric>& localPts
         ) const;
 
     // Static data
 
         //- Maximum order of accuracy when integrating polynomials
-        static constexpr label maxSupportedOrder = 19;
+        static constexpr label maxSupportedOrder = 6;
 
         //- Quadrature rules storage
         struct quadratureRule
         {
-            List<scalar> points;
+            List<barycentric> points;
             List<scalar> weights;
         };
 
@@ -108,19 +117,20 @@ public:
 
     // Constructors
 
-        //- Construct from two points
-        lineQuadrature
+        //- Construct from four points
+        tetQuadrature
         (
-            const point& start,
-            const point& end,
+            const point& a,
+            const point& b,
+            const point& c,
+            const point& d,
             const label& order
         );
 
-        //- Construct from a standard line object
-        lineQuadrature
+        //- Construct from a standard tetrahedron object
+        tetQuadrature
         (
-            const line<point,
-            const point&>& l,
+            const tetrahedron<point, const point&>& tet,
             const label& order
         );
 

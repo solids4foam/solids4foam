@@ -19,7 +19,24 @@ Function
     quadrature
 
 Description
-    Base quadrature class
+    Abstract base class providing a common interface for numerical
+    quadrature rules on reference geometric entities.
+
+    The quadrature class defines storage and access for quadrature
+    points and associated weights, expressed in the local coordinate
+    system of the reference element. It supports integration of
+    scalar- and vector-valued quantities by evaluating them at the
+    quadrature points and forming the weighted sum.
+
+    Derived classes implement specific quadrature rules for particular
+    reference geometries (e.g. line, triangle, tetrahedron), including
+    the placement of quadrature points and the corresponding weights.
+    The quadrature order is specified at construction time and controls
+    the accuracy of the numerical integration.
+
+    This class is intended for use in finite-volume and finite-element
+    style integrations within solids4foam, including high-order
+    reconstruction, projection, and weak-form evaluations.
 
 SourceFile
     quadrature.C

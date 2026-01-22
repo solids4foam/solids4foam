@@ -19,7 +19,18 @@ Function
     triQuadrature
 
 Description
-    Quadrature for triangle
+    Numerical quadrature rules for integration over a two-dimensional
+    reference triangular element.
+
+    This class provides Gaussian-type quadrature rules for triangles,
+    defining quadrature points in barycentric (area) coordinates along
+    with the associated integration weights. The selected quadrature
+    order determines the accuracy of polynomial integration over the
+    reference triangle.
+
+    The triQuadrature class is intended for surface and face-based
+    integrations, including high-order reconstruction, projection, and
+    weak-form evaluations on triangular elements.
 
     Source:
     D. A. Dunavant,
