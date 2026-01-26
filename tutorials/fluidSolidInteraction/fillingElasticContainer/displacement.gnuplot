@@ -8,4 +8,4 @@ set grid
 set key top right
 set ytics 0.4
 
-plot "postProcessing/0/solidPointDisplacement_disp.dat" u 1:3 w l notitle
+plot "postProcessing/0/solidPointDisplacement_disp.dat" u 1:3 w l lc "red" lw 6 notitle
