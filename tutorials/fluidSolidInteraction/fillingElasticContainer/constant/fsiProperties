@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+//fluidSolidInterface    fixedRelaxation;
+fluidSolidInterface    Aitken;
+//fluidSolidInterface    IQNILS;
+
+"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
+{
+    // Interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Predictors at tjhe start of a new time step
+    predictor            yes;
+    predictSolid         yes;
+
+    // Under-relaxation factor for passing the solid interface
+    // displacement/velocity to the fluid interface
+    // For fixedRelaxation, this value is used for all iterations
+    // For Aitken, this value is used for the first iteration each time-step,
+    // then it adaptively changes
+    // For IQNILS, this value is used for the first two iterations each
+    // time-step, then the IQNILS procedure is used
+    relaxationFactor     0.1; //0.05;
+
+    // Tolerance for the FSI loop within each time-step
+    outerCorrTolerance   1e-4;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr           30;
+
+    // Enable/disable coupling from the start
+    coupled yes;
+
+    // Move the fluid interface to the solid interface at the end of each time
+    // step
+    // This avoids a gap appearing at the expense of weakly violating the
+    // kinetic/force continuity
+    additionalMeshCorrection no;
+
+    // Calculate the residual based on the displacement increment (yes) or total
+    // displacement (no)
+    incrementalResiduals no;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+
+    // Method for transferring information between the interfaces
+    interfaceTransferMethod directMap;
+    //interfaceTransferMethod RBF;
+    //interfaceTransferMethod GGI;
+}
+
+// ************************************************************************* //

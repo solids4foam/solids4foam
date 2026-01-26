@@ -8,6 +8,8 @@
         rAU = 1.0/UEqn.A();
     }
 
+    updateRobinFsiInterfaceRAU(rAU.ref(), p_rgh, U, rho);
+
     surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU()));
     volVectorField HbyA(constrainHbyA(rAU()*UEqn.H(), U, p_rgh));
     surfaceScalarField phiHbyA
@@ -27,6 +29,7 @@
 
     surfaceScalarField phig
     (
+        "phig",
         (
             mixture.surfaceTensionForce()
           - ghf*fvc::snGrad(rho)
@@ -34,6 +37,8 @@
     );
 
     phiHbyA += phig;
+
+    updateRobinFsiInterfacePhi(phiHbyA, phig, p_rgh, U, rAU.ref());
 
     // Update the pressure BCs to ensure flux consistency
     // constrainPressure(p_rgh, U, phiHbyA, rAUf, MRF);

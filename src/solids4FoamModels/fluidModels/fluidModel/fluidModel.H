@@ -385,6 +385,22 @@ public:
                 return pPtr_();
             }
 
+            //- Return const solution pressure field
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual const volScalarField& solutionP() const
+            {
+                return pPtr_();
+            }
+
+            //- Return const solution pressure field
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual volScalarField& solutionP()
+            {
+                return pPtr_();
+            }
+
             //- Return const velocity gradient field
             virtual const volTensorField& gradU() const
             {
@@ -506,6 +522,17 @@ public:
             (
                 const label patchID
             ) const = 0;
+
+            //- Patch pressure force for the solution o field (N/m2)
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual tmp<scalarField> patchSolutionPressureForce
+            (
+                const label patchID
+            ) const
+            {
+                return patchPressureForce(patchID);
+            }
 
             //- Patch temperature
             virtual tmp<scalarField> patchTemperature(const label patchID) const

@@ -167,18 +167,18 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     // label patchID = this->patch().index(); // this is the fluid patch ID!
 
     // Find the solid patch ID corresponding to the current fluid patch
-    label patchID = -1;
+    label solidPatchID = -1;
     forAll(fsi.fluidPatchIndices(), interfaceI)
     {
         if (fsi.fluidPatchIndices()[interfaceI] == patch().index())
         {
             // Take the corresponding solid patch ID
-            patchID = fsi.solidPatchIndices()[interfaceI];
+            solidPatchID = fsi.solidPatchIndices()[interfaceI];
             break;
         }
     }
 
-    if (patchID == -1)
+    if (solidPatchID == -1)
     {
         FatalErrorIn
         (
@@ -194,12 +194,15 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     // Also, what happends if mu/lambda are varying...
 
     // Get solid density
-    const scalarField rhoSolid =
-        fsi.solid().mechanical().rho()().boundaryField()[patchID];
+    const scalarField& rhoSolid =
+        fsi.solid().rho().boundaryField()[solidPatchID];
 
     // Get solid stiffness (impK for generality)
-    scalarField impK =
-        fsi.solid().mechanical().impK()().boundaryField()[patchID];
+    const scalarField& impK =
+        fsi.solidMesh().lookupObject<volScalarField>
+        (
+            "impK"
+        ).boundaryField()[solidPatchID];
 
     // p-wave propagation speed, ap
     const scalarField ap(sqrt(impK/rhoSolid));
@@ -211,11 +214,13 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         // Calculate a virtual thickness based on the speed of sound aand time
         // step
         hs = ap*mesh.time().deltaT().value();
-    }
 
-    // Fluid properties
-    const dictionary& transportProperties =
-        db().lookupObject<IOdictionary>("transportProperties");
+        if (debug)
+        {
+            Info<< "hs: min = " << min(hs) << ", max = " << max(hs)
+                << ", mean = " << average(hs) << endl;
+        }
+    }
 
     // Update velocity and acceleration
 
@@ -240,29 +245,38 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     {
         const scalarField& rhoFluid =
             patch().lookupPatchField<volScalarField, scalar>("rho");
+        const scalarField& phig =
+            patch().lookupPatchField<surfaceScalarField, scalar>("phig");
 
         const dimensionSet& pDims = pressure.dimensions();
+
+        const scalarField c1(rhoSolid*hs/rhoFluid);
 
         if (pDims == dimPressure/dimDensity)
         {
             // p/rho
             // Divide RHS by rhoFluid
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolid*hs/rhoFluid;
+            this->coeff1() = c1;
             this->rhs() =
-                prevPressure_/rhoFluid - rhoSolid*hs*prevDdtUn/rhoFluid;
+                (prevPressure_ - rhoSolid*hs*prevDdtUn + c1*phig)/rhoFluid;
         }
         else
         {
             // p
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolid*hs/rhoFluid;
-            this->rhs() = prevPressure_ - rhoSolid*hs*prevDdtUn;
+            this->coeff1() = c1;
+            this->rhs() = prevPressure_ - rhoSolid*hs*prevDdtUn + c1*phig;
         }
     }
     else
     {
-        Info<< "Did not find rho" << endl;
+        Info<< "Did not find rho: looking up from transportProperties" << endl;
+
+        // Fluid properties
+        const dictionary& transportProperties =
+            db().lookupObject<IOdictionary>("transportProperties");
+
         // Lookup the density from the transport properties
         const dimensionedScalar rhoFluid
         (

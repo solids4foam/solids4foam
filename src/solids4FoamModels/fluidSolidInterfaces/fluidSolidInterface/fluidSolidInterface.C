@@ -1456,11 +1456,18 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
         (
             isA<movingWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+                fluid().solutionP().boundaryField()
+                [
+                    fluidPatchIndices()[interfaceI]
+                ]
             )
         )
         {
-            Info<< "Setting acceleration at fluid side of the interface"
+            Info<< "Setting acceleration at fluid side of the interface: "
+                << fluidMesh().boundary()
+                   [
+                       fluidPatchIndices()[interfaceI]
+                   ].name()
                 << endl;
 
             // Take references to zones
@@ -1501,7 +1508,7 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 (
                     refCast<const movingWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1530,11 +1537,19 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
         (
             isA<elasticWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+                fluid().solutionP().boundaryField()
+                [
+                    fluidPatchIndices()[interfaceI]
+                ]
             )
         )
         {
-            Info<< "Setting acceleration at fluid side of the interface"
+            Info<< "Setting acceleration and previous pressure at fluid side of "
+                << "the interface: "
+                << fluidMesh().boundary()
+                   [
+                       fluidPatchIndices()[interfaceI]
+                   ].name()
                 << endl;
 
             // Take references to zones
@@ -1575,7 +1590,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 (
                     refCast<const elasticWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1587,7 +1602,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 (
                     refCast<const elasticWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1598,7 +1613,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
             {
                 prevAcceleration = fluidPatchAcceleration;
                 prevPressure =
-                    fluid().patchPressureForce
+                    fluid().patchSolutionPressureForce
                     (
                         fluidPatchIndices()[interfaceI]
                     );
@@ -1612,7 +1627,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 // ZT: Pressure is not zero.
                 // prevPressure = 0;
                 prevPressure =
-                    fluid().patchPressureForce
+                    fluid().patchSolutionPressureForce
                     (
                         fluidPatchIndices()[interfaceI]
                     );
