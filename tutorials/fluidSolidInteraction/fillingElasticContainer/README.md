@@ -56,23 +56,23 @@ The adopted material parameters are given below:
 
 ### Table 1: Problem Physical Parameters
 
-| Category | Parameter                               |       Value       | Units      |
-| :------: | :-------------------------------------- | :---------------: | :--------- |
-| Geometry | Rigid container top side                |       4.87        | m          |
-|          | Rigid container bottom side, $$b$$      |       1.30        | m          |
-|          | Rigid container height, $$h$$           |       2.50        | m          |
-|          | Elastic container straight side, $$H$$  |       3.75        | m          |
-|          | Elastic container cap radius, $$R$$     |       2.25        | m          |
-|          | Elastic container thickness, $$s$$      |       0.20        | m          |
-|          | Gravity, $$g$$                          |       9.81        | m/s$$^2$$  |
-|  Solid   | Density, $$\rho_s$$                     |        20         | kg/m$$^3$$ |
-|          | Young’s modulus, $$E_s$$                | $$2.1\times10^7$$ | Pa         |
-|          | Poisson’s ratio, $$\nu_s$$              |        0.3        |            |
-|  Fluid   | Phase 1 density, $$\rho_{f_1}$$         |       1000        | kg/m$$^3$$ |
-|          | Phase 1 dynamic viscosity, $$\mu_{f_1}$$|        100        | Pa·s       |
-|          | Phase 2 density, $$\rho_{f_2}$$         |          1        | kg/m$$^3$$ |
-|          | Phase 2 dynamic viscosity, $$\mu_{f_2}$$| $$1.48\times10^{-5}$$| Pa·s       |
-|          | Surface tension coefficient, $$\sigma$$ |          0        | N/m        |
+| Category | Parameter                               |       Value       | Units|
+| :------: | :-------------------------------------- | :---------------: | :--: |
+| Geometry | Rigid container top side                |       4.87        | m    |
+|          | Rigid container bottom side, $$b$$      |       1.30        | m    |
+|          | Rigid container height, $$h$$           |       2.50        | m    |
+|          | Elastic container straight side, $$H$$  |       3.75        | m    |
+|          | Elastic container cap radius, $$R$$     |       2.25        | m    |
+|          | Elastic container thickness, $$s$$      |       0.20        | m    |
+|          | Gravity, $$g$$                          |       9.81  | m/s$$^2$$ |
+|  Solid   | Density, $$\rho_s$$                     |        20   | kg/m$$^3$$ |
+|          | Young’s modulus, $$E_s$$                | $$2.1\times10^7$$ | Pa   |
+|          | Poisson’s ratio, $$\nu_s$$              |        0.3        |      |
+|  Fluid   | Phase 1 density, $$\rho_{f_1}$$         |       1000  | kg/m$$^3$$ |
+|          | Phase 1 dynamic viscosity, $$\mu_{f_1}$$|        100        | Pa·s |
+|          | Phase 2 density, $$\rho_{f_2}$$         |          1  | kg/m$$^3$$ |
+|       | Phase 2 dynamic viscosity, $$\mu_{f_2}$$| $$1.48\times10^{-5}$$| Pa·s |
+|          | Surface tension coefficient, $$\sigma$$ |          0        | N/m  |
 
 ---
 
@@ -81,7 +81,7 @@ The adopted material parameters are given below:
 - **Fluid:** two-phase incompressible flow (water + air) using an arbitrary
   Lagrangian-Eulerian volume of fluid formulation (`interFoam`)
 - **Solid:** nonlinear hyperelastic total Lagrangian solid formulation with
-  Jacobian-free Newton-Krylov solution algorithm [5] 
+  Jacobian-free Newton-Krylov solution algorithm [5]
 - **Coupling:** partitioned FSI framework with Robin-Neumann coupling [4]
 - **Time integration:** transient
 
@@ -90,6 +90,7 @@ Compared to the original single-phase benchmarks, the inclusion of air introduce
  the transient response.
 
 This case therefore serves both as:
+
 - A reproduction (with modifications) of a well-established fluid-solid
   interaction benchmark, and
 - A demonstration of two-phase fluid-solid interaction capabilities within
@@ -112,7 +113,6 @@ To clean the case:
 ./Allclean
 ```
 
-
 ---
 
 ## Results
@@ -130,7 +130,6 @@ Video 1 shows the Time evolution of the phase distribution field in the fluid an
 
 **Video 1: Time evolution of the phase distribution field in the fluid and the
 displacement magnitude field in the solid.**
-
 
 A commonly reported metric for this benchmark is the vertical displacement of
  the container apex as a function of time. This data is recored in the case via
