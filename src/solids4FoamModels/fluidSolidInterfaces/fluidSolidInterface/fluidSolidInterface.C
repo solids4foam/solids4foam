@@ -588,7 +588,16 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
 
     if (residualFilePtr_.empty())
     {
-        const fileName historyDir = runTime().path()/"residuals";
+        fileName historyDir;
+        if (Pstream::parRun())
+        {
+            historyDir = runTime().path()/".."/"postProcessing";
+        }
+        else
+        {
+            historyDir = runTime().path()/"postProcessing";
+        }
+
         mkDir(historyDir);
         residualFilePtr_.set(new OFstream(historyDir/"fsiResiduals.dat"));
         residualFilePtr_()

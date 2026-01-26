@@ -28,6 +28,121 @@ License
 namespace Foam
 {
 
+// * * * * * * * * * * * * * Private Functions * * * * * * * * * * * * * * * //
+
+const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
+{
+    if (rhoSolidHsPtr_.empty())
+    {
+    #ifdef OPENFOAM_NOT_EXTEND
+        const fvMesh& mesh = internalField().mesh();
+    #else
+        const fvMesh& mesh = dimensionedInternalField().mesh();
+    #endif
+
+        // Looking up the FSI solver
+        const fluidSolidInterface& fsi =
+            mesh.objectRegistry::parent().lookupObject<fluidSolidInterface>
+            (
+                "fsiProperties"
+            );
+
+        // Find the solid patch ID corresponding to the current fluid patch
+        label solidPatchID = -1;
+        label interfaceID = -1;
+        forAll(fsi.fluidPatchIndices(), i)
+        {
+            if (fsi.fluidPatchIndices()[i] == patch().index())
+            {
+                // Take the corresponding solid patch ID
+                solidPatchID = fsi.solidPatchIndices()[i];
+                interfaceID = i;
+                break;
+            }
+        }
+
+        if (solidPatchID == -1)
+        {
+            FatalErrorInFunction
+                << "Are you sure this patch is an FSI interface?"
+                << abort(FatalError);
+        }
+
+        // Get solid density
+        const scalarField& rho =
+            fsi.solidMesh().lookupObject<volScalarField>
+            (
+                "rho"
+            ).boundaryField()[solidPatchID];
+
+        // Get solid stiffness (impK for generality)
+        const scalarField& impK =
+            fsi.solidMesh().lookupObject<volScalarField>
+            (
+                "impK"
+            ).boundaryField()[solidPatchID];
+
+        // p-wave propagation speed, ap, on the solid patch
+        const scalarField ap(sqrt(impK/rho));
+
+        // Solid "virtual thickness"
+        scalarField hs(rho.size(), constantHs_);
+        if (constantHs_ < SMALL)
+        {
+            // Calculate a virtual thickness based on the speed of sound and time
+            // step
+            hs = ap*mesh.time().deltaT().value();
+
+            if (debug)
+            {
+                Info<< "hs: min = " << min(hs) << ", max = " << max(hs)
+                    << ", mean = " << average(hs) << endl;
+            }
+        }
+
+        // Calculate rhoHs at the solid
+        const scalarField rhoHs(rho*hs);
+
+        // Take references to zones
+        const standAlonePatch& fluidZone =
+            fsi.fluid().globalPatches()[interfaceID].globalPatch();
+        const standAlonePatch& solidZone =
+            fsi.solid().globalPatches()[interfaceID].globalPatch();
+
+        // Map the solid patch field to the global zone
+        scalarField rhoHsZone
+        (
+            fsi.solid().globalPatches()[interfaceID].patchFaceToGlobal(rhoHs)
+        );
+        scalarField rhoHsZoneAtFluid(fluidZone.size(), 0.0);
+
+        // Map rhoHs from the solid patch to the fluid patch
+        // Transfer the field from the solid interface to the fluid interface
+        fsi.interfaceToInterfaceList()[interfaceID].transferFacesZoneToZone
+        (
+            solidZone,          // from zone
+            fluidZone,          // to zone
+            rhoHsZone,          // from field
+            rhoHsZoneAtFluid    // to field
+        );
+
+        // Initialise the rhoHs field for the fluid patch and map zone to patch
+        rhoSolidHsPtr_.set
+        (
+            new scalarField
+            (
+                fsi.fluid().globalPatches()
+                [
+                    interfaceID
+                ].globalFaceToPatch(rhoHsZoneAtFluid)
+            )
+        );
+    }
+
+    return rhoSolidHsPtr_();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
@@ -39,6 +154,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinFvPatchScalarField(p, iF),
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
+    rhoSolidHsPtr_(),
     constantHs_(-1.0)
 {}
 
@@ -54,6 +170,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinFvPatchScalarField(ptf, p, iF, mapper),
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
+    rhoSolidHsPtr_(),
     constantHs_(ptf.constantHs_)
 {}
 
@@ -68,6 +185,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinFvPatchScalarField(p, iF),
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
+    rhoSolidHsPtr_(),
     constantHs_(dict.lookupOrDefault<scalar>("constantHs", -1.0))
 {
     if (dict.found("value"))
@@ -118,6 +236,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinFvPatchScalarField(pivpvf, iF),
     prevPressure_(pivpvf.prevPressure_),
     prevAcceleration_(pivpvf.prevAcceleration_),
+    rhoSolidHsPtr_(),
     constantHs_(pivpvf.constantHs_)
 {}
 
@@ -155,90 +274,31 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     const fvMesh& mesh = dimensionedInternalField().mesh();
 #endif
 
-    // Looking up fsi solver
+    // Looking up the FSI solver
     const fluidSolidInterface& fsi =
         mesh.objectRegistry::parent().lookupObject<fluidSolidInterface>
         (
             "fsiProperties"
         );
 
-    // Bug-fix, Mike Tree, see:
-    // https://bitbucket.org/philip_cardiff/solids4foam-release/issues/27/elasticwallpressurefvpatchscalarfieldc
-    // label patchID = this->patch().index(); // this is the fluid patch ID!
+    // Map the solid density times the solid virtual thickness mapped to the
+    // current (fluid) patch
+    const scalarField& rhoSolidHs = this->rhoSolidHs();
 
-    // Find the solid patch ID corresponding to the current fluid patch
-    label solidPatchID = -1;
-    forAll(fsi.fluidPatchIndices(), interfaceI)
-    {
-        if (fsi.fluidPatchIndices()[interfaceI] == patch().index())
-        {
-            // Take the corresponding solid patch ID
-            solidPatchID = fsi.solidPatchIndices()[interfaceI];
-            break;
-        }
-    }
-
-    if (solidPatchID == -1)
-    {
-        FatalErrorIn
-        (
-            "void elasticWallPressureFvPatchScalarField::updateCoeffs()"
-        )   << "Are you sure this patch is an FSI interface?"
-            << abort(FatalError);
-    }
-
-    // Solid properties
-    // PC: hmnn what if the solidModel does not use mu and lambda...
-    // It seems that ap is the speed of sound so we just need the stiffness, we
-    // can lookup impK
-    // Also, what happends if mu/lambda are varying...
-
-    // Get solid density
-    const scalarField& rhoSolid =
-        fsi.solid().rho().boundaryField()[solidPatchID];
-
-    // Get solid stiffness (impK for generality)
-    const scalarField& impK =
-        fsi.solidMesh().lookupObject<volScalarField>
-        (
-            "impK"
-        ).boundaryField()[solidPatchID];
-
-    // p-wave propagation speed, ap
-    const scalarField ap(sqrt(impK/rhoSolid));
-
-    // Solid "virtual thickness"
-    scalarField hs(patch().size(), constantHs_);
-    if (constantHs_ < SMALL)
-    {
-        // Calculate a virtual thickness based on the speed of sound aand time
-        // step
-        hs = ap*mesh.time().deltaT().value();
-
-        if (debug)
-        {
-            Info<< "hs: min = " << min(hs) << ", max = " << max(hs)
-                << ", mean = " << average(hs) << endl;
-        }
-    }
-
-    // Update velocity and acceleration
-
-    const fvPatch& p = patch();
-    const vectorField n(p.nf());
-
+    // Lookup the pressure dimensions
 #ifdef OPENFOAM_NOT_EXTEND
     const word fieldName = internalField().name();
 #else
     const word fieldName = dimensionedInternalField().name();
 #endif
 
-    const volScalarField& pressure =
-        mesh.lookupObject<volScalarField>(fieldName);
+    const dimensionSet& pDims =
+        mesh.lookupObject<volScalarField>(fieldName).dimensions();;
 
     // The previous acceleration is updated at the end of each
     // time step in the fluidSolidInterface
-    const scalarField prevDdtUn(n & prevAcceleration_);
+    // const vectorField n(p.nf());
+    const scalarField prevDdtUn(patch().nf() & prevAcceleration_);
 
     // Check if a density field is present
     if (fsi.fluid().mesh().foundObject<volScalarField>("rho"))
@@ -248,9 +308,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         const scalarField& phig =
             patch().lookupPatchField<surfaceScalarField, scalar>("phig");
 
-        const dimensionSet& pDims = pressure.dimensions();
-
-        const scalarField c1(rhoSolid*hs/rhoFluid);
+        const scalarField c1(rhoSolidHs/rhoFluid);
 
         if (pDims == dimPressure/dimDensity)
         {
@@ -259,14 +317,14 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             this->coeff0() = 1.0;
             this->coeff1() = c1;
             this->rhs() =
-                (prevPressure_ - rhoSolid*hs*prevDdtUn + c1*phig)/rhoFluid;
+                (prevPressure_ - rhoSolidHs*prevDdtUn + c1*phig)/rhoFluid;
         }
         else
         {
             // p
             this->coeff0() = 1.0;
             this->coeff1() = c1;
-            this->rhs() = prevPressure_ - rhoSolid*hs*prevDdtUn + c1*phig;
+            this->rhs() = prevPressure_ - rhoSolidHs*prevDdtUn + c1*phig;
         }
     }
     else
@@ -285,27 +343,26 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
         if (debug)
         {
-            Info<< "rhoSolid = " << max(rhoSolid)
-                << ", hs = " << max(hs)
+            Info<< "rhoSolidHs = " << max(rhoSolidHs)
                 << ", rhoFluid = " << rhoFluid.value()
                 << endl;
         }
 
-        if (pressure.dimensions() == dimPressure/dimDensity)
+        if (pDims == dimPressure/dimDensity)
         {
             // p/rho
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolid*hs/rhoFluid.value();
+            this->coeff1() = rhoSolidHs/rhoFluid.value();
             this->rhs() =
                 prevPressure_/rhoFluid.value()
-              - rhoSolid*hs*prevDdtUn/rhoFluid.value();
+              - rhoSolidHs*prevDdtUn/rhoFluid.value();
         }
         else
         {
             // p
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolid*hs/rhoFluid.value();
-            this->rhs() = prevPressure_ - rhoSolid*hs*prevDdtUn;
+            this->coeff1() = rhoSolidHs/rhoFluid.value();
+            this->rhs() = prevPressure_ - rhoSolidHs*prevDdtUn;
         }
     }
 
