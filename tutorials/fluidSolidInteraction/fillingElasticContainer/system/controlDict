@@ -29,7 +29,6 @@ endTime         10;
 
 deltaT          1e-3;
 
-//writeControl    adjustableRunTime;
 writeControl    runTime;
 
 writeInterval   0.05;
@@ -51,6 +50,7 @@ runTimeModifiable no;
 adjustTimeStep  no;
 
 maxCo           0.5;
+
 maxAlphaCo      0.5;
 
 maxDeltaT       1;
@@ -68,7 +68,7 @@ functions
         libs            ("libfieldFunctionObjects.so");
         region          fluid;
         fields          (alpha.water);
-        operation       volIntegrate;   // ∫ alpha dV
+        operation       volIntegrate;
         regionType      all;
         writeFields     no;
         writeControl    timeStep;
