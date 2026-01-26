@@ -6,7 +6,7 @@ sort: 4
 
 ---
 
-Prepared by Philip Cardiff
+Prepared by Philip Cardiff, Amirhossein Taran
 
 ---
 
@@ -48,7 +48,7 @@ The problem geometry and material parameters are based on the benchmark studies
  the elastic container to allow the air to escape as the viscous fluid drops
  from the funnel.
 
-![Figure 1: Fluid and solid computational domains and boundary conditions](./images/fillingElasticContainer-geometry.pdf)
+![Figure 1: Fluid and solid computational domains and boundary conditions](./images/fillingElasticContainer-geometry.pdf.png)
 
 **Figure 1: Fluid and solid Computational domains and boundary conditions.**
 
@@ -160,7 +160,7 @@ The displacement vs time are shown in Figure 2, for a fluid mesh with $$8\,000$$
  cells and solid mesh with $$1\,920$$, showing close agreement with the
  single-phase results from the literature for the initial displacement spike.
 
-![Figure 2: Displacement of the container apex point vs time. Adapted from [3].](./images/fillingElasticContainer-displacement.pdf)
+![Figure 2: Displacement of the container apex point vs time. Adapted from [3].](./images/fillingElasticContainer-displacement.pdf.png)
 
 **Figure 2: Displacement of the container apex point vs time.**
 
@@ -171,7 +171,7 @@ Figure 3 shows the number of fluid-solid interaction coupling iteration per time
  highlights the robustness and efficiency of the Robin-Neumann coupling approach
  in this high added-mass scenario.
 
-![Figure 3: Number of fluid-solid interaction coupling iterations vs time.](./images/fillingElasticContainer-fsi-iterations.pdf)
+![Figure 3: Number of fluid-solid interaction coupling iterations vs time.](./images/fillingElasticContainer-fsi-iterations.pdf.png)
 
 **Figure 3: Number of fluid-solid interaction coupling iterations vs time.**
 
