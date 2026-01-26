@@ -20,6 +20,6 @@ FoamFile
 // argList happy. Use instead the decomposeParDicts in system/fluid and
 // system/solid
 
-numberOfSubdomains 4;
+//numberOfSubdomains 1;
 
 // ************************************************************************* //

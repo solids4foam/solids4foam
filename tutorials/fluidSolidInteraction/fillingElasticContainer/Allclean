@@ -11,7 +11,6 @@ solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
 cleanCase
-cleanCase fluid
-cleanCase solid
+rm -rf constant/*/polyMesh
 rm -rf case.foam *.pdf 0/fluid/alpha.water
-\cp 0/fluid/alpha.water.org 0/fluid/alpha.water
+\cp 0/fluid/org/alpha.water 0/fluid/alpha.water
