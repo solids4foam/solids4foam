@@ -1,4 +1,5 @@
 EXE_INC = \
+    -I../../../src/genericWriter/lnInclude \
     -IalphaFieldFunctions/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
