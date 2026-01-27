@@ -199,7 +199,7 @@ As a result, while qualitative agreement with published results is expected, exa
 [A. Franci, E. Oñate, J. M. Carbonell, Unified Lagrangian formulation for solid and fluid mechanics and FSI problems, Comput. Methods Appl. Mech. Engrg., 298 (2016) 520–547.](http://dx.doi.org/10.1016/j.cma.2015.09.023)
 
 [2]
-[M. Meduri et al., A partitioned fully explicit Lagrangian finite element method for highly nonlinear fluid–structure interaction problems, Comput. Methods Appl. Mech. Engrg., 315 (2017) 388–421.](http://dx.doi.org/10.1016/j.cma.2015.09.023)
+[M. Meduri et al., A partitioned fully explicit Lagrangian finite element method for highly nonlinear fluid–structure interaction problems, Comput. Methods Appl. Mech. Engrg., 315 (2017) 388–421.](https://doi.org/10.1002/nme.560)
 
 [3]
 [M. Cerquaglia et al., A fully partitioned Lagrangian framework for FSI problems characterized by free surfaces, large solid deformations and displacements, and strong added-mass effects, Comput. Methods Appl. Mech. Engrg., 348 (2019) 202–233.](https://doi.org/10.1016/j.cma.2019.01.021)
