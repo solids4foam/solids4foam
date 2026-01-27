@@ -156,11 +156,11 @@ The `solidPointDisplacement` function object records the displacement history of
 postProcessing/0/solidPointDisplacement_disp.dat
 ```
 
-The displacement vs time are shown in Figure 2, for a fluid mesh with $$8\,000$$
- cells and solid mesh with $$1\,920$$, showing close agreement with the
+The displacement vs time are shown in Figure 2, where the results from two
+ solids4foam mesh densities are shown; close agreement are seen with the
  single-phase results from the literature for the initial displacement spike.
 
-![Figure 2: Displacement of the container apex point vs time. Adapted from [3].](./images/fillingElasticContainer-displacement.pdf)
+![Figure 2: Displacement of the container apex point vs time. Adapted from [3].](./images/fillingElasticContainer-displacement.png)
 
 **Figure 2: Displacement of the container apex point vs time.**
 

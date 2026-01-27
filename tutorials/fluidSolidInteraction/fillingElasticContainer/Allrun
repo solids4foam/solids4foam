@@ -19,8 +19,8 @@ solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
 # Create meshes
-solids4Foam::runApplication -s solid blockMesh -region solid
-solids4Foam::runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s solid blockMesh -region solid -dict system/solid/blockMeshDict.1
+solids4Foam::runApplication -s fluid blockMesh -region fluid -dict system/fluid/blockMeshDict.1
 
 # Set water volume fraction field (alpha) in the fluid
 \cp 0/fluid/org/alpha.water 0/fluid/alpha.water
