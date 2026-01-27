@@ -6,7 +6,7 @@ sort: 4
 
 ---
 
-Prepared by Philip Cardiff
+Prepared by Philip Cardiff, Amirhossein Taran, Ivan Batistić
 
 ---
 
@@ -48,7 +48,7 @@ The problem geometry and material parameters are based on the benchmark studies
  the elastic container to allow the air to escape as the viscous fluid drops
  from the funnel.
 
-![Figure 1: Fluid and solid computational domains and boundary conditions](./images/fillingElasticContainer-geometry.pdf)
+![Figure 1: Fluid and solid computational domains and boundary conditions](./images/fillingElasticContainer-geometry.png)
 
 **Figure 1: Fluid and solid Computational domains and boundary conditions.**
 
@@ -171,7 +171,7 @@ Figure 3 shows the number of fluid-solid interaction coupling iteration per time
  highlights the robustness and efficiency of the Robin-Neumann coupling approach
  in this high added-mass scenario.
 
-![Figure 3: Number of fluid-solid interaction coupling iterations vs time.](./images/fillingElasticContainer-fsi-iterations.pdf)
+![Figure 3: Number of fluid-solid interaction coupling iterations vs time.](./images/fillingElasticContainer-fsi-iterations.png)
 
 **Figure 3: Number of fluid-solid interaction coupling iterations vs time.**
 
