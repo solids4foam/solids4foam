@@ -41,6 +41,7 @@ solidTractionFvPatchVectorField
     nonOrthogonalCorrections_(true),
     useUndeformedArea_(false),
     traction_(p.size(), vector::zero),
+    tractionRatePtr_(),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
@@ -75,6 +76,7 @@ solidTractionFvPatchVectorField
         dict.lookupOrDefault<Switch>("useUndeformedArea", false)
     ),
     traction_(p.size(), vector::zero),
+    tractionRatePtr_(),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
@@ -235,9 +237,11 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
 #ifdef OPENFOAM_ORG
     traction_(mapper(pvf.traction_)),
+    tractionRatePtr_(),
     pressure_(mapper(pvf.pressure_)),
 #else
     traction_(pvf.traction_, mapper),
+    tractionRatePtr_(),
     pressure_(pvf.pressure_, mapper),
 #endif
     tractionSeries_(pvf.tractionSeries_),
@@ -262,6 +266,7 @@ solidTractionFvPatchVectorField
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
+    tractionRatePtr_(),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
@@ -286,6 +291,7 @@ solidTractionFvPatchVectorField
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
+    tractionRatePtr_(),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
@@ -365,6 +371,13 @@ void solidTractionFvPatchVectorField::updateCoeffs()
             (
                 tractionFieldPtr_()
             ).correctBoundaryConditions();
+        }
+
+        // Update the traction history fields, if defined
+        traction_.advance();
+        if (tractionRatePtr_.valid())
+        {
+            tractionRatePtr_->advance();
         }
     }
 

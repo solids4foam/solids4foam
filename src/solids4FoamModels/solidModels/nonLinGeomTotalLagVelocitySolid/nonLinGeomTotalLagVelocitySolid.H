@@ -121,7 +121,7 @@ class nonLinGeomTotalLagVelocitySolid
         void enforceTractionBoundaries
         (
             surfaceVectorField& force,             // force at the faces
-            const volVectorField& D,               // displacement field
+            volVectorField& D,                     // displacement field
             const surfaceVectorField& nCurrent,    // deformed unit normals
             const surfaceScalarField& magSfCurrent // deformed area magnitudes
         ) const;
