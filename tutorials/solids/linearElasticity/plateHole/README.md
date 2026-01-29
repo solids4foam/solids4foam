@@ -33,7 +33,7 @@ right
     type            analyticalPlateHoleTraction;
     farFieldTractionX 1e6;
     holeRadius      0.5;
-          value           uniform (0 0 0);
+    value           uniform (0 0 0);
 }
 ```
 
