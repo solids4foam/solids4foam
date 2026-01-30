@@ -22,17 +22,12 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     // Solution algorithm
     solutionAlgorithm implicitSegregated;
-    //solutionAlgorithm PETScSNES;
-    //solutionAlgorithm explicit;
-
-    // PETSc options file used by PETScSNES
-    //optionsFile petscOptions.lu;
 
     // Predict displacement at the start of a time-step
     predictor yes;
 
     // Damping to help reach steady state
-    dampingCoeff [0 0 -1 0 0 0 0] 1e-1;
+    dampingCoeff     dampingCoeff [0 0 -1 0 0 0 0] 1e-1;
 
     stabilisation
     {
