@@ -56,7 +56,7 @@ fluidSolidInterface    Aitken;
     // Defaults to 0.0
     couplingStartTime    10.0;
 
-    // Predictors at tjhe start of a new time step
+    // Predictors at the start of a new time step
     predictor            yes;
     predictSolid         yes;
 
