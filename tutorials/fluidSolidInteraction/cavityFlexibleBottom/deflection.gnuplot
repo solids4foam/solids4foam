@@ -7,8 +7,8 @@ set y2label "u_y [m]"
 set grid
 
 set y2tics
-set yrange[0.002:0.008]
-set y2range[-0.003:0]
+set yrange[0.001:0.002]
+set y2range[-0.3:-0.05]
 
 plot [2:] \
     "./postProcessing/0/solidPointDisplacement_pointDisp.dat" using 1:2 axis x1y1 title "u_x" with lines lw 2, \
