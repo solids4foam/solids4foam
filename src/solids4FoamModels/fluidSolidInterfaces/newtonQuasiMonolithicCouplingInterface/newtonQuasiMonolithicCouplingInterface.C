@@ -55,8 +55,14 @@ addToRunTimeSelectionTable
 
 void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
 {
-    // if (isFluid_ != nullptr || isMotion_ != nullptr || isSolid_ != nullptr)
-    if (isFluid_ != nullptr || isSolid_ != nullptr)
+    if
+    (
+        isFluid_ != nullptr
+     || isFluidVelocity_ != nullptr
+     || isFluidPressure_ != nullptr
+     // || isMotion_ != nullptr
+     || isSolid_ != nullptr
+    )
     {
         FatalErrorInFunction
             << "Pointer already set" << exit(FatalError);
@@ -71,7 +77,7 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
         // Set the number local block equations
         const label blockn = fluid().mesh().nCells();
 
-        // Fluid and solid block size
+        // Fluid block size
         const label fluidBlockSize = twoD ? 3 : 4;
 
         // Set the number local scalar equations
@@ -82,6 +88,62 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
 
         // Create the index sets, where it is assumed the motion equations come first
         ISCreateStride(PETSC_COMM_WORLD, NFluid, 0, 1, &isFluid_);
+    }
+
+    // Fluid velocity field
+    {
+        const label blockn = fluid().mesh().nCells();
+        const label fluidBlockSize = twoD ? 3 : 4;
+
+        const label nVelPerCell = twoD ? 2 : 3;
+        const label nVel = blockn*nVelPerCell;
+
+        List<PetscInt> idx(nVel);
+
+        PetscInt k = 0;
+        for (label c = 0; c < blockn; ++c)
+        {
+            const PetscInt base = c*fluidBlockSize;
+            idx[k++] = base + 0;
+            idx[k++] = base + 1;
+            if (!twoD)
+            {
+                idx[k++] = base + 2;
+            }
+        }
+
+        ISCreateGeneral
+        (
+            PETSC_COMM_WORLD,
+            idx.size(),
+            idx.begin(),
+            PETSC_COPY_VALUES,
+            &isFluidVelocity_
+        );
+    }
+
+    // Fluid pressure field
+    {
+        const label blockn = fluid().mesh().nCells();
+        const label fluidBlockSize = twoD ? 3 : 4;
+
+        const label nP = blockn;
+        List<PetscInt> idx(nP);
+
+        for (label c = 0; c < blockn; ++c)
+        {
+            const PetscInt base = c * fluidBlockSize;
+            idx[c] = base + (fluidBlockSize - 1);
+        }
+
+        ISCreateGeneral
+        (
+            PETSC_COMM_WORLD,
+            idx.size(),
+            idx.begin(),
+            PETSC_COPY_VALUES,
+            &isFluidPressure_
+        );
     }
 
     // Fluid mesh motion
@@ -1231,7 +1293,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     nRegions_(2),
     subMatsPtr_(nullptr),
     isFluid_(nullptr),
+    isFluidVelocity_(nullptr),
+    isFluidPressure_(nullptr),
     isSolid_(nullptr),
+    configuredNestedFluidSplit_(false),
     tsLogPtr_()
     // oldTimeValue_(runTime.value()),
     // nConsecutiveFailedSolves_(0),
@@ -1745,6 +1810,26 @@ label newtonQuasiMonolithicCouplingInterface::initialiseSolution(Vec& x)
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::customiseSolver()
+{
+    KSP ksp; PC pc; const char* pct = nullptr;
+    SNESGetKSP(snes(), &ksp);
+    KSPGetPC(ksp, &pc);
+    PCGetType(pc, &pct);
+
+    // If a split preconditioner is used, let is know where the fluid unknowns
+    // and solid unknowns are located
+    // CHECK: is it ok to only call this for timeIndex == 1?
+    if (pct && !std::strcmp(pct, PCFIELDSPLIT) && runTime().timeIndex() == 1)
+    {
+        Info<< "    Defining the fluid-solid field indices for the fluid-solid"
+            << nl << "    split preconditioner" << endl;
+        PCFieldSplitSetIS(pc, "fluid", isFluid());
+        PCFieldSplitSetIS(pc, "solid", isSolid());
+    }
+}
+
+
 label newtonQuasiMonolithicCouplingInterface::formResidual
 (
     Vec f,
@@ -2052,6 +2137,64 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
 
     // Ass
     MatScale(subMats[1][1], solidSystemScaleFactor_);
+
+    // Configure the field split for velocity and pressure in the fluid
+    if (!configuredNestedFluidSplit_)
+    {
+        KSP ksp;
+        PC pc;
+        const char* pct = nullptr;
+
+        SNESGetKSP(snes(), &ksp);
+        KSPGetPC(ksp, &pc);
+
+        SNESGetKSP(snes(), &ksp);
+        KSPGetPC(ksp, &pc);
+        PCGetType(pc, &pct);
+
+        // Only proceed if the top-level PC is a field split
+        if (pct && std::strcmp(pct, PCFIELDSPLIT) == 0)
+        {
+            configuredNestedFluidSplit_ = true;
+
+            // Ensure PC/KSP is set up *now that J is assembled*
+            KSPSetUp(ksp);
+
+            PetscInt nsplit;
+            KSP* subksps;
+            PCFieldSplitGetSubKSP(pc, &nsplit, &subksps);
+
+            for (PetscInt i = 0; i < nsplit; ++i)
+            {
+                PC subpc;
+                const char* subpct = nullptr;
+                const char* prefix = nullptr;
+                KSPGetPC(subksps[i], &subpc);
+                PCGetType(subpc, &subpct);
+                PCGetOptionsPrefix(subpc, &prefix);
+
+                if (prefix && std::strstr(prefix, "fluid"))
+                {
+                    if (subpct && !std::strcmp(subpct, PCFIELDSPLIT))
+                    {
+                        Info<< "    Defining the fluid velocity-pressure field indices"
+                            << "for the fluid sub-problem" << nl
+                            << "    split preconditioner" << endl;
+
+                        // local-to-fluid indices (0..NFluid-1)
+
+                        PCFieldSplitSetIS(subpc, "velocity", isFluidVelocity());
+                        PCFieldSplitSetIS(subpc, "pressure", isFluidPressure());
+
+                        // ISDestroy(&isV);
+                        // ISDestroy(&isP);
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     return 0;
 }

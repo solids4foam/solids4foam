@@ -309,6 +309,10 @@ public:
 
         // Edit
 
+            //- Called after SNESSetFromOptions(), before first SNESSolve()
+            virtual void customiseSolver()
+            {}
+
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
@@ -422,7 +426,7 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const scalar scale = -1.0
             ) const;
 
             //- Insert linearisation of div(phi,U) into a PETSc matrix
@@ -438,12 +442,12 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const scalar scale = -1.0
             ) const;
 
             //- Insert div(U) into the scalar p equation of a a PETSc matrix
-            //  If "flipSign" is true, -div(phi,U) is inserted rather than
-            //  div(phi,U)
+            //  If "flipSign" is true, -div(U) is inserted rather than
+            //  div(U)
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -452,7 +456,7 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = false
+                const scalar scale = 1.0
             ) const;
 
             //- Extract a subset of components a raw scalar array 'x' into the
