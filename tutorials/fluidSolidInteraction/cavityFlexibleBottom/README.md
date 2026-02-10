@@ -92,7 +92,7 @@ The interface force reported in [1] is several orders of magnitude smaller
 
 For mesh with  $$0.1$$ m spacing, the vertical displacement reported in [1] is
 approximately $$-0.232\,\mathrm{m}$$ (estimated from the published diagram),
-whereas the solids4foam prediction is $$-0.2305\,\mathrm{m}$$.
+whereas the solids4foam prediction is $$-0.219\,\mathrm{m}$$.
 
 ![.](images/cavityFlexibleBottom-TukovicEtAl-results.png)
 

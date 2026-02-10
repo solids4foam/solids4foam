@@ -1,0 +1,5 @@
+type            parabolicVelocity;
+maxValue        1.5;
+n               (1 0 0);
+y               (0 1 0);
+value           uniform (0 0 0);
