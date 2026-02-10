@@ -1,16 +1,17 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2012                                 |
-|   \\  /    A nd           | Website:  www.openfoam.com                      |
-|    \\/     M anipulation  |                                                 |
+| cardiacFoam: the OpenFOAM heart project                                     |
+| Version:     v0.1                                                           |
+| Web:         https://cardiacFoam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      binary;
     class       volScalarField;
-    arch        "LSB;label=32;scalar=64";
     location    "0";
     object      t;
 }
@@ -18,7 +19,6 @@ FoamFile
 
 // Dimensionless thickness
 dimensions      [0 0 0 0 0 0 0];
-
 
 internalField   uniform 0;
 
@@ -39,6 +39,5 @@ boundaryField
         value           uniform 1;
     }
 }
-
 
 // ************************************************************************* //
