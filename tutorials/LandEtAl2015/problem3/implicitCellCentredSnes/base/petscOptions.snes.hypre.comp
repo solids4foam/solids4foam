@@ -5,7 +5,7 @@
 #-snes_composite_type multiplicative
 #-snes_composite_sneses newtonls,newtonls
 -snes_composite_sneses newtonls
- 
+
 #-snes_mf
 #-snes_mf_operator
 -sub_0_snes_mf
