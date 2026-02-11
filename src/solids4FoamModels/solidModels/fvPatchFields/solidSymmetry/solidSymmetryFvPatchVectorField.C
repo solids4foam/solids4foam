@@ -20,6 +20,7 @@ License
 #include "solidSymmetryFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -87,7 +88,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     symmetryFvPatchField<vector>(p, iF, dict),
     secondOrder_(false)
 {
-    Info << "Symmetry boundary condition with non-orthogonal correction"
+    Info<< "Symmetry boundary condition with non-orthogonal correction"
         << endl;
 
     if (dict.found("secondOrder"))
@@ -150,43 +151,69 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
     // Unit normals
     const vectorField n(patch().nf());
 
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    // Lookup the gradient of displacement field
-    const fvPatchField<tensor>& gradD =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
+    // Field and gradient field names
 #ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
+    const word fieldName(internalField().name());
 #else
-            "grad(" + dimensionedInternalField().name() + ")"
+    const word fieldName(dimensionedInternalField().name());
 #endif
+    const word gradName("grad(" + fieldName + ")");
+
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
+    {
+        applyCorrection = false;
+    }
+
+    if (applyCorrection)
+    {
+        // Delta vectors
+        const vectorField delta(patch().delta());
+
+        // Non-orthogonal correction vectors
+        const vectorField k((I - sqr(n)) & delta);
+
+        // Lookup the gradient of displacement field
+        const fvPatchField<tensor>& gradD =
+            patch().lookupPatchField<volTensorField, tensor>(gradName);
+
+        // Calculate the corrected patch internal field
+        const vectorField DP
+        (
+            patchInternalField()
+          + (k & gradD.patchInternalField())
         );
 
-    // Calculate the corrected patch internal field
-    const vectorField DP
-    (
-        patchInternalField()
-      + (k & gradD.patchInternalField())
-    );
+        if (secondOrder_)
+        {
+            // Normal component of patch internal gradient
+            const vectorField nGradDP(n & gradD.patchInternalField());
 
-    if (secondOrder_)
-    {
-        // Normal component of patch internal gradient
-        const vectorField nGradDP(n & gradD.patchInternalField());
-
-        return
-          2*(
-                transform(I - 2.0*sqr(n), DP) - DP
-            )*(patch().deltaCoeffs()/2.0)
-          - transform(sqr(n), nGradDP);
+            return
+              2*(
+                    transform(I - 2.0*sqr(n), DP) - DP
+                )*(patch().deltaCoeffs()/2.0)
+              - transform(sqr(n), nGradDP);
+        }
+        else
+        {
+            return
+            (
+                transform(I - 2.0*sqr(n), DP)
+              - DP
+            )*(patch().deltaCoeffs()/2.0);
+        }
     }
     else
     {
+        // No corrections
+        const vectorField DP
+        (
+            patchInternalField()
+        );
+
         return
         (
             transform(I - 2.0*sqr(n), DP)
@@ -197,8 +224,7 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
 
 
 // Evaluate the field on the patch
-void solidSymmetryFvPatchVectorField::
-evaluate(const Pstream::commsTypes)
+void solidSymmetryFvPatchVectorField::evaluate(const Pstream::commsTypes)
 {
     if (!this->updated())
     {
@@ -208,45 +234,73 @@ evaluate(const Pstream::commsTypes)
     // Unit normals
     const vectorField n(patch().nf());
 
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    // Lookup the gradient of displacement field
-    const fvPatchField<tensor>& gradD =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
+    // Field and gradient field names
 #ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
+    const word fieldName(internalField().name());
 #else
-            "grad(" + dimensionedInternalField().name() + ")"
+    const word fieldName(dimensionedInternalField().name());
 #endif
-        );
+    const word gradName("grad(" + fieldName + ")");
 
-    // Calculate the corrected patch internal field
-    const vectorField DP
-    (
-        patchInternalField()
-      + (k & gradD.patchInternalField())
-    );
-
-    if (secondOrder_)
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
     {
-        const vectorField nGradDP(n&gradD.patchInternalField());
+        applyCorrection = false;
+    }
 
-        Field<vector>::operator=
+    if (applyCorrection)
+    {
+        // Delta vectors
+        const vectorField delta(patch().delta());
+
+        // Non-orthogonal correction vectors
+        const vectorField k((I - sqr(n)) & delta);
+
+        // Lookup the gradient of displacement field
+        const fvPatchField<tensor>& gradD =
+            patch().lookupPatchField<volTensorField, tensor>(gradName);
+
+        // Calculate the corrected patch internal field
+        const vectorField DP
         (
-            transform
-            (
-                I - sqr(n),
-                DP + 0.5*nGradDP/patch().deltaCoeffs()
-            )
+            patchInternalField()
+          + (k & gradD.patchInternalField())
         );
+
+        if (secondOrder_)
+        {
+            const vectorField nGradDP(n&gradD.patchInternalField());
+
+            Field<vector>::operator=
+            (
+                transform
+                (
+                    I - sqr(n),
+                    DP + 0.5*nGradDP/patch().deltaCoeffs()
+                )
+            );
+        }
+        else
+        {
+            Field<vector>::operator=
+            (
+                (
+                    DP
+                  + transform(I - 2.0*sqr(n), DP)
+                )/2.0
+            );
+        }
     }
     else
     {
+        // Calculate the corrected patch internal field
+        const vectorField DP
+        (
+            patchInternalField()
+        );
+
         Field<vector>::operator=
         (
             (

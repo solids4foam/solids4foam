@@ -19,7 +19,11 @@ Class
     Foam::robinFvPatchField
 
 Description
-    Foam::robinFvPatchField
+    A Robin condition which can be written as
+
+        c0*psi + c1*((d psi)/(d psi)) = r
+
+
 
 SourceFiles
     robinFvPatchField.C
@@ -47,13 +51,13 @@ class robinFvPatchField
 {
     // Private data
 
-        //- Coefficient by normal derivative
+        //- Coefficient for the value (c0)
         scalarField coeff0_;
 
-        //- Coefficient by normal derivative
+        //- Coefficient for the normal derivative (c1)
         scalarField coeff1_;
 
-        //- Right hand side of linear equation
+        //- Right hand side of linear equation (r)
         Field<Type> rhs_;
 
 public:

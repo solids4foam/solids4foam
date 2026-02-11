@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -46,5 +46,23 @@ timeFormat      general;
 timePrecision   6;
 
 runTimeModifiable no;
+
+functions
+{
+    analyticalSolution
+    {
+        type    squarePlateAnalyticalSolution;
+
+        a    10; // Length of the plate (in x direction)
+        b    10; // Width of the plate (in y direction)
+        h    0.1; // Plate thickness
+        p    1000;  // Applied transverse pressure
+        E    2e11;  // Young's modulus
+        nu    0.3; // Poisson's ratio
+
+        //boundaryConditions allEdgesSupported;
+        boundaryConditions allEdgesClamped;
+    }
+}
 
 // ************************************************************************* //

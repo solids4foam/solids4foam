@@ -80,18 +80,21 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::electroMechanicalLaw::materialTangentField() const
+void Foam::electroMechanicalLaw::materialTangentField(List<mat66>& matTan) const
 {
-    return passiveMechLawPtr_->materialTangentField();
+    passiveMechLawPtr_->materialTangentField(matTan);
 }
-#endif
 
 
 Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::bulkModulus() const
 {
     return passiveMechLawPtr_->bulkModulus();
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
+{
+    return passiveMechLawPtr_->shearModulus();
 }
 
 
@@ -127,7 +130,8 @@ void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
     // Add active stress to the passive stress
     // Note that the active stress is converted from a 2nd Piola-Kirchhoff
     // stress to a Cauchy stress
-    sigma += J*symm(F & (currentTa*f0f0) & F.T());
+    // sigma += J*symm(F & (currentTa*f0f0) & F.T());
+    sigma += symm(F & (currentTa*f0f0) & F.T())/J;
 }
 
 

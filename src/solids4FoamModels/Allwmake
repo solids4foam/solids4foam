@@ -28,6 +28,21 @@ else
         echo "Updating Make/files link to Make/files.openfoam"
         (cd Make && ln -sf files.openfoam files)
     fi
+
+    # OpenFOAM.org does not allow C-style comments in Make files
+    if [[ $WM_PROJECT_VERSION != v* ]]
+    then
+        echo "Removing C-style comments from Make/files"
+        awk '
+            {
+                # Remove inline /* ... */ comments
+                gsub(/\/\*.*\*\//, "")
+            }
+            /\/\*/ { in_comment = 1 }
+            !in_comment
+            /\*\// { in_comment = 0 }
+        ' Make/files.openfoam > tmpfile && mv tmpfile Make/files.openfoam
+    fi
 fi
 
 wmake $targetType libso

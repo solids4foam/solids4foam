@@ -20,6 +20,7 @@ License
 #include "solidWedgeFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -164,44 +165,62 @@ tmp<Field<vector> > solidWedgeFvPatchVectorField::snGrad() const
     const scalarField d(((patch().Cn() - patchC) & centreN)/(n & centreN));
     const vectorField projC(d*n + patchC);
 
-    // Calculate correction vector which connects actual cell centre to the
-    // transformed cell centre
-    const vectorField k(projC - patch().Cn());
-
     Field<vector> pif(this->patchInternalField());
 
-    const fvPatchField<tensor>& gradU =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
+    // Field and gradient field names
 #ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
+    const word fieldName(internalField().name());
 #else
-            "grad(" + dimensionedInternalField().name() + ")"
+    const word fieldName(dimensionedInternalField().name());
 #endif
+    const word gradName("grad(" + fieldName + ")");
+
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
+    {
+        applyCorrection = false;
+    }
+
+    if (applyCorrection)
+    {
+        // Calculate correction vector which connects actual cell centre to the
+        // transformed cell centre
+        const vectorField k(projC - patch().Cn());
+
+        const fvPatchField<tensor>& gradU =
+            patch().lookupPatchField<volTensorField, tensor>(gradName);
+
+        const Field<vector> projU
+        (
+            this->patchInternalField() + (k & gradU.patchInternalField())
         );
 
-    const Field<vector> projU
-    (
-        this->patchInternalField() + (k & gradU.patchInternalField())
-    );
+        // Calculate delta coeffs from proj position on centre plane to transformed
+        // projected position
+        const scalarField projDeltaCoeff
+        (
+            1.0/mag(transform(wedgePatch.cellT(), projC) - projC)
+        );
 
-    // Calculate delta coeffs from proj position on centre plane to transformed
-    // projected position
-    const scalarField projDeltaCoeff
-    (
-        1.0/mag(transform(wedgePatch.cellT(), projC) - projC)
-    );
-
-    return
-    (
-        transform(wedgePatch.cellT(), projU) - projU
-    )*projDeltaCoeff;
-
-    // old way without correction
-    // return
-    // (
-    //  transform(refCast<const wedgeFvPatch>(this->patch()).cellT(), pif) - pif
-    // )*(0.5*this->patch().deltaCoeffs());
+        return
+        (
+            transform(wedgePatch.cellT(), projU) - projU
+        )*projDeltaCoeff;
+    }
+    else
+    {
+        // No correction
+        return
+        (
+            transform
+            (
+                refCast<const wedgeFvPatch>(this->patch()).cellT(),
+                pif
+            ) - pif
+        )*(0.5*this->patch().deltaCoeffs());
+    }
 }
 
 
@@ -223,27 +242,48 @@ void solidWedgeFvPatchVectorField::evaluate(const Pstream::commsTypes)
     const vectorField patchC(patch().patch().faceCentres());
     const vectorField transC(wedgePatch.faceT().T() & patchC);
 
-    // Calculate correction vector which connects actual cell centre to the
-    // transformed cell centre
+    // Field and gradient field names
+#ifdef OPENFOAM_NOT_EXTEND
+    const word fieldName(internalField().name());
+#else
+    const word fieldName(dimensionedInternalField().name());
+#endif
+    const word gradName("grad(" + fieldName + ")");
+
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
+    {
+        applyCorrection = false;
+    }
+
+    if (applyCorrection)
+    {
+        // Calculate correction vector which connects actual cell centre to the
+        // transformed cell centre
     const vectorField k(transC - patch().Cn());
 
-    const fvPatchField<tensor>& gradU =
-        patch().lookupPatchField<volTensorField, tensor>
+        const fvPatchField<tensor>& gradU =
+            patch().lookupPatchField<volTensorField, tensor>(gradName);
+
+        Field<vector> pif(this->patchInternalField());
+        pif += (k & gradU.patchInternalField());
+
+        Field<vector>::operator=
         (
-#ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
+            transform(wedgePatch.faceT(), pif)
         );
+    }
+    else
+    {
+        const Field<vector> pif(this->patchInternalField());
 
-    Field<vector> pif(this->patchInternalField());
-    pif += (k & gradU.patchInternalField());
-
-    Field<vector>::operator=
-    (
-        transform(wedgePatch.faceT(), pif)
-    );
+        Field<vector>::operator=
+        (
+            transform(wedgePatch.faceT(), pif)
+        );
+    }
 }
 
 

@@ -99,13 +99,14 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
-#endif
+        virtual void materialTangentField(List<mat66>& matTan) const;
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;
+
+        //- Return the shear modulus field
+        virtual tmp<volScalarField> shearModulus() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

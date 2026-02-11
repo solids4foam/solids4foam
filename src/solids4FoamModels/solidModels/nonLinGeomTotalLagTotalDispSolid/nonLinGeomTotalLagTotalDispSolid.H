@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
+#include "foamPetscSnesHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +59,8 @@ namespace solidModels
 
 class nonLinGeomTotalLagTotalDispSolid
 :
-    public solidModel
+    public solidModel,
+    public foamPetscSnesHelper
 {
     // Private data
 
@@ -70,6 +72,9 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Jacobian of total deformation gradient
         volScalarField J_;
+
+        //- Acceleration
+        volVectorField A_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -84,14 +89,50 @@ class nonLinGeomTotalLagTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Diffusivity for the pressure equation
+        //  This controls the amount of smoothing in the pressure equation
+        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
+
+        //- Time rate of pressure
+        //  This is used by the optional linear predictor
+        mutable autoPtr<volScalarField> dpdtPtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
+
+        //- Number of unknowns per cell, used by PETSc SNES solver
+        const label blockSize_;
+
 
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Enforce traction boundary conditions on the provided traction field
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& force,             // force at the faces
+            const volVectorField& D,               // displacement field
+            const surfaceVectorField& nCurrent,    // deformed unit normals
+            const surfaceScalarField& magSfCurrent // deformed area magnitudes
+        ) const;
+
+        //- Evolve the solid solver using the segregated implicit approach
+        bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
+        //  A compact approximate Jacobian (same one as used by the segregated
+        //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
+        //  works well with this approach
+        bool evolveSnes();
+
+        // Make the pDiffusivity field
+        void makePDiffusivity() const;
+
+        // Return a const reference to the pDiffusivity field
+        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid
@@ -151,6 +192,32 @@ public:
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+#ifdef USE_PETSC
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x);
+
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector
+            virtual label formResidual
+            (
+                Vec f,         // Residual
+                const Vec x    // Solution
+            );
+
+            //- Form the Jacobian of the governing equation
+            virtual label formJacobian
+            (
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
+            );
+#endif // USE_PETSC
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad

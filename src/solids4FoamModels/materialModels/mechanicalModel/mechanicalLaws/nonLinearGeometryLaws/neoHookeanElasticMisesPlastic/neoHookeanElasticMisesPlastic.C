@@ -1624,8 +1624,14 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     //     F() = relF() & F().oldTime();
     // }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the total true (Hencky) strain
-    const volSymmTensorField epsilon(0.5*log(symm(F().T() & F())));
+    const volSymmTensorField epsilon(0.5*log(symm(FT & F)));
 
     // Calculate equivalent strain, for normalisation of the error
     const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon))));

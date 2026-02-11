@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# This case requires PETSc to be installed
+if [ -z "${PETSC_DIR}" ];
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable"; echo
+    exit 0
+fi
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Build the utility for initialising the solution
+wmake initialiseTaylorGreenVortex
+
+# Build boundary condition and mesh motion libraries
+(cd src && ./Allwmake)
+
+# Copy 0.orig to 0
+restore0Dir
+
+# Create the mesh
+runApplication blockMesh
+
+# Initialie the velocity and pressure initial fields with the analytical
+# solutions
+runApplication initialiseTaylorGreenVortex
+
+# Run the solver
+runApplication solids4Foam

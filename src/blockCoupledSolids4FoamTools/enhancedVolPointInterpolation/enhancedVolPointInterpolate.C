@@ -225,15 +225,23 @@ Foam::tmp<Foam::Field<Type>> Foam::enhancedVolPointInterpolation::flatBoundaryFi
     const fvMesh& mesh = vf.mesh();
     const fvBoundaryMesh& bm = mesh.boundary();
 
+#ifdef OPENFOAM_COM
+    const label nBoundaryFaces = mesh.nBoundaryFaces();
+    const label nInternalFaces = mesh.nInternalFaces();
+#else
+    const label nInternalFaces = mesh.nInternalFaces();
+    const label nBoundaryFaces = mesh.nFaces() - nInternalFaces;
+#endif
+
     tmp<Field<Type>> tboundaryVals
     (
-        new Field<Type>(mesh.nBoundaryFaces())
+        new Field<Type>(nBoundaryFaces)
     );
     Field<Type>& boundaryVals = tboundaryVals.ref();
 
     forAll(vf.boundaryField(), patchi)
     {
-        label bFacei = bm[patchi].patch().start() - mesh.nInternalFaces();
+        label bFacei = bm[patchi].patch().start() - nInternalFaces;
 
         if
         (
@@ -313,7 +321,7 @@ void Foam::enhancedVolPointInterpolation::interpolateBoundaryField
     addSeparated(pf);
 
     // Optionally normalise
-    if (normalisationPtr_)
+    if (normalisationPtr_.valid())
     {
         const scalarField& normalisation = normalisationPtr_();
         forAll(mp, i)
@@ -507,8 +515,13 @@ Foam::enhancedVolPointInterpolation::interpolate
     const pointMesh& pm = pointMesh::New(vf.mesh());
     const objectRegistry& db = pm.thisDb();
 
+#ifdef OPENFOAM_COM
     PointFieldType* pfPtr =
         db.objectRegistry::template getObjectPtr<PointFieldType>(name);
+#else
+    PointFieldType* pfPtr =
+        db.objectRegistry::template lookupObjectRef<PointFieldType>(name);
+#endif
 
     if (!cache || vf.mesh().changing())
     {
@@ -604,8 +617,13 @@ Foam::enhancedVolPointInterpolation::interpolate
     const objectRegistry& db = pm.thisDb();
 
 
+#ifdef OPENFOAM_COM
     PointFieldType* pfPtr =
         db.objectRegistry::template getObjectPtr<PointFieldType>(name);
+#else
+    PointFieldType* pfPtr =
+        db.objectRegistry::template lookupObjectRef<PointFieldType>(name);
+#endif
 
     if (!cache || vf.mesh().changing())
     {

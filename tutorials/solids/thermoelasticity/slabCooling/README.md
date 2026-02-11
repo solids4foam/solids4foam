@@ -116,6 +116,22 @@ mesh using `blockMesh` (`> blockMesh`), after which the case is run with the
 
 ---
 
+## Regression Testing
+
+The `slabCooling` case also includes a lightweight physics-based regression
+ test (`regressionTest.sh`). This script automatically runs the case and checks
+ the values for maximum stress and strain are as expected.
+
+This regression test is primarily intended for automated verification (e.g.
+ continuous integration and solver development) rather than routine tutorial
+ usage, and can be run manually with
+
+```bash
+./regressionTest.sh
+```
+
+---
+
 ### References
 
 [1]

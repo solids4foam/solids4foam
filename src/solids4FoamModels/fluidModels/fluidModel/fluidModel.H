@@ -43,22 +43,21 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
-#ifdef OPENFOAM_COM
-        #include "gravityMeshObject.H"
-#else
-    #include "uniformDimensionedFields.H"
-#endif
+#include "boolIOList.H"
+#include "compatibilityFunctions.H"
 #include "globalPolyPatch.H"
-#if FOAMEXTEND
+
+#ifdef OPENFOAM_COM
+    #include "gravityMeshObject.H"
+    #include "fvOptions.H"
+#elif defined(FOAMEXTEND)
     #include "oversetMesh.H"
-#endif
-#ifdef OPENFOAM_ORG
+    #include "uniformDimensionedFields.H"
+#elif defined(OPENFOAM_ORG)
     #include "fvModels.H"
     #include "fvConstraints.H"
-#elif OPENFOAM_COM
-    #include "fvOptions.H"
+    #include "uniformDimensionedFields.H"
 #endif
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,6 +97,14 @@ class fluidModel
         const uniformDimensionedVectorField g_;
 #endif
 
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  U field
+        boolIOList useBoundaryFaceValuesU_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  p field
+        boolIOList useBoundaryFaceValuesp_;
+
         //- Velocity field header
         IOobject Uheader_;
 
@@ -118,6 +125,12 @@ class fluidModel
 
         //- Flux field
         autoPtr<surfaceScalarField> phiPtr_;
+
+        //- Acceleration field
+        autoPtr<volVectorField> APtr_;
+
+        //- Rate of change of pressure field
+        autoPtr<volScalarField> dpdtPtr_;
 
         //- Adjustable time-step switch
         const Switch adjustTimeStep_;
@@ -142,6 +155,9 @@ class fluidModel
 
         //- Cumulative continuity error
         scalar cumulativeContErr_;
+
+        //- Flag indicating if the case is 2-D or 3-D
+        const bool twoD_;
 
 #ifdef OPENFOAM_ORG
         //- fvModels
@@ -249,7 +265,6 @@ protected:
             volVectorField& U
         ) const;
 
-
 public:
 
     //- Runtime type information
@@ -319,6 +334,12 @@ public:
                 return meshPtr_().time();
             }
 
+            //- Is the model two-dimensional
+            const bool& twoD() const
+            {
+                return twoD_;
+            }
+
             //- Return non-const acess to the pimple control
             pisoControl& piso();
 
@@ -364,6 +385,22 @@ public:
                 return pPtr_();
             }
 
+            //- Return const solution pressure field
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual const volScalarField& solutionP() const
+            {
+                return pPtr_();
+            }
+
+            //- Return const solution pressure field
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual volScalarField& solutionP()
+            {
+                return pPtr_();
+            }
+
             //- Return const velocity gradient field
             virtual const volTensorField& gradU() const
             {
@@ -398,6 +435,30 @@ public:
             virtual surfaceScalarField& phi()
             {
                 return phiPtr_();
+            }
+
+            //- Return const acceleration field
+            virtual const volVectorField& A() const
+            {
+                return APtr_();
+            }
+
+            //- Return acceleration field
+            virtual volVectorField& A()
+            {
+                return APtr_();
+            }
+
+            //- Return const acceleration field
+            virtual const volScalarField& dpdt() const
+            {
+                return dpdtPtr_();
+            }
+
+            //- Return const acceleration field
+            virtual volScalarField& dpdt()
+            {
+                return dpdtPtr_();
             }
 
 #ifdef OPENFOAM_ORG
@@ -461,6 +522,17 @@ public:
             (
                 const label patchID
             ) const = 0;
+
+            //- Patch pressure force for the solution o field (N/m2)
+            //  Default to p, but can be overwritten in the derived fluid models
+            //  For example, p_rgh for interFluid
+            virtual tmp<scalarField> patchSolutionPressureForce
+            (
+                const label patchID
+            ) const
+            {
+                return patchPressureForce(patchID);
+            }
 
             //- Patch temperature
             virtual tmp<scalarField> patchTemperature(const label patchID) const

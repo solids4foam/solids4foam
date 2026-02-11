@@ -10,7 +10,6 @@ else
 endif
 
 EXE_INC = \
-    -std=c++11 \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \

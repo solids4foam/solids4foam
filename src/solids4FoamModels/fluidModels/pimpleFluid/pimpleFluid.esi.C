@@ -350,6 +350,8 @@ bool pimpleFluid::evolve()
     const bool checkMeshCourantNo = checkMeshCourantNo_;
     const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
+    #include "CourantNo.H"
+
     // --- Pressure-velocity PIMPLE corrector loop
     while (pimple.loop())
     {
@@ -503,9 +505,13 @@ bool pimpleFluid::evolve()
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
+            gradp() = fvc::grad(p);
+
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
          // fvOptions.correct(U);
+
+            gradU() = fvc::grad(U);
         }
 
         // Correct Uf if the mesh is moving

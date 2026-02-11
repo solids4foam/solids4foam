@@ -47,6 +47,16 @@ function solids4Foam::convertCaseFormat()
         return 0
     fi
 
+    # GNU sed must be used
+    if sed --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed detected"
+    else
+        echo "Error: This script requires GNU sed. Please install it (e.g.,"
+        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
+        exit 1
+    fi
+
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
@@ -61,8 +71,14 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+        echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+    fi
+
     # Check all files in the 0 directory
-    for FILE in $(find "${CASE_DIR}" -type f)
+    for FILE in $(find "${CASE_DIR}/0" -type f)
     do
         if [[ -f "${FILE}" ]]
         then
@@ -90,6 +106,14 @@ function solids4Foam::convertCaseFormat()
         echo "Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
         \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
     fi
+
+    # faMeshDefinition - for now, only support OpenFOAM.com
+    # if [[ -f "${CASE_DIR}"/constant/faMesh/faMeshDefinition ]]
+    # then
+    #     echo "Moving constant/faMesh/faMeshDefinition to system/finite-area"
+    #     mkdir -p "${CASE_DIR}"/system/finite-area
+    #     \mv "${CASE_DIR}"/constant/faMesh/faMeshDefinition "${CASE_DIR}"/system/finite-area
+    # fi
 
     # Replace the functions file
     if [[ -f "${CASE_DIR}"/system/functions ]]
@@ -199,6 +223,21 @@ function solids4Foam::convertCaseFormat()
         sed -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
     fi
 
+    # 13. Replace mirrorMeshDict differences
+    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
+        echo "system/mirrorMeshDict with with 'point' and 'normal'"
+        sed -i -E 's/\bbasePoint\b/point/' system/mirrorMeshDict
+        sed -i -E 's/\bnormalVector\b/normal/' system/mirrorMeshDict
+    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
+        echo "system/solid/mirrorMeshDict with with 'point' and 'normal'"
+        sed -i -E 's/\bbasePoint\b/point/' system/solid/mirrorMeshDict
+        sed -i -E 's/\bnormalVector\b/normal/' system/solid/mirrorMeshDict
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -229,6 +268,16 @@ function solids4Foam::convertCaseFormatFoamExtend()
     # Give sensible names to the argument
     CASE_DIR=$1
 
+    # GNU sed must be used
+    if sed --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed detected"
+    else
+        echo "Error: This script requires GNU sed. Please install it (e.g.,"
+        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
+        exit 1
+    fi
+
     # Un-do changes made in convertCaseFormat, if any
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
@@ -245,7 +294,13 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    for FILE in $(find "${CASE_DIR}" -type f)
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+    echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+    fi
+
+    for FILE in $(find "${CASE_DIR}/0" -type f)
     do
         if [[ -f "${FILE}" ]]
         then
@@ -276,6 +331,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
     fi
+
+    # faMeshDefinition
+    # if [[ -f "${CASE_DIR}"/system/finite-area/faMeshDefinition ]]
+    # then
+    #     echo "Moving system/finite-area/faMeshDefinition to constant/faMesh"
+    #     mkdir -p "${CASE_DIR}"/constant/polyMesh
+    #     \mv "${CASE_DIR}"/system/finite-area/faMeshDefinition "${CASE_DIR}"/constant/faMesh
+    # fi
 
     if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
     then
@@ -383,6 +446,21 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Updating plot.gnuplot"
         sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
+    fi
+
+    # 13. Replace mirrorMeshDict differences
+    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
+        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
+        sed -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
+        sed -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
+    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
+    then
+        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
+        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
+        sed -i -E 's/\bpoint\b/basePoint/' system/solid/mirrorMeshDict
+        sed -i -E 's/\b(normal)\b/\1Vector/' system/solid/mirrorMeshDict
     fi
 
     echo
@@ -518,10 +596,7 @@ function solids4Foam::removeEmptyDirs()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 function solids4Foam::runApplication()
 {
-    local appName appRun logFile logMode
-
-    # Any additional parsed arguments (eg, decomposeParDict)
-    local appArgs
+    local appName="" appRun="" logFile="" logMode="" appArgs=""
 
     # Parse options until executable is encountered
     while [ "$#" -gt 0 ] && [ -z "$appRun" ]
@@ -669,4 +744,110 @@ function solids4Foam::runParallel()
         )
         fi
     fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# runSolidModel
+#     Run the case using the specified solid model. This script modifies the
+#     case to work with the specified solid model and then runs the case.
+#     Modification are made to the solidProperties, fvSchemes, fvSolution,
+#     boundary conditions, etc., as needed.
+# Arguments:
+#     1: Address of the case directory
+#     2: Name of the solid model to use
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::runSolidModel()
+{
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "| solids4Foam::runSolidModel start                                   |"
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo
+
+    # Check number of input parameters is correct
+    if [[ $# -ne 2 ]]
+    then
+        solids4Foam::err "runSolidModel: incorrect number of parameters"
+    fi
+
+    # Give sensible names to the argument
+    CASE_DIR=$1
+    SOLID_MODEL=$2
+
+    # Directory containing the template solid model dicts
+    # Note: the Allwmake script replaces /Users/philipc/OpenFOAM/philipc-v2012/solids4foam/applications/scripts with $(pwd)
+    DICTS_PARENT_DIR=/Users/philipc/OpenFOAM/philipc-v2012/solids4foam/applications/scripts
+    DICTS_DIR=${DICTS_PARENT_DIR}/solidModelDicts/${SOLID_MODEL}
+
+    # Check default dictionaries exist for the specified solid model
+    if [ ! -d "${DICTS_DIR}" ]; then
+        solids4Foam::err "Cannot find ${DICTS_DIR}. Do default dicts exist for this solid model?"
+    fi
+
+    # Copy default dictionaries for the specified solid model
+
+    echo "Replacing solidProperties"
+    \cp ${DICTS_DIR}/solidProperties ${CASE_DIR}/constant/
+
+    echo "Replacing fvSolution"
+    \cp ${DICTS_DIR}/fvSolution ${CASE_DIR}/system/
+
+    echo "Replacing fvSchemes"
+    \cp ${DICTS_DIR}/fvSchemes ${CASE_DIR}/system/
+
+    # Add files to case, if the addFilesToCase directory is present
+    if [ -d "${DICTS_DIR}/addFilesToCase" ]; then
+        for f in "${DICTS_DIR}/addFilesToCase/"*; do
+            if [ -f "$f" ]; then  # Ensure it's a file
+                echo "Copying ${f} to ${CASE_DIR}"
+                \cp "${f}" "${CASE_DIR}"
+            fi
+        done
+    fi
+
+    # Check the displacement file is correct
+    if [ ! -f "${DICTS_DIR}/displacementName" ]; then
+        solids4Foam::err "Cannot find ${DICTS_DIR}/displacementName. This file should contain the name of displacement field primary unknown"
+    fi
+    DISP_NAME_FILE="${DICTS_DIR}"/displacementName
+    DISP=$(cat "${DISP_NAME_FILE}")
+
+    if [ ! -f "${DICTS_DIR}/0/${DISP}" ]; then
+        # The DISP field is not present. Check if we can copy a field that is
+        # present
+
+        if [ "${DISP}" = "D" ] && [ -f "${CASE_DIR}/0/DD" ]; then
+            echo "Renaming ${CASE_DIR}/0/DD to ${CASE_DIR}/0/D"
+            \mv "${CASE_DIR}/0/DD" "${CASE_DIR}/0/D"
+            sed -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
+        fi
+
+        if [ "${DISP}" = "DD" ] && [ -f "${CASE_DIR}/0/D" ]; then
+            echo "Renaming ${CASE_DIR}/0/D to ${CASE_DIR}/0/DD"
+            \mv "${CASE_DIR}/0/D" "${CASE_DIR}/0/DD"
+            sed -i "s/object.*D;/object DD;/g" "${CASE_DIR}/0/DD"
+        fi
+
+        if [ "${DISP}" != "D" ] && [ "${DISP}" != "DD" ]; then
+            solids4Foam::err "Cannot find ${DICTS_DIR}/0/${DISP} and it cannot be copied from D or DD"
+        fi
+    fi
+
+    # Other checks - to-do
+    # 1. solidModel may use D, DD, pointD or other
+    # 2. Specify forms of boundary condition, e.g. solidTraction vs
+    #    blockSolidTraction
+
+    # Run the case
+    if [ ! -f "${CASE_DIR}/Allrun" ]; then
+        solids4Foam::err "Cannot find ${CASE_DIR}/Allrun"
+    fi
+    echo "Running ./Allrun on ${CASE_DIR}"
+    ./Allrun &> log.Allrun
+
+    echo
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "| solids4Foam::runSolidModel end                                     |"
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo
 }

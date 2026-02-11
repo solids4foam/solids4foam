@@ -10,6 +10,15 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if [[ "${WM_PROJECT_VERSION#v}" -lt 2412 ]]
+then
+    echo
+    echo "OpenFOAM-v2412 or a newer version is required for this case"
+    echo
+    exit 0
+fi
 
 # Create volume mesh
 solids4Foam::runApplication blockMesh

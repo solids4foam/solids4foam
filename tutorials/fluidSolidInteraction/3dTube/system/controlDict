@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -64,9 +64,9 @@ functions
     forces
     {
         type                forces;
-        "libs|functionObjectLibs" ( "libforces.so" );
-        outputControl       timeStep;
-        outputInterval      1;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
         patches             (wall);
         "pName|p"           p;
         "UName|U"           U;
@@ -78,15 +78,10 @@ functions
     }
     fsiConvData
     {
-        type fsiConvergenceData;        
+        type fsiConvergenceData;
         region fluid;
     }
 
-}
-
-DebugSwitches
-{
-    elasticWallPressure  1;
 }
 
 // ************************************************************************* //

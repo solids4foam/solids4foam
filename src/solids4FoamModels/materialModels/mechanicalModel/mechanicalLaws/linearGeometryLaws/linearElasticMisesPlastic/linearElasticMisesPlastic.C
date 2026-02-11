@@ -610,7 +610,14 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mu_ = E_/(2.0*(1.0 + nu_));
 
         // Set the bulk modulus
-        K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+	if (planeStress())
+        {
+            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
+	}
+	else
+	{
+            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+	}
     }
     else if (dict.found("mu") && dict.found("K"))
     {
@@ -787,19 +794,13 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
-#ifdef OPENFOAM_COM
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::linearElasticMisesPlastic::materialTangentField() const
+void Foam::linearElasticMisesPlastic::materialTangentField
+(
+    List<mat66>& matTan
+) const
 {
-    // Prepare tmp field
-    tmp<Field<scalarSquareMatrix>> tresult
-    (
-        new Field<scalarSquareMatrix>
-        (
-            mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
-        )
-    );
-    Field<scalarSquareMatrix>& result = tresult.ref();
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
     // Calculated as per box 3.2 in Simo and Hughes
 
@@ -912,12 +913,18 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
             // Insert tangent component
             forAll(tangCmptI, faceI)
             {
-                result[faceI](XX, cmptI) = tangCmptI[faceI][XX];
-                result[faceI](YY, cmptI) = tangCmptI[faceI][YY];
-                result[faceI](ZZ, cmptI) = tangCmptI[faceI][ZZ];
-                result[faceI](XY, cmptI) = tangCmptI[faceI][XY];
-                result[faceI](YZ, cmptI) = tangCmptI[faceI][YZ];
-                result[faceI](XZ, cmptI) = tangCmptI[faceI][XZ];
+                // Take a reference to the current tangent
+                mat66& curMatTan = matTan[faceI];
+
+                // Zero the tangent
+                curMatTan.clear();
+
+                curMatTan(XX, cmptI) = tangCmptI[faceI][XX];
+                curMatTan(YY, cmptI) = tangCmptI[faceI][YY];
+                curMatTan(ZZ, cmptI) = tangCmptI[faceI][ZZ];
+                curMatTan(XY, cmptI) = tangCmptI[faceI][XY];
+                curMatTan(YZ, cmptI) = tangCmptI[faceI][YZ];
+                curMatTan(XZ, cmptI) = tangCmptI[faceI][XZ];
             }
 
             forAll(tangCmpt.boundaryField(), patchI)
@@ -930,24 +937,23 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                 {
                     const label faceID = start + fI;
 
-                    result[faceID](XX, cmptI) = tangCmptI[fI][XX];
-                    result[faceID](YY, cmptI) = tangCmptI[fI][YY];
-                    result[faceID](ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    result[faceID](XY, cmptI) = tangCmptI[fI][XY];
-                    result[faceID](YZ, cmptI) = tangCmptI[fI][YZ];
-                    result[faceID](XZ, cmptI) = tangCmptI[fI][XZ];
+                    // Take a reference to the current tangent
+                    mat66& curMatTan = matTan[faceID];
+
+                    // Zero the tangent
+                    curMatTan.clear();
+
+                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
                 }
             }
         }
     }
-    // else // Analytical tangent
-    // {
-    //     notImplemented("Analytical tangent not implemented");
-    // }
-
-    return tresult;
 }
-#endif // OPENFOAM_COM
 
 
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)

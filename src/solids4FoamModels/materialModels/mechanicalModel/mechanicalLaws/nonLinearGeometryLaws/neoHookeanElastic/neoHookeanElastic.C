@@ -45,7 +45,11 @@ Foam::neoHookeanElastic::neoHookeanElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     mu_("mu", dimPressure, 0.0),
-    K_("K", dimPressure, 0.0)
+    K_("K", dimPressure, 0.0),
+    alternatePressureDefinition_
+    (
+        dict.lookupOrDefault<Switch>("alternatePressureDefinition", false)
+    )
 {
     // Read mechanical properties
     if
@@ -139,22 +143,34 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
     );
 }
 
-#ifdef OPENFOAM_COM
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::neoHookeanElastic::materialTangentField() const
+
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::shearModulus() const
 {
-    // Prepare tmp field
-    tmp<Field<scalarSquareMatrix>> tresult
+    return tmp<volScalarField>
     (
-        new Field<scalarSquareMatrix>
+        new volScalarField
         (
-            mesh().nFaces(), scalarSquareMatrix(6, 0.0)
+            IOobject
+            (
+                "mu",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_
         )
     );
-    Field<scalarSquareMatrix>& result = tresult.ref();
+}
+
+
+void Foam::neoHookeanElastic::materialTangentField(List<mat66>& matTan) const
+{
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
     // Calculate tangent field
-    //if (dict().lookup("numericalTangent"));
     {
         // Lookup current stress and store it as the reference
         const surfaceSymmTensorField& sigmaRef =
@@ -234,12 +250,18 @@ Foam::neoHookeanElastic::materialTangentField() const
             // Insert tangent component
             forAll(tangCmptI, faceI)
             {
-                result[faceI](XX, cmptI) = tangCmptI[faceI][XX];
-                result[faceI](YY, cmptI) = tangCmptI[faceI][YY];
-                result[faceI](ZZ, cmptI) = tangCmptI[faceI][ZZ];
-                result[faceI](XY, cmptI) = tangCmptI[faceI][XY];
-                result[faceI](YZ, cmptI) = tangCmptI[faceI][YZ];
-                result[faceI](XZ, cmptI) = tangCmptI[faceI][XZ];
+                // Take a reference to the current tangent
+                mat66& curMatTan = matTan[faceI];
+
+                // Zero the tangent
+                curMatTan.clear();
+
+                curMatTan(XX, cmptI) = tangCmptI[faceI][XX];
+                curMatTan(YY, cmptI) = tangCmptI[faceI][YY];
+                curMatTan(ZZ, cmptI) = tangCmptI[faceI][ZZ];
+                curMatTan(XY, cmptI) = tangCmptI[faceI][XY];
+                curMatTan(YZ, cmptI) = tangCmptI[faceI][YZ];
+                curMatTan(XZ, cmptI) = tangCmptI[faceI][XZ];
             }
 
             forAll(tangCmpt.boundaryField(), patchI)
@@ -252,24 +274,23 @@ Foam::neoHookeanElastic::materialTangentField() const
                 {
                     const label faceID = start + fI;
 
-                    result[faceID](XX, cmptI) = tangCmptI[fI][XX];
-                    result[faceID](YY, cmptI) = tangCmptI[fI][YY];
-                    result[faceID](ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    result[faceID](XY, cmptI) = tangCmptI[fI][XY];
-                    result[faceID](YZ, cmptI) = tangCmptI[fI][YZ];
-                    result[faceID](XZ, cmptI) = tangCmptI[fI][XZ];
+                    // Take a reference to the current tangent
+                    mat66& curMatTan = matTan[faceID];
+
+                    // Zero the tangent
+                    curMatTan.clear();
+
+                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
                 }
             }
         }
     }
-    // else // Analytical tangent
-    // {
-    //     notImplemented("Analytical tangent not implemented");
-    // }
-
-    return tresult;
 }
-#endif // OPENFOAM_COM
 
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
@@ -282,21 +303,38 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
+    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
 
     // Calculate the deviatoric stress
     const volSymmTensorField s(mu_*dev(bEbar));
 
     // Update the hydrostatic stress
-    updateSigmaHyd
-    (
-        0.5*K()*(pow(J, 2.0) - 1.0),
-        (4.0/3.0)*mu_ + K_
-    );
+    if (alternatePressureDefinition_)
+    {
+        updateSigmaHyd
+        (
+            K()*(J - 1.0),
+            (4.0/3.0)*mu_ + K_
+        );
+    }
+    else
+    {
+        updateSigmaHyd
+        (
+            0.5*K()*(pow(J, 2.0) - 1.0),
+            (4.0/3.0)*mu_ + K_
+        );
+    }
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*(sigmaHyd()*I + s);
@@ -338,11 +376,16 @@ void Foam::neoHookeanElastic::correctF
     const surfaceTensorField& F
 ) const
 {
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const surfaceTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & F.T()));
+    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
 
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(mu_*dev(bEbar));

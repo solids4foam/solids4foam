@@ -42,11 +42,7 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "scalarMatrices.H"
-#else
-    #include "scalarSquareMatrix.H"
-#endif
+#include "mat66.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -508,27 +504,33 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual scalarSquareMatrix materialTangent() const
+        virtual mat66 materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return scalarSquareMatrix(0);
+            return mat66();
         }
 
-        //- Material tangent field for Newton Raphson loop
+        //- Populate the material tangent field
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<scalarSquareMatrix>>
-            materialTangentField() const;
-#endif
+        virtual void materialTangentField(List<mat66>& matTan) const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {
             notImplemented("bulkModulus() const");
+
+            // Keep compiler happy
+            return rho();
+        }
+
+        //- Return shear modulus
+        virtual tmp<volScalarField> shearModulus() const
+        {
+            notImplemented("shearModulus() const");
 
             // Keep compiler happy
             return rho();

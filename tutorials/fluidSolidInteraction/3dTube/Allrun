@@ -4,9 +4,17 @@
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage
-# ./Allrun
+# ./Allrun # default behaviour is Robin-Neumann coupling
+# ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
-# ./Allrun robin
+
+# This case requires PETSc to be installed
+if [ -z "${PETSC_DIR}" ];
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable"; echo
+    exit 0
+fi
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -16,17 +24,17 @@ if [[ "$1" == "sonicLiquidFluid" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
-elif [[ "$1" == "robin" ]]; then
-    # Robin-Neumann pimpleFluid approach
-    echo "Using the Robin-Neumann sonicLiquidFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.robin')
+elif [[ "$1" == "dirichletNeumann" ]]; then
+    # Dirichlet-Neumann pimpleFluid approach
+    echo "Using the Dirichlet-Neumann pimpleFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
 else
-    # Dirichlet-Neumann pimpleFluid approach
-    echo "Using the Dirichlet-Neumann pimpleFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+    # Robin-Neumann pimpleFluid approach
+    echo "Using the Robin-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done

@@ -41,6 +41,8 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
+#include "foamPetscSnesHelper.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +60,8 @@ namespace solidModels
 
 class linGeomTotalDispSolid
 :
-    public solidModel
+    public solidModel,
+    public foamPetscSnesHelper
 {
     // Private data
 
@@ -75,8 +78,22 @@ class linGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Diffusivity for the pressure equation
+        //  This controls the amount of smoothing in the pressure equation
+        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
+
+        //- Acceleration field
+        //  Only used by the explicit solution scheme
+        volVectorField A_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
+
+        //- Number of unknowns per cell, used by PETSc SNES solver
+        const label blockSize_;
+
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
 
 
     // Private Member Functions
@@ -84,6 +101,32 @@ class linGeomTotalDispSolid
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Enforce traction boundary conditions on the provided traction field
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& traction,
+            const volVectorField& D,      // displacement field
+            const surfaceVectorField& n   // unit normals field
+        ) const;
+
+        //- Evolve the solid solver using the segregated implicit approach
+        bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
+        //  A compact approximate Jacobian (same one as used by the segregated
+        //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
+        //  works well with this approach
+        bool evolveSnes();
+
+        //- Evolve the solid solver using the explicit approach
+        bool evolveExplicit();
+
+        // Make the pDiffusivity field
+        void makePDiffusivity() const;
+
+        // Return a const reference to the pDiffusivity field
+        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
@@ -135,10 +178,47 @@ public:
                 return D();
             }
 
+
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+#ifdef USE_PETSC
+            //- Initialise the Jacobian matrix
+            //  This procedure should set the size and non-zero structure of
+            //  the matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            //  This procedure should set the size of the solution vector
+            virtual label initialiseSolution(Vec& x);
+
+            //- Calculate the residual (PETSc array) given the solution (PETSc
+            //  array) vector
+            virtual label formResidual
+            (
+                Vec f,         // Residual
+                const Vec x    // Solution
+            );
+
+            //- Form the Jacobian of the governing equation
+            virtual label formJacobian
+            (
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
+            );
+
+            //- Apply a physics-based preconditioner
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            );
+#endif // USE_PETSC
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad

@@ -20,6 +20,7 @@ License
 #include "solidSymmetryFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -139,32 +140,54 @@ tmp<Field<scalar> > solidSymmetryFvPatchScalarField::snGrad() const
     // Unit normals
     const vectorField n(patch().nf());
 
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    // Lookup the gradient of displacement field
-    const fvPatchField<vector>& gradU =
-        patch().lookupPatchField<volVectorField, vector>
-        (
+    // Field and gradient field names
 #ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
+    const word fieldName(internalField().name());
 #else
-            "grad(" + dimensionedInternalField().name() + ")"
+    const word fieldName(dimensionedInternalField().name());
 #endif
-        );
+    const word gradName("grad(" + fieldName + ")");
 
-    // Calculate the corrected patch internal field
-    scalarField UP(patchInternalField());
-    UP += (k & gradU.patchInternalField());
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
+    {
+        applyCorrection = false;
+    }
 
-    return
-    (
-        transform(I - 2.0*sqr(n), UP)
-      - UP
-    )*(patch().deltaCoeffs()/2.0);
+    if (applyCorrection)
+    {
+        // Delta vectors
+        const vectorField delta(patch().delta());
+
+        // Non-orthogonal correction vectors
+        const vectorField k((I - sqr(n)) & delta);
+
+        // Lookup the gradient of displacement field
+        const fvPatchField<vector>& gradU =
+            patch().lookupPatchField<volVectorField, vector>(gradName);
+
+        // Calculate the corrected patch internal field
+        scalarField UP(patchInternalField());
+        UP += (k & gradU.patchInternalField());
+
+        return
+        (
+            transform(I - 2.0*sqr(n), UP)
+          - UP
+        )*(patch().deltaCoeffs()/2.0);
+    }
+    else
+    {
+        const scalarField UP(patchInternalField());
+
+        return
+        (
+            transform(I - 2.0*sqr(n), UP)
+          - UP
+        )*(patch().deltaCoeffs()/2.0);
+    }
 }
 
 
@@ -179,34 +202,59 @@ void solidSymmetryFvPatchScalarField::evaluate(const Pstream::commsTypes)
     // Unit normals
     const vectorField n(patch().nf());
 
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    // Lookup the gradient of displacement field
-    const fvPatchField<vector>& gradU =
-        patch().lookupPatchField<volVectorField, vector>
-        (
+    // Field and gradient field names
 #ifdef OPENFOAM_NOT_EXTEND
-            "grad(" + internalField().name() + ")"
+    const word fieldName(internalField().name());
 #else
-            "grad(" + dimensionedInternalField().name() + ")"
+    const word fieldName(dimensionedInternalField().name());
 #endif
-        );
+    const word gradName("grad(" + fieldName + ")");
 
-    // Calculate the corrected patch internal field
-    scalarField UP(patchInternalField());
-    UP += (k & gradU.patchInternalField());
+    // Do not apply corrections on old-time or previous fields as the gradients
+    // do not exist
+    bool applyCorrection = true;
+    if (endsWith(fieldName, "_0") || endsWith(fieldName, "PrevIter"))
+    {
+        applyCorrection = false;
+    }
 
-    Field<scalar>::operator=
-    (
+    if (applyCorrection)
+    {
+        // Delta vectors
+        const vectorField delta(patch().delta());
+
+        // Non-orthogonal correction vectors
+        const vectorField k((I - sqr(n)) & delta);
+
+        // Lookup the gradient of displacement field
+        const fvPatchField<vector>& gradU =
+            patch().lookupPatchField<volVectorField, vector>(gradName);
+
+        // Calculate the corrected patch internal field
+        scalarField UP(patchInternalField());
+        UP += (k & gradU.patchInternalField());
+
+        Field<scalar>::operator=
         (
-            UP
-          + transform(I - 2.0*sqr(n), UP)
-        )/2.0
-    );
+            (
+                UP
+              + transform(I - 2.0*sqr(n), UP)
+            )/2.0
+        );
+    }
+    else
+    {
+        // Calculate the corrected patch internal field
+        const scalarField UP(patchInternalField());
+
+        Field<scalar>::operator=
+        (
+            (
+                    UP
+              + transform(I - 2.0*sqr(n), UP)
+            )/2.0
+        );
+    }
 }
 
 

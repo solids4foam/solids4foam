@@ -39,6 +39,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(p, iF),
     nonOrthogonalCorrections_(true),
+    useUndeformedArea_(false),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -46,6 +47,7 @@ solidTractionFvPatchVectorField
     tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(false),
+    extrapolateValue_(false),
     setEffectiveTraction_(false),
     relaxFac_(1.0),
     curTimeIndex_(-1)
@@ -68,6 +70,10 @@ solidTractionFvPatchVectorField
     (
         dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
     ),
+    useUndeformedArea_
+    (
+        dict.lookupOrDefault<Switch>("useUndeformedArea", false)
+    ),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -75,6 +81,7 @@ solidTractionFvPatchVectorField
     tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
+    extrapolateValue_(dict.lookupOrDefault<Switch>("extrapolateValue", false)),
     setEffectiveTraction_
     (
         dict.lookupOrDefault<Switch>("setEffectiveTraction", false)
@@ -197,6 +204,11 @@ solidTractionFvPatchVectorField
         Info<< "    second order correction" << endl;
     }
 
+    if (extrapolateValue_)
+    {
+        Info<< "    extrapolating patch values" << endl;
+    }
+
     if (setEffectiveTraction_)
     {
         Info<< "    set effective traction" << endl;
@@ -220,6 +232,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf, p, iF, mapper),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
 #ifdef OPENFOAM_ORG
     traction_(mapper(pvf.traction_)),
     pressure_(mapper(pvf.pressure_)),
@@ -232,6 +245,7 @@ solidTractionFvPatchVectorField
     tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(pvf.secondOrder_),
+    extrapolateValue_(pvf.extrapolateValue_),
     setEffectiveTraction_(pvf.setEffectiveTraction_),
     relaxFac_(pvf.relaxFac_),
     curTimeIndex_(pvf.curTimeIndex_)
@@ -246,6 +260,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
@@ -253,6 +268,7 @@ solidTractionFvPatchVectorField
     tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(pvf.secondOrder_),
+    extrapolateValue_(pvf.extrapolateValue_),
     setEffectiveTraction_(pvf.setEffectiveTraction_),
     relaxFac_(pvf.relaxFac_),
     curTimeIndex_(pvf.curTimeIndex_)
@@ -268,6 +284,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf, iF),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
@@ -275,6 +292,7 @@ solidTractionFvPatchVectorField
     tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(pvf.secondOrder_),
+    extrapolateValue_(pvf.extrapolateValue_),
     setEffectiveTraction_(pvf.setEffectiveTraction_),
     relaxFac_(pvf.relaxFac_),
     curTimeIndex_(pvf.curTimeIndex_)
@@ -439,9 +457,20 @@ void solidTractionFvPatchVectorField::evaluate
               + 0.5*(gradient() + nGradUP)/patch().deltaCoeffs()
             );
         }
+        else if (extrapolateValue_)
+        {
+            // Face unit normals
+            const vectorField n(patch().nf());
+
+            Field<vector>::operator=
+            (
+                patchInternalField()
+              + (k & gradField.patchInternalField())
+              + (n & gradField.patchInternalField())/patch().deltaCoeffs()
+            );
+        }
         else
         {
-
             Field<vector>::operator=
             (
                 patchInternalField()
@@ -473,6 +502,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
     os.writeKeyword("nonOrthogonalCorrections")
         << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+    os.writeKeyword("useUndeformedArea")
+        << useUndeformedArea_ << token::END_STATEMENT << nl;
 
     if (tractionFieldPtr_.valid())
     {
@@ -518,6 +549,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
     os.writeKeyword("secondOrder")
         << secondOrder_ << token::END_STATEMENT << nl;
+    os.writeKeyword("extrapolateValue")
+        << extrapolateValue_ << token::END_STATEMENT << nl;
     os.writeKeyword("setEffectiveTraction")
         << setEffectiveTraction_ << token::END_STATEMENT << nl;
     os.writeKeyword("relaxationFactor")

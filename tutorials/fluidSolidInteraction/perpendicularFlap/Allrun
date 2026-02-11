@@ -6,6 +6,14 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# PETSc is required for this case
+if [[ -z "${PETSC_DIR:-}" ]]
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
+    exit 0
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 

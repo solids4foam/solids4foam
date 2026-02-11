@@ -51,7 +51,6 @@ else
 endif
 
 EXE_INC = \
-    -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
     -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
@@ -65,6 +64,7 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/fvMotionSolver/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
     -I$(LIB_SRC)/postProcessing/foamCalcFunctions/lnInclude \

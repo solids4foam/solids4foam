@@ -874,7 +874,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             // Point face addressing
             labelList patchPoints = pointSet.toc();
 
-#ifdef OPENFOAM_ORG
+//#ifdef OPENFOAM_ORG
             // List(SLList) in the Foundation version doesn't work, maybe only
             // for Type = labelPair, so we will do it manually
             List<labelPair> patchPointsFaces(pointFaceSet.size());
@@ -891,9 +891,9 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                     patchPointsFaces[i++] = iter();
                 }
             }
-#else
-            List<labelPair> patchPointsFaces(pointFaceSet);
-#endif
+// #else
+//             List<labelPair> patchPointsFaces(pointFaceSet);
+// #endif
 
             labelListList patchPointFaces(patchPoints.size());
 
@@ -1271,7 +1271,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
             // Point cell addressing
             labelList patchPoints = pointSet.toc();
-#ifdef OPENFOAM_ORG
+// #ifdef OPENFOAM_ORG
             // List(SLList) in the Foundation version doesn't work, maybe only
             // for Type = labelPair, so we will do it manually
             List<labelPair> patchPointsCells(pointCellSet.size());
@@ -1288,9 +1288,9 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                     patchPointsCells[i++] = iter();
                 }
             }
-#else
-            List<labelPair> patchPointsCells(pointCellSet);
-#endif
+// #else
+//             List<labelPair> patchPointsCells(pointCellSet);
+// #endif
 
             labelListList patchPointCells(patchPoints.size());
 

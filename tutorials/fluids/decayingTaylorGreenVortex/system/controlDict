@@ -1,0 +1,146 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs
+(
+    "libdecayingTaylorGreenVortexMeshMotion.so"
+    "libdecayingTaylorGreenVortexFvPatchVectorField.so"
+);
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         0.4;
+
+deltaT          1e-3;
+
+writeControl    runTime;
+
+writeInterval   0.4;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+adjustTimeStep no;
+
+functions
+{
+    error
+    {
+        name    error;
+        type    coded;
+        libs    (utilityFunctionObjects);
+
+        codeEnd
+        #{
+            // Define the exact U
+            const scalar Re = 10;
+            const scalar t = time().value();
+            const scalar pi = constant::mathematical::pi;
+            const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
+
+            volVectorField exactU
+            (
+                IOobject
+                (
+                    "exactU",
+                    time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedVector(dimVelocity, Zero)
+            );
+
+            {
+                const scalarField x(mesh().C().component(vector::X));
+                const scalarField y(mesh().C().component(vector::Y));
+
+                exactU.primitiveFieldRef() =
+                    A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
+                  - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0);
+            }
+
+            forAll(exactU.boundaryField(), patchI)
+            {
+                if (exactU.boundaryField()[patchI].size())
+                {
+                    const scalarField x
+                    (
+                        mesh().C().boundaryField()[patchI].component(vector::X)
+                    );
+                    const scalarField y
+                    (
+                        mesh().C().boundaryField()[patchI].component(vector::Y)
+                    );
+
+                    exactU.boundaryFieldRef()[patchI] =
+                        A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
+                      - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0);
+                }
+            }
+
+            exactU.correctBoundaryConditions();
+
+            Info<< "Writing exactU to " << time().timeName() << endl;
+            exactU.write();
+
+            // Lookup U
+            const auto& U = mesh().lookupObject<volVectorField>("U");
+
+            // Calculate the error
+            const volScalarField magError("magError", mag(U - exactU));
+            Info<< "Writing magError to " << time().timeName() << endl;
+            magError.write();
+            const scalarField& Vol = mesh().V().field();
+            const scalar totalVol = gSum(Vol);
+            const vectorField diff(U - exactU);
+
+            // Arithmetic errors
+            // const scalar errorL1 = gAverage(mag(diff));
+            // const scalar errorL2 = sqrt(gAverage(magSqr(diff)));
+            // const scalar errorLInf = gMax(mag(diff));
+
+            // Volume-weighted errors
+            const scalar errorL1 = gSum(mag(diff*Vol))/totalVol;
+            const scalar errorL2 = sqrt(gSum(magSqr(diff)*Vol)/totalVol);
+            const scalar errorLInf = gMax(mag(diff));
+
+            Info<< "Velocity errors norms:" << nl
+                << "    mean L1 = " << errorL1 << nl
+                << "    mean L2 = " << errorL2 << nl
+                << "    LInf = " << errorLInf << endl;
+        #};
+    }
+}
+
+// ************************************************************************* //

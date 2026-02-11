@@ -1,0 +1,132 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   petscSnes (default), vertexCentred, segregated, unsCoupled
+# -------------------------------------------------------------------------
+
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  petscSnes       (default)
+  vertexCentred
+  segregated
+  unsCoupled
+
+Examples:
+  ./Allrun
+  ./Allrun vertexCentred
+  ./Allrun segregated
+  ./Allrun unsCoupled
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-petscSnes}"
+
+# Validate approach name
+case "$APPROACH" in
+    petscSnes|vertexCentred|segregated|unsCoupled) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    # $1 = suffix (e.g. petscSnes)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    case "$APPROACH" in
+        petscSnes|vertexCentred)
+            if [[ -z "${PETSC_DIR:-}" ]]
+            then
+                echo; echo "Skipping this case as PETSc is not installed"
+                echo "Please set the PETSC_DIR variable"; echo
+                exit 0
+            fi
+            ;;
+    esac
+}
+
+select_approach() {
+    case "$APPROACH" in
+        vertexCentred)
+            echo "Using the vertexCentred approach"
+            link_files_for_suffix "vertexCentred"
+            ;;
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        unsCoupled)
+            echo "Using the unsCoupled approach"
+            solids4Foam::caseOnlyRunsWithFoamExtend
+            link_files_for_suffix "unsCoupled"
+            ;;
+        petscSnes|*)
+            echo "Using the petscSnes approach"
+            link_files_for_suffix "petscSnes"
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+require_petsc_or_exit_silently
+
+select_approach
+
+echo
+echo "Compiling libraries..."
+(cd src && ./Allwmake -s)
+
+echo
+solids4Foam::convertCaseFormat .
+
+echo
+solids4Foam::runApplication blockMesh
+
+echo
+solids4Foam::runApplication solids4Foam

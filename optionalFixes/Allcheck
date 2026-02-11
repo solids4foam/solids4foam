@@ -3,10 +3,13 @@ cd ${0%/*} || exit 1    # run from this directory
 
 echo "optionalFixes/Allcheck"
 
-# This script reports on files that require fixes in the OpenFOAM installation.
-# To skip these checks, set S4F_NO_FILE_FIXES=1, i.e.
-#   export S4F_NO_FILE_FIXES=1
-# To see the consequence of these fixes, visit www.solids4foam.com.
+# This script reports on files that can be optionally fixed in the OpenFOAM
+# installation. To see the consequence of these fixes, visit www.solids4foam.com.
+
+# If S4F_NO_FILE_FIXES is not defined, then set it to 1
+# To enable checks, set S4F_NO_FILE_FIXES to 0 on the command line, e.g
+# export S4F_NO_FILE_FIXES=0
+: "${S4F_NO_FILE_FIXES:=1}"
 
 # Function for the checking and reporting how to replace a file
 # Arguments:
@@ -16,9 +19,12 @@ echo "optionalFixes/Allcheck"
 #
 checkAndReport()
 {
-    if [ -n "$S4F_NO_FILE_FIXES" ]
+    if [ "$S4F_NO_FILE_FIXES" = "1" ]
     then
+        echo
         echo "The S4F_NO_FILE_FIXES variable is set so checks will not be performed"
+        echo "To enable these checks, set the S4F_NO_FILE_FIXES variable to 0, i.e."
+        echo "export S4F_NO_FILE_FIXES=0"
     elif cmp --silent "./${1}/${2}" "${3}/${2}"
     then
         echo "'${2}' has already been replaced"
@@ -43,6 +49,14 @@ checkAndReport()
 result=0
 if [ "$WM_PROJECT" = "foam" ]
 then
+    # Fix required for newer compilers
+    checkAndReport \
+        "foam-extend-4.1" \
+        "FixedList.C" \
+        "$FOAM_SRC/foam/containers/Lists/FixedList" \
+        "$FOAM_SRC/foam"
+    if [ $? -ne 0 ]; then result=1; fi
+
     # This fixes the segmentation error that happens at the end of solver due to
     # a mesh object being freed twice
     checkAndReport \
@@ -60,7 +74,7 @@ then
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
-    
+
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
     checkAndReport \
@@ -80,13 +94,30 @@ then
 elif [[ $WM_PROJECT_VERSION == v* ]]
 then
     # Fix time index storage in the storeOldTimes function
-    checkAndReport \
-        "OpenFOAM-v2012" \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
+    if [ "${WM_PROJECT_VERSION:1}" -ge 2412 ]
+    then
+        checkAndReport \
+            "OpenFOAM-v2412" \
+            "backwardDdtScheme.C" \
+            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+            "$FOAM_SRC/finiteVolume"
+    else
+        checkAndReport \
+            "OpenFOAM-v2012" \
+            "backwardDdtScheme.C" \
+            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+            "$FOAM_SRC/finiteVolume"
+    fi
     if [ $? -ne 0 ]; then result=1; fi
 else
+    # Fix required for newer compilers
+    checkAndReport \
+        "OpenFOAM-9" \
+        "FixedList.C" \
+        "$FOAM_SRC/foam/containers/Lists/FixedList" \
+        "$FOAM_SRC/foam"
+    if [ $? -ne 0 ]; then result=1; fi
+
     # Fix time index storage in the storeOldTimes function
     checkAndReport \
         "OpenFOAM-9" \

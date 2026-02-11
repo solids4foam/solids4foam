@@ -45,7 +45,7 @@ Author
 #define pulsedParabolicVelocityFvPatchVectorField_H
 
 #include "fvPatchFields.H"
-#include "fixedValueFvPatchFields.H"
+#include "fixedValueCorrectedFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +58,7 @@ namespace Foam
 
 class pulsedParabolicVelocityFvPatchVectorField
 :
-    public fixedValueFvPatchVectorField
+    public fixedValueCorrectedFvPatchVectorField
 {
     // Private data
 

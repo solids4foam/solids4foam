@@ -30,6 +30,8 @@ License
     #include "ZoneID.H"
     #include "crackerFvMesh.H"
 #endif
+#include "lookupSolidModel.H"
+
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -473,6 +475,64 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::shearModulus() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        return laws[0].shearModulus();
+    }
+    else
+    {
+        // Accumulate data for all fields
+        tmp<volScalarField> tresult
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "shearModulusLaw",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0),
+                calculatedFvPatchScalarField::typeName
+            )
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        volScalarField& result = tresult.ref();
+#else
+        volScalarField& result = tresult();
+#endif
+
+        // Accumulated subMesh fields and then map to the base mesh
+        PtrList<volScalarField> shearModulii(laws.size());
+
+        forAll(laws, lawI)
+        {
+            shearModulii.set
+            (
+                lawI,
+                new volScalarField(laws[lawI].shearModulus())
+            );
+        }
+
+        // Map subMesh fields to the base mesh
+        solSubMeshes().mapSubMeshVolFields<scalar>(shearModulii, result);
+
+        // Clear subMesh fields
+        shearModulii.clear();
+
+        return tresult;
+    }
+}
+
+
 void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;
@@ -823,6 +883,9 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshPointD(), pointD
         );
     }
+
+    pointD.correctBoundaryConditions();
+    correctSymmPlanes(pointD);
 }
 
 
@@ -839,11 +902,7 @@ void Foam::mechanicalModel::interpolate
 
     if (laws.size() == 1)
     {
-#ifdef OPENFOAM_COM
         volToPoint().interpolate(D, gradD, pointD);
-#else
-        volToPoint().interpolate(D, pointD);
-#endif
     }
     else
     {
@@ -858,9 +917,7 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshVolToPoint()[lawI].interpolate
             (
                 solSubMeshes().subMeshD()[lawI],
-#ifdef OPENFOAM_COM
                 solSubMeshes().subMeshGradD()[lawI],
-#endif
                 solSubMeshes().subMeshPointD()[lawI]
             );
         }
@@ -874,6 +931,95 @@ void Foam::mechanicalModel::interpolate
 #else
     this->interpolate(D, pointD, useVolFieldSigma);
 #endif
+
+    pointD.correctBoundaryConditions();
+    correctSymmPlanes(pointD);
+}
+
+
+void Foam::mechanicalModel::correctSymmPlanes
+(
+    pointVectorField& pointD
+) const
+{
+    const polyMesh& mesh = pointD.mesh().mesh();
+    vectorField& pointDI = pointD;
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            if
+            (
+                returnReduce(mesh.boundaryMesh()[patchI].size(), sumOp<int>())
+             == 0
+            )
+            {
+                continue;
+            }
+
+            const vector avgN =
+                gAverage(mesh.boundaryMesh()[patchI].pointNormals());
+
+            const vector i(1, 0, 0);
+            const vector j(0, 1, 0);
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & i) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].x() = 0;
+                }
+            }
+            else if (mag(avgN & j) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].y() = 0;
+                }
+            }
+            else if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+        else if (isA<emptyPolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            if
+            (
+                returnReduce(mesh.boundaryMesh()[patchI].size(), sumOp<int>())
+            )
+            {
+                continue;
+            }
+
+            const vector avgN =
+                gAverage(mesh.boundaryMesh()[patchI].pointNormals());
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+    }
+
+    // Apply 2-D corrections
+    const solidModel& solMod = lookupSolidModel(mesh);
+    solMod.twoDCorrector().correctPoints(pointDI);
 }
 
 

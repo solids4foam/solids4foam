@@ -131,9 +131,9 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage
-# ./Allrun
+# ./Allrun # default behaviour is Robin-Neumann coupling
+# ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
-# ./Allrun robin
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -143,17 +143,17 @@ if [[ "$1" == "sonicLiquidFluid" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
-elif [[ "$1" == "robin" ]]; then
-    # Robin-Neumann pimpleFluid approach
-    echo "Using the Robin-Neumann sonicLiquidFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.robin')
+elif [[ "$1" == "dirichletNeumann" ]]; then
+    # Dirichlet-Neumann pimpleFluid approach
+    echo "Using the Dirichlet-Neumann pimpleFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
 else
-    # Dirichlet-Neumann pimpleFluid approach
-    echo "Using the Dirichlet-Neumann pimpleFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+    # Robin-Neumann pimpleFluid approach
+    echo "Using the Robin-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
@@ -196,24 +196,25 @@ fi
 ```
 
 As can be seen above, the `Allrun` script can be run with different values for
-the first argument `$1` passed to the script. Running the script without any
-argument (i.e., `./Allrun`) uses the FSI coupling approach 1 (Aitken's) or 2
-(IQNILS), depending on the value of `fluidSolidInterface` in `constant/fsiProperties`;
-for example, `fluidSolidInterface    IQNILS;`. The weakly compressible fluid
-model (approaches 3 and 4) can be used by running the `Allrun` script with the
-argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`. Once again,
-switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled via the
-`fluidSolidInterface` setting in `constant/fsiProperties`. Finally, the
-Robin-Neumann coupling approach (approach 5) can be used by executing the
-`Allrun` script as `./Allrun robin` for approach 5. Examining the `U` and `p`
-files in `0/fluid.robin/` shows that the Robin approach uses the custom
-conditions `elasticWallVelocity` and `elasticWallPressure` at the interface.
+ the first argument `$1` passed to the script. Running the script without any
+ argument (i.e., `./Allrun`) uses the Robin-Neumann coupling approach (approach
+ 5). The Dirchlet-Neumann coupling approaches (approaches 1 and 2) can be selected
+ by running the script as `./Allrun dirichletNeumann`, where Aitken's
+ (approach 1) or IQNILS (approach 2) can be used depending on the value of `fluidSolidInterface`
+ in `constant/fsiProperties`; for example, `fluidSolidInterface    IQNILS;`. The
+ weakly compressible fluid model (approaches 3 and 4) can be used by running the
+ `Allrun` script with the argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`.
+ Once again, switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled
+ via the `fluidSolidInterface` setting in `constant/fsiProperties`.
+ Examining the `U` and `p` files in `0/fluid.robin/` shows that the Robin
+ approach uses the custom conditions `elasticWallVelocity` and `elasticWallPressure`
+ at the interface.
 
 The `Allrun` script updates the case with links to the correct files to be used
-by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
-generate the meshes in the solid and fluid domains, followed by running the
-`solids4Foam` solver. Subsequently, if `gnuplot` is installed, three figures will
-be generated in the case directory:
+ by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
+ generate the meshes in the solid and fluid domains, followed by running the
+ `solids4Foam` solver. Subsequently, if `gnuplot` is installed, three figures will
+ be generated in the case directory:
 
 - `axialDisplacement.pdf`: this plots the axial displacement of point A vs time.
 - `radialDisplacement.pdf`: this plots the radial displacement of point A vs
@@ -226,7 +227,7 @@ The tutorial case for approach 6, which uses preCICE, is located at
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
-`Allrun` script, i.e. `./Allclean`.
+ `Allrun` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -257,11 +258,11 @@ point A (see Figure 1) vs time, while `radialDisplacement.pdf` plots the radial
 displacement of point A. The `fsiConvergence.pdf` (Figure 4) file plots the
 number of FSI iterations per time step.
 
-![Axial displacement](images/axialDisplacement.pdf)
+![Axial displacement](images/axialDisplacement.png)
 
 ### Figure 3: `axialDisplacement.pdf`
 
-![FSI convergence](images/fsiConvergence.pdf)
+![FSI convergence](images/fsiConvergence.png)
 
 ### Figure 4: `fsiConvergence.pdf`
 
@@ -305,11 +306,18 @@ iterations per time step. In the figures, the approaches are designated as:
 ### Figure 7: Number of FSI iterations per time-step with deltaT = 1e-4 s
 
 The predictions from all approaches agree closely. Examining the number of FSI
-iterations per time step, both implementations (solids4foam and preCICE) of
-Dirichlet-Neumann coupling with IQN-ILS acceleration is seen to require the
-the fewest number of iterations. The weakly compressible approach is the next best
-performing approach, while the incompressible Aitken's-accelerated
-Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
+ iterations per time step, both implementations (solids4foam and preCICE) of
+ Dirichlet-Neumann coupling with IQN-ILS acceleration is seen to require the
+ the fewest number of iterations. The weakly compressible approach is the next
+ best performing approach, while the incompressible Aitken's-accelerated
+ Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
+ The reason that the solids4foam and preCICE IQN-ILS implementations show
+ different numbers of iterations may be attributed to differences in the coupling
+ configurations and implementation; for example, the preCICE IQN-ILS is
+ configured in this case to use the results from the previous 15 time steps
+ (`time-windows-reused` in `precice-config.xml`), whereas solids4foam here uses
+ results from two time steps (`couplingReuse` in `constant/fsiProperties`); in
+ addition, implementations of the residual convergence checks are different.
 
 ### Small Time Step
 

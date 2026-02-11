@@ -181,35 +181,61 @@ do
 done
 
 # Modify fvSolution
-# Set maxIter to 1 for linear solvers
-echo "Modifying the fvSolution linear solvers to run only one iteration"
+# Set maxIter to 1 for linear solvers and nOuterCorrectors to 1 for PIMPLE
+echo "Modifying the fvSolution to run only one iteration"
 for FVS in $(find . -name "fvSolution")
 do
     mv ${FVS} ${FVS}.org
     sed -e "s|maxIter.*;|maxIter 1;|g" ${FVS}.org > ${FVS}
+    sed -i "s|nOuterCorrectors.*;|nOuterCorrectors 1;|g" ${FVS}
 done
 
 # Modify solidProperties
-# set nCorrectors to 1 for solids4foam solvers
+# set nCorrectors to 1 for solids4foam solvers and set the stopOnError flag to
+# off
 echo "Modifying the solidProperties to run only one iteration"
 for SP in $(find . -name "solidProperties")
 do
-    mv ${SP} ${SP}.org
+    mv "${SP}" "${SP}.org"
+
+    awk '
+      /Coeffs/ { want=1 }                 # saw a *Coeffs line → arm insertion
+      { print }                           # print current line
+      /\{/ && want {
+        print "    nCorrectors 1;";
+        print "    stopOnError no;";
+        want=0                            # done for this block
+      }
+    ' "${SP}.org" > "${SP}"
+
     sed \
+    -i \
     -e "s|//nCorrectors.*;|nCorrectors 1;|g" \
     -e "s|nCorrectors.*;|nCorrectors 1;|g" \
-    ${SP}.org > ${SP}
+    ${SP}
+
+    sed -i -e "s|stopOnError.*;|stopOnError no;|g" ${SP}
 done
 
 # Modify fsiProperties
-echo "Modifying the fsiProperties to run only one iteration"
-for FP in $(find . -name "fsiProperties")
+echo "Modifying fsiProperties (portable, symlink-safe, with backup)"
+
+for FP in $(find . -name "fsiProperties*")
 do
-    mv ${FP} ${FP}.org
-    sed \
-    -e "s|//nOuterCorr.*;|nOuterCorr 1;|g" \
-    -e "s|nOuterCorr.*;|nOuterCorr 1;|g" \
-    ${FP}.org > ${FP}
+    # Create backup of the *target* (not the symlink)
+    if [ ! -f "${FP}.org" ]; then
+        cp -L "$FP" "${FP}.org"
+        echo "Backup created: ${FP}.org"
+    fi
+
+    # Edit the target in-place, preserving symlink
+    sed -i.bak \
+      -e 's|//nOuterCorr.*;|nOuterCorr 1;|g' \
+      -e 's|nOuterCorr.*;|nOuterCorr 1;|g' \
+      "$FP"
+
+    # Remove sed’s temporary .bak file
+    rm -f "${FP}.bak"
 done
 
 # Source tutorial functions

@@ -16,5 +16,12 @@ solids4Foam::runApplication blockMesh
 solids4Foam::runApplication setSet -batch batch.setSet
 solids4Foam::runApplication setsToZones
 
+# Fix for symmetry type
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo "Replacing symmetryPlane with symmetry for T files in hotCylinderTemperatureField"
+    find hotCylinderTemperatureField -name T | xargs sed -i 's\symmetryPlane\symmetry\g'
+fi
+
 # Run the solver
 solids4Foam::runApplication solids4Foam

@@ -1,0 +1,74 @@
+-snes_mf
+-snes_mf_operator
+
+#-snes_test_jacobian
+#-snes_test_jacobian_view
+#-snes_lag_jacobian -2
+#-snes_lag_jacobian 1
+
+-snes_type newtonls
+#-snes_type fas
+#-snes_type ksponly
+#-snes_linesearch_type basic
+#-snes_linesearch_damping 0.1
+#-snes_type ngmres
+#-snes_ncg_type dy
+#-snes_type qn
+#-snes_rtol 1e-6
+#-snes_atol 1e-12
+#-snes_stol 1e-12
+-snes_max_it 1000
+-snes_monitor
+#-snes_view
+
+#-mat_view
+#-mat_view ::ascii_matlab
+#-snes_monitor_residual
+#-snes_monitor_residual ::ascii_matlab
+#-ksp_type gmres
+#-ksp_type fgmres
+-ksp_type lgmres
+#-ksp_type fcg
+#-ksp_gmres_modifiedgramschmidt
+#-ksp_gmres_cgs_refinement_type refine_always
+#-ksp_fgmres_modifypcnochange
+#-ksp_pc_side right
+-ksp_gmres_restart 100
+-ksp_rtol 1e-3
+#-ksp_atol 1e-14
+#-ksp_max_it 100
+#-ksp_monitor
+#-ksp_view
+
+-snes_lag_preconditioner_persists true
+-snes_lag_preconditioner -2
+
+#-pc_type bjacobi
+#-pc_type asm
+#-pc_type sor
+#-pc_type ilu
+#-pc_factor_levels 1
+#-sub_pc_type lu
+#-sub_pc_type cholesky
+#-sub_pc_type ilu
+#-sub_pc_type icc
+#-sub_pc_factor_levels 1
+
+-pc_type hypre
+-pc_hypre_type boomeramg
+-pc_hypre_boomeramg_max_iter 1
+-pc_hypre_boomeramg_strong_threshold 0.25
+-pc_hypre_boomeramg_grid_sweeps_up 1
+-pc_hypre_boomeramg_grid_sweeps_down 1
+-pc_hypre_boomeramg_agg_nl 1
+-pc_hypre_boomeramg_agg_num_paths 1
+-pc_hypre_boomeramg_max_levels 25
+-pc_hypre_boomeramg_coarsen_type HMIS
+-pc_hypre_boomeramg_interp_type ext+i
+-pc_hypre_boomeramg_P_max 1
+-pc_hypre_boomeramg_truncfactor 0.3
+
+#-mat_view ::ascii_info_detail
+#-mat_view ::ascii_matlab
+#-log_view
+#-options_view

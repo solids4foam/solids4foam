@@ -1,0 +1,6 @@
+decayingTaylorGreenVortexFvPatchVectorField.C
+fixedGradientCorrected/fixedGradientCorrectedFvPatchVectorField.C
+fixedGradientCorrected/fixedGradientCorrectedFvPatchScalarField.C
+patchCorrectionVectors.C
+
+LIB = $(FOAM_USER_LIBBIN)/libdecayingTaylorGreenVortexFvPatchVectorField

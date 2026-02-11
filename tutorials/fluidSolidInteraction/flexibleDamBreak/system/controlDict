@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -53,9 +53,11 @@ maxCo           0.5;
 
 maxDeltaT       1;
 
+maxAlphaCo      0.5;
+
 functions
 {
-    disp
+    displacement
     {
         type    solidPointDisplacement;
         point   (0.292 0.07999997 0);

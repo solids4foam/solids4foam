@@ -1,0 +1,171 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pcorr|pcorrFinal|pFinal"
+    {
+        solver          GAMG;
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+        tolerance       1e-08;
+        relTol          0;
+========
+        tolerance       1e-8;
+        relTol          1e-3;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+========
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0.001;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+    "U|UFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-08;
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+        relTol          0;
+========
+        relTol          1e-3;
+        minIter         1;
+    }
+
+    "T|TFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-08;
+        relTol          1e-3;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+        minIter         1;
+    }
+}
+
+PISO
+{
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+}
+
+PIMPLE
+{
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+    //correctPhi          no;
+    nOuterCorrectors    100;
+    nCorrectors         3;
+    nNonOrthogonalCorrectors 2;
+
+    //pRefCell        0;
+    pRefPoint (0.5 0.5 0);
+    pRefValue 0.0;
+
+    moveMeshOuterCorrectors true;
+    consistent true;
+========
+    nOuterCorrectors 20;
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+
+    pRefPoint        (-0.02 0.02 0);
+    pRefValue        0;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+
+    residualControl
+    {
+        p
+        {
+            tolerance 1e-6;
+            relTol 0;
+        }
+        U
+        {
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+            tolerance 1e-7;
+            relTol 0;
+========
+            relTol 1e-6;
+            tolerance 1e-6;
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+        }
+    }
+}
+
+<<<<<<<< HEAD:tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution.pimpleFoam
+relaxationFactors
+{}
+
+cache
+{
+    grad(U);
+    grad(p);
+========
+
+relaxationFactors
+{
+    equations
+    {
+        U    0.99;
+        UFinal 0.99;
+
+        T 0.99;
+        TFinal 0.99;
+    }
+    fields
+    {
+        p    0.9;
+        pFinal    0.9;
+
+        T 1;
+        TFinal 1;
+    }
+>>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/fluid/fvSolution
+}
+
+// ************************************************************************* //

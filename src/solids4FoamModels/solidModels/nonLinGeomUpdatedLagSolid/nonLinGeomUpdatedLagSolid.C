@@ -23,6 +23,11 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "bound.H"
+#include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "symmetryFvPatchFields.H"
+#include "slipFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -43,6 +48,363 @@ addToRunTimeSelectionTable
 );
 
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+void nonLinGeomUpdatedLagSolid::predict()
+{
+    Info<< "Linear predictor" << endl;
+
+    // Predict D using the velocity field
+    // Note: the case may be steady-state but U can still be calculated using a
+    // transient method
+    DD() = U()*runTime().deltaT() + 0.5*sqr(runTime().deltaT())*A_;
+
+    // Update gradient of displacement increment
+    mechanical().grad(DD(), gradDD());
+
+    // Relative deformation gradient
+    relF_ = I + gradDD().T();
+
+    // Inverse relative deformation gradient
+    relFinv_ = inv(relF_);
+
+    // Total deformation gradient
+    F_ = relF_ & F_.oldTime();
+
+    // Relative Jacobian (Jacobian of relative deformation gradient)
+    relJ_ = det(relF_);
+
+    // Jacobian of deformation gradient
+    J_ = relJ_*J_.oldTime();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+}
+
+
+void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
+(
+    surfaceVectorField& force,
+    const volVectorField& D,
+    const surfaceVectorField& nCurrent,
+    const surfaceScalarField& magSfCurrent
+) const
+{
+    // Enforce traction conditions
+    forAll(D.boundaryField(), patchI)
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        vectorField& forceP = force.boundaryFieldRef()[patchI];
+#else
+        vectorField& forceP = force.boundaryField()[patchI];
+#endif
+
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidTractionFvPatchVectorField& tracPatch =
+                refCast<const solidTractionFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+
+            // traction.boundaryFieldRef()[patchI] =
+            //     tracPatch.traction() - nPatch*tracPatch.pressure();
+            if (tracPatch.useUndeformedArea())
+            {
+                notImplemented("Not implemented for updated Lagrangian");
+
+                // const scalarField& magSfPatch =
+                //     D.mesh().boundary()[patchI].magSf();
+
+                // forceP =
+                //     (
+                //         tracPatch.traction() - nPatch*tracPatch.pressure()
+                //     )*magSfPatch;
+            }
+            else
+            {
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
+
+                forceP =
+                    (
+                        tracPatch.traction() - nPatch*tracPatch.pressure()
+                    )*magSfCurrentPatch;
+            }
+        }
+        else if
+        (
+            isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<symmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<slipFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+
+            // Set shear traction to zero
+            // traction.boundaryFieldRef()[patchI] =
+                // sqr(nPatch) & traction.boundaryField()[patchI];
+            forceP = sqr(nPatch) & force.boundaryField()[patchI];
+        }
+    }
+}
+
+
+bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
+{
+   Info<< "Evolving solid solver using an implicit segregated approach"
+       << endl;
+
+    if (predictor_ && newTimeStep())
+    {
+        predict();
+    }
+
+    int iCorr = 0;
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector> solverPerfDD;
+    SolverPerformance<vector>::debug = 0;
+#else
+    lduSolverPerformance solverPerfDD;
+    blockLduMatrix::debug = 0;
+#endif
+
+    Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
+        << endl;
+
+    // Updated (end of last time step) unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
+    // Momentum equation loop
+    do
+    {
+        // Store fields for under-relaxation and residual calculation
+        DD().storePrevIter();
+
+        // Calculate deformed area vectors and normals
+        const surfaceVectorField SfCurrent
+        (
+            fvc::interpolate(relJ_*relFinv_.T()) & mesh().Sf()
+        );
+        const surfaceScalarField magSfCurrent(mag(SfCurrent));
+        const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+        // Traction vectors at the faces
+        surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+        // Add stabilisation to the traction
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        // To-do: add a stabilisation traction function to momentumStabilisation
+        const scalar scaleFactor =
+            readScalar(stabilisation().dict().lookup("scaleFactor"));
+        const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
+        traction += scaleFactor*impKf_*(fvc::snGrad(DD()) - (n & gradDDf));
+
+        // Calculate the force at the faces
+        surfaceVectorField force(magSfCurrent*traction);
+
+        // Enforce traction boundary conditions
+        enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
+
+        // Momentum equation incremental updated Lagrangian form
+        fvVectorMatrix DDEqn
+        (
+            fvm::d2dt2(rho_, DD())
+          + fvc::d2dt2(rho_, D().oldTime())
+         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+          + fvc::div(force)
+          + rho_*g()
+        );
+
+        // Under-relax the linear system
+        DDEqn.relax();
+
+        // Enforce any cell displacements
+        solidModel::setCellDisps(DDEqn);
+
+        // Solve the linear system
+        solverPerfDD = DDEqn.solve();
+
+        // Under-relax the DD field using fixed or adaptive under-relaxation
+        relaxField(DD(), iCorr);
+
+        // Update the total displacement
+        D() = D().oldTime() + DD();
+
+        // Update gradient of displacement increment
+        mechanical().grad(DD(), gradDD());
+
+        // Relative deformation gradient
+        relF_ = I + gradDD().T();
+
+        // Inverse relative deformation gradient
+        relFinv_ = inv(relF_);
+
+        // Total deformation gradient
+        F_ = relF_ & F_.oldTime();
+
+        // Relative Jacobian (Jacobian of relative deformation gradient)
+        relJ_ = det(relF_);
+
+        // Jacobian of deformation gradient
+        J_ = relJ_*J_.oldTime();
+
+        // Update the momentum equation inverse diagonal field
+        // This may be used by the mechanical law when calculating the
+        // hydrostatic pressure
+        const volScalarField DEqnA("DEqnA", DDEqn.A());
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+    }
+    while
+    (
+       !converged
+        (
+            iCorr,
+#ifdef OPENFOAM_NOT_EXTEND
+            mag(solverPerfDD.initialResidual()),
+            cmptMax(solverPerfDD.nIterations()),
+#else
+            solverPerfDD.initialResidual(),
+            solverPerfDD.nIterations(),
+#endif
+            DD()
+        ) && ++iCorr < nCorr()
+    );
+
+    // Update gradient of total displacement
+    // Do we need this?
+    gradD() = fvc::grad(D().oldTime() + DD());
+
+    // Total displacement
+    D() = D().oldTime() + DD();
+
+    // Interpolate cell displacement increments to vertices
+    mechanical().interpolate(DD(), gradDD(), pointDD());
+
+    // Total displacement at points
+    pointD() = pointD().oldTime() + pointDD();
+
+    // Velocity
+    U() = fvc::ddt(D());
+
+    // Acceleration
+    A_ = fvc::d2dt2(D());
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector>::debug = 1;
+#else
+    blockLduMatrix::debug = 1;
+#endif
+
+    return true;
+}
+
+
+bool nonLinGeomUpdatedLagSolid::evolveSnes()
+{
+#ifdef USE_PETSC
+    Info<< "Solving the momentum equation for DD using PETSc SNES" << endl;
+
+    // Update D boundary conditions
+    DD().correctBoundaryConditions();
+
+    // Solution predictor
+    if (predictor_ && newTimeStep())
+    {
+        predict();
+
+        // Use the segregated solver as a predictor
+        //evolveImplicitSegregated();
+
+        // Map the DD field to the SNES solution vector
+        // Map the D field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<vector>
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DD().primitiveFieldRef(),
+#else
+            DD().internalField(),
+#endif
+            foamPetscSnesHelper::solution(),
+            0, // Location of first component
+            solidModel::twoD()
+          ? makeList<label>({0,1})
+          : makeList<label>({0,1,2})
+        );
+    }
+
+    // Solve the nonlinear system and check the convergence
+    foamPetscSnesHelper::solve();
+
+    // Retrieve the solution
+    // Map the PETSc solution to the DD field
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        foamPetscSnesHelper::solution(),
+#ifdef OPENFOAM_NOT_EXTEND
+        DD().primitiveFieldRef(),
+#else
+        DD().internalField(),
+#endif
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    DD().correctBoundaryConditions();
+
+    // Total displacement
+    D() = D().oldTime() + DD();
+
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(DD(), gradDD(), pointDD());
+    pointDD().correctBoundaryConditions();
+
+    // Total point displacement
+    pointD() = pointD().oldTime() + pointDD();;
+
+    // Velocity
+    U() = fvc::ddt(D());
+
+    // Acceleration
+    A_ = fvc::d2dt2(D());
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
+
+    return true;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
@@ -52,6 +414,21 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 )
 :
     solidModel(typeName, runTime, region),
+    foamPetscSnesHelper
+    (
+        "DD",
+        fileName
+        (
+            solidModelDict().lookupOrDefault<fileName>
+            (
+                "optionsFile", "petscOptions"
+            )
+        ),
+        mesh(),
+        solutionLocation::CELLS,
+        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
+        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    ),
     F_
     (
         IOobject
@@ -125,15 +502,63 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         ),
         mechanical().rho()
     ),
+    A_
+    (
+        IOobject
+        (
+            "A",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", dimVelocity/dimTime, vector::zero)
+    ),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    rImpK_(1.0/impK_),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    blockSize_
+    (
+      label(solidModel::twoD() ? 2 : 3)
+      //   solvePressure() // not yet implemented in this solid model
+      // ? label(solidModel::twoD() ? 3 : 4)
+      // : label(solidModel::twoD() ? 2 : 3)
+    )
 {
     DDisRequired();
 
     // Force all required old-time fields to be created
     fvm::d2dt2(rho_, DD());
     fvc::d2dt2(rho_, D().oldTime());
+
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        // It is important to call the stress calculation procedure during the
+        // constructor to allow it to correctly initialise fields
+        mechanical().correct(sigma());
+    }
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().ddtScheme("ddt(" + DD().name() +')')
+#else
+            mesh().schemesDict().ddtScheme("ddt(" + DD().name() +')')
+#endif
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << DD().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
 
     // For consistent restarts, we will update the relative kinematic fields
     DD().correctBoundaryConditions();
@@ -150,6 +575,60 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         // Let the mechanical law know
         mechanical().setRestart();
     }
+
+    // Check the gradScheme
+    const word gradDScheme
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh().gradScheme("grad(" + DD().name() +')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + DD().name() +')')
+#endif
+    );
+
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        if (gradDScheme != "leastSquaresS4f")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "The `leastSquaresS4f` gradScheme should be used for "
+                << "`grad(D)` when using the "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " solution algorithm" << abort(FatalError);
+        }
+
+        // Set extrapolateValue to true for solidTraction boundaries
+        forAll(DD().boundaryField(), patchI)
+        {
+            if
+            (
+                isA<solidTractionFvPatchVectorField>
+                (
+                    DD().boundaryField()[patchI]
+                )
+            )
+            {
+                Info<< "    Setting `extrapolateValue` to `true` on the "
+                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << "field" << endl;
+
+                solidTractionFvPatchVectorField& tracPatch =
+                    refCast<solidTractionFvPatchVectorField>
+                    (
+#ifdef OPENFOAM_NOT_EXTEND
+                        DD().boundaryFieldRef()[patchI]
+#else
+                        DD().boundaryField()[patchI]
+#endif
+                    );
+
+                tracPatch.extrapolateValue() = true;
+            }
+        }
+    }
 }
 
 
@@ -158,120 +637,232 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 
 bool nonLinGeomUpdatedLagSolid::evolve()
 {
-    Info<< "Evolving solid solver" << endl;
-
-    int iCorr = 0;
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<vector> solverPerfDD;
-    SolverPerformance<vector>::debug = 0;
-#else
-    lduSolverPerformance solverPerfDD;
-    blockLduMatrix::debug = 0;
-#endif
-
-    Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
-        << endl;
-
-    // Momentum equation loop
-    do
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
-        // Store fields for under-relaxation and residual calculation
-        DD().storePrevIter();
-
-        // Momentum equation incremental updated Lagrangian form
-        fvVectorMatrix DDEqn
-        (
-            fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(relJ_*relFinv_ & sigma(), "div(sigma)")
-          + rho_*g()
-          + stabilisation().stabilisation(DD(), gradDD(), impK_)
-        );
-
-        // Under-relax the linear system
-        DDEqn.relax();
-
-        // Enforce any cell displacements
-        solidModel::setCellDisps(DDEqn);
-
-        // Solve the linear system
-        solverPerfDD = DDEqn.solve();
-
-        // Under-relax the DD field using fixed or adaptive under-relaxation
-        relaxField(DD(), iCorr);
-
-        // Update the total displacement
-        D() = D().oldTime() + DD();
-
-        // Update gradient of displacement increment
-        mechanical().grad(DD(), gradDD());
-
-        // Relative deformation gradient
-        relF_ = I + gradDD().T();
-
-        // Inverse relative deformation gradient
-        relFinv_ = inv(relF_);
-
-        // Total deformation gradient
-        F_ = relF_ & F_.oldTime();
-
-        // Relative Jacobian (Jacobian of relative deformation gradient)
-        relJ_ = det(relF_);
-
-        // Jacobian of deformation gradient
-        J_ = relJ_*J_.oldTime();
-
-        // Update the momentum equation inverse diagonal field
-        // This may be used by the mechanical law when calculating the
-        // hydrostatic pressure
-        const volScalarField DEqnA("DEqnA", DDEqn.A());
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        return evolveSnes();
     }
-    while
-    (
-       !converged
-        (
-            iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
-            mag(solverPerfDD.initialResidual()),
-            cmptMax(solverPerfDD.nIterations()),
-#else
-            solverPerfDD.initialResidual(),
-            solverPerfDD.nIterations(),
-#endif
-            DD()
-        )
-     && ++iCorr < nCorr()
-    );
+    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    // {
+    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+    //     // could be combined with PETSc to achieve this.. todo!
+    //     return evolveImplicitCoupled();
+    // }
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        return evolveImplicitSegregated();
+    }
+    // else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
+    // {
+    //     return evolveExplicit();
+    // }
+    else
+    {
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            // << solutionAlgorithmNames_.names() << endl;
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::PETSC_SNES
+               ]
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
+               ]
+            // << solidModel::solutionAlgorithmNames_
+            //    [
+            //        solidModel::solutionAlgorithm::EXPLICIT
+            //    ]
+            << endl;
+    }
 
-    // Update gradient of total displacement
-    gradD() = fvc::grad(D().oldTime() + DD());
-
-    // Total displacement
-    D() = D().oldTime() + DD();
-
-    // Update pointDD as it used by FSI procedure
-    mechanical().interpolate(DD(), gradDD(), pointDD());
-
-    // Total displacement at points
-    pointD() = pointD().oldTime() + pointDD();
-
-    // Velocity
-    U() = fvc::ddt(D());
-
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<vector>::debug = 1;
-#else
-    blockLduMatrix::debug = 1;
-#endif
-
+    // Keep compiler happy
     return true;
 }
 
+
+#ifdef USE_PETSC
+
+label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
+{
+    // Initialise based on compact stencil fvMesh
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
+label nonLinGeomUpdatedLagSolid::initialiseSolution(Vec& x)
+{
+    // Initialise based on mesh.nCells()
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
+}
+
+
+label nonLinGeomUpdatedLagSolid::formResidual
+(
+    Vec f,
+    const Vec x
+)
+{
+    // Copy x into the DD field
+    volVectorField& DD = const_cast<volVectorField&>(this->DD());
+    vectorField& DDI = DD;
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        DDI,
+        0,                          // Location of first DDI component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Enforce the boundary conditions
+    DD.correctBoundaryConditions();
+
+    // Update total displacement
+    D() = D().oldTime() + DD;
+
+    // Update displacement increment gradient
+    mechanical().grad(DD, gradDD());
+
+    // Relative deformation gradient
+    relF_ = I + gradDD().T();
+
+    // Inverse relative deformation gradient
+    relFinv_ = inv(relF_);
+
+    // Total deformation gradient
+    F_ = relF_ & F_.oldTime();
+
+    // Relative Jacobian (Jacobian of relative deformation gradient)
+    relJ_ = det(relF_);
+
+    // Jacobian of deformation gradient
+    J_ = relJ_*J_.oldTime();
+
+    // Update the momentum equation inverse diagonal field
+    // This may be used by the mechanical law when calculating the
+    // hydrostatic pressure
+    //const volScalarField DEqnA("DEqnA", DDEqn.A());
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
+    // Unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+    const surfaceVectorField SfCurrent
+    (
+        fvc::interpolate(relJ_*relFinv_.T()) & mesh().Sf()
+    );
+    const surfaceScalarField magSfCurrent(mag(SfCurrent));
+    const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+    // Traction vectors at the faces
+    //surfaceVectorField traction(n & fvc::interpolate(sigma()));
+    surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+    // Add stabilisation to the traction
+    // We add this before enforcing the traction condition as the stabilisation
+    // is set to zero on traction boundaries
+    // To-do: add a stabilisation traction function to momentumStabilisation
+    const scalar scaleFactor =
+        readScalar(stabilisation().dict().lookup("scaleFactor"));
+    const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
+    traction += scaleFactor*impKf_*(fvc::snGrad(DD) - (n & gradDDf));
+
+    // Calculate the force at the faces
+    surfaceVectorField force(magSfCurrent*traction);
+
+    // Enforce traction boundary conditions
+    enforceTractionBoundaries(force, DD, nCurrent, magSfCurrent);
+
+    // The residual vector is defined as
+    // F = div(sigma) + rho*g
+    //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
+    // where, here, we roll the stabilisationTerm into the div(sigma)
+    vectorField residual
+    (
+        fvc::div(magSfCurrent*traction)
+      + rho()
+       *(
+           g() - fvc::d2dt2(D()) - dampingCoeff()*fvc::ddt(D())
+        )
+    );
+
+    // Make residual extensive as fvc operators are intensive (per unit volume)
+    residual *= mesh().V();
+
+    // Add optional fvOptions, e.g. MMS body force
+    // Note that "source()" is already multiplied by the volumes
+    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+
+    // Copy the residual into the f field
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        residual,
+        f,
+        0,                          // Location of first DI component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        notImplemented("Not implemented for active 'solvePressure'");
+    }
+
+    return 0;
+}
+
+
+label nonLinGeomUpdatedLagSolid::formJacobian
+(
+    Mat jac,
+    const Vec x
+)
+{
+    // Copy x into the DD field
+    volVectorField& DD = const_cast<volVectorField&>(this->DD());
+    vectorField& DDI = DD;
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        DDI,
+        0,                          // Location of first DDI component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Enforce the boundary conditions
+    DD.correctBoundaryConditions();
+
+    // Calculate a segregated approximation of the Jacobian
+    fvVectorMatrix approxJ
+    (
+        fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+      - rho()*fvm::d2dt2(DD)
+    );
+
+    if (dampingCoeff().value() > SMALL)
+    {
+        approxJ -= dampingCoeff()*rho()*fvm::ddt(DD);
+    }
+
+    // Optional: under-relaxation of the linear system
+    approxJ.relax();
+
+    // Convert fvMatrix matrix to PETSc matrix
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+    (
+        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+    );
+
+    return 0;
+}
+
+
+#endif // USE_PETSC
 
 tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 (
@@ -368,7 +959,7 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #else
     const vectorField oldPoints = mesh().allPoints();
 #endif
-    moveMesh(oldPoints, DD(), pointDD());
+    moveMesh(oldPoints, pointDD());
 
     solidModel::updateTotalFields();
 }

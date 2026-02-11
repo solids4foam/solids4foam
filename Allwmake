@@ -10,7 +10,10 @@ then
     echo "Please source the OpenFOAM/FOAM bashrc first!"
     exit 1
 else
-    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312" "v2406")
+    allowed_ver=(
+        "v2512" "v2506" "v2412" "v2406" "v2312" "v2306" "v2212" "v2206" "v2112"
+        "v2012" "v2106" "4.1" "9"
+    )
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
         echo "Unsupported OpenFOAM version sourced!"
     fi
@@ -57,8 +60,9 @@ then
     exit 1
 else
     echo "There were no build errors: enjoy solids4foam!"; echo
-    echo "To test the installation, run:"
-    echo "    > cd tutorials && ./Alltest"
+    echo "To test the installation:"
+    echo "    > cd tutorials && ./Alltest            # quick 'smoke test'"
+    echo "    > cd tutorials && ./Alltest-regression # comprehensive (can be slow)"
 fi
 echo
 

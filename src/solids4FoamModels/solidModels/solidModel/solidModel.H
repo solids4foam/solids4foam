@@ -50,7 +50,17 @@ SourceFiles
 #include "OFstream.H"
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
-#include "dualMeshToMeshMap.H"
+#include "meshDual.H"
+#include "twoDPointCorrector.H"
+#include "checkConvergence.H"
+#include "boolIOList.H"
+#include "compatibilityFunctions.H"
+#ifdef OPENFOAM_COM
+    #include "Enum.H"
+    #include "fvOptions.H"
+#else
+    #include "NamedEnum.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,16 +76,37 @@ class solidModel
     public physicsModel,
     public regIOobject
 {
+public:
+
+        //- Solution algorithms
+        enum solutionAlgorithm
+        {
+            PETSC_SNES,
+            IMPLICIT_COUPLED,
+            IMPLICIT_SEGREGATED,
+            EXPLICIT
+        };
+
+        //- Solution algorithm names
+#ifdef OPENFOAM_COM
+        static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
+#else
+        static const NamedEnum<solutionAlgorithm, 4> solutionAlgorithmNames_;
+#endif
+
+private:
+
     // Private data
 
-        //- Mesh
-        autoPtr<dynamicFvMesh> meshPtr_;
+        //- Pointer to the mesh if we created it
+        autoPtr<dynamicFvMesh> meshOwnerPtr_;
+
+        //- Pointer to the mesh
+        //  This always points to the mesh we use (owned or borrowed)
+        dynamicFvMesh* meshPtr_;
 
         //- Dual mesh
-        mutable autoPtr<fvMesh> dualMeshPtr_;
-
-        //- Dual mesh to primary mesh map
-        mutable autoPtr<dualMeshToMeshMap> dualMeshToMeshMapPtr_;
+        mutable autoPtr<meshDual> dualMeshPtr_;
 
         //- Solid properties dictionary
         mutable IOdictionary solidProperties_;
@@ -83,11 +114,23 @@ class solidModel
         //- Derived solidModel type
         const word type_;
 
+        //- Solution algorithm, e.g. coupled, segregated, explicit, SNES
+        //  This enum is used by some of the solid models but not all
+        const solutionAlgorithm solutionAlgorithm_;
+
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
 
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  D field
+        boolIOList useBoundaryFaceValuesD_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  p field
+        boolIOList useBoundaryFaceValuesp_;
 
         //- Total displacement field header
         IOobject Dheader_;
@@ -106,7 +149,7 @@ class solidModel
         volVectorField DD_;
 
         //- Velocity field
-        volVectorField U_;
+        mutable autoPtr<volVectorField> UPtr_;
 
         //- Point mesh
         const pointMesh& pMesh_;
@@ -177,7 +220,7 @@ class solidModel
         Switch enforceLinear_;
 
         //- Under-relaxation method
-        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
+        //  It can be 'fixed' or 'Aitken'
         const word relaxationMethod_;
 
         //- Aitken's under-relaxation factor field
@@ -185,24 +228,6 @@ class solidModel
 
         //- Aitken's residual field
         volVectorField aitkenResidual_;
-
-        //- Restart frequency for the Quasi-Newton method
-        const int QuasiNewtonRestartFreq_;
-
-        //- Quasi-Newton method input vector field
-        DynamicList<vectorField> QuasiNewtonV_;
-
-        //- Quasi-Newton method output vector field
-        DynamicList<vectorField> QuasiNewtonW_;
-
-        //- Quasi-Newton method time indices for the input-ouput fields
-        DynamicList<scalar> QuasiNewtonT_;
-
-        //- Reference D field used for Quasi-Newton method
-        volVectorField DRef_;
-
-        //- Reference D (without relaxation) field used for Quasi-Newton method
-        volVectorField unrelaxedDRef_;
 
         //- Ptr list of global poly patches
         //  This is a copy of a patch which is reconstructed in full on each
@@ -221,6 +246,23 @@ class solidModel
         //- Store rho*d2d2t(D) for efficiency
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
+        //- TwoD point corrector object
+        twoDPointCorrector twoDCorrector_;
+
+        //- Flag indicating if the case is 2-D or 3-D
+        const bool twoD_;
+
+        //- Flag indicating that the pressure equation should be solved
+        const Switch solvePressure_;
+
+        //- Pressure
+        //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
+        autoPtr<volScalarField> pPtr_;
+
+#ifdef OPENFOAM_COM
+        //- fvOptions
+        fv::options& fvOptions_;
+#endif
 
     // Private Member Functions
 
@@ -236,6 +278,9 @@ class solidModel
 
         //- Make the rho field
         void makeRho() const;
+
+        //- Make the U field
+        void makeU() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -265,20 +310,11 @@ protected:
         //- Make the dual mesh from the mesh
         void makeDualMesh() const;
 
-        //- Mark features for dual mesh
-        //  Copied from polyDualMeshApp.C
-        void simpleMarkFeatures
-        (
-            const polyMesh& mesh,
-            const PackedBoolList& isBoundaryEdge,
-            const scalar featureAngle,
-            const bool concaveMultiCells,
-            const bool doNotPreserveFaceZones,
-            labelList& featureFaces,
-            labelList& featureEdges,
-            labelList& singleCellFeaturePoints,
-            labelList& multiCellFeaturePoints
-        ) const;
+        //- Const-access to the dual mesh to mesh map object
+        const dualMeshToMeshMap& dualMeshMap() const
+        {
+            return dualMesh().dualMeshMap();
+        }
 
         //- Return non-const reference to solid properties dictionary
         IOdictionary& solidProperties()
@@ -291,9 +327,6 @@ protected:
 
         //- Return non-const reference to the thermal model
         thermalModel& thermal();
-
-        //- Return non-const reference to the mechanical model
-        mechanicalModel& mechanical();
 
         //- Return non-const reference to the density
         volScalarField& rho();
@@ -364,6 +397,22 @@ protected:
         //- Return non-const access to rhoD2dt2D
         volVectorField& rhoD2dt2D() const;
 
+        //- Return maxIterReached
+        const Switch& solvePressure() const
+        {
+            return solvePressure_;
+        }
+
+        //- Non-const access to the pressure
+        volScalarField& p();
+
+#ifdef OPENFOAM_COM
+        //- Return non-const access to fvOptions
+        fv::options& fvOptions()
+        {
+            return fvOptions_;
+        }
+#endif
 
 public:
 
@@ -415,23 +464,20 @@ public:
             //- Return mesh
             const dynamicFvMesh& mesh() const
             {
-                return meshPtr_();
+                return *meshPtr_;
             }
 
             //- Return non-const mesh
             dynamicFvMesh& mesh()
             {
-                return meshPtr_();
+                return *meshPtr_;
             }
 
             //- Return dualMesh
-            const fvMesh& dualMesh() const;
+            const meshDual& dualMesh() const;
 
             //- Return non-const dualMesh
-            fvMesh& dualMesh();
-
-            //- Return const dualMeshToMeshMap
-            const dualMeshToMeshMap& dualMeshMap() const;
+            meshDual& dualMesh();
 
             //- Return point mesh
             const pointMesh& pMesh() const
@@ -442,13 +488,19 @@ public:
             //- Return time
             const Time& runTime() const
             {
-                return meshPtr_().time();
+                return meshPtr_->time();
             }
 
             //- Return solid properties dictionary
             const dictionary& solidProperties() const
             {
                 return solidProperties_;
+            }
+
+            //- Const access to the solution algorithm enum
+            const solutionAlgorithm& solutionAlg() const
+            {
+                return solutionAlgorithm_;
             }
 
             //- Is it a new time step? This function return true the first time
@@ -463,6 +515,9 @@ public:
 
             //- Return const reference to the thermal model
             const thermalModel& thermal() const;
+
+            //- Return non-const reference to the mechanical model
+            mechanicalModel& mechanical();
 
             //- Return const reference to the mechanical model
             const mechanicalModel& mechanical() const;
@@ -494,13 +549,29 @@ public:
             //- Return non-const reference to U
             virtual volVectorField& U()
             {
-                return U_;
+                if (UPtr_.empty())
+                {
+                    makeU();
+                }
+
+                return autoPtrRef(UPtr_);
             }
 
             //- Return const reference to U
             virtual const volVectorField& U() const
             {
-                return U_;
+                if (UPtr_.empty())
+                {
+                    makeU();
+                }
+
+                return autoPtrRef(UPtr_);
+            }
+
+            //- Return non-const reference to UPtr
+            virtual autoPtr<volVectorField>& UPtr()
+            {
+                return UPtr_;
             }
 
             //- Return non-const reference to pointD
@@ -584,6 +655,18 @@ public:
             //- Each solidModel must indicate whether D or DD is the primary
             //  solution variable
             virtual volVectorField& solutionD() = 0;
+
+            //- Const-reference to the twoD point corrector object
+            const twoDPointCorrector& twoDCorrector() const
+            {
+                return twoDCorrector_;
+            }
+
+            //- Is the model two-dimensional
+            const bool& twoD() const
+            {
+                return twoD_;
+            }
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -779,12 +862,11 @@ public:
             //- Return the desired new time-step size
             virtual scalar newDeltaT();
 
-            //- Move the mesh to the deformed configuration
+            //- Move the mesh by the provided point displacement field
             virtual void moveMesh
             (
                 const pointField& oldPoints,
-                const volVectorField& DD,
-                pointVectorField& pointDD
+                const pointVectorField& pointDD
             );
 
             //- End of the program

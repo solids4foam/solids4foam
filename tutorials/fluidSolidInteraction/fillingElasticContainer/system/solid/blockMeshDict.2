@@ -1,0 +1,116 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale 1;
+
+vertices
+(
+    (-2.45 0 0)        // 0
+    (-2.45 -3.75 0)    // 1
+    (2.45 -3.75 0)     // 2
+    (2.45 0 0)         // 3
+
+    (-2.25 0 0)        // 4
+    (-2.25 -3.75 0)    // 5
+    (2.25 -3.75 0)     // 6
+    (2.25 0 0)         // 7
+
+    (-2.45 0 0.1)      // 8
+    (-2.45 -3.75 0.1)  // 9
+    (2.45 -3.75 0.1)   // 10
+    (2.45 0 0.1)       // 11
+
+    (-2.25 0 0.1)      // 12
+    (-2.25 -3.75 0.1)  // 13
+    (2.25 -3.75 0.1)   // 14
+    (2.25 0 0.1)       // 15
+
+    (0 -6 0)           // 16
+    (0 -6.2 0)         // 17
+
+    (0 -6 0.1)         // 18
+    (0 -6.2 0.1)       // 19
+);
+
+blocks
+(
+    hex (0 1 5 4 8 9 13 12) (40 12 1) simpleGrading (1 1 1)
+    hex (1 17 16 5 9 19 18 13) (40 12 1) simpleGrading (1 1 1)
+    hex (17 2 6 16 19 10 14 18) (40 12 1) simpleGrading (1 1 1)
+    hex (2 3 7 6 10 11 15 14) (40 12 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+    // left outer
+    arc 1 17 (-1.7324116139 -5.4824116139 0)
+    arc 2 17 (1.7324116139 -5.4824116139 0)
+
+    // right outer
+    arc 9 19 (-1.7324116139 -5.4824116139 0.1)
+    arc 10 19 (1.7324116139 -5.4824116139 0.1)
+
+    // left inner
+    arc 5 16 (-1.5909902577 -5.3409902577 0)
+    arc 6 16 (1.5909902577 -5.3409902577 0)
+
+    // right inner
+    arc 13 18 (-1.5909902577 -5.3409902577 0.1)
+    arc 14 18 (1.5909902577 -5.3409902577 0.1)
+);
+
+boundary
+(
+    fixed
+    {
+        type patch;
+        faces
+        (
+            (4 0 12 8)
+            (3 7 15 11)
+        );
+    }
+    interface
+    {
+        type patch;
+        faces
+        (
+            (5 4 12 13)
+            (7 6 14 15)
+            (16 5 13 18)
+            (6 16 18 14)
+        );
+    }
+    outer
+    {
+        type patch;
+        faces
+        (
+            (0 1 9 8)
+            (2 3 11 10)
+            (1 17 19 9)
+            (17 2 10 19)
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

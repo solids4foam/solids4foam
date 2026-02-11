@@ -15,7 +15,7 @@ set output 'reaction-x.png'
 
 plot "postProcessing/0/solidForcesfixed.dat" u ($1/31.5):($2) w lp ls 1 title"solids4foam",\
      "netoEtAl.dat" u ($1/31.5):2 w p ls 2 title"Neto et al."
-     
+
 set output 'reaction-y.png'
 set yrange [0:50]
 set ylabel "Reaction-y"

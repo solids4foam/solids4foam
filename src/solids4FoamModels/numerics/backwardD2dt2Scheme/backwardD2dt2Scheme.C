@@ -78,25 +78,10 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    if (mag(mesh().time().deltaT() - mesh().time().deltaT0()).value() > SMALL)
-    {
-        notImplemented
-        (
-            "backwardD2dt2Scheme not implemented for variable time steps"
-        );
-    }
-
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
     }
-
-    // Default to 1st order Euler on the first time step
-    // ZT
-    // if (mesh().time().timeIndex() == 1)
-    // {
-    //     return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(vf);
-    // }
 
     IOobject d2dt2IOobject
     (
@@ -115,11 +100,6 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
     const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
     const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
     const scalar coefft0 = coefft + coefft00;
-
-    // ZT
-    // const scalar coefft = 1.5;
-    // const scalar coefft0 = 2.0;
-    // const scalar coefft00 = 0.5;
 
     return tmp<GeometricField<Type, fvPatchField, volMesh> >
     (
@@ -154,25 +134,10 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    if (mag(mesh().time().deltaT() - mesh().time().deltaT0()).value() > SMALL)
-    {
-        notImplemented
-        (
-            "backwardD2dt2Scheme not implemented for variable time steps"
-        );
-    }
-
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
     }
-
-    // Default to 1st order Euler on the first time step
-    // ZT
-    // if (mesh().time().timeIndex() == 1)
-    // {
-    //     return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(rho, vf);
-    // }
 
     IOobject d2dt2IOobject
     (
@@ -191,11 +156,6 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
     const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
     const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
     const scalar coefft0 = coefft + coefft00;
-
-    // ZT
-    // const scalar coefft = 1.5;
-    // const scalar coefft0 = 2.0;
-    // const scalar coefft00 = 0.5;
 
     return tmp<GeometricField<Type, fvPatchField, volMesh> >
     (
@@ -229,24 +189,10 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    if (mag(mesh().time().deltaT() - mesh().time().deltaT0()).value() > SMALL)
-    {
-        notImplemented
-        (
-            "backwardD2dt2Scheme not implemented for variable time steps"
-        );
-    }
-
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
     }
-
-    // Default to 1st order Euler on the first time step
-    // if (mesh().time().timeIndex() == 1)
-    // {
-    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(vf);
-    // }
 
     tmp<fvMatrix<Type> > tfvm
     (
@@ -271,7 +217,8 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
     const scalar coefft0 = coefft + coefft00;
 
-    fvm = coefft*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
+    fvm =
+        coefft*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
        *backwardDdtScheme<Type>(mesh()).fvmDdt(vf);
 
 #ifdef FOAMEXTEND
@@ -312,25 +259,10 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    if (mag(mesh().time().deltaT() - mesh().time().deltaT0()).value() > SMALL)
-    {
-        notImplemented
-        (
-            "backwardD2dt2Scheme not implemented for variable time steps"
-        );
-    }
-
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
     }
-
-    // Default to 1st order Euler on the first time step
-    // ZT
-    // if (mesh().time().timeIndex() == 1)
-    // {
-    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
-    // }
 
     tmp<fvMatrix<Type> > tfvm
     (
@@ -355,7 +287,8 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
     const scalar coefft0 = coefft + coefft00;
 
-    fvm = coefft*rho*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
+    fvm =
+        coefft*rho*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
        *backwardDdtScheme<Type>(mesh()).fvmDdt(vf);
 
 #ifdef FOAMEXTEND
@@ -396,25 +329,10 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    if (mag(mesh().time().deltaT() - mesh().time().deltaT0()).value() > SMALL)
-    {
-        notImplemented
-        (
-            "backwardD2dt2Scheme not implemented for variable time steps"
-        );
-    }
-
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
     }
-
-    // Default to 1st order Euler on the first time step
-    // ZT
-    // if (mesh().time().timeIndex() == 1)
-    // {
-    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
-    // }
 
     tmp<fvMatrix<Type> > tfvm
     (
@@ -439,7 +357,8 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
     const scalar coefft0 = coefft + coefft00;
 
-    fvm = coefft*rho*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
+    fvm =
+        coefft*rho*dimensionedScalar("rDeltaT", dimless/dimTime, rDeltaT)
        *backwardDdtScheme<Type>(mesh()).fvmDdt(vf);
 
 #ifdef FOAMEXTEND

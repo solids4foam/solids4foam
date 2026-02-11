@@ -328,7 +328,11 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "w",
             runTime.timeName(),
+#if (OPENFOAM > 2312)
+            aMesh_,
+#else
             mesh(),
+#endif
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -353,7 +357,11 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "M",
             runTime.timeName(),
+#if (OPENFOAM > 2312)
+            aMesh_,
+#else
             mesh(),
+#endif
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -378,7 +386,11 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "p",
             runTime.timeName(),
+#if (OPENFOAM > 2312)
+            aMesh_,
+#else
             mesh(),
+#endif
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
@@ -403,7 +415,11 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
         (
             "theta",
             runTime.timeName(),
+#if (OPENFOAM > 2312)
+            aMesh_,
+#else
             mesh(),
+#endif
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),

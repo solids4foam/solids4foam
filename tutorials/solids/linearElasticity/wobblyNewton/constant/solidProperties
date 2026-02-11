@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -17,42 +17,23 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-// solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
-solidModel     vertexCentredLinearGeometry;
+solidModel     linearGeometryTotalDisplacement;
+//solidModel     vertexCentredLinearGeometry;
 
-"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs"
 {
-    // Solution algorithm (implicitCoupled, implicitSegregated, explicit, ...)
-    solutionAlgorithm implicitCoupled;
-
-    // Update the stiffness matrix every outer iteration
-    fullNewton no;
+    // Solution algorithm (PETScSNES, implicitSegregated, explicit, ...)
+    solutionAlgorithm PETScSNES;
 
     // Compact edge discretisation fraction
     // 0 -> more accurate but oscillations more likely
     // 1 -> less accurate but oscillations less likely
-    zeta            0.0;
+    //zeta           0.1;
 
-    // Maximum number of Newton-Raphson iterations
-    nCorrectors 1;
-
-    // Tolerance for Newton-Raphson loop
-    solutionTolerance 1e-6;
-
-    // Fraction of compact edge direction gradient used
-    zeta 1.0;
-
-    // Line search settings
-    lineSearch no;
-    lineSearchRTol 0.5;
-
-    // Use PETSc, else use Eigen SparseLU
-    usePETSc yes;
+    // PETSc options
     //optionsFile petscOptions.mumps;
-    optionsFile petscOptions.hypre;
-    //optionsFile petscOptions.cg;
+    //optionsFile petscOptions.hypre;
+    optionsFile petscOptions.mf.hypre;
 }
 
 // ************************************************************************* //

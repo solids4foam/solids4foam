@@ -153,6 +153,9 @@ public:
             //- Return bulk modulus
             tmp<volScalarField> bulkModulus() const;
 
+            //- Return shear modulus
+            tmp<volScalarField> shearModulus() const;
+
             //- Return material residual i.e. a measured of how convergence of
             //  the material model
             scalar residual();
@@ -226,6 +229,12 @@ public:
                 pointVectorField& pointD,
                 const bool useVolFieldSigma = true
             );
+
+            //- Correct pointD on symmetry planes
+            void correctSymmPlanes
+            (
+                pointVectorField& pointD
+            ) const;
 
             //- Update total accumulated fields
             void updateTotalFields();

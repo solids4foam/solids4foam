@@ -26,11 +26,11 @@ Prepared by Ivan Batistić, with additions by Philip Cardiff
 
 - **Utility purpose** Mesh converter: converts
   [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh
-  (in `*.inp` format) into the FOAM mesh format.  
+  (in `*.inp` format) into the FOAM mesh format.
   Currently, this utility only supports 3-D hexahedral cells/elements.
   Note that each distribution of `OpenFOAM` comes with a set of mesh converters
-  (but not for Abaqus), see the available one
-  [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).
+  (but not for Abaqus), see the available ones in the
+  [OpenFOAM User Guide](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).
 - **Arguments**
 
   - `<mesh.inp>` name of the Abaqus mesh file.
@@ -56,7 +56,7 @@ Prepared by Ivan Batistić, with additions by Philip Cardiff
 ## `addTinyPatch`
 
 - **Utility purpose** For a chosen patch, find the closest face to the specified
-  location and separate it into a new patch.  
+  location and separate it into a new patch.
   The utility can be used, for example, to create patches for specifying point
   loads.
 
@@ -105,9 +105,9 @@ When using `addTinyPatch` the original mesh is overwritten!
   foamMeshToAbaqus
   ```
 
-  Converted mesh is written to the`abaqusMesh.inp` file.  
+  Converted mesh is written to the`abaqusMesh.inp` file.
   Creates a node set and and element set and a surface for each boundary
-  patch.  
+  patch.
   Also creates a element set for each material in the materials file (if it is
   exists).
 
@@ -120,7 +120,7 @@ When using `addTinyPatch` the original mesh is overwritten!
 
 ## `perturbMeshPoints`
 
-- **Utility purpose**  
+- **Utility purpose**
    Add a random perturbation to each mesh points. The perturbation of a point is
   calculated as a scale factor times the local minimum edge length.
 
@@ -146,14 +146,14 @@ When using `addTinyPatch` the original mesh is overwritten!
   This utility is useful for creating distorted grids for testing
   discretisations.
 
-- **Arguments**  
+- **Arguments**
   None
 
 - **Options/parameters**
 
   None
 
-- **Dictionary**  
+- **Dictionary**
   Inputs are defined in dictionary named `perturbMeshPointsDict` and located in
   `system` directory:
 
@@ -212,6 +212,34 @@ to `constant` before running the simulation!
 
 ---
 
+## `projectPatchToSphere`
+
+- **Utility purpose**
+  Project points of the specified patch onto the surface of a sphere.
+  It does not alter internal points.
+
+- **Arguments**
+
+  - `<patchName>` patch to be projected;
+  - `(x y z)` origin vector of the sphere.
+  - `radius` radius of the sphere.
+
+- **Options/parameters**
+
+  None
+
+- **Example of usage**
+
+  ```bash
+  projectPatchToSphere leftPatch (0 0 0) 0.5
+  ```
+
+```note
+The mesh is overwritten!
+```
+
+---
+
 ## `splitPatch`
 
 - **Utility purpose** Splits a patch into two patches by putting faces in the
@@ -241,7 +269,7 @@ to `constant` before running the simulation!
   - `newPatchName`is the name of the splitted patch part;
   - `boundBoxes` is list of bounding boxes; each defined with two vectors:
     `(xmin ymin zmin)` and `(xmax ymax zmax)`. Boundary patch faces inside this
-    bounding box will be put in a new patch.  
+    bounding box will be put in a new patch.
     _Note:_ The face's centre point is tested to see if it is inside the
     bounding boxes!
 

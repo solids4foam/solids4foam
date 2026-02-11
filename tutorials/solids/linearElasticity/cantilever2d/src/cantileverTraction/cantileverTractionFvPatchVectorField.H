@@ -1,0 +1,185 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    cantileverTractionFvPatchVectorField
+
+Description
+    The boundary condition applies the analytical face traction to the
+    end of a simple bending cantilever test case, as described in:
+
+    C.E. Augarde, A.J. Deeks, The use of Timoshenko’s exact solution for a
+    cantilever beam in adaptive analysis. Finite Elements in Analysis and
+    Design, 44, 2008, 595–601, 10.1016/j.finel.2008.01.010.
+
+    It is assumed that the origin is at the centre of the fixed patch.
+
+    The beam is L long and D deep (thick).
+
+
+SourceFiles
+    cantileverTractionFvPatchVectorField.C
+
+Author
+    Philip Cardiff, UCD. All rights reserved.
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef cantileverTractionFvPatchVectorField_H
+#define cantileverTractionFvPatchVectorField_H
+
+#include "solidTractionFvPatchVectorField.H"
+#include "cantileverAnalytical.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+               Class cantileverTractionFvPatchVectorField Declaration
+\*---------------------------------------------------------------------------*/
+
+class cantileverTractionFvPatchVectorField
+:
+    public solidTractionFvPatchVectorField
+{
+    // Private data
+
+        //- Helper object for calculating the analytical displacements and
+        //  traction
+        cantileverAnalytical analyticalSol_;
+
+        //- Current time index
+        label curTimeIndex_;
+
+
+public:
+
+    //- Runtime type information
+    TypeName("cantileverTraction");
+
+
+    // Constructors
+
+        //- Construct from patch and internal field
+        cantileverTractionFvPatchVectorField
+        (
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&
+        );
+
+        //- Construct from patch, internal field and dictionary
+        cantileverTractionFvPatchVectorField
+        (
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&,
+            const dictionary&
+        );
+
+        //- Construct by mapping given cantileverTractionFvPatchVectorField onto
+        //  a new patch
+        cantileverTractionFvPatchVectorField
+        (
+            const cantileverTractionFvPatchVectorField&,
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&,
+            const fvPatchFieldMapper&
+        );
+
+        //- Construct as copy
+        cantileverTractionFvPatchVectorField
+        (
+            const cantileverTractionFvPatchVectorField&
+#ifdef OPENFOAM_ORG
+        ) = delete;
+#else
+        );
+
+        //- Construct and return a clone
+        virtual tmp<fvPatchVectorField> clone() const
+        {
+            return tmp<fvPatchVectorField>
+            (
+                new cantileverTractionFvPatchVectorField(*this)
+            );
+        }
+#endif
+
+        //- Construct as copy setting internal field reference
+        cantileverTractionFvPatchVectorField
+        (
+            const cantileverTractionFvPatchVectorField&,
+            const DimensionedField<vector, volMesh>&
+        );
+
+        //- Construct and return a clone setting internal field reference
+        virtual tmp<fvPatchField<vector> > clone
+        (
+            const DimensionedField<vector, volMesh>& iF
+        ) const
+        {
+            return tmp<fvPatchField<vector> >
+            (
+                new cantileverTractionFvPatchVectorField(*this, iF)
+            );
+        }
+
+    //- Destructor
+    virtual ~cantileverTractionFvPatchVectorField();
+
+
+    // Member functions
+
+        // Mapping functions
+
+            //- Map (and resize as needed) from self given a mapping object
+            virtual void autoMap
+            (
+                const fvPatchFieldMapper&
+            );
+
+            //- Reverse map the given fvPatchField onto this fvPatchField
+            virtual void rmap
+            (
+                const fvPatchField<vector>&,
+                const labelList&
+            );
+
+
+        // Evaluation functions
+
+            //- Update the coefficients associated with the patch field
+            virtual void updateCoeffs();
+
+
+        // Member functions
+
+            //- Write
+            virtual void write(Ostream&) const;
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

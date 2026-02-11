@@ -35,16 +35,19 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef USE_PETSC
+
 #ifndef vfvmCellPoint_H
 #define vfvmCellPoint_H
 
 #include "volFields.H"
 #include "pointFields.H"
-#include "sparseMatrix.H"
 #include "scalarMatrices.H"
-#include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
-#include "SparseMatrixTemplate.H"
+#include "meshDual.H"
+#include "matNN.H"
+#include <petscksp.h>
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -53,19 +56,20 @@ namespace Foam
 
 namespace vfvm
 {
-    // Add coefficients to the matrix for the divergence of stress
-    // Note: this function does not calculate contributions to the right-hand
-    // side
+    //- Insert vfvm::divSigma coefficients into the given PETSc matrix
     void divSigma
     (
-        sparseMatrix& matrix,
+        Mat jac,
+        const pointVectorField& pointD,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
+        const label nScalarEqns,
+        const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangentField,
-        const scalar zeta,
-        const bool debug = false
+        const List<mat66>& materialTangent,
+        const scalar zetaImplicit,
+        const bool flipSign = false
     );
 
     // Add coefficients to the matrix for the divergence of stress
@@ -75,51 +79,60 @@ namespace vfvm
     // side
     void divSigma
     (
-        sparseMatrix& matrix,
+        Mat jac,
+        const pointVectorField& pointD,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
+        const label nScalarEqns,
+        const labelList& localToGlobalPointMap,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangentField,
-        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const List<mat66>& materialTangent,
+        const List<mat39>& geometricStiffnessField,
         const symmTensorField& sigma,
         const tensorField& dualGradDField,
-        const boolList& fixedDofs,
-        const symmTensorField& fixedDofDirections,
-        const scalar fixedDofScale,
-        const scalar zeta, // fraction of compact edge direction component used
-        const bool debug = false
+        const scalar zetaImplicit,
+        const bool flipSign = false
     );
 
-    // Add coefficients to the matrix for the Laplacian of a scalar field with
-    // a scalar diffusivity field
-    void laplacian
-    (
-        sparseScalarMatrix& matrix,
-        const Switch compactStencil,
-        const fvMesh& mesh,
-        const fvMesh& dualMesh,
-        const labelList& dualFaceToCell,
-        const labelList& dualCellToPoint,
-        const scalarField& diffusivity, // diffusivity in the primary cells
-        const bool debug = false
-    );
-
-    // Add coefficients to the matrix for the second time derivative
-    // Note: this function does not calculate contributions to the right-hand
-    // side
+    //- Insert vfvm::d2dt2 coefficients into the given PETSc matrix
     void d2dt2
     (
-        ITstream& d2dt2Scheme,
-        const scalar& deltaT,           // time-step
-        const word& pointDname,
-        sparseMatrix& matrix,
+        Mat jac,
+        const pointVectorField& pointD,
         const scalarField& pointRhoI,
         const scalarField& pointVolI,
-        const int debug  // debug switch
+        ITstream& d2dt2Scheme,
+        const label nScalarEqns,
+        const labelList& localToGlobalPointMap,
+        const bool flipSign = false
     );
 
-} // End namespace vfvc
+    // Insert laplacian coefficients into the given PETSc matrix
+    void laplacian
+    (
+        Mat jac,
+        const Switch compactStencil,
+        const scalar zeta, // compact stencil coefficient
+        const meshDual& dualMesh,
+        const label nScalarEqns,
+        const labelList& localToGlobalPointMap,
+        const scalarField& diffusivity, // diffusivity in the primary cells
+        const bool flipSign = false
+    );
+
+    // // Create and return a sparse matrix with the (Newton) linearised
+    // // discretisation of the advection term div(rho*v*v)
+    // tmp<sparseMatrix> div
+    // (
+    //     // const surfaceScalarField& dualRho, // dual surface density field
+    //     // const scalar rho, // density
+    //     const pointVectorField& pointV, // primary mesh velocity point field
+    //     const meshDual& dualMesh, // dual mesh
+    //     const bool debug = false
+    // );
+
+} // End namespace vfvm
 
 } // End namespace Foam
 
@@ -127,5 +140,7 @@ namespace vfvm
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // ifdef USE_PETSC
 
 // ************************************************************************* //

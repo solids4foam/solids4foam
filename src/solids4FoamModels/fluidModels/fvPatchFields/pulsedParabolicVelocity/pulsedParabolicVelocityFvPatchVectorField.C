@@ -37,7 +37,7 @@ pulsedParabolicVelocityFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedValueCorrectedFvPatchVectorField(p, iF),
     steadyValue_(0),
     n_(1, 0, 0),
     y_(0, 1, 0),
@@ -57,7 +57,7 @@ pulsedParabolicVelocityFvPatchVectorField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+    fixedValueCorrectedFvPatchVectorField(ptf, p, iF, mapper),
     steadyValue_(ptf.steadyValue_),
     n_(ptf.n_),
     y_(ptf.y_),
@@ -76,7 +76,7 @@ pulsedParabolicVelocityFvPatchVectorField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedValueCorrectedFvPatchVectorField(p, iF),
     steadyValue_(readScalar(dict.lookup("steadyValue"))),
     n_(dict.lookup("n")),
     y_(dict.lookup("y")),
@@ -106,7 +106,7 @@ pulsedParabolicVelocityFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(fcvpvf, iF),
+    fixedValueCorrectedFvPatchVectorField(fcvpvf, iF),
     steadyValue_(fcvpvf.steadyValue_),
     n_(fcvpvf.n_),
     y_(fcvpvf.y_),
@@ -139,7 +139,10 @@ void pulsedParabolicVelocityFvPatchVectorField::updateCoeffs()
     const vectorField& c = patch().Cf();
 
     // Calculate local 1-D coordinate for the parabolic profile
-    const scalarField coord(2*((c - ctr) & y_)/((boundBoxMax_ - boundBoxMin_) & y_));
+    const scalarField coord
+    (
+        2*((c - ctr) & y_)/((boundBoxMax_ - boundBoxMin_) & y_)
+    );
 
     vectorField::operator=(n_*curMaxValue*(1.0 - sqr(coord)));
 }

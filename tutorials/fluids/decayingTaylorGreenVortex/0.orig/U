@@ -1,0 +1,65 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    walls
+    {
+        // decayingTaylorGreenVortexVelocity employs non-orthogonal corrections
+        // which are required to achieve second-order accuracy on grids with
+        // boundary non-orthogonality
+        type            decayingTaylorGreenVortexVelocity;
+
+        // codedFixedValue does NOT employ non-orthogonal corrections and hence
+        // will approach zero-order accuracy for grids which contain boundary
+        // non-orthogonality in the limit of mesh refinement
+        // type            codedFixedValue;
+        // name            decayingTaylorGreenVortexVelocity;
+
+        // code
+        // #{
+        //     const scalar Re = 10;
+        //     const scalar t = db().time().value();
+        //     const scalar pi = constant::mathematical::pi;
+        //     const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
+
+        //     const scalarField x(patch().Cf().component(vector::X));
+        //     const scalarField y(patch().Cf().component(vector::Y));
+
+        //     const vectorField velocity
+        //     (
+        //         A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
+        //       - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
+        //     );
+
+        //     operator==(velocity);
+        // #};
+
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

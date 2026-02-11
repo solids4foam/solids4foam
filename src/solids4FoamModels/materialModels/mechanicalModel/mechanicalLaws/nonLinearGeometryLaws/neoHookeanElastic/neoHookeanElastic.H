@@ -72,11 +72,16 @@ class neoHookeanElastic
 {
     // Private data
 
-        // Shear modulus
+        //- Shear modulus
         dimensionedScalar mu_;
 
-        // Bulk modulus
+        //- Bulk modulus
         dimensionedScalar K_;
+
+        //- Alternative definition of the Kirchhoff pressure
+        //  default: -0.5*K*(pow(J, 2.0) - 1.0)
+        //  alternate: -0.5*K*(J - 1.0)
+        const Switch alternatePressureDefinition_;
 
     // Private Member Functions
 
@@ -117,13 +122,14 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_COM
         //- Return material tangent
-        tmp<Field<scalarSquareMatrix>> materialTangentField() const;
-#endif
+        virtual void materialTangentField(List<mat66>& matTan) const;
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;
+
+        //- Return the shear modulus field
+        virtual tmp<volScalarField> shearModulus() const;
 
         //- Calculate the volField stress
         virtual void correct(volSymmTensorField& sigma);

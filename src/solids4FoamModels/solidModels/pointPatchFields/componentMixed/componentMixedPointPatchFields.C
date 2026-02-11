@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef FOAMEXTEND
+
 #include "componentMixedPointPatchFields.H"
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
@@ -42,5 +44,7 @@ makeTemplatePointPatchTypeField                                               \
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

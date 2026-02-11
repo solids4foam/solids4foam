@@ -31,7 +31,7 @@ License
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
-    // #include "SymmetryPointPatchField.H"
+    #include "BasicSymmetryPointPatchField.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -661,12 +661,12 @@ void newLeastSquaresVolPointInterpolation::interpolate
 #ifdef OPENFOAM_NOT_EXTEND
                 symmetryPointPatchField<Type>
 #else
-                SymmetryPointPatchField
+                BasicSymmetryPointPatchField
                 <
                     pointPatchField,
                     pointMesh,
                     pointPatch,
-                    pointPatch,
+                    // pointPatch,
                     DummyMatrix,
                     Type
                 >
@@ -714,12 +714,12 @@ void newLeastSquaresVolPointInterpolation::interpolate
 #ifdef OPENFOAM_NOT_EXTEND
                 symmetryPointPatchField<Type>
 #else
-                SymmetryPointPatchField
+                BasicSymmetryPointPatchField
                 <
                     pointPatchField,
                     pointMesh,
                     pointPatch,
-                    pointPatch,
+                    // pointPatch,
                     DummyMatrix,
                     Type
                 >

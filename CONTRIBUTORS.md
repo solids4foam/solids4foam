@@ -2,35 +2,37 @@
 sort: 2
 ---
 
-# List of conctributors
+# List of contributors
 
 This list has been generated using `git shortlog -s --all`. If your name is
 missing, please let <philip.cardiff@ucd.ie> know.
 
 - Philip Cardiff
+- Ivan Batistić
 - Zeljko Tukovic
 - Danial Khazaei
-- Denis Maier
-- Iago Lessa de Oliveira
-- Jozsef Nagy
-- Jeff Heylmun
-- Saber Mohammadi
-- Bruno Santos
-- Cyrille Bonamy
-- Jeffrey Heylmun
-- Scott Levie
-- Sindeev Sergey
-- Andrew Whelan
-- Emad Tandis
-- Karen FitzGerald
-- Philipp Milovic
-- Seevani Bali
-- Ivan Batistic
-- Simona Moretti
-- Andrea Luigi Facci
 - Federico Mazzanti
-- Xiaohu Guo
+- Iago Lessa de Oliveira
+- Denis Maier
+- Jeff Heylmun
+- Gerasimos Chourdakis
 - Amirhossein Taran
+- Bruno Santos
+- Scott Levie
+- Saber Mohammadi
+- Jeffrey Heylmun
+- Cyrille Bonamy
+- Emad Tandis
+- Xiaohu Guo
+- Sergey Sindeev
+- Philipp Milovic
+- Patrick Höhn
+- Simona Moretti
 - Mark Olesen
-- Sandro Manservisi
-- Greg Burgreen
+- Karen FitzGerald
+- Bruno Santos
+- Ali Bozorgzadeh
+- Andry Guillaume
+- Jean-Marie Monlon
+- Matheus Miguel
+- Stephan Arndt

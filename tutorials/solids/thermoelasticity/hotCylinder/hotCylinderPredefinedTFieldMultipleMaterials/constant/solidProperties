@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -20,21 +20,6 @@ FoamFile
 //solidModel     weakThermalLinearGeometry;
 //solidModel     thermalLinearGeometry;
 solidModel     linearGeometryTotalDisplacement;
-
-"linearGeometryCoeffs|thermalLinearGeometryCoeffs|weakThermalLinearGeometryCoeffs"
-{
-    // Maximum number of correctors
-    nCorrectors    1000;
-
-    // Solution tolerance
-    solutionTolerance 1e-06;
-
-    // Alternative solution tolerance
-    alternativeTolerance 1e-07;
-
-    // Write frequency for the residuals
-    infoFrequencyT  100;
-}
 
 linearGeometryTotalDisplacementCoeffs
 {

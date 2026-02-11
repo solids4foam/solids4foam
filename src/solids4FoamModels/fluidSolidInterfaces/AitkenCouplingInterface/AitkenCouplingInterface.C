@@ -176,28 +176,22 @@ void AitkenCouplingInterface::updateDisplacement()
     {
         forAll(fluid().globalPatches(), interfaceI)
         {
-            aitkenRelaxationFactors_[interfaceI] =
-                -aitkenRelaxationFactors_[interfaceI]
-               *(
-                    sum
-                    (
-                        residualsPrev()[interfaceI]
-                      & (residuals()[interfaceI] - residualsPrev()[interfaceI])
-                    )
-                   /(
-                        sum
-                        (
-                            (
-                                residuals()[interfaceI]
-                              - residualsPrev()[interfaceI]
-                            )
-                          & (
-                                residuals()[interfaceI]
-                              - residualsPrev()[interfaceI]
-                            )
-                        )
-                    )
-                );
+            const vectorField resMinusResPrev
+            (
+                residuals()[interfaceI] - residualsPrev()[interfaceI]
+            );
+
+            const scalar denom = sum(resMinusResPrev & resMinusResPrev);
+
+            // Only update the relaxation factor if the denom is non-zero
+            if (denom > VSMALL)
+            {
+                aitkenRelaxationFactors_[interfaceI] =
+                    -aitkenRelaxationFactors_[interfaceI]
+                   *(
+                        sum(residualsPrev()[interfaceI] & resMinusResPrev )/denom
+                    );
+            }
 
             if (Pstream::parRun())
             {

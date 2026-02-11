@@ -185,18 +185,6 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
 }
 
 
-const labelIOList&
-directMapInterfaceToInterfaceMapping::zoneAToZoneBFaceMap() const
-{
-    if (zoneAToZoneBFaceMapPtr_.empty())
-    {
-        calcZoneAToZoneBFaceMap();
-    }
-
-    return zoneAToZoneBFaceMapPtr_;
-}
-
-
 void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
 {
     if (zoneBToZoneAFaceMapPtr_.valid())
@@ -318,18 +306,6 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
 }
 
 
-const labelIOList&
-directMapInterfaceToInterfaceMapping::zoneBToZoneAFaceMap() const
-{
-    if (zoneBToZoneAFaceMapPtr_.empty())
-    {
-        calcZoneBToZoneAFaceMap();
-    }
-
-    return zoneBToZoneAFaceMapPtr_;
-}
-
-
 void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
 {
     if (zoneAToZoneBPointMapPtr_.valid())
@@ -436,18 +412,6 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
             << "Direct mapping can only be used with conformal interfaces!"
             << abort(FatalError);
     }
-}
-
-
-const labelIOList&
-directMapInterfaceToInterfaceMapping::zoneAToZoneBPointMap() const
-{
-    if (zoneAToZoneBPointMapPtr_.empty())
-    {
-        calcZoneAToZoneBPointMap();
-    }
-
-    return zoneAToZoneBPointMapPtr_;
 }
 
 
@@ -560,19 +524,6 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
 }
 
 
-const labelIOList&
-directMapInterfaceToInterfaceMapping::zoneBToZoneAPointMap() const
-{
-    if (zoneBToZoneAPointMapPtr_.empty())
-    {
-        calcZoneBToZoneAPointMap();
-    }
-
-    return zoneBToZoneAPointMapPtr_();
-
-}
-
-
 void directMapInterfaceToInterfaceMapping::calcMinEdgeLengths() const
 {
     if (minEdgeLengthsPtr_.valid())
@@ -656,6 +607,55 @@ directMapInterfaceToInterfaceMapping::directMapInterfaceToInterfaceMapping
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+const labelIOList&
+directMapInterfaceToInterfaceMapping::zoneBToZoneAFaceMap() const
+{
+    if (zoneBToZoneAFaceMapPtr_.empty())
+    {
+        calcZoneBToZoneAFaceMap();
+    }
+
+    return zoneBToZoneAFaceMapPtr_;
+}
+
+
+const labelIOList&
+directMapInterfaceToInterfaceMapping::zoneAToZoneBFaceMap() const
+{
+    if (zoneAToZoneBFaceMapPtr_.empty())
+    {
+        calcZoneAToZoneBFaceMap();
+    }
+
+    return zoneAToZoneBFaceMapPtr_;
+}
+
+
+const labelIOList&
+directMapInterfaceToInterfaceMapping::zoneAToZoneBPointMap() const
+{
+    if (zoneAToZoneBPointMapPtr_.empty())
+    {
+        calcZoneAToZoneBPointMap();
+    }
+
+    return zoneAToZoneBPointMapPtr_;
+}
+
+
+const labelIOList&
+directMapInterfaceToInterfaceMapping::zoneBToZoneAPointMap() const
+{
+    if (zoneBToZoneAPointMapPtr_.empty())
+    {
+        calcZoneBToZoneAPointMap();
+    }
+
+    return zoneBToZoneAPointMapPtr_();
+
+}
+
 
 void directMapInterfaceToInterfaceMapping::transferFacesZoneToZone
 (

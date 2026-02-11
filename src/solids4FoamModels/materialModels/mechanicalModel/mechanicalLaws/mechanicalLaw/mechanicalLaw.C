@@ -161,7 +161,11 @@ void Foam::mechanicalLaw::makeSigma0() const
     }
 
     // Check if a single
-    if (mesh() == baseMesh())
+    if
+    (
+        mesh() == baseMesh()
+    || !baseMesh().foundObject<mechanicalModel>("mechanicalProperties")
+    )
     {
         sigma0Ptr_.set
         (
@@ -338,7 +342,11 @@ void Foam::mechanicalLaw::makeF()
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::NO_WRITE
+                // ZT: Must write in order to allow restart
+                // for incremental TL solvers.
+                // Required if correct(sigma) is used in the solver
+                IOobject::AUTO_WRITE
+                // IOobject::NO_WRITE
             ),
             mesh(),
             dimensionedTensor("I", dimless, I)
@@ -448,7 +456,7 @@ void Foam::mechanicalLaw::makeSigmaHyd()
                 "sigmaHyd",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::READ_IF_PRESENT,
+                IOobject::NO_READ,
                 IOobject::AUTO_WRITE
             ),
             mesh(),
@@ -466,7 +474,7 @@ void Foam::mechanicalLaw::makeSigmaHyd()
                 "grad(sigmaHyd)",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::READ_IF_PRESENT,
+                IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -1534,7 +1542,12 @@ Foam::mechanicalLaw::mechanicalLaw
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called
     // region0.
-    if (mesh.time().foundObject<fvMesh>("solid"))
+    // Alternatively, the user can specify the region name
+    if (dict_.found("regionName"))
+    {
+        baseMeshRegionName_ = word(dict_.lookup("regionName"));
+    }
+    else if (mesh.time().foundObject<fvMesh>("solid"))
     {
         baseMeshRegionName_ = "solid";
     }
@@ -1552,7 +1565,9 @@ Foam::mechanicalLaw::mechanicalLaw
             "    const fvMesh& mesh,\n"
             "    dictionary& dict\n"
             ")"
-        ) << "solid region name not found" << abort(FatalError);
+        )   << "solid region name not found. Maybe you meant to specify the "
+            << "region name in the mechanical law dict? " << nl
+            << "e.g. 'regionName      meshMotionFluid;'" << abort(FatalError);
     }
 
     if (solvePressureEqn_)
@@ -1610,20 +1625,17 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
-Foam::mechanicalLaw::materialTangentField() const
+void Foam::mechanicalLaw::materialTangentField(List<mat66>& matTan) const
 {
-    // Default to uniform field
-    // This function can be overwritten in specific mechanical laws
-    tmp<Field<scalarSquareMatrix>> tresult
-    (
-        new Field<scalarSquareMatrix>(mesh().nFaces(), materialTangent())
-    );
+    // Set the list size
+    matTan.resize(mesh().nFaces());
 
-    return tresult;
+    // Default to uniform field
+    forAll(matTan, faceI)
+    {
+        matTan[faceI] = materialTangent();
+    }
 }
-#endif
 
 
 void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)

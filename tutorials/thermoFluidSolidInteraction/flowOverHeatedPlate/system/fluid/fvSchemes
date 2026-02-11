@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     4.0                                |
-|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -23,14 +25,14 @@ ddtSchemes
 gradSchemes
 {
     default         Gauss linear;
-    
+
 }
 
 divSchemes
 {
     default none;
-    
-    div(phi,U) Gauss linearUpwind cellLimited grad(U) 1;    
+
+    div(phi,U) Gauss linearUpwind cellLimited grad(U) 1;
     div(phi,T) Gauss linearUpwind cellLimited grad(T) 1;
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
@@ -47,7 +49,6 @@ laplacianSchemes
     laplacian(lambdaEff,T) Gauss linear corrected;
 }
 
-
 snGradSchemes
 {
     default         corrected;
@@ -62,6 +63,5 @@ interpolationSchemes
 {
     default         linear;
 }
-
 
 // ************************************************************************* //

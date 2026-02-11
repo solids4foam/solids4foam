@@ -1,0 +1,11 @@
+cantileverAnalytical/cantileverAnalytical.C
+
+cantileverDisplacement/cantileverDisplacementPointPatchVectorField.C
+cantileverDisplacement/cantileverDisplacementFvPatchVectorField.C
+
+cantileverTraction/cantileverTractionPointPatchVectorField.C
+cantileverTraction/cantileverTractionFvPatchVectorField.C
+
+cantileverAnalyticalSolutionFunctionObject/cantileverAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libcantileverAnalytical

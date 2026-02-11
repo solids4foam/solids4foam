@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    Up
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_rtol "1e-3";
+            snes_stol "1e-3";
+            snes_max_it "1000";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            snes_max_linear_solve_fail "10000000";
+            snes_max_funcs "100000000";
+
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+            ksp_rtol "1e-2";
+            ksp_pc_side right;
+
+            pc_type fieldsplit;
+            pc_fieldsplit_block_size "3";
+
+            // Velocity in 2-D
+            pc_fieldsplit_0_fields "0,1";
+
+            // Pressure in 2-D
+            pc_fieldsplit_1_fields "2";
+
+            pc_fieldsplit_type schur;
+            pc_fieldsplit_schur_factorization_type lower;
+            //pc_fieldsplit_schur_precondition a11;
+            pc_fieldsplit_schur_precondition selfp;
+
+            // Velocity equation
+            fieldsplit_0_ksp_type preonly;
+            fieldsplit_0_pc_type asm;
+            fieldsplit_0_sub_pc_type ilu;
+            fieldsplit_0_sub_pc_factor_levels "0";
+
+            // Pressure equation
+            fieldsplit_1_ksp_type preonly;
+            fieldsplit_1_pc_type asm;
+            fieldsplit_1_sub_pc_type ilu;
+            fieldsplit_1_sub_pc_factor_levels "3";
+        }
+    }
+}
+
+// ************************************************************************* //

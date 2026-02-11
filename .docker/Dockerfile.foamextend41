@@ -1,22 +1,19 @@
 ################################################################################
 # Dockerfile to build solids4foam with foam-extend-4.1
-# philip.cardiff@ucd.ie, Aug 2022
+# philip.cardiff@ucd.ie, January 2026
 ################################################################################
 
 # Set the base image
-FROM philippic/foam-extend-4.1-ubuntu18.04-v2:latest
+FROM philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas
 
 # File Author / Maintainer
-MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
+LABEL maintainer="Philip Cardiff <philip.cardiff@ucd.ie>"
 
 # Change default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Add solids4Foam 
-COPY . /home/dockeruser/solids4foam
-
-# Change ownership to dockeruser
-RUN chown -R dockeruser:dockeruser /home/dockeruser/solids4foam
+# Add solids4Foam
+COPY --chown=dockeruser:dockeruser . /home/dockeruser/solids4foam
 
 # Change user to dockeruser
 USER dockeruser

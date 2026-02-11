@@ -24,14 +24,11 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
-    #include "polyTopoChange.H"
 #else
     #include "blockSolidTractionFvPatchVectorField.H"
-    #include "directTopoChange.H"
 #endif
 #include "fvcGradf.H"
 #include "wedgePolyPatch.H"
-#include "meshDualiser.H"
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -43,442 +40,63 @@ namespace Foam
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 
+#ifdef OPENFOAM_COM
+    const Enum<solidModel::solutionAlgorithm>
+    solidModel::solutionAlgorithmNames_
+    ({
+        {
+            solidModel::solutionAlgorithm::PETSC_SNES,
+            "PETScSNES"
+        },
+        {
+            solidModel::solutionAlgorithm::IMPLICIT_COUPLED,
+            "implicitCoupled"
+        },
+        {
+            solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED,
+            "implicitSegregated"
+        },
+        {
+            solidModel::solutionAlgorithm::EXPLICIT,
+            "explicit"
+        },
+    });
+#else
+    template<>
+    const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
+    {
+     	"PETScSNES",
+        "implicitCoupled",
+	"implicitSegregated",
+        "explicit"
+    };
+#endif
+
 #ifdef OPENFOAM_ORG
     typedef meshFaceZones faceZoneMesh;
 #endif
 }
 
+
+#ifndef OPENFOAM_COM
+const Foam::NamedEnum<Foam::solidModel::solutionAlgorithm, 4>
+    Foam::solidModel::solutionAlgorithmNames_;
+#endif
+
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 void Foam::solidModel::makeDualMesh() const
 {
-    if (dualMeshPtr_.valid() || dualMeshToMeshMapPtr_.valid())
+    if (dualMeshPtr_.valid())
     {
         FatalErrorIn("void Foam::solidModel::makeDualMesh() const")
-            << "Pointers already set!" << abort(FatalError);
+            << "Pointer already set!" << abort(FatalError);
     }
 
     Info<< "Creating dualMesh" << endl;
 
-    // Steps:
-    // 1. Copy the current mesh
-    // 2. Convert the mesh to its dual mesh
-    // 3. Create the dual-mesh-to-mesh and mesh-to-dual-mesh maps
-
-    // 1. Copy the current mesh
-    dualMeshPtr_.set
-    (
-        new fvMesh
-        (
-            Foam::IOobject
-            (
-                "dualMesh",
-                runTime().constant(),
-                runTime(),
-                Foam::IOobject::READ_IF_PRESENT
-            ),
-#ifdef OPENFOAM_NOT_EXTEND
-            pointField(mesh().points()),
-            faceList(mesh().faces()),
-            labelList(mesh().faceOwner()),
-            labelList(mesh().faceNeighbour()),
-#else
-            Xfer<pointField>(mesh().points()),
-            Xfer<faceList>(mesh().faces()),
-            Xfer<labelList>(mesh().faceOwner()),
-            Xfer<labelList>(mesh().faceNeighbour()),
-#endif
-            true
-        )
-    );
-
-    // Copy boundary patches
-    fvMesh& dualMesh = dualMeshPtr_();
-    List<polyPatch*> patches(mesh().boundaryMesh().size());
-    forAll(patches, patchI)
-    {
-        // Clone the patch and reset the referenced boundary mesh
-        patches[patchI] =
-            mesh().boundaryMesh()[patchI].clone(dualMesh.boundaryMesh()).ptr();
-    }
-
-    // Add boundary patches
-    dualMesh.addFvPatches(patches, true);
-
-
-    // 2. Convert the mesh to its dual mesh
-
-    // Create one dual face between cell centres and face centres
-    const bool splitAllFaces = true;
-
-    // Hard-coded settings
-    // Find a way to add this default value to 'solidProperties' dict in the
-    // future
-    const scalar featureAngle
-    (
-        solidModelDict().lookupOrDefault<scalar>
-        (
-            word("featureAngle"), scalar(30)
-        )
-    );
-    const bool doNotPreserveFaceZones
-    (
-        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false)
-    );
-    const bool concaveMultiCells
-    (
-        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false)
-    );
-
-    Info<< "    featureAngle: " << featureAngle << nl
-        << "    doNotPreserveFaceZones: " << doNotPreserveFaceZones << nl
-        << "    concaveMultiCells: " << concaveMultiCells << endl;
-
-    // Mark boundary edges and points
-    PackedBoolList isBoundaryEdge(dualMesh.nEdges());
-    for
-    (
-        label faceI = dualMesh.nInternalFaces();
-        faceI < dualMesh.nFaces();
-        faceI++
-    )
-    {
-        const labelList& fEdges = dualMesh.faceEdges()[faceI];
-
-        forAll(fEdges, i)
-        {
-            isBoundaryEdge.set(fEdges[i], 1);
-        }
-    }
-
-    // Face(centre)s that need inclusion in the dual mesh
-    labelList featureFaces;
-    // Edge(centre)s
-    labelList featureEdges;
-    // Points (that become a single cell) that need inclusion
-    labelList singleCellFeaturePoints;
-    // Points (that become a multiple cells)
-    labelList multiCellFeaturePoints;
-
-    // Sample implementation of feature detection.
-    simpleMarkFeatures
-    (
-        dualMesh,
-        isBoundaryEdge,
-        featureAngle,
-        concaveMultiCells,
-        doNotPreserveFaceZones,
-        featureFaces,
-        featureEdges,
-        singleCellFeaturePoints,
-        multiCellFeaturePoints
-    );
-
-    // If we want to split all polyMesh faces into one dualface per cell
-    // we are passing through we also need a point
-    // at the polyMesh facecentre and edgemid of the faces we want to
-    // split.
-    if (splitAllFaces)
-    {
-        featureEdges = identity(dualMesh.nEdges());
-        featureFaces = identity(dualMesh.nFaces());
-    }
-
-    // Topo change container
-#ifdef OPENFOAM_NOT_EXTEND
-    polyTopoChange meshMod(dualMesh.boundaryMesh().size());
-#else
-    directTopoChange meshMod(dualMesh.boundaryMesh().size());
-#endif
-
-    // Mesh dualiser engine
-    meshDualiser dualMaker(dualMesh);
-
-    // Insert all commands into directTopoChange to create dual of mesh.
-    // This does all the hard work.
-    dualMaker.setRefinement
-    (
-        splitAllFaces,
-        featureFaces,
-        featureEdges,
-        singleCellFeaturePoints,
-        multiCellFeaturePoints,
-        meshMod
-    );
-
-    // Create mesh, return map from old to new mesh.
-    autoPtr<mapPolyMesh> map = meshMod.changeMesh(dualMesh, false);
-
-    // Update fields
-    dualMesh.updateMesh(map);
-
-    if (map().hasMotionPoints())
-    {
-        dualMesh.movePoints(map().preMotionPoints());
-    }
-
-    // Find a way to add this default value to 'solidProperties' dict in the future
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
-    {
-        dualMesh.setInstance(runTime().constant());
-        Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
-        dualMesh.write();
-
-        // Write feature set fields
-        pointScalarField cellFeaturePoints
-        (
-            IOobject
-            (
-                "cellFeaturePoints",
-                runTime().timeName(),
-                runTime(),
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            pMesh_,
-            dimensionedScalar("0", dimless, 0.0)
-        );
-        forAll(singleCellFeaturePoints, i)
-        {
-            cellFeaturePoints[singleCellFeaturePoints[i]] += 1;
-        }
-        forAll(multiCellFeaturePoints, i)
-        {
-            cellFeaturePoints[multiCellFeaturePoints[i]] += 2;
-        }
-        Info<< "Writing " << cellFeaturePoints.name() << endl;
-        cellFeaturePoints.write();
-    }
-
-
-    // 3. Create the dual-mesh-to-mesh and mesh-to-dual-mesh maps
-    dualMeshToMeshMapPtr_.set
-    (
-        new dualMeshToMeshMap(mesh(), dualMesh, dualMaker)
-    );
-}
-
-
-// Copied from polyDualMeshApp.C
-void Foam::solidModel::simpleMarkFeatures
-(
-    const polyMesh& mesh,
-    const PackedBoolList& isBoundaryEdge,
-    const scalar featureAngle,
-    const bool concaveMultiCells,
-    const bool doNotPreserveFaceZones,
-    labelList& featureFaces,
-    labelList& featureEdges,
-    labelList& singleCellFeaturePoints,
-    labelList& multiCellFeaturePoints
-) const
-{
-#ifdef OPENFOAM_NOT_EXTEND
-    scalar minCos = Foam::cos(featureAngle*constant::mathematical::pi/180.0);
-#else
-    scalar minCos = Foam::cos(featureAngle*mathematicalConstant::pi/180.0);
-#endif
-
-    const polyBoundaryMesh& patches = mesh.boundaryMesh();
-
-    // Working sets
-    labelHashSet featureEdgeSet;
-    labelHashSet singleCellFeaturePointSet;
-    labelHashSet multiCellFeaturePointSet;
-
-
-    // 1. Mark all edges between patches
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    forAll(patches, patchI)
-    {
-        const polyPatch& pp = patches[patchI];
-        const labelList& meshEdges = pp.meshEdges();
-
-        // All patch corner edges. These need to be feature points & edges!
-        for (label edgeI = pp.nInternalEdges(); edgeI < pp.nEdges(); edgeI++)
-        {
-            label meshEdgeI = meshEdges[edgeI];
-            featureEdgeSet.insert(meshEdgeI);
-            singleCellFeaturePointSet.insert(mesh.edges()[meshEdgeI][0]);
-            singleCellFeaturePointSet.insert(mesh.edges()[meshEdgeI][1]);
-        }
-    }
-
-
-
-    // 2. Mark all geometric feature edges
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Make distinction between convex features where the boundary point becomes
-    // a single cell and concave features where the boundary point becomes
-    // multiple 'half' cells.
-
-    // Addressing for all outside faces
-    primitivePatch allBoundary
-    (
-        SubList<face>
-        (
-            mesh.faces(),
-            mesh.nFaces()-mesh.nInternalFaces(),
-            mesh.nInternalFaces()
-        ),
-        mesh.points()
-    );
-
-    // Check for non-manifold points (surface pinched at point)
-    allBoundary.checkPointManifold(false, &singleCellFeaturePointSet);
-
-    // Check for non-manifold edges (surface pinched at edge)
-    const labelListList& edgeFaces = allBoundary.edgeFaces();
-    const labelList& meshPoints = allBoundary.meshPoints();
-
-    forAll(edgeFaces, edgeI)
-    {
-        const labelList& eFaces = edgeFaces[edgeI];
-
-        if (eFaces.size() > 2)
-        {
-            const edge& e = allBoundary.edges()[edgeI];
-
-            //Info<< "Detected non-manifold boundary edge:" << edgeI
-            //    << " coords:"
-            //    << allBoundary.points()[meshPoints[e[0]]]
-            //    << allBoundary.points()[meshPoints[e[1]]] << endl;
-
-            singleCellFeaturePointSet.insert(meshPoints[e[0]]);
-            singleCellFeaturePointSet.insert(meshPoints[e[1]]);
-        }
-    }
-
-    // Check for features.
-    forAll(edgeFaces, edgeI)
-    {
-        const labelList& eFaces = edgeFaces[edgeI];
-
-        if (eFaces.size() == 2)
-        {
-            label f0 = eFaces[0];
-            label f1 = eFaces[1];
-
-            // check angle
-            const vector& n0 = allBoundary.faceNormals()[f0];
-            const vector& n1 = allBoundary.faceNormals()[f1];
-
-            if ((n0 & n1) < minCos)
-            {
-                const edge& e = allBoundary.edges()[edgeI];
-                label v0 = meshPoints[e[0]];
-                label v1 = meshPoints[e[1]];
-
-                label meshEdgeI = meshTools::findEdge(mesh, v0, v1);
-                featureEdgeSet.insert(meshEdgeI);
-
-                // Check if convex or concave by looking at angle
-                // between face centres and normal
-                vector c1c0
-                (
-                    allBoundary[f1].centre(allBoundary.points())
-                  - allBoundary[f0].centre(allBoundary.points())
-                );
-
-                if (concaveMultiCells && (c1c0 & n0) > SMALL)
-                {
-                    // Found concave edge. Make into multiCell features
-                    Info<< "Detected concave feature edge:" << edgeI
-                        << " cos:" << (c1c0 & n0)
-                        << " coords:"
-                        << allBoundary.points()[v0]
-                        << allBoundary.points()[v1]
-                        << endl;
-
-                    singleCellFeaturePointSet.erase(v0);
-                    multiCellFeaturePointSet.insert(v0);
-                    singleCellFeaturePointSet.erase(v1);
-                    multiCellFeaturePointSet.insert(v1);
-                }
-                else
-                {
-                    // Convex. singleCell feature.
-                    if (!multiCellFeaturePointSet.found(v0))
-                    {
-                        singleCellFeaturePointSet.insert(v0);
-                    }
-                    if (!multiCellFeaturePointSet.found(v1))
-                    {
-                        singleCellFeaturePointSet.insert(v1);
-                    }
-                }
-            }
-        }
-    }
-
-
-    // 3. Mark all feature faces
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    // Face centres that need inclusion in the dual mesh
-    labelHashSet featureFaceSet(mesh.nFaces()-mesh.nInternalFaces());
-    // A. boundary faces.
-    for (label faceI = mesh.nInternalFaces(); faceI < mesh.nFaces(); faceI++)
-    {
-        featureFaceSet.insert(faceI);
-    }
-
-    // B. face zones.
-    const faceZoneMesh& faceZones = mesh.faceZones();
-
-    if (doNotPreserveFaceZones)
-    {
-        if (faceZones.size() > 0)
-        {
-            WarningIn("simpleMarkFeatures(..)")
-                << "Detected " << faceZones.size()
-                << " faceZones. These will not be preserved."
-                << endl;
-        }
-    }
-    else
-    {
-        if (faceZones.size() > 0)
-        {
-            Info<< "Detected " << faceZones.size()
-                << " faceZones. Preserving these by marking their"
-                << " points, edges and faces as features." << endl;
-        }
-
-        forAll(faceZones, zoneI)
-        {
-            const faceZone& fz = faceZones[zoneI];
-
-            Info<< "Inserting all faces in faceZone " << fz.name()
-                << " as features." << endl;
-
-            forAll(fz, i)
-            {
-                label faceI = fz[i];
-                const face& f = mesh.faces()[faceI];
-                const labelList& fEdges = mesh.faceEdges()[faceI];
-
-                featureFaceSet.insert(faceI);
-                forAll(f, fp)
-                {
-                    // Mark point as multi cell point (since both sides of
-                    // face should have different cells)
-                    singleCellFeaturePointSet.erase(f[fp]);
-                    multiCellFeaturePointSet.insert(f[fp]);
-
-                    // Make sure there are points on the edges.
-                    featureEdgeSet.insert(fEdges[fp]);
-                }
-            }
-        }
-    }
-
-    // Transfer to arguments
-    featureFaces = featureFaceSet.toc();
-    featureEdges = featureEdgeSet.toc();
-    singleCellFeaturePoints = singleCellFeaturePointSet.toc();
-    multiCellFeaturePoints = multiCellFeaturePointSet.toc();
+    dualMeshPtr_.set(new meshDual(mesh(), solidModelDict()));
 }
 
 
@@ -656,6 +274,33 @@ void Foam::solidModel::makeRho() const
 }
 
 
+void Foam::solidModel::makeU() const
+{
+    if (!UPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeU() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    UPtr_.set
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "U",
+                runTime().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimLength/dimTime, vector::zero)
+        )
+    );
+}
+
+
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 {
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -714,7 +359,7 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
-const Foam::fvMesh& Foam::solidModel::dualMesh() const
+const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
     if (dualMeshPtr_.empty())
     {
@@ -725,7 +370,7 @@ const Foam::fvMesh& Foam::solidModel::dualMesh() const
 }
 
 
-Foam::fvMesh& Foam::solidModel::dualMesh()
+Foam::meshDual& Foam::solidModel::dualMesh()
 {
     if (dualMeshPtr_.empty())
     {
@@ -733,17 +378,6 @@ Foam::fvMesh& Foam::solidModel::dualMesh()
     }
 
     return dualMeshPtr_();
-}
-
-
-const Foam::dualMeshToMeshMap& Foam::solidModel::dualMeshMap() const
-{
-    if (dualMeshToMeshMapPtr_.empty())
-    {
-        makeDualMesh();
-    }
-
-    return dualMeshToMeshMapPtr_();
 }
 
 
@@ -755,17 +389,6 @@ Foam::thermalModel& Foam::solidModel::thermal()
     }
 
     return thermalPtr_();
-}
-
-
-Foam::mechanicalModel& Foam::solidModel::mechanical()
-{
-    if (mechanicalPtr_.empty())
-    {
-        makeMechanicalModel();
-    }
-
-    return mechanicalPtr_();
 }
 
 
@@ -949,6 +572,34 @@ Foam::volVectorField& Foam::solidModel::rhoD2dt2D() const
     return rhoD2dt2DPtr_();
 }
 
+
+Foam::volScalarField& Foam::solidModel::p()
+{
+    if (pPtr_.empty())
+    {
+        pPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "p",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0),
+                "zeroGradient"
+            )
+        );
+    }
+
+    return autoPtrRef(pPtr_);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -972,9 +623,11 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
-    meshPtr_
+    meshOwnerPtr_
     (
-        dynamicFvMesh::New
+        runTime.foundObject<dynamicFvMesh>(region)
+      ? Foam::autoPtr<Foam::dynamicFvMesh>()
+      : dynamicFvMesh::New
         (
             IOobject
             (
@@ -985,8 +638,13 @@ Foam::solidModel::solidModel
             )
         )
     ),
+    meshPtr_
+    (
+        meshOwnerPtr_.valid()
+      ? meshOwnerPtr_.ptr()
+      : &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
+    ),
     dualMeshPtr_(),
-    dualMeshToMeshMapPtr_(),
     solidProperties_
     (
         // If region == "region0" then read from the main case
@@ -1012,8 +670,42 @@ Foam::solidModel::solidModel
         )
     ),
     type_(type),
+    solutionAlgorithm_
+    (
+        solidModelDict().found("solutionAlgorithm")
+#ifdef OPENFOAM_COM
+      ? solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
+#else
+      ? solutionAlgorithmNames_.read(solidModelDict().lookup("solutionAlgorithm"))
+#endif
+      : solutionAlgorithm::IMPLICIT_SEGREGATED
+    ),
     thermalPtr_(),
     mechanicalPtr_(),
+    useBoundaryFaceValuesD_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_D",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
+    useBoundaryFaceValuesp_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_p",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
     DDheader_("DD", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pointDheader_("pointD", runTime.timeName(), mesh(), IOobject::MUST_READ),
@@ -1043,20 +735,8 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("0", dimLength/dimTime, vector::zero)
-    ),
-    pMesh_(pointMesh::New(meshPtr_())),
+    UPtr_(),
+    pMesh_(pointMesh::New(*meshPtr_)),
     pointD_
     (
         IOobject
@@ -1182,11 +862,11 @@ Foam::solidModel::solidModel
         (
             "aitkenAlpha",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedScalar("one", dimless, 1.0)
     ),
     aitkenResidual_
@@ -1195,44 +875,11 @@ Foam::solidModel::solidModel
         (
             "aitkenResidual",
             runTime.constant(),
-            meshPtr_(),
+            *meshPtr_,
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        meshPtr_(),
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
-    QuasiNewtonRestartFreq_
-    (
-        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
-    ),
-    QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonT_(QuasiNewtonRestartFreq_ + 2),
-    DRef_
-    (
-        IOobject
-        (
-            "DRef",
-            runTime.constant(),
-            meshPtr_(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        meshPtr_(),
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
-    unrelaxedDRef_
-    (
-        IOobject
-        (
-            "unrelaxedDRef",
-            runTime.constant(),
-            meshPtr_(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        meshPtr_(),
+        *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     globalPatchesPtrList_(),
@@ -1241,8 +888,42 @@ Foam::solidModel::solidModel
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
-    rhoD2dt2DPtr_()
+    rhoD2dt2DPtr_(),
+    twoDCorrector_(mesh()),
+    twoD_(mesh().nGeometricD() == 2),
+    solvePressure_
+    (
+        solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
+    ),
+    pPtr_()
+#ifdef OPENFOAM_COM
+    ,
+    fvOptions_(fv::options::New(*meshPtr_))
+#endif
 {
+    // Set the useBoundaryFaceValues fields
+    forAll(useBoundaryFaceValuesD_, patchI)
+    {
+        if (isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        {
+            useBoundaryFaceValuesD_[patchI] = false;
+        }
+        else
+        {
+            useBoundaryFaceValuesD_[patchI] = true;
+        }
+    }
+    if (pPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesp_, patchI)
+        {
+            if (pPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesp_[patchI] = true;
+            }
+        }
+    }
+
     // Force old time fields to be stored
     D_.oldTime().oldTime();
     DD_.oldTime().oldTime();
@@ -1284,10 +965,6 @@ Foam::solidModel::solidModel
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
-    if (relaxationMethod_ == "QuasiNewton")
-    {
-        Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
-    }
 
     // If requested, create the residual file
     if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))
@@ -1321,6 +998,13 @@ Foam::solidModel::solidModel
             solidModelDict().subDict("stabilisation")
         )
     );
+
+#ifdef OPENFOAM_COM
+    if (!fvOptions_.optionList::size())
+    {
+        Info<< "No finite volume options present" << endl;
+    }
+#endif
 
     // If the case is axisymmetric, we will disable solving in the out-of-plane
     // direction
@@ -1359,6 +1043,17 @@ const Foam::thermalModel& Foam::solidModel::thermal() const
     }
 
     return thermalPtr_();
+}
+
+
+Foam::mechanicalModel& Foam::solidModel::mechanical()
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
 }
 
 
@@ -2008,119 +1703,18 @@ Foam::scalar Foam::solidModel::newDeltaT()
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
-    const volVectorField& DD,
-    pointVectorField& pointDD
+    const pointVectorField& pointDD
 )
 {
     Info<< "Moving the mesh to the deformed configuration" << nl << endl;
 
-    //- Move mesh by interpolating displacement field to vertices
+    const vectorField& pointDDI = pointDD;
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(DD, pointDD);
+    // Calculate the new points and apply 2-D corrections
+    vectorField newPoints(oldPoints + pointDDI);
+    twoDCorrector_.correctPoints(newPoints);
 
-    // Fix, AW/PC, 22-Dec-20,
-    // correctBoundaryConditions should not be called as it causes (global?)
-    // points to become out of sync. This results in the error "face area does
-    // not match neighbour..."
-    //pointDD.correctBoundaryConditions();
-
-#ifdef OPENFOAM_NOT_EXTEND
-    vectorField& pointDDI = pointDD.primitiveFieldRef();
-#else
-    vectorField& pointDDI = pointDD.internalField();
-#endif
-
-    vectorField newPoints = oldPoints;
-
-    // Correct symmetryPlane points
-
-    forAll(mesh().boundaryMesh(), patchI)
-    {
-        if (isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-             == 0
-            )
-            {
-                continue;
-            }
-
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-
-            const vector i(1, 0, 0);
-            const vector j(0, 1, 0);
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & i) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].x() = 0;
-                }
-            }
-            else if (mag(avgN & j) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].y() = 0;
-                }
-            }
-            else if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].z() = 0;
-                }
-            }
-        }
-        else if (isA<emptyPolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-            )
-            {
-                continue;
-            }
-
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].z() = 0;
-                }
-            }
-        }
-    }
-
-    // Note: allPoints will have more points than pointDD if there are
-    // globalFaceZones
-    forAll(pointDDI, pointI)
-    {
-        newPoints[pointI] += pointDDI[pointI];
-    }
-
-    // Move unused globalFaceZone points
-    // Not need anymore as globalFaceZones are not used
-    //updateGlobalFaceZoneNewPoints(pointDDI, newPoints);
-
-    twoDPointCorrector twoDCorrector(mesh());
-    twoDCorrector.correctPoints(newPoints);
-    twoDCorrector.correctPoints(pointDDI);
+    // Move the mesh
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);

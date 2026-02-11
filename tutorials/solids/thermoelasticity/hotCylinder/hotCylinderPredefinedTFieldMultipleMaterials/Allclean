@@ -11,3 +11,10 @@ rm -rf constant/polyMesh/boundary VTK case.foam postProcessing system/*Subset
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
+
+# Fix for symmetry type
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo "Replacing symmetry with symmetryPlane for T files in hotCylinderTemperatureField"
+    find hotCylinderTemperatureField -name T | xargs sed -i 's\symmetry\symmetryPlane\g'
+fi

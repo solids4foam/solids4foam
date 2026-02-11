@@ -543,6 +543,30 @@ Foam::fluidModel::fluidModel
         )
     ),
     g_(readG()),
+    useBoundaryFaceValuesU_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_U",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
+    useBoundaryFaceValuesp_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_p",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
     UPtr_
@@ -630,6 +654,40 @@ Foam::fluidModel::fluidModel
             fvc::interpolate(U()) & mesh().Sf()
         )
     ),
+    APtr_
+    (
+        constructNull
+      ? nullptr
+      : new volVectorField
+        (
+            IOobject
+            (
+                "A",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            fvc::ddt(UPtr_())
+        )
+    ),
+    dpdtPtr_
+    (
+        constructNull
+      ? nullptr
+      : new volScalarField
+        (
+            IOobject
+            (
+                "dpdt",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            fvc::ddt(pPtr_())
+        )
+    ),
     adjustTimeStep_
     (
         runTime.controlDict().lookupOrDefault<Switch>("adjustTimeStep", false)
@@ -647,16 +705,39 @@ Foam::fluidModel::fluidModel
     UMax_("UMax", dimVelocity, 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
+    twoD_(mesh().nGeometricD() == 2),
 #ifdef OPENFOAM_ORG
     fvModels_(fvModels::New(mesh())),
     fvConstraints_(fvConstraints::New(mesh())),
-#elif OPENFOAM_COM
+#elif defined(OPENFOAM_COM)
     fvOptions_(fv::options::New(mesh())),
 #endif
     fsiMeshUpdate_(false),
     fsiMeshUpdateChanged_(false),
     globalPatchesPtrList_()
 {
+    // Set the useBoundaryFaceValues fields
+    if (UPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesU_, patchI)
+        {
+            if (UPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesU_[patchI] = true;
+            }
+        }
+    }
+    if (pPtr_.valid())
+    {
+        forAll(useBoundaryFaceValuesp_, patchI)
+        {
+            if (pPtr_->boundaryField()[patchI].fixesValue())
+            {
+                useBoundaryFaceValuesp_[patchI] = true;
+            }
+        }
+    }
+
     if (!constructNull)
     {
         gradUPtr_() = fvc::grad(UPtr_());
@@ -686,7 +767,7 @@ Foam::fluidModel::fluidModel
     {
         Info << "No fvConstraints present" << endl;
     }
-#elif OPENFOAM_COM
+#elif defined(OPENFOAM_COM)
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
     {

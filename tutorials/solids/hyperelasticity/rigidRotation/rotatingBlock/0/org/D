@@ -1,0 +1,89 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    left
+    {
+        type           fixedRotation;
+        rotationAngleSeries
+        {
+            "fileName|file"       "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds    clamp;
+        }
+        rotationAxis   ( 0 0 1 );
+        rotationOrigin ( 0 0 0 );
+        value          uniform ( 0 0 0 );
+    }
+
+    right
+    {
+        type           fixedRotation;
+        rotationAngleSeries
+        {
+            "fileName|file"       "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds    clamp;
+        }
+        rotationAxis   ( 0 0 1 );
+        rotationOrigin ( 0 0 0 );
+        value          uniform ( 0 0 0 );
+    }
+
+    top
+    {
+        type           fixedRotation;
+        rotationAngleSeries
+        {
+            "fileName|file"       "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds    clamp;
+        }
+        rotationAxis   ( 0 0 1 );
+        rotationOrigin ( 0 0 0 );
+        value          uniform ( 0 0 0 );
+    }
+
+    bottom
+    {
+        type           fixedRotation;
+        rotationAngleSeries
+        {
+            "fileName|file"       "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds    clamp;
+        }
+        rotationAxis   ( 0 0 1 );
+        rotationOrigin ( 0 0 0 );
+        value          uniform ( 0 0 0 );
+    }
+
+    back
+    {
+        type            empty;
+    }
+
+    front
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

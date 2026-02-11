@@ -180,6 +180,29 @@ the cases in the Fluent `.msh` format, and the meshes are created with the
 
 ---
 
+## Regression Testing
+
+The `rotatingSphere` case also includes a lightweight physics-based regression
+test (`regressionTest.sh`). This script automatically runs the case using
+several solid formulation and solver combinations (total/updated Lagrangian,
+with and without PETSc SNES) and checks a key physical invariant of the problem.
+
+For a purely rigid body rotation, a correct finite-strain formulation and
+constitutive model should generate zero stress. In practice, the regression
+test verifies that the final reported maximum von Mises stress remains small
+(below a loose threshold), ensuring that no spurious stresses are introduced
+during large rotations.
+
+This regression test is primarily intended for automated verification (e.g.
+continuous integration and solver development) rather than routine tutorial
+usage, and can be run manually with
+
+```bash
+cd rotatingSphere && ./regressionTest.sh
+```
+
+---
+
 ### References
 
 [1] Maneeratana K, 2000, Development of the finite volume method for non-linear

@@ -6,7 +6,7 @@ sort: 5
 
 ---
 
-Prepared by Ivan Batistić
+Prepared by Ivan Batistić with edits by Philip Cardiff
 
 ---
 
@@ -61,7 +61,7 @@ $$
 u_y = \frac{P}{6EI} \left(3\nu y^2(L-x)+(4+5\nu)\frac{D^2x}{4}+(3L-x)x^2  \right),
 $$
 
-​ where $\nu$ is Poisson's ratio, $E$ is Young modulus, $I$ is the second moment
+ where $\nu$ is Poisson's ratio, $E$ is Young modulus, $I$ is the second moment
 of are of the cross-section, $P$ is applied load and $L$ is length of the beam.
 
 ```note
@@ -150,7 +150,7 @@ $$
   \qquad \sigma_z = \nu \sigma_y.
 $$
 
-​ where $$E$$ is Young's modulus, $$\nu$$ Poisson's ratio and $$\Delta$$
+ where $$E$$ is Young's modulus, $$\nu$$ Poisson's ratio and $$\Delta$$
 prescribed displacement of upper block top surface.
 
 ```note
@@ -229,7 +229,7 @@ $$
 -\frac{a^2+b^2}{r}\right)\cos (\theta),
 $$
 
-​ where $a$ is beam inner radius, $b$ is beam outer radius and $P$ is applied
+ where $a$ is beam inner radius, $b$ is beam outer radius and $P$ is applied
 shear force.
 
 - **Example of usage**
@@ -297,7 +297,7 @@ $$
 T = \displaystyle{\frac{\Delta T}{\ln \frac{b}{a}} \ln \frac{b}{r}},
 $$
 
-​ where $a$ is pipe inner radius, $b$ is pipe outer radius, $\nu$ is Poisson's
+ where $a$ is pipe inner radius, $b$ is pipe outer radius, $\nu$ is Poisson's
 ratio, $E$ is Young modulus, $\alpha$ is coefficient of linear thermal expansion
 and $\Delta T$ is temperature difference between inner and outer pipe surface.
 
@@ -372,7 +372,7 @@ $$
 + \frac{2a^2}{r^2} \right)\sin(2\theta),
 $$
 
-​ same in cartesian coordinates:
+ same in cartesian coordinates:
 
 $$
 \sigma_{xx} = T \left( 1-\frac{a^2}{r^2}\left(\frac{3}{2}\cos(2\theta)
@@ -389,7 +389,7 @@ $$
 +\sin(4\theta) \right) + \frac{3}{2}\frac{a^4}{r^4}\sin(4\theta) \right).
 $$
 
-​ Displacement field in cartesian coordinates:
+ Displacement field in cartesian coordinates:
 
 $$
 u_x = \frac{Ta}{8\mu}\left( \frac{r}{a}(\kappa+1)\cos\theta+\frac{2a}{r}
@@ -403,7 +403,7 @@ u_y = \frac{Ta}{8\mu}\left( \frac{r}{a}(\kappa-3)\sin\theta+\frac{2a}{r}
 -\frac{2a^3}{r^3}\sin(3\theta)  \right),
 $$
 
-​ where $$a$$ is hole radius, $$T$$ is far field traction in $$x$$ direction,
+ where $$a$$ is hole radius, $$T$$ is far field traction in $$x$$ direction,
 $$\nu$$ is Poisson's ratio, $$\mu$$ is shear modulus and $$\kappa$$ parameter is
 equal to $$3-4\nu$$.
 
@@ -643,12 +643,12 @@ equal to $$3-4\nu$$.
 
   - Output file format:
 
-    ```c++
-    # Time minX minY minZ maxX maxY maxZ avX avY avZ
-    1 1 1 1 3 4 5 1.2 2 4
-    2 1 1 1 3 3 2 1 3 5
-    ...
-    ```
+      ```c++
+      # Time minX minY minZ maxX maxY maxZ avX avY avZ
+      1 1 1 1 3 4 5 1.2 2 4
+      2 1 1 1 3 3 2 1 3 5
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `solids/hyperelasticity/longWall`
@@ -703,12 +703,12 @@ equal to $$3-4\nu$$.
 
   - Output file format:
 
-    ```c++
-    # Time forceX forceY forceZ normalForce
-    1 40 40 50 48
-    2 40 60 70 45
-    ...
-    ```
+      ```c++
+      # Time forceX forceY forceZ normalForce
+      1 40 40 50 48
+      2 40 60 70 45
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `solids/linearElasticity/punch`
@@ -778,12 +778,12 @@ equal to $$3-4\nu$$.
 
   - Output file format:
 
-    ```c++
-    # Time dispX dispY dispZ forceX forceY forceZ
-    1 0.1 0.1 0.1 40 40 50
-    2 0.1 0.2 0.2 40 60 70
-    ...
-    ```
+      ```c++
+      # Time dispX dispY dispZ forceX forceY forceZ
+      1 0.1 0.1 0.1 40 40 50
+      2 0.1 0.2 0.2 40 60 70
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `solids/linearElasticity/punch`
@@ -836,12 +836,12 @@ equal to $$3-4\nu$$.
 
   - Output file format:
 
-    ```c++
-    # Time kineticEnergy
-    1 0.10
-    2 0.11
-    ...
-    ```
+      ```c++
+      # Time kineticEnergy
+      1 0.10
+      2 0.11
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `None`
@@ -887,12 +887,12 @@ equal to $$3-4\nu$$.
 
   - Output file format:
 
-    ```c++
-    # Time Dx Dy Dz magD
-    1 0.10 0.20 0.10 0.24494897
-    2 0.11 0.20 0.22 0.26551836
-    ...
-    ```
+      ```c++
+      # Time Dx Dy Dz magD
+      1 0.10 0.20 0.10 0.24494897
+      2 0.11 0.20 0.22 0.26551836
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `solids/hyperelasticity/cylinderCrush`
@@ -959,12 +959,12 @@ This function object is currently only implemented for serial run!
 
   - Output file format:
 
-    ```c++
-    # PointID PointCoord Dx Dy Dz mag
-    152 (0.2 0.3 0.5) 0.1 0.2 0.1 0.2449
-    258 (0.4 0.3 0.5) 0.1 0.2 0.2 0.3
-    ...
-    ```
+      ```c++
+      # PointID PointCoord Dx Dy Dz mag
+      152 (0.2 0.3 0.5) 0.1 0.2 0.1 0.2449
+      258 (0.4 0.3 0.5) 0.1 0.2 0.2 0.3
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   None.
@@ -1058,12 +1058,12 @@ This function object is currently only implemented for serial run!
 
   - Output file format:
 
-    ```c++
-    # Time value
-    1 225
-    2 226
-    ...
-    ```
+      ```c++
+      # Time value
+      1 225
+      2 226
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `None`
@@ -1105,9 +1105,9 @@ This function object is currently only implemented for serial run!
 
   - `referencePoint` is a coordinate at which the potential energy is zero.
 
-    ```note
-    The value for the uniform gravity field $g$ is specified at `constant/g`!
-    ```
+  ```note
+  The value for the uniform gravity field $g$ is specified at `constant/g`!
+  ```
 
 - **Optional arguments**
 
@@ -1119,12 +1119,12 @@ This function object is currently only implemented for serial run!
 
   - Output file format:
 
-    ```c++
-    # Time potentialEnergy
-    1 500
-    2 520
-    ...
-    ```
+      ```c++
+      # Time potentialEnergy
+      1 500
+      2 520
+      ...
+      ```
 
 - **Tutorial case in which it is used:**
   `None`
@@ -1238,9 +1238,9 @@ This function object is currently only implemented for serial run!
 
   - `historyPatch` is the name of the patch.
 
-    ```note
-    The non-existing patch name will not stop the simulation.
-    ```
+      ```note
+      The non-existing patch name will not stop the simulation.
+      ```
 
 - **Optional arguments**
 
@@ -1253,10 +1253,24 @@ This function object is currently only implemented for serial run!
   - Output file format:
 
     ```c++
-    # Time torqueX torqueY torqueZ
-    1 10 12 13
-    2 12 13 13
-    ...
+    functions
+    {
+        cavityAnalytical
+        {
+            type sphericalCavityAnalyticalSolution;
+
+            farFieldTractionZ 1e6;
+            cavityRadius 0.2;
+            E 200e9;
+            nu 0.3;
+
+            // Optional
+            cellDisplacement yes;
+            pointDisplacement no;
+            cellStress yes;
+            pointStress no;
+        }
+    }
     ```
 
 - **Tutorial case in which it is used:**
@@ -1316,6 +1330,89 @@ This function object is currently only implemented for serial run!
 
 - **Tutorial case in which it is used:**
   `None`
+
+---
+
+## `squarePlateAnalyticalSolution/`
+
+- **Function object purpose**
+  To generate the analytical solution fields for the thin square plate problem.
+  The analytical solution is taken from:
+  [Timoshenko, S., & Woinowsky-Krieger, S., Theory of plates and shells. 1959.](https://www.cap-recifal.com/ccs_files/articles/cuveaqua1_denisio/Timoshenko_-_Theory_of_plates_and_shells.pdf)
+
+$$
+w = \frac{4\,p\,a^4}{\pi^5 D}
+\sum_{m = 1,3,5,\dots}
+\frac{(-1)^{\frac{m-1}{2}}}{m^5} \,
+\cos\!\biggl(\frac{m\pi x}{a}\biggr)
+\Biggl[
+  1
+  - \frac{\alpha_m \,\tanh(\alpha_m) \;+\; 2\,\cosh\!\bigl(\dfrac{m\pi y}{a}\bigr)}{2\,\cosh(\alpha_m)}
+  \;+\;
+  \frac{1}{2\,\cosh(\alpha_m)}\,\frac{m \pi y}{a}\,\sinh\!\bigl(\dfrac{m\pi y}{a}\bigr)
+\Biggr].
+$$
+
+ where $p$ is the applied pressure, $D$ is the plate bending stiffness, $a$ is
+ the plate length (in the $x$-direction) and $\alpha_m=\pi m b/(2a)$.
+
+```note
+The analytical solution field is available only when all edges are (simply) supported.
+For a clamped plate, only the maximum deflection is printed.
+The analytical solution assumes the origin is at the centre of the plate.
+```
+
+- **Example of usage**
+
+  ```c++
+  functions
+  {
+      cantileverSolution
+      {
+          type    cantileverAnalyticalSolution;
+
+          a    10;
+          b    10;
+          h    0.1;
+          p    1000;
+          E    2e11;
+          nu   0.3;
+
+          //Optional
+          cellDisplacement true;
+          pointDisplacement true;
+      }
+  }
+  ```
+
+- **Arguments**
+
+  - `P` Applied transverse pressure;
+  - `a` Length of the plate (in x direction);
+  - `b` Width of the plate (in y direction);
+  - `h` Depth of the plate;
+  - `E` Young's modulus;
+  - `nu` Poisson's ratio.
+
+- **Optional arguments**
+
+  - `cellDisplacement` write the analytical solution for cell-centred displacement
+    field; default is true;
+  - `pointDisplacement` write the analytical solution for vertex-centred
+    displacement field; default is true;
+
+- **Outputs**
+
+  - Analytical solution for the displacement field `analyticalD` in time
+    directories.
+  - `DDiference` field; difference between analytical displacement (deflection)
+    and calculated one: `analyticalD-D`.
+  - Log at the end of each time-step:
+    `Norms: mean L1, mean L2, LInfL: 0.12 0.2 0.5`
+    `...`
+
+- **Tutorial case in which it is used:** :
+  `solids/beamsPlatesShells/squarePlate`
 
 ---
 

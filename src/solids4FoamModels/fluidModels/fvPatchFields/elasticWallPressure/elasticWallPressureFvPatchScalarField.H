@@ -50,7 +50,7 @@ class elasticWallPressureFvPatchScalarField
     public robinFvPatchField<scalar>
 {
     // Private data
-    //
+
         //- Pressure applied at the solid side of the interface
         //  in the previous fsi iteration
         scalarField prevPressure_;
@@ -58,6 +58,22 @@ class elasticWallPressureFvPatchScalarField
         //- Acceleration of the solid side of the interface
         //  in the previous fsi iteration
         vectorField prevAcceleration_;
+
+        //- A pointer to the solid density times the solid virtual thickness
+        //  field mapped to the fluid patch
+        mutable autoPtr<scalarField> rhoSolidHsPtr_;
+
+        //- Optional constant solid thickness
+        //  If constantHs < SMALL, it indicates that it should not be used and
+        // instead a virtual solid thickness is calculated on the fly
+        const scalar constantHs_;
+
+
+    // Private functions
+
+        //- Return (and construct, if needed) the rhoSolid field
+        const scalarField& rhoSolidHs() const;
+
 
 public:
 

@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Solution algorithm: implicitSegregated (default), PETScSNES, ..
+    solutionAlgorithm PETScSNES;
+
+    // Solution tolerance for displacement
+    "solutionTolerance|sTol"       1e-12;
+
+    // Alternative solution tolerance for displacement
+    "alternativeTolerance|rTol"    1e-12;
+
+    // Stabilisation term
+    stabilisation
+    {
+        type        RhieChow;
+        scaleFactor 1.0;
+    }
+}
+
+// ************************************************************************* //

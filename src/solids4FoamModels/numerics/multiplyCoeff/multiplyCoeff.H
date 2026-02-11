@@ -35,11 +35,8 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "scalarMatrices.H"
-#else
-    #include "scalarSquareMatrix.H"
-#endif
+#include "mat66.H"
+#include "mat39.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +55,33 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        const scalarSquareMatrix& C,
+        const mat66& C,
+        const vector& g
+    );
+
+    // The multiplication evaluates the following in index notation:
+    //     coeff_ij = (Sf_m C_mikl + G_mkl sigma_mi)*g_k delta_lj
+    // where delta is kronecker delta.
+    // The 4th order material tangent matrix is represented by a 6x6 matrix and
+    // the geometric stiffness matrix is represented by a 3x9 matrix
+    void multiplyCoeff
+    (
+        tensor& coeff,
+        const vector& Sf,
+        const mat66& C,
+        const mat39& G,
+        const symmTensor& sigma,
+        const vector& g
+    );
+
+    // The multiplication evaluates the following in index notation:
+    //     coeff_ij = gradP_m G_mkl g_k
+    // The geometric stiffness matrix is represented by a 3x9 matrix
+    void multiplyCoeff
+    (
+        vector& coeff,
+        const mat39& G,
+        const vector& gradP,
         const vector& g
     );
 

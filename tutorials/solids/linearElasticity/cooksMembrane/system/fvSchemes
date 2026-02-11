@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -30,7 +30,7 @@ ddtSchemes
 gradSchemes
 {
      default                none;
-     grad(D)                extendedLeastSquares 0;
+     grad(D)                leastSquares;
 }
 
 divSchemes
@@ -42,8 +42,7 @@ divSchemes
 
 laplacianSchemes
 {
-    default                 none;
-    laplacian(DD,D)         Gauss linear corrected;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
@@ -53,9 +52,7 @@ snGradSchemes
 
 interpolationSchemes
 {
-    default                 none;
-    interpolate(impK)       linear;
-    interpolate(grad(D))    linear;
+    default                 linear;
 }
 
 // ************************************************************************* //

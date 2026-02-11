@@ -53,9 +53,9 @@ functions
     forces
     {
         type                forces;
-        "libs|functionObjectLibs" ( "libforces.so" );
-        outputControl       timeStep;
-        outputInterval      1;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
         patches             (wall);
         "pName|p"           p;
         "UName|U"           U;

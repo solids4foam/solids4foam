@@ -35,7 +35,6 @@ SourceFiles
 #ifndef solidTractionFreeFvPatchVectorField_H
 #define solidTractionFreeFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
 

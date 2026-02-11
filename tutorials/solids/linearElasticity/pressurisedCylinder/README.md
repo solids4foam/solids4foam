@@ -56,8 +56,8 @@ and for radial displacement:
 
 $$
 u_r =
-\dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\rig
-ht].
+\dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}
+\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\right].
 $$
 
 Results presented in Figures 2 and 3 show numerical and analytical calculations

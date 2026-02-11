@@ -20,6 +20,8 @@ InClass
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef FOAMEXTEND
+
 #include "solidRigidContactFvPatchVectorField.H"
 #include "pointFields.H"
 #include "PrimitivePatchInterpolationTemplate.H"
@@ -549,5 +551,6 @@ Foam::solidRigidContactFvPatchVectorField::zoneToZones()
 //     return shadowZones()[masterShadowID];
 // }
 
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

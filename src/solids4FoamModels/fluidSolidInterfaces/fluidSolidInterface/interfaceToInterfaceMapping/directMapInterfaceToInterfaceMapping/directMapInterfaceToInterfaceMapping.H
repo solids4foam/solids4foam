@@ -88,26 +88,14 @@ class directMapInterfaceToInterfaceMapping
         //- Calculate zoneA to zoneB face map
         void calcZoneAToZoneBFaceMap() const;
 
-        //- Return a reference to the zoneA to zoneB face map
-        const labelIOList& zoneAToZoneBFaceMap() const;
-
         //- Calculate zoneB to zoneA face map
         void calcZoneBToZoneAFaceMap() const;
-
-        //- Return a reference to the zoneB to zoneA face map
-        const labelIOList& zoneBToZoneAFaceMap() const;
 
         //- Calculate zoneA to zoneB point map
         void calcZoneAToZoneBPointMap() const;
 
-        //- Return a reference to the zoneA to zoneB point map
-        const labelIOList& zoneAToZoneBPointMap() const;
-
         //- Calculate zoneB to zoneA point map
         void calcZoneBToZoneAPointMap() const;
-
-        //- Return a reference to the zoneB to zoneA point map
-        const labelIOList& zoneBToZoneAPointMap() const;
 
         //- Calculate minimal edge lengths
         void calcMinEdgeLengths() const;
@@ -174,6 +162,20 @@ public:
 
 
     // Member Functions
+
+        // Access
+
+            //- Return a reference to the zoneB to zoneA face map
+            const labelIOList& zoneBToZoneAFaceMap() const;
+
+            //- Return a reference to the zoneA to zoneB face map
+            const labelIOList& zoneAToZoneBFaceMap() const;
+
+            //- Return a reference to the zoneA to zoneB point map
+            const labelIOList& zoneAToZoneBPointMap() const;
+
+            //- Return a reference to the zoneB to zoneA point map
+            const labelIOList& zoneBToZoneAPointMap() const;
 
         // Edit
 

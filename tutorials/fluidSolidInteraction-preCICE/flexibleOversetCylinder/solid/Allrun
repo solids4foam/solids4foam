@@ -6,7 +6,7 @@
 # Create the mesh
 runApplication blockMesh
 
-# preCICE needs 2-D geometry to be in the XY plane 
+# preCICE needs 2-D geometry to be in the XY plane
 transformPoints -rotate-angle "((1 0 0) 90)"
 
 # Run the solver

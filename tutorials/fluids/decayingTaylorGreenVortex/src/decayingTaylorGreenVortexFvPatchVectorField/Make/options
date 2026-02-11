@@ -1,0 +1,31 @@
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
+    else
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+else
+    ifneq (,$(findstring -DOPENFOAM=,$(GFLAGS)))
+        VERSION_SPECIFIC_INC = -DOPENFOAM_COM
+    else ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC = -DOPENFOAM_COM
+    else
+        VERSION_SPECIFIC_INC = -DOPENFOAM_ORG
+    endif
+    VERSION_SPECIFIC_INC += -DOPENFOAM_NOT_EXTEND
+endif
+
+EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/fileFormats/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude
+
+LIB_LIBS = \
+    -lOpenFOAM \
+    -lfiniteVolume \
+    -lfileFormats \
+    -lsurfMesh \
+    -lmeshTools

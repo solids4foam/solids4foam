@@ -183,11 +183,17 @@ void Foam::rotationInvariantLinearElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Calculate the right Cauchy Green tensor
-    const volSymmTensorField C(symm(F().T() & F()));
+    const volSymmTensorField C(symm(FT & F));
 
     // Eigen value field of C
     volVectorField lambda
@@ -263,7 +269,7 @@ void Foam::rotationInvariantLinearElastic::correct(volSymmTensorField& sigma)
     );
 
     // Calculate the Cauchy stress
-    sigma = J*symm(F() & S & F().T());
+    sigma = J*symm(F & S & F.T());
 }
 
 
@@ -274,99 +280,6 @@ void Foam::rotationInvariantLinearElastic::correct(surfaceSymmTensorField& sigma
         "void Foam::rotationInvariantLinearElastic::correct"
         "(surfaceSymmTensorField& sigma)"
     );
-
-    // Update the deformation gradient field
-    // Note: if true is returned, it means that linearised elasticity was
-    // enforced by the solver via the enforceLinear switch
-    if (updateF(sigma, mu_, K_))
-    {
-        return;
-    }
-
-    // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J(det(Ff()));
-
-    // Calculate the right Cauchy Green tensor
-    const surfaceSymmTensorField C(symm(Ff().T() & Ff()));
-
-    // Eigen value field of C
-    surfaceVectorField lambda
-    (
-        IOobject
-        (
-            "eigenVal(" + C.name() + ")",
-            C.time().timeName(),
-            C.db(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        C.mesh(),
-        dimensionedVector("zero", C.dimensions(), vector::zero)
-    );
-
-    // Eigen vectors will be store in the rows i.e. the first eigen vector
-    // is (eigenVec.xx() eigenVec.xy() eigenVec.xz())
-    surfaceTensorField eigVec
-    (
-        IOobject
-        (
-            "eigenVec(" + C.name() + ")",
-            C.time().timeName(),
-            C.db(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        C.mesh(),
-        dimensionedTensor("zero", dimless, tensor::zero)
-    );
-
-    // Calculate eigen values and eigen vectors of C
-    eig3Field(C, eigVec, lambda);
-
-    // Create a surfaceVectorField for each principal direction
-    const vector i(1, 0, 0);
-    const vector j(0, 1, 0);
-    const vector k(0, 0, 1);
-    const surfaceVectorField eigVec1
-    (
-        "eigVec1",
-        eigVec.component(tensor::XX)*i
-      + eigVec.component(tensor::XY)*j
-      + eigVec.component(tensor::XZ)*k
-    );
-    const surfaceVectorField eigVec2
-    (
-        "eigVec2",
-        eigVec.component(tensor::YX)*i
-      + eigVec.component(tensor::YY)*j
-      + eigVec.component(tensor::YZ)*k
-    );
-    const surfaceVectorField eigVec3
-    (
-        "eigVec3",
-        eigVec.component(tensor::ZX)*i
-      + eigVec.component(tensor::ZY)*j
-      + eigVec.component(tensor::ZZ)*k
-    );
-
-    // Calculate the Biot strain
-    const surfaceSymmTensorField biotStrain
-    (
-        "biotStrain",
-        sqrt(lambda.component(vector::X))*sqr(eigVec1)
-      + sqrt(lambda.component(vector::Y))*sqr(eigVec2)
-      + sqrt(lambda.component(vector::Z))*sqr(eigVec3)
-      - I
-    );
-
-    // Calculate the 2nd Piola-Kirchhoff stress using Hooke's law
-    const surfaceSymmTensorField S
-    (
-        "S2PK", 2.0*mu_*biotStrain + lambda_*tr(biotStrain)*I
-    );
-
-    // Calculate the Cauchy stress
-    sigma = J*symm(Ff() & S & Ff().T());
 }
 
 

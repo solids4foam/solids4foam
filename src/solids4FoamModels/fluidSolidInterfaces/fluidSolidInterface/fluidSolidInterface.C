@@ -37,6 +37,7 @@ License
 #include "RBFMeshMotionSolver.H"
 #include "FieldSumOp.H"
 
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -55,13 +56,25 @@ bool Foam::fluidSolidInterface::updateCoupled()
         if (runTime().value() > (couplingStartTime_ - SMALL))
         {
             InfoIn("fluidSolidInterface::updateCoupled()")
-                << "Enabling fluid-solid coupling" << endl;
+                << "Enabling fluid-solid coupling" << nl << endl;
 
             // Enable coupling
             coupled_ = true;
 
             return true;
         }
+    }
+
+    return false;
+}
+
+
+bool Foam::fluidSolidInterface::newTimeStep() const
+{
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+        return true;
     }
 
     return false;
@@ -303,6 +316,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
         fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
     predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
+    curTimeIndex_(-1),
     interfaceDeformationLimit_
     (
         fsiProperties_.lookupOrAddDefault<scalar>
@@ -574,7 +588,16 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
 
     if (residualFilePtr_.empty())
     {
-        const fileName historyDir = runTime().path()/"residuals";
+        fileName historyDir;
+        if (Pstream::parRun())
+        {
+            historyDir = runTime().path()/".."/"postProcessing";
+        }
+        else
+        {
+            historyDir = runTime().path()/"postProcessing";
+        }
+
         mkDir(historyDir);
         residualFilePtr_.set(new OFstream(historyDir/"fsiResiduals.dat"));
         residualFilePtr_()
@@ -955,14 +978,10 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
-                        motionU.boundaryFieldRef()
-                        [
-                            fluidPatchIndices()[interfaceI]
-                        ]
-#else
-                        motionU.boundaryField()[fluidPatchIndices()[interfaceI]]
-#endif
+                        boundaryFieldRef
+                        (
+                            motionU
+                        )[fluidPatchIndices()[interfaceI]]
                     );
 
                 motionUFluidPatch ==
@@ -985,8 +1004,6 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             const bool fvMotionSolver =
                 subMesh.foundObject<pointVectorField>("pointMotionU");
-
-            // Info << subMesh.boundaryMesh() << endl;
 
             if (fvMotionSolver)
             {
@@ -1448,11 +1465,18 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
         (
             isA<movingWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+                fluid().solutionP().boundaryField()
+                [
+                    fluidPatchIndices()[interfaceI]
+                ]
             )
         )
         {
-            Info<< "Setting acceleration at fluid side of the interface"
+            Info<< "Setting acceleration at fluid side of the interface: "
+                << fluidMesh().boundary()
+                   [
+                       fluidPatchIndices()[interfaceI]
+                   ].name()
                 << endl;
 
             // Take references to zones
@@ -1493,7 +1517,7 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 (
                     refCast<const movingWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1522,11 +1546,19 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
         (
             isA<elasticWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+                fluid().solutionP().boundaryField()
+                [
+                    fluidPatchIndices()[interfaceI]
+                ]
             )
         )
         {
-            Info<< "Setting acceleration at fluid side of the interface"
+            Info<< "Setting acceleration and previous pressure at fluid side of "
+                << "the interface: "
+                << fluidMesh().boundary()
+                   [
+                       fluidPatchIndices()[interfaceI]
+                   ].name()
                 << endl;
 
             // Take references to zones
@@ -1567,7 +1599,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 (
                     refCast<const elasticWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1579,7 +1611,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 (
                     refCast<const elasticWallPressureFvPatchScalarField>
                     (
-                        fluid().p().boundaryField()
+                        fluid().solutionP().boundaryField()
                         [
                             fluidPatchIndices()[interfaceI]
                         ]
@@ -1590,7 +1622,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
             {
                 prevAcceleration = fluidPatchAcceleration;
                 prevPressure =
-                    fluid().patchPressureForce
+                    fluid().patchSolutionPressureForce
                     (
                         fluidPatchIndices()[interfaceI]
                     );
@@ -1604,7 +1636,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 // ZT: Pressure is not zero.
                 // prevPressure = 0;
                 prevPressure =
-                    fluid().patchPressureForce
+                    fluid().patchSolutionPressureForce
                     (
                         fluidPatchIndices()[interfaceI]
                     );

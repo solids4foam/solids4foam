@@ -30,7 +30,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          
+
       # Step 4: Update the submodule to the latest commit on the "development" branch
       - name: Update submodule to latest commit
         run: |
@@ -41,7 +41,7 @@ jobs:
           cd ..
           git add solids4foam
           git commit -m "Automated update of submodule to the latest development commit"
-      
+
       # Step 5: Push the changes back to the solids4foam.github.io repository
       - name: Push updated submodule
         run: |

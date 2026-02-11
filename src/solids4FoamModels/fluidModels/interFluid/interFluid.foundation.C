@@ -176,7 +176,7 @@ interFluid::interFluid
         twoPhaseChangeModel& phaseChange = phaseChangePtr_();
         tmp<volScalarField>& rAU = rAU_;
         volVectorField& U = this->U();
-        volScalarField& p = this->p();
+        //volScalarField& p = this->p();
         volScalarField& p_rgh = p_rgh_;
         const dynamicFvMesh& mesh = this->mesh();
         pimpleControl& pimple = this->pimple();
@@ -346,7 +346,7 @@ bool interFluid::evolve()
 
                 if (correctPhi)
                 {
-                    #include "correctPhi.foundation.H"
+                    #include "correctPhi.foundation.interFluid.H"
                 }
 
                 mixture.correct();

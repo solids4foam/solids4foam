@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -18,12 +18,6 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 // M4
 
-
-
-
-
-
-
 // GEOMETRY
 // visina
 //m4_define(H, 0.010)
@@ -36,10 +30,7 @@ FoamFile
 
 // visina flapa
 
-
 // z koordinata
-
-
 
 // MESH
 // Abaqus mesh
@@ -47,30 +38,26 @@ FoamFile
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 //m4_define(BLOCKSIZE1,  calc(H*1000) calc((L-l)*2000) 1)
 
-
-
-
-
 //m4_define(r2,calc(r1+h))
 //m4_define(angle, rad(45))
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-convertToMeters 1;
+scale 1;
 
 vertices
 (
  //block1
     //Plane A:
-    ( -0.04  0 -0.001) // Vertex A0 = 0 
-    (  0  0 -0.001) // Vertex A1 = 1 
-    (  0  0.04 -0.001) // Vertex A2 = 2 
-    ( -0.04  0.04 -0.001) // Vertex A3 = 3 
+    ( -0.04  0 -0.001) // Vertex A0 = 0
+    (  0  0 -0.001) // Vertex A1 = 1
+    (  0  0.04 -0.001) // Vertex A2 = 2
+    ( -0.04  0.04 -0.001) // Vertex A3 = 3
     //Plane B:
-    ( -0.04  0 0.001) // Vertex B0 = 4 
-    (  0  0 0.001) // Vertex B1 = 5 
-    (  0  0.04 0.001) // Vertex B2 = 6 
-    ( -0.04  0.04 0.001) // Vertex B3 = 7 
+    ( -0.04  0 0.001) // Vertex B0 = 4
+    (  0  0 0.001) // Vertex B1 = 5
+    (  0  0.04 0.001) // Vertex B2 = 6
+    ( -0.04  0.04 0.001) // Vertex B3 = 7
  );
 
 blocks

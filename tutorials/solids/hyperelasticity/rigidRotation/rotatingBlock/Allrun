@@ -1,10 +1,103 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   totalLagrangian (default), updatedLagrangian, totalLagrangianPetscSnes,
+#   updatedLagrangianPetscSnes
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  totalLagrangian       (default)
+  updatedLagrangian
+  totalLagrangianPetscSnes
+  updatedLagrangianPetscSnes
+
+Examples:
+  ./Allrun
+  ./Allrun totalLagrangian
+  ./Allrun updatedLagrangian
+  ./Allrun totalLagrangianPetscSnes
+  ./Allrun updatedLagrangianPetscSnes
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
+
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-totalLagrangian}"
+
+# Validate approach name
+case "$APPROACH" in
+    totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    # $1 = suffix (e.g. totalLagrangian)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+select_approach() {
+    echo "Using the $APPROACH approach"
+    case "$APPROACH" in
+        totalLagrangian|totalLagrangianPetscSnes)
+            link_files_for_suffix "$APPROACH"
+            (cd 0 && rm -f D* && ln -s org/D .)
+            ;;
+        updatedLagrangian|updatedLagrangianPetscSnes)
+            link_files_for_suffix "$APPROACH"
+            (cd 0 && rm -f D* && ln -s org/DD .)
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+select_approach
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

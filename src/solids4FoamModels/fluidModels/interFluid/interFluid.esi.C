@@ -26,6 +26,12 @@ License
 #include "findRefCell.H"
 #include "constrainHbyA.H"
 #include "constrainPressure.H"
+#include "elasticSlipWallVelocityFvPatchVectorField.H"
+#include "elasticWallVelocityFvPatchVectorField.H"
+#include "elasticWallPressureFvPatchScalarField.H"
+#include "movingWallPressureFvPatchScalarField.H"
+#include "EulerDdtScheme.H"
+#include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -39,6 +45,132 @@ namespace fluidModels
 
 defineTypeNameAndDebug(interFluid, 0);
 addToRunTimeSelectionTable(fluidModel, interFluid, dictionary);
+
+// * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
+
+void interFluid::updateRobinFsiInterfacePhi
+(
+    surfaceScalarField& phiHbyA,
+    const surfaceScalarField& phig,
+    const volScalarField& p,
+    const volVectorField& U,
+    const volScalarField& rAU
+) const
+{
+    forAll(p.boundaryField(), patchI)
+    {
+        const bool isElasticSlipWall =
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                p.boundaryField()[patchI]
+            )
+         && isA<elasticSlipWallVelocityFvPatchVectorField>
+            (
+                U.boundaryField()[patchI]
+            );
+
+        const bool isElasticWall =
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                p.boundaryField()[patchI]
+            )
+         && isA<elasticWallVelocityFvPatchVectorField>
+            (
+                U.boundaryField()[patchI]
+            );
+
+        if (isElasticSlipWall || isElasticWall)
+        {
+            const word ddtScheme
+            (
+                mesh().ddtScheme("ddt(" + U.name() +')')
+            );
+
+            if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
+            {
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    (
+                        U.oldTime().boundaryField()[patchI]
+                      & mesh().Sf().boundaryField()[patchI]
+                    )
+                  + phig.boundaryField()[patchI];
+            }
+            else if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
+            {
+                FatalErrorInFunction
+                    << "Not implemented for backward scheme"
+                    << exit(FatalError);
+            }
+        }
+        else if
+        (
+            isA<movingWallPressureFvPatchScalarField>
+            (
+                p.boundaryField()[patchI]
+            )
+        )
+        {
+            phiHbyA.boundaryFieldRef()[patchI] +=
+                rAU.boundaryField()[patchI]
+               *p.boundaryField()[patchI].snGrad()
+               *mesh().magSf().boundaryField()[patchI];
+        }
+    }
+}
+
+
+void interFluid::updateRobinFsiInterfaceRAU
+(
+    volScalarField& rAU,
+    const volScalarField& p,
+    const volVectorField& U,
+    const volScalarField& rho
+) const
+{
+    forAll(p.boundaryField(), patchI)
+    {
+        const bool isElasticSlipWall =
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                p.boundaryField()[patchI]
+            )
+         && isA<elasticSlipWallVelocityFvPatchVectorField>
+            (
+                U.boundaryField()[patchI]
+            );
+
+        const bool isElasticWall =
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                p.boundaryField()[patchI]
+            )
+         && isA<elasticWallVelocityFvPatchVectorField>
+            (
+                U.boundaryField()[patchI]
+            );
+
+        if (isElasticSlipWall || isElasticWall)
+        {
+            const word ddtScheme
+            (
+                mesh().ddtScheme("ddt(" + U.name() +')')
+            );
+
+            if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
+            {
+                rAU.boundaryFieldRef()[patchI] =
+                    runTime().deltaT().value()/rho.boundaryField()[patchI];
+            }
+            else if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
+            {
+                FatalErrorInFunction
+                    << "Not implemented for backward scheme"
+                    << exit(FatalError);
+            }
+        }
+    }
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -169,6 +301,7 @@ interFluid::interFluid
     talphaPhi1Corr0_()
 {
     UisRequired();
+    Uf_.ref().storeOldTime();
 
     // Reset p dimensions: we should allow p not to be read!
     Info<< "Resetting the dimensions of p" << endl;
@@ -195,7 +328,6 @@ interFluid::interFluid
 
     {
         volVectorField& U = this->U();
-        volScalarField& p = this->p();
         volScalarField& p_rgh = p_rgh_;
         const dynamicFvMesh& mesh = this->mesh();
         pimpleControl& pimple = this->pimple();
@@ -203,6 +335,7 @@ interFluid::interFluid
         const bool correctPhi = correctPhi_;
         const volScalarField& rho = rho_;
         scalar& cumulativeContErr = cumulativeContErr_;
+        tmp<volScalarField>& rAU = rAU_;
 
         #include "initCorrectPhi.esi.H"
     }
@@ -282,6 +415,20 @@ tmp<scalarField> interFluid::patchPressureForce(const label patchID) const
 }
 
 
+tmp<scalarField> interFluid::patchSolutionPressureForce
+(
+    const label patchID
+) const
+{
+    tmp<scalarField> tpF
+    (
+        new scalarField(p_rgh_.boundaryField()[patchID])
+    );
+
+    return tpF;
+}
+
+
 bool interFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
@@ -319,10 +466,23 @@ bool interFluid::evolve()
     surfaceScalarField& alphaPhi10 = alphaPhi10_;
     tmp<volScalarField>& rAU = rAU_;
 
+    if (!LTS)
+    {
+        #include "CourantNo.H"
+        #include "alphaCourantNo.H"
+
+        Info<< "maxAlphaCo = " << maxAlphaCo << endl;
+    }
+
     // --- Pressure-velocity PIMPLE corrector loop
     while (pimple.loop())
     {
-        if (pimple.firstIter() || moveMeshOuterCorrectors)
+        if
+        (
+            pimple.firstIter()
+         || moveMeshOuterCorrectors
+         || fluidModel::fsiMeshUpdate()
+        )
         {
             if (fluidModel::fsiMeshUpdate())
             {

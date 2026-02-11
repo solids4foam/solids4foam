@@ -113,7 +113,7 @@ plot is generated if the `gnuplot` program is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
-`Allrun` script, i.e. `> ./Allclean`.
+ `Allrun` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -188,8 +188,8 @@ pimpleFluidCoeffs
 
 ```note
 The `pimpleFluid` fluid model does not require any settings to be specified.
-Parameters related to the PIMPLE algorithm as instead specified in
-`system/fvSolution`, just like for the `pimpleFoam` solver.
+ Parameters related to the PIMPLE algorithm as instead specified in
+ `system/fvSolution`, just like for the `pimpleFoam` solver.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`
