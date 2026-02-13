@@ -321,6 +321,25 @@ bool newtonIcoFluid::evolve()
         fvc::makeRelative(phi, U);
     }
 
+    // Print the Courant number
+    {
+        const dimensionedScalar& deltaT = runTime().deltaT();
+
+        const scalarField sumPhi
+        (
+            fvc::surfaceSum(mag(phi))().primitiveField()
+        );
+
+        const scalar CoNum =
+            0.5*gMax(sumPhi/mesh.V().field())*deltaT.value();
+
+        const scalar meanCoNum =
+            0.5*(gSum(sumPhi)/gSum(mesh.V().field()))*deltaT.value();
+
+        Info<< "Fluid Courant number mean: " << meanCoNum
+            << " max: " << CoNum << endl;
+    }
+
     // Solve the nonlinear system and check the convergence
     Info<< "Solving the fluid for U and p" << endl;
     foamPetscSnesHelper::solve();
@@ -451,8 +470,17 @@ label newtonIcoFluid::formResidual
     // Update gradU
     gradU() = fvc::grad(U);
 
+    // Lookup the forceImplicitFlux flag; if true, then the extrapolatedFlux flag
+    // is ignored
+    const Switch forceImplicitFlux =
+        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
+
     // Update the flux
-    if (extrapolatedFlux)
+    if (forceImplicitFlux || !extrapolatedFlux)
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+    else
     {
         if
         (
@@ -478,10 +506,6 @@ label newtonIcoFluid::formResidual
                     + 0.25*U.oldTime().oldTime().oldTime()
                   ) & mesh.Sf();
         }
-    }
-    else
-    {
-        phi = fvc::interpolate(U) & mesh.Sf();
     }
 
     // Absolute flux
@@ -566,9 +590,11 @@ label newtonIcoFluid::formResidual
     // Fp = stabilisation - div(U)
     //    = stabilisation - tr(grad(U))
     // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
+    // Note: when phi is extrapolated then div(U) != div(phi): this matters for
+    // stabilisation
     scalarField pressureResidual
     (
-      - fvc::div(U)
+        - fvc::div(U)
     );
 
     // Add stabilisation
