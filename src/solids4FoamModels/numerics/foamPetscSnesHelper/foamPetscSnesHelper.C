@@ -995,7 +995,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Get reference to least square vectors
@@ -1010,7 +1010,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalarField& VI = mesh.V();
 
-    const scalar sign = flipSign ? -1.0 : 1.0;
+    // const scalar sign = flipSign ? -1.0 : 1.0;
+    const scalar sign = scale;
 
     // Get the blockSize
     label blockSize;
@@ -1245,7 +1246,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
@@ -1256,7 +1257,8 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const scalarField& wI = mesh.weights();
     const labelList& own = mesh.owner();
     const labelList& nei = mesh.neighbour();
-    const scalar sign = flipSign ? -1 : 1;
+    // const scalar sign = flipSign ? -1 : 1;
+    const scalar sign = scale;
     tensor coeff = tensor::zero;
 
     // Add segregated component of convection term
@@ -1592,12 +1594,13 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = p.mesh();
-    const scalar sign = flipSign ? -1 : 1;
+    //const scalar sign = flipSign ? -1 : 1;
+    const scalar sign = scale;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
     {
@@ -1696,6 +1699,9 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     // Load the correct options database
     PetscOptionsPush(options_);
     SNESSetFromOptions(snes_.s);
+
+    // Allow derived classes to adjust PC, KSP, etc.
+    this->customiseSolver();
 
     // Set the snesHasRun flag
     snesHasRun_ = true;

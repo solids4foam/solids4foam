@@ -101,11 +101,20 @@ class newtonQuasiMonolithicCouplingInterface
         //- PETSc index set for the fluid unknowns
         mutable IS isFluid_;
 
+        //- PETSc index set for the fluid velocity unknowns
+        mutable IS isFluidVelocity_;
+
+        //- PETSc index set for the fluid pressure unknowns
+        mutable IS isFluidPressure_;
+
         //- PETSc index set for the motion unknowns
         //mutable IS isMotion_;
 
         //- PETSc index set for the solid unknowns
         mutable IS isSolid_;
+
+        //- Flag to indicate the fluid index fields have been set
+        mutable bool configuredNestedFluidSplit_;
 
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
@@ -123,7 +132,8 @@ class newtonQuasiMonolithicCouplingInterface
 
     // Private Member Functions
 
-        //- Make the isFluid, isMotion and isSolid index sets
+        //- Make the isFluid, isFluidVelocity, isFluidPressure, isMotion and
+        //  isSolid index sets
         void makeIsFluidIsMotionIsSolid() const;
 
         //- Return isFluid pointer
@@ -135,6 +145,28 @@ class newtonQuasiMonolithicCouplingInterface
             }
 
             return isFluid_;
+        }
+
+        //- Return isFluidVelocity pointer
+        IS isFluidVelocity() const
+        {
+            if (isFluidVelocity_ == nullptr)
+            {
+                makeIsFluidIsMotionIsSolid();
+            }
+
+            return isFluidVelocity_;
+        }
+
+        //- Return isFluidPressure pointer
+        IS isFluidPressure() const
+        {
+            if (isFluidPressure_ == nullptr)
+            {
+                makeIsFluidIsMotionIsSolid();
+            }
+
+            return isFluidPressure_;
         }
 
         //- Return isSolid pointer
@@ -310,6 +342,9 @@ public:
             //- Initialise the solution vector
             //  This procedure should set the size of the solution vector
             virtual label initialiseSolution(Vec& x);
+
+            //- Called after SNESSetFromOptions(), before first SNESSolve()
+            virtual void customiseSolver();
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector
