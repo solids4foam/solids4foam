@@ -43,7 +43,7 @@ Author
 #include "List.H"
 #include "vector.H"
 #include "fvPatchFieldMapper.H"
- 
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -213,14 +213,14 @@ public:
             void operator=(const tmp<Field<vector>>& trhs)
             {
                 Field<vector>::operator=(trhs);
-            }            
+            }
             void operator=(const vector& rhs)
             {
                 Field<vector>::operator=(rhs);
-            }            
+            }
 };
 
-    
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
