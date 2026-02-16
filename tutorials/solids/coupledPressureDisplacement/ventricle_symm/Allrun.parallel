@@ -1,0 +1,19 @@
+#!/bin/sh
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+set -e
+
+# reset
+
+#paraview file
+touch case.foam
+
+fluent3DMeshToFoam ventricle_cetvrtina.msh
+
+createPatch -overwrite
+
+decomposePar > log.decompose
+#before running the case, run blockMesh command in openfoam2206 or openfoam2306
+# run
+mpirun -np 10  solids4Foam -parallel > log.mpirun &disown

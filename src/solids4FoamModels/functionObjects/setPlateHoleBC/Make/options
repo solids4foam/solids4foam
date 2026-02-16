@@ -1,0 +1,18 @@
+SOLIDS4FOAM_DIR = $(FOAM_RUN)/solids4foam
+
+
+EXE_INC = \
+    -I$(SOLIDS4FOAM_DIR)/src/solids4FoamModels/lnInclude \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/finiteArea/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/triSurface/lnInclude \
+    -I$(LIB_SRC)/lagrangian/basic/lnInclude
+
+LIB_LIBS = \
+    -lfiniteVolume \
+    -lfiniteArea \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -lmeshTools

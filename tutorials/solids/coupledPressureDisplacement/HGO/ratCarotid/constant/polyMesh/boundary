@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       polyBoundaryMesh;
+    location    "constant/polyMesh";
+    object      boundary;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+6
+(
+    inside
+    {
+        type            patch;
+        nFaces          180;
+        startFace       2844;
+    }
+    outside
+    {
+        type            patch;
+        nFaces          180;
+        startFace       3024;
+    }
+    symm1
+    {
+        type            symmetryPlane;
+        nFaces          180;
+        startFace       3204;
+    }
+    symm2
+    {
+        type            symmetryPlane;
+        nFaces          180;
+        startFace       3384;
+    }
+    symm3
+    {
+        type            symmetryPlane;
+        nFaces          36;
+        startFace       3564;
+    }
+    symm4
+    {
+        type            symmetryPlane;
+        nFaces          36;
+        startFace       3600;
+    }
+)
+
+
+// ************************************************************************* //

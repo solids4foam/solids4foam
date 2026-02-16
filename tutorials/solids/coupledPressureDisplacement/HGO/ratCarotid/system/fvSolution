@@ -1,0 +1,83 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    DDDp
+    {
+        solver BiCGStab;
+        preconditioner Cholesky;
+
+        minIter			1;
+        maxIter			500;
+
+        tolerance		1e-13;
+        relTol			1e-3;
+    }
+
+    // "D|DD"
+    // {
+    //     solver          PCG;
+    //     preconditioner  FDIC;
+    //     tolerance       1e-09;
+    //     relTol          0.1;
+    // }
+
+    "psi0|psi1"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-8;
+        relTol          0;
+    }
+}
+
+SIMPLE
+{
+    nNonOrthogonalCorrectors 5;
+}
+
+relaxationFactors
+{
+    fields
+    {
+        Dp               0.98; //0.5; //0.05;
+        DpFinal          0.98; //0.05;
+        DD               0.98; //0.98;
+        DDFinal          0.98; //0.98;
+
+        nonLinForceCorrection 1;
+    }
+
+    equations
+    {
+        DD               0.98; //0.98;
+        DDFinal          0.98; //0.98;
+    }
+
+    // Under-relaxating the DD equation by 0.99-0.9999 can improve convergence in
+    // some cases, in particular when there are solidContact boundaries
+    //DEqn   0.999;
+    //DDEqn   0.999;
+
+    // Under-relaxating the DD field by 0.1-0.9 can improve convergence in some
+    // cases
+    //D 0.7;
+    //DD 0.7;
+}
+
+// ************************************************************************* //

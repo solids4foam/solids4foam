@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      DD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions			[0 1 0 0 0 0 0];
+
+internalField		uniform (0 0 0);
+
+boundaryField
+{
+    symmetry_1
+    {
+        type            blockSymmPlane;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+    symmetry_2
+    {
+        type            blockSymmPlane;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+
+    wall_inner
+    {
+        type		tractionPressureDisplacement;
+        traction	uniform (0 0 0);
+        pressureSeries
+        {
+            file "$FOAM_CASE/constant/timeVsPressure";
+            outOfBounds	clamp;
+        }
+        // pressure	uniform 0;
+        value		uniform (0 0 0);
+    }
+
+    wall_outer
+    {
+        type		tractionPressureDisplacement;
+        traction	uniform (0 0 0);
+        pressure	uniform 0;
+        value		uniform (0 0 0);
+    }
+
+    top
+    {
+        // type		symmetryPlane;
+        type		fixedDisplacement;
+        value		uniform (0 0 0);
+    }
+
+
+}
+
+
+// ************************************************************************* //

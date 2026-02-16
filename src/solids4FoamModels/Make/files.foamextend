@@ -23,6 +23,7 @@ solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+solidModels/coupledPressureDisplacementSolid/coupledPressureDisplacementSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
@@ -82,6 +83,10 @@ $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 $(nonLinGeomLaws)/YeohElastic/YeohElastic.C
+$(nonLinGeomLaws)/pdNeoHookeanElastic/pdNeoHookeanElastic.C
+$(nonLinGeomLaws)/pdGuccioneElastic/pdGuccioneElastic.C
+$(nonLinGeomLaws)/pdHGO/pdHGO.C
+
 
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws
@@ -114,6 +119,8 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
+$(solidFvPatchFields)/tractionPressureDisplacement/tractionPressureDisplacementFvPatchVectorField.C
+$(solidFvPatchFields)/pressureTraction/pressureTractionFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
@@ -199,6 +206,8 @@ functionObjects/squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
 functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
+functionObjects/setPlateHoleBC/setPlateHoleBC.C
+
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 /*numerics/AMIInterpolationS4F/AMIInterpolationS4F.C
@@ -247,6 +256,13 @@ numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C*/
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
+numerics/stabLeastSquaresGrad/stabLeastSquaresVectors.C
+numerics/stabLeastSquaresGrad/scalarStabLeastSquaresGrad.C
+numerics/stabLeastSquaresGrad/stabLeastSquaresGrads.C
+numerics/simpleUncorrectedSnGrad/simpleUncorrectedSnGrads.C
+numerics/diagVectorField/diagVectorField.C
+numerics/updatedLagGaussGrad/updatedLagGaussGrads.C
+numerics/updatedLagGaussGrad/scalarUpdatedLagGaussGrad.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
@@ -255,6 +271,7 @@ dynamicFvMesh/crackerFvMesh/cohesivePolyPatch/cohesivePolyPatch.C
 dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
 dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
 dynamicFvMesh/crackerFvMesh/solidCohesive/solidCohesiveFvPatchVectorField.C
+
 
 simpleCohesiveZones = dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneLaws
 $(simpleCohesiveZones)/simpleCohesiveZoneLaw/simpleCohesiveZoneLaw.C

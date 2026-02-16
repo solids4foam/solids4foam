@@ -1,0 +1,28 @@
+#!/bin/sh
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+set -e
+
+
+# mesh
+
+# create empty patches
+#runApplication -l log.createPatch createPatch -overwrite
+
+# scale
+#transformPoints -scale '(0.1 0.1 0.1)' > "log.transformPoints"
+
+
+# reset
+rm -rf 0
+cp -rf 0.orig 0
+# Delte total fields for incremental solver
+rm -rf 0/D
+rm -rf 0/p
+
+# paraview file
+touch case.foam
+
+# run
+runApplication solids4Foam

@@ -1,0 +1,67 @@
+# Script for postProcessing inflation of an infinitely long tube
+# transformStressToCylindrical calculate stress in cylindrical coordinates
+# gnuplot ./postProcessong.gplt
+
+# case settings
+Ro = 16             #Outer radius (m)
+Ri = 8              #Inner radius (m)
+E = 1000000000      #Young modul (Pa)
+p = 1000000        #Pressure    (Pa)
+a=1 #Hole radius
+k=1 #Kolosov constant 3-4ni
+theta=0 #kut
+sigma0 = 1000000 #naprezanje
+mu =  333333333.333 #lame constant E/2(1+nu)
+
+#
+# Displacement diagram
+#
+
+reset
+set output 'radialDisplacement.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Radial displacement (m)'
+#set title 'Radial displacement vs. radius of the tube'
+set key right top
+
+
+plot [1:4]"./postProcessing/sets/1/line_D.xy" using 1:($4)  w p ls 2 title'FVM', \
+     sigma0*a/(8*mu)*(x/a*(k+1)+2*a/x*((k+1)+1) - 2* a**3/x**3)  w l ls 2 title'analitic'
+
+
+set output
+
+
+reset
+set output 'sigma.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Radial displacement (m)'
+#set title 'Radial displacement vs. radius of the tube'
+set key right top
+set angles degrees
+theta=90 #pi/2 #kut
+
+#plot [1:4] [0:4]"./postProcessing/sets/1/lineDE_sigma.xy" every 4::0 using 2:($4)/1000000  w p ls 2 title'FVM',\
+
+
+
+plot [1:4] [0:4]"./left_sigmaxx.dat" using ($1):($2)/1000000  w p ls 2 title'FVM',\
+     sigma0*(1-a**2/x**2*(3/2 * cos(2*theta) + sin(4*theta)) + 3/2 * a**4/x**4 * cos(4*theta))/1000000 w l ls 1 title'analitical'
+set output
+

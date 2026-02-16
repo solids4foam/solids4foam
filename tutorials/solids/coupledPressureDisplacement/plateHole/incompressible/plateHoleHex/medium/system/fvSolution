@@ -1,0 +1,142 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    Dp__
+    {
+        solver pUBlockMklPardiso;
+    }
+
+    Dp_
+    {
+        solver pUBlockPetsc;
+
+        petsc
+        {
+            useBlockMatrix false;
+
+            options
+            {
+                ksp_type bcgs; //bcgs; //gmres; //preonly;
+
+// With or without hypre
+// #if 0
+                pc_type  hypre;
+                pc_hypre_type boomeramg;
+                pc_hypre_boomeramg_max_iter "1";
+                pc_hypre_boomeramg_strong_threshold "0.25";
+                pc_hypre_boomeramg_grid_sweeps_up "1";
+                pc_hypre_boomeramg_grid_sweeps_down "1";
+                pc_hypre_boomeramg_agg_nl "1";
+                pc_hypre_boomeramg_agg_num_paths "1";
+                pc_hypre_boomeramg_max_levels "25";
+                pc_hypre_boomeramg_coarsen_type HMIS;
+                pc_hypre_boomeramg_interp_type ext+i;
+                pc_hypre_boomeramg_P_max "1";
+                pc_hypre_boomeramg_truncfactor "0.3";
+// #else
+                // pc_type bjacobi; //lu //bjacobi //l; // cholesky
+                // sub_pc_type ilu; //ilu //icc
+// #endif
+
+                // pc_type hypre; //hypre; //lu; //bjacobi; //lu; // cholesky
+                // pc_factor_mat_solver_type mumps;
+                // sub_pc_type icc; //ilu; //icc;
+
+                // ksp_cg_single_reduction true;
+
+                // when using OpenFOAM's L1 based criterion,
+                // we can save some work
+                // comment the line below if not using cg
+                // (or one of its variants)
+                // ksp_norm_type none;
+
+                // uncomment the line below to obtain
+                // a textbook CG with use_petsc_residual_norm == true
+                // ksp_norm_type unpreconditioned;// natural;
+                // mat_type  mpiaij;
+            }
+
+            // use petsc default convergence testing instead of
+            // OpenFOAM's L1 based criterion
+            // default is false
+            use_petsc_residual_norm false;
+            // monitor (print to stdout) residual reduction in OpenFOAM norm
+            // default is false
+            monitor_foam_residual_norm false;
+
+            caching
+            {
+                matrix
+                {
+                    update always;
+                }
+
+                preconditioner
+                {
+                    update always;
+                }
+            }
+        }
+
+        tolerance       1e-20;
+        relTol          1e-1;
+        minIter         1;
+        maxIter         1000;
+    }
+
+    "Dp|DDDp"
+    {
+        solver			BiCGStab;
+        preconditioner	        Cholesky; //BlockAMG Cholesky GaussSeidel ILUC0 ILUCp
+
+        minIter			1;
+        maxIter			5000;
+
+        tolerance		1e-20;
+        relTol			1e-3;
+    }
+}
+
+relaxationFactors
+{
+    fields
+    {
+        p 1;
+        pFinal 1;
+        D 1;
+        DFinal 1;
+
+        Dp 1;
+        DpFinal 1;
+        DD 1;
+        DDFinal 1;
+
+        nonLinForceCorrection 1;
+    }
+
+    equations
+    {
+        // D 0.999;
+        // DFinal 0.999;
+        DD 0.99;
+        DDFinal 0.99;
+    }
+}
+
+// ************************************************************************* //

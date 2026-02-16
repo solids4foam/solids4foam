@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+# Create mesh
+m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+runApplication blockMesh
+
+# Decompose case
+runApplication decomposePar
+
+# Run solver
+runParallel solids4Foam 2
+
+# Reconstruct case
+runApplication reconstructPar
+
+# postProcess
+runApplication sample
+gnuplot ./postProcessing.gplt
+
+#rm -rf logSample
+
+# ----------------------------------------------------------------- end-of-file
+
