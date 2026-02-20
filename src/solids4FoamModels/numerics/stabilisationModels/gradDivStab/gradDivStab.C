@@ -1,0 +1,105 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "gradDivStab.H"
+#include "addToRunTimeSelectionTable.H"
+#include "orthogonalSnGrad.H"
+#include "fvc.H"
+
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(gradDivStab, 0);
+    addToRunTimeSelectionTable
+    (
+        stabilisationModel, gradDivStab, stabModel
+    );
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+// Construct from dictionary
+Foam::gradDivStab::gradDivStab
+(
+    const fvMesh& mesh,
+    const dictionary& dict,
+    const dimensionSet& dims
+)
+:
+    stabilisationModel(mesh, dict, dims),
+    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
+    faceVectorPtr_()
+{}
+
+
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
+Foam::gradDivStab::~gradDivStab()
+{}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::gradDivStab::updateVector
+(
+    const volVectorField& p,
+    const volTensorField* gradPtr
+)
+{
+    // If required, initialise the face stabilisation field
+    if (faceVectorPtr_.empty())
+    {
+        faceVectorPtr_.set
+        (
+            new surfaceVectorField
+            (
+                IOobject
+                (
+                    "faceStabilisation(" + p.name() + ")",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedVector("0", dims(), vector::zero)
+            )
+        );
+    }
+
+    // Create the orthogonal normal gradient operator
+    fv::orthogonalSnGrad<scalar> op(mesh());
+    
+    // Inner pass: divergence of field
+    const volScalarField divP(fvc::div(p));
+
+    // Face-based h^2 scale via deltaCoeffs
+    const surfaceScalarField h2f(1.0/sqr(mesh().deltaCoeffs()));
+
+    // Outer pass: orthogonal diffusion of L1, scaled by h^2
+    // Note that we ignore the tangential component as we only care about
+    // stabilisation (not the physical operator) and the tangential components
+    // could inject noise
+    faceVectorPtr_.ref() = -scaleFactor_*h2f*op.snGrad(divP)*mesh().Sf();
+}
+
+// ************************************************************************* //
