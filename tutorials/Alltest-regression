@@ -11,7 +11,7 @@ IFS=$'\n\t'
 #     Alltest-regression
 #
 # Description
-#     Regression test driver - cCopies regression test cases to a separate
+#     Regression test driver - copies regression test cases to a separate
 #     directory and runs them there to avoid polluting the original tutorials.
 #
 #------------------------------------------------------------------------------
