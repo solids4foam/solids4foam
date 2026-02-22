@@ -243,6 +243,7 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/stabilisationModels/stabilisationModel/stabilisationModel.C
+numerics/stabilisationModels/alphaStab/alphaStab.C
 numerics/stabilisationModels/diffStencilLaplacianStab/diffStencilLaplacianStab.C
 numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOrderLaplacianStab.C
 numerics/stabilisationModels/gradDivStab/gradDivStab.C
