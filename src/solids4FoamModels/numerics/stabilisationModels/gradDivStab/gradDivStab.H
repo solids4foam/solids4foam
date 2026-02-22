@@ -72,7 +72,7 @@ class gradDivStab
         const scalar scaleFactor_;
 
         //- Pointer to the vector face stabilisation
-        autoPtr<surfaceVectorField> faceVectorPtr_;
+        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
 
     // Private Member Functions
 
@@ -88,7 +88,7 @@ class gradDivStab
 public:
 
     //- Runtime type information
-    TypeName("gradDivStab");
+    TypeName("gradDiv");
 
     // Constructors
 
@@ -136,7 +136,7 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
-            );
+            ) const;
 };
 
 

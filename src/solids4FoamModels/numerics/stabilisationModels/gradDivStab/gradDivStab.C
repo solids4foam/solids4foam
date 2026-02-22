@@ -63,7 +63,7 @@ void Foam::gradDivStab::updateVector
 (
     const volVectorField& p,
     const volTensorField* gradPtr
-)
+) const
 {
     // If required, initialise the face stabilisation field
     if (faceVectorPtr_.empty())

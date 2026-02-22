@@ -74,10 +74,10 @@ class alphaStab
         const scalar scaleFactor_;
 
         //- Pointer to the scalar face stabilisation
-        autoPtr<surfaceScalarField> faceScalarPtr_;
+        mutable autoPtr<surfaceScalarField> faceScalarPtr_;
 
         //- Pointer to the vector face stabilisation
-        autoPtr<surfaceVectorField> faceVectorPtr_;
+        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
 
     // Private Member Functions
 
@@ -100,7 +100,7 @@ class alphaStab
 public:
 
     //- Runtime type information
-    TypeName("alphaStab");
+    TypeName("alpha");
 
     // Constructors
 
@@ -168,7 +168,7 @@ public:
             (
                 const volScalarField& field,
                 const volVectorField* gradPtr = nullptr
-            );
+            ) const;
 
             //- Re-calculate the vector stabilisation
             // Provide the primary variable field and optionally its gradient
@@ -176,7 +176,7 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
-            );
+            ) const;
 };
 
 

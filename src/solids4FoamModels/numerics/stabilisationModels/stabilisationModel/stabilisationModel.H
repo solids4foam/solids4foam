@@ -184,7 +184,7 @@ public:
             (
                 const volScalarField& field,
                 const volVectorField* gradPtr = nullptr
-            )
+            ) const
             {
                 FatalErrorInFunction
                     << "scalar stabilisation not supported by "
@@ -200,7 +200,7 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
-            )
+            ) const
             {
                 FatalErrorInFunction
                     << "scalar stabilisation not supported by "

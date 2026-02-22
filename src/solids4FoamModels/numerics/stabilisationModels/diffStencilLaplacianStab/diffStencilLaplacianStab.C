@@ -61,7 +61,7 @@ void Foam::diffStencilLaplacianStab::updateScalar
 (
     const volScalarField& p,
     const volVectorField* gradPtr
-)
+) const
 {
     if (gradPtr == nullptr)
     {
@@ -102,7 +102,7 @@ void Foam::diffStencilLaplacianStab::updateVector
 (
     const volVectorField& p,
     const volTensorField* gradPtr
-)
+) const
 {
     if (gradPtr == nullptr)
     {

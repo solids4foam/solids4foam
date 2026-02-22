@@ -61,7 +61,7 @@ void Foam::JamesonSchmidtTurkelStab::updateScalar
 (
     const volScalarField& p,
     const volVectorField* gradPtr
-)
+) const
 {
     // If required, initialise the face stabilisation field
     if (faceScalarPtr_.empty())
@@ -93,7 +93,7 @@ void Foam::JamesonSchmidtTurkelStab::updateVector
 (
     const volVectorField& p,
     const volTensorField* gradPtr
-)
+) const
 {
     // If required, initialise the face stabilisation field
     if (faceVectorPtr_.empty())

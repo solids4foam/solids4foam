@@ -61,7 +61,7 @@ void Foam::alphaStab::updateScalar
 (
     const volScalarField& p,
     const volVectorField* gradPtr
-)
+) const
 {
     if (gradPtr == nullptr)
     {
@@ -102,7 +102,7 @@ void Foam::alphaStab::updateVector
 (
     const volVectorField& p,
     const volTensorField* gradPtr
-)
+) const
 {
     if (gradPtr == nullptr)
     {

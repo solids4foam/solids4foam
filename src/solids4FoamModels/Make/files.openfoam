@@ -3,7 +3,6 @@ physicsModel/physicsModel.C
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/checkConvergence.C
-solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
@@ -11,11 +10,11 @@ solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
 solidModels/kirchhoffPlateSolid/clampedMoment/clampedMomentFaPatchScalarField.C
 solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatchScalarField.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
-solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
-solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
-solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
-solidModels/poroLinGeomSolid/poroLinGeomSolid.C
-solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
+/*solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C*/
+/*solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
+solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C*/
+/*solidModels/poroLinGeomSolid/poroLinGeomSolid.C
+solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C*/
 solidModels/thermalSolid/thermalSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
@@ -245,6 +244,7 @@ numerics/rotation/RodriguesRotation.C
 numerics/stabilisationModels/stabilisationModel/stabilisationModel.C
 numerics/stabilisationModels/alphaStab/alphaStab.C
 numerics/stabilisationModels/diffStencilLaplacianStab/diffStencilLaplacianStab.C
+numerics/stabilisationModels/diffStencilLaplacianStab/RhieChowStab/RhieChowStab.C
 numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOrderLaplacianStab.C
 numerics/stabilisationModels/gradDivStab/gradDivStab.C
 numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C

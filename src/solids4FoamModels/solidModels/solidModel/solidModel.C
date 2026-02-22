@@ -823,7 +823,8 @@ Foam::solidModel::solidModel
             dimensionedScalar("dampingCoeff", dimless/dimTime, 0)
         )
     ),
-    stabilisationPtr_(),
+    momentumStabilisationPtr_(),
+    pressureStabilisationPtr_(),
     solutionTol_
     (
         solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)
@@ -979,25 +980,49 @@ Foam::solidModel::solidModel
         }
     }
 
-    // Create stabilisation object
+    // Create momentum stabilisation
 
     if (!solidModelDict().found("stabilisation"))
     {
         // If the stabilisation sub-dict is not found, we will add it with
         // default settings
         dictionary stabDict;
-        stabDict.add("type", "RhieChow");
+        stabDict.add("type", "diffStencilLaplacian");
         stabDict.add("scaleFactor", 0.1);
-        solidModelDict().add("stabilisation", stabDict);
+
+        // Add default for momentum and pressure
+        solidModelDict().add("momentum", stabDict);
+        solidModelDict().add("pressure", stabDict);
     }
 
-    stabilisationPtr_.set
-    (
-        new momentumStabilisation
+    momentumStabilisationPtr_ =
+        stabilisationModel::New
         (
-            solidModelDict().subDict("stabilisation")
-        )
-    );
+            mesh(),
+            solidModelDict().subDict("stabilisation").subDict("momentum"),
+            dimless
+        );
+
+    pressureStabilisationPtr_ =
+        stabilisationModel::New
+        (
+            mesh(),
+            solidModelDict().subDict("stabilisation").subDict("pressure"),
+            dimPressure
+        );
+
+    // Check for previous stabilisation definition
+    if
+    (
+        solidModelDict().subDict("stabilisation").found("type")
+     || solidModelDict().subDict("stabilisation").found("scaleFactor")
+    )
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
+    }
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())
