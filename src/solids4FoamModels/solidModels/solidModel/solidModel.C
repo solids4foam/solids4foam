@@ -986,13 +986,28 @@ Foam::solidModel::solidModel
     {
         // If the stabilisation sub-dict is not found, we will add it with
         // default settings
-        dictionary stabDict;
-        stabDict.add("type", "diffStencilLaplacian");
-        stabDict.add("scaleFactor", 0.1);
+        dictionary momenDict;
+        momenDict.add("type", "diffStencilLaplacian");
+        momenDict.add("scaleFactor", 0.1);
 
         // Add default for momentum and pressure
-        solidModelDict().add("momentum", stabDict);
-        solidModelDict().add("pressure", stabDict);
+        dictionary stabDict;
+        stabDict.add("momentum", momenDict);
+        stabDict.add("pressure", momenDict);
+
+        // Add stabilisation dict
+        solidModelDict().add("stabilisation", stabDict);
+    }
+    else if // Check for previous stabilisation definition
+    (
+        solidModelDict().subDict("stabilisation").found("type")
+     || solidModelDict().subDict("stabilisation").found("scaleFactor")
+    )
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
     }
 
     momentumStabilisationPtr_ =
@@ -1008,21 +1023,8 @@ Foam::solidModel::solidModel
         (
             mesh(),
             solidModelDict().subDict("stabilisation").subDict("pressure"),
-            dimPressure
+            dimPressure/dimLength
         );
-
-    // Check for previous stabilisation definition
-    if
-    (
-        solidModelDict().subDict("stabilisation").found("type")
-     || solidModelDict().subDict("stabilisation").found("scaleFactor")
-    )
-    {
-        FatalErrorInFunction
-            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
-            << "solidProperties: this is the old format. Instead, define a "
-            << "stabilisation/momentum sub-dict" << exit(FatalError);
-    }
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())

@@ -889,14 +889,29 @@ label linGeomTotalDispSolid::formResidual
         // Replace the pressure component of stress
         sigma() = dev(sigma()) - p*I;
 
-        // Calculate pressure equation residual
-        const volScalarField kappa("kappa", mechanical().bulkModulus());
+        // Calculate the pressure gradient (we should store this!)
         const volVectorField gradp(fvc::grad(p));
+
+        // Re-calculate the pressure stabilisation parameter
         pressureStabilisation().updateScalar(p, &gradp);
+
+        // Lookup te bulk modulus (we should store this!)
+        const volScalarField kappa("kappa", mechanical().bulkModulus());
+
+        // Dimensional consistency factor
+        const dimensionedScalar one
+        (
+            "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
+        );
+
+        // Calculate pressure equation residual
         scalarField pressureResidual
         (
           - p/kappa
-          + fvc::div(impKf_*pressureStabilisation().faceScalar()*mesh.magSf())
+          + fvc::div
+            (
+                impKf_*pressureStabilisation().faceScalar()*mesh.magSf()
+            )*one
           - tr(gradD())
         );
 
@@ -996,49 +1011,23 @@ label linGeomTotalDispSolid::formJacobian
 
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
-    }
-
-    // Calculate a segregated approximation of the Jacobian
-    fvVectorMatrix approxJ
-    (
-        fvm::laplacian(impKf_, D, "laplacian(DD,D)")
-      - rho()*fvm::d2dt2(D)
-    );
-
-    if (dampingCoeff().value() > SMALL)
-    {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
-    }
-
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
-
-    // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    (
-        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-    );
-
-    if (solvePressure())
-    {
-        const volScalarField& p = this->p();
 
         const volScalarField kappa("kappa", mechanical().bulkModulus());
         //const volScalarField rKappa(1.0/mechanical().bulkModulus());
         const volScalarField rKappa(1.0/kappa);
-        const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        // const surfaceScalarField kappaf(fvc::interpolate(kappa));
         {
-            // Calculate pressure equation matrix
-            const dimensionedScalar one("one", dimless, 1);
-            // fvScalarMatrix approxPressureJ
-            // (
-            //   - fvm::Sp(one, p)
-            //   + fvm::laplacian(pDiffusivity(), p, "laplacian(Dp,p)")
-            // );
+            // Dimensional consistency factor
+            const dimensionedScalar one
+            (
+                "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
+            );
+
             fvScalarMatrix approxPressureJ
             (
               - fvm::Sp(rKappa, p)
-              + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+              // + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
+              + one*fvm::laplacian(impKf_, p, "laplacian(Dp,p)")
             );
 
             // Insert the pressure equation
@@ -1070,6 +1059,27 @@ label linGeomTotalDispSolid::formJacobian
             solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
         );
     }
+
+    // Calculate a segregated approximation of the Jacobian
+    fvVectorMatrix approxJ
+    (
+        fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+      - rho()*fvm::d2dt2(D)
+    );
+
+    if (dampingCoeff().value() > SMALL)
+    {
+        approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+    }
+
+    // Optional: under-relaxation of the linear system
+    approxJ.relax();
+
+    // Convert fvMatrix matrix to PETSc matrix
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+    (
+        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+    );
 
     return 0;
 }

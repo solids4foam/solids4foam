@@ -19,31 +19,7 @@ Class
     generalisedEvenOrderLaplacianStab
 
 Description
-    Face-based stabilisation model based on the Laplacian^laplacianPower. This
-    is a generalisation of the 4th order term of Jameson, Schmidt and Turkel.
-
-    This selectively damps grid-scale oscillatory modes while maintaining
-    consistency for smooth solutions.
-
-    For similar damping of the checkboard frequencyies, set the scaleFactor as:
-
-        scaleFactor = (4d)^{1 - m}
-
-        where d is the dimension (1-D, 2-D, 3-D), and m == laplacianPower
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation. However, when applied to higher-order
-    schemes, the leading truncation error introduced by this stabilisation
-    is second order, and therefore the overall method may be limited to
-    second-order convergence unless a higher-order variant of the
-    stabilisation is employed.
-
-    The stabilisation may be retrieved as a face flux contribution (surface
-    field).
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
+    To be added.
 
 SourceFiles
     generalisedEvenOrderLaplacianStab.C

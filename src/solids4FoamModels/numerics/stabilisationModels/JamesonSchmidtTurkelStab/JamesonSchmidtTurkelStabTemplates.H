@@ -46,7 +46,7 @@ void Foam::JamesonSchmidtTurkelStab::computeDiffStencil
     const surfaceScalarField h2f(1.0/sqr(mesh.deltaCoeffs()));
 
     // Outer pass: orthogonal diffusion of L1, scaled by h^2
-    faceFlux = -scaleFactor*h2f*op.snGrad(L1)*mesh.magSf();
+    faceFlux = -scaleFactor*h2f*op.snGrad(L1);
 }
 
 

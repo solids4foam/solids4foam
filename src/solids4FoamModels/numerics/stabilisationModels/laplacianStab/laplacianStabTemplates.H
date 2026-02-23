@@ -42,8 +42,11 @@ void Foam::laplacianStab::computeDiffStencil
     // Face-based h^2 scale via deltaCoeffs
     const surfaceScalarField h2f(1.0/sqr(mesh.deltaCoeffs()));
 
+    // Dimensional consistency factor
+    const dimensionedScalar one("one", dimless/sqr(dimLength), 1.0);
+
     // Outer pass: orthogonal diffusion of L1, scaled by h^2
-    faceFlux = -scaleFactor*h2f*op.snGrad(field)*mesh.magSf();
+    faceFlux = -scaleFactor*one*h2f*op.snGrad(field);
 }
 
 

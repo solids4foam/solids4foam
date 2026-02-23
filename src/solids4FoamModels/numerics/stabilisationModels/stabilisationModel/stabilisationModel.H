@@ -55,11 +55,11 @@ class stabilisationModel
         //- Reference to the mesh
         const fvMesh& mesh_;
 
-        //- Mechanical law dictionary
+        //- Stabilisation dictionary
         const dictionary dict_;
 
         //- Dimensioned of the stabilisation
-        const dimensionSet& dims_;
+        const dimensionSet dims_;
 
 
     // Private Member Functions
@@ -155,7 +155,7 @@ public:
             }
 
             //- Provide read-only access to the scalar face stabilisation
-            const surfaceScalarField& faceScalar() const
+            virtual const surfaceScalarField& faceScalar() const
             {
                 FatalErrorInFunction
                     << "Scalar stabilisation not supported by "
@@ -166,7 +166,7 @@ public:
             }
 
             //- Provide read-only access to the vector face stabilisation
-            const surfaceVectorField& faceVector() const
+            virtual const surfaceVectorField& faceVector() const
             {
                 FatalErrorInFunction
                     << "Vector stabilisation not supported by "

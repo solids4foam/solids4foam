@@ -71,7 +71,7 @@ void Foam::alphaStab::computeDiffStencil
         const Type uR = fieldI[neiCellID] + (dR & gradFieldI[neiCellID]);
 
         // Stabilisation based on the jump across the face
-        faceFluxI[facei] = deltaCoeffs[facei]*(uR - uL);
+        faceFluxI[facei] = scaleFactor_*deltaCoeffs[facei]*(uR - uL);
     }
 
     typename SurfaceField::Boundary& faceFluxfBf = faceFlux.boundaryFieldRef();
@@ -108,13 +108,16 @@ void Foam::alphaStab::computeDiffStencil
                 const vector dR = patchCf[facei] - neiProcC[facei];
 
                 // Extrapolate from the owner to the face
-                const Type uL = fieldI[ownCellID] + (dL & gradFieldI[ownCellID]);
+                const Type uL =
+                    fieldI[ownCellID] + (dL & gradFieldI[ownCellID]);
 
                 // Extrapolate from the neighbour (other proc) to the face
-                const Type uR = neiProcField[facei] + (dR & neiProcGrad[facei]);
+                const Type uR =
+                    neiProcField[facei] + (dR & neiProcGrad[facei]);
 
                 // Stabilisation based on the jump across the face
-                faceFluxfBfI[facei] = patchDeltaCoeffs[facei]*(uR - uL);
+                faceFluxfBfI[facei] =
+                    scaleFactor_*patchDeltaCoeffs[facei]*(uR - uL);
             }
         }
         else
@@ -134,7 +137,8 @@ void Foam::alphaStab::computeDiffStencil
                 const Type& uR = patchInternalField[facei];
 
                 // Stabilisation based on the jump across the face
-                faceFluxfBfI[facei] = patchDeltaCoeffs[facei]*(uR - uL);
+                faceFluxfBfI[facei] =
+                    scaleFactor_*patchDeltaCoeffs[facei]*(uR - uL);
             }
         }
     }

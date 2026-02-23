@@ -30,7 +30,7 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     const GeoField& field,
     SurfaceField& faceFlux,
     scalar scaleFactor,
-    const label laplacianPower   // m ≥ 1
+    const label m        // laplacianPower
 ) const
 {
     // Take a reference to the mesh
@@ -40,26 +40,51 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     using Type = typename GeoField::value_type;
     fv::orthogonalSnGrad<Type> op(mesh);
 
-    // Working field
-    GeoField L("L", field);
-
-    // Apply orthogonal Laplacian m times
-    for (label i = 0; i < laplacianPower; ++i)
+    // -----------------------------------------------------
+    // Special case m = 0  ->  Oosterlee h^2 * Laplacian
+    // -----------------------------------------------------
+    if (m == 0)
     {
-        L = fvc::div(op.snGrad(L)*mesh.magSf());
+        const GeoField L0
+        (
+            fvc::div(op.snGrad(field) * mesh.magSf())
+        );
+
+        const surfaceScalarField h2f
+        (
+            1.0/sqr(mesh.deltaCoeffs())
+        );
+
+        faceFlux = scaleFactor*h2f*op.snGrad(L0);
+
+        return;
     }
 
-    // h^(2(m-1)) scaling
+    // -----------------------------------------------------
+    // General case m >= 1
+    // Build tL = Δ^m(field)
+    // -----------------------------------------------------
+
+    tmp<GeoField> tL = field;
+
+    for (label i = 0; i < m; ++i)
+    {
+        tL = fvc::div(op.snGrad(tL())*mesh.magSf());
+    }
+
+    // -----------------------------------------------------
+    // h^(2m) scaling
+    // -----------------------------------------------------
+
     const surfaceScalarField h2fPow
     (
-        pow(1.0/sqr(mesh.deltaCoeffs()), laplacianPower - 1)
+        pow(1.0/sqr(mesh.deltaCoeffs()), m)
     );
 
-    // Ensure damping sign
-    const scalar sign = (laplacianPower % 2 == 0) ? 1.0 : -1.0;
+    // Alternating sign ensures damping
+    const scalar sign = (m % 2 == 0) ? 1.0 : -1.0;
 
-    // Calculate the flux
-    faceFlux = sign*scaleFactor*h2fPow*op.snGrad(L)*mesh.magSf();
+    faceFlux = sign*scaleFactor*h2fPow*op.snGrad(tL());
 }
 
 
