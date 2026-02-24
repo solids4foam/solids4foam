@@ -1012,10 +1012,7 @@ label linGeomTotalDispSolid::formJacobian
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        const volScalarField kappa("kappa", mechanical().bulkModulus());
-        //const volScalarField rKappa(1.0/mechanical().bulkModulus());
-        const volScalarField rKappa(1.0/kappa);
-        // const surfaceScalarField kappaf(fvc::interpolate(kappa));
+        const volScalarField rKappa("rKappa", 1.0/mechanical().bulkModulus());
         {
             // Dimensional consistency factor
             const dimensionedScalar one
@@ -1026,8 +1023,7 @@ label linGeomTotalDispSolid::formJacobian
             fvScalarMatrix approxPressureJ
             (
               - fvm::Sp(rKappa, p)
-              // + fvm::laplacian(pDiffusivity()/kappaf, p, "laplacian(Dp,p)")
-              + one*fvm::laplacian(impKf_, p, "laplacian(Dp,p)")
+              + one*pressureStabilisation().scalarJacobian(p, &impKf_)
             );
 
             // Insert the pressure equation
@@ -1063,7 +1059,7 @@ label linGeomTotalDispSolid::formJacobian
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
     (
-        fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+        momentumStabilisation().vectorJacobian(D, &impKf_)
       - rho()*fvm::d2dt2(D)
     );
 

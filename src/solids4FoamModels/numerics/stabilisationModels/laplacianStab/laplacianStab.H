@@ -65,17 +65,6 @@ class laplacianStab
 :
     public stabilisationModel
 {
-    // Private data
-
-        //- Scale factor used for globally scaling the amount of stabilisation
-        const scalar scaleFactor_;
-
-        //- Pointer to the scalar face stabilisation
-        mutable autoPtr<surfaceScalarField> faceScalarPtr_;
-
-        //- Pointer to the vector face stabilisation
-        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
-
     // Private Member Functions
 
         //- Template calculation of the stabilisation
@@ -121,46 +110,6 @@ public:
 
         // Access
 
-            //- Does this stabilisation model support scalar fields?
-            virtual bool supportsScalar() const
-            {
-                return true;
-            }
-
-            //- Does this stabilisation model support vector fields?
-            virtual bool supportsVector() const
-            {
-                return true;
-            }
-
-            //- Provide read-only access to the scalar face stabilisation
-            const surfaceScalarField& faceScalar() const
-            {
-                if (faceScalarPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateScalar(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceScalarPtr_();
-            }
-
-            //- Provide read-only access to the vector face stabilisation
-            const surfaceVectorField& faceVector() const
-            {
-                if (faceVectorPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateVector(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceVectorPtr_();
-            }
-
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient
             virtual void updateScalar
@@ -175,6 +124,26 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
+            ) const;
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvScalarMatrix& scalarJacobian
+            (
+                const volScalarField& field,
+                const surfaceScalarField* gammaPtr = nullptr
+            ) const;
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvVectorMatrix& vectorJacobian
+            (
+                const volVectorField& field,
+                const surfaceScalarField* gammaPtr = nullptr
             ) const;
 };
 

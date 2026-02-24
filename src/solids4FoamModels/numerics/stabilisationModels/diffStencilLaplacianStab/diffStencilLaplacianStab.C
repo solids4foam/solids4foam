@@ -19,6 +19,7 @@ License
 
 #include "diffStencilLaplacianStab.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fvmLaplacian.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -44,6 +45,10 @@ Foam::diffStencilLaplacianStab::diffStencilLaplacianStab
 :
     stabilisationModel(mesh, dict, dims),
     scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
+    scaleFactorJacobian_
+    (
+        dict.lookupOrDefault<scalar>("scaleFactorJacobian", scaleFactor_)
+    ),
     faceScalarPtr_(),
     faceVectorPtr_()
 {}
@@ -137,5 +142,87 @@ void Foam::diffStencilLaplacianStab::updateVector
     // Update the stabilisation
     computeDiffStencil(p, gradP, faceVectorPtr_.ref(), scaleFactor_);
 }
+
+const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
+(
+    const volScalarField& field,
+    const surfaceScalarField* gammaPtr
+) const
+{
+    // If required, initialise the face stabilisation field
+    if (scalarJacobianPtr_.empty())
+    {
+        if (gammaPtr == nullptr)
+        {
+            scalarJacobianPtr_.set
+            (
+                new fvScalarMatrix
+                (
+                    fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            scalarJacobianPtr_.set
+            (
+                new fvScalarMatrix
+                (
+                    fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return scalarJacobianPtr_();
+}
+
+
+const Foam::fvVectorMatrix& Foam::diffStencilLaplacianStab::vectorJacobian
+(
+    const volVectorField& field,
+    const surfaceScalarField* gammaPtr
+) const
+{
+    // If required, initialise the face stabilisation field
+    if (vectorJacobianPtr_.empty())
+    {
+        if (gammaPtr == nullptr)
+        {
+            vectorJacobianPtr_.set
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian_
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            vectorJacobianPtr_.set
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian_
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return vectorJacobianPtr_();
+}
+
 
 // ************************************************************************* //

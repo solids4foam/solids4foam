@@ -38,6 +38,7 @@ Author
 #include "dictionary.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "fvMatrices.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,7 +62,29 @@ class stabilisationModel
         //- Dimensioned of the stabilisation
         const dimensionSet dims_;
 
+        //- Scale factor used for globally scaling the amount of stabilisation
+        const scalar scaleFactor_;
 
+        //- Scale factor used for globally scaling the approximate Jacobian
+        //  This defaults to scaleFactor
+        const scalar scaleFactorJacobian_;
+
+        //- Pointer to the scalar face stabilisation
+        mutable autoPtr<surfaceScalarField> faceScalarPtr_;
+
+        //- Pointer to the vector face stabilisation
+        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
+
+        //- Pointer to the scalar approximate Jacobian
+        mutable autoPtr<fvScalarMatrix> scalarJacobianPtr_;
+
+        //- Pointer to the vector approximate Jacobian
+        mutable autoPtr<fvVectorMatrix> vectorJacobianPtr_;
+
+        //- Pointer to the reciprocal of the deltaCoeffs squared
+        mutable autoPtr<surfaceScalarField> h2Ptr_;
+
+ 
     // Private Member Functions
 
         //- Disallow copy construct
@@ -142,38 +165,86 @@ public:
                 return dims_;
             }
 
-            //- Does this stabilisation model support scalar fields?
-            virtual bool supportsScalar() const
+            //- Return the scale factor
+            scalar scaleFactor() const
             {
-                return false;
+                return scaleFactor_;
             }
 
-            //- Does this stabilisation model support vector fields?
-            virtual bool supportsVector() const
+            //- Return the scale factor for Jacobian
+            scalar scaleFactorJacobian() const
             {
-                return false;
+                return scaleFactorJacobian_;
             }
+
+            //- Provide access to the scalar face stabilisation pointer
+            autoPtr<surfaceScalarField>& faceScalarPtr() const
+            {
+                return faceScalarPtr_;
+            };
 
             //- Provide read-only access to the scalar face stabilisation
-            virtual const surfaceScalarField& faceScalar() const
+            const surfaceScalarField& faceScalar() const
             {
-                FatalErrorInFunction
-                    << "Scalar stabilisation not supported by "
-                    << type() << exit(FatalError);
+                if (faceScalarPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not yet set: the updateScalar(...) "
+                        << "function must be called first"
+                        << type() << abort(FatalError);
+                }
 
-                // Keep the compiler happy
-                std::abort();
+                return faceScalarPtr_();
             }
 
-            //- Provide read-only access to the vector face stabilisation
-            virtual const surfaceVectorField& faceVector() const
+            //- Provide access to the vector face stabilisation pointer
+            autoPtr<surfaceVectorField>& faceVectorPtr() const
             {
-                FatalErrorInFunction
-                    << "Vector stabilisation not supported by "
-                    << type() << exit(FatalError);
+                return faceVectorPtr_;
+            };
 
-                // Keep the compiler happy
-                std::abort();
+            //- Provide read-only access to the vector face stabilisation
+            const surfaceVectorField& faceVector() const
+            {
+                if (faceVectorPtr_.empty())
+                {
+                    FatalErrorInFunction
+                        << "Pointer not yet set: the updateVector(...) "
+                        << "function must be called first"
+                        << type() << abort(FatalError);
+                }
+
+                return faceVectorPtr_();
+            }
+
+            //- Provide access to the scalarJacobianPtr
+            autoPtr<fvScalarMatrix>& scalarJacobianPtr() const
+            {
+                return scalarJacobianPtr_;
+            }
+
+            //- Provide access to the vectorJacobianPtr
+            autoPtr<fvVectorMatrix>& vectorJacobianPtr() const
+            {
+                return vectorJacobianPtr_;
+            }
+
+            //- Provide read-only access to the h2 field
+            const surfaceScalarField& h2() const
+            {
+                if (h2Ptr_.empty())
+                {
+                    h2Ptr_.set
+                    (
+                        new surfaceScalarField
+                        (
+                            "h2",
+                            1.0/sqr(mesh().deltaCoeffs())
+                        )
+                    );
+                }
+
+                return h2Ptr_();
             }
 
         // Edit
@@ -195,7 +266,7 @@ public:
             }
 
             //- Re-calculate the vector stabilisation
-            // Provide the primary variable field and optionally its gradient
+            //  Provide the primary variable field and optionally its gradient
             virtual void updateVector
             (
                 const volVectorField& field,
@@ -204,6 +275,42 @@ public:
             {
                 FatalErrorInFunction
                     << "scalar stabilisation not supported by "
+                    << type() << exit(FatalError);
+
+                // Keep the compiler happy
+                std::abort();
+            }
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvScalarMatrix& scalarJacobian
+            (
+                const volScalarField& field,
+                const surfaceScalarField* gammaPtr = nullptr
+            ) const
+            {
+                FatalErrorInFunction
+                    << "scalarJacobian not supported by "
+                    << type() << exit(FatalError);
+
+                // Keep the compiler happy
+                std::abort();
+            }
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvVectorMatrix& vectorJacobian
+            (
+                const volVectorField& field,
+                const surfaceScalarField* gammaPtr = nullptr
+            ) const
+            {
+                FatalErrorInFunction
+                    << "vectorJacobian not supported by "
                     << type() << exit(FatalError);
 
                 // Keep the compiler happy

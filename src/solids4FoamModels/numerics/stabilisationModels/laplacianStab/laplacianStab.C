@@ -19,6 +19,7 @@ License
 
 #include "laplacianStab.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fvmLaplacian.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,10 +43,7 @@ Foam::laplacianStab::laplacianStab
     const dimensionSet& dims
 )
 :
-    stabilisationModel(mesh, dict, dims),
-    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    faceScalarPtr_(),
-    faceVectorPtr_()
+    stabilisationModel(mesh, dict, dims)
 {}
 
 
@@ -64,9 +62,9 @@ void Foam::laplacianStab::updateScalar
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceScalarPtr_.empty())
+    if (faceScalarPtr().empty())
     {
-        faceScalarPtr_.set
+        faceScalarPtr().set
         (
             new surfaceScalarField
             (
@@ -85,7 +83,7 @@ void Foam::laplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor());
 }
 
 
@@ -96,9 +94,9 @@ void Foam::laplacianStab::updateVector
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -117,7 +115,92 @@ void Foam::laplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor());
 }
+
+
+const Foam::fvScalarMatrix& Foam::laplacianStab::scalarJacobian
+(
+    const volScalarField& field,
+    const surfaceScalarField* gammaPtr
+) const
+{
+    // If required, initialise the face stabilisation field
+    if (scalarJacobianPtr().empty())
+    {
+        if (gammaPtr == nullptr)
+        {
+            scalarJacobianPtr().set
+            (
+                new fvScalarMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            scalarJacobianPtr().set
+            (
+                new fvScalarMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return scalarJacobianPtr();
+}
+
+
+const Foam::fvVectorMatrix& Foam::laplacianStab::vectorJacobian
+(
+    const volVectorField& field,
+    const surfaceScalarField* gammaPtr
+) const
+{
+    // If required, initialise the face stabilisation field
+    if (vectorJacobianPtr().empty())
+    {
+        if (gammaPtr == nullptr)
+        {
+            vectorJacobianPtr().set
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            vectorJacobianPtr().set
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return vectorJacobianPtr();
+}
+
 
 // ************************************************************************* //
