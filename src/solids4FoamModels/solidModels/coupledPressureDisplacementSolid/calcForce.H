@@ -76,25 +76,11 @@ else
                     DD().boundaryField()[patchI]
                 );
 
-            // vectorField traction =
-            //     force_.boundaryField()[patchI]/
-            //     mesh().boundary()[patchI].magSf();
-
-            // Info << mesh().boundary()[patchI].name() << ": "
-            //      << average(mag(traction)) << endl;
-
             force_.boundaryField()[patchI] =
             (
                 ted.traction()*mesh().magSf().boundaryField()[patchI]
               - ted.pressure()*mesh().Sf().boundaryField()[patchI]
             );
-
-            // traction =
-            //     force_.boundaryField()[patchI]/
-            //     mesh().boundary()[patchI].magSf();
-
-            // Info << mesh().boundary()[patchI].name() << ": "
-            //      << average(mag(traction)) << endl;
         }
     }
 

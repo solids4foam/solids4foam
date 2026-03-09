@@ -49,6 +49,7 @@ tmp<BlockLduSystem<vector, vector> > updatedLagGaussGrad<scalar>::fvmGrad
 {
     const fvMesh& mesh = vf.mesh();
 
+    // ZT: Interpolate on initial configuration
     tmp<surfaceScalarField> tweights = this->tinterpScheme_().weights(vf);
     const scalarField& wIn = tweights().internalField();
 
@@ -70,7 +71,7 @@ tmp<BlockLduSystem<vector, vector> > updatedLagGaussGrad<scalar>::fvmGrad
     CoeffField<vector>::linearTypeField& u = bs.upper().asLinear();
     CoeffField<vector>::linearTypeField& l = bs.lower().asLinear();
 
-    // Lookup current area field
+    // Lookup current area field (use previous configration, UL)
     const surfaceVectorField& curSf =
         mesh.lookupObject<surfaceVectorField>("curSf").oldTime();
     // mesh.lookupObject<surfaceVectorField>("curSf");

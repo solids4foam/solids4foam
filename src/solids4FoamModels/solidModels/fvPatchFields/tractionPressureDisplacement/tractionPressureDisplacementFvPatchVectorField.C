@@ -436,26 +436,25 @@ void tractionPressureDisplacementFvPatchVectorField::updateCoeffs()
     const vectorField n = patch().nf();
 
     const vectorField& refSf = patch().Sf();
-    const tensorField Fm = FM(refConfig);
-    const tensorField invFm = inv(Fm);
-    const scalarField Jm = det(Fm);
 
-    const vectorField curSf = Jm*(invFm.T() & refSf);
+    vectorField curSf = refSf;
+    if
+    (
+        solMod.nonLinGeom() !=
+        nonLinearGeometry::LINEAR_GEOMETRY
+    )
+    {
+        const tensorField Fm = FM(false);
+        const tensorField invFm = inv(Fm);
+        const scalarField Jm = det(Fm);
+        curSf = Jm*(invFm.T() & refSf);
+    }
     const scalarField magCurSf = mag(curSf);
     const vectorField curN = curSf/magCurSf;
 
-    // Reconstruct patch displacement increment
-    // using conservative displacement increment
-    vectorField pDD = patchInternalField();
-    {
-        const fvsPatchVectorField& DDf =
-            patch().lookupPatchField<surfaceVectorField, vector>("DDf");
-
-        const vectorField pDDn = curN*(curN & DDf);
-
-        pDD -= curN*(curN & pDD);
-        pDD += pDDn;
-    }
+    // Take conservative displacement increment
+    vectorField pDD =
+        patch().lookupPatchField<surfaceVectorField, vector>("DDf");
 
     // Calculate disp increment gradient
     this->gradient() =
@@ -510,8 +509,8 @@ transformedGradient() const
 
     if
     (
-        solMod.nonLinGeom() ==
-        nonLinearGeometry::TOTAL_LAGRANGIAN
+        solMod.nonLinGeom() !=
+        nonLinearGeometry::LINEAR_GEOMETRY
     )
     {
         const bool refConfig = false;
