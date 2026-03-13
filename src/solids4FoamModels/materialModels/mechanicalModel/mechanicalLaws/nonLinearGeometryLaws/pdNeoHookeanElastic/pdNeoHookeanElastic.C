@@ -91,6 +91,10 @@ Foam::pdNeoHookeanElastic::pdNeoHookeanElastic
             << "One should specify E and nu"
             << abort(FatalError);
     }
+
+    // Read F and Ff if present (need for restart)
+    F();
+    Ff();
 }
 
 
