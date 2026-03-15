@@ -48,9 +48,7 @@ Foam::diffStencilLaplacianStab::diffStencilLaplacianStab
     scaleFactorJacobian_
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", scaleFactor_)
-    ),
-    faceScalarPtr_(),
-    faceVectorPtr_()
+    )
 {}
 
 
@@ -78,9 +76,9 @@ void Foam::diffStencilLaplacianStab::updateScalar
     const volVectorField& gradP = *gradPtr;
 
     // If required, initialise the face stabilisation field
-    if (faceScalarPtr_.empty())
+    if (faceScalarPtr().empty())
     {
-        faceScalarPtr_.set
+        faceScalarPtr().set
         (
             new surfaceScalarField
             (
@@ -99,7 +97,7 @@ void Foam::diffStencilLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceScalarPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, faceScalarPtr().ref(), scaleFactor_);
 }
 
 
@@ -119,9 +117,9 @@ void Foam::diffStencilLaplacianStab::updateVector
     const volTensorField& gradP = *gradPtr;
 
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -140,21 +138,22 @@ void Foam::diffStencilLaplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceVectorPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, faceVectorPtr().ref(), scaleFactor_);
 }
 
 const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
 (
     const volScalarField& field,
-    const surfaceScalarField* gammaPtr
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (scalarJacobianPtr_.empty())
+    if (scalarJacobianPtr().empty() || rebuild)
     {
         if (gammaPtr == nullptr)
         {
-            scalarJacobianPtr_.set
+            scalarJacobianPtr().reset
             (
                 new fvScalarMatrix
                 (
@@ -169,7 +168,7 @@ const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
                 "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
             );
 
-            scalarJacobianPtr_.set
+            scalarJacobianPtr().reset
             (
                 new fvScalarMatrix
                 (
@@ -179,22 +178,23 @@ const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
         }
     }
 
-    return scalarJacobianPtr_();
+    return scalarJacobianPtr()();
 }
 
 
 const Foam::fvVectorMatrix& Foam::diffStencilLaplacianStab::vectorJacobian
 (
     const volVectorField& field,
-    const surfaceScalarField* gammaPtr
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (vectorJacobianPtr_.empty())
+    if (vectorJacobianPtr().empty() || rebuild)
     {
         if (gammaPtr == nullptr)
         {
-            vectorJacobianPtr_.set
+            vectorJacobianPtr().reset
             (
                 new fvVectorMatrix
                 (
@@ -210,7 +210,7 @@ const Foam::fvVectorMatrix& Foam::diffStencilLaplacianStab::vectorJacobian
                 "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
             );
 
-            vectorJacobianPtr_.set
+            vectorJacobianPtr().reset
             (
                 new fvVectorMatrix
                 (
@@ -221,7 +221,7 @@ const Foam::fvVectorMatrix& Foam::diffStencilLaplacianStab::vectorJacobian
         }
     }
 
-    return vectorJacobianPtr_();
+    return vectorJacobianPtr()();
 }
 
 

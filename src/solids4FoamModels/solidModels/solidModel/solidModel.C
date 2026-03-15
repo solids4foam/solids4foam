@@ -982,27 +982,26 @@ Foam::solidModel::solidModel
 
     // Create momentum stabilisation
 
+    dictionary defaultStabSubDict;
+    defaultStabSubDict.add("type", "diffStencilLaplacian");
+    defaultStabSubDict.add("scaleFactor", 0.1);
+
     if (!solidModelDict().found("stabilisation"))
     {
         // If the stabilisation sub-dict is not found, we will add it with
         // default settings
-        dictionary momenDict;
-        momenDict.add("type", "diffStencilLaplacian");
-        momenDict.add("scaleFactor", 0.1);
-
-        // Add default for momentum and pressure
         dictionary stabDict;
-        stabDict.add("momentum", momenDict);
-        stabDict.add("pressure", momenDict);
+        stabDict.add("momentum", defaultStabSubDict);
+        stabDict.add("pressure", defaultStabSubDict);
 
         // Add stabilisation dict
         solidModelDict().add("stabilisation", stabDict);
     }
-    else if // Check for previous stabilisation definition
-    (
-        solidModelDict().subDict("stabilisation").found("type")
-     || solidModelDict().subDict("stabilisation").found("scaleFactor")
-    )
+
+    dictionary& stabDict = solidModelDict().subDict("stabilisation");
+
+    // Check for previous stabilisation definition
+    if (stabDict.found("type") || stabDict.found("scaleFactor"))
     {
         FatalErrorInFunction
             << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
@@ -1010,11 +1009,21 @@ Foam::solidModel::solidModel
             << "stabilisation/momentum sub-dict" << exit(FatalError);
     }
 
+    if (!stabDict.found("momentum"))
+    {
+        stabDict.add("momentum", defaultStabSubDict);
+    }
+
+    if (!stabDict.found("pressure"))
+    {
+        stabDict.add("pressure", defaultStabSubDict);
+    }
+
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
             mesh(),
-            solidModelDict().subDict("stabilisation").subDict("momentum"),
+            stabDict.subDict("momentum"),
             dimless
         );
 
@@ -1022,7 +1031,7 @@ Foam::solidModel::solidModel
         stabilisationModel::New
         (
             mesh(),
-            solidModelDict().subDict("stabilisation").subDict("pressure"),
+            stabDict.subDict("pressure"),
             dimPressure/dimLength
         );
 

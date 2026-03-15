@@ -133,7 +133,8 @@ public:
             virtual const fvScalarMatrix& scalarJacobian
             (
                 const volScalarField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 
             //- Provide an implicit approximation of the stabilisation
@@ -143,7 +144,8 @@ public:
             virtual const fvVectorMatrix& vectorJacobian
             (
                 const volVectorField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 };
 

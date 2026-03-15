@@ -56,11 +56,6 @@ class generalisedEvenOrderLaplacianStab
         //- Laplacian power, e.g. 1 == laplacianStab, 2 == JSTStab, ..
         const label laplacianPower_;   // m ≥ 1
 
-        //- Pointer to the scalar face stabilisation
-        mutable autoPtr<surfaceScalarField> faceScalarPtr_;
-
-        //- Pointer to the vector face stabilisation
-        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
 
     // Private Member Functions
 
@@ -107,46 +102,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Does this stabilisation model support scalar fields?
-            virtual bool supportsScalar() const
-            {
-                return true;
-            }
-
-            //- Does this stabilisation model support vector fields?
-            virtual bool supportsVector() const
-            {
-                return true;
-            }
-
-            //- Provide read-only access to the scalar face stabilisation
-            const surfaceScalarField& faceScalar() const
-            {
-                if (faceScalarPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateScalar(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceScalarPtr_();
-            }
-
-            //- Provide read-only access to the vector face stabilisation
-            const surfaceVectorField& faceVector() const
-            {
-                if (faceVectorPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateVector(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceVectorPtr_();
-            }
 
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient

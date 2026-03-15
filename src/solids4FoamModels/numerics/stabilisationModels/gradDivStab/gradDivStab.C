@@ -46,8 +46,7 @@ Foam::gradDivStab::gradDivStab
 )
 :
     stabilisationModel(mesh, dict, dims),
-    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    faceVectorPtr_()
+    scaleFactor_(readScalar(dict.lookup("scaleFactor")))
 {}
 
 
@@ -66,9 +65,9 @@ void Foam::gradDivStab::updateVector
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -99,7 +98,7 @@ void Foam::gradDivStab::updateVector
     // Note that we ignore the tangential component as we only care about
     // stabilisation (not the physical operator) and the tangential components
     // could inject noise
-    faceVectorPtr_.ref() = -scaleFactor_*h2f*op.snGrad(divP)*mesh().Sf();
+    faceVectorPtr().ref() = -scaleFactor_*h2f*op.snGrad(divP)*mesh().Sf();
 }
 
 // ************************************************************************* //

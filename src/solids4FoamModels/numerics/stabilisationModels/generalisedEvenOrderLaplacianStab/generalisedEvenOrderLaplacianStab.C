@@ -44,9 +44,7 @@ Foam::generalisedEvenOrderLaplacianStab::generalisedEvenOrderLaplacianStab
 :
     stabilisationModel(mesh, dict, dims),
     scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    laplacianPower_(readScalar(dict.lookup("laplacianPower"))),
-    faceScalarPtr_(),
-    faceVectorPtr_()
+    laplacianPower_(readScalar(dict.lookup("laplacianPower")))
 {}
 
 
@@ -65,9 +63,9 @@ void Foam::generalisedEvenOrderLaplacianStab::updateScalar
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceScalarPtr_.empty())
+    if (faceScalarPtr().empty())
     {
-        faceScalarPtr_.set
+        faceScalarPtr().set
         (
             new surfaceScalarField
             (
@@ -86,7 +84,7 @@ void Foam::generalisedEvenOrderLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr_.ref(), scaleFactor_, laplacianPower_);
+    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor_, laplacianPower_);
 }
 
 
@@ -97,9 +95,9 @@ void Foam::generalisedEvenOrderLaplacianStab::updateVector
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -118,7 +116,7 @@ void Foam::generalisedEvenOrderLaplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr_.ref(), scaleFactor_, laplacianPower_);
+    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor_, laplacianPower_);
 }
 
 // ************************************************************************* //

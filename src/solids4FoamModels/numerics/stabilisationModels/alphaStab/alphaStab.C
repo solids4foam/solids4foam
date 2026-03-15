@@ -43,9 +43,7 @@ Foam::alphaStab::alphaStab
 )
 :
     stabilisationModel(mesh, dict, dims),
-    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    faceScalarPtr_(),
-    faceVectorPtr_()
+    scaleFactor_(readScalar(dict.lookup("scaleFactor")))
 {}
 
 
@@ -73,9 +71,9 @@ void Foam::alphaStab::updateScalar
     const volVectorField& gradP = *gradPtr;
 
     // If required, initialise the face stabilisation field
-    if (faceScalarPtr_.empty())
+    if (faceScalarPtr().empty())
     {
-        faceScalarPtr_.set
+        faceScalarPtr().set
         (
             new surfaceScalarField
             (
@@ -94,7 +92,7 @@ void Foam::alphaStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceScalarPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, faceScalarPtr().ref(), scaleFactor_);
 }
 
 
@@ -114,9 +112,9 @@ void Foam::alphaStab::updateVector
     const volTensorField& gradP = *gradPtr;
 
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -135,7 +133,7 @@ void Foam::alphaStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceVectorPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, faceVectorPtr().ref(), scaleFactor_);
 }
 
 // ************************************************************************* //

@@ -43,9 +43,7 @@ Foam::JamesonSchmidtTurkelStab::JamesonSchmidtTurkelStab
 )
 :
     stabilisationModel(mesh, dict, dims),
-    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    faceScalarPtr_(),
-    faceVectorPtr_()
+    scaleFactor_(readScalar(dict.lookup("scaleFactor")))
 {}
 
 
@@ -64,9 +62,9 @@ void Foam::JamesonSchmidtTurkelStab::updateScalar
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceScalarPtr_.empty())
+    if (faceScalarPtr().empty())
     {
-        faceScalarPtr_.set
+        faceScalarPtr().set
         (
             new surfaceScalarField
             (
@@ -85,7 +83,7 @@ void Foam::JamesonSchmidtTurkelStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor_);
 }
 
 
@@ -96,9 +94,9 @@ void Foam::JamesonSchmidtTurkelStab::updateVector
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (faceVectorPtr_.empty())
+    if (faceVectorPtr().empty())
     {
-        faceVectorPtr_.set
+        faceVectorPtr().set
         (
             new surfaceVectorField
             (
@@ -117,7 +115,7 @@ void Foam::JamesonSchmidtTurkelStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr_.ref(), scaleFactor_);
+    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor_);
 }
 
 // ************************************************************************* //

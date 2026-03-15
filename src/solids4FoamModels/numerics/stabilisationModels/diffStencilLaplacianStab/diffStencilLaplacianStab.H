@@ -81,17 +81,6 @@ class diffStencilLaplacianStab
         //  This defaults to scaleFactor
         const scalar scaleFactorJacobian_;
 
-        //- Pointer to the scalar face stabilisation
-        mutable autoPtr<surfaceScalarField> faceScalarPtr_;
-
-        //- Pointer to the vector face stabilisation
-        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
-
-        //- Pointer to the scalar approximate Jacobian
-        mutable autoPtr<fvScalarMatrix> scalarJacobianPtr_;
-
-        //- Pointer to the vector approximate Jacobian
-        mutable autoPtr<fvVectorMatrix> vectorJacobianPtr_;
 
     // Private Member Functions
 
@@ -136,46 +125,6 @@ public:
 
         // Access
 
-            //- Does this stabilisation model support scalar fields?
-            virtual bool supportsScalar() const
-            {
-                return true;
-            }
-
-            //- Does this stabilisation model support vector fields?
-            virtual bool supportsVector() const
-            {
-                return true;
-            }
-
-            //- Provide read-only access to the scalar face stabilisation
-            const surfaceScalarField& faceScalar() const
-            {
-                if (faceScalarPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateScalar(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceScalarPtr_();
-            }
-
-            //- Provide read-only access to the vector face stabilisation
-            const surfaceVectorField& faceVector() const
-            {
-                if (faceVectorPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateVector(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceVectorPtr_();
-            }
-
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient
             virtual void updateScalar
@@ -199,7 +148,8 @@ public:
             virtual const fvScalarMatrix& scalarJacobian
             (
                 const volScalarField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 
             //- Provide an implicit approximation of the stabilisation
@@ -209,7 +159,8 @@ public:
             virtual const fvVectorMatrix& vectorJacobian
             (
                 const volVectorField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 };
 

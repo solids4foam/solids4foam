@@ -122,15 +122,16 @@ void Foam::laplacianStab::updateVector
 const Foam::fvScalarMatrix& Foam::laplacianStab::scalarJacobian
 (
     const volScalarField& field,
-    const surfaceScalarField* gammaPtr
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (scalarJacobianPtr().empty())
+    if (scalarJacobianPtr().empty() || rebuild)
     {
         if (gammaPtr == nullptr)
         {
-            scalarJacobianPtr().set
+            scalarJacobianPtr().reset
             (
                 new fvScalarMatrix
                 (
@@ -146,7 +147,7 @@ const Foam::fvScalarMatrix& Foam::laplacianStab::scalarJacobian
                 "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
             );
 
-            scalarJacobianPtr().set
+            scalarJacobianPtr().reset
             (
                 new fvScalarMatrix
                 (
@@ -164,15 +165,16 @@ const Foam::fvScalarMatrix& Foam::laplacianStab::scalarJacobian
 const Foam::fvVectorMatrix& Foam::laplacianStab::vectorJacobian
 (
     const volVectorField& field,
-    const surfaceScalarField* gammaPtr
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
 ) const
 {
     // If required, initialise the face stabilisation field
-    if (vectorJacobianPtr().empty())
+    if (vectorJacobianPtr().empty() || rebuild)
     {
         if (gammaPtr == nullptr)
         {
-            vectorJacobianPtr().set
+            vectorJacobianPtr().reset
             (
                 new fvVectorMatrix
                 (
@@ -188,7 +190,7 @@ const Foam::fvVectorMatrix& Foam::laplacianStab::vectorJacobian
                 "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
             );
 
-            vectorJacobianPtr().set
+            vectorJacobianPtr().reset
             (
                 new fvVectorMatrix
                 (

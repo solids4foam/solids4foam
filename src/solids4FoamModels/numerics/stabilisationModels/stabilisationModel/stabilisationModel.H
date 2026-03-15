@@ -190,7 +190,7 @@ public:
                 {
                     FatalErrorInFunction
                         << "Pointer not yet set: the updateScalar(...) "
-                        << "function must be called first"
+                        << "function must be called first for "
                         << type() << abort(FatalError);
                 }
 
@@ -210,7 +210,7 @@ public:
                 {
                     FatalErrorInFunction
                         << "Pointer not yet set: the updateVector(...) "
-                        << "function must be called first"
+                        << "function must be called first for "
                         << type() << abort(FatalError);
                 }
 
@@ -288,7 +288,8 @@ public:
             virtual const fvScalarMatrix& scalarJacobian
             (
                 const volScalarField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const
             {
                 FatalErrorInFunction
@@ -306,7 +307,8 @@ public:
             virtual const fvVectorMatrix& vectorJacobian
             (
                 const volVectorField& field,
-                const surfaceScalarField* gammaPtr = nullptr
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const
             {
                 FatalErrorInFunction

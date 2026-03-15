@@ -71,9 +71,6 @@ class gradDivStab
         //- Scale factor used for globally scaling the amount of stabilisation
         const scalar scaleFactor_;
 
-        //- Pointer to the vector face stabilisation
-        mutable autoPtr<surfaceVectorField> faceVectorPtr_;
-
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -109,26 +106,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Does this stabilisation model support vector fields?
-            virtual bool supportsVector() const
-            {
-                return true;
-            }
-
-            //- Provide read-only access to the vector face stabilisation
-            const surfaceVectorField& faceVector() const
-            {
-                if (faceVectorPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not yet set: the updateVector(...) "
-                        << "function must be called first"
-                        << type() << abort(FatalError);
-                }
-
-                return faceVectorPtr_();
-            }
 
             //- Re-calculate the vector stabilisation
             // Provide the primary variable field and optionally its gradient
