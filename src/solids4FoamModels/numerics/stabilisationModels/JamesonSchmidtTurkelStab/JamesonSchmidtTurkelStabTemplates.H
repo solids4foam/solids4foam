@@ -38,7 +38,7 @@ void Foam::JamesonSchmidtTurkelStab::computeDiffStencil
     // Create the orthogonal normal gradient operator
     using Type = typename GeoField::value_type;
     fv::orthogonalSnGrad<Type> op(mesh);
-    
+
     // Inner pass: orthogonal diffusion operator
     const GeoField L1(fvc::div(op.snGrad(field)*mesh.magSf()));
 

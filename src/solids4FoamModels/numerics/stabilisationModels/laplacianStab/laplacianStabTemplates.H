@@ -38,7 +38,7 @@ void Foam::laplacianStab::computeDiffStencil
     // Create the orthogonal normal gradient operator
     using Type = typename GeoField::value_type;
     fv::orthogonalSnGrad<Type> op(mesh);
-    
+
     // Face-based h^2 scale via deltaCoeffs
     const surfaceScalarField h2f(1.0/sqr(mesh.deltaCoeffs()));
 

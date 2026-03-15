@@ -106,7 +106,7 @@ class stabilisationModel
             cellVectorPtr_.clear();
         }
 
- 
+
     // Private Member Functions
 
         //- Disallow copy construct

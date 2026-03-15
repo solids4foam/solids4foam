@@ -92,7 +92,7 @@ void Foam::gradDivStab::updateVector
 
     // Create the orthogonal normal gradient operator
     fv::orthogonalSnGrad<scalar> op(mesh());
-    
+
     // Inner pass: divergence of field
     const volScalarField divP(fvc::div(p));
 
