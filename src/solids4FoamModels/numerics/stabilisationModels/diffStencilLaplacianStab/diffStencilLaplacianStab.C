@@ -66,6 +66,8 @@ void Foam::diffStencilLaplacianStab::updateScalar
     const volVectorField* gradPtr
 ) const
 {
+    clearCellScalarCache();
+
     if (gradPtr == nullptr)
     {
         FatalErrorInFunction
@@ -107,6 +109,8 @@ void Foam::diffStencilLaplacianStab::updateVector
     const volTensorField* gradPtr
 ) const
 {
+    clearCellVectorCache();
+
     if (gradPtr == nullptr)
     {
         FatalErrorInFunction
@@ -157,7 +161,8 @@ const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
             (
                 new fvScalarMatrix
                 (
-                    fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                    scaleFactorJacobian_
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
                 )
             );
         }
@@ -172,7 +177,8 @@ const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian
             (
                 new fvScalarMatrix
                 (
-                    fvm::laplacian(*gammaPtr, field, schemeName)
+                    scaleFactorJacobian_
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
                 )
             );
         }

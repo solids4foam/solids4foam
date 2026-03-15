@@ -19,8 +19,7 @@ Class
     RhieChowStab
 
 Description
-    For backwards compatibility is just a synonym for diffStencilLaplacianStab
-
+    Backwards-compatibility alias for `diffStencilLaplacianStab`.
 
 SourceFiles
     RhieChowStab.C

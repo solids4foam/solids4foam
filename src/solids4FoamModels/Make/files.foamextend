@@ -3,7 +3,6 @@ physicsModel/physicsModel.C
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/checkConvergence.C
-solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
@@ -11,7 +10,6 @@ solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
 solidModels/kirchhoffPlateSolid/clampedMoment/clampedMomentFaPatchScalarField.C
 solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatchScalarField.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
-solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C

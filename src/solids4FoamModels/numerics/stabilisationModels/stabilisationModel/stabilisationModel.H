@@ -19,8 +19,10 @@ Class
     Foam::stabilisationModel
 
 Description
-    Class for calculating stabilisation terms for vector and scalar geometric
-    fields.
+    Base class for runtime-selectable scalar and vector stabilisation models.
+
+    Derived classes cache face-based stabilisation fields and may also provide
+    cached cell-centred fields and approximate Jacobians.
 
 SourceFiles
     stabilisationModel.C
@@ -81,8 +83,28 @@ class stabilisationModel
         //- Pointer to the vector approximate Jacobian
         mutable autoPtr<fvVectorMatrix> vectorJacobianPtr_;
 
+        //- Pointer to the cell scalar stabilisation
+        mutable autoPtr<volScalarField> cellScalarPtr_;
+
+        //- Pointer to the cell vector stabilisation
+        mutable autoPtr<volVectorField> cellVectorPtr_;
+
         //- Pointer to the reciprocal of the deltaCoeffs squared
         mutable autoPtr<surfaceScalarField> h2Ptr_;
+
+    protected:
+
+        //- Invalidate the cached cell scalar stabilisation
+        void clearCellScalarCache() const
+        {
+            cellScalarPtr_.clear();
+        }
+
+        //- Invalidate the cached cell vector stabilisation
+        void clearCellVectorCache() const
+        {
+            cellVectorPtr_.clear();
+        }
 
  
     // Private Member Functions
@@ -217,6 +239,24 @@ public:
                 return faceVectorPtr_();
             }
 
+            //- Provide read-only access to the cell scalar stabilisation
+            //  If rebuild is true, re-calculate it from the cached face field
+            //  An optional face diffusivity can be included inside the div
+            const volScalarField& cellScalar
+            (
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
+            ) const;
+
+            //- Provide read-only access to the cell vector stabilisation
+            //  If rebuild is true, re-calculate it from the cached face field
+            //  An optional face diffusivity can be included inside the div
+            const volVectorField& cellVector
+            (
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
+            ) const;
+
             //- Provide access to the scalarJacobianPtr
             autoPtr<fvScalarMatrix>& scalarJacobianPtr() const
             {
@@ -274,7 +314,7 @@ public:
             ) const
             {
                 FatalErrorInFunction
-                    << "scalar stabilisation not supported by "
+                    << "vector stabilisation not supported by "
                     << type() << exit(FatalError);
 
                 // Keep the compiler happy

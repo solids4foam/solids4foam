@@ -567,6 +567,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     ),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
+    rKappa_(1.0/mechanical().bulkModulus()),
     pDiffusivityPtr_(),
     A_
     (
@@ -895,9 +896,6 @@ label linGeomTotalDispSolid::formResidual
         // Re-calculate the pressure stabilisation parameter
         pressureStabilisation().updateScalar(p, &gradp);
 
-        // Lookup te bulk modulus (we should store this!)
-        const volScalarField kappa("kappa", mechanical().bulkModulus());
-
         // Dimensional consistency factor
         const dimensionedScalar one
         (
@@ -907,11 +905,8 @@ label linGeomTotalDispSolid::formResidual
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
-          - p/kappa
-          + fvc::div
-            (
-                impKf_*pressureStabilisation().faceScalar()*mesh.magSf()
-            )*one
+          - p*rKappa_
+          + pressureStabilisation().cellScalar(&impKf_, true)*one
           - tr(gradD())
         );
 
@@ -1012,7 +1007,6 @@ label linGeomTotalDispSolid::formJacobian
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        const volScalarField rKappa("rKappa", 1.0/mechanical().bulkModulus());
         {
             // Dimensional consistency factor
             const dimensionedScalar one
@@ -1022,7 +1016,7 @@ label linGeomTotalDispSolid::formJacobian
 
             fvScalarMatrix approxPressureJ
             (
-              - fvm::Sp(rKappa, p)
+              - fvm::Sp(rKappa_, p)
               + one*pressureStabilisation().scalarJacobian(p, &impKf_)
             );
 

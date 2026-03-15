@@ -19,7 +19,10 @@ Class
     generalisedEvenOrderLaplacianStab
 
 Description
-    To be added.
+    Face-based stabilisation model based on repeated Laplacian application.
+
+    The model generalises the Laplacian-based stabilisation family to higher
+    even orders through the user-selected Laplacian power.
 
 SourceFiles
     generalisedEvenOrderLaplacianStab.C

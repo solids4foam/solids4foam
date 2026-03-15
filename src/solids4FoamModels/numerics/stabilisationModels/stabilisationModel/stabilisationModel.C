@@ -21,6 +21,7 @@ InClass
 \*---------------------------------------------------------------------------*/
 
 #include "stabilisationModel.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -51,6 +52,8 @@ Foam::stabilisationModel::stabilisationModel
     faceVectorPtr_(),
     scalarJacobianPtr_(),
     vectorJacobianPtr_(),
+    cellScalarPtr_(),
+    cellVectorPtr_(),
     h2Ptr_()
 {}
 
@@ -83,6 +86,66 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
     }
 
     return autoPtr<stabilisationModel>(ctorPtr(mesh, dict, dims));
+}
+
+
+const Foam::volScalarField& Foam::stabilisationModel::cellScalar
+(
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
+) const
+{
+    if (cellScalarPtr_.empty() || rebuild)
+    {
+        if (faceScalarPtr_.empty())
+        {
+            FatalErrorInFunction
+                << "Pointer not yet set: the updateScalar(...) "
+                << "function must be called first for "
+                << type() << abort(FatalError);
+        }
+
+        tmp<volScalarField> tCellScalar
+        (
+            gammaPtr == nullptr
+          ? fvc::div(mesh().magSf()*faceScalar())
+          : fvc::div((*gammaPtr)*mesh().magSf()*faceScalar())
+        );
+        tCellScalar.ref().rename("cellStabilisation(" + faceScalar().name() + ")");
+        cellScalarPtr_.reset(tCellScalar.ptr());
+    }
+
+    return cellScalarPtr_();
+}
+
+
+const Foam::volVectorField& Foam::stabilisationModel::cellVector
+(
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
+) const
+{
+    if (cellVectorPtr_.empty() || rebuild)
+    {
+        if (faceVectorPtr_.empty())
+        {
+            FatalErrorInFunction
+                << "Pointer not yet set: the updateVector(...) "
+                << "function must be called first for "
+                << type() << abort(FatalError);
+        }
+
+        tmp<volVectorField> tCellVector
+        (
+            gammaPtr == nullptr
+          ? fvc::div(mesh().magSf()*faceVector())
+          : fvc::div((*gammaPtr)*mesh().magSf()*faceVector())
+        );
+        tCellVector.ref().rename("cellStabilisation(" + faceVector().name() + ")");
+        cellVectorPtr_.reset(tCellVector.ptr());
+    }
+
+    return cellVectorPtr_();
 }
 
 

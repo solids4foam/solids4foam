@@ -61,6 +61,8 @@ void Foam::alphaStab::updateScalar
     const volVectorField* gradPtr
 ) const
 {
+    clearCellScalarCache();
+
     if (gradPtr == nullptr)
     {
         FatalErrorInFunction
@@ -89,6 +91,9 @@ void Foam::alphaStab::updateScalar
                 dimensionedScalar("0", dims(), 0.0)
             )
         );
+
+        // This is an oriented field
+        faceScalarPtr().ref().setOriented(true);
     }
 
     // Update the stabilisation
@@ -102,6 +107,8 @@ void Foam::alphaStab::updateVector
     const volTensorField* gradPtr
 ) const
 {
+    clearCellVectorCache();
+
     if (gradPtr == nullptr)
     {
         FatalErrorInFunction
@@ -130,6 +137,9 @@ void Foam::alphaStab::updateVector
                 dimensionedVector("0", dims(), vector::zero)
             )
         );
+
+        // This is an oriented field
+        faceVectorPtr().ref().setOriented(true);
     }
 
     // Update the stabilisation

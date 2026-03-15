@@ -19,24 +19,11 @@ Class
     laplacianStab
 
 Description
-    Face-based stabilisation model based on the Laplacian.
+    Face-based stabilisation model based on the Laplacian of the primary
+    field.
 
-    This selectively damps grid-scale oscillatory modes while maintaining
-    consistency for smooth solutions.
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation. However, when applied to higher-order
-    schemes, the leading truncation error introduced by this stabilisation
-    is second order, and therefore the overall method may be limited to
-    second-order convergence unless a higher-order variant of the
-    stabilisation is employed.
-
-    The stabilisation may be retrieved as a face flux contribution (surface
-    field).
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
+    This is the simplest Laplacian-based stabilisation in the directory and
+    provides the common cached face-field and approximate Jacobian interface.
 
 SourceFiles
     laplacianStab.C

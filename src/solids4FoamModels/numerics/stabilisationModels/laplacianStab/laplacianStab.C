@@ -61,6 +61,8 @@ void Foam::laplacianStab::updateScalar
     const volVectorField* gradPtr
 ) const
 {
+    clearCellScalarCache();
+
     // If required, initialise the face stabilisation field
     if (faceScalarPtr().empty())
     {
@@ -93,6 +95,8 @@ void Foam::laplacianStab::updateVector
     const volTensorField* gradPtr
 ) const
 {
+    clearCellVectorCache();
+
     // If required, initialise the face stabilisation field
     if (faceVectorPtr().empty())
     {

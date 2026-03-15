@@ -19,27 +19,11 @@ Class
     alphaStab
 
 Description
-    Face-based stabilisation model based on the alpha scheme of Nishikawa.
+    Face-based stabilisation model based on Nishikawa's alpha scheme.
 
-    The method constructs a stabilisation flux (surface field) proportional
-    to the "jump" in the field across the face. The jump at the face is
-    calculated by extrapolating from either side. This selectively damps
-    grid-scale oscillatory modes while maintaining consistency for smooth
-    solutions.
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation.
-
-    This scheme can be generalised to higher-order by increasing the order of
-    the extrapolation from adjacent cell-centres.
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
-
-    The implementation is designed for high performance: internal storage
-    is preallocated and updated in-place to avoid repeated memory allocation
-    during frequent residual evaluations in nonlinear or segregated solvers.
+    The stabilisation is formed from an extrapolated jump across each face and
+    is intended to damp grid-scale oscillations while remaining consistent for
+    smooth solutions.
 
 SourceFiles
     alphaStab.C

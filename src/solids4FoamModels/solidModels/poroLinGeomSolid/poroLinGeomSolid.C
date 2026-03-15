@@ -293,6 +293,8 @@ bool poroLinGeomSolid::evolve()
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
 
+        momentumStabilisation().updateVector(D(), &gradD());
+
         // Linear momentum equation total displacement form
         fvVectorMatrix DEqn
         (
@@ -301,7 +303,7 @@ bool poroLinGeomSolid::evolve()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + stabilisation().stabilisation(D(), gradD(), impK_)
+          + impK_*momentumStabilisation().cellVector(nullptr, true)
         );
 
         // Under-relaxation the linear system

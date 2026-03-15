@@ -62,7 +62,9 @@ The intended solver-side usage is:
 2. Call `updateScalar(...)` or `updateVector(...)` when the stabilisation
    needs to be refreshed.
 3. Read the cached result using `faceScalar()` or `faceVector()`.
-4. If supported by the model, use `scalarJacobian(...)` or
+4. Optionally derive a cached cell field using `cellScalar(...)` or
+   `cellVector(...)`.
+5. If supported by the model, use `scalarJacobian(...)` or
    `vectorJacobian(...)` to obtain an approximate implicit contribution.
 
 For example, in
@@ -73,6 +75,23 @@ the traction.
 If `faceScalar()` or `faceVector()` is accessed before the corresponding
 `update...()` call, the code intentionally aborts with a clear fatal error.
 This is by design and is used to keep the interface simple.
+
+The `cellScalar(...)` and `cellVector(...)` accessors follow the same pattern.
+They build and cache a cell-centred divergence of the current face
+stabilisation. If the corresponding face field has not been initialised yet,
+they also abort with a clear fatal error.
+
+The cell-field interface accepts:
+
+```text
+cellScalar(gammaPtr, rebuild)
+cellVector(gammaPtr, rebuild)
+```
+
+The optional `gammaPtr` lets a solver include a face diffusivity inside the
+divergence, for example `div(gamma*faceScalar*magSf)`. The optional `rebuild`
+flag defaults to `false` and forces the cached cell field to be recalculated
+from the current cached face field when set to `true`.
 
 ## Gradient Arguments
 

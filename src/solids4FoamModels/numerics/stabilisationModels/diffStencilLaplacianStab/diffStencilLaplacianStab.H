@@ -19,31 +19,12 @@ Class
     diffStencilLaplacianStab
 
 Description
-    Face-based stabilisation model based on the difference between compact
-    and extended stencil Laplacian/gradient approximations.
+    Face-based stabilisation model based on the difference between compact-
+    stencil and extended-stencil gradient/Laplacian approximations.
 
-    The method constructs a stabilisation flux (surface field) proportional
-    to the difference between a small-stencil face-normal gradient and a
-    larger-stencil reconstructed gradient. This selectively damps grid-scale
-    oscillatory modes while maintaining consistency for smooth solutions.
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation. However, when applied to higher-order
-    schemes, the leading truncation error introduced by this stabilisation
-    is second order, and therefore the overall method may be limited to
-    second-order convergence unless a higher-order variant of the
-    stabilisation is employed.
-
-    The stabilisation may be retrieved as a face flux contribution (surface
-    field).
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
-
-    The implementation is designed for high performance: internal storage
-    is preallocated and updated in-place to avoid repeated memory allocation
-    during frequent residual evaluations in nonlinear or segregated solvers.
+    The stabilisation is formed from the mismatch between the two operators
+    and is intended to damp grid-scale oscillations while remaining
+    consistent for smooth solutions.
 
 SourceFiles
     diffStencilLaplacianStab.C

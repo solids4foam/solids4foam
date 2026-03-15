@@ -19,25 +19,11 @@ Class
     gradDivStab
 
 Description
-    Face-based stabilisation model based on grad(div(field)): this targets
-    volumetric oscillations in the field.
+    Face-based stabilisation model based on grad(div(field)).
 
-    This selectively damps grid-scale oscillatory modes while maintaining
-    consistency for smooth solutions.
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation. However, when applied to higher-order
-    schemes, the leading truncation error introduced by this stabilisation
-    is second order, and therefore the overall method may be limited to
-    second-order convergence unless a higher-order variant of the
-    stabilisation is employed.
-
-    The stabilisation may be retrieved as a face flux contribution (surface
-    field).
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
+    This form primarily targets volumetric or compressive oscillations in the
+    field while retaining the same cached face-field interface as the other
+    stabilisation models.
 
 SourceFiles
     gradDivStab.C

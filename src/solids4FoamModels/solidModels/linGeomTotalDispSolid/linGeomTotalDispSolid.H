@@ -78,6 +78,10 @@ class linGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure Jacobian when solvePressure is enabled
+        const volScalarField rKappa_;
+
         //- Diffusivity for the pressure equation
         //  This controls the amount of smoothing in the pressure equation
         mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;

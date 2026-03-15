@@ -44,7 +44,7 @@ Foam::generalisedEvenOrderLaplacianStab::generalisedEvenOrderLaplacianStab
 :
     stabilisationModel(mesh, dict, dims),
     scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
-    laplacianPower_(readScalar(dict.lookup("laplacianPower")))
+    laplacianPower_(readInt(dict.lookup("laplacianPower")))
 {}
 
 
@@ -62,6 +62,8 @@ void Foam::generalisedEvenOrderLaplacianStab::updateScalar
     const volVectorField* gradPtr
 ) const
 {
+    clearCellScalarCache();
+
     // If required, initialise the face stabilisation field
     if (faceScalarPtr().empty())
     {
@@ -94,6 +96,8 @@ void Foam::generalisedEvenOrderLaplacianStab::updateVector
     const volTensorField* gradPtr
 ) const
 {
+    clearCellVectorCache();
+
     // If required, initialise the face stabilisation field
     if (faceVectorPtr().empty())
     {

@@ -64,6 +64,8 @@ void Foam::gradDivStab::updateVector
     const volTensorField* gradPtr
 ) const
 {
+    clearCellVectorCache();
+
     // If required, initialise the face stabilisation field
     if (faceVectorPtr().empty())
     {
@@ -83,6 +85,9 @@ void Foam::gradDivStab::updateVector
                 dimensionedVector("0", dims(), vector::zero)
             )
         );
+
+        // This is an oriented field
+        faceVectorPtr().ref().setOriented(true);
     }
 
     // Create the orthogonal normal gradient operator
@@ -94,11 +99,20 @@ void Foam::gradDivStab::updateVector
     // Face-based h^2 scale via deltaCoeffs
     const surfaceScalarField h2f(1.0/sqr(mesh().deltaCoeffs()));
 
+    // Face unit normals
+    surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
     // Outer pass: orthogonal diffusion of L1, scaled by h^2
     // Note that we ignore the tangential component as we only care about
     // stabilisation (not the physical operator) and the tangential components
     // could inject noise
-    faceVectorPtr().ref() = -scaleFactor_*h2f*op.snGrad(divP)*mesh().Sf();
+    tmp<surfaceVectorField> trhs
+    (
+        -scaleFactor_*Foam::pow(h2f, 0.5)*op.snGrad(divP)*n
+    );
+    trhs.ref().setOriented(true);
+
+    faceVectorPtr().ref() = trhs;
 }
 
 // ************************************************************************* //

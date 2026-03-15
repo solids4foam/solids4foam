@@ -19,25 +19,11 @@ Class
     JamesonSchmidtTurkelStab
 
 Description
-    Face-based stabilisation model based on the Laplacian of a Laplacian,
-    similar to the 4th term of Jameson, Schmidt and Turkel
+    Face-based stabilisation model based on a Laplacian of a Laplacian,
+    similar to the fourth-order Jameson-Schmidt-Turkel dissipation term.
 
-    This selectively damps grid-scale oscillatory modes while maintaining
-    consistency for smooth solutions.
-
-    The stabilisation term scales with the square of the mesh spacing (O(h^2))
-    under grid refinement. Consequently, it does not alter the formal accuracy
-    of a second-order discretisation. However, when applied to higher-order
-    schemes, the leading truncation error introduced by this stabilisation
-    is second order, and therefore the overall method may be limited to
-    second-order convergence unless a higher-order variant of the
-    stabilisation is employed.
-
-    The stabilisation may be retrieved as a face flux contribution (surface
-    field).
-
-    A user-defined scale factor controls the magnitude of the stabilisation
-    and can be specified at run time via dictionary entries.
+    This model is intended to provide stronger damping of grid-scale
+    oscillations than the basic Laplacian-based form.
 
 SourceFiles
     JamesonSchmidtTurkelStab.C
