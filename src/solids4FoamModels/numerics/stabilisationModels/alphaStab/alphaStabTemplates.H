@@ -41,8 +41,8 @@ void Foam::alphaStab::computeDiffStencil
     const fvMesh& mesh = field.mesh();
     const vectorField& C = mesh.C();
     const vectorField& Cf = mesh.Cf();
-    const Field<Type>& fieldI = field.primitiveField();
-    const Field<GradType>& gradFieldI = gradField.primitiveField();
+    const Field<Type>& fieldI = field.internalField();
+    const Field<GradType>& gradFieldI = gradField.internalField();
     Field<Type>& faceFluxI = Foam::primitiveFieldRef(faceFlux);
 
     // Unit normals

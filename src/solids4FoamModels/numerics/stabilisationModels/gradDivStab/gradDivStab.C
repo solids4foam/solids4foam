@@ -113,9 +113,9 @@ void Foam::gradDivStab::updateVector
     (
         -scaleFactor_*Foam::pow(h2f, 0.5)*op.snGrad(divP)*n
     );
-    #ifdef OPENFOAM_COM
+#ifdef OPENFOAM_COM
     tmpRef(trhs).setOriented(true);
-    #endif
+#endif
 
     autoPtrRef(faceVectorPtr()) = tmpRef(trhs);
 }
