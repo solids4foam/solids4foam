@@ -261,5 +261,6 @@ higherOrderHelpers/fvMeshQuadrature/fvMeshQuadrature.C
 higherOrderHelpers/weightFunction/weightFunction.C
 higherOrderHelpers/SymmTensor3rdOrder/labelSymmTensor3rdOrder/labelSymmTensor3rdOrder.C
 higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
+higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

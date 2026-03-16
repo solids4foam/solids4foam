@@ -29,7 +29,7 @@ SourceFiles
 #ifndef symmTensor3rdOrder_H
 #define symmTensor3rdOrder_H
 
-#include "../SymmTensor3rdOrderTemplate.H"
+#include "SymmTensor3rdOrderTemplate.H"
 #include "vector.H"
 #include "contiguous.H"
 
