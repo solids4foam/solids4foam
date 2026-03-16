@@ -37,7 +37,7 @@ deltaT          1e-3;
 
 writeControl    runTime;
 
-writeInterval   0.4;
+writeInterval   0.1;
 
 writeFormat     ascii;
 
