@@ -81,7 +81,6 @@ void Foam::alphaStab::computeDiffStencil
     {
         Field<Type>& faceFluxfBfI = faceFluxfBf[patchi];
         const fvPatchField<Type>& pvf = field.boundaryField()[patchi];
-        const Field<Type> patchInternalField(pvf.patchInternalField());
         const labelUList& faceCells = mesh.boundary()[patchi].faceCells();
         const vectorField& patchCf = mesh.boundary()[patchi].Cf();
         const scalarField& patchDeltaCoeffs =
@@ -134,8 +133,8 @@ void Foam::alphaStab::computeDiffStencil
                 // Extrapolate from the owner to the face
                 const Type uL = fieldI[ownCellID] + (dL & gradFieldI[ownCellID]);
 
-                // Use the value at the patch
-                const Type& uR = patchInternalField[facei];
+                // Use the actual boundary value on uncoupled patches
+                const Type& uR = pvf[facei];
 
                 // Stabilisation based on the jump across the face
                 faceFluxfBfI[facei] =

@@ -68,7 +68,7 @@ class stabilisationModel
         const scalar scaleFactor_;
 
         //- Scale factor used for globally scaling the approximate Jacobian
-        //  This defaults to scaleFactor
+        //  This defaults to 1.0
         const scalar scaleFactorJacobian_;
 
         //- Pointer to the scalar face stabilisation

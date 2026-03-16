@@ -123,6 +123,10 @@ scalarJacobian(field, gammaPtr, rebuild)
 vectorJacobian(field, gammaPtr, rebuild)
 ```
 
+The optional `scaleFactorJacobian` entry defaults to `1.0`, not to the
+explicit stabilisation `scaleFactor`. This lets the approximate Jacobian act
+as an independently tuned implicit contribution when needed.
+
 The default is `false`, which preserves the existing behaviour and reuses the
 cached matrix. If a solver needs the approximate Jacobian to be reconstructed
 because the relevant coefficients or matrix structure have changed, it can pass
