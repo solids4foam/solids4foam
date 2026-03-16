@@ -19,6 +19,7 @@ License
 
 #include "JamesonSchmidtTurkelStab.H"
 #include "addToRunTimeSelectionTable.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -85,7 +86,7 @@ void Foam::JamesonSchmidtTurkelStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, autoPtrRef(faceScalarPtr()), scaleFactor_);
 }
 
 
@@ -119,7 +120,7 @@ void Foam::JamesonSchmidtTurkelStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, autoPtrRef(faceVectorPtr()), scaleFactor_);
 }
 
 // ************************************************************************* //

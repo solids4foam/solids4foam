@@ -19,6 +19,7 @@ License
 
 #include "alphaStab.H"
 #include "addToRunTimeSelectionTable.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -93,11 +94,13 @@ void Foam::alphaStab::updateScalar
         );
 
         // This is an oriented field
-        faceScalarPtr().ref().setOriented(true);
+#ifdef OPENFOAM_COM
+        autoPtrRef(faceScalarPtr()).setOriented(true);
+#endif
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceScalarPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
 }
 
 
@@ -139,11 +142,13 @@ void Foam::alphaStab::updateVector
         );
 
         // This is an oriented field
-        faceVectorPtr().ref().setOriented(true);
+#ifdef OPENFOAM_COM
+        autoPtrRef(faceVectorPtr()).setOriented(true);
+#endif
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceVectorPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, autoPtrRef(faceVectorPtr()), scaleFactor_);
 }
 
 // ************************************************************************* //

@@ -22,6 +22,7 @@ InClass
 
 #include "stabilisationModel.H"
 #include "fvc.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -72,6 +73,7 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 
     Info<< "Selecting stabilisation model " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
     auto* ctorPtr = stabModelConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -84,6 +86,22 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
             *stabModelConstructorTablePtr_
         )   << exit(FatalIOError);
     }
+#else
+    stabModelConstructorTable::iterator cstrIter =
+        stabModelConstructorTablePtr_->find(modelType);
+
+    if (cstrIter == stabModelConstructorTablePtr_->end())
+    {
+        FatalErrorIn("stabilisationModel::New(...)")
+            << "Unknown stabilisation model type " << modelType
+            << nl << nl
+            << "Valid stabilisation model types are:" << nl
+            << stabModelConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    auto* ctorPtr = cstrIter();
+#endif
 
     return autoPtr<stabilisationModel>(ctorPtr(mesh, dict, dims));
 }
@@ -111,7 +129,10 @@ const Foam::volScalarField& Foam::stabilisationModel::cellScalar
           ? fvc::div(mesh().magSf()*faceScalar())
           : fvc::div((*gammaPtr)*mesh().magSf()*faceScalar())
         );
-        tCellScalar.ref().rename("cellStabilisation(" + faceScalar().name() + ")");
+        tmpRef(tCellScalar).rename
+        (
+            "cellStabilisation(" + faceScalar().name() + ")"
+        );
         cellScalarPtr_.reset(tCellScalar.ptr());
     }
 
@@ -141,7 +162,10 @@ const Foam::volVectorField& Foam::stabilisationModel::cellVector
           ? fvc::div(mesh().magSf()*faceVector())
           : fvc::div((*gammaPtr)*mesh().magSf()*faceVector())
         );
-        tCellVector.ref().rename("cellStabilisation(" + faceVector().name() + ")");
+        tmpRef(tCellVector).rename
+        (
+            "cellStabilisation(" + faceVector().name() + ")"
+        );
         cellVectorPtr_.reset(tCellVector.ptr());
     }
 

@@ -19,6 +19,7 @@ License
 
 #include "generalisedEvenOrderLaplacianStab.H"
 #include "addToRunTimeSelectionTable.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -86,7 +87,13 @@ void Foam::generalisedEvenOrderLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor_, laplacianPower_);
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceScalarPtr()),
+        scaleFactor_,
+        laplacianPower_
+    );
 }
 
 
@@ -120,7 +127,13 @@ void Foam::generalisedEvenOrderLaplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor_, laplacianPower_);
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceVectorPtr()),
+        scaleFactor_,
+        laplacianPower_
+    );
 }
 
 // ************************************************************************* //

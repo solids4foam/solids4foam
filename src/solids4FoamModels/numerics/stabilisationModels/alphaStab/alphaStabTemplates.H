@@ -19,6 +19,7 @@ License
 
 #include "alphaStab.H"
 #include "fvc.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
@@ -42,7 +43,7 @@ void Foam::alphaStab::computeDiffStencil
     const vectorField& Cf = mesh.Cf();
     const Field<Type>& fieldI = field.primitiveField();
     const Field<GradType>& gradFieldI = gradField.primitiveField();
-    Field<Type>& faceFluxI = faceFlux.primitiveFieldRef();
+    Field<Type>& faceFluxI = Foam::primitiveFieldRef(faceFlux);
 
     // Unit normals
     //const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -74,11 +75,11 @@ void Foam::alphaStab::computeDiffStencil
         faceFluxI[facei] = scaleFactor_*deltaCoeffs[facei]*(uR - uL);
     }
 
-    typename SurfaceField::Boundary& faceFluxfBf = faceFlux.boundaryFieldRef();
+    auto& faceFluxfBf = Foam::boundaryFieldRef(faceFlux);
 
     forAll(faceFlux.boundaryField(), patchi)
     {
-        Field<Type> faceFluxfBfI = faceFluxfBf[patchi];
+        Field<Type>& faceFluxfBfI = faceFluxfBf[patchi];
         const fvPatchField<Type>& pvf = field.boundaryField()[patchi];
         const Field<Type> patchInternalField(pvf.patchInternalField());
         const labelUList& faceCells = mesh.boundary()[patchi].faceCells();
@@ -143,7 +144,9 @@ void Foam::alphaStab::computeDiffStencil
         }
     }
 
+#ifdef OPENFOAM_COM
     faceFlux.correctBoundaryConditions();
+#endif
 }
 
 

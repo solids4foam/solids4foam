@@ -20,6 +20,7 @@ License
 #include "laplacianStab.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvmLaplacian.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -85,7 +86,7 @@ void Foam::laplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceScalarPtr().ref(), scaleFactor());
+    computeDiffStencil(p, autoPtrRef(faceScalarPtr()), scaleFactor());
 }
 
 
@@ -119,7 +120,7 @@ void Foam::laplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, faceVectorPtr().ref(), scaleFactor());
+    computeDiffStencil(p, autoPtrRef(faceVectorPtr()), scaleFactor());
 }
 
 

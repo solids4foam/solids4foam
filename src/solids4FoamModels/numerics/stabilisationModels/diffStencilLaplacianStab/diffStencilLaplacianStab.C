@@ -20,6 +20,7 @@ License
 #include "diffStencilLaplacianStab.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvmLaplacian.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -99,7 +100,7 @@ void Foam::diffStencilLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceScalarPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
 }
 
 
@@ -142,7 +143,7 @@ void Foam::diffStencilLaplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, faceVectorPtr().ref(), scaleFactor_);
+    computeDiffStencil(p, gradP, autoPtrRef(faceVectorPtr()), scaleFactor_);
 }
 
 const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian

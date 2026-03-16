@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "orthogonalSnGrad.H"
 #include "fvc.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -87,7 +88,9 @@ void Foam::gradDivStab::updateVector
         );
 
         // This is an oriented field
-        faceVectorPtr().ref().setOriented(true);
+#ifdef OPENFOAM_COM
+        autoPtrRef(faceVectorPtr()).setOriented(true);
+#endif
     }
 
     // Create the orthogonal normal gradient operator
@@ -110,9 +113,11 @@ void Foam::gradDivStab::updateVector
     (
         -scaleFactor_*Foam::pow(h2f, 0.5)*op.snGrad(divP)*n
     );
-    trhs.ref().setOriented(true);
+    #ifdef OPENFOAM_COM
+    tmpRef(trhs).setOriented(true);
+    #endif
 
-    faceVectorPtr().ref() = trhs;
+    autoPtrRef(faceVectorPtr()) = tmpRef(trhs);
 }
 
 // ************************************************************************* //
