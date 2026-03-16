@@ -46,6 +46,7 @@ SourceFiles
 #endif
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
+#include "stabilisationModel.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -92,6 +93,12 @@ class newtonIcoFluid
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
+
+        //- Momentum stabilisation model
+        autoPtr<stabilisationModel> momentumStabilisationPtr_;
+
+        //- Pressure stabilisation model
+        autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -189,6 +196,18 @@ public:
             const dimensionedScalar& rho() const
             {
                 return rho_;
+            }
+
+            //- Return const reference to the momentum stabilisation
+            const stabilisationModel& momentumStabilisation() const
+            {
+                return momentumStabilisationPtr_();
+            }
+
+            //- Return const reference to the pressure stabilisation
+            const stabilisationModel& pressureStabilisation() const
+            {
+                return pressureStabilisationPtr_();
             }
 
 

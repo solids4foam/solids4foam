@@ -89,7 +89,7 @@ Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorFie
 Foam::tmp<Foam::Field<Foam::vector> >
 Foam::fixedValueCorrectedFvPatchVectorField::snGrad() const
 {
-    const word gradName(internalFieldName(*this));
+    const word gradName("grad(" + internalFieldName(*this) + ")");
 
     if (nonOrthogonalCorrections_ && db().foundObject<volTensorField>(gradName))
     {
@@ -117,7 +117,7 @@ Foam::fixedValueCorrectedFvPatchVectorField::snGrad() const
 Foam::tmp<Foam::Field<Foam::vector> >
 Foam::fixedValueCorrectedFvPatchVectorField::gradientBoundaryCoeffs() const
 {
-    const word gradName(internalFieldName(*this));
+    const word gradName("grad(" + internalFieldName(*this) + ")");
 
     if (nonOrthogonalCorrections_ && db().foundObject<volTensorField>(gradName))
     {

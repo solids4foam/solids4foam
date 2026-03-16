@@ -47,7 +47,7 @@ Foam::diffStencilLaplacianStab::diffStencilLaplacianStab
     scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
     scaleFactorJacobian_
     (
-        dict.lookupOrDefault<scalar>("scaleFactorJacobian", scaleFactor_)
+        dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     )
 {}
 
