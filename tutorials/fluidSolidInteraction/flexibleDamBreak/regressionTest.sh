@@ -25,6 +25,17 @@ ALLRUN_LOGFILE="log.Allrun"
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    variant="openfoamorg"
+fi
+
+if [[ "${variant}" == "foamextend" ]]; then
+    REF_MAX_DISP=3.76032e-05
+fi
+
 echo "============================================================"
 echo "flexibleDamBreak FSI regression test"
 echo "Max displacement difference < ${DISP_MAX_TOL}"

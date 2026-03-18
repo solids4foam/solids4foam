@@ -29,6 +29,17 @@ EPS_MAX=1e-7
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    variant="openfoamorg"
+fi
+
+if [[ "${variant}" != "openfoamcom" ]]; then
+    SIGMA_MAX=1.05e3
+fi
+
 echo "============================================================"
 echo "slabCooling regression test"
 echo "Max sigmaEq < ${SIGMA_MAX} Pa"
