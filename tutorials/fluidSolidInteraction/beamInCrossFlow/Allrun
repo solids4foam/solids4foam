@@ -11,6 +11,7 @@
 
 coupling=iqnils
 runMode=serial
+fvSolutionSuffix=""
 
 for arg in "$@"
 do
@@ -32,16 +33,16 @@ do
     esac
 done
 
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    fvSolutionSuffix=".foamextend"
+fi
+
 echo "Using ${coupling} coupling setup"
 
-for file in \
-    constant/fsiProperties \
-    constant/solid/solidProperties \
-    system/controlDict \
-    system/fluid/fvSolution
-do
-    ln -vnsf "$(basename "$file").${coupling}" "$file"
-done
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+ln -vnsf "controlDict.${coupling}" system/controlDict
+ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
 
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
