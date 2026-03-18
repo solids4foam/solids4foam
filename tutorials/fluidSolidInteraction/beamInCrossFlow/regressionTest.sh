@@ -27,6 +27,11 @@ FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
 
+variant="openfoam"
+if [[ -n "${FOAMEXTEND:-}" ]]; then
+    variant="foamextend"
+fi
+
 echo "============================================================"
 echo "Beam-in-cross-flow FSI regression test"
 echo "Regression end time          = ${REGRESSION_END_TIME}"
@@ -141,6 +146,10 @@ prepare_case() {
         ln -vnsf "controlDict.${coupling}" system/controlDict
         ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
 
+        if [[ "${variant}" == "foamextend" ]]; then
+            ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
+        fi
+
         patch_end_time "system/controlDict.${coupling}"
     ) > /dev/null
 
@@ -237,9 +246,15 @@ check_case() {
     return "${failures}"
 }
 
-REF_MAX_DISP=0.039909
-REF_FINAL_DISP=0.039232
-REF_FINAL_FORCE=6.54692
+if [[ "${variant}" == "foamextend" ]]; then
+    REF_MAX_DISP=0.040466
+    REF_FINAL_DISP=0.039857
+    REF_FINAL_FORCE=6.60812
+else
+    REF_MAX_DISP=0.039909
+    REF_FINAL_DISP=0.039232
+    REF_FINAL_FORCE=6.54692
+fi
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
