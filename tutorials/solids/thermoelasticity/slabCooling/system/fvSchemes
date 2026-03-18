@@ -29,7 +29,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default                leastSquares;
+    default                pointCellsLeastSquares;
 }
 
 divSchemes
@@ -49,6 +49,7 @@ laplacianSchemes
 snGradSchemes
 {
     default                none;
+    snGrad(D)              corrected;
 }
 
 interpolationSchemes

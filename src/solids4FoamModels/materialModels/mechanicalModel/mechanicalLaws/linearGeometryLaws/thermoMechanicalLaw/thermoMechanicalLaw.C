@@ -353,6 +353,12 @@ Foam::tmp<Foam::volScalarField> Foam::thermoMechanicalLaw::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::thermoMechanicalLaw::bulkModulus() const
+{
+    return mechLawPtr_->bulkModulus();
+}
+
+
 void Foam::thermoMechanicalLaw::correct(volSymmTensorField& sigma)
 {
     // Calculate stress without thermal stress term
