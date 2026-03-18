@@ -24,6 +24,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "pointFieldFunctions.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -701,11 +702,34 @@ Foam::linearElasticMisesPlastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
+    tmpRef(tresult).correctBoundaryConditions();
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::linearElasticMisesPlastic::shearModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "shearModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    tmpRef(tresult).correctBoundaryConditions();
 
     return tresult;
 }
