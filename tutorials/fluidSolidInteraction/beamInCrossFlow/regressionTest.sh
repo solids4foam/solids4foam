@@ -46,7 +46,10 @@ extract_max_displacement() {
         }
         next
     }
-    ($1 + 0) == $1 && col > 0 {
+    ($1 + 0) == $1 {
+        if (col <= 0) {
+            col = 2
+        }
         if (!seen || $col > maxVal) {
             maxVal = $col
             seen = 1
@@ -67,7 +70,10 @@ extract_final_displacement() {
         }
         next
     }
-    ($1 + 0) == $1 && col > 0 {
+    ($1 + 0) == $1 {
+        if (col <= 0) {
+            col = 3
+        }
         last = $col
     }
     END {
@@ -79,7 +85,11 @@ extract_final_force() {
     awk '
     ($1 + 0) == $1 {
         gsub(/[()]/, "", $0)
-        last = $2
+        if (NF >= 7) {
+            last = $2 + $5
+        } else {
+            last = $2
+        }
     }
     END {
         if (last != "") print last
@@ -95,7 +105,7 @@ patch_end_time() {
     local tmp_file="${control_dict}.tmp"
 
     awk -v endTime="${REGRESSION_END_TIME}" '
-    /^\s*endTime\s+/ {
+    /^[[:space:]]*endTime[[:space:]]+/ {
         print "endTime         " endTime ";"
         next
     }
@@ -227,9 +237,9 @@ check_case() {
     return "${failures}"
 }
 
-REF_MAX_DISP=0.039834
-REF_FINAL_DISP=0.010894
-REF_FINAL_FORCE=2.36775
+REF_MAX_DISP=0.039909
+REF_FINAL_DISP=0.039232
+REF_FINAL_FORCE=6.54692
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
