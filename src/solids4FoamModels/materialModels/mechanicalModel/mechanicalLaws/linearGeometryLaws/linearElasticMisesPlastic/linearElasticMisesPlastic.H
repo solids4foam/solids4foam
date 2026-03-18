@@ -281,6 +281,12 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Return bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const;
+
+        //- Return shear modulus
+        virtual tmp<volScalarField> shearModulus() const;
+
         //- Populate the material tangent field
         //  The size of this field should be mesh.nFaces()
         virtual void materialTangentField(List<mat66>& matTan) const;
