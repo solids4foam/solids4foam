@@ -33,7 +33,7 @@ do
     esac
 done
 
-if [[ -n "${FOAMEXTEND:-}" ]]; then
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     fvSolutionSuffix=".foamextend"
 fi
 

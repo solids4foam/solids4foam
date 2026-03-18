@@ -28,7 +28,7 @@ FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 REGRESSION_END_TIME=1
 
 variant="openfoam"
-if [[ -n "${FOAMEXTEND:-}" ]]; then
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     variant="foamextend"
 fi
 
