@@ -27,9 +27,11 @@ FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
 
-variant="openfoam"
+variant="openfoamcom"
 if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     variant="foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" == "9" ]]; then
+    variant="openfoamorg"
 fi
 
 echo "============================================================"
@@ -52,7 +54,7 @@ extract_max_displacement() {
         next
     }
     ($1 + 0) == $1 {
-        if ("'"${variant}"'" == "foamextend" && col <= 0) {
+        if ("'"${variant}"'" != "openfoamcom" && col <= 0) {
             col = 2
         }
         if (col > 0 && (!seen || $col > maxVal)) {
@@ -76,7 +78,7 @@ extract_final_displacement() {
         next
     }
     ($1 + 0) == $1 {
-        if ("'"${variant}"'" == "foamextend" && col <= 0) {
+        if ("'"${variant}"'" != "openfoamcom" && col <= 0) {
             col = 3
         }
         if (col > 0) {
@@ -92,7 +94,7 @@ extract_final_force() {
     awk '
     ($1 + 0) == $1 {
         gsub(/[()]/, "", $0)
-        if ("'"${variant}"'" == "foamextend" && NF >= 7) {
+        if ("'"${variant}"'" != "openfoamcom" && NF >= 7) {
             last = $2 + $5
         } else {
             last = $2
@@ -150,6 +152,8 @@ prepare_case() {
 
         if [[ "${variant}" == "foamextend" ]]; then
             ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
+        elif [[ "${variant}" == "openfoamorg" ]]; then
+            ln -vnsf "fvSolution.${coupling}.openfoamorg" system/fluid/fvSolution
         fi
 
         patch_end_time "system/controlDict.${coupling}"
@@ -252,6 +256,10 @@ if [[ "${variant}" == "foamextend" ]]; then
     REF_MAX_DISP=0.040466
     REF_FINAL_DISP=0.039857
     REF_FINAL_FORCE=6.60812
+elif [[ "${variant}" == "openfoamorg" ]]; then
+    REF_MAX_DISP=0.039909
+    REF_FINAL_DISP=0.039232
+    REF_FINAL_FORCE=6.54692
 else
     REF_MAX_DISP=0.039834
     REF_FINAL_DISP=0.039150
