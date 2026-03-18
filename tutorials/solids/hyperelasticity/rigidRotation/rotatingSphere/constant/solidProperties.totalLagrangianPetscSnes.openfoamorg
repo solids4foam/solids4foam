@@ -17,10 +17,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryUpdatedLagrangian;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-nonLinearGeometryUpdatedLagrangianCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
+    // Solution algorithm: implicitSegregated (default), PETScSNES, ..
+    solutionAlgorithm PETScSNES;
+
     // Solution tolerance for displacement
     "solutionTolerance|sTol"       1e-12;
 
@@ -30,8 +33,11 @@ nonLinearGeometryUpdatedLagrangianCoeffs
     // Stabilisation term
     stabilisation
     {
-        type        RhieChow;
-        scaleFactor 1.0;
+        momentum
+        {
+            type        RhieChow;
+            scaleFactor 1.0;
+        }
     }
 }
 

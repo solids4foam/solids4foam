@@ -30,11 +30,8 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     // Stabilisation term
     stabilisation
     {
-        momentum
-        {
-            type        RhieChow;
-            scaleFactor 1.0;
-        }
+        type        RhieChow;
+        scaleFactor 1.0;
     }
 }
 

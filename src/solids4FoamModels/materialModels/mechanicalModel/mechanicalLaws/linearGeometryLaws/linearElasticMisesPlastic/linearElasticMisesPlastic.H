@@ -282,7 +282,6 @@ public:
 
         //- Return shear modulus
         virtual tmp<volScalarField> shearModulus() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
