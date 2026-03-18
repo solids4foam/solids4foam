@@ -17,6 +17,13 @@
 #     https://www.gnu.org/licenses/lgpl-3.0.en.html
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+# On macOS, ensure OpenFOAM libraries remain discoverable for child processes.
+case "$(uname -s)" in
+Darwin)
+    export DYLD_LIBRARY_PATH="${FOAM_LIBBIN}:${FOAM_USER_LIBBIN}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    ;;
+esac
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # convertCaseFormat
 #     Converts a case from foam extend format to OpenFOAM format. No changes are
