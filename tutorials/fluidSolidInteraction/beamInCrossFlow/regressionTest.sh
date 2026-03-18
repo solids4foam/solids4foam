@@ -27,6 +27,11 @@ FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
 
+variant="openfoam"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+fi
+
 echo "============================================================"
 echo "Beam-in-cross-flow FSI regression test"
 echo "Regression end time          = ${REGRESSION_END_TIME}"
@@ -46,8 +51,11 @@ extract_max_displacement() {
         }
         next
     }
-    ($1 + 0) == $1 && col > 0 {
-        if (!seen || $col > maxVal) {
+    ($1 + 0) == $1 {
+        if ("'"${variant}"'" == "foamextend" && col <= 0) {
+            col = 2
+        }
+        if (col > 0 && (!seen || $col > maxVal)) {
             maxVal = $col
             seen = 1
         }
@@ -67,8 +75,13 @@ extract_final_displacement() {
         }
         next
     }
-    ($1 + 0) == $1 && col > 0 {
-        last = $col
+    ($1 + 0) == $1 {
+        if ("'"${variant}"'" == "foamextend" && col <= 0) {
+            col = 3
+        }
+        if (col > 0) {
+            last = $col
+        }
     }
     END {
         if (last != "") print last
@@ -79,7 +92,11 @@ extract_final_force() {
     awk '
     ($1 + 0) == $1 {
         gsub(/[()]/, "", $0)
-        last = $2
+        if ("'"${variant}"'" == "foamextend" && NF >= 7) {
+            last = $2 + $5
+        } else {
+            last = $2
+        }
     }
     END {
         if (last != "") print last
@@ -95,7 +112,7 @@ patch_end_time() {
     local tmp_file="${control_dict}.tmp"
 
     awk -v endTime="${REGRESSION_END_TIME}" '
-    /^\s*endTime\s+/ {
+    /^[[:space:]]*endTime[[:space:]]+/ {
         print "endTime         " endTime ";"
         next
     }
@@ -130,6 +147,10 @@ prepare_case() {
         ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
         ln -vnsf "controlDict.${coupling}" system/controlDict
         ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
+
+        if [[ "${variant}" == "foamextend" ]]; then
+            ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
+        fi
 
         patch_end_time "system/controlDict.${coupling}"
     ) > /dev/null
@@ -227,9 +248,15 @@ check_case() {
     return "${failures}"
 }
 
-REF_MAX_DISP=0.039834
-REF_FINAL_DISP=0.010894
-REF_FINAL_FORCE=2.36775
+if [[ "${variant}" == "foamextend" ]]; then
+    REF_MAX_DISP=0.040466
+    REF_FINAL_DISP=0.039857
+    REF_FINAL_FORCE=6.60812
+else
+    REF_MAX_DISP=0.039834
+    REF_FINAL_DISP=0.010894
+    REF_FINAL_FORCE=2.36775
+fi
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
