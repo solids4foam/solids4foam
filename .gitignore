@@ -4,6 +4,7 @@
 notes.txt
 todo*
 tutorialsTest*
+regressionTests*
 
 # Build log files
 log.Allwmake
