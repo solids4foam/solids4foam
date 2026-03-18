@@ -38,7 +38,11 @@ solidModel     unsNonLinearGeometryUpdatedLagrangian;
 
     stabilisation
     {
-        type none;
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.0;
+        }
     }
 }
 
