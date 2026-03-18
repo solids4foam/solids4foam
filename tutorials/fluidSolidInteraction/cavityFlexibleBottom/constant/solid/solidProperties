@@ -31,7 +31,11 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 
     stabilisation
     {
-        scaleFactor 0.1;
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.1;
+        }
     }
 }
 

@@ -291,6 +291,13 @@ Foam::viscousHookeanElastic::~viscousHookeanElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+Foam::tmp<Foam::volScalarField>
+Foam::viscousHookeanElastic::bulkModulus() const
+{
+    return K();
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::impK() const
 {
     // Calculate scaling factor to ensure optimal convergence

@@ -681,6 +681,37 @@ Foam::linearElasticMisesPlastic::~linearElasticMisesPlastic()
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::tmp<Foam::volScalarField>
+Foam::linearElasticMisesPlastic::bulkModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "bulkModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const
 {
     // Calculate scaling factor to ensure optimal convergence
