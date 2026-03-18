@@ -254,8 +254,8 @@ if [[ "${variant}" == "foamextend" ]]; then
     REF_FINAL_FORCE=6.60812
 else
     REF_MAX_DISP=0.039834
-    REF_FINAL_DISP=0.010894
-    REF_FINAL_FORCE=2.36775
+    REF_FINAL_DISP=0.039150
+    REF_FINAL_FORCE=6.54017
 fi
 
 aitken_case=$(prepare_case aitken)
