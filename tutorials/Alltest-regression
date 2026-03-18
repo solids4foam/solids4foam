@@ -2,12 +2,19 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-# -------------------------------------------------------------------------
-# solids4Foam regression test driver
+#------------------------------------------------------------------------------
+# License
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
 #
-# Copies regression test cases to a separate directory and
-# runs them there to avoid polluting the original tutorials.
-# -------------------------------------------------------------------------
+# Script
+#     Alltest-regression
+#
+# Description
+#     Regression test driver - copies regression test cases to a separate
+#     directory and runs them there to avoid polluting the original tutorials.
+#
+#------------------------------------------------------------------------------
 
 echo "============================================================"
 echo "solids4Foam regression tests"
