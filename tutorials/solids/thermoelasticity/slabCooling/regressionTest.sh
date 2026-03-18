@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # slabCooling regression test
 # Unconstrained thermal contraction
@@ -32,26 +36,40 @@ echo "epsilonEq order: ${EPS_MIN} < eps < ${EPS_MAX}"
 echo "============================================================"
 echo
 
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
+
 # ------------------------------------------------------------
 # Clean & run
 # ------------------------------------------------------------
 
-./Allclean > /dev/null 2>&1 || true
-./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+prepare_case
+( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
 # ------------------------------------------------------------
 # Extract helpers
 # ------------------------------------------------------------
 
 extract_max_epsilon() {
-    grep "Max epsilonEq" "${SOLVER_LOGFILE}" \
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | tail -n 1 \
         | awk -F '=' '{print $2}' \
         | tr -d '[:space:]'
 }
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${SOLVER_LOGFILE}" \
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | tail -n 1 \
         | awk -F '=' '{print $2}' \
         | tr -d '[:space:]'
@@ -97,7 +115,7 @@ else
 fi
 
 # Clean case again
-./Allclean > /dev/null 2>&1 || true
+( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 # ------------------------------------------------------------
 # Summary

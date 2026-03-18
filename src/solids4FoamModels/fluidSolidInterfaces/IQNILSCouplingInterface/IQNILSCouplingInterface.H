@@ -64,6 +64,9 @@ class IQNILSCouplingInterface
         //- Coupling reuse
         label couplingReuse_;
 
+        //- Absolute tolerance for filtering repeated/near-dependent modes
+        const scalar minSignificant_;
+
         //- Predict solid
         const bool predictSolid_;
 
@@ -81,6 +84,12 @@ class IQNILSCouplingInterface
 
         //- Reuse coupling
         label couplingReuse() const;
+
+        //- Remove a stored coupling mode for the given interface
+        void removeCouplingMode(const label interfaceI, const label modeI);
+
+        //- Filter repeated/near-dependent coupling modes
+        void filterCouplingModes(const label interfaceI);
 
         //- Disallow default bitwise copy construct
         IQNILSCouplingInterface(const IQNILSCouplingInterface&);

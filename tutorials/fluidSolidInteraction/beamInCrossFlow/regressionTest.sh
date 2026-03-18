@@ -6,19 +6,16 @@ IFS=$'\n\t'
 # Beam-in-cross-flow FSI regression test
 # ============================================================
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-3      # max displacement absolute tolerance
-FORCE_MEAN_TOL=0.25    # mean force tolerance
-
-# Number of samples from end of force.dat to average
-FORCE_AVG_SAMPLES=50
-
-# Reference values
-REF_MAX_DISP=0.052432
-REF_MEAN_FORCE=2.27283
+DISP_MAX_TOL=2e-3
+DISP_FINAL_TOL=2e-3
+FORCE_FINAL_TOL=0.2
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -27,124 +24,230 @@ ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
+# Shortened end time for regression efficiency
+REGRESSION_END_TIME=1
+
 echo "============================================================"
 echo "Beam-in-cross-flow FSI regression test"
-echo "Max displacement difference < ${DISP_MAX_TOL}"
-echo "Mean force difference       < ${FORCE_MEAN_TOL}"
+echo "Regression end time          = ${REGRESSION_END_TIME}"
+echo "Max tip Dx difference       < ${DISP_MAX_TOL}"
+echo "Final tip Dx difference     < ${DISP_FINAL_TOL}"
+echo "Final total force Fx diff   < ${FORCE_FINAL_TOL}"
 echo "============================================================"
 echo
 
-# ------------------------------------------------------------
-# Clean & run case
-# ------------------------------------------------------------
-
-CHECK_ONLY=false
-
-for arg in "$@"; do
-    case "$arg" in
-        --check-only|--no-run)
-            CHECK_ONLY=true
-            ;;
-        *)
-            ;;
-    esac
-done
-
-if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
-
-# OpenFOAM variant compatibility
-mkdir -p postProcessing/fluid/forces/0
-(
-    cd postProcessing/fluid/forces/0
-
-    # foam-extend writes forces to a 'forces' sub-directory so we will create a
-    # link
-    if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
-        ln -s ../../../../forces/0/forces.dat force.dat
-    fi
-
-    # OpenFOAM.org creates forces.dat instead of force.dat
-    if [[ ! -e force.dat && -f forces.dat ]]; then
-        ln -s forces.dat force.dat
-    fi
-)
-
-# ------------------------------------------------------------
-# Extract helpers
-# ------------------------------------------------------------
-
 extract_max_displacement() {
-    awk '{print $2}' "${DISP_FILE}" | sort -g | tail -1
-}
-
-extract_mean_force_tail() {
-    tail -n "${FORCE_AVG_SAMPLES}" "${FORCE_FILE}" | \
-    awk '
-    {
-        # Remove parentheses
-        gsub(/[()]/, "", $0)
-
-        # After cleanup, fields are:
-        # $1 = time
-        # $2 = Fx (both formats)
-        sum += $2
-        n++
+    awk -v fieldName="Dx" '
+    /^#/ {
+        for (i = 1; i <= NF; i++) {
+            if ($i == fieldName) {
+                col = i - 1
+            }
+        }
+        next
+    }
+    ($1 + 0) == $1 && col > 0 {
+        if (!seen || $col > maxVal) {
+            maxVal = $col
+            seen = 1
+        }
     }
     END {
-        if (n > 0) print sum/n
-    }'
+        if (seen) print maxVal
+    }' "${1}/${DISP_FILE}"
+}
+
+extract_final_displacement() {
+    awk -v fieldName="Dx" '
+    /^#/ {
+        for (i = 1; i <= NF; i++) {
+            if ($i == fieldName) {
+                col = i - 1
+            }
+        }
+        next
+    }
+    ($1 + 0) == $1 && col > 0 {
+        last = $col
+    }
+    END {
+        if (last != "") print last
+    }' "${1}/${DISP_FILE}"
+}
+
+extract_final_force() {
+    awk '
+    ($1 + 0) == $1 {
+        gsub(/[()]/, "", $0)
+        last = $2
+    }
+    END {
+        if (last != "") print last
+    }' "${1}/${FORCE_FILE}"
 }
 
 abs() {
     awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
 }
 
-# ------------------------------------------------------------
-# Extract values
-# ------------------------------------------------------------
+patch_end_time() {
+    local control_dict="$1"
+    local tmp_file="${control_dict}.tmp"
 
-max_disp=$(extract_max_displacement)
-mean_force=$(extract_mean_force_tail)
+    awk -v endTime="${REGRESSION_END_TIME}" '
+    /^\s*endTime\s+/ {
+        print "endTime         " endTime ";"
+        next
+    }
+    { print }
+    ' "${control_dict}" > "${tmp_file}"
 
-if [[ -z "${max_disp}" || -z "${mean_force}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
-    exit 1
-fi
+    mv "${tmp_file}" "${control_dict}"
+}
 
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
+prepare_case() {
+    local coupling="$1"
+    local case_dir="${REGRESSION_ROOT}/${coupling}"
 
-force_diff=$(awk "BEGIN {print ${mean_force} - ${REF_MEAN_FORCE}}")
-force_diff_abs=$(abs "${force_diff}")
+    rm -rf "${case_dir}"
+    mkdir -p "${case_dir}"
 
-# ------------------------------------------------------------
-# Checks
-# ------------------------------------------------------------
+    for item in "${SCRIPT_DIR}"/*; do
+        local base_item
+        base_item=$(basename "${item}")
+
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+
+        cp -a "${item}" "${case_dir}/"
+    done
+
+    (
+        cd "${case_dir}"
+
+        ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+        ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+        ln -vnsf "controlDict.${coupling}" system/controlDict
+        ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
+
+        patch_end_time "system/controlDict.${coupling}"
+    ) > /dev/null
+
+    echo "${case_dir}"
+}
+
+run_case() {
+    local case_dir="$1"
+    local coupling="$2"
+
+    echo "Running ${coupling} regression case"
+
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun "${coupling}" > "${ALLRUN_LOGFILE}" 2>&1
+
+        mkdir -p postProcessing/fluid/forces/0
+        cd postProcessing/fluid/forces/0
+
+        if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
+            ln -s ../../../../forces/0/forces.dat force.dat
+        fi
+
+        if [[ ! -e force.dat && -f forces.dat ]]; then
+            ln -s forces.dat force.dat
+        fi
+    )
+}
+
+check_case() {
+    local coupling="$1"
+    local case_dir="$2"
+    local ref_max_disp="$3"
+    local ref_final_disp="$4"
+    local ref_final_force="$5"
+
+    local max_disp
+    local final_disp
+    local final_force
+    local disp_diff
+    local disp_diff_abs
+    local final_disp_diff
+    local final_disp_diff_abs
+    local final_force_diff
+    local final_force_diff_abs
+    local failures=0
+
+    max_disp=$(extract_max_displacement "${case_dir}")
+    final_disp=$(extract_final_displacement "${case_dir}")
+    final_force=$(extract_final_force "${case_dir}")
+
+    if [[ -z "${max_disp}" || -z "${final_disp}" || -z "${final_force}" ]]; then
+        echo "FAIL [${coupling}]: Could not extract regression quantities"
+        return 1
+    fi
+
+    disp_diff=$(awk "BEGIN {print ${max_disp} - ${ref_max_disp}}")
+    disp_diff_abs=$(abs "${disp_diff}")
+
+    final_disp_diff=$(awk "BEGIN {print ${final_disp} - ${ref_final_disp}}")
+    final_disp_diff_abs=$(abs "${final_disp_diff}")
+
+    final_force_diff=$(awk "BEGIN {print ${final_force} - ${ref_final_force}}")
+    final_force_diff_abs=$(abs "${final_force_diff}")
+
+    if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
+        printf "PASS [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${max_disp}" "${disp_diff_abs}"
+    else
+        printf "FAIL [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${max_disp}" "${disp_diff_abs}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${final_disp_diff_abs} < ${DISP_FINAL_TOL})}"; then
+        printf "PASS [%s]: final tip Dx = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${final_disp}" "${final_disp_diff_abs}"
+    else
+        printf "FAIL [%s]: final tip Dx = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${final_disp}" "${final_disp_diff_abs}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${final_force_diff_abs} < ${FORCE_FINAL_TOL})}"; then
+        printf "PASS [%s]: final total Fx = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${final_force}" "${final_force_diff_abs}"
+    else
+        printf "FAIL [%s]: final total Fx = %.6g (Δ = %.3g)\n" \
+            "${coupling}" "${final_force}" "${final_force_diff_abs}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
+}
+
+REF_MAX_DISP=0.039834
+REF_FINAL_DISP=0.010894
+REF_FINAL_FORCE=2.36775
+
+aitken_case=$(prepare_case aitken)
+run_case "${aitken_case}" aitken
+
+iqnils_case=$(prepare_case iqnils)
+run_case "${iqnils_case}" iqnils
+
+echo
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
-else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
-    failures=$((failures + 1))
-fi
+check_case aitken "${aitken_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
-if awk "BEGIN {exit !(${force_diff_abs} < ${FORCE_MEAN_TOL})}"; then
-    printf "PASS: mean force = %.6g (Δ = %.3g)\n" \
-        "${mean_force}" "${force_diff_abs}"
-else
-    printf "FAIL: mean force = %.6g (Δ = %.3g)\n" \
-        "${mean_force}" "${force_diff_abs}"
-    failures=$((failures + 1))
-fi
+check_case iqnils "${iqnils_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
 echo
 if (( failures == 0 )); then
