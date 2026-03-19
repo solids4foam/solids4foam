@@ -35,7 +35,7 @@ boundaryField
         pressure	uniform 0;
         value		uniform (0 0 0);
     }
-    
+
     up
     {
         type		tractionExtrapolatedDisplacement;
@@ -43,7 +43,7 @@ boundaryField
         pressure	uniform 0;
         value		uniform (0 0 0);
     }
-    
+
     down
     {
         // type            symmetryPlane;
@@ -52,7 +52,7 @@ boundaryField
         value           uniform (0 0 0);
         // type            blockSymmPlane;
     }
-    
+
     left
     {
         // type            symmetryPlane;
@@ -60,7 +60,7 @@ boundaryField
         patchType       symmetryPlane;
         value           uniform (0 0 0);
     }
-    
+
     frontAndBack
     {
         type            empty;

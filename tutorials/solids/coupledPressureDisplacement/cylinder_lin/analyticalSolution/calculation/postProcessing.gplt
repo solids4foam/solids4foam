@@ -15,7 +15,7 @@ set term postscript color
 set size 0.9,0.9
 
 set style line 1 linecolor rgb "black" dt 1 linetype 6 linewidth 2.75 ps 0.5
-set style line 2 linecolor rgb "red" dt 1 linetype 6 linewidth 2.75 ps 0.7 
+set style line 2 linecolor rgb "red" dt 1 linetype 6 linewidth 2.75 ps 0.7
 set style line 3 linecolor rgb "forest-green" dt 1 linetype 4 linewidth 2.75 ps 0.7
 
 

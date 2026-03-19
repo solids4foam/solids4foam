@@ -72,7 +72,7 @@
         blockLower[faceI](1,0) -= fCoeff[faceI].yx();
         blockLower[faceI](1,1) -= fCoeff[faceI].yy();
         blockLower[faceI](1,2) -= fCoeff[faceI].yz();
-            
+
         blockLower[faceI](2,0) -= fCoeff[faceI].zx();
         blockLower[faceI](2,1) -= fCoeff[faceI].zy();
         blockLower[faceI](2,2) -= fCoeff[faceI].zz();
@@ -81,11 +81,11 @@
         blockDiag[own[faceI]](0,0) += fCoeff[faceI].xx();
         blockDiag[own[faceI]](0,1) += fCoeff[faceI].xy();
         blockDiag[own[faceI]](0,2) += fCoeff[faceI].xz();
-                
+
         blockDiag[own[faceI]](1,0) += fCoeff[faceI].yx();
         blockDiag[own[faceI]](1,1) += fCoeff[faceI].yy();
         blockDiag[own[faceI]](1,2) += fCoeff[faceI].yz();
-            
+
         blockDiag[own[faceI]](2,0) += fCoeff[faceI].zx();
         blockDiag[own[faceI]](2,1) += fCoeff[faceI].zy();
         blockDiag[own[faceI]](2,2) += fCoeff[faceI].zz();
@@ -98,12 +98,12 @@
         blockDiag[nei[faceI]](1,0) += fCoeff[faceI].yx();
         blockDiag[nei[faceI]](1,1) += fCoeff[faceI].yy();
         blockDiag[nei[faceI]](1,2) += fCoeff[faceI].yz();
-            
+
         blockDiag[nei[faceI]](2,0) += fCoeff[faceI].zx();
         blockDiag[nei[faceI]](2,1) += fCoeff[faceI].zy();
         blockDiag[nei[faceI]](2,2) += fCoeff[faceI].zz();
 
-     
+
         source[own[faceI]](0) += correction[faceI].x();
         source[own[faceI]](1) += correction[faceI].y();
         source[own[faceI]](2) += correction[faceI].z();
@@ -144,7 +144,7 @@
             blockDiag[curCell](0,0) -= fCoeff[faceI].xx();
             blockDiag[curCell](0,1) -= fCoeff[faceI].xy();
             blockDiag[curCell](0,2) -= fCoeff[faceI].xz();
- 
+
             blockDiag[curCell](1,0) -= fCoeff[faceI].yx();
             blockDiag[curCell](1,1) -= fCoeff[faceI].yy();
             blockDiag[curCell](1,2) -= fCoeff[faceI].yz();

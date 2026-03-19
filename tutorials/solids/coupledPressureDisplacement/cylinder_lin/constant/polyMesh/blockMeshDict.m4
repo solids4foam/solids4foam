@@ -22,16 +22,16 @@ m4_define(rad, [calc($1*pi/180.0)])
 m4_define(VCOUNT, 0)
 m4_define(vlabel, [[// ]Vertex $1 = VCOUNT m4_define($1, VCOUNT)m4_define([VCOUNT], m4_incr(VCOUNT))])
 
-// GEOMETRY 
+// GEOMETRY
 // Inner radius
 m4_define(r1, 8)
-// thickness 
+// thickness
 m4_define(h, 8)
 // lenght
 m4_define(l, 0.5)
 
 // MESH
-// Abaqus mesh 
+// Abaqus mesh
 //m4_define(BLOCKSIZE, 40 54 1)
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 m4_define(BLOCKSIZE, 10 26 1)
@@ -113,7 +113,7 @@ boundary
         (
             (A0 A1 A2 A3)
         );
-    } 
+    }
     symm2
     {
         type symmetryPlane;

@@ -38,7 +38,7 @@ for i in range(0, num_samples):
         r[i] = r_i
     else:
         r[i] = r[i-1] + delta/(num_samples-1)
-        
+
     r[i]=np.round(r[i], decimals=3)
     #radial stress
     sigma_rr[i] = p_i * r_i**2 /(r_o**2 - r_i**2) * (1 - r_o**2/r[i]**2)
@@ -52,8 +52,8 @@ for i in range(0, num_samples):
     #axial stress
     sigma_z[i] = p_i * r_i**2 /(r_o**2 - r_i**2)
     #pressure
-    p[i] = 1/3 * (sigma_rr[i] + sigma_ff[i] + sigma_z[i]) 
-  
+    p[i] = 1/3 * (sigma_rr[i] + sigma_ff[i] + sigma_z[i])
+
 
 
 a = np.transpose(np.array([[r], [sigma_rr], [sigma_ff], [sigma_z], [u_r], [p]]))

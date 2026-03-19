@@ -31,13 +31,13 @@ boundaryField
         type tractionPressure;
         value uniform 0;
     }
-    
+
     right
     {
         type tractionPressure;
         value uniform 0;
     }
-    
+
     left
     {
         type    symmetryPlane;
@@ -55,7 +55,7 @@ boundaryField
         // patchType symmetryPlane;
         // gradient uniform 0;
     }
-    
+
     frontAndBack
     {
         type            empty;

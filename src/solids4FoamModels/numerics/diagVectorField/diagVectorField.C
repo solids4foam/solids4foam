@@ -44,7 +44,7 @@ namespace Foam
     (
         new diagTensorField(vf.size(), diagTensor::zero)
     );
-    diagTensorField& dtf = tresult(); 
+    diagTensorField& dtf = tresult();
 
     forAll(dtf, i)
     {
@@ -52,10 +52,10 @@ namespace Foam
         dtf[i].yy() = vf[i].y();
         dtf[i].zz() = vf[i].z();
     }
-    
+
     return tresult;
 }
-    
+
 } // End namespace Foam
 
 // ************************************************************************* //

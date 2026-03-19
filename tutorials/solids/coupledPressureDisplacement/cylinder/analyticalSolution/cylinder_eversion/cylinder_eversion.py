@@ -70,7 +70,7 @@ def f1(p0, a):
          + 0.5 * mu * np.log(Z / la2) / lz                                     \
          + 0.5 * mu * ZB / (Z * lz)                                            \
          - 0.5 * mu * ZB / l2a2
- 
+
 
 # 'df(r)/dr'
 def df1dr(p0, a):
@@ -143,7 +143,7 @@ def lambda_t(R, r0):
 def pressure(R, r0, p0):
 
     r = radius(R, r0)
- 
+
     return p0                                                                  \
          - mu * np.log(R * r0 / (r * A)) / lz                                  \
          + mu * np.power(R / (lz * r), 2)                                      \

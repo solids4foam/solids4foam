@@ -22,16 +22,16 @@ FoamFile
 
 
 
-// GEOMETRY 
+// GEOMETRY
 // Inner radius
 
-// thickness 
+// thickness
 
 // lenght
 
 
 // MESH
-// Abaqus mesh 
+// Abaqus mesh
 //m4_define(BLOCKSIZE, 40 54 1)
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 
@@ -49,16 +49,16 @@ convertToMeters 1;
 vertices
 (
     //Plane A:
-    (8 0 -0.5) // Vertex A0 = 0 
-    (16 0 -0.5) // Vertex A1 = 1 
-    (0 16 -0.5) // Vertex A2 = 2 
-    (0 8 -0.5) // Vertex A3 = 3 
+    (8 0 -0.5) // Vertex A0 = 0
+    (16 0 -0.5) // Vertex A1 = 1
+    (0 16 -0.5) // Vertex A2 = 2
+    (0 8 -0.5) // Vertex A3 = 3
 
     //Plane B:
-    (8 0 0.5) // Vertex B0 = 4 
-    (16 0 0.5) // Vertex B1 = 5 
-    (0 16 0.5) // Vertex B2 = 6 
-    (0 8 0.5) // Vertex B3 = 7 
+    (8 0 0.5) // Vertex B0 = 4
+    (16 0 0.5) // Vertex B1 = 5
+    (0 16 0.5) // Vertex B2 = 6
+    (0 8 0.5) // Vertex B3 = 7
 );
 
 blocks
@@ -113,7 +113,7 @@ boundary
         (
             (0 1 2 3)
         );
-    } 
+    }
     symm2
     {
         type symmetryPlane;
