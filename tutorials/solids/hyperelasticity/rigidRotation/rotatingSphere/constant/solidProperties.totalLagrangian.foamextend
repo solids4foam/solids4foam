@@ -26,16 +26,6 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 
     // Alternative solution tolerance for displacement
     "alternativeTolerance|rTol"    1e-12;
-
-    // Stabilisation term
-    stabilisation
-    {
-        momentum
-        {
-            type        RhieChow;
-            scaleFactor 1.0;
-        }
-    }
 }
 
 // ************************************************************************* //
