@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # Contact patch test regression test
 # Checks numerical vs analytical solution
@@ -30,6 +34,19 @@ echo "Max sigma_y relative error (in %) in " \
 echo "============================================================"
 echo
 
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
+
 # ------------------------------------------------------------
 # Clean & run case
 # ------------------------------------------------------------
@@ -47,8 +64,9 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    prepare_case
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -58,19 +76,19 @@ fi
 # ------------------------------------------------------------
 
 extract_max_epsilon() {
-    grep "Max epsilonEq" "${SOLVER_LOGFILE}" \
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tail -n 1
 }
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${SOLVER_LOGFILE}" \
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tail -n 1
 }
 
 extract_relative_sigma_y_error() {
-    grep "Average relative error in sigma_y field:" "${SOLVER_LOGFILE}" \
+    grep "Average relative error in sigma_y field:" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tr -d '%' \
         | tail -n 1

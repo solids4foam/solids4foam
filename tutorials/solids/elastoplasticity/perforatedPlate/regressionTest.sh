@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # Elastoplastic perforated plate regression test
 # Checks strain, stress, and plastic yielding
@@ -29,30 +33,45 @@ echo "Yielding cells          in [${YIELD_MIN}, ${YIELD_MAX}]"
 echo "============================================================"
 echo
 
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
+
+prepare_case
+
 # Clean case
-./Allclean > /dev/null 2>&1 || true
+( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 # Run case
-./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
 # ------------------------------------------------------------
 # Extract helpers
 # ------------------------------------------------------------
 
 extract_max_epsilon() {
-    grep "Max epsilonEq" "${SOLVER_LOGFILE}" \
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tail -n 1
 }
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${SOLVER_LOGFILE}" \
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tail -n 1
 }
 
 extract_yielding_cells() {
-    grep "cells .* are actively yielding" "${SOLVER_LOGFILE}" \
+    grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | tail -n 101 \
         | head -n 1 \
         | awk '{print $1}'
@@ -106,7 +125,7 @@ else
 fi
 
 # Clean case again
-./Allclean > /dev/null 2>&1 || true
+( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 echo
 if (( failures == 0 ))

@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # Beam-in-cross-flow FSI regression test
 # ============================================================
@@ -34,6 +38,19 @@ echo "Mean force difference       < ${FORCE_MEAN_TOL}"
 echo "============================================================"
 echo
 
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
+
 # ------------------------------------------------------------
 # Clean & run case
 # ------------------------------------------------------------
@@ -51,16 +68,17 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    prepare_case
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
 # OpenFOAM variant compatibility
-mkdir -p postProcessing/fluid/forces/0
+mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
 (
-    cd postProcessing/fluid/forces/0
+    cd "${CASE_DIR}/postProcessing/fluid/forces/0"
 
     # foam-extend writes forces to a 'forces' sub-directory so we will create a
     # link
@@ -79,11 +97,11 @@ mkdir -p postProcessing/fluid/forces/0
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk '{print $3}' "${DISP_FILE}" | sort -g | tail -1
+    awk '{print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 extract_mean_force_tail() {
-    tail -n "${FORCE_AVG_SAMPLES}" "${FORCE_FILE}" | \
+    tail -n "${FORCE_AVG_SAMPLES}" "${CASE_DIR}/${FORCE_FILE}" | \
     awk '
     {
         # Remove parentheses

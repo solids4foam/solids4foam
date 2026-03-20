@@ -21,8 +21,7 @@ solver          decayingTaylorGreenVortexMeshMotion;
 decayingTaylorGreenVortexMeshMotionCoeffs
 {
     // Motion scale factor
-    //scaleFactor    0.1;
-    scaleFactor    0.01;
+    scaleFactor    0.1;
 
     orthogonalMeshMotion no;
 }

@@ -30,7 +30,11 @@ linearGeometryTotalDisplacementCoeffs
     // Stabilisation
     stabilisation
     {
-        scaleFactor 0.5;
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.5;
+        }
     }
 }
 
