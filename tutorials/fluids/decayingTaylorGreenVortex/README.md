@@ -347,21 +347,29 @@ In this case, the `newtonIcoFluid` fluid solver is used, which solves the
  incompressible Navier-Stokes equations using a Jacobian-free Newton-Krylov
  approach [^cardiff2025] built on the PETSc SNES nonlinear solver. The
  `newtonIcoFluid` settings are defined in `constant/fluidProperties`, where three
- types of settings are given: (i) numerical smoothing parameter for quelling
- checkerboarding oscillations, (ii) pressure reference point, and (iii) the
- PETSc options file, where the PETSc SNES nonlinear solver settings are defined.
+ types of settings are given: (i) momentum and pressure stabilisation models,
+ (ii) pressure reference point, and (iii) the PETSc options file, where the
+ PETSc SNES nonlinear solver settings are defined.
 
 ```c++
 fluidModel newtonIcoFluid;
 
 newtonIcoFluidCoeffs
 {
-    // Smoothing terms
-    // Trottenberg gives 1/16 for Stokes flow
-    omega     [0 -2 1 0 0 0 0] 0.0625;
-    localReRef 1e6;
-    omegaExponent 1.0;
-    alphaU    1.0;
+    stabilisation
+    {
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.0;
+        }
+
+        pressure
+        {
+            type        RhieChow;
+            scaleFactor 1.0;
+        }
+    }
 
     // Set the pressure to zero at the centre cell
     pRefPoint (0.5 0.5 0);

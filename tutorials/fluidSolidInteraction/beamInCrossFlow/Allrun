@@ -43,7 +43,7 @@ done
 
 if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     fvSolutionSuffix=".foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" == "9" ]]; then
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
     fvSolutionSuffix=".openfoamorg"
 fi
 
