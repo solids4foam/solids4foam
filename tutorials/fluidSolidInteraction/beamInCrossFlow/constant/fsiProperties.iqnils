@@ -56,6 +56,14 @@ fluidSolidInterface    IQNILS;
     // Defaults to 0 modes
     couplingReuse 0;
     minSignificant 1e-12;
+    // Optional: relative QR2-style filtering of older secant modes
+    // relMinSignificant 1e-2;
+    // Optional: normalize secant columns before the IQN-ILS QR solve
+    // normalizeCouplingColumns yes;
+    // Optional: relative cutoff for the QR back-substitution
+    // qrSolveTolerance 1e-10;
+    // Optional: apply a second orthogonalization correction in the QR build
+    // reorthogonalizeCouplingColumns yes;
 
     // Write fsi residuals to file
     writeResidualsToFile yes;

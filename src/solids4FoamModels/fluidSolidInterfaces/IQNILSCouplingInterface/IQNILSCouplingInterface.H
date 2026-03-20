@@ -67,6 +67,19 @@ class IQNILSCouplingInterface
         //- Absolute tolerance for filtering repeated/near-dependent modes
         const scalar minSignificant_;
 
+        //- Relative tolerance for QR2-style filtering of near-dependent modes
+        const scalar relMinSignificant_;
+
+        //- Normalize IQN-ILS secant columns before the QR solve
+        const bool normalizeCouplingColumns_;
+
+        //- Relative tolerance used to drop nearly singular directions in the
+        //  QR back-substitution
+        const scalar qrSolveTolerance_;
+
+        //- Perform a second MGS pass while building the QR factorization
+        const bool reorthogonalizeCouplingColumns_;
+
         //- Predict solid
         const bool predictSolid_;
 
@@ -88,8 +101,18 @@ class IQNILSCouplingInterface
         //- Remove a stored coupling mode for the given interface
         void removeCouplingMode(const label interfaceI, const label modeI);
 
+        //- Remove modes older than the specified minimum time index
+        void removeOldCouplingModes
+        (
+            const label interfaceI,
+            const label minTimeIndexToKeep
+        );
+
         //- Filter repeated/near-dependent coupling modes
         void filterCouplingModes(const label interfaceI);
+
+        //- Filter near-dependent modes using a relative QR2-style criterion
+        void filterRelativeCouplingModes(const label interfaceI);
 
         //- Disallow default bitwise copy construct
         IQNILSCouplingInterface(const IQNILSCouplingInterface&);

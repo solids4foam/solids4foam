@@ -64,6 +64,34 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     (
         fsiProperties().lookupOrAddDefault<scalar>("minSignificant", 1.0e-12)
     ),
+    relMinSignificant_
+    (
+        fsiProperties().lookupOrAddDefault<scalar>
+        (
+            "relMinSignificant", -1.0
+        )
+    ),
+    normalizeCouplingColumns_
+    (
+        fsiProperties().lookupOrAddDefault<bool>
+        (
+            "normalizeCouplingColumns", false
+        )
+    ),
+    qrSolveTolerance_
+    (
+        fsiProperties().lookupOrAddDefault<scalar>
+        (
+            "qrSolveTolerance", 1.0e-10
+        )
+    ),
+    reorthogonalizeCouplingColumns_
+    (
+        fsiProperties().lookupOrAddDefault<bool>
+        (
+            "reorthogonalizeCouplingColumns", false
+        )
+    ),
     predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)),
     fluidPatchesPointsV_(nGlobalPatches()),
     fluidPatchesPointsW_(nGlobalPatches()),
@@ -100,6 +128,90 @@ void IQNILSCouplingInterface::removeCouplingMode
 }
 
 
+void IQNILSCouplingInterface::removeOldCouplingModes
+(
+    const label interfaceI,
+    const label minTimeIndexToKeep
+)
+{
+    while
+    (
+        fluidPatchesPointsT_[interfaceI].size()
+     && fluidPatchesPointsT_[interfaceI][0] < minTimeIndexToKeep
+    )
+    {
+        removeCouplingMode(interfaceI, 0);
+    }
+}
+
+
+void IQNILSCouplingInterface::filterRelativeCouplingModes(const label interfaceI)
+{
+    if
+    (
+        relMinSignificant_ <= 0.0
+     || fluidPatchesPointsV_[interfaceI].size() < 2
+    )
+    {
+        return;
+    }
+
+    const word patchName =
+        fluidMesh().boundary()
+        [
+            fluid().globalPatches()[interfaceI].patch().index()
+        ].name();
+
+    bool removedMode = true;
+
+    while (removedMode && fluidPatchesPointsV_[interfaceI].size() > 1)
+    {
+        removedMode = false;
+
+        const label cols = fluidPatchesPointsV_[interfaceI].size();
+        DynamicList<vectorField> Q(cols);
+
+        for (label i = 0; i < cols; i++)
+        {
+            vectorField v(fluidPatchesPointsV_[interfaceI][cols - 1 - i]);
+            const scalar origNorm = Foam::sqrt(sum(v & v));
+
+            forAll(Q, qI)
+            {
+                v -= sum(Q[qI] & v)*Q[qI];
+            }
+
+            const scalar orthNorm = Foam::sqrt(sum(v & v));
+
+            // Keep the newest column and only filter older information.
+            if
+            (
+                i > 0
+             && origNorm > VSMALL
+             && orthNorm < relMinSignificant_*origNorm
+            )
+            {
+                Info<< "Removing IQN-ILS mode (" << patchName
+                    << "): |v_orth| = " << orthNorm
+                    << " < relMinSignificant*|v| = "
+                    << relMinSignificant_*origNorm << endl;
+
+                removeCouplingMode(interfaceI, cols - 1 - i);
+                removedMode = true;
+                break;
+            }
+
+            if (orthNorm > VSMALL)
+            {
+                v /= orthNorm;
+            }
+
+            Q.append(v);
+        }
+    }
+}
+
+
 void IQNILSCouplingInterface::filterCouplingModes(const label interfaceI)
 {
     const word patchName =
@@ -122,6 +234,8 @@ void IQNILSCouplingInterface::filterCouplingModes(const label interfaceI)
 
         removeCouplingMode(interfaceI, 0);
     }
+
+    filterRelativeCouplingModes(interfaceI);
 
     if
     (
@@ -178,6 +292,7 @@ void IQNILSCouplingInterface::filterCouplingModes(const label interfaceI)
     }
 }
 
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 bool IQNILSCouplingInterface::evolve()
@@ -197,7 +312,6 @@ bool IQNILSCouplingInterface::evolve()
     if (predictSolid_ && coupled())
     {
         updateForce();
-
         solid().evolve();
 
         residualNorm =
@@ -286,47 +400,11 @@ void IQNILSCouplingInterface::updateDisplacement()
                    ].name()
                 << "): " << fluidPatchesPointsT_[interfaceI].size();
 
-            while (true)
-            {
-                if (fluidPatchesPointsT_[interfaceI].size())
-                {
-                    if
-                    (
-                        (fluid().runTime().timeIndex() - couplingReuse())
-                      > fluidPatchesPointsT_[interfaceI][0]
-                    )
-                    {
-                        for
-                        (
-                            label i = 0;
-                            i < fluidPatchesPointsT_[interfaceI].size() - 1;
-                            i++
-                        )
-                        {
-                            fluidPatchesPointsT_[interfaceI][i] =
-                                fluidPatchesPointsT_[interfaceI][i + 1];
-
-                            fluidPatchesPointsV_[interfaceI][i] =
-                                fluidPatchesPointsV_[interfaceI][i + 1];
-
-                            fluidPatchesPointsW_[interfaceI][i] =
-                                fluidPatchesPointsW_[interfaceI][i + 1];
-                        }
-
-                        fluidPatchesPointsT_[interfaceI].remove();
-                        fluidPatchesPointsV_[interfaceI].remove();
-                        fluidPatchesPointsW_[interfaceI].remove();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
+            removeOldCouplingModes
+            (
+                interfaceI,
+                fluid().runTime().timeIndex() - couplingReuse()
+            );
 
             Info<< ", modes after clean-up ("
                 << fluidMesh().boundary()
@@ -409,10 +487,26 @@ void IQNILSCouplingInterface::updateDisplacement()
             RectangularMatrix<scalar> C(cols, 1);
             RectangularMatrix<scalar> Rcolsum(1, cols);
             DynamicList<vectorField> Q;
+            DynamicList<vectorField> W(cols);
 
             for (label i = 0; i < cols; i++)
             {
                 Q.append(fluidPatchesPointsV_[interfaceI][cols-1-i]);
+                W.append(fluidPatchesPointsW_[interfaceI][cols-1-i]);
+            }
+
+            if (normalizeCouplingColumns_)
+            {
+                for (label i = 0; i < cols; i++)
+                {
+                    const scalar colNorm = Foam::sqrt(sum(Q[i] & Q[i]));
+
+                    if (colNorm > VSMALL)
+                    {
+                        Q[i] /= colNorm;
+                        W[i] /= colNorm;
+                    }
+                }
             }
 
             for (label i = 0; i < cols; i++)
@@ -426,6 +520,13 @@ void IQNILSCouplingInterface::updateDisplacement()
                 {
                     R[i][j] = sum(Q[i] & Q[j]);
                     Q[j] -= R[i][j]*Q[i];
+
+                    if (reorthogonalizeCouplingColumns_)
+                    {
+                        const scalar correction = sum(Q[i] & Q[j]);
+                        R[i][j] += correction;
+                        Q[j] -= correction*Q[i];
+                    }
                 }
 
                 // Project minus the residual vector on the Q
@@ -450,7 +551,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 }
             }
 
-            scalar epsilon = 1.0E-10*max(Rcolsum);
+            scalar epsilon = qrSolveTolerance_*max(Rcolsum);
 
             for (label i = 0; i < cols; i++)
             {
@@ -490,7 +591,7 @@ void IQNILSCouplingInterface::updateDisplacement()
             for (label i = 0; i < cols; i++)
             {
                 fluidZonesPointsDispls()[interfaceI] +=
-                    fluidPatchesPointsW_[interfaceI][i]*C[cols-1-i][0];
+                    W[cols-1-i]*C[cols-1-i][0];
             }
         }
         else

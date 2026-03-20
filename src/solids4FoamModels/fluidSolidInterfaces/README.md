@@ -58,6 +58,15 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   retained.
 - `minSignificant`: absolute filtering tolerance for repeated or
   near-dependent modes.
+- `relMinSignificant`: optional relative QR2-style filtering tolerance based on
+  the fraction of new information in each older secant mode.
+- `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
+  pair before the QR solve to improve the conditioning of the least-squares
+  system.
+- `qrSolveTolerance`: relative cutoff used to ignore nearly singular
+  directions during the triangular back-substitution.
+- `reorthogonalizeCouplingColumns`: optionally apply a second
+  Gram-Schmidt-style correction while assembling the QR system.
 - `predictSolid`: optionally solve the solid once before the outer FSI loop.
 
 Implementation:
