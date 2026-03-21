@@ -63,6 +63,18 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
   pair before the QR solve to improve the conditioning of the least-squares
   system.
+- `reusePreviousStepModes`: optionally reuse the previous time step's cached
+  secants only in the first IQN-ILS solve of the new time step. If the
+  immediately previous time step converged in one iteration and generated no
+  new secants, the implementation falls back to the latest non-empty cached
+  time step instead, which is closer to preCICE's backup LS-system behavior.
+- `maxReuseUpdateNormRatio`: optional safeguard that caps the norm of that
+  first reused IQN-ILS correction relative to the current interface residual.
+- `combinedCouplingSystem`: optionally assemble one aligned least-squares
+  system across all coupled interfaces instead of solving one interface at a
+  time. On single-interface cases this should reproduce the per-interface
+  result; it is mainly a structural step toward a more preCICE-like assembly.
+  This can also be combined with `preciceStyleCouplingQR`.
 - `requireAllResidualMeasures`: optionally require all normalized residual
   measures in the shared FSI convergence check to satisfy the tolerance.
   Legacy behavior uses the minimum of the available residual measures, which

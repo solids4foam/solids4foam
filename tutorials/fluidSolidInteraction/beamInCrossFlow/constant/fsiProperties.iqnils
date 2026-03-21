@@ -60,6 +60,12 @@ fluidSolidInterface    IQNILS;
     // relMinSignificant 1e-2;
     // Optional: normalize secant columns before the IQN-ILS QR solve
     // normalizeCouplingColumns yes;
+    // Optional: reuse the previous time step's secants only in iteration 1
+    // reusePreviousStepModes yes;
+    // Optional: cap the reused iteration-1 IQN correction relative to |r|
+    // maxReuseUpdateNormRatio 0.5;
+    // Optional: assemble one aligned LS system across all interfaces
+    // combinedCouplingSystem yes;
     // Optional: relative cutoff for the QR back-substitution
     // qrSolveTolerance 1e-10;
     // Optional: apply a second orthogonalization correction in the QR build

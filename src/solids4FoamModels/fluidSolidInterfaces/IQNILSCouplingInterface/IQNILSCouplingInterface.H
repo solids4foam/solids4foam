@@ -81,6 +81,10 @@ class IQNILSCouplingInterface
         //  columns for the current solve without deleting history
         const scalar qrFilterTolerance_;
 
+        //- Build one combined IQN-ILS least-squares system across all
+        //  interfaces, with columns aligned by recency
+        const bool combinedCouplingSystem_;
+
         //- Build the IQN-ILS least-squares system with a preCICE-like QR2 pass
         const bool preciceStyleCouplingQR_;
 
@@ -113,6 +117,15 @@ class IQNILSCouplingInterface
         //- Cached secant updates from the previous converged time step
         List<DynamicList<vectorField> > previousStepPatchesPointsW_;
 
+        //- Backup secants from the latest converged time step that contained
+        //  usable IQN-ILS modes. These are used if the immediately previous
+        //  time step converged in one iteration and produced no new modes.
+        List<DynamicList<vectorField> > previousNonEmptyStepPatchesPointsV_;
+
+        //- Backup secant updates from the latest converged time step that
+        //  contained usable IQN-ILS modes
+        List<DynamicList<vectorField> > previousNonEmptyStepPatchesPointsW_;
+
 
     // Private Member Functions
 
@@ -139,6 +152,11 @@ class IQNILSCouplingInterface
         //  IQN-ILS solve for this interface
         bool usePreviousStepModesInSolve(const label interfaceI) const;
 
+        //- True if the latest non-empty cached time step should be used
+        //  because the immediately previous time step converged without
+        //  generating secant modes
+        bool usePreviousNonEmptyStepModesInSolve(const label interfaceI) const;
+
         //- Number of secant modes available to the current IQN-ILS solve,
         //  combining active and optionally cached previous-step modes
         label nSolveCouplingModes(const label interfaceI) const;
@@ -152,6 +170,26 @@ class IQNILSCouplingInterface
             vectorField& v,
             vectorField& w
         ) const;
+
+        //- Total number of interface points across all interfaces
+        label combinedCouplingSystemSize();
+
+        //- Number of aligned secant columns in the combined IQN-ILS system
+        label nCombinedCouplingModes();
+
+        //- Return the nth newest aligned secant column in the combined system
+        void combinedCouplingMode
+        (
+            const label newestModeI,
+            vectorField& v,
+            vectorField& w
+        );
+
+        //- Return the combined interface residual for all interfaces
+        vectorField combinedResidual();
+
+        //- Set all interface displacements from a combined correction vector
+        void applyCombinedCorrection(const vectorField& correction);
 
         //- Filter repeated/near-dependent coupling modes
         void filterCouplingModes(const label interfaceI);
@@ -177,6 +215,14 @@ class IQNILSCouplingInterface
             DynamicList<vectorField>& solveW,
             RectangularMatrix<scalar>& R
         ) const;
+
+        //- Build a preCICE-style QR2-filtered combined IQN-ILS system
+        label buildPreciceStyleCombinedCouplingQR
+        (
+            DynamicList<vectorField>& solveQ,
+            DynamicList<vectorField>& solveW,
+            RectangularMatrix<scalar>& R
+        );
 
         //- Disallow default bitwise copy construct
         IQNILSCouplingInterface(const IQNILSCouplingInterface&);

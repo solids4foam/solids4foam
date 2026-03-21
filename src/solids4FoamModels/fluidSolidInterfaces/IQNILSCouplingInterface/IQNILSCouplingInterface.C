@@ -93,6 +93,13 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
             "qrFilterTolerance", -1.0
         )
     ),
+    combinedCouplingSystem_
+    (
+        fsiProperties().lookupOrAddDefault<bool>
+        (
+            "combinedCouplingSystem", false
+        )
+    ),
     preciceStyleCouplingQR_
     (
         fsiProperties().lookupOrAddDefault<bool>
@@ -126,7 +133,9 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     fluidPatchesPointsW_(nGlobalPatches()),
     fluidPatchesPointsT_(nGlobalPatches()),
     previousStepPatchesPointsV_(nGlobalPatches()),
-    previousStepPatchesPointsW_(nGlobalPatches())
+    previousStepPatchesPointsW_(nGlobalPatches()),
+    previousNonEmptyStepPatchesPointsV_(nGlobalPatches()),
+    previousNonEmptyStepPatchesPointsW_(nGlobalPatches())
 {}
 
 
@@ -193,6 +202,24 @@ void IQNILSCouplingInterface::cacheCurrentStepModes()
 
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (fluidPatchesPointsV_[interfaceI].size() > 0)
+        {
+            previousNonEmptyStepPatchesPointsV_[interfaceI].clear();
+            previousNonEmptyStepPatchesPointsW_[interfaceI].clear();
+
+            forAll(fluidPatchesPointsV_[interfaceI], modeI)
+            {
+                previousNonEmptyStepPatchesPointsV_[interfaceI].append
+                (
+                    fluidPatchesPointsV_[interfaceI][modeI]
+                );
+                previousNonEmptyStepPatchesPointsW_[interfaceI].append
+                (
+                    fluidPatchesPointsW_[interfaceI][modeI]
+                );
+            }
+        }
+
         previousStepPatchesPointsV_[interfaceI].clear();
         previousStepPatchesPointsW_[interfaceI].clear();
 
@@ -226,6 +253,20 @@ bool IQNILSCouplingInterface::usePreviousStepModesInSolve
 }
 
 
+bool IQNILSCouplingInterface::usePreviousNonEmptyStepModesInSolve
+(
+    const label interfaceI
+) const
+{
+    return
+        reusePreviousStepModes_
+     && couplingReuse() == 0
+     && outerCorr() == 1
+     && previousStepPatchesPointsV_[interfaceI].size() == 0
+     && previousNonEmptyStepPatchesPointsV_[interfaceI].size() > 0;
+}
+
+
 label IQNILSCouplingInterface::nSolveCouplingModes(const label interfaceI) const
 {
     label nModes = fluidPatchesPointsV_[interfaceI].size();
@@ -233,6 +274,10 @@ label IQNILSCouplingInterface::nSolveCouplingModes(const label interfaceI) const
     if (usePreviousStepModesInSolve(interfaceI))
     {
         nModes += previousStepPatchesPointsV_[interfaceI].size();
+    }
+    else if (usePreviousNonEmptyStepModesInSolve(interfaceI))
+    {
+        nModes += previousNonEmptyStepPatchesPointsV_[interfaceI].size();
     }
 
     return nModes;
@@ -258,12 +303,140 @@ void IQNILSCouplingInterface::solveCouplingMode
     else
     {
         const label previousNewestModeI = newestModeI - nActiveModes;
+        const bool usePreviousStepModes =
+            usePreviousStepModesInSolve(interfaceI);
         const label nPreviousModes =
-            previousStepPatchesPointsV_[interfaceI].size();
+            usePreviousStepModes
+          ? previousStepPatchesPointsV_[interfaceI].size()
+          : previousNonEmptyStepPatchesPointsV_[interfaceI].size();
         const label modeI = nPreviousModes - 1 - previousNewestModeI;
 
-        v = previousStepPatchesPointsV_[interfaceI][modeI];
-        w = previousStepPatchesPointsW_[interfaceI][modeI];
+        if (usePreviousStepModes)
+        {
+            v = previousStepPatchesPointsV_[interfaceI][modeI];
+            w = previousStepPatchesPointsW_[interfaceI][modeI];
+        }
+        else
+        {
+            v = previousNonEmptyStepPatchesPointsV_[interfaceI][modeI];
+            w = previousNonEmptyStepPatchesPointsW_[interfaceI][modeI];
+        }
+    }
+}
+
+
+label IQNILSCouplingInterface::combinedCouplingSystemSize()
+{
+    label size = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        size += fluidZonesPointsDispls()[interfaceI].size();
+    }
+
+    return size;
+}
+
+
+label IQNILSCouplingInterface::nCombinedCouplingModes()
+{
+    label cols = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        cols = max(cols, nSolveCouplingModes(interfaceI));
+    }
+
+    return cols;
+}
+
+
+void IQNILSCouplingInterface::combinedCouplingMode
+(
+    const label newestModeI,
+    vectorField& v,
+    vectorField& w
+)
+{
+    const label totalSize = combinedCouplingSystemSize();
+
+    v.setSize(totalSize);
+    v = Zero;
+    w.setSize(totalSize);
+    w = Zero;
+
+    label offset = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        const label localSize = fluidZonesPointsDispls()[interfaceI].size();
+
+        if (newestModeI < nSolveCouplingModes(interfaceI))
+        {
+            vectorField localV;
+            vectorField localW;
+            solveCouplingMode(interfaceI, newestModeI, localV, localW);
+
+            forAll(localV, pointI)
+            {
+                v[offset + pointI] = localV[pointI];
+                w[offset + pointI] = localW[pointI];
+            }
+        }
+
+        offset += localSize;
+    }
+}
+
+
+vectorField IQNILSCouplingInterface::combinedResidual()
+{
+    vectorField residual(combinedCouplingSystemSize(), Zero);
+
+    label offset = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        const vectorField localResidual
+        (
+            fluidZonesPointsDispls()[interfaceI]
+          - solidZonesPointsDispls()[interfaceI]
+        );
+
+        forAll(localResidual, pointI)
+        {
+            residual[offset + pointI] = localResidual[pointI];
+        }
+
+        offset += localResidual.size();
+    }
+
+    return residual;
+}
+
+
+void IQNILSCouplingInterface::applyCombinedCorrection
+(
+    const vectorField& correction
+)
+{
+    label offset = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        fluidZonesPointsDisplsPrev()[interfaceI] =
+            fluidZonesPointsDispls()[interfaceI];
+
+        fluidZonesPointsDispls()[interfaceI] =
+            solidZonesPointsDispls()[interfaceI];
+
+        forAll(fluidZonesPointsDispls()[interfaceI], pointI)
+        {
+            fluidZonesPointsDispls()[interfaceI][pointI] +=
+                correction[offset + pointI];
+        }
+
+        offset += fluidZonesPointsDispls()[interfaceI].size();
     }
 }
 
@@ -465,6 +638,72 @@ label IQNILSCouplingInterface::buildPreciceStyleCouplingQR
         {
             Info<< "Ignoring IQN-ILS QR2 column (" << patchName
                 << "): repeated orthogonalization failed" << endl;
+            continue;
+        }
+
+        const label col = solveQ.size();
+        solveQ.append(v);
+        solveW.append(w);
+
+        for (label row = 0; row <= col; row++)
+        {
+            R[row][col] = r[row];
+        }
+    }
+
+    return solveQ.size();
+}
+
+
+label IQNILSCouplingInterface::buildPreciceStyleCombinedCouplingQR
+(
+    DynamicList<vectorField>& solveQ,
+    DynamicList<vectorField>& solveW,
+    RectangularMatrix<scalar>& R
+)
+{
+    const label storedCols = nCombinedCouplingModes();
+
+    solveQ.clear();
+    solveW.clear();
+    R = RectangularMatrix<scalar>(storedCols, storedCols, 0.0);
+
+    for (label i = 0; i < storedCols; i++)
+    {
+        vectorField v;
+        vectorField w;
+        combinedCouplingMode(i, v, w);
+        const scalar origNorm = Foam::sqrt(sum(v & v));
+
+        if (normalizeCouplingColumns_ && origNorm > VSMALL)
+        {
+            v /= origNorm;
+            w /= origNorm;
+        }
+
+        scalarField r;
+        scalar rho = 0.0;
+        const label status =
+            orthogonalizeCouplingColumn(v, r, rho, solveQ);
+
+        if
+        (
+            i > 0
+         && qrFilterTolerance_ > 0.0
+         && origNorm > VSMALL
+         && rho < qrFilterTolerance_*origNorm
+        )
+        {
+            Info<< "Ignoring IQN-ILS combined QR2 column: |v_orth| = "
+                << rho << " < qrFilterTolerance*|v| = "
+                << qrFilterTolerance_*origNorm << endl;
+            continue;
+        }
+
+        if (status < 0)
+        {
+            Info<< "Ignoring IQN-ILS combined QR2 column: "
+                << "repeated orthogonalization failed" << endl;
             continue;
         }
 
@@ -689,6 +928,11 @@ void IQNILSCouplingInterface::updateDisplacement()
                 Info<< ", cached previous-step modes available: "
                     << previousStepPatchesPointsV_[interfaceI].size();
             }
+            else if (usePreviousNonEmptyStepModesInSolve(interfaceI))
+            {
+                Info<< ", cached previous non-empty step modes available: "
+                    << previousNonEmptyStepPatchesPointsV_[interfaceI].size();
+            }
 
             Info<< endl;
         }
@@ -751,7 +995,262 @@ void IQNILSCouplingInterface::updateDisplacement()
     forAll(fluid().globalPatches(), interfaceI)
     {
         filterCouplingModes(interfaceI);
+    }
 
+    if (combinedCouplingSystem_)
+    {
+        const label storedCols = nCombinedCouplingModes();
+
+        if (storedCols > 0)
+        {
+            DynamicList<vectorField> solveQ(storedCols);
+            DynamicList<vectorField> solveW(storedCols);
+            DynamicList<vectorField> qBasis(storedCols);
+            vectorField solveResidual(combinedResidual());
+            RectangularMatrix<scalar> preciceR(0, 0, 0.0);
+            label cols = 0;
+
+            if (preciceStyleCouplingQR_)
+            {
+                cols =
+                    buildPreciceStyleCombinedCouplingQR
+                    (
+                        solveQ,
+                        solveW,
+                        preciceR
+                    );
+            }
+            else
+            {
+                for (label i = 0; i < storedCols; i++)
+                {
+                    vectorField v;
+                    vectorField w;
+                    combinedCouplingMode(i, v, w);
+                    const scalar origNorm = Foam::sqrt(sum(v & v));
+
+                    if (normalizeCouplingColumns_ && origNorm > VSMALL)
+                    {
+                        v /= origNorm;
+                        w /= origNorm;
+                    }
+
+                    vectorField vOrth(v);
+                    forAll(qBasis, qI)
+                    {
+                        vOrth -= sum(qBasis[qI] & vOrth)*qBasis[qI];
+                    }
+
+                    const scalar orthNorm = Foam::sqrt(sum(vOrth & vOrth));
+
+                    if
+                    (
+                        qrFilterTolerance_ > 0.0
+                     && i > 0
+                     && origNorm > VSMALL
+                     && orthNorm < qrFilterTolerance_*origNorm
+                    )
+                    {
+                        Info<< "Ignoring IQN-ILS combined solve column: |v_orth| = "
+                            << orthNorm << " < qrFilterTolerance*|v| = "
+                            << qrFilterTolerance_*origNorm << endl;
+                        continue;
+                    }
+
+                    solveQ.append(v);
+                    solveW.append(w);
+
+                    if (orthNorm > VSMALL)
+                    {
+                        vOrth /= orthNorm;
+                    }
+
+                    qBasis.append(vOrth);
+                }
+
+                cols = solveQ.size();
+            }
+
+            if (cols > 0)
+            {
+                Field<scalar> coeffs(cols, 0.0);
+                RectangularMatrix<scalar> R(cols, cols, 0.0);
+                RectangularMatrix<scalar> Rcolsum(1, cols);
+
+                if (preciceStyleCouplingQR_)
+                {
+                    for (label i = 0; i < cols; i++)
+                    {
+                        coeffs[i] = -sum(solveQ[i] & solveResidual);
+                    }
+
+                    for (label i = 0; i < cols; i++)
+                    {
+                        for (label j = i; j < cols; j++)
+                        {
+                            R[i][j] = preciceR[i][j];
+                        }
+                    }
+                }
+                else
+                {
+                    RectangularMatrix<scalar> C(cols, 1);
+
+                    for (label i = 0; i < cols; i++)
+                    {
+                        R[i][i] = Foam::sqrt(sum(solveQ[i] & solveQ[i]));
+                        solveQ[i] /= R[i][i];
+
+                        for (label j = i + 1; j < cols; j++)
+                        {
+                            R[i][j] = sum(solveQ[i] & solveQ[j]);
+                            solveQ[j] -= R[i][j]*solveQ[i];
+
+                            if (reorthogonalizeCouplingColumns_)
+                            {
+                                const scalar correction =
+                                    sum(solveQ[i] & solveQ[j]);
+                                R[i][j] += correction;
+                                solveQ[j] -= correction*solveQ[i];
+                            }
+                        }
+
+                        C[i][0] = sum(solveQ[i] & solveResidual);
+                    }
+
+                    for (label i = 0; i < cols; i++)
+                    {
+                        coeffs[cols - 1 - i] = C[cols - 1 - i][0];
+                    }
+                }
+
+                for (label j = 0; j < cols; j++)
+                {
+                    Rcolsum[0][j] = 0.0;
+
+                    for (label i = 0; i < j + 1; i++)
+                    {
+                        Rcolsum[0][j] += cmptMag(R[i][j]);
+                    }
+                }
+
+                scalar epsilon = qrSolveTolerance_*max(Rcolsum);
+
+                for (label i = 0; i < cols; i++)
+                {
+                    if (cmptMag(R[i][i]) > epsilon)
+                    {
+                        for (label j = i + 1; j < cols; j++)
+                        {
+                            R[i][j] /= R[i][i];
+                        }
+
+                        coeffs[i] /= R[i][i];
+                        R[i][i] = 1.0;
+                    }
+                }
+
+                for (label j = cols - 1; j >= 0; j--)
+                {
+                    if (cmptMag(R[j][j]) > epsilon)
+                    {
+                        for (label i = 0; i < j; i++)
+                        {
+                            coeffs[i] -= coeffs[j]*R[i][j];
+                        }
+                    }
+                    else
+                    {
+                        coeffs[j] = 0.0;
+                    }
+                }
+
+                vectorField couplingCorrection
+                (
+                    combinedCouplingSystemSize(),
+                    Zero
+                );
+
+                for (label i = 0; i < cols; i++)
+                {
+                    couplingCorrection += solveW[i]*coeffs[i];
+                }
+
+                bool reusedPreviousStepModes = false;
+
+                forAll(fluid().globalPatches(), interfaceI)
+                {
+                    reusedPreviousStepModes =
+                        reusedPreviousStepModes
+                     || usePreviousStepModesInSolve(interfaceI);
+                }
+
+                if
+                (
+                    reusedPreviousStepModes
+                 && maxReuseUpdateNormRatio_ > 0.0
+                )
+                {
+                    const scalar residualNorm =
+                        Foam::sqrt(sum(solveResidual & solveResidual));
+                    const scalar correctionNorm =
+                        Foam::sqrt(sum(couplingCorrection & couplingCorrection));
+                    const scalar maxCorrectionNorm =
+                        maxReuseUpdateNormRatio_*residualNorm;
+
+                    if
+                    (
+                        residualNorm > VSMALL
+                     && correctionNorm > maxCorrectionNorm
+                    )
+                    {
+                        const scalar scale =
+                            maxCorrectionNorm/max(correctionNorm, VSMALL);
+
+                        Info<< "Limiting reused combined IQN-ILS correction: "
+                            << "|du| = " << correctionNorm
+                            << " > maxReuseUpdateNormRatio*|r| = "
+                            << maxCorrectionNorm
+                            << ", scale = " << scale << endl;
+
+                        couplingCorrection *= scale;
+                    }
+                }
+
+                applyCombinedCorrection(couplingCorrection);
+
+                return;
+            }
+        }
+
+        forAll(fluid().globalPatches(), interfaceI)
+        {
+            Info<< "Current fsi under-relaxation factor ("
+                << fluidMesh().boundary()
+                   [
+                       fluid().globalPatches()[interfaceI].patch().index()
+                   ].name()
+                << "): " << relaxationFactor_ << endl;
+
+            fluidZonesPointsDisplsPrev()[interfaceI] =
+                fluidZonesPointsDispls()[interfaceI];
+
+            if ((outerCorr() == 1) && predictor())
+            {
+                fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
+            }
+            else
+            {
+                fluidZonesPointsDispls()[interfaceI] +=
+                    relaxationFactor_*residuals()[interfaceI];
+            }
+        }
+
+        return;
+    }
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
         const label storedCols = nSolveCouplingModes(interfaceI);
 
         if (storedCols > 0)
