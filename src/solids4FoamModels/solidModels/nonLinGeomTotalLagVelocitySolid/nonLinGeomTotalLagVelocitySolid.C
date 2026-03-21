@@ -94,7 +94,8 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
     surfaceVectorField& force,
     volVectorField& D,
     const surfaceVectorField& nCurrent,
-    const surfaceScalarField& magSfCurrent
+    const surfaceScalarField& magSfCurrent,
+    const surfaceScalarField& magSfOldTime
 ) const
 {
     // Enforce traction conditions
@@ -164,37 +165,34 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
                 trac + 0.5*deltaT*(3*tracRate - tracRateOld)
             );
 
+            const scalarField& magSfPatch = mesh.boundary()[patchI].magSf();
+            const scalarField& magSfCurrentPatch =
+                magSfCurrent.boundaryField()[patchI];
+            const scalarField& magSfOldTimePatch =
+                magSfOldTime.boundaryField()[patchI];
+
             // Enforce tracFuture on the forceFutureTime boundary
-            forceP = tracFuture*mesh.boundary()[patchI].magSf();
+            if (tracPatch.useUndeformedArea())
+            {
+                forceP = tracFuture*magSfPatch;
+            }
+            else
+            {
+                forceP = tracFuture*magSfCurrentPatch;
+            }
 
             // We will also enforce the exact values on the old-time field, as
             // these were extrapolated in the previous time-step and we can
             // correct them here
-            force.oldTime().boundaryFieldRef()[patchI] =
-                trac*mesh.boundary()[patchI].magSf();
-
-            // TODO: extend to current patch Sf!
-
-            // if (tracPatch.useUndeformedArea())
-            // {
-            //     const scalarField& magSfPatch =
-            //         D.mesh().boundary()[patchI].magSf();
-
-            //     forceP =
-            //         (
-            //             tracPatch.traction() - nPatch*tracPatch.pressure()
-            //         )*magSfPatch;
-            // }
-            // else
-            // {
-            //     const scalarField& magSfCurrentPatch =
-            //         magSfCurrent.boundaryField()[patchI];
-
-            //     forceP =
-            //         (
-            //             tracPatch.traction() - nPatch*tracPatch.pressure()
-            //         )*magSfCurrentPatch;
-            // }
+            if (tracPatch.useUndeformedArea())
+            {
+                force.oldTime().boundaryFieldRef()[patchI] = trac*magSfPatch;
+            }
+            else
+            {
+                force.oldTime().boundaryFieldRef()[patchI] =
+                    trac*magSfOldTimePatch;
+            }
         }
         else if
         (
@@ -747,6 +745,20 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // from the current time using the velocity. This is the approach given in
     // Jaiman and Joshi, 2022, in Eq. 6.16.
 
+    // Calculate the current deformed geometry for correcting the old-time
+    // force boundary values on traction patches.
+    mechanical().grad(D(), gradD());
+
+    const volTensorField FCurrent("FCurrent", I + gradD().T());
+    const volTensorField FinvCurrent("FinvCurrent", inv(FCurrent));
+    const volScalarField JCurrent("JCurrent", det(FCurrent));
+    const surfaceVectorField SfCurrent
+    (
+        "SfCurrent",
+        fvc::interpolate(JCurrent*FinvCurrent.T()) & mesh.Sf()
+    );
+    const surfaceScalarField magSfCurrent("magSfCurrent", mag(SfCurrent));
+
     // Approximate the displacement at the future time step
     DFutureTime_ = D() + 0.5*deltaT*(3*U - U.oldTime());
 
@@ -810,7 +822,14 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
 
         // Enforce traction boundary conditions at the new time
         // This extrapolates the traction boundaries
-        enforceTractionBoundaries(forceFutureTime_, D(), n, mesh.magSf());
+        enforceTractionBoundaries
+        (
+            forceFutureTime_,
+            D(),
+            n,
+            mesh.magSf(),
+            mesh.magSf()
+        );
     }
     else
     {
@@ -841,14 +860,18 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
         // Update the future-time force at the faces
         forceFutureTime_ = magSfNew*tractionNew;
 
-        // Enforce traction boundary conditions at the new time
-        // TODO: we need to access traction at the new time (if available) ...
-        // but how do we extrapolate this consistently ...
-        FatalErrorInFunction
-            << "Check if enforceTractionBoundaries is correct for large strains"
-            << exit(FatalError);
-
-        enforceTractionBoundaries(forceFutureTime_, D(), nNew, magSfNew);
+        // Enforce traction boundary conditions at the new time.
+        // Use the future-time deformed areas for the extrapolated traction
+        // force and the current-time deformed areas when correcting the
+        // old-time exact force values.
+        enforceTractionBoundaries
+        (
+            forceFutureTime_,
+            D(),
+            nNew,
+            magSfNew,
+            magSfCurrent
+        );
     }
 
     // The residual vector is defined as

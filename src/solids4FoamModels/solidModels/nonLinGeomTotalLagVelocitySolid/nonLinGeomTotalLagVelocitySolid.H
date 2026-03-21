@@ -120,10 +120,11 @@ class nonLinGeomTotalLagVelocitySolid
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
         (
-            surfaceVectorField& force,             // force at the faces
-            volVectorField& D,                     // displacement field
-            const surfaceVectorField& nCurrent,    // deformed unit normals
-            const surfaceScalarField& magSfCurrent // deformed area magnitudes
+            surfaceVectorField& force,                  // future-time force
+            volVectorField& D,                          // displacement field
+            const surfaceVectorField& nCurrent,         // future-time normals
+            const surfaceScalarField& magSfCurrent,     // future-time areas
+            const surfaceScalarField& magSfOldTime      // current-time areas
         ) const;
 
         //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
