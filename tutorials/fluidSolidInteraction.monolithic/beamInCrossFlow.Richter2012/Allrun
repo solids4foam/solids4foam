@@ -1,0 +1,158 @@
+#!/bin/bash
+
+set -e
+
+# Source required functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+source solids4FoamScripts.sh
+
+# Define configurations as space-separated strings
+configs=(
+    "BASE=base/quasiMonolithic NAME=quasiMonolithic"
+    "BASE=base/partitioned NAME=partitioned"
+)
+
+# Define start and end mesh indices
+# Mesh input files are defined from 1 to 4
+# END_MESH should be greater than START_MESH
+START_MESH=1
+END_MESH=3
+
+
+# Detect the CPU type: we append this to the case name
+if [[ "$OSTYPE" == "darwin"* ]]
+then
+    # macOS
+    CPU_TYPE=$(sysctl -n machdep.cpu.brand_string | sed 's/[^a-zA-Z0-9]/_/g')
+elif [[ -f /proc/cpuinfo ]]
+then
+    # Linux
+    CPU_TYPE=$(grep -m 1 "model name" /proc/cpuinfo | awk -F': ' '{print $2}' | sed 's/[^a-zA-Z0-9]/_/g')
+else
+    # Fallback if neither method works
+    CPU_TYPE="Unknown_CPU"
+fi
+
+
+# Create timestamped working directory for this run
+DATE=$(date +%Y%m%d_%H%M%S)
+RUN_DIR="run_${CPU_TYPE}_${DATE}"
+echo "Creating ${RUN_DIR}"
+mkdir "${RUN_DIR}"
+
+# Enter the run directory
+cd "${RUN_DIR}"
+
+# Iterate through configurations
+for config in "${configs[@]}"
+do
+    # Parse the configuration string
+    eval $config
+    echo; echo "***************************************"
+    echo "Running configuration: $config"
+    echo "***************************************"
+
+    # Define results summary file name
+    SUMMARY="${NAME}.summary.txt"
+    echo "# Mesh Time Mem Dx" > "${SUMMARY}"
+
+    # Loop over mesh densities in each configuration
+    for i in `seq $START_MESH $END_MESH`
+    do
+        CASE="${NAME}.$i"
+        echo; echo "Processing case: $CASE"
+
+        # Prepare the case
+        echo "BASE=$BASE"
+        cp -r "../${BASE}" "${CASE}"
+        cd "$CASE"
+
+        # Replace the solid blockMeshDict
+        if [[ ! -f "system/solid/blockMeshDict.$i" ]]
+        then
+            echo "Cannot find ${CASE}/system/solid/blockMeshDict.$i: please add it to ${BASE}/"; echo
+            exit 1;
+        else
+            echo "Copying ${CASE}/system/solid/blockMeshDict.$i to ${CASE}/system/solid/blockMeshDict"
+            \cp "system/solid/blockMeshDict.$i" system/solid/blockMeshDict
+        fi
+
+        # Replace the fluid blockMeshDict
+        if [[ ! -f "system/fluid/blockMeshDict.$i" ]]
+        then
+            echo "Cannot find ${CASE}/system/fluid/blockMeshDict.$i: please add it to ${BASE}/"; echo
+            exit 1;
+        else
+            echo "Copying ${CASE}/system/fluid/blockMeshDict.$i to ${CASE}/system/fluid/blockMeshDict"
+            \cp "system/fluid/blockMeshDict.$i" system/fluid/blockMeshDict
+        fi
+
+        # Create the mesh
+        solids4Foam::runApplication -s solid blockMesh -region solid
+        solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+        # Run the solver
+        # If "gtime" is available (could be called "time" on Linux), use it to
+        # record the max memory usage
+        if command -v gtime &> /dev/null
+        then
+            echo "Running solids4Foam on ${CASE} with gtime"
+            gtime -f "Maximum resident set size (kbytes): %M" solids4Foam &> log.solids4Foam
+        elif command -v time &> /dev/null
+        then
+            echo "Running solids4Foam on ${CASE} with time"
+            /usr/bin/time -f "Maximum resident set size (kbytes): %M" solids4Foam &> log.solids4Foam
+        else
+            echo "Running solids4Foam on ${CASE}"
+            solids4Foam::runApplication solids4Foam
+        fi
+
+        # Extract results from solver log and append them to a summary file
+        echo; echo "Appending results to ${SUMMARY}"
+        if grep -aq "Maximum resident" log.solids4Foam; then
+            MAX_MEMORY=$(grep -a "Maximum resident" log.solids4Foam | awk '{print int($6 / 1000)}')
+        else
+            MAX_MEMORY="NaN"
+        fi
+
+        # Record the time
+        CLOCK_TIME=$(grep -a "ClockTime" log.solids4Foam | tail -1 | awk '{print $7}')
+
+        # Extract the final x displacement
+        if [[ ! -f postProcessing/0/solidPointDisplacement_displacement.dat ]]
+        then
+            echo "Missing postProcessing/0/solidPointDisplacement_displacement.dat"
+            exit 1
+        fi
+        XDISP=$(tail -1 postProcessing/0/solidPointDisplacement_displacement.dat | awk '{print $2}')
+
+        # Write data to file
+        echo "$i $CLOCK_TIME $MAX_MEMORY $XDISP" >> ../"${SUMMARY}"
+
+        cd ..
+    done
+
+    # Print summary file
+    echo; echo "${SUMMARY} file:"; cat "${SUMMARY}"; echo
+done
+
+# Create plots if gnuplot in installed
+if command -v gnuplot &>/dev/null
+then
+    # Copy gnuplot scripts
+    cp ../plotScripts/*gnuplot .
+
+    # Run all scripts
+    for f in *gnuplot
+    do
+        echo "Running gnuplot on $f"
+        gnuplot -c "$f" "${NAME}"
+    done
+fi
+
+# Exit the run directory
+cd ..
+
+echo; echo; echo "Done!"; echo
+echo; echo $(date)
+echo; echo

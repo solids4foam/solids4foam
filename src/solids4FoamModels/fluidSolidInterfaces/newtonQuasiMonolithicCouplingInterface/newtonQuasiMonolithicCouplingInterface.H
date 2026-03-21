@@ -307,18 +307,23 @@ public:
 
         virtual ~newtonQuasiMonolithicCouplingInterface()
         {
-            // Destroy each submatrix
-            for (label i = 0; i < nRegions_*nRegions_; ++i)
+            if (subMatsPtr_ != nullptr)
             {
-                MatDestroy(&subMatsPtr_[i]);
-            }
+                // Destroy each submatrix
+                for (label i = 0; i < nRegions_*nRegions_; ++i)
+                {
+                    MatDestroy(&subMatsPtr_[i]);
+                }
 
-            // Free the array of Mat handles
-            delete[] subMatsPtr_;
-            subMatsPtr_ = nullptr;
+                // Free the array of Mat handles
+                delete[] subMatsPtr_;
+                subMatsPtr_ = nullptr;
+            }
 
             // Free index sets
             ISDestroy(&isFluid_);
+            ISDestroy(&isFluidVelocity_);
+            ISDestroy(&isFluidPressure_);
             // ISDestroy(&isMotion_);
             ISDestroy(&isSolid_);
         }

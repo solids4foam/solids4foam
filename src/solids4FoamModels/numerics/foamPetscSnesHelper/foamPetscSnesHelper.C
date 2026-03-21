@@ -35,6 +35,8 @@ License
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
+Foam::label Foam::foamPetscSnesHelper::petscInitialisationCount_ = 0;
+
 PetscErrorCode formResidualFoamPetscSnesHelper
 (
     SNES snes,    // snes object
@@ -580,8 +582,18 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        // Initialise PETSc without any options file
-        PetscInitialize(NULL, NULL, NULL, NULL);
+        PetscBool petscInitialised = PETSC_FALSE;
+        PetscBool petscFinalized = PETSC_FALSE;
+        PetscInitialized(&petscInitialised);
+        PetscFinalized(&petscFinalized);
+
+        if (!petscInitialised && !petscFinalized)
+        {
+            // Initialise PETSc without any options file
+            PetscInitialize(NULL, NULL, NULL, NULL);
+        }
+
+        ++petscInitialisationCount_;
 
         // Create and store the options database from a dedicated options file
         // or from an OpenFOAM dict
@@ -678,10 +690,14 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
         PetscOptionsDestroy(&options_);
         snesUserPtr_.clear();
 
-        WarningInFunction
-            << "Find a neat solution to finalise PETSc only once"
-            << endl;
-        //PetscFinalize();
+        --petscInitialisationCount_;
+
+        if (petscInitialisationCount_ < 0)
+        {
+            FatalErrorInFunction
+                << "petscInitialisationCount_ is negative"
+                << abort(FatalError);
+        }
     }
 }
 

@@ -115,6 +115,11 @@ public:
 
 private:
 
+    // Private static data
+
+        //- Number of helper instances participating in PETSc lifecycle
+        static label petscInitialisationCount_;
+
     // Private data
 
         //- Location of the solution unknowns, e.g. cells or points

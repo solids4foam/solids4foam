@@ -343,7 +343,7 @@ void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
     );
 
     // Cleanup IS objects.
-    for (label r = 0; r < nRegions_; ++r)
+    for (label r = 0; r < nRegions; ++r)
     {
         ISDestroy(&isRow[r]);
         ISDestroy(&isCol[r]);
@@ -1872,7 +1872,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     // 1. Retrieve UFluid, p and USolid from the PETSc solution vector
     retrieveSolution
     (
-        foamPetscSnesHelper::solution(),
+        x,
         UFluid, p, USolid,
         fluidBlockSize, solidBlockSize,
         twoD
