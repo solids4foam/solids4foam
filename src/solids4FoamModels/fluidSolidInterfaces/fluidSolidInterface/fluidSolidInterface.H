@@ -138,6 +138,10 @@ class fluidSolidInterface
         //- Incremental or absolute residual calculation approach
         const Switch incrementalResiduals_;
 
+        //- Require all residual measures to satisfy the tolerance instead of
+        //  using the legacy minimum-based combination
+        const Switch requireAllResidualMeasures_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 

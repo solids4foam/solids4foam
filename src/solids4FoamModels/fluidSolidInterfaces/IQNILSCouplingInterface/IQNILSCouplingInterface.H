@@ -77,6 +77,21 @@ class IQNILSCouplingInterface
         //  QR back-substitution
         const scalar qrSolveTolerance_;
 
+        //- Relative QR-stage filter tolerance used to ignore weak older secant
+        //  columns for the current solve without deleting history
+        const scalar qrFilterTolerance_;
+
+        //- Build the IQN-ILS least-squares system with a preCICE-like QR2 pass
+        const bool preciceStyleCouplingQR_;
+
+        //- Keep previous time-step modes for the first outer iteration even
+        //  when couplingReuse is zero, then drop them before iteration two
+        const bool reusePreviousStepModes_;
+
+        //- Limit the norm of the first reused IQN-ILS correction relative to
+        //  the current interface residual norm. Negative disables the limit.
+        const scalar maxReuseUpdateNormRatio_;
+
         //- Perform a second MGS pass while building the QR factorization
         const bool reorthogonalizeCouplingColumns_;
 
@@ -91,6 +106,12 @@ class IQNILSCouplingInterface
 
         //- List of coupling field T
         List<DynamicList<scalar> > fluidPatchesPointsT_;
+
+        //- Cached secant information from the previous converged time step
+        List<DynamicList<vectorField> > previousStepPatchesPointsV_;
+
+        //- Cached secant updates from the previous converged time step
+        List<DynamicList<vectorField> > previousStepPatchesPointsW_;
 
 
     // Private Member Functions
@@ -108,11 +129,54 @@ class IQNILSCouplingInterface
             const label minTimeIndexToKeep
         );
 
+        //- Clear all active coupling modes for the given interface
+        void clearCouplingModes(const label interfaceI);
+
+        //- Cache the current time-step coupling modes for next-step reuse
+        void cacheCurrentStepModes();
+
+        //- True if the previous time-step cache should be used in the current
+        //  IQN-ILS solve for this interface
+        bool usePreviousStepModesInSolve(const label interfaceI) const;
+
+        //- Number of secant modes available to the current IQN-ILS solve,
+        //  combining active and optionally cached previous-step modes
+        label nSolveCouplingModes(const label interfaceI) const;
+
+        //- Return the nth newest secant mode available to the current
+        //  IQN-ILS solve. Active modes are preferred over previous-step modes.
+        void solveCouplingMode
+        (
+            const label interfaceI,
+            const label newestModeI,
+            vectorField& v,
+            vectorField& w
+        ) const;
+
         //- Filter repeated/near-dependent coupling modes
         void filterCouplingModes(const label interfaceI);
 
         //- Filter near-dependent modes using a relative QR2-style criterion
         void filterRelativeCouplingModes(const label interfaceI);
+
+        //- Orthogonalize and normalize a new QR column using a preCICE-like
+        //  repeated MGS procedure. Returns -1 if the column should be discarded.
+        label orthogonalizeCouplingColumn
+        (
+            vectorField& v,
+            scalarField& r,
+            scalar& rho,
+            const DynamicList<vectorField>& qBasis
+        ) const;
+
+        //- Build the IQN-ILS QR system using newest-first QR2-style insertion
+        label buildPreciceStyleCouplingQR
+        (
+            const label interfaceI,
+            DynamicList<vectorField>& solveQ,
+            DynamicList<vectorField>& solveW,
+            RectangularMatrix<scalar>& R
+        ) const;
 
         //- Disallow default bitwise copy construct
         IQNILSCouplingInterface(const IQNILSCouplingInterface&);

@@ -335,6 +335,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<Switch>("incrementalResiduals", true)
     ),
+    requireAllResidualMeasures_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>
+        (
+            "requireAllResidualMeasures", false
+        )
+    ),
     residuals_(),
     residualsPrev_(),
     maxResidualsNorm_(),
@@ -1445,9 +1452,18 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         Info<< "FSI residual2 norm for interface " << interfaceI
             << ": " << residualNorm2 << endl;
 
-        // For this interface, the residual is defined as the minium of
-        // residualNorm1 and residualNorm2
-        const scalar residualInterfaceI = min(residualNorm1, residualNorm2);
+        // Legacy solids4foam behavior uses the minimum of the two residual
+        // measures, while stricter convergence requires both to be small.
+        const scalar residualInterfaceI =
+            requireAllResidualMeasures_
+          ? max(residualNorm1, residualNorm2)
+          : min(residualNorm1, residualNorm2);
+
+        if (requireAllResidualMeasures_)
+        {
+            Info<< "FSI combined residual norm for interface " << interfaceI
+                << " (max): " << residualInterfaceI << endl;
+        }
 
         // Update the maximum residual for all interfaces
         maxResidual = max(maxResidual, residualInterfaceI);

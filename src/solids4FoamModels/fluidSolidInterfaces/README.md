@@ -63,6 +63,10 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
   pair before the QR solve to improve the conditioning of the least-squares
   system.
+- `requireAllResidualMeasures`: optionally require all normalized residual
+  measures in the shared FSI convergence check to satisfy the tolerance.
+  Legacy behavior uses the minimum of the available residual measures, which
+  can stop earlier when only one measure has decayed.
 - `qrSolveTolerance`: relative cutoff used to ignore nearly singular
   directions during the triangular back-substitution.
 - `reorthogonalizeCouplingColumns`: optionally apply a second
