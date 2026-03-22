@@ -1878,6 +1878,17 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         twoD
     );
 
+    // 1b. When passViscousStress is enabled, update the fluid interface
+    //     velocity from the current USolid BEFORE computing the viscous
+    //     traction. Without this, patchViscousForce computes grad(U) using the
+    //     stale fixedValue boundary from the previous SNES iteration, making
+    //     the residual an inconsistent function of x.
+    if (passViscousStress_)
+    {
+        mapInterfaceSolidToMeshMotion();
+        mapInterfaceMotionUToFluidU();
+    }
+
     // 2. Map the fluid interface traction to the solid interface
 
     // Fluid interface traction
