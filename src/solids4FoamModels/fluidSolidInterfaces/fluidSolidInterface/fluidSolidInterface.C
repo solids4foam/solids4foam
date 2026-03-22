@@ -329,6 +329,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidZonesPointsDisplsPrev_(),
     solidZonesPointsDispls_(),
     solidZonesPointsDisplsRef_(),
+    fluidZonesTractions_(),
+    fluidZonesTractionsRef_(),
+    solidZonesTractions_(),
+    solidZonesTractionsRef_(),
     interfacesPointsDispls_(),
     interfacesPointsDisplsPrev_(),
     incrementalResiduals_
@@ -477,6 +481,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidZonesPointsDisplsPrev_.setSize(nGlobalPatches_);
     solidZonesPointsDispls_.setSize(nGlobalPatches_);
     solidZonesPointsDisplsRef_.setSize(nGlobalPatches_);
+    fluidZonesTractions_.setSize(nGlobalPatches_);
+    fluidZonesTractionsRef_.setSize(nGlobalPatches_);
+    solidZonesTractions_.setSize(nGlobalPatches_);
+    solidZonesTractionsRef_.setSize(nGlobalPatches_);
     interfacesPointsDispls_.setSize(nGlobalPatches_);
     interfacesPointsDisplsPrev_.setSize(nGlobalPatches_);
     residuals_.setSize(nGlobalPatches_);
@@ -699,6 +707,10 @@ void Foam::fluidSolidInterface::initializeFields()
     {
         const label nPoints =
             fluid().globalPatches()[interfaceI].globalPatch().nPoints();
+        const label nFluidFaces =
+            fluid().globalPatches()[interfaceI].globalPatch().size();
+        const label nSolidFaces =
+            solid().globalPatches()[interfaceI].globalPatch().size();
 
         fluidZonesPointsDispls_[interfaceI] = vectorField(nPoints, vector::zero);
 
@@ -713,6 +725,18 @@ void Foam::fluidSolidInterface::initializeFields()
 
         solidZonesPointsDisplsRef_[interfaceI] =
             vectorField(nPoints, vector::zero);
+
+        fluidZonesTractions_[interfaceI] =
+            vectorField(nFluidFaces, vector::zero);
+
+        fluidZonesTractionsRef_[interfaceI] =
+            vectorField(nFluidFaces, vector::zero);
+
+        solidZonesTractions_[interfaceI] =
+            vectorField(nSolidFaces, vector::zero);
+
+        solidZonesTractionsRef_[interfaceI] =
+            vectorField(nSolidFaces, vector::zero);
 
         residualsPrev_[interfaceI] = residuals_[interfaceI];
 
@@ -1155,6 +1179,8 @@ void Foam::fluidSolidInterface::updateForce()
           - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
         );
 
+        fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
+
         // Initialise the solid zone traction field that is to be interpolated
         // from the fluid zone
         vectorField solidZoneTotalTraction(solidZone.size(), vector::zero);
@@ -1170,6 +1196,8 @@ void Foam::fluidSolidInterface::updateForce()
 
         // Flip traction sign after transferring from fluid to solid
         solidZoneTotalTraction = -solidZoneTotalTraction;
+
+        solidZonesTractions()[interfaceI] = solidZoneTotalTraction;
 
         // Set traction on solid
         if (coupled())

@@ -114,6 +114,13 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
             "reusePreviousStepModes", false
         )
     ),
+    minPreviousStepModesForReuse_
+    (
+        fsiProperties().lookupOrAddDefault<label>
+        (
+            "minPreviousStepModesForReuse", 1
+        )
+    ),
     maxReuseUpdateNormRatio_
     (
         fsiProperties().lookupOrAddDefault<scalar>
@@ -128,14 +135,32 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
             "reorthogonalizeCouplingColumns", false
         )
     ),
+    residualSumPreconditioning_
+    (
+        fsiProperties().lookupOrAddDefault<bool>
+        (
+            "residualSumPreconditioning", false
+        )
+    ),
+    residualPreconditioningEpsilon_
+    (
+        fsiProperties().lookupOrAddDefault<scalar>
+        (
+            "residualPreconditioningEpsilon", SMALL
+        )
+    ),
     predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)),
     fluidPatchesPointsV_(nGlobalPatches()),
     fluidPatchesPointsW_(nGlobalPatches()),
+    solidPatchesFacesTractionW_(nGlobalPatches()),
     fluidPatchesPointsT_(nGlobalPatches()),
     previousStepPatchesPointsV_(nGlobalPatches()),
     previousStepPatchesPointsW_(nGlobalPatches()),
+    previousStepPatchesFacesTractionW_(nGlobalPatches()),
     previousNonEmptyStepPatchesPointsV_(nGlobalPatches()),
-    previousNonEmptyStepPatchesPointsW_(nGlobalPatches())
+    previousNonEmptyStepPatchesPointsW_(nGlobalPatches()),
+    previousNonEmptyStepPatchesFacesTractionW_(nGlobalPatches()),
+    residualPointScale_(nGlobalPatches())
 {}
 
 
@@ -160,11 +185,15 @@ void IQNILSCouplingInterface::removeCouplingMode
 
         fluidPatchesPointsW_[interfaceI][i] =
             fluidPatchesPointsW_[interfaceI][i + 1];
+
+        solidPatchesFacesTractionW_[interfaceI][i] =
+            solidPatchesFacesTractionW_[interfaceI][i + 1];
     }
 
     fluidPatchesPointsT_[interfaceI].remove();
     fluidPatchesPointsV_[interfaceI].remove();
     fluidPatchesPointsW_[interfaceI].remove();
+    solidPatchesFacesTractionW_[interfaceI].remove();
 }
 
 
@@ -190,6 +219,7 @@ void IQNILSCouplingInterface::clearCouplingModes(const label interfaceI)
     fluidPatchesPointsT_[interfaceI].clear();
     fluidPatchesPointsV_[interfaceI].clear();
     fluidPatchesPointsW_[interfaceI].clear();
+    solidPatchesFacesTractionW_[interfaceI].clear();
 }
 
 
@@ -206,6 +236,7 @@ void IQNILSCouplingInterface::cacheCurrentStepModes()
         {
             previousNonEmptyStepPatchesPointsV_[interfaceI].clear();
             previousNonEmptyStepPatchesPointsW_[interfaceI].clear();
+            previousNonEmptyStepPatchesFacesTractionW_[interfaceI].clear();
 
             forAll(fluidPatchesPointsV_[interfaceI], modeI)
             {
@@ -217,11 +248,16 @@ void IQNILSCouplingInterface::cacheCurrentStepModes()
                 (
                     fluidPatchesPointsW_[interfaceI][modeI]
                 );
+                previousNonEmptyStepPatchesFacesTractionW_[interfaceI].append
+                (
+                    solidPatchesFacesTractionW_[interfaceI][modeI]
+                );
             }
         }
 
         previousStepPatchesPointsV_[interfaceI].clear();
         previousStepPatchesPointsW_[interfaceI].clear();
+        previousStepPatchesFacesTractionW_[interfaceI].clear();
 
         forAll(fluidPatchesPointsV_[interfaceI], modeI)
         {
@@ -232,6 +268,10 @@ void IQNILSCouplingInterface::cacheCurrentStepModes()
             previousStepPatchesPointsW_[interfaceI].append
             (
                 fluidPatchesPointsW_[interfaceI][modeI]
+            );
+            previousStepPatchesFacesTractionW_[interfaceI].append
+            (
+                solidPatchesFacesTractionW_[interfaceI][modeI]
             );
         }
 
@@ -249,7 +289,8 @@ bool IQNILSCouplingInterface::usePreviousStepModesInSolve
         reusePreviousStepModes_
      && couplingReuse() == 0
      && outerCorr() == 1
-     && previousStepPatchesPointsV_[interfaceI].size() > 0;
+     && previousStepPatchesPointsV_[interfaceI].size()
+        >= minPreviousStepModesForReuse_;
 }
 
 
@@ -263,7 +304,8 @@ bool IQNILSCouplingInterface::usePreviousNonEmptyStepModesInSolve
      && couplingReuse() == 0
      && outerCorr() == 1
      && previousStepPatchesPointsV_[interfaceI].size() == 0
-     && previousNonEmptyStepPatchesPointsV_[interfaceI].size() > 0;
+     && previousNonEmptyStepPatchesPointsV_[interfaceI].size()
+        >= minPreviousStepModesForReuse_;
 }
 
 
@@ -320,6 +362,44 @@ void IQNILSCouplingInterface::solveCouplingMode
         {
             v = previousNonEmptyStepPatchesPointsV_[interfaceI][modeI];
             w = previousNonEmptyStepPatchesPointsW_[interfaceI][modeI];
+        }
+    }
+}
+
+
+void IQNILSCouplingInterface::solveSecondaryTractionMode
+(
+    const label interfaceI,
+    const label newestModeI,
+    vectorField& wTraction
+) const
+{
+    const label nActiveModes = solidPatchesFacesTractionW_[interfaceI].size();
+
+    if (newestModeI < nActiveModes)
+    {
+        const label modeI = nActiveModes - 1 - newestModeI;
+        wTraction = solidPatchesFacesTractionW_[interfaceI][modeI];
+    }
+    else
+    {
+        const label previousNewestModeI = newestModeI - nActiveModes;
+        const bool usePreviousStepModes =
+            usePreviousStepModesInSolve(interfaceI);
+        const label nPreviousModes =
+            usePreviousStepModes
+          ? previousStepPatchesFacesTractionW_[interfaceI].size()
+          : previousNonEmptyStepPatchesFacesTractionW_[interfaceI].size();
+        const label modeI = nPreviousModes - 1 - previousNewestModeI;
+
+        if (usePreviousStepModes)
+        {
+            wTraction = previousStepPatchesFacesTractionW_[interfaceI][modeI];
+        }
+        else
+        {
+            wTraction =
+                previousNonEmptyStepPatchesFacesTractionW_[interfaceI][modeI];
         }
     }
 }
@@ -606,6 +686,7 @@ label IQNILSCouplingInterface::buildPreciceStyleCouplingQR
         vectorField v;
         vectorField w;
         solveCouplingMode(interfaceI, i, v, w);
+        applyResidualPreconditioning(interfaceI, v);
         const scalar origNorm = Foam::sqrt(sum(v & v));
 
         if (normalizeCouplingColumns_ && origNorm > VSMALL)
@@ -673,6 +754,7 @@ label IQNILSCouplingInterface::buildPreciceStyleCombinedCouplingQR
         vectorField v;
         vectorField w;
         combinedCouplingMode(i, v, w);
+        applyResidualPreconditioningCombined(v);
         const scalar origNorm = Foam::sqrt(sum(v & v));
 
         if (normalizeCouplingColumns_ && origNorm > VSMALL)
@@ -802,6 +884,113 @@ void IQNILSCouplingInterface::filterCouplingModes(const label interfaceI)
 }
 
 
+void IQNILSCouplingInterface::updateResidualPreconditioning()
+{
+    if (!residualSumPreconditioning_)
+    {
+        return;
+    }
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        const vectorField& res = residuals()[interfaceI];
+        scalarField& scale = residualPointScale_[interfaceI];
+        scale.setSize(res.size());
+
+        forAll(res, pointI)
+        {
+            const scalar magnitude = Foam::mag(res[pointI]);
+            scale[pointI] =
+                1.0/(residualPreconditioningEpsilon_ + magnitude);
+        }
+    }
+}
+
+
+void IQNILSCouplingInterface::applyResidualPreconditioning
+(
+    const label interfaceI,
+    vectorField& v
+) const
+{
+    if (!residualSumPreconditioning_)
+    {
+        return;
+    }
+
+    const scalarField& scale = residualPointScale_[interfaceI];
+
+    if (scale.size() != v.size())
+    {
+        return;
+    }
+
+    forAll(v, pointI)
+    {
+        v[pointI] *= scale[pointI];
+    }
+}
+
+
+void IQNILSCouplingInterface::applyResidualPreconditioningCombined
+(vectorField& v) const
+{
+    if (!residualSumPreconditioning_)
+    {
+        return;
+    }
+
+    label offset = 0;
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        const scalarField& scale = residualPointScale_[interfaceI];
+
+        forAll(scale, pointI)
+        {
+            const label index = offset + pointI;
+
+            if (index < v.size())
+            {
+                v[index] *= scale[pointI];
+            }
+        }
+
+        offset += scale.size();
+    }
+}
+
+
+bool IQNILSCouplingInterface::usePreciceStyleCouplingQR
+(
+    const label interfaceI
+) const
+{
+    return
+        preciceStyleCouplingQR_
+     && fluidPatchesPointsV_[interfaceI].size() > 0;
+}
+
+
+bool IQNILSCouplingInterface::useCombinedPreciceStyleCouplingQR() const
+{
+    if (!preciceStyleCouplingQR_)
+    {
+        return false;
+    }
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        if (fluidPatchesPointsV_[interfaceI].size() > 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 bool IQNILSCouplingInterface::evolve()
@@ -825,6 +1014,8 @@ bool IQNILSCouplingInterface::evolve()
 
         residualNorm =
             updateResidual();
+
+        updateResidualPreconditioning();
     }
 
     do
@@ -850,6 +1041,8 @@ bool IQNILSCouplingInterface::evolve()
 
             // Calculate the FSI residual
             residualNorm = updateResidual();
+
+            updateResidualPreconditioning();
         }
         else
         {
@@ -947,6 +1140,9 @@ void IQNILSCouplingInterface::updateDisplacement()
 
             fluidZonesPointsDisplsRef()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
+
+            solidZonesTractionsRef()[interfaceI] =
+                solidZonesTractions()[interfaceI];
         }
     }
     else
@@ -978,6 +1174,15 @@ void IQNILSCouplingInterface::updateDisplacement()
                 )
             );
 
+            solidPatchesFacesTractionW_[interfaceI].append
+            (
+                vectorField
+                (
+                    solidZonesTractions()[interfaceI]
+                  - solidZonesTractionsRef()[interfaceI]
+                )
+            );
+
             fluidPatchesPointsT_[interfaceI].append
             (
                 fluid().runTime().timeIndex()
@@ -988,6 +1193,9 @@ void IQNILSCouplingInterface::updateDisplacement()
 
             fluidZonesPointsDisplsRef()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
+
+            solidZonesTractionsRef()[interfaceI] =
+                solidZonesTractions()[interfaceI];
         }
     }
 
@@ -1010,7 +1218,7 @@ void IQNILSCouplingInterface::updateDisplacement()
             RectangularMatrix<scalar> preciceR(0, 0, 0.0);
             label cols = 0;
 
-            if (preciceStyleCouplingQR_)
+            if (useCombinedPreciceStyleCouplingQR())
             {
                 cols =
                     buildPreciceStyleCombinedCouplingQR
@@ -1077,7 +1285,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 RectangularMatrix<scalar> R(cols, cols, 0.0);
                 RectangularMatrix<scalar> Rcolsum(1, cols);
 
-                if (preciceStyleCouplingQR_)
+                if (useCombinedPreciceStyleCouplingQR())
                 {
                     for (label i = 0; i < cols; i++)
                     {
@@ -1214,6 +1422,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                             << ", scale = " << scale << endl;
 
                         couplingCorrection *= scale;
+
                     }
                 }
 
@@ -1275,11 +1484,10 @@ void IQNILSCouplingInterface::updateDisplacement()
                 fluidZonesPointsDispls()[interfaceI]
               - solidZonesPointsDispls()[interfaceI]
             );
-
             RectangularMatrix<scalar> preciceR(0, 0, 0.0);
             label cols = 0;
 
-            if (preciceStyleCouplingQR_)
+            if (usePreciceStyleCouplingQR(interfaceI))
             {
                 cols =
                     buildPreciceStyleCouplingQR
@@ -1348,7 +1556,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 RectangularMatrix<scalar> R(cols, cols, 0.0);
                 RectangularMatrix<scalar> Rcolsum(1, cols);
 
-                if (preciceStyleCouplingQR_)
+                if (usePreciceStyleCouplingQR(interfaceI))
                 {
                     for (label i = 0; i < cols; i++)
                     {

@@ -92,12 +92,22 @@ class IQNILSCouplingInterface
         //  when couplingReuse is zero, then drop them before iteration two
         const bool reusePreviousStepModes_;
 
+        //- Minimum number of cached secant modes required before previous-step
+        //  reuse is considered ready
+        const label minPreviousStepModesForReuse_;
+
         //- Limit the norm of the first reused IQN-ILS correction relative to
         //  the current interface residual norm. Negative disables the limit.
         const scalar maxReuseUpdateNormRatio_;
 
         //- Perform a second MGS pass while building the QR factorization
         const bool reorthogonalizeCouplingColumns_;
+
+        //- Enable residual-sum preconditioning
+        const bool residualSumPreconditioning_;
+
+        //- Small regularization added to the inverse residual magnitude
+        const scalar residualPreconditioningEpsilon_;
 
         //- Predict solid
         const bool predictSolid_;
@@ -108,6 +118,9 @@ class IQNILSCouplingInterface
         //- List of coupling field W
         List<DynamicList<vectorField> > fluidPatchesPointsW_;
 
+        //- List of secondary coupling field W for mapped solid tractions
+        List<DynamicList<vectorField> > solidPatchesFacesTractionW_;
+
         //- List of coupling field T
         List<DynamicList<scalar> > fluidPatchesPointsT_;
 
@@ -117,6 +130,9 @@ class IQNILSCouplingInterface
         //- Cached secant updates from the previous converged time step
         List<DynamicList<vectorField> > previousStepPatchesPointsW_;
 
+        //- Cached secondary traction secants from the previous converged step
+        List<DynamicList<vectorField> > previousStepPatchesFacesTractionW_;
+
         //- Backup secants from the latest converged time step that contained
         //  usable IQN-ILS modes. These are used if the immediately previous
         //  time step converged in one iteration and produced no new modes.
@@ -125,6 +141,11 @@ class IQNILSCouplingInterface
         //- Backup secant updates from the latest converged time step that
         //  contained usable IQN-ILS modes
         List<DynamicList<vectorField> > previousNonEmptyStepPatchesPointsW_;
+
+        //- Backup secondary traction secants from the latest converged time
+        //  step that contained usable IQN-ILS modes
+        List<DynamicList<vectorField> >
+            previousNonEmptyStepPatchesFacesTractionW_;
 
 
     // Private Member Functions
@@ -171,6 +192,15 @@ class IQNILSCouplingInterface
             vectorField& w
         ) const;
 
+        //- Return the nth newest secondary traction secant update available to
+        //  the current IQN-ILS solve.
+        void solveSecondaryTractionMode
+        (
+            const label interfaceI,
+            const label newestModeI,
+            vectorField& wTraction
+        ) const;
+
         //- Total number of interface points across all interfaces
         label combinedCouplingSystemSize();
 
@@ -193,6 +223,14 @@ class IQNILSCouplingInterface
 
         //- Filter repeated/near-dependent coupling modes
         void filterCouplingModes(const label interfaceI);
+
+        //- True if the preCICE-style QR2 solve should be used for this
+        //  interface in the current outer iteration
+        bool usePreciceStyleCouplingQR(const label interfaceI) const;
+
+        //- True if the combined LS system should use the preCICE-style QR2
+        //  solve in the current outer iteration
+        bool useCombinedPreciceStyleCouplingQR() const;
 
         //- Filter near-dependent modes using a relative QR2-style criterion
         void filterRelativeCouplingModes(const label interfaceI);

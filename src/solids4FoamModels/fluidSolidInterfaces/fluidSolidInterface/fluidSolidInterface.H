@@ -129,6 +129,18 @@ class fluidSolidInterface
         //- List of solid zones ref. point displacements
         List<vectorField> solidZonesPointsDisplsRef_;
 
+        //- List of fluid zones face tractions
+        List<vectorField> fluidZonesTractions_;
+
+        //- List of fluid zones reference face tractions
+        List<vectorField> fluidZonesTractionsRef_;
+
+        //- List of solid zones face tractions mapped from the fluid
+        List<vectorField> solidZonesTractions_;
+
+        //- List of solid zones reference face tractions
+        List<vectorField> solidZonesTractionsRef_;
+
         //- List of interfaces point displacements
         List<vectorField> interfacesPointsDispls_;
 
@@ -415,6 +427,30 @@ public:
             List<vectorField>& interfacesPointsDispls()
             {
                 return interfacesPointsDispls_;
+            }
+
+            //- Return fluid zones face tractions
+            List<vectorField>& fluidZonesTractions()
+            {
+                return fluidZonesTractions_;
+            }
+
+            //- Return fluid zones reference face tractions
+            List<vectorField>& fluidZonesTractionsRef()
+            {
+                return fluidZonesTractionsRef_;
+            }
+
+            //- Return solid zones face tractions
+            List<vectorField>& solidZonesTractions()
+            {
+                return solidZonesTractions_;
+            }
+
+            //- Return solid zones reference face tractions
+            List<vectorField>& solidZonesTractionsRef()
+            {
+                return solidZonesTractionsRef_;
             }
 
             //- Return interfaces previous points displacements

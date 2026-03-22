@@ -63,6 +63,11 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
   pair before the QR solve to improve the conditioning of the least-squares
   system.
+- `residualSumPreconditioning`: optionally scale each `V` column by the inverse
+  of the current residual magnitude before the QR solve, mimicking preCICE's
+  residual-sum approach.
+- `residualPreconditioningEpsilon`: regularization added to the residual
+  magnitude when computing the above scaling weight.
 - `reusePreviousStepModes`: optionally reuse the previous time step's cached
   secants only in the first IQN-ILS solve of the new time step. If the
   immediately previous time step converged in one iteration and generated no
