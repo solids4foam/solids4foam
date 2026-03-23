@@ -1,3 +1,7 @@
+---
+sort: 6
+---
+
 # fluidSolidInterfaces
 
 This directory contains the `fluidSolidInterface` base class and the
