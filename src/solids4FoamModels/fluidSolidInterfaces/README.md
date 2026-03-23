@@ -4,6 +4,8 @@ sort: 6
 
 # Fluid-solid coupling schemes: `fluidSolidInterfaces`
 
+---
+
 Fluid-solid coupling schemes are implemented in solids4foam via the `fluidSolidInterface`
 base class and derived runtime-selectable fluid-solid interface coupling schemes.
 
@@ -11,6 +13,8 @@ The base class is implemented in
 `fluidSolidInterface/fluidSolidInterface.{H,C}`. It manages the fluid and solid
 models, interface mapping, residual evaluation, outer-correction controls, and
 shared coupling data.
+
+---
 
 ## Available Schemes
 
@@ -84,14 +88,7 @@ can optionally include mechanical coupling as well.
 Implementation:
 `thermalCouplingInterface/thermalCouplingInterface.{H,C}`
 
-### `newtonMonolithicCouplingInterface`
-
-Monolithic fluid-solid interaction solver with a Newton-Raphson solution
-algorithm. Unlike the partitioned Dirichlet-Neumann schemes above, this class
-assembles and solves a coupled monolithic problem.
-
-Implementation:
-`newtonMonolithicCouplingInterface/newtonMonolithicCouplingInterface.{H,C}`
+---
 
 ## Notes
 
