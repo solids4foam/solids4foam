@@ -48,7 +48,7 @@ void Foam::newAMIMethod<SourcePatch, TargetPatch>::checkPatches() const
         boundBox bbTgtInf(bbTgt);
         bbTgtInf.inflate(maxBoundsError);
 
-        if (!bbTgtInf.contains(bbSrc))
+        if (!bbTgtInf.contains(bbSrc) && debug)
         {
             WarningInFunction
                 << "Source and target patch bounding boxes are not similar"
