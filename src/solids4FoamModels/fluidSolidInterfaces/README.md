@@ -102,5 +102,3 @@ Implementation:
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the
   inner fluid and solid solves.
-- The monolithic Newton scheme follows a different solution strategy and is
-  typically selected only when a fully coupled solve is desired.

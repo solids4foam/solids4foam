@@ -281,7 +281,7 @@ The relative merits of explicit and implicit approaches can be summarised as:
       prohibitive. Consequently, explicit methods are typically only efficient
       for _fast_ problems, which occur over short time periods.
 
-- Implicit
+- **Implicit**
   - _Advantages_
     - The ability to use large time steps means that _slow_ problems (i.e.,
       static or quasi-static) can be efficiently analysed.
@@ -331,22 +331,18 @@ Most solid models in solids4foam are discretised using the cell-centred finite
 
 ## Solid Models Available in solids4foam
 
-Here, we list the solid models currently available in soldis4foam, and brieflu
+Here, we list the solid models currently available in solids4foam, and briefly
 summarise their characteristic features. All solid models use a cell-centred
 finite volume discretisation unless stated otherwise.
 
 - **Linear geometry solid models**
 
   - `linGeomTotalDispSolid`: solves for total displacement $$\boldsymbol{d}$$
-    (`D`) using a segregated approach.
-  - `linGeomSolid`: solves for the increment of displacement
-    $$\Delta \boldsymbol{d}$$ (`DD`) using a segregated approach.
+    (`D`) using a segregated approach; also supports explicit time-stepping and
+    a PETSc SNES-based nonlinear solver.
   - `unsLinGeomSolid`: solves for total displacement $$\boldsymbol{d}$$ (`D`)
     using a segregated approach and the _uns_ discretisation, which is more
     accurate but more expensive than the `linGeomTotalDispSolid` discretisation.
-  - `linGeomPressureDisplacementSolid`: solves for total displacement
-    $$\boldsymbol{d}$$ (`D`) and hydrostatic pressure $$p$$ (`p`) using a
-    segregated PIMPLE-type algorithm.
 
   - `weakThermalLinGeomSolid`: sequentially solves for the temperature $$T$$
     (`T`) and total displacement $$\boldsymbol{d}$$ (`D`) in a segregated manner
@@ -354,16 +350,15 @@ finite volume discretisation unless stated otherwise.
   - `thermalLinGeomSolid`: solves for the temperature $$T$$ (`T`) and total
     displacement $$\boldsymbol{d}$$ (`D`), where outer iterations ensure
     convergence of the temperature-displacement coupling in a segregated manner.
+  - `thermalSolid`: solves for the temperature $$T$$ (`T`) and total
+    displacement $$\boldsymbol{d}$$ (`D`) with strongly coupled momentum and
+    heat equations using a segregated approach.
   - `poroLinGeomSolid`: solves for the pore-pressure $$p$$ (`p`) and total
     displacement $$\boldsymbol{d}$$ (`D`), where outer iterations ensure
     convergence of the pressure-displacement coupling in a segregated manner,
     based on
     [https://doi.org/10.1002/nag.2361](https://doi.org/10.1002/nag.2361).
 
-  - `coupledLinGeomPressureDisplacementSolid`: similar to
-    `linGeomPressureDisplacementSolid`, except the pressure-displacement
-    equations are solved semi-coupled; _currently only available with
-    foam-extend_.
   - `coupledUnsLinGeomLinearElasticSolid`: a block-coupled version of
     `unsLinGeomSolid`, based on
     [https://doi.org/10.1016/j.compstruc.2016.07.004](https://doi.org/10.1016/j.compstruc.2016.07.004);
@@ -374,27 +369,25 @@ finite volume discretisation unless stated otherwise.
     [https://doi.org/10.13140/RG.2.2.22896.33283](https://doi.org/10.13140/RG.2.2.22896.33283);
     this solver currently works best with triangular and tetrahedral grids.
 
-  - `explicitLinGeomTotalDispSolid`: an explicit version of
-    `linGeomTotalDispSolid`.
-  - `explicitUnsLinGeomTotalDispSolid`: an explicit version of
-    `unsLinGeomSolid`.
-
   - `kirchhoffPlateSolid`: this model solves the Kirchhoff plate equations using
     a segregated finite area method; _currently only available with
     foam-extend_.
 
 - **Nonlinear geometry solid models**
+
   - `nonLinGeomTotalLagTotalDispSolid`: a total Lagrangian nonlinear geometry
-    version of `linGeomTotalDispSolid`.
-  - `nonLinGeomTotalLagSolid`: a total Lagrangian nonlinear geometry version of
-    `linGeomSolid`.
-  - `nonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry
-    version of `linGeomSolid`.
+    version of `linGeomTotalDispSolid`; solves for total displacement
+    $$\boldsymbol{d}$$ (`D`).
+  - `nonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry solid
+    model which solves for the increment of displacement
+    $$\Delta \boldsymbol{d}$$ (`DD`) using a segregated approach.
   - `unsNonLinGeomTotalLagSolid`: a total Lagrangian nonlinear geometry version
-    of `unsLinGeomSolid`.
+    of `unsLinGeomSolid`; solves for total displacement $$\boldsymbol{d}$$
+    (`D`).
   - `unsNonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry
     version of `unsLinGeomSolid`, except that the primary solution variable is
     the increment of displacement $$\Delta \boldsymbol{d}$$ (`DD`).
-  - `coupledNonLinGeomPressureDisplacementSolid`: a total Lagrangian nonlinear
-    geometry version of `coupledLinGeomPressureDisplacementSolid`; _currently
-    only available with foam-extend_.
+  - `vertexCentredNonLinGeomTotalLagSolid`: a vertex-centred total Lagrangian
+    nonlinear geometry approach which solves for the total displacement at the
+    mesh vertices/points (`pointD`); supports Newton-Raphson, segregated and
+    explicit solution algorithms.
