@@ -9,6 +9,13 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+# Use extendedLeastSquares for foam extend
+if [[ $WM_PROJECT = "foam" ]]
+then
+    echo "Switching the gradScheme to extendedLeastSquares"; echo
+    sed -i "s/ leastSquaresS4f;/ extendedLeastSquares 0;/g" system/fvSchemes
+fi
+
 # Create the mesh
 solids4Foam::runApplication blockMesh
 
