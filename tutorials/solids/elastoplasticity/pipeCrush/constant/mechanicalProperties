@@ -30,7 +30,7 @@ mechanical
         nu              nu [ 0 0 0 0 0 0 0 ] 0.3;
         "fileName|file" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
         outOfBounds     clamp;
-        smoothPressure  yes;
+        solvePressureEqn yes;
         updateBEbarConsistent yes;
     }
 );

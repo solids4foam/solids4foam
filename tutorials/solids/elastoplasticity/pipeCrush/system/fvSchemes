@@ -28,7 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            leastSquares;
+    default            leastSquaresS4f;
 }
 
 divSchemes
