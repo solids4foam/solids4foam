@@ -65,9 +65,9 @@ namespace Foam
     template<>
     const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
     {
-     	"PETScSNES",
+        "PETScSNES",
         "implicitCoupled",
-	"implicitSegregated",
+        "implicitSegregated",
         "explicit"
     };
 #endif
@@ -298,6 +298,223 @@ void Foam::solidModel::makeU() const
             dimensionedVector("0", dimLength/dimTime, vector::zero)
         )
     );
+}
+
+
+void Foam::solidModel::makeMovingLeastSquares() const
+{
+    if (!movingLeastSquaresPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    // Include fixedValue patches as ghost points in the least squares stencils
+    boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
+    forAll(includePatchInStencils, patchI)
+    {
+        if
+        (
+            isA<fixedDisplacementFvPatchVectorField>
+            (
+                D().boundaryField()[patchI]
+            )
+         || isA<fixedValueFvPatchVectorField>
+            (
+                D().boundaryField()[patchI]
+            )
+        )
+        {
+            includePatchInStencils[patchI] = true;
+        }
+    }
+
+    movingLeastSquaresPtr_.set
+    (
+        new movingLeastSquares
+        (
+            mesh(),
+            MLSStencil(),
+            MLSQuadrature(),
+            MLSWeightFunction(),
+            includePatchInStencils,
+            solidModelDict().subDict("highOrderCoeffs")
+        )
+    );
+}
+
+
+void Foam::solidModel::makeSigmaQuad() const
+{
+    if (!sigmaQuadPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    const CompactListList<point>& faceQuadPts =
+        MLSQuadrature().faceQuadPoints();
+
+    labelList rowSizes(faceQuadPts.size(), 0);
+    forAll(faceQuadPts, faceI)
+    {
+        rowSizes[faceI] = faceQuadPts[faceI].size();
+    }
+
+    sigmaQuadPtr_.set(new CompactListList<symmTensor>(rowSizes));
+
+    CompactListList<symmTensor>& sigmaQuad = sigmaQuadPtr_();
+    forAll(sigmaQuad, faceI)
+    {
+        forAll(sigmaQuad[faceI], qpI)
+        {
+            sigmaQuad[faceI][qpI] = symmTensor::zero;
+        }
+    }
+}
+
+
+void Foam::solidModel::makeMovingLeastSquaresStencil() const
+{
+    if (!movingLeastSquaresStencilPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!"
+            << abort(FatalError);
+    }
+
+    const dictionary& dict =
+        solidModelDict().subDict("highOrderCoeffs");
+
+    const label N = readInt(dict.lookup("order"));
+
+    const label minNn = (mesh().nGeometricD() == 2) ?
+        ((N+1)*(N+2)/2) :
+        ((N+1)*(N+2)*(N+3)/6);
+
+    // Number of cells in face stencil
+    const label faceNn = minNn + readInt(dict.lookup("faceStencilExtraCells"));
+
+    // Number of cells in cell stencil
+    const label cellNn =
+        dict.found("cellStencilExtraCells")
+        ? minNn + readInt(dict.lookup("cellStencilExtraCells"))
+        : faceNn;
+
+    // Check ratio of stencil size and minimum stencil size
+    const scalar faceNnRatio = scalar(faceNn) / scalar(minNn);
+    const scalar cellNnRatio = scalar(cellNn) / scalar(minNn);
+
+    if (cellNnRatio < 1.2 || cellNnRatio > 15.0)
+    {
+        WarningInFunction
+            << "Cell stencil size is outside valid range." << nl
+            << "cellNn/minNn = " << cellNnRatio << nl
+            << "Check 'cellStencilExtraCells' entry in the dictionary."
+            << endl;
+    }
+
+    if (faceNnRatio < 1.2 || faceNnRatio > 15.0)
+    {
+        WarningInFunction
+            << "Face stencil size is outside recommended range." << nl
+            << "faceNn/minNn = " << faceNnRatio << nl
+            << "Check 'faceStencilExtraCells' entry in the dictionary."
+            << endl;
+    }
+
+    // Maximum of neighbour first halo depth is multiplied with this scale
+    // factor to get estimated halo depth. This scale factor needs to be
+    // conservative but large value will slow down stencil construction
+    const scalar haloDepthScale =
+        dict.lookupOrDefault<scalar>("haloDepthScale", N*2.5);
+
+    movingLeastSquaresStencilPtr_.set
+    (
+        new movingLeastSquaresStencil
+        (
+            mesh(),
+            haloDepthScale,
+            faceNn,
+            cellNn
+        )
+    );
+}
+
+
+void Foam::solidModel::makeFvMeshQuadrature() const
+{
+    if (!fvMeshQuadraturePtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!"
+            << abort(FatalError);
+    }
+
+    const dictionary& dict =
+        solidModelDict().subDict("highOrderCoeffs");
+
+    // Exact inegration of volume inegrals up to Nv polynomial order
+    const label Nv = readInt(dict.lookup("order"));
+
+    // Exact inegration of surface inegrals (stress) up to N-1 order
+    const label Nf = Nv - 1;
+
+    fvMeshQuadraturePtr_.set
+    (
+        new fvMeshQuadrature(mesh(), Nv, Nf, true)
+    );
+}
+
+
+void Foam::solidModel::makeWeightFunction() const
+{
+    if (!weightFunctionPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!"
+            << abort(FatalError);
+    }
+    const dictionary& dict =
+        solidModelDict().subDict("highOrderCoeffs");
+
+    weightFunctionPtr_.set
+    (
+        new weightFunction
+        (
+            dict.subDict("weightFunctionCoeffs")
+        )
+    );
+}
+
+
+void Foam::solidModel::makeGradDQuad() const
+{
+    if (!gradDQuadPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    const CompactListList<point>& faceQuadPts =
+        MLSQuadrature().faceQuadPoints();
+
+    labelList rowSizes(faceQuadPts.size(), 0);
+    forAll(faceQuadPts, faceI)
+    {
+        rowSizes[faceI] = faceQuadPts[faceI].size();
+    }
+
+    gradDQuadPtr_.set(new CompactListList<tensor>(rowSizes));
+
+    CompactListList<tensor>& gradDQ = gradDQuadPtr_();
+    forAll(gradDQ, faceI)
+    {
+        forAll(gradDQ[faceI], qpI)
+        {
+            gradDQ[faceI][qpI] = tensor::zero;
+        }
+    }
 }
 
 
@@ -682,6 +899,12 @@ Foam::solidModel::solidModel
     ),
     thermalPtr_(),
     mechanicalPtr_(),
+#ifndef FOAMEXTEND
+    movingLeastSquaresPtr_(),
+    movingLeastSquaresStencilPtr_(),
+    fvMeshQuadraturePtr_(),
+    weightFunctionPtr_(),
+#endif
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -776,6 +999,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
+    gradDQuadPtr_(),
     gradDD_
     (
         IOobject
@@ -802,6 +1026,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    sigmaQuadPtr_(),
     curTimeIndex_(-1),
     rhoPtr_(),
     g_
@@ -1056,6 +1281,10 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
+
+#ifndef FOAMEXTEND
+    clearMovingLeastSquaresData();
+#endif
 }
 
 
@@ -1621,6 +1850,17 @@ void Foam::solidModel::recalculateRho()
     rhoPtr_.clear();
     makeRho();
 }
+
+
+void Foam::solidModel::clearMovingLeastSquaresData()
+{
+    gradDQuadPtr_.clear();
+    sigmaQuadPtr_.clear();
+#ifndef FOAMEXTEND
+    movingLeastSquaresPtr_.clear();
+#endif
+}
+
 
 Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
 {

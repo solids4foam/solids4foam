@@ -60,6 +60,7 @@ Author
 #include "treeBoundBox.H"
 #include "CompactListList.H"
 #include "boolList.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -200,6 +201,18 @@ public:
     virtual ~movingLeastSquaresStencil() = default;
 
     // Member Functions
+
+        //- Stencil size for faces
+        label faceNn() const
+        {
+            return N_;
+        }
+
+        //- Stencil size for cells
+        label cellNn() const
+        {
+            return Nc_;
+        }
 
         //- Return overall cell stencil size using cell faces stencils
         tmp<labelField> cellFacesStencilSize() const;

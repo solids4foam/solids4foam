@@ -88,13 +88,54 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = n.boundaryField()[patchI];
 
+            if (highOrderResidual_)
+            {
+                // Face quadrature points weights
+                const CompactListList<scalar>& faceQuadWeights =
+                    MLSQuadrature().faceQuadWeights();
+
+                const surfaceScalarField& magSf = mesh().magSf();
+
+                // Get value at patch faces quadrature points
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature();
+
+                const CompactListList<vector>& quadratureValues =
+                    patchQuadraturePointsValue();
+
+                forAll(mesh().boundaryMesh()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+
+                    // Get global face index
+                    const label faceID = faceI + start;
+
+                    // Get the number of quadrature points for this face
+                    const label nPoints = faceQuadWeights[faceID].size();
+
+                    // Loop over quadrature points and add their contribution
+                    traction.boundaryFieldRef()[patchI][faceI] = vector::zero;
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+                        traction.boundaryFieldRef()[patchI][faceI] +=
+                            quadratureValues[faceI][pointI]
+                          * faceQuadWeights[faceID][pointI];
+                    }
+                    // Divide with area because we use physical weights
+                    traction.boundaryFieldRef()[patchI][faceI]
+                        *= (1.0/(magSf.boundaryField()[patchI][faceI]));
+                }
+            }
+            else
+            {
 #ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
+                traction.boundaryFieldRef()[patchI] =
+                    tracPatch.traction() - nPatch*tracPatch.pressure();
 #else
-            traction.boundaryField()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
+                traction.boundaryField()[patchI] =
+                    tracPatch.traction() - nPatch*tracPatch.pressure();
 #endif
+            }
         }
         else if
         (
@@ -359,7 +400,18 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
 
     // Update gradient of displacement
-    mechanical().grad(D(), gradD());
+    if (highOrderResidual_)
+    {
+        gradD() = MLS().grad(D());
+
+        // Calculate the cell centre stress using run-time selectable
+        // mechanical law
+        mechanical().correct(sigma());
+    }
+    else
+    {
+        mechanical().grad(D(), gradD());
+    }
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
@@ -480,6 +532,55 @@ bool linGeomTotalDispSolid::evolveExplicit()
     return true;
 }
 
+
+bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
+{
+//     Info<< "Evolving solid solver using an implicit coupled approach with"
+//         << "high order discretisation" << endl;
+
+//     if (predictor_ && newTimeStep())
+//     {
+//         predict();
+//     }
+
+//     // Mesh update loop
+//     do
+//     {
+//         int iCorr = 0;
+//         scalar currentResidualNorm = 0;
+//         scalar initialResidualNorm = 0;
+//         scalar deltaXNorm = 0;
+//         scalar xNorm = 0;
+//         Info<< "Solving the momentum equation for D" << endl;
+
+//         // Momentum equation loop
+//         // We need to iterate until second and third derivatives in alpha
+//         // stabilisation converges. We can't put those in stiffness matrix
+//         do
+//         {
+
+
+//         }
+//         while
+//         (
+//             !checkConvergence
+//             (
+//                 currentResidualNorm,
+//                 initialResidualNorm,
+//                 deltaXNorm,
+//                 xNorm,
+//                 ++iCorr,
+//                 convParam
+//             )
+//         );
+
+//     }
+//     while (solidModel::mesh().update());
+    return true;
+}
+
+
+
 void linGeomTotalDispSolid::makePDiffusivity() const
 {
     if (pDiffusivityPtr_.valid())
@@ -589,6 +690,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
+    highOrderJacobian_(false),
+    highOrderResidual_(false),
     ds_
     (
         IOobject
@@ -612,6 +715,28 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    if
+    (
+        (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+     && solidModelDict().found("highOrderCoeffs")
+    )
+    {
+        const dictionary& dict =
+            solidModelDict().subDict("highOrderCoeffs");
+
+        highOrderJacobian_ =
+            dict.lookupOrDefault<Switch>
+            (
+                "highOrderJacobian", false
+            );
+
+        highOrderResidual_ =
+            dict.lookupOrDefault<Switch>
+            (
+                "highOrderResidual", false
+            );
+    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
 
@@ -783,12 +908,23 @@ bool linGeomTotalDispSolid::evolve()
     {
         return evolveSnes();
     }
-    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
-    // {
-    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-    //     // could be combined with PETSc to achieve this.. todo!
-    //     return evolveImplicitCoupled();
-    // }
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    {
+        if (solidModelDict().found("highOrderCoeffs"))
+        {
+             return evolveHighOrderImplicitCoupled();
+        }
+        else
+        {
+            // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+            // could be combined with PETSc to achieve this.. todo!
+            FatalErrorInFunction
+                << "Coupled implicit solver not yet implemented here"
+                << abort(FatalError);
+
+            // return evolveImplicitCoupled();
+        }
+    }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
         return evolveImplicitSegregated();
@@ -859,20 +995,61 @@ label linGeomTotalDispSolid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    // Enforce the boundary conditions
-    D.correctBoundaryConditions();
+    if (solvePressure() && highOrderResidual_)
+    {
+        FatalErrorInFunction
+                << "solvePressure must be disbled when using high order "
+                << "residual calculation. Mixed approach not yet implemented!"
+                << abort(FatalError);
+    }
 
-    // Update gradient of displacement
-    mechanical().grad(D, gradD());
+    // Unit normal vectors at the faces
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
-    // Enforce the boundary conditions again for any conditions that use gradD
-    //D.correctBoundaryConditions();
+    // Traction vectors at the faces
+    surfaceVectorField traction
+    (
+        IOobject
+        (
+            "traction",
+             mesh.time().timeName(),
+             mesh,
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("0", dimPressure, vector::zero)
+    );
+
+    if(highOrderResidual_)
+    {
+        // Update gradient of displacement
+        mechanical().grad(D, gradDQuad());
+
+        // Calculate sigma at quadrature points
+        mechanical().correct(gradDQuad(), sigmaQuad());
+
+        // Integration over face quadrature points to get face traction
+        traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
+    }
+    else
+    {
+        // Enforce the boundary conditions
+        D.correctBoundaryConditions();
+
+        // Update gradient of displacement
+        mechanical().grad(D, gradD());
+
+        // Enforce the boundary conditions again for any conditions that
+        // use gradD
+        //D.correctBoundaryConditions();
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+    }
 
     // Update velocity
     U() = fvc::ddt(D);
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
 
     if (solvePressure())
     {
@@ -920,11 +1097,9 @@ label linGeomTotalDispSolid::formResidual
         );
     }
 
-    // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    if(highOrderResidual_)
+    {
 
-    // Traction vectors at the faces
-    surfaceVectorField traction(n & fvc::interpolate(sigma()));
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
@@ -944,9 +1119,18 @@ label linGeomTotalDispSolid::formResidual
         fvc::div(mesh.magSf()*traction)
       + rho()
        *(
-            g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+            g() - dampingCoeff()*fvc::ddt(D)
         )
     );
+
+    if (highOrderResidual_)
+    {
+        residual -= rho() * hofvc::d2dt2(D);
+    }
+    else
+    {
+        residual -= rho() * fvc::d2dt2(D);
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();

@@ -548,6 +548,14 @@ public:
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
 
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
         virtual scalar residual();

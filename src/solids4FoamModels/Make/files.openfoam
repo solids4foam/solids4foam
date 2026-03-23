@@ -262,5 +262,8 @@ higherOrderHelpers/weightFunction/weightFunction.C
 higherOrderHelpers/SymmTensor3rdOrder/labelSymmTensor3rdOrder/labelSymmTensor3rdOrder.C
 higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
 higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
+higherOrderHelpers/hofv/hofvm.C
+higherOrderHelpers/hofv/hofvc.C
+
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

@@ -761,7 +761,6 @@ void movingLeastSquaresStencil::calcFacesStencil() const
     ownedFacesBox.inflate(scaledHaloDepth);
 #endif
 
-
     // Box for remote processors cells
     List<treeBoundBox> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
@@ -978,7 +977,11 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
             }
         );
 
-        if (dist.size() < Nc_)
+        // Required numnber of cell is for one smaller becouse of cell centre
+        // which is also part of the stencil
+        const label nReq = Nc_ - 1;
+
+        if (dist.size() < nReq)
         {
             FatalErrorInFunction
                 << "Cell " << cellI << " has only " << dist.size()
@@ -987,10 +990,10 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
         }
 
         // Enlarge stencil to include cells with the same distance
-        const scalar cut = dist[Nc_-1].second();
+        const scalar cut = dist[nReq-1].second();
         const scalar cutTol = cut*(1.0 + relTol);
 
-        label nPick = Nc_;
+        label nPick = nReq;
         while (nPick < dist.size() && dist[nPick].second() <= cutTol)
         {
             ++nPick;
@@ -1096,35 +1099,35 @@ tmp<labelField> movingLeastSquaresStencil::cellFacesStencilSize() const
 
 const CompactListList<label>& movingLeastSquaresStencil::facesStencil() const
 {
-    if (!facesStencilPtr_.valid())
+    if (facesStencilPtr_.empty())
     {
          calcFacesStencil();
     }
 
-    return facesStencilPtr_();
+    return autoPtrRef(facesStencilPtr_);
 }
 
 
 const CompactListList<label>& movingLeastSquaresStencil::cellsStencil() const
 {
     // Cells stencils are constructed from faces stencils
-    if (!facesStencilPtr_.valid())
+    if (facesStencilPtr_.empty())
     {
          calcFacesStencil();
     }
 
-    if (!cellsStencilPtr_.valid())
+    if (cellsStencilPtr_.empty())
     {
         calcCellsStencil();
     }
 
-    return cellsStencilPtr_();
+    return autoPtrRef(cellsStencilPtr_);
 }
 
 
 const List<labelList>& movingLeastSquaresStencil::remoteCellsPerProc() const
 {
-    if (!remoteCellsPerProcPtr_.valid())
+    if (remoteCellsPerProcPtr_.empty())
     {
          calcFacesStencil();
     }
@@ -1135,7 +1138,7 @@ const List<labelList>& movingLeastSquaresStencil::remoteCellsPerProc() const
 
 const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
 {
-    if (!remoteCentresPerProcPtr_.valid())
+    if (remoteCentresPerProcPtr_.empty())
     {
         calcFacesStencil();
     }
@@ -1146,7 +1149,7 @@ const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
 
 const boolList& movingLeastSquaresStencil::procCells() const
 {
-    if (!procCellsPtr_.valid())
+    if (procCellsPtr_.empty())
     {
         calcProcessorCells();
     }

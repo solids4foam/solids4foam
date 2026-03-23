@@ -384,7 +384,7 @@ lineQuadrature::lineQuadrature
     const label chosen = chooseOrder(order);
     const auto& rule = rules()[chosen];
 
-    weights_ = rule.weights;
+    weights_ = normaliseWeights(rule.weights);
     points_ = parametricToPoint(rule.points);
 }
 
@@ -400,7 +400,7 @@ lineQuadrature::lineQuadrature
     const label chosen = chooseOrder(order);
     const auto& rule = rules()[chosen];
 
-    weights_ = rule.weights;
+    weights_ = normaliseWeights(rule.weights);
     points_ = parametricToPoint(rule.points);
 }
 

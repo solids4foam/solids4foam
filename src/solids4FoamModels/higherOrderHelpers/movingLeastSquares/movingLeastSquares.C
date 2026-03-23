@@ -20,7 +20,7 @@ License
 #include "movingLeastSquares.H"
 #include "volFields.H"
 #include "surfaceFields.H"
-
+#include "compatibilityFunctions.H"
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
@@ -33,7 +33,6 @@ License
 
 namespace Foam
 {
-
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(movingLeastSquares, 0);
@@ -47,7 +46,7 @@ const CompactListList<scalar>& movingLeastSquares::cellInterpCoeffs() const
         calcCellCoeffs();
     }
 
-    return cellInterpCoeffsPtr_();
+    return autoPtrRef(cellInterpCoeffsPtr_);
 }
 
 
@@ -58,7 +57,7 @@ const CompactListList<vector>& movingLeastSquares::cellGradCoeffs() const
         calcCellCoeffs();
     }
 
-    return cellGradCoeffsPtr_();
+    return autoPtrRef(cellGradCoeffsPtr_);
 }
 
 
@@ -70,7 +69,7 @@ movingLeastSquares::cellSecondGradCoeffs() const
         calcCellCoeffs();
     }
 
-    return cellSecondGradCoeffsPtr_();
+    return autoPtrRef(cellSecondGradCoeffsPtr_);
 }
 
 
@@ -82,7 +81,7 @@ movingLeastSquares::cellThirdGradCoeffs() const
         calcCellCoeffs();
     }
 
-    return cellThirdGradCoeffsPtr_();
+    return autoPtrRef(cellThirdGradCoeffsPtr_);
 }
 
 
@@ -94,7 +93,7 @@ movingLeastSquares::faceGradCoeffs() const
         calcFaceCoeffs();
     }
 
-    return faceGradCoeffsPtr_();
+    return autoPtrRef(faceGradCoeffsPtr_);
 }
 
 
@@ -105,7 +104,7 @@ volScalarField& movingLeastSquares::cellConditionNumber() const
         makeCellConditionNumber();
     }
 
-    return cellConditionNumberPtr_();
+    return autoPtrRef(cellConditionNumberPtr_);
 }
 
 
@@ -144,7 +143,7 @@ surfaceScalarField& movingLeastSquares::faceConditionNumber() const
         makeFaceConditionNumber();
     }
 
-    return faceConditionNumberPtr_();
+    return autoPtrRef(faceConditionNumberPtr_);
 }
 
 
@@ -172,6 +171,20 @@ void movingLeastSquares::makeFaceConditionNumber() const
            dimensionedScalar("0", dimless, Zero)
         )
     );
+}
+
+
+label movingLeastSquares::minNn() const
+{
+    // Taylor order in 2D case does not have terms related to z coordinate
+    if (mesh_.nGeometricD() == 2)
+    {
+        return ((N_+1)*(N_+2)/2);
+    }
+    else
+    {
+        return ((N_+1)*(N_+2)*(N_+3)/6);
+    }
 }
 
 
@@ -230,20 +243,6 @@ void movingLeastSquares::generateExponents
 
     // Adjust capacity to actual size
     exponents.shrink();
-}
-
-
-label movingLeastSquares::minNn() const
-{
-    // Taylor order in 2D case does not have terms related to z coordinate
-    if (mesh_.nGeometricD() == 2)
-    {
-        return ((N_+1)*(N_+2)/2);
-    }
-    else
-    {
-        return ((N_+1)*(N_+2)*(N_+3)/6);
-    }
 }
 
 
@@ -378,6 +377,10 @@ movingLeastSquares::QRSolution movingLeastSquares::QRSolve
 
 void movingLeastSquares::calcCellCoeffs() const
 {
+    if (debug)
+    {
+        InfoInFunction << "start" << endl;
+    }
 
     if
     (
@@ -460,7 +463,7 @@ void movingLeastSquares::calcCellCoeffs() const
 
     forAll(stencils, cellI)
     {
-        const labelList& stencil = stencils[cellI];
+        const labelUList stencil = stencils[cellI];
         const vector& cellC = CI[cellI];
 
         // Find max distance in this stencil
@@ -666,11 +669,20 @@ void movingLeastSquares::calcCellCoeffs() const
             << mesh.time().value() << endl;
         cellConditionNumber().write();
     }
+    if (debug)
+    {
+        InfoInFunction << "end" << endl;
+    }
 }
 
 
 void movingLeastSquares::calcFaceCoeffs() const
 {
+    if (debug)
+    {
+        InfoInFunction << "start" << endl;
+    }
+
     if (faceGradCoeffsPtr_.valid())
     {
         FatalErrorInFunction
@@ -706,6 +718,7 @@ void movingLeastSquares::calcFaceCoeffs() const
     // Reference to face stencils, quadrature points and remote centres
     const CompactListList<label>& stencils = stencil_.facesStencil();
     const CompactListList<point>& faceQuadPts = quadrature_.faceQuadPoints();
+
     const Map<vector>& remoteCI = stencil_.remoteCentresMap();
 
     // Definition of Lambda function which will be used to get cell centres
@@ -723,7 +736,7 @@ void movingLeastSquares::calcFaceCoeffs() const
     // Loop over all faces
     forAll(stencils, faceI)
     {
-        const labelList& stencil = stencils[faceI];
+        const UList<label> stencil = stencils[faceI];
 
         // Centre of current face
         const vector& faceCentre = Cf[faceI];
@@ -738,7 +751,6 @@ void movingLeastSquares::calcFaceCoeffs() const
 
             maxDist = max(maxDist, d);
         }
-
         // Scaling factor for Taylor series
         const scalar h = 2.0 * maxDist;
 
@@ -760,6 +772,14 @@ void movingLeastSquares::calcFaceCoeffs() const
 
             if
             (
+                isA<emptyPolyPatch>(mesh.boundaryMesh()[patchID])
+            )
+            {
+                continue;
+            }
+
+            if
+            (
                 isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
              || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
             )
@@ -777,7 +797,6 @@ void movingLeastSquares::calcFaceCoeffs() const
                 faceNormal /= (mag(faceNormal) + VSMALL);
             }
         }
-
         const label stencilSize = stencil.size();
 
         // Number of neighbours in stencil
@@ -798,7 +817,7 @@ void movingLeastSquares::calcFaceCoeffs() const
         }
 
         // Face quadrature points
-        const List<point> curFaceQuadPts = faceQuadPts[faceI];
+        const UList<point> curFaceQuadPts = faceQuadPts[faceI];
         const label nbOfQuadPts = curFaceQuadPts.size();
 
         // Allocate CompactListList for this face
@@ -923,6 +942,7 @@ void movingLeastSquares::calcFaceCoeffs() const
                  faceGradCoeffs[faceI][qpI][i] =
                      vector(cxRow(i), cyRow(i), czRow(i));
             }
+
         }
 
         if (calcConditionNumber_)
@@ -950,6 +970,11 @@ void movingLeastSquares::calcFaceCoeffs() const
             << mesh.time().value() << endl;
         faceConditionNumber().write();
     }
+
+    if (debug)
+    {
+        InfoInFunction << "end" << endl;
+    }
 }
 
 
@@ -970,8 +995,6 @@ movingLeastSquares::movingLeastSquares
     quadrature_(quadrature),
     weightFunc_(weightFunc),
     N_(readInt(dict.lookup("order"))),
-    faceNn_(minNn() + readInt(dict.lookup("faceStencilExtraCells"))),
-    cellNn_(minNn() + readInt(dict.lookup("cellStencilExtraCells"))),
     includePatchInStencils_(includePatchInStencils),
     calcConditionNumber_
     (
@@ -996,29 +1019,6 @@ movingLeastSquares::movingLeastSquares
                 << "Please change mesh orientation!"
                 << abort(FatalError);
         }
-    }
-
-    const scalar faceNnRatio = scalar(faceNn_) / scalar(minNn());
-    const scalar cellNnRatio = scalar(cellNn_) / scalar(minNn());
-
-    if (faceNnRatio < 1.0 || faceNnRatio > 3.0)
-    {
-        WarningInFunction
-            << "Face stencil size is outside recommended range." << nl
-            << "faceNn/minNn = " << faceNnRatio << nl
-            << "Recommended range is approximately 1.5–2.5." << nl
-            << "Check 'faceStencilExtraCells' entry in the dictionary."
-            << endl;
-    }
-
-    if (cellNnRatio < 1.0 || cellNnRatio > 3.0)
-    {
-        WarningInFunction
-        << "Cell stencil size is outside recommended range." << nl
-        << "cellNn/minNn = " << cellNnRatio << nl
-        << "Recommended range is approximately 1.5–2.5." << nl
-        << "Check 'cellStencilExtraCells' entry in the dictionary."
-        << endl;
     }
 }
 

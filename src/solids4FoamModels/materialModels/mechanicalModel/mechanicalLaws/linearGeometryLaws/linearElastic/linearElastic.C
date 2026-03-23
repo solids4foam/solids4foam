@@ -74,14 +74,14 @@ Foam::linearElastic::linearElastic
         // Set the bulk modulus
         if (nu_.value() < 0.5)
         {
-	    if (planeStress())
+            if (planeStress())
             {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
-	    }
-	    else
-	    {
+            }
+            else
+            {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
-	    }
+            }
         }
         else
         {
@@ -429,6 +429,34 @@ void Foam::linearElastic::correct
         sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
     }
 }
+
+void Foam::linearElastic::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    // Initialise eps outside loop
+    symmTensor epsilon = symmTensor::zero;
+
+    // Get mu and lambda values
+    const scalar mu = mu_.value();
+    const scalar lambda = lambda_.value();
+
+    forAll(sigmaQuad, faceI)
+    {
+        UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            epsilon = symm(faceGradDQuad[qpI]);
+
+            faceSigmaQuad[qpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
+        }
+    }
+}
+
 
 
 // ************************************************************************* //

@@ -60,6 +60,7 @@ SourceFiles
 #include "symmTensor3rdOrder.H"
 #include "weightFunction.H"
 #include "fvMeshQuadrature.H"
+#include "compatibilityFunctions.H"
 #include "movingLeastSquaresStencil.H"
 #include "volFields.H"
 
@@ -95,12 +96,6 @@ private:
 
         //- Order of interpolation
         const label N_;
-
-        //- Numbers of cells in the faces stencil
-        const label faceNn_;
-
-        //- Numbers of cells in the cells stencil
-        const label cellNn_;
 
         //- Include patch in the stencils as ghost point
         //  Used for patches with prescribed value
@@ -306,9 +301,17 @@ private:
         //- Gradient of field at face quadrature points
         template<class Type>
         autoPtr<CompactListList<typename outerProduct<vector, Type>::type>>
-        faceGrad
+        fGrad
         (
             const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
+
+        //- Gradient of field at face quadrature points
+        template<class Type>
+        void fGrad
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            CompactListList<typename outerProduct<vector, Type>::type>& result
         ) const;
 
         //- Get patch face quadrature values
@@ -316,6 +319,14 @@ private:
         autoPtr<CompactListList<Type>> patchFaceQuadValues
         (
             const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const label patchI
+        ) const;
+
+        //- Get patch face quadrature values for vector field
+        template<>
+        autoPtr<CompactListList<vector>> patchFaceQuadValues
+        (
+            const GeometricField<vector, fvPatchField, volMesh>& vf,
             const label patchI
         ) const;
 

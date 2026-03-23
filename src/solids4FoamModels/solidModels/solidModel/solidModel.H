@@ -62,6 +62,10 @@ SourceFiles
     #include "NamedEnum.H"
 #endif
 
+#ifndef FOAMEXTEND
+    #include "movingLeastSquares.H"
+#endif
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -124,6 +128,21 @@ private:
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
+#ifndef FOAMEXTEND
+        //- Moving Least Squares (MLS) for high-order discretisation
+        mutable autoPtr<movingLeastSquares> movingLeastSquaresPtr_;
+
+        //- Moving Least Squares stencil
+        mutable autoPtr<movingLeastSquaresStencil>
+            movingLeastSquaresStencilPtr_;
+
+        //- Quadrature data storage
+        mutable autoPtr<fvMeshQuadrature> fvMeshQuadraturePtr_;
+
+        //- Weight function for MLS
+        mutable autoPtr<weightFunction> weightFunctionPtr_;
+#endif
+
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
         boolIOList useBoundaryFaceValuesD_;
@@ -164,6 +183,10 @@ private:
         //- Gradient of total displacement
         volTensorField gradD_;
 
+        //- Gradient of total displacement at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -172,6 +195,10 @@ private:
         //  true (Cauchy) stress for nonlinear geometry (large strain)
         //  approaches
         volSymmTensorField sigma_;
+
+        //- Cauchy stress at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<symmTensor>> sigmaQuadPtr_;
 
         //- Time-step index used to determine when it is a new time-step
         mutable label curTimeIndex_;
@@ -284,6 +311,24 @@ private:
 
         //- Make the U field
         void makeU() const;
+
+        //- Make the sigma at face quadrature points field
+        void makeSigmaQuad() const;
+
+        //- Make the gradD at face quadrature points field
+        void makeGradDQuad() const;
+
+        //- Make the Moving Least Squares object
+        void makeMovingLeastSquares() const;
+
+        //- Make the Moving Least Squares stencil
+        void makeMovingLeastSquaresStencil() const;
+
+        //- Make the fvMesh quadrature data for high order discretisation
+        void makeFvMeshQuadrature() const;
+
+        //- Make the weight funtion for high order discretisation
+        void makeWeightFunction() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -622,6 +667,28 @@ public:
                 return gradD_;
             }
 
+            //- Return non-const reference to gradD at face quadrature points
+            virtual CompactListList<tensor>& gradDQuad()
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+
+            //- Return const reference to gradD at face quadrature points
+            virtual const CompactListList<tensor>& gradDQuad() const
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
             {
@@ -644,6 +711,28 @@ public:
             virtual const volSymmTensorField& sigma() const
             {
                 return sigma_;
+            }
+
+            //- Return non-const reference to sigma at face quarature points
+            virtual CompactListList<symmTensor>& sigmaQuad()
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
+            }
+
+            //- Return const reference to sigma at face quadrature points
+            virtual const CompactListList<symmTensor>& sigmaQuad() const
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
             }
 
             //- Return nonlinear geometry enumerator
@@ -676,7 +765,47 @@ public:
             {
                 return twoD_;
             }
+#ifndef FOAMEXTEND
+            //- Return moving least squares interpolation
+            const movingLeastSquares& MLS() const
+            {
+                if (movingLeastSquaresPtr_.empty())
+                {
+                    makeMovingLeastSquares();
+                }
+                return autoPtrRef(movingLeastSquaresPtr_);
+            }
 
+            //- Return stencil for moving least squares
+            const movingLeastSquaresStencil& MLSStencil() const
+            {
+                if (movingLeastSquaresStencilPtr_.empty())
+                {
+                    makeMovingLeastSquaresStencil();
+                }
+                return autoPtrRef(movingLeastSquaresStencilPtr_);
+            }
+
+            //- Return quadrature class that stores data for integration
+            const fvMeshQuadrature& MLSQuadrature() const
+            {
+                if (fvMeshQuadraturePtr_.empty())
+                {
+                    makeFvMeshQuadrature();
+                }
+                return autoPtrRef(fvMeshQuadraturePtr_);
+            }
+
+            //- Return weight function used for weightening in moving least squares
+            const weightFunction& MLSWeightFunction() const
+            {
+                if (weightFunctionPtr_.empty())
+                {
+                    makeWeightFunction();
+                }
+                return autoPtrRef(weightFunctionPtr_);
+            }
+#endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -836,6 +965,9 @@ public:
 
             //- Let the material model recalculate the density
             virtual void recalculateRho();
+
+            //- Clear Moving Least Squares interpolator
+            virtual void clearMovingLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);

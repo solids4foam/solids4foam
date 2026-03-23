@@ -56,6 +56,7 @@ SourceFiles
 #define fvMeshQuadrature_H
 
 #include "fvMesh.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

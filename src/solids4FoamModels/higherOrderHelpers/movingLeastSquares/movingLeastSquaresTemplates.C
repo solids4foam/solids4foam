@@ -119,11 +119,12 @@ tmp<GeometricField<
     );
 
     GeometricField<GradType, fvPatchField, volMesh>& grad = tGrad.ref();
-
+    //    Info<< gradCoeffs[0]<<endl;
+    //    Info<<stencils[0]<<endl;
     forAll(stencils, cellI)
     {
-        const auto stencil = stencils[cellI];
-        const auto coeffs = gradCoeffs[cellI];
+        const UList<label> stencil = stencils[cellI];
+        const UList<vector> coeffs = gradCoeffs[cellI];
 
         // Stencil contribution
         forAll(stencil, cI)
@@ -151,9 +152,29 @@ tmp<GeometricField<
 
 template<class Type>
 autoPtr<CompactListList<typename outerProduct<vector, Type>::type>>
-movingLeastSquares::faceGrad
+movingLeastSquares::fGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf
+) const
+{
+    typedef typename outerProduct<vector, Type>::type GradType;
+
+    autoPtr<CompactListList<GradType>> tResult
+    (
+        new CompactListList<GradType>(quadrature_.faceQuadPoints().sizes())
+    );
+
+    faceGrad(vf, autoPtrRef(tResult));
+
+    return tResult;
+}
+
+
+template<class Type>
+void movingLeastSquares::fGrad
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    CompactListList<typename outerProduct<vector, Type>::type>& result
 ) const
 {
     typedef typename outerProduct<vector, Type>::type GradType;
@@ -170,18 +191,11 @@ movingLeastSquares::faceGrad
     const Field<Type>& vfI = vf.internalField();
     const List<Field<Type>> remoteField = stencil_.remoteFieldPerProc(vfI);
 
-    // Allocate and initialise return grad field
-    autoPtr<CompactListList<GradType>> tFaceQuadGrad
-    (
-        new CompactListList<GradType>(faceQuadPts.sizes())
-    );
-    CompactListList<GradType>& faceQuadGrad = tFaceQuadGrad();
-
-    forAll(faceQuadGrad, faceI)
+    forAll(result, faceI)
     {
-        forAll(faceQuadGrad[faceI], qpI)
+        forAll(result[faceI], qpI)
         {
-            faceQuadGrad[faceI][qpI] = pTraits<GradType>::zero;
+            result[faceI][qpI] = pTraits<GradType>::zero;
         }
     }
 
@@ -195,7 +209,7 @@ movingLeastSquares::faceGrad
         {
             forAll(stencil, cI)
             {
-                faceQuadGrad[faceI][qpI] +=
+                result[faceI][qpI] +=
                     coeffs[qpI][cI]
                   * fieldValue
                     (
@@ -255,13 +269,13 @@ movingLeastSquares::faceGrad
                                 remoteField
                             );
 
-                        faceQuadGrad[globalFaceID][qpI] +=
+                        result[globalFaceID][qpI] +=
                             coeffs[qpI][cI] * val;
 
                         // Add mirrored cell value from mirrored stencil
                         const Type mirrorVal = transform(R, val);
 
-                        faceQuadGrad[globalFaceID][qpI] +=
+                        result[globalFaceID][qpI] +=
                             coeffs[qpI][cI + stencilSize] * mirrorVal;
                     }
                 }
@@ -280,7 +294,7 @@ movingLeastSquares::faceGrad
                 {
                     forAll(stencil, cI)
                     {
-                        faceQuadGrad[globalFaceID][qpI] +=
+                        result[globalFaceID][qpI] +=
                             coeffs[qpI][cI]
                           * fieldValue
                             (
@@ -289,7 +303,7 @@ movingLeastSquares::faceGrad
                                 remoteLoc,
                                 vfI,
                                 remoteField
-                             );
+                            );
                     }
                 }
             }
@@ -323,20 +337,14 @@ movingLeastSquares::faceGrad
 
                 forAll(faceQuadPts[globalFaceID], qpI)
                 {
-                    faceQuadGrad[globalFaceID][qpI] +=
+                    result[globalFaceID][qpI] +=
                         coeffs[qpI][ghostPointID] * quadVal[faceI][qpI];
                 }
             }
         }
     }
-
-    return tFaceQuadGrad;
 }
 
-
-
-
 }
-
 
 // ************************************************************************* //

@@ -174,6 +174,13 @@ public:
                 pointSymmTensorField& sigma, const pointTensorField& gradD
             );
 
+            //- Calculate the stress at face quadrature points
+            void correct
+            (
+                const CompactListList<tensor>& gradDQuad,
+                CompactListList<symmTensor>& sigmaQuad
+            );
+
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);
 
@@ -182,6 +189,13 @@ public:
             (
                 const volVectorField& D,
                 volTensorField& gradD
+            );
+
+            //- Update the gradient of displacement for face quadrature points
+            void grad
+            (
+                const volVectorField& D,
+                CompactListList<tensor>& gradDQuad
             );
 
             //- Update the gradient of displacement vol field using pointD

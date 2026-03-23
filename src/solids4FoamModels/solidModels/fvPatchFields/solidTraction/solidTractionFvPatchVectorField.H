@@ -66,10 +66,10 @@ class solidTractionFvPatchVectorField
         const Switch useUndeformedArea_;
 
         //- Traction
-        vectorField traction_;
+        mutable vectorField traction_;
 
         //- Pressure
-        scalarField pressure_;
+        mutable scalarField pressure_;
 
         //- Traction time series
         interpolationTable<vector> tractionSeries_;
@@ -98,7 +98,7 @@ class solidTractionFvPatchVectorField
         const scalar relaxFac_;
 
         //- Current time index
-        label curTimeIndex_;
+        mutable label curTimeIndex_;
 
 
 public:
@@ -209,6 +209,11 @@ public:
             {
                 return useUndeformedArea_;
             }
+
+            //- Return face quadrature values
+            //  Used for high order solvers, argument is position of points
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
 
 
         // Mapping functions

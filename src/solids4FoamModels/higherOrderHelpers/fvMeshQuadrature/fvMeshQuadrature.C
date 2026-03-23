@@ -156,6 +156,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
         if (solD[cmpt] == -1)
         {
             emptyDir[cmpt] = 1.0;
+            emptyCmpt = cmpt;
             break;
         }
     }
@@ -286,7 +287,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
             continue;
         }
 
-        const vectorField& patchSf = pp.faceAreas();
+        const vectorField patchSf(pp.faceAreas());
         forAll(pp, patchFaceI)
         {
             const label faceI = pp.start() + patchFaceI;
@@ -632,10 +633,10 @@ fvMeshQuadrature::fvMeshQuadrature
     cellOrder_(cellOrder),
     faceOrder_(faceOrder),
     allowDegenerateTriFallback_(allowDegenerateTriFallback),
-    faceQuadPointsPtr_(nullptr),
-    faceQuadWeightsPtr_(nullptr),
-    cellQuadPointsPtr_(nullptr),
-    cellQuadWeightsPtr_(nullptr)
+    faceQuadPointsPtr_(),
+    faceQuadWeightsPtr_(),
+    cellQuadPointsPtr_(),
+    cellQuadWeightsPtr_()
 {
 }
 
@@ -653,44 +654,44 @@ fvMeshQuadrature::~fvMeshQuadrature()
 
 const CompactListList<point>& fvMeshQuadrature::faceQuadPoints() const
 {
-    if (!faceQuadPointsPtr_.valid())
+    if (faceQuadPointsPtr_.empty())
     {
         calcQuadPointsAndWeights();
     }
 
-    return faceQuadPointsPtr_();
+    return autoPtrRef(faceQuadPointsPtr_);
 }
 
 
 const CompactListList<scalar>& fvMeshQuadrature::faceQuadWeights() const
 {
-    if (!faceQuadWeightsPtr_.valid())
+    if (faceQuadWeightsPtr_.empty())
     {
         calcQuadPointsAndWeights();
     }
 
-    return faceQuadWeightsPtr_();
+    return autoPtrRef(faceQuadWeightsPtr_);
 }
 
 const CompactListList<point>& fvMeshQuadrature::cellQuadPoints() const
 {
-    if (!cellQuadPointsPtr_.valid())
+    if (cellQuadPointsPtr_.empty())
     {
         calcQuadPointsAndWeights();
     }
 
-    return cellQuadPointsPtr_();
+    return autoPtrRef(cellQuadPointsPtr_);
 }
 
 
 const CompactListList<scalar>& fvMeshQuadrature::cellQuadWeights() const
 {
-    if (!cellQuadWeightsPtr_.valid())
+    if (cellQuadWeightsPtr_.empty())
     {
         calcQuadPointsAndWeights();
     }
 
-    return cellQuadWeightsPtr_();
+    return autoPtrRef(cellQuadWeightsPtr_);
 }
 
 void fvMeshQuadrature::clear()
