@@ -147,6 +147,10 @@ class IQNILSCouplingInterface
         List<DynamicList<vectorField> >
             previousNonEmptyStepPatchesFacesTractionW_;
 
+        //- Per-interface per-point scaling factors for residual-sum
+        //  preconditioning
+        List<scalarField> residualPointScale_;
+
 
     // Private Member Functions
 
@@ -234,6 +238,19 @@ class IQNILSCouplingInterface
 
         //- Filter near-dependent modes using a relative QR2-style criterion
         void filterRelativeCouplingModes(const label interfaceI);
+
+        //- Update per-point residual scaling factors for preconditioning
+        void updateResidualPreconditioning();
+
+        //- Apply residual-sum preconditioning to a single interface vector
+        void applyResidualPreconditioning
+        (
+            const label interfaceI,
+            vectorField& v
+        ) const;
+
+        //- Apply residual-sum preconditioning to the combined interface vector
+        void applyResidualPreconditioningCombined(vectorField& v) const;
 
         //- Orthogonalize and normalize a new QR column using a preCICE-like
         //  repeated MGS procedure. Returns -1 if the column should be discarded.
