@@ -2,11 +2,10 @@
 sort: 6
 ---
 
-# fluidSolidInterfaces
+# Fluid-solid coupling schemes: `fluidSolidInterfaces`
 
-This directory contains the `fluidSolidInterface` base class and the
-runtime-selectable fluid-solid interface coupling schemes used by
-`solids4Foam`.
+Fluid-solid coupling schemes are implemented in solids4foam via the `fluidSolidInterface`
+base class and derived runtime-selectable fluid-solid interface coupling schemes.
 
 The base class is implemented in
 `fluidSolidInterface/fluidSolidInterface.{H,C}`. It manages the fluid and solid
