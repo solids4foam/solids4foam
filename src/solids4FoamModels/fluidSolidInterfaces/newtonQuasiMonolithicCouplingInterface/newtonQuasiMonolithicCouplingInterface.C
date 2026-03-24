@@ -32,6 +32,7 @@ License
 #include "dynamicMotionSolverFvMesh.H"
 #include "motionSolver.H"
 #include "meshMotionSolidModelFvMotionSolver.H"
+#include "globalIndex.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,39 +72,34 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
     // Set twoD flag
     const bool twoD = fluid().twoD();
 
-    // Fluid
-    label NFluid = -1;
+    // Fluid block parameters
+    const label fluidBlockn = fluid().mesh().nCells();
+    const label fluidBlockSize = twoD ? 3 : 4;
+    const label fluidLocalSize = fluidBlockn*fluidBlockSize;
+
+    // Global indexing for the fluid block: gives each process its global
+    // start offset within the fluid DOFs
+    const globalIndex fluidGI(fluidLocalSize);
+    const label localFluidStart = fluidGI.localStart();
+    const label totalFluidSize = fluidGI.totalSize();
+
+    // Fluid IS: each process owns its local portion of the fluid indices
+    ISCreateStride
+    (
+        PETSC_COMM_WORLD, fluidLocalSize, localFluidStart, 1, &isFluid_
+    );
+
+    // Fluid velocity field IS: velocity DOF indices within the fluid block
     {
-        // Set the number local block equations
-        const label blockn = fluid().mesh().nCells();
-
-        // Fluid block size
-        const label fluidBlockSize = twoD ? 3 : 4;
-
-        // Set the number local scalar equations
-        const label n = blockn*fluidBlockSize;
-
-        // Set the global system size
-        NFluid = returnReduce(n, sumOp<label>());
-
-        // Create the index sets, where it is assumed the motion equations come first
-        ISCreateStride(PETSC_COMM_WORLD, NFluid, 0, 1, &isFluid_);
-    }
-
-    // Fluid velocity field
-    {
-        const label blockn = fluid().mesh().nCells();
-        const label fluidBlockSize = twoD ? 3 : 4;
-
         const label nVelPerCell = twoD ? 2 : 3;
-        const label nVel = blockn*nVelPerCell;
+        const label nVel = fluidBlockn*nVelPerCell;
 
         List<PetscInt> idx(nVel);
 
         PetscInt k = 0;
-        for (label c = 0; c < blockn; ++c)
+        for (label c = 0; c < fluidBlockn; ++c)
         {
-            const PetscInt base = c*fluidBlockSize;
+            const PetscInt base = localFluidStart + c*fluidBlockSize;
             idx[k++] = base + 0;
             idx[k++] = base + 1;
             if (!twoD)
@@ -122,17 +118,13 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
         );
     }
 
-    // Fluid pressure field
+    // Fluid pressure field IS: pressure DOF indices within the fluid block
     {
-        const label blockn = fluid().mesh().nCells();
-        const label fluidBlockSize = twoD ? 3 : 4;
+        List<PetscInt> idx(fluidBlockn);
 
-        const label nP = blockn;
-        List<PetscInt> idx(nP);
-
-        for (label c = 0; c < blockn; ++c)
+        for (label c = 0; c < fluidBlockn; ++c)
         {
-            const PetscInt base = c * fluidBlockSize;
+            const PetscInt base = localFluidStart + c*fluidBlockSize;
             idx[c] = base + (fluidBlockSize - 1);
         }
 
@@ -146,44 +138,23 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
         );
     }
 
-    // Fluid mesh motion
-    // label NMotion = -1;
-    // {
-    //     // Set the number local block equations
-    //     // Note: the motion mesh is the fluid mesh
-    //     const label blockn = fluid().mesh().nCells();
-
-    //     // Motion and solid block size
-    //     const label motionBlockSize = twoD ? 2 : 3;
-
-    //     // Set the number local scalar equations
-    //     const label n = blockn*motionBlockSize;
-
-    //     // Set the global system size
-    //     NMotion = returnReduce(n, sumOp<label>());
-
-    //     // Create the index sets, where it is assumed the motion equations come first
-    //     ISCreateStride(PETSC_COMM_WORLD, NMotion, NFluid, 1, &isMotion_);
-    // }
-
-    // Solid
+    // Solid IS: each process owns its local portion, offset by the total
+    // fluid size in the monolithic system
     {
-        // Set the number local block equations
-        const label blockn = solid().mesh().nCells();
-
-        // Solid block size
+        const label solidBlockn = solid().mesh().nCells();
         const label solidBlockSize = twoD ? 2 : 3;
+        const label solidLocalSize = solidBlockn*solidBlockSize;
 
-        // Set the number local scalar equations
-        const label n = blockn*solidBlockSize;
+        const globalIndex solidGI(solidLocalSize);
 
-        // Set the global system size
-        const label NSolid = returnReduce(n, sumOp<label>());
-
-        // Create the solid index set assuming the solid equations are after the
-        // motion equations
-        // ISCreateStride(PETSC_COMM_WORLD, NSolid, NMotion, 1, &isSolid_);
-        ISCreateStride(PETSC_COMM_WORLD, NSolid, NFluid, 1, &isSolid_);
+        ISCreateStride
+        (
+            PETSC_COMM_WORLD,
+            solidLocalSize,
+            totalFluidSize + solidGI.localStart(),
+            1,
+            &isSolid_
+        );
     }
 }
 
@@ -250,25 +221,32 @@ void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
 
     // Create arrays (vectors) of IS objects for rows and columns.
     // These will indicate where in the matrix the different regions are
-    // located
+    // located.
+    // Each process must specify its own global index range within each
+    // region, accounting for DOFs on preceding processes (parallel fix).
     std::vector<IS> isRow(nRegions), isCol(nRegions);
-    label globalOffset = 0;
+    label cumulativeGlobalSize = 0;
     for (label r = 0; r < nRegions; ++r)
     {
         const label nBlocks = nBlocksAndBlockSize[r].first();
         const label blockSize = nBlocksAndBlockSize[r].second();
-        const label regionSize = nBlocks*blockSize;
+        const label regionLocalSize = nBlocks*blockSize;
+
+        // Compute the global start index for this process within this
+        // region, accounting for DOFs on preceding processes
+        const globalIndex regionGI(regionLocalSize);
+        const label first = cumulativeGlobalSize + regionGI.localStart();
 
         // Create an IS that covers the indices for region r
         ISCreateStride
         (
-            PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isRow[r]
+            PETSC_COMM_WORLD, regionLocalSize, first, 1, &isRow[r]
         );
         ISCreateStride
         (
-            PETSC_COMM_WORLD, regionSize, globalOffset, 1, &isCol[r]
+            PETSC_COMM_WORLD, regionLocalSize, first, 1, &isCol[r]
         );
-        globalOffset += regionSize;
+        cumulativeGlobalSize += regionGI.totalSize();
     }
 
     // Create an array of submatrices.
@@ -404,37 +382,85 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
     std::vector<label> d_nnz(scalarRowN, 0);
     std::vector<label> o_nnz(scalarRowN, 0);
 
-    // Set non-zeros for each interface fluid cells
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    // Set non-zeros for each interface fluid cell
+    // In parallel, we need to determine if the coupled solid cell is on
+    // this processor (d_nnz) or another processor (o_nnz)
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    const labelList& fluidFaceCells =
-        fluidMesh.boundary()[fluidPatchID].faceCells();
-    forAll(fluidFaceMap, fluidFaceI)
+    const fvPatch& fluidPatchRef = fluidMesh.boundary()[fluidPatchID];
+    const labelList& fluidFaceCells = fluidPatchRef.faceCells();
+
+    // Build zone-level global solid cell IDs
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
+
+    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+    const fvPatch& solidPatchRef = solidMesh().boundary()[solidPatchID];
+    const labelList& solidFaceCells = solidPatchRef.faceCells();
+
+    const globalIndex& solidGlobalCells =
+        refCast<const foamPetscSnesHelper>(solid()).globalCells();
+
+    // Local field: global cell ID for each local solid interface face
+    scalarField localSolidGlobalCellIDs(solidPatchRef.size(), 0);
+    forAll(solidPatchRef, faceI)
+    {
+        localSolidGlobalCellIDs[faceI] =
+            solidGlobalCells.toGlobal(solidFaceCells[faceI]);
+    }
+
+    // Broadcast to zone level (all processors get the full array)
+    const scalarField zoneSolidGlobalCellIDs
+    (
+        solidGlobalPatch.patchFaceToGlobal(localSolidGlobalCellIDs)
+    );
+
+    // Zone-level face map: fluid zone face -> solid zone face
+    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
+
+    // Loop over LOCAL fluid interface faces
+    forAll(fluidPatchRef, fluidFaceI)
     {
         const label fluidCellID = fluidFaceCells[fluidFaceI];
+
+        // Map local fluid face -> zone fluid face -> zone solid face
+        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
+        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
+        const label globalSolidCellID =
+            label(zoneSolidGlobalCellIDs[solidZoneFaceI]);
+
+        // Check if the coupled solid cell is on this processor
+        const bool solidCellLocal =
+            solidGlobalCells.isLocal(globalSolidCellID);
 
         // Calculate the row index for this cells first scalar equation
         label rowI = fluidCellID*fluidBlockSize;
 
-        // Set the number of non-zeros to be the number of solid equations
-        d_nnz[rowI++] = solidBlockSize;
-        d_nnz[rowI++] = solidBlockSize;
-        d_nnz[rowI++] = solidBlockSize;
-
-        if (!twoD)
+        // Accumulate the number of non-zeros (a corner cell may have
+        // multiple faces on the interface, each coupling to a different
+        // solid cell)
+        if (solidCellLocal)
         {
-            d_nnz[rowI++] = solidBlockSize;
-        }
-    }
+            d_nnz[rowI++] += solidBlockSize;
+            d_nnz[rowI++] += solidBlockSize;
+            d_nnz[rowI++] += solidBlockSize;
 
-    // Parallel: we need to decide how to deal with this, e.g. do we allow
-    // the same general decompositions as in the partitioned approach
-    // For now, only allow serial
-    if (Pstream::parRun())
-    {
-        FatalErrorInFunction
-            << "Currently, serial runs are allowed in "
-            << typeName << abort(FatalError);
+            if (!twoD)
+            {
+                d_nnz[rowI++] += solidBlockSize;
+            }
+        }
+        else
+        {
+            o_nnz[rowI++] += solidBlockSize;
+            o_nnz[rowI++] += solidBlockSize;
+            o_nnz[rowI++] += solidBlockSize;
+
+            if (!twoD)
+            {
+                o_nnz[rowI++] += solidBlockSize;
+            }
+        }
     }
 
     // Allocate parallel matrix using AIJ
@@ -492,38 +518,85 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
     std::vector<label> d_nnz(scalarRowN, 0);
     std::vector<label> o_nnz(scalarRowN, 0);
 
-    // Set non-zeros for each interface solid cells
-    const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+    // Set non-zeros for each interface solid cell
+    // In parallel, we need to determine if the coupled fluid cell is on
+    // this processor (d_nnz) or another processor (o_nnz)
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const labelList& solidFaceCells =
-        solidMesh.boundary()[solidPatchID].faceCells();
-    forAll(solidFaceMap, solidFaceI)
+    const fvPatch& solidPatchRef = solidMesh.boundary()[solidPatchID];
+    const labelList& solidFaceCells = solidPatchRef.faceCells();
+
+    // Build zone-level global fluid cell IDs
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
+
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const fvPatch& fluidPatchRef = fluidMesh().boundary()[fluidPatchID];
+    const labelList& fluidFaceCells = fluidPatchRef.faceCells();
+
+    const globalIndex& fluidGlobalCells =
+        refCast<const foamPetscSnesHelper>(fluid()).globalCells();
+
+    // Local field: global cell ID for each local fluid interface face
+    scalarField localFluidGlobalCellIDs(fluidPatchRef.size(), 0);
+    forAll(fluidPatchRef, faceI)
+    {
+        localFluidGlobalCellIDs[faceI] =
+            fluidGlobalCells.toGlobal(fluidFaceCells[faceI]);
+    }
+
+    // Broadcast to zone level (all processors get the full array)
+    const scalarField zoneFluidGlobalCellIDs
+    (
+        fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
+    );
+
+    // Zone-level face map: solid zone face -> fluid zone face
+    const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+    const labelList& solidFaceToZone = solidGlobalPatch.faceToGlobalAddr();
+
+    // Loop over LOCAL solid interface faces
+    forAll(solidPatchRef, solidFaceI)
     {
         const label solidCellID = solidFaceCells[solidFaceI];
+
+        // Map local solid face -> zone solid face -> zone fluid face
+        const label solidZoneFaceI = solidFaceToZone[solidFaceI];
+        const label fluidZoneFaceI = solidFaceMap[solidZoneFaceI];
+        const label globalFluidCellID =
+            label(zoneFluidGlobalCellIDs[fluidZoneFaceI]);
+
+        // Check if the coupled fluid cell is on this processor
+        const bool fluidCellLocal =
+            fluidGlobalCells.isLocal(globalFluidCellID);
 
         // Calculate the row index for this cells first scalar equation
         label rowI = solidCellID*solidBlockSize;
 
-        // Set the number of non-zeros to be the number of fluid equations
+        // Accumulate the number of non-zeros (a corner cell may have
+        // multiple faces on the interface, each coupling to a different
+        // fluid cell)
         // e.g., The x-momentum equation could have a coefficient for the
         // fluid x/y/z velocity and fluid pressure
-        d_nnz[rowI++] = fluidBlockSize;
-        d_nnz[rowI++] = fluidBlockSize;
-
-        if (!twoD)
+        if (fluidCellLocal)
         {
-            d_nnz[rowI++] = fluidBlockSize;
-        }
-    }
+            d_nnz[rowI++] += fluidBlockSize;
+            d_nnz[rowI++] += fluidBlockSize;
 
-    // Parallel: we need to decide how to deal with this, e.g. do we allow
-    // the same general decompositions as in the partitioned approach
-    // For now, only allow serial
-    if (Pstream::parRun())
-    {
-        FatalErrorInFunction
-            << "Currently, serial runs are allowed in "
-            << typeName << abort(FatalError);
+            if (!twoD)
+            {
+                d_nnz[rowI++] += fluidBlockSize;
+            }
+        }
+        else
+        {
+            o_nnz[rowI++] += fluidBlockSize;
+            o_nnz[rowI++] += fluidBlockSize;
+
+            if (!twoD)
+            {
+                o_nnz[rowI++] += fluidBlockSize;
+            }
+        }
     }
 
     // Allocate parallel matrix using AIJ
@@ -551,19 +624,16 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // This function incorporates the effect of the solid interface velocity on
     // the fluid interface velocity field
 
-    // The fluid and mesh motion refer to the same mesh so they can use the same
-    // global cells object
-    const globalIndex& globalCells =
+    // Global cells for the fluid and solid regions
+    const globalIndex& fluidGlobalCells =
         refCast<foamPetscSnesHelper>(fluid()).globalCells();
-
-
-    // The interface velocity equal the mesh motion interface
-    // velocity
+    const globalIndex& solidGlobalCells =
+        refCast<foamPetscSnesHelper>(solid()).globalCells();
 
     // The fluid interface is a prescribed velocity (fixedValue) condition
     // where we assume the fluid wall velocity is equal to the mesh velocity of
-    // the adjacent cell centre. This approximatation is sufficiently
-    // accurate as a preconditioner for the matrix and will not affected the
+    // the adjacent cell centre. This approximation is sufficiently
+    // accurate as a preconditioner for the matrix and will not affect the
     // converged solution (which is entirely governed by formResidual)
 
     if (fluidSolidInterface::fluidPatchIndices().size() != 1)
@@ -647,36 +717,51 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // (pressure) equation, where the div(U) term should use the adjacent
     // solid cell velocity instead of the known boundary face velocity
 
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    // Build zone-level global solid cell IDs for parallel face mapping
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
 
-    // Lookup the solid interface patch
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
     const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
     const labelList& solidFaceCells = solidPatch.faceCells();
+
+    // Local field: global cell ID for each local solid interface face
+    scalarField localSolidGlobalCellIDs(solidPatch.size(), 0);
+    forAll(solidPatch, faceI)
+    {
+        localSolidGlobalCellIDs[faceI] =
+            solidGlobalCells.toGlobal(solidFaceCells[faceI]);
+    }
+
+    // Broadcast to zone level (all processors get the full array)
+    const scalarField zoneSolidGlobalCellIDs
+    (
+        solidGlobalPatch.patchFaceToGlobal(localSolidGlobalCellIDs)
+    );
+
+    // Zone-level face map and local-to-zone addressing
+    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
 
     forAll(fluidPatch, fluidFaceI)
     {
         // Fluid cell adjacent to the interface
         const label fluidCellID = fluidFaceCells[fluidFaceI];
 
-        // Neighbouring solid face index
-        // TODO: fix for parallel! use zone face ID instead of face ID
-        const label solidFaceI = fluidFaceMap[fluidFaceI];
+        // Map local fluid face -> zone fluid face -> zone solid face
+        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
+        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
 
-        // Neighbouring solid cell
-        const label solidCellID = solidFaceCells[solidFaceI];
-
-        // We will add coefficients at block row "fluidCellID" and block
-        // column "solidCellID"
-        // Note that the nested monolithic matrix takes care of offsetting
-        // the rows/columns when the submatrices are inserted into the
-        // nested matrix
+        // Get global solid cell ID from the zone-level array
+        const label globalSolidCellID =
+            label(zoneSolidGlobalCellIDs[solidZoneFaceI]);
 
         // Global block row ID of fluid matrix
-        const label globalBlockRowI = globalCells.toGlobal(fluidCellID);
+        const label globalBlockRowI =
+            fluidGlobalCells.toGlobal(fluidCellID);
 
         // Global block column ID of solid matrix
-        const label globalBlockColI = globalCells.toGlobal(solidCellID);
+        const label globalBlockColI = globalSolidCellID;
 
         // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
         // square block coefficients, so we will insert the scalar
@@ -783,11 +868,14 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
 
     // The solid interface is a prescribed traction condition, where we
     // approximate the traction on the fluid side of the interface using a
-    // compact stencil. For this approximate Jacobian, we assume the traction
-    // on a fluid interface face is equal to the pressure at the centre of the
-    // adjacent fluid cell. This approximatation is sufficiently
-    // accurate as a preconditioner for the matrix and will not affect the
-    // converged solution (which is entirely governed by formResidual)
+    // compact stencil. For pressure, we assume the traction on a fluid
+    // interface face is equal to the pressure at the centre of the adjacent
+    // fluid cell. For the viscous stress (when passViscousStress is enabled),
+    // we use the snGrad approximation: the viscous traction depends on the
+    // adjacent fluid cell velocity through the boundary face gradient.
+    // This approximation is sufficiently accurate as a preconditioner for
+    // the matrix and will not affect the converged solution (which is
+    // entirely governed by formResidual)
 
     if (fluidSolidInterface::solidPatchIndices().size() != 1)
     {
@@ -808,8 +896,11 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
             interfaceToInterfaceList()[0]
         );
 
-    // The face map gives the fluid face ID for each solid face
+    // Zone-level face map and local-to-zone addressing for parallel
     const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
+    const labelList& solidFaceToZone = solidGlobalPatch.faceToGlobalAddr();
 
     // Lookup the fluid interface patch
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
@@ -836,77 +927,104 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
             << "The solid interface patch must be of type 'solidTraction'"
             << abort(FatalError);
     }
+
     // Todo: add rho() to the fluidModel base class
-    const vectorField patchCoeffs
+    fluidModels::newtonIcoFluid& newtonFluid =
+        refCast<fluidModels::newtonIcoFluid>(fluid());
+
+    // Build zone-level global fluid cell IDs for parallel face mapping
+    const globalIndex& fluidGlobalCells =
+        refCast<foamPetscSnesHelper>(fluid()).globalCells();
+
+    scalarField localFluidGlobalCellIDs(fluidPatch.size(), 0);
+    forAll(fluidPatch, faceI)
+    {
+        localFluidGlobalCellIDs[faceI] =
+            fluidGlobalCells.toGlobal(fluidFaceCells[faceI]);
+    }
+
+    const scalarField zoneFluidGlobalCellIDs
     (
-        solidPatch.Sf()
-       *refCast<fluidModels::newtonIcoFluid>(fluid()).rho().value()
+        fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
     );
+
+    // Pressure coupling coefficients: solidSf * rho (local to solid, OK)
+    const vectorField pressureCoeffs
+    (
+        solidPatch.Sf()*newtonFluid.rho().value()
+    );
+
+    // Viscous coupling coefficients (only when passViscousStress is enabled)
+    // The viscous traction from the fluid on the solid is:
+    //   t_viscous = -rho * nf & (nuEff * (gradU + gradU^T))
+    // Using the snGrad approximation for the boundary face gradient:
+    //   d(t_viscous_i)/d(U_cell_k) = rho*nuEff*deltaCoeffs*(delta_ik + nf_i*nf_k)
+    // So the force contribution is:
+    //   d(F_i)/d(U_cell_k) = rho*nuEff*deltaCoeffs*|Sf|*(delta_ik + nf_i*nf_k)
+    // In parallel, the viscous coefficients are on the fluid side so we
+    // broadcast them to the zone level for cross-processor access
+    scalarField zoneViscDiffCoeffs;
+    vectorField zoneFluidNf;
+    if (passViscousStress_)
+    {
+        const scalarField fluidPatchNuEff
+        (
+            newtonFluid.turbulence().nuEff(fluidPatchID)
+        );
+
+        scalarField localViscDiffCoeffs
+        (
+            newtonFluid.rho().value()
+           *fluidPatchNuEff
+           *fluidPatch.deltaCoeffs()
+           *fluidPatch.magSf()
+        );
+
+        vectorField localFluidNf(fluidPatch.nf());
+
+        // Broadcast to zone level for parallel access
+        zoneViscDiffCoeffs =
+            fluidGlobalPatch.patchFaceToGlobal(localViscDiffCoeffs);
+        zoneFluidNf =
+            fluidGlobalPatch.patchFaceToGlobal(localFluidNf);
+    }
+
+    const globalIndex& solidGlobalCells =
+        refCast<foamPetscSnesHelper>(solid()).globalCells();
 
     forAll(solidPatch, solidFaceI)
     {
-        const label fluidFaceID = solidFaceMap[solidFaceI];
+        // Map local solid face -> zone solid face -> zone fluid face
+        const label solidZoneFaceI = solidFaceToZone[solidFaceI];
+        const label fluidZoneFaceI = solidFaceMap[solidZoneFaceI];
 
-        // Fluid and solid cells, which are coupled
+        // Solid cell is local
         const label solidCellID = solidFaceCells[solidFaceI];
-        const label fluidCellID = fluidFaceCells[fluidFaceID];
 
-        // We will add a coefficient at block row "solidCellID" and block
-        // column "fluidCellID"
-        // Note that the nested monolithic matrix takes care of offsetting
-        // the rows/columns when the submatrices are inserted into the
-        // nested matrix
+        // Get global fluid cell ID from the zone-level array
+        const label globalFluidCellID =
+            label(zoneFluidGlobalCellIDs[fluidZoneFaceI]);
 
         // Global block row ID of solid matrix
         const label globalBlockRowI =
-            refCast<foamPetscSnesHelper>(solid()).globalCells().toGlobal
-            (
-                solidCellID
-            );
+            solidGlobalCells.toGlobal(solidCellID);
 
         // Global block column ID of fluid matrix
-        const label globalBlockColI =
-            refCast<foamPetscSnesHelper>(fluid()).globalCells().toGlobal
-            (
-                fluidCellID
-            );
+        const label globalBlockColI = globalFluidCellID;
 
         // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
         // square block coefficients, so we will insert the scalar
         // coefficients manually
 
-        // Calculate the scalar global row ID (not the block row ID)
+        // --- Pressure coupling ---
         // The column corresponds to the pressure equation in the fluid cell
-        label globalRowI = globalBlockRowI*solidBlockSize;
-        const label globalColI =
-            globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
-
-        // Manually insert the 3 scalar coefficients (2 in 2-D)
-        PetscScalar value = -patchCoeffs[solidFaceI][vector::X];
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        globalRowI++;
-        //globalColI++;
-        value = -patchCoeffs[solidFaceI][vector::Y];
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        if (!twoD)
         {
-            globalRowI++;
-            //globalColI++;
-            value = -patchCoeffs[solidFaceI][vector::Z];
+            label globalRowI = globalBlockRowI*solidBlockSize;
+            const label globalColI =
+                globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
+
+            // Manually insert the 3 scalar coefficients (2 in 2-D)
+            PetscScalar value = -pressureCoeffs[solidFaceI][vector::X];
             CHKERRQ
             (
                 MatSetValues
@@ -914,6 +1032,65 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
                     Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
+
+            globalRowI++;
+            value = -pressureCoeffs[solidFaceI][vector::Y];
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+
+            if (!twoD)
+            {
+                globalRowI++;
+                value = -pressureCoeffs[solidFaceI][vector::Z];
+                CHKERRQ
+                (
+                    MatSetValues
+                    (
+                        Asf, 1, &globalRowI, 1, &globalColI,
+                        &value, ADD_VALUES
+                    )
+                );
+            }
+        }
+
+        // --- Viscous stress coupling ---
+        // The columns correspond to the velocity equations in the fluid cell
+        if (passViscousStress_)
+        {
+            // Use zone-level coefficients for parallel access
+            const scalar D = zoneViscDiffCoeffs[fluidZoneFaceI];
+            const vector& nf = zoneFluidNf[fluidZoneFaceI];
+
+            // Number of velocity components
+            const label nVelCmpts = twoD ? 2 : 3;
+
+            for (label i = 0; i < nVelCmpts; ++i)
+            {
+                for (label k = 0; k < nVelCmpts; ++k)
+                {
+                    // d(F_i)/d(U_k) = D * (delta_ik + nf_i*nf_k)
+                    PetscScalar value = D*((i == k ? 1.0 : 0.0) + nf[i]*nf[k]);
+
+                    PetscInt globalRowI =
+                        globalBlockRowI*solidBlockSize + i;
+                    PetscInt globalColI =
+                        globalBlockColI*fluidBlockSize + k;
+
+                    CHKERRQ
+                    (
+                        MatSetValues
+                        (
+                            Asf, 1, &globalRowI, 1, &globalColI,
+                            &value, ADD_VALUES
+                        )
+                    );
+                }
+            }
         }
     }
 
@@ -964,8 +1141,13 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
             interfaceToInterfaceList()[0]
         );
 
-    // The face map gives the solid face ID for each fluid face
+    // Zone-level face map: fluidZoneFace -> solidZoneFace
     const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+
+    // Global patches for parallel face data transfer
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
+    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
 
     // Lookup the fluid mesh interface patch
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
@@ -988,6 +1170,8 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
 
     // Map the solid interface displacement to the motion interface
+    // In parallel, we broadcast solid data to zone level, map solid->fluid
+    // zone faces, then extract local fluid values
     if (extrapolateSolidInterfaceDisplacement_)
     {
         const fvPatchVectorField& solidPatchD =
@@ -995,13 +1179,24 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
         const fvPatchVectorField& solidPatchU =
             solid().U().boundaryField()[solidPatchID];
 
+        // Broadcast to zone level
+        const vectorField zoneSolidD
+        (
+            solidGlobalPatch.patchFaceToGlobal(solidPatchD)
+        );
+        const vectorField zoneSolidU
+        (
+            solidGlobalPatch.patchFaceToGlobal(solidPatchU)
+        );
+
+        // Map from solid zone to fluid local via zone face mapping
         forAll(motionPatchD, fluidFaceI)
         {
-            const label solidFaceID = fluidFaceMap[fluidFaceI];
+            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
+            const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
 
-            // Extrapolated patch value (larger stencil)
-            motionPatchD[fluidFaceI] = solidPatchD[solidFaceID];
-            motionPatchU[fluidFaceI] = solidPatchU[solidFaceID];
+            motionPatchD[fluidFaceI] = zoneSolidD[solidZoneFaceI];
+            motionPatchU[fluidFaceI] = zoneSolidU[solidZoneFaceI];
         }
     }
     else
@@ -1011,14 +1206,31 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
         const vectorField& solidDI = solid().D();
         const vectorField& solidUI = solid().U();
 
+        // Build local solid cell-centre D and U, then broadcast to zone level
+        vectorField localSolidCellD(solidMesh().boundary()[solidPatchID].size());
+        vectorField localSolidCellU(solidMesh().boundary()[solidPatchID].size());
+        forAll(localSolidCellD, faceI)
+        {
+            localSolidCellD[faceI] = solidDI[solidFaceCells[faceI]];
+            localSolidCellU[faceI] = solidUI[solidFaceCells[faceI]];
+        }
+
+        const vectorField zoneSolidCellD
+        (
+            solidGlobalPatch.patchFaceToGlobal(localSolidCellD)
+        );
+        const vectorField zoneSolidCellU
+        (
+            solidGlobalPatch.patchFaceToGlobal(localSolidCellU)
+        );
+
         forAll(motionPatchD, fluidFaceI)
         {
-            const label solidFaceID = fluidFaceMap[fluidFaceI];
+            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
+            const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
 
-            // Adjacent cell value
-            const label solidCellID = solidFaceCells[solidFaceID];
-            motionPatchD[fluidFaceI] = solidDI[solidCellID];
-            motionPatchU[fluidFaceI] = solidUI[solidCellID];
+            motionPatchD[fluidFaceI] = zoneSolidCellD[solidZoneFaceI];
+            motionPatchU[fluidFaceI] = zoneSolidCellU[solidZoneFaceI];
         }
     }
 
@@ -1297,6 +1509,8 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     isFluidPressure_(nullptr),
     isSolid_(nullptr),
     configuredNestedFluidSplit_(false),
+    nestMat_(nullptr),
+    Pmat_(nullptr),
     tsLogPtr_()
     // oldTimeValue_(runTime.value()),
     // nConsecutiveFailedSolves_(0),
@@ -1925,23 +2139,40 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
             interfaceToInterfaceList()[0]
         );
 
-    // The face map gives the solid face ID for each fluid face
+    // Zone-level face map: fluidZoneFace -> solidZoneFace
+    // zoneBToZoneAFaceMap: size = zoneA (fluid), map[fluidZoneFaceI] = solidZoneFaceI
     const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+
+    // Global patch for parallel face data transfer
+    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
+    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
 
     // Calculate the solid interface traction
     // Flip the sign as the solid normals point in the opposite direction to
     // the fluid normals
     const label solidPatchID =
         fluidSolidInterface::solidPatchIndices()[0];
-    vectorField solidTraction
+
+    // Broadcast local fluid traction to zone level
+    const vectorField negFluidTraction(-fluidTraction);
+    const vectorField zoneFluidTraction
     (
-        solidMesh().boundary()[solidPatchID].size()
+        fluidGlobalPatch.patchFaceToGlobal(negFluidTraction)
     );
-    forAll(fluidTraction, fluidFaceI)
+
+    // Map from fluid zone faces to solid zone faces at zone level
+    vectorField zoneSolidTraction(solidGlobalPatch.globalPatch().size(), vector::zero);
+    forAll(fluidFaceMap, fluidZoneFaceI)
     {
-        solidTraction[fluidFaceMap[fluidFaceI]] =
-            -fluidTraction[fluidFaceI];
+        zoneSolidTraction[fluidFaceMap[fluidZoneFaceI]] =
+            zoneFluidTraction[fluidZoneFaceI];
     }
+
+    // Extract local solid traction from zone level
+    const vectorField solidTraction
+    (
+        solidGlobalPatch.globalFaceToPatch(zoneSolidTraction)
+    );
 
     // Lookup the displacement interface traction patch and set the traction
     fvPatchVectorField& solidPatchD =
@@ -2020,22 +2251,15 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     // 6. Apply scaling factors to solid and fluid equations to preserve the
     //    condition number of the monolithic system
     {
-        PetscScalar* ff;
-        VecGetArray(f, &ff);
+        Vec fFluid = nullptr;
+        VecGetSubVector(f, isFluid(), &fFluid);
+        VecScale(fFluid, fluidSystemScaleFactor_);
+        VecRestoreSubVector(f, isFluid(), &fFluid);
 
-        for (int i = 0; i < fluidSystemEnd; ++i)
-        {
-            ff[i] *= fluidSystemScaleFactor_;
-        }
-
-        const label solidSystemEnd =
-            solidFirstEqnID + solidMesh().nCells()*solidBlockSize;
-        for (int i = solidFirstEqnID; i < solidSystemEnd; ++i)
-        {
-            ff[i] *= solidSystemScaleFactor_;
-        }
-
-        VecRestoreArray(f, &ff);
+        Vec fSolid = nullptr;
+        VecGetSubVector(f, isSolid(), &fSolid);
+        VecScale(fSolid, solidSystemScaleFactor_);
+        VecRestoreSubVector(f, isSolid(), &fSolid);
     }
 
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -2075,10 +2299,27 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    // Get access to the sub-matrices
+    // Determine the assembly matrix: always the MatNest.
+    // On the first call, jac IS the MatNest and we store a pointer to it.
+    // On subsequent calls (when Pmat_ is active), jac may be the converted
+    // MPIAIJ, so we use the stored nestMat_ for assembly.
+    Mat assemblyMat = jac;
+    if (nestMat_ != nullptr)
+    {
+        // Use the stored MatNest for assembly
+        assemblyMat = nestMat_;
+        MatZeroEntries(assemblyMat);
+    }
+    else
+    {
+        // First call: store the MatNest pointer
+        nestMat_ = jac;
+    }
+
+    // Get access to the sub-matrices from the MatNest
     PetscInt nr, nc;
     Mat **subMats;
-    CHKERRQ(MatNestGetSubMats(jac, &nr, &nc, &subMats));
+    CHKERRQ(MatNestGetSubMats(assemblyMat, &nr, &nc, &subMats));
 
     if (nr != 2 || nc != 2)
     {
@@ -2087,8 +2328,8 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             << "nr = " << nr << ", nc = " << nc << abort(FatalError);
     }
 
-    // Zero the entries
-    MatZeroEntries(jac);
+    // Zero the entries of the MatNest (may already be zeroed by callback)
+    MatZeroEntries(assemblyMat);
 
     // Form diagonal submatrices
     //  - Aff: fluid equations (momentum and pressure)
@@ -2132,22 +2373,68 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
     // Scale the su-matrices to preserve the condition number of the
     // monolithic system
 
-    // We must assembly the matrix before we can use MatScale
-    // Complete matrix assembly
-    CHKERRQ(MatAssemblyBegin(jac, MAT_FINAL_ASSEMBLY));
-    CHKERRQ(MatAssemblyEnd(jac, MAT_FINAL_ASSEMBLY));
+    // Explicitly assemble each sub-matrix before assembling the nest.
+    // This ensures off-process entries (from parallel coupling blocks)
+    // are properly flushed.
+    CHKERRQ(MatAssemblyBegin(subMats[0][0], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(subMats[0][0], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyBegin(subMats[0][1], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(subMats[0][1], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyBegin(subMats[1][0], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(subMats[1][0], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyBegin(subMats[1][1], MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(subMats[1][1], MAT_FINAL_ASSEMBLY));
 
-    // Aff
+    // Complete nest matrix assembly
+    CHKERRQ(MatAssemblyBegin(assemblyMat, MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(assemblyMat, MAT_FINAL_ASSEMBLY));
+
+    // Scale the sub-matrices
     MatScale(subMats[0][0], fluidSystemScaleFactor_);
-
-    // Afs
     MatScale(subMats[0][1], fluidSystemScaleFactor_);
-
-    // Asf
     MatScale(subMats[1][0], solidSystemScaleFactor_);
-
-    // Ass
     MatScale(subMats[1][1], solidSystemScaleFactor_);
+
+    // In parallel, convert the assembled MatNest to monolithic MPIAIJ for
+    // preconditioning. This allows standard PCs (LU, ILU, bjacobi, etc.)
+    // to work with the block-structured system.
+    // In serial, PETSc handles the MatNest natively.
+    if (Pstream::parRun())
+    {
+        if (Pmat_ == nullptr)
+        {
+            // First call: create the MPIAIJ by conversion
+            CHKERRQ
+            (
+                MatConvert(assemblyMat, MATAIJ, MAT_INITIAL_MATRIX, &Pmat_)
+            );
+
+            // Update the SNES to use Pmat_ for preconditioning
+            Mat currentJac;
+            SNESJacobianFn *jacFunc;
+            void *jacCtx;
+            CHKERRQ
+            (
+                SNESGetJacobian
+                (
+                    snes(), &currentJac, nullptr, &jacFunc, &jacCtx
+                )
+            );
+            CHKERRQ
+            (
+                SNESSetJacobian(snes(), currentJac, Pmat_, jacFunc, jacCtx)
+            );
+        }
+        else
+        {
+            // Subsequent calls: reuse the existing MPIAIJ structure
+            CHKERRQ
+            (
+                MatConvert(assemblyMat, MATAIJ, MAT_REUSE_MATRIX, &Pmat_)
+            );
+        }
+
+    }
 
     // Configure the field split for velocity and pressure in the fluid
     if (!configuredNestedFluidSplit_)

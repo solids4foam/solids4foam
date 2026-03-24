@@ -1,0 +1,100 @@
+/*--------------------------------*- C++ -*----------------------------------* \
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type            codedFixedValue;
+        value           uniform 0;
+
+        name            smoothRampedParabolicFixedValue;
+
+        code
+        #{
+            // y coordinate relative to the centre of the channel
+            const scalarField y
+            (
+                patch().Cf().component(vector::Y) - 1.5
+            );
+
+            // Velocity magnitude after transition period
+            scalarField UMag(-6.0*sqr(y) + 1.5);
+
+            // Smoothly ramp the velocity magnitude over the rampPeriod
+            const scalar t = this->db().time().value();
+            const scalar rampPeriod = 50;
+            if (t < rampPeriod)
+            {
+                UMag *= (1.0 - cos(M_PI*t/rampPeriod))/2.0;
+            }
+
+            // Apply UMag in the x direction
+            operator==(UMag*vector(1, 0, 0));
+        #};
+
+        // type            uniformFixedValue;
+        // uniformValue    table
+        // (
+        //     (0   (0 0 0))
+        //     (20  (1 0 0))
+        // );
+        // type            fixedProfile;
+        // profile         polynomial
+        // (
+        //     ((1.5 0 0)  (0 0 0))  // Coefficient for y^0 = 1
+        //     ((-6 0 0) (2 0 0))    // Coefficient for y^2 = -6
+        // );
+        // direction       (0 1 0);
+        // origin          1.5;
+        value             uniform (0 0 0);
+    }
+
+    walls
+    {
+        // Can be used in openfoam but not available in foam extend
+        //type            noSlip;
+
+        // Can be used in all versions
+        type              fixedValue;
+        value             uniform (0 0 0);
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    interface
+    {
+        type            fixedValue;
+        //type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

@@ -116,6 +116,13 @@ class newtonQuasiMonolithicCouplingInterface
         //- Flag to indicate the fluid index fields have been set
         mutable bool configuredNestedFluidSplit_;
 
+        //- Pointer to the MatNest used for assembly (stored after first
+        //  formJacobian call). Not owned — it is A_.m from the base class.
+        Mat nestMat_;
+
+        //- Converted monolithic MPIAIJ preconditioner matrix (owned)
+        Mat Pmat_;
+
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
@@ -319,6 +326,9 @@ public:
                 delete[] subMatsPtr_;
                 subMatsPtr_ = nullptr;
             }
+
+            // Free the converted preconditioner matrix
+            MatDestroy(&Pmat_);
 
             // Free index sets
             ISDestroy(&isFluid_);

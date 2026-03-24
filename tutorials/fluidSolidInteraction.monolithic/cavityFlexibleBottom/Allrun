@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 # Source required functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 source solids4FoamScripts.sh
@@ -145,16 +143,16 @@ do
 
         # Extract results from solver log and append them to a summary file
         echo; echo "Appending results to ${SUMMARY}"
-        if grep -aq "gtime/time" log.solids4Foam; then
-            CLOCK_TIME=$(grep -a "gtime/time" log.solids4Foam | awk '{print $5}')
+        if grep -q "gtime/time" log.solids4Foam; then
+            CLOCK_TIME=$(grep "gtime/time" log.solids4Foam | awk '{print $5}')
         else
             # Record the time
-            CLOCK_TIME=$(grep -a "ClockTime" log.solids4Foam | awk '{print $7}')
+            CLOCK_TIME=$(grep "ClockTime" log.solids4Foam | awk '{print $7}')
         fi
 
         # Extract results from solver log and append them to a summary file
-        if grep -aq "Maximum resident" log.solids4Foam; then
-            MAX_MEMORY=$(grep -a "Maximum resident" log.solids4Foam | awk '{print int($6 / 1000)}')
+        if grep -q "Maximum resident" log.solids4Foam; then
+            MAX_MEMORY=$(grep "Maximum resident" log.solids4Foam | awk '{print int($6 / 1000)}')
         else
             MAX_MEMORY="NaN"
         fi
@@ -164,18 +162,13 @@ do
         CELLS_SOLID=$(grep "cells:" log.checkMesh.solid | awk '{print $2}')
 
         # Point A deflection
-        if [[ ! -f postProcessing/0/solidPointDisplacement_pointDisp.dat ]]
-        then
-            echo "Missing postProcessing/0/solidPointDisplacement_pointDisp.dat"
-            exit 1
-        fi
         DY=$(awk '{print $3}' postProcessing/0/solidPointDisplacement_pointDisp.dat | tail -1)
 
         # Write data to file
         echo "$i $CELLS_FLUID $CELLS_SOLID $DT $CLOCK_TIME $MAX_MEMORY $DY " >> ../"${SUMMARY}"
 
         # Print summary file
-        echo; echo "${SUMMARY} file:"; cat ../"${SUMMARY}"; echo
+        echo; echo "${SUMMARY} file:"; cat "${SUMMARY}"; echo
 
         cd ..
     done

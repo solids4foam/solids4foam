@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2412                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          fsiProperties;
+}
+
+fluidSolidInterface NewtonQuasiMonolithic;
+
+NewtonQuasiMonolithicCoeffs
+{
+    solidPatch      interface;
+    fluidPatch      interface;
+    fluidSystemScaleFactor 1e+08;
+    coupled         yes;
+    interfaceTransferMethod directMap;
+    writeResidualsToFile yes;
+    passViscousStress yes;
+    optionsFile     petscOptions.mfjacobi;
+}
+
+
+// ************************************************************************* //
