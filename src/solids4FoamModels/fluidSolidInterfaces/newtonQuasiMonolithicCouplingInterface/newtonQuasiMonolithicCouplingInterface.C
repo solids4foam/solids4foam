@@ -2436,15 +2436,15 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
 
     }
 
-    // Configure the field split for velocity and pressure in the fluid
+    // Configure field split index sets when the top-level PC is fieldsplit.
+    // Two-level split:
+    //   Level 1: fluid vs solid (top-level PC)
+    //   Level 2: velocity vs pressure within fluid (nested PC, optional)
     if (!configuredNestedFluidSplit_)
     {
         KSP ksp;
         PC pc;
         const char* pct = nullptr;
-
-        SNESGetKSP(snes(), &ksp);
-        KSPGetPC(ksp, &pc);
 
         SNESGetKSP(snes(), &ksp);
         KSPGetPC(ksp, &pc);
@@ -2455,42 +2455,27 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         {
             configuredNestedFluidSplit_ = true;
 
-            // Ensure PC/KSP is set up *now that J is assembled*
-            KSPSetUp(ksp);
+            // Set top-level IS for fluid/solid split
+            Info<< "    Setting fluid/solid field split index sets" << endl;
+            PCFieldSplitSetIS(pc, "fluid", isFluid());
+            PCFieldSplitSetIS(pc, "solid", isSolid());
 
-            PetscInt nsplit;
-            KSP* subksps;
-            PCFieldSplitGetSubKSP(pc, &nsplit, &subksps);
-
-            for (PetscInt i = 0; i < nsplit; ++i)
+            // Ensure the KSP has the correct preconditioning matrix
+            // before setup. The SNES may not have updated the KSP
+            // operators yet (this is inside formJacobian, before
+            // SNES processes the returned matrices).
             {
-                PC subpc;
-                const char* subpct = nullptr;
-                const char* prefix = nullptr;
-                KSPGetPC(subksps[i], &subpc);
-                PCGetType(subpc, &subpct);
-                PCGetOptionsPrefix(subpc, &prefix);
-
-                if (prefix && std::strstr(prefix, "fluid"))
-                {
-                    if (subpct && !std::strcmp(subpct, PCFIELDSPLIT))
-                    {
-                        Info<< "    Defining the fluid velocity-pressure field indices"
-                            << "for the fluid sub-problem" << nl
-                            << "    split preconditioner" << endl;
-
-                        // local-to-fluid indices (0..NFluid-1)
-
-                        PCFieldSplitSetIS(subpc, "velocity", isFluidVelocity());
-                        PCFieldSplitSetIS(subpc, "pressure", isFluidPressure());
-
-                        // ISDestroy(&isV);
-                        // ISDestroy(&isP);
-
-                        break;
-                    }
-                }
+                Mat amat;
+                SNESGetJacobian(snes(), &amat, nullptr, nullptr, nullptr);
+                Mat pmat = (Pstream::parRun() && Pmat_ != nullptr)
+                    ? Pmat_ : assemblyMat;
+                KSPSetOperators(ksp, amat, pmat);
             }
+
+            // Note: nested velocity/pressure split within the fluid
+            // sub-block is configured via PETSc command-line options
+            // using block_size (e.g. -fieldsplit_fluid_pc_fieldsplit_
+            // block_size 3 for 2D, 4 for 3D).
         }
     }
 
