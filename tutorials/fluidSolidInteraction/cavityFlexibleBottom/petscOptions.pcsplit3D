@@ -1,0 +1,112 @@
+-snes_type newtonls
+-snes_rtol 1e-3
+-snes_stol 1e-3
+-snes_max_it 1000
+-snes_monitor
+-snes_converged_reason
+
+-snes_mf
+-snes_mf_operator
+
+-snes_max_linear_solve_fail 10000000
+-snes_max_funcs 100000000
+
+-ksp_type lgmres
+-ksp_gmres_restart 100
+-ksp_converged_reason
+-ksp_rtol 1e-2
+-ksp_pc_side right
+
+# Fluid block: stride 4 starting at 0, length nFluidDofs
+-pc_fieldsplit_fluid_type strided
+-pc_fieldsplit_fluid_fields 3
+-pc_fieldsplit_fluid_stride 3
+-pc_fieldsplit_fluid_first 0
+-pc_fieldsplit_fluid_size 5070
+
+# Solid block: contiguous block after fluid
+-pc_fieldsplit_solid_type contiguous
+-pc_fieldsplit_solid_first 5070
+-pc_fieldsplit_solid_size 312
+
+-pc_type fieldsplit
+-pc_fieldsplit_type schur
+-pc_fieldsplit_schur_factorization_type lower
+-pc_fieldsplit_schur_precondition selfp
+
+
+-fieldsplit_fluid_ksp_type preonly
+#-fieldsplit_fluid_pc_type fieldsplit
+#-fieldsplit_fluid_pc_type lu
+#-fieldsplit_fluid_pc_fieldsplit_type schur
+
+-fieldsplit_fluid_pc_type hypre
+-fieldsplit_fluid_pc_hypre_type boomeramg
+-fieldsplit_fluid_pc_hypre_boomeramg_max_iter 1
+-fieldsplit_fluid_pc_hypre_boomeramg_strong_threshold 0.25
+#-fieldsplit_fluid_pc_hypre_boomeramg_strong_threshold 0.7
+-fieldsplit_fluid_pc_hypre_boomeramg_grid_sweeps_up 1
+-fieldsplit_fluid_pc_hypre_boomeramg_grid_sweeps_down 1
+-fieldsplit_fluid_pc_hypre_boomeramg_agg_nl 1
+-fieldsplit_fluid_pc_hypre_boomeramg_agg_num_paths 1
+-fieldsplit_fluid_pc_hypre_boomeramg_max_levels 25
+-fieldsplit_fluid_pc_hypre_boomeramg_coarsen_type HMIS
+-fieldsplit_fluid_pc_hypre_boomeramg_interp_type ext+i
+-fieldsplit_fluid_pc_hypre_boomeramg_P_max 1
+-fieldsplit_fluid_pc_hypre_boomeramg_truncfactor 0.3
+
+#-fieldsplit_fluid_fieldsplit_velocity_pc_type hypre
+#-fieldsplit_fluid_fieldsplit_pressure_pc_type jacobi
+
+-fieldsplit_solid_ksp_type preonly
+-fieldsplit_solid_pc_type lu
+
+
+
+
+
+#-pc_type fieldsplit
+#-pc_fieldsplit_block_size 4
+
+# Velocity and pressure
+#-pc_fieldsplit_0_fields 0,1,2,3
+
+# Displacement
+#-pc_fieldsplit_1_fields 4
+
+##-pc_fieldsplit_type schur
+#-pc_fieldsplit_schur_factorization_type lower
+##-pc_fieldsplit_schur_precondition a11
+#-pc_fieldsplit_schur_precondition selfp
+
+# Velocity equation
+#-fieldsplit_0_ksp_type preonly
+#-fieldsplit_0_pc_type asm
+#-fieldsplit_0_sub_pc_type ilu
+#-fieldsplit_0_sub_pc_factor_levels 0
+
+# Pressure equation
+#-fieldsplit_1_ksp_type preonly
+
+#-fieldsplit_1_pc_type asm
+#-fieldsplit_1_sub_pc_type ilu
+#-fieldsplit_1_sub_pc_factor_levels 0
+
+# -fieldsplit_1_pc_type hypre
+# -fieldsplit_1_pc_hypre_type boomeramg
+# -fieldsplit_1_pc_hypre_boomeramg_max_iter 1
+# #-fieldsplit_1_pc_hypre_boomeramg_strong_threshold 0.25
+# -fieldsplit_1_pc_hypre_boomeramg_strong_threshold 0.7
+# -fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up 1
+# -fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down 1
+# -fieldsplit_1_pc_hypre_boomeramg_agg_nl 1
+# -fieldsplit_1_pc_hypre_boomeramg_agg_num_paths 1
+# -fieldsplit_1_pc_hypre_boomeramg_max_levels 25
+# -fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS
+# -fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i
+# -fieldsplit_1_pc_hypre_boomeramg_P_max 1
+# -fieldsplit_1_pc_hypre_boomeramg_truncfactor 0.3
+
+# #-snes_lag_preconditioner 2
+# #-snes_lag_preconditioner_persists
+# #-snes_lag_jacobian 1

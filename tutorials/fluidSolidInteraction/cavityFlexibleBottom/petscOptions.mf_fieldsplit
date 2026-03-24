@@ -1,0 +1,59 @@
+# Matrix-free Jacobian + 2-level physics-based field split preconditioner
+#
+# Level 1: fluid / solid split (multiplicative = block Gauss-Seidel)
+# Level 2 (fluid): velocity / pressure split (block_size 3 for 2D)
+#
+# Velocity: block Jacobi + ILU(0) per process
+# Pressure: Hypre BoomerAMG (single V-cycle)
+# Solid:    block Jacobi + LU per process
+#
+# Note: for 3D, change block_size to 4, 0_fields to 0,1,2, 1_fields to 3
+
+-snes_type newtonls
+-snes_linesearch_type l2
+-snes_rtol 1e-4
+-snes_stol 1e-4
+-snes_monitor
+-snes_converged_reason
+
+# Matrix-free Jacobian-vector products; assembled matrix for PC only
+-snes_mf_operator
+
+# Linear solver
+-ksp_type lgmres
+-ksp_gmres_restart 200
+-ksp_rtol 1e-4
+-ksp_converged_reason
+-ksp_max_it 500
+
+# ---------- Level 1: fluid / solid field split ----------
+-pc_type fieldsplit
+-pc_fieldsplit_type multiplicative
+
+# ---------- Fluid sub-block: nested velocity / pressure split ----------
+-fieldsplit_fluid_ksp_type preonly
+-fieldsplit_fluid_pc_type fieldsplit
+-fieldsplit_fluid_pc_fieldsplit_type schur
+-fieldsplit_fluid_pc_fieldsplit_schur_fact_type lower
+-fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp
+-fieldsplit_fluid_pc_fieldsplit_block_size 3
+-fieldsplit_fluid_pc_fieldsplit_0_fields 0,1
+-fieldsplit_fluid_pc_fieldsplit_1_fields 2
+
+# Velocity (split 0): block Jacobi with ILU(0) sub-blocks
+-fieldsplit_fluid_fieldsplit_0_ksp_type preonly
+-fieldsplit_fluid_fieldsplit_0_pc_type bjacobi
+-fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu
+-fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels 0
+
+# Pressure (split 1): Hypre BoomerAMG (single V-cycle)
+-fieldsplit_fluid_fieldsplit_1_ksp_type preonly
+-fieldsplit_fluid_fieldsplit_1_pc_type hypre
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_type boomeramg
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_iter 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold 0.5
+
+# ---------- Solid sub-block: LU per process ----------
+-fieldsplit_solid_ksp_type preonly
+-fieldsplit_solid_pc_type bjacobi
+-fieldsplit_solid_sub_pc_type lu

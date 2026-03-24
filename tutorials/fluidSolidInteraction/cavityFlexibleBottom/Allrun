@@ -4,8 +4,8 @@
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage:
-# ./Allrun                     -> partitioned, serial
-# ./Allrun parallel            -> partitioned, parallel
+# ./Allrun                     -> partitioned (Aitken), serial
+# ./Allrun parallel            -> partitioned (Aitken), parallel
 # ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
 # ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
 
@@ -17,27 +17,28 @@ for arg in "$@"; do
     if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
 done
 
-# Monolithic: delegate to the quasi-monolithic case directory
-if [[ "$SOLVER" == "monolithic" ]]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    MONOLITHIC_DIR="$SCRIPT_DIR/../../fluidSolidInteraction.monolithic/cavityFlexibleBottom/base/quasiMonolitic"
-    cd "$MONOLITHIC_DIR"
-    if $PARALLEL; then
-        ./Allrun parallel
-    else
-        ./Allrun
-    fi
-    exit $?
-fi
-
-# --- Partitioned solver ---
-
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# Check case version is correct
-solids4Foam::convertCaseFormat .
+if [[ "$SOLVER" == "monolithic" ]]; then
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    echo "Using the monolithic Newton/PETSc approach"
+    for file in $(find ./0 ./constant ./system -name '*.monolithic')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+else
+    # Dirichlet-Neumann partitioned approach
+    echo "Using the partitioned Aitken approach"
+    solids4Foam::convertCaseFormat .
+    for file in $(find ./0 ./constant ./system -name '*.partitioned')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+fi
 
+# Inlet velocity profile symlink: needed by U.partitioned (read by both solver
+# modes during decomposePar), and used as the actual BC in partitioned mode
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT != *"v"* ]]
 then
     cd 0/fluid/ && ln -sf inlet.fixedProfile velocityInletProfile && cd ../..

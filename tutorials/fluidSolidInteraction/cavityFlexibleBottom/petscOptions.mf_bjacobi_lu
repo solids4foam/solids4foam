@@ -1,0 +1,21 @@
+# Matrix-free Jacobian + Block Jacobi with LU sub-blocks
+-snes_type newtonls
+-snes_linesearch_type l2
+-snes_rtol 1e-4
+-snes_stol 1e-4
+-snes_monitor
+-snes_converged_reason
+
+# Matrix-free Jacobian-vector products; assembled matrix for PC only
+-snes_mf_operator
+
+# Linear solver
+-ksp_type lgmres
+-ksp_gmres_restart 200
+-ksp_rtol 1e-4
+-ksp_converged_reason
+-ksp_max_it 500
+
+# Block Jacobi with LU per-process sub-blocks
+-pc_type bjacobi
+-sub_pc_type lu
