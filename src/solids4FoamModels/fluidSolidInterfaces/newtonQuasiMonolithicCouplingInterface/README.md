@@ -39,7 +39,7 @@ NewtonQuasiMonolithicCoeffs
     coupled             yes;
     interfaceTransferMethod directMap;
     passViscousStress   yes;
-    optionsFile         petscOptions.mfjacobi;  // PETSc SNES/KSP/PC options
+    optionsFile         petscOptions.mf_bjacobi_lu;  // PETSc SNES/KSP/PC options
 }
 ```
 
@@ -50,13 +50,15 @@ for the SNES nonlinear solver, KSP linear solver, and PC preconditioner.
 
 ### Recommended for parallel runs
 
-**`petscOptions.mfjacobi`** (default): Matrix-free Jacobian with Jacobi
-preconditioner. Uses finite-difference Jacobian-vector products for the Newton
-direction and the assembled Jacobian only for preconditioning.
+**`petscOptions.mf_bjacobi_lu`** (default): Matrix-free Jacobian with block
+Jacobi preconditioner using LU factorisation per process. Best parallel
+performance — fewest KSP iterations per SNES step.
 
-**`petscOptions.lupar`**: Matrix-free Jacobian with redundant LU
-preconditioner. More robust but gathers the matrix to a single process for
-factoring — only practical for small to moderate problem sizes.
+**`petscOptions.mf_asm_ilu`**: Matrix-free Jacobian with additive Schwarz
+(overlap 1) and ILU(1) sub-blocks. Good alternative with lower memory.
+
+**`petscOptions.mf_bjacobi_ilu`**: Matrix-free Jacobian with block Jacobi
+and ILU(0) sub-blocks. Lightest memory footprint but more KSP iterations.
 
 ### Serial-only options
 

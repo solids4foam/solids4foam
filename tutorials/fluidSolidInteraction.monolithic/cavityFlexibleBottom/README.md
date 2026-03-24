@@ -35,15 +35,17 @@ cd base/quasiMonolitic
 The solver behaviour is controlled via the `optionsFile` entry in
 `constant/fsiProperties`. Several configurations are provided:
 
-| File | Description | Parallel |
-|------|-------------|----------|
-| `petscOptions.mfjacobi` | Matrix-free J*v, Jacobi PC, LGMRES | Yes (default) |
-| `petscOptions.lupar` | Matrix-free J*v, redundant LU PC | Yes (small cases) |
-| `petscOptions.lu` | Assembled Jacobian, direct LU | Serial only |
+| File | Description | Notes |
+|------|-------------|-------|
+| `petscOptions.mf_bjacobi_lu` | Matrix-free J*v, block Jacobi + LU sub-blocks | **Default**. Best parallel performance |
+| `petscOptions.mf_asm_ilu` | Matrix-free J*v, additive Schwarz + ILU(1) | Good alternative, ~2x more KSP iters |
+| `petscOptions.mf_bjacobi_ilu` | Matrix-free J*v, block Jacobi + ILU(0) | Lighter memory, ~3x more KSP iters |
+| `petscOptions.mf_hypre` | Matrix-free J*v, Hypre BoomerAMG | Does not converge on this saddle-point system |
+| `petscOptions.lu` | Assembled Jacobian, direct LU | Serial only. Most robust |
 
 To switch, edit `constant/fsiProperties`:
 ```c++
-optionsFile petscOptions.mfjacobi;
+optionsFile petscOptions.mf_bjacobi_lu;
 ```
 
 ### Mesh Refinement
