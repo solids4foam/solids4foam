@@ -77,11 +77,18 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
     const label fluidBlockSize = twoD ? 3 : 4;
     const label fluidLocalSize = fluidBlockn*fluidBlockSize;
 
-    // Global indexing for the fluid block: gives each process its global
-    // start offset within the fluid DOFs
-    const globalIndex fluidGI(fluidLocalSize);
-    const label localFluidStart = fluidGI.localStart();
-    const label totalFluidSize = fluidGI.totalSize();
+    // Solid block parameters (needed early for global start calculation)
+    const label solidBlockn = solid().mesh().nCells();
+    const label solidBlockSize = twoD ? 2 : 3;
+    const label solidLocalSize = solidBlockn*solidBlockSize;
+
+    // The Vec layout is per-process interleaved: each process owns
+    // [proc_fluid, proc_solid] as a contiguous chunk. We need the IS
+    // global indices to match this layout, NOT block-wise numbering.
+    const label totalLocalSize = fluidLocalSize + solidLocalSize;
+    const globalIndex vecGI(totalLocalSize);
+    const label vecGlobalStart = vecGI.localStart();
+    const label localFluidStart = vecGlobalStart;
 
     // Fluid IS: each process owns its local portion of the fluid indices
     ISCreateStride
@@ -138,20 +145,14 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
         );
     }
 
-    // Solid IS: each process owns its local portion, offset by the total
-    // fluid size in the monolithic system
+    // Solid IS: each process owns its local portion, offset by the local
+    // fluid size within this process's chunk of the Vec
     {
-        const label solidBlockn = solid().mesh().nCells();
-        const label solidBlockSize = twoD ? 2 : 3;
-        const label solidLocalSize = solidBlockn*solidBlockSize;
-
-        const globalIndex solidGI(solidLocalSize);
-
         ISCreateStride
         (
             PETSC_COMM_WORLD,
             solidLocalSize,
-            totalFluidSize + solidGI.localStart(),
+            vecGlobalStart + fluidLocalSize,
             1,
             &isSolid_
         );
@@ -225,17 +226,28 @@ void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
     // Each process must specify its own global index range within each
     // region, accounting for DOFs on preceding processes (parallel fix).
     std::vector<IS> isRow(nRegions), isCol(nRegions);
-    label cumulativeGlobalSize = 0;
+
+    // The Vec layout is per-process interleaved: each process owns
+    // [region0_local, region1_local, ...] as a contiguous chunk.
+    // Compute total local size to get the Vec global start for this process.
+    label totalLocalSize = 0;
+    for (label r = 0; r < nRegions; ++r)
+    {
+        totalLocalSize +=
+            nBlocksAndBlockSize[r].first()*nBlocksAndBlockSize[r].second();
+    }
+    const globalIndex vecGI(totalLocalSize);
+    const label vecGlobalStart = vecGI.localStart();
+
+    label cumulativeLocalSize = 0;
     for (label r = 0; r < nRegions; ++r)
     {
         const label nBlocks = nBlocksAndBlockSize[r].first();
         const label blockSize = nBlocksAndBlockSize[r].second();
         const label regionLocalSize = nBlocks*blockSize;
 
-        // Compute the global start index for this process within this
-        // region, accounting for DOFs on preceding processes
-        const globalIndex regionGI(regionLocalSize);
-        const label first = cumulativeGlobalSize + regionGI.localStart();
+        // Global start index for this process's region r DOFs
+        const label first = vecGlobalStart + cumulativeLocalSize;
 
         // Create an IS that covers the indices for region r
         ISCreateStride
@@ -246,7 +258,7 @@ void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
         (
             PETSC_COMM_WORLD, regionLocalSize, first, 1, &isCol[r]
         );
-        cumulativeGlobalSize += regionGI.totalSize();
+        cumulativeLocalSize += regionLocalSize;
     }
 
     // Create an array of submatrices.
