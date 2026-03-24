@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Example usage:
+# ./Allrun                     -> partitioned, serial
+# ./Allrun parallel            -> partitioned, parallel
+# ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
+# ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
+
+# Parse arguments (order-independent)
+SOLVER="partitioned"
+PARALLEL=false
+for arg in "$@"; do
+    if [[ "$arg" == "monolithic" ]]; then SOLVER="monolithic"; fi
+    if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
+done
+
+# Monolithic: delegate to the quasi-monolithic case directory
+if [[ "$SOLVER" == "monolithic" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    MONOLITHIC_DIR="$SCRIPT_DIR/../../fluidSolidInteraction.monolithic/cavityFlexibleBottom/base/quasiMonolitic"
+    cd "$MONOLITHIC_DIR"
+    if $PARALLEL; then
+        ./Allrun parallel
+    else
+        ./Allrun
+    fi
+    exit $?
+fi
+
+# --- Partitioned solver ---
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT != *"v"* ]]
+then
+    cd 0/fluid/ && ln -sf inlet.fixedProfile velocityInletProfile && cd ../..
+else
+    cd 0/fluid/ && ln -sf inlet.parabolic velocityInletProfile && cd ../..
+fi
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if $PARALLEL; then
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
