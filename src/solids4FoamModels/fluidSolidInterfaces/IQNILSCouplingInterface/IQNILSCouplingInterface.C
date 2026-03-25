@@ -441,9 +441,9 @@ void IQNILSCouplingInterface::combinedCouplingMode
     const label totalSize = combinedCouplingSystemSize();
 
     v.setSize(totalSize);
-    v = Zero;
+    v = vector::zero;
     w.setSize(totalSize);
-    w = Zero;
+    w = vector::zero;
 
     label offset = 0;
 
@@ -471,7 +471,7 @@ void IQNILSCouplingInterface::combinedCouplingMode
 
 vectorField IQNILSCouplingInterface::combinedResidual()
 {
-    vectorField residual(combinedCouplingSystemSize(), Zero);
+    vectorField residual(combinedCouplingSystemSize(), vector::zero);
 
     label offset = 0;
 
@@ -614,7 +614,7 @@ label IQNILSCouplingInterface::orthogonalizeCouplingColumn
 
     while (true)
     {
-        vectorField u(v.size(), Zero);
+        vectorField u(v.size(), vector::zero);
         scalarField s(colNum, 0.0);
 
         for (label j = 0; j < colNum; j++)
@@ -1376,7 +1376,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 vectorField couplingCorrection
                 (
                     combinedCouplingSystemSize(),
-                    Zero
+                    vector::zero
                 );
 
                 for (label i = 0; i < cols; i++)
@@ -1655,7 +1655,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 vectorField couplingCorrection
                 (
                     fluidZonesPointsDispls()[interfaceI].size(),
-                    Zero
+                    vector::zero
                 );
 
                 for (label i = 0; i < cols; i++)
