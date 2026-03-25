@@ -1121,6 +1121,8 @@ Foam::solidModel::solidModel
     (
         solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
     ),
+    highOrderJacobian_(false),
+    highOrderResidual_(false),
     pPtr_()
 #ifdef OPENFOAM_COM
     ,
@@ -1189,6 +1191,31 @@ Foam::solidModel::solidModel
         gradDD_.writeOpt() = IOobject::NO_WRITE;
     }
 
+    if (solidModelDict().found("highOrderCoeffs"))
+    {
+        const dictionary& hoDict = solidModelDict().subDict("highOrderCoeffs");
+
+        highOrderJacobian_ =
+            hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
+
+        highOrderResidual_ =
+            hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
+
+        if
+        (
+            (highOrderJacobian_ || highOrderResidual_)
+         && solutionAlg() != solutionAlgorithm::PETSC_SNES
+        )
+        {
+            FatalErrorInFunction
+                << "highOrderResidual/highOrderJacobian are only supported "
+                << "with "
+                << solidModel::solutionAlgorithmNames_
+                   [solidModel::solutionAlgorithm::PETSC_SNES]
+                << abort(FatalError);
+        }
+    }
+
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
 
@@ -1242,6 +1269,23 @@ Foam::solidModel::solidModel
     if (!stabDict.found("pressure"))
     {
         stabDict.add("pressure", defaultStabSubDict);
+    }
+
+    // Only alpha stabilisation is allowed with high-order residual calculation
+    if (stabDict.found("momentum"))
+    {
+        const dictionary& momentumDict = stabDict.subDict("momentum");
+
+        const word stabType =
+            momentumDict.lookupOrDefault<word>("type", "default");
+
+        if (stabType != "alpha" && highOrderResidual())
+        {
+            FatalErrorInFunction
+                << "Only alpha stabilisation is supported with high-order "
+                << "residual calculation"
+                << abort(FatalError);
+        }
     }
 
     momentumStabilisationPtr_ =

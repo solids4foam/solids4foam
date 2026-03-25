@@ -88,7 +88,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = n.boundaryField()[patchI];
 
-            if (highOrderResidual_)
+            if (highOrderResidual())
             {
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
@@ -400,7 +400,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
 
     // Update gradient of displacement
-    if (highOrderResidual_)
+    if (highOrderResidual())
     {
         gradD() = MLS().grad(D());
 
@@ -690,8 +690,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
-    highOrderJacobian_(false),
-    highOrderResidual_(false),
     ds_
     (
         IOobject
@@ -715,28 +713,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
-
-    if
-    (
-        (solutionAlg() == solutionAlgorithm::PETSC_SNES)
-     && solidModelDict().found("highOrderCoeffs")
-    )
-    {
-        const dictionary& dict =
-            solidModelDict().subDict("highOrderCoeffs");
-
-        highOrderJacobian_ =
-            dict.lookupOrDefault<Switch>
-            (
-                "highOrderJacobian", false
-            );
-
-        highOrderResidual_ =
-            dict.lookupOrDefault<Switch>
-            (
-                "highOrderResidual", false
-            );
-    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
 
@@ -995,7 +971,7 @@ label linGeomTotalDispSolid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    if (solvePressure() && highOrderResidual_)
+    if (solvePressure() && highOrderResidual())
     {
         FatalErrorInFunction
                 << "solvePressure must be disbled when using high order "
@@ -1021,9 +997,13 @@ label linGeomTotalDispSolid::formResidual
         dimensionedVector("0", dimPressure, vector::zero)
     );
 
-    if(highOrderResidual_)
+    if (highOrderResidual())
     {
-        // Update gradient of displacement
+        // Update cell-centre gradient of displacement
+        // Consider switching to mechanical().grad() interface
+        gradD() = MLS().grad(D);
+
+        // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
 
         // Calculate sigma at quadrature points
@@ -1097,10 +1077,6 @@ label linGeomTotalDispSolid::formResidual
         );
     }
 
-    if(highOrderResidual_)
-    {
-
-
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
@@ -1123,7 +1099,7 @@ label linGeomTotalDispSolid::formResidual
         )
     );
 
-    if (highOrderResidual_)
+    if (highOrderResidual())
     {
         residual -= rho() * hofvc::d2dt2(D);
     }

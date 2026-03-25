@@ -285,6 +285,12 @@ private:
         //- Flag indicating that the pressure equation should be solved
         const Switch solvePressure_;
 
+        //- Calculate Jacobian using high order (for PETSc SNES)
+        Switch highOrderJacobian_;
+
+        //- High-order residual calculation (for PETSc SNES)
+        Switch highOrderResidual_;
+
         //- Pressure
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
         autoPtr<volScalarField> pPtr_;
@@ -555,6 +561,14 @@ public:
             const solutionAlgorithm& solutionAlg() const
             {
                 return solutionAlgorithm_;
+            }
+
+            //- Return true if the high-order residual discretisation is active
+            bool highOrderResidual() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderResidual_;
             }
 
             //- Is it a new time step? This function return true the first time

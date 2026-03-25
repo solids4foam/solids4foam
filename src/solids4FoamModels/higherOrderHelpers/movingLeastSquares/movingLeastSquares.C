@@ -1069,7 +1069,7 @@ movingLeastSquares::patchFaceQuadValues
     const fixedDisplacementFvPatchVectorField& patchField =
         refCast<const fixedDisplacementFvPatchVectorField>(pf);
 
-    return patchField.evaluateQuadrature(quadrature_.faceQuadPoints());
+    return patchField.evaluateQuadrature();
 }
 
 

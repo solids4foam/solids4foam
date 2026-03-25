@@ -97,14 +97,6 @@ class linGeomTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
-        //- Calculate Jacobian using high order, only used in
-        //  combination with PETSC_SNES
-        Switch highOrderJacobian_;
-
-        //- High order residual calculation, only used in combination
-        //  with PETSC_SNES
-        Switch highOrderResidual_;
-
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
 

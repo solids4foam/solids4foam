@@ -38,6 +38,7 @@ Author
 #define alphaStab_H
 
 #include "stabilisationModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,6 +68,22 @@ class alphaStab
             const GeoField& field,
             const GradField& gradField,
             SurfaceField& faceFlux,
+            scalar scaleFactor
+        ) const;
+
+        void computeDiffStencilHighOrderScalar
+        (
+            const volScalarField& field,
+            const volVectorField& gradField,
+            surfaceScalarField& faceFlux,
+            scalar scaleFactor
+        ) const;
+
+        void computeDiffStencilHighOrderVector
+        (
+            const volVectorField& field,
+            const volTensorField& gradField,
+            surfaceVectorField& faceFlux,
             scalar scaleFactor
         ) const;
 
@@ -115,6 +132,14 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
+            ) const;
+
+            //- Provide an approximate implicit Jacobian contribution
+            virtual const fvVectorMatrix& vectorJacobian
+            (
+                const volVectorField& field,
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 };
 

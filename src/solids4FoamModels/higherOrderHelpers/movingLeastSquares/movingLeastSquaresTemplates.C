@@ -119,8 +119,7 @@ tmp<GeometricField<
     );
 
     GeometricField<GradType, fvPatchField, volMesh>& grad = tGrad.ref();
-    //    Info<< gradCoeffs[0]<<endl;
-    //    Info<<stencils[0]<<endl;
+
     forAll(stencils, cellI)
     {
         const UList<label> stencil = stencils[cellI];

@@ -26,6 +26,7 @@ License
 #include "pointFields.H"
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -359,10 +360,15 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
 
 autoPtr<CompactListList<vector>>
 fixedDisplacementFvPatchVectorField::evaluateQuadrature
-(
-    const CompactListList<point>& faceQuadPoints
-) const
+() const
 {
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is list for the  whole mesh
+    const CompactListList<point>& faceQuadPoints =
+        solMod.MLSQuadrature().faceQuadPoints();
+
     // faceQuadPoints is list for whole mesh.
     labelList nQpPerFace(this->size(), 0);
     const label start = this->patch().start();

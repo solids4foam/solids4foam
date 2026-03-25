@@ -186,9 +186,7 @@ public:
             //- Return face quadrature points values
             // Used for high order solvers, argument is position of points
             virtual autoPtr<CompactListList<vector>> evaluateQuadrature
-            (
-                const CompactListList<point>& faceQuadPoints
-            ) const;
+            () const;
 
         // Mapping functions
 
