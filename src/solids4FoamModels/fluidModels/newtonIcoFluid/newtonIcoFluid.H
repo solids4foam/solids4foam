@@ -237,10 +237,7 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            )
-            {
-                return formResidual(f, x, false);
-            }
+            );
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector, with optional flux extrapolation
@@ -266,10 +263,7 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
-            )
-            {
-                return formJacobian(jac, x, false);
-            }
+            );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian

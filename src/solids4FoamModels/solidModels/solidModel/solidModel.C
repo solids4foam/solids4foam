@@ -636,7 +636,7 @@ Foam::solidModel::solidModel
                 runTime,
                 IOobject::MUST_READ
             )
-        ).ptr()
+        )
     ),
     meshPtr_
     (

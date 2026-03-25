@@ -792,11 +792,8 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
         // is set to zero on traction boundaries
-        const scalar scaleFactor =
-            readScalar(stabilisation().dict().lookup("scaleFactor"));
-        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-        traction +=
-            scaleFactor*impKf_*(fvc::snGrad(DFutureTime_) - (n & gradDf));
+        momentumStabilisation().updateVector(DFutureTime_, &gradD());
+        traction += impKf_*momentumStabilisation().faceVector();
 
         // Update the future-time force at the faces
         forceFutureTime_ = mesh.magSf()*traction;
@@ -832,11 +829,8 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
         // the traction in the reference configuration)
         // CAREFUL: D may not have corrected BCs with non-ortho corrections; maybe
         // formulate in terms of alpha scheme instead
-        const scalar scaleFactor =
-            readScalar(stabilisation().dict().lookup("scaleFactor"));
-        const surfaceTensorField gradDf(fvc::interpolate(gradD()));
-        tractionNew +=
-            scaleFactor*impKf_*(fvc::snGrad(DFutureTime_) - (n & gradDf));
+        momentumStabilisation().updateVector(DFutureTime_, &gradD());
+        tractionNew += impKf_*momentumStabilisation().faceVector();
 
         // Update the future-time force at the faces
         forceFutureTime_ = magSfNew*tractionNew;
