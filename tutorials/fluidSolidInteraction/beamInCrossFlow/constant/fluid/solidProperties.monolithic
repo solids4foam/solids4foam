@@ -11,13 +11,18 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       uniformDimensionedVectorField;
-    location    "constant";
-    object      g;
+    class       dictionary;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -2 0 0 0 0];
-value           ( 0 0 0 );
+solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm    PETScSNES;
+    optionsFile    petscOptions.meshMotion;
+}
+
 
 // ************************************************************************* //

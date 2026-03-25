@@ -11,13 +11,35 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       uniformDimensionedVectorField;
-    location    "constant";
-    object      g;
+    class       dictionary;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -2 0 0 0 0];
-value           ( 0 0 0 );
+fluidSolidInterface NewtonQuasiMonolithic;
+
+NewtonQuasiMonolithicCoeffs
+{
+    // Solid and fluid interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Enable coupling
+    coupled         yes;
+
+    // Mapping data across the solid-fluid interface
+    interfaceTransferMethod directMap;
+
+    // PETSc SNES nonlinear solver settings file
+    optionsFile     petscOptions.mf_fieldsplit;
+
+    // Pass viscous forces from fluid-to-solid interface (in addition to pressure
+    // forces)
+    passViscousStress yes;
+
+    // Scaling for fluid system to improve the condition number
+    fluidSystemScaleFactor 1e+08;
+}
+
 
 // ************************************************************************* //

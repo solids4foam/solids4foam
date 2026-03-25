@@ -16,5 +16,8 @@ else
 fi
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
+# Remove symlinks created by Allrun for monolithic/partitioned switching
+find ./0 ./constant ./system -maxdepth 3 -type l -exec rm -f {} \; 2>/dev/null
+
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

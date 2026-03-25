@@ -11,13 +11,25 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       uniformDimensionedVectorField;
-    location    "constant";
-    object      g;
+    class       dictionary;
+    object      mechanicalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -2 0 0 0 0];
-value           ( 0 0 0 );
+planeStress no;
+
+mechanical
+(
+    rubber
+    {
+        type        diffusionHyperElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1;
+        mu          mu [1 -1 -2 0 0 0 0] 1;
+        K           K [1 -1 -2 0 0 0 0]  3;
+        diffusivity quadratic inverseDistance (interface);
+        regionName fluid;
+        writeStiffScaleFactor no;
+    }
+);
 
 // ************************************************************************* //

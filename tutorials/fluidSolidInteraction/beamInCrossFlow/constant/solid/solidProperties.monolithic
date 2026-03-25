@@ -11,13 +11,23 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       uniformDimensionedVectorField;
-    location    "constant";
-    object      g;
+    class       dictionary;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -2 0 0 0 0];
-value           ( 0 0 0 );
+solidModel    nonLinearGeometryTotalLagrangianVelocity;
+
+nonLinearGeometryTotalLagrangianVelocityCoeffs
+{
+    linearElasticFormulation no;
+
+    dampingCoeff [0 0 -1 0 0 0 0] 1e-1;
+
+    stabilisation
+    {
+        scaleFactor 0.1;
+    }
+}
 
 // ************************************************************************* //

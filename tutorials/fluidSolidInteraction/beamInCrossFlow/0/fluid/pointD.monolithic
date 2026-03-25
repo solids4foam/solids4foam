@@ -11,51 +11,51 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       pointVectorField;
+    object      D;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            backward;
-}
+dimensions      [0 1 0 0 0 0 0];
 
-ddtSchemes
-{
-    default            backward;
-}
+internalField   uniform (0 0 0);
 
-gradSchemes
+boundaryField
 {
-    default            leastSquares;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear corrected;
-    laplacian(DDD,DD)  Gauss linear corrected;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-    interpolate(grad(DD)) linear;
+    interface
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    left
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    symmetry
+    {
+        type            symmetryPlane;
+    }
 }
 
 // ************************************************************************* //

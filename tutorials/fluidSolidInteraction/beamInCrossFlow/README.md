@@ -106,9 +106,11 @@ $$
 = \boldsymbol{n}^{[i]} \cdot \boldsymbol{\sigma}_{\mathrm{solid}}^{[i]}
 $$
 
-A partitioned approach is adopted for enforcing these interface conditions where
-the fluid and solid regions are solved separately. A strongly-coupled
-Dirichlet-Neumann coupling algorithm is used:
+Two approaches are available for enforcing these interface conditions:
+
+**Partitioned (Aitken)**: the fluid and solid regions are solved separately
+using a strongly-coupled Dirichlet-Neumann coupling algorithm with Aitken
+under-relaxation:
 
 ```pseudocode
 for all time-steps
@@ -122,6 +124,11 @@ for all time-steps
     while not converged
 end
 ```
+
+**Monolithic (Newton/PETSc)**: the fluid and solid are assembled into a single
+coupled nonlinear system and solved simultaneously using a Newton method with
+PETSc. A physics-based field-split preconditioner is used to efficiently solve
+the coupled system.
 
 ---
 
@@ -147,56 +154,21 @@ ground, wall and outlet.
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e.
-`./Allrun`. The `Allrun` script is shown below:
+The tutorial case can be run using the included `Allrun` script. The case
+supports both a **partitioned** (Aitken) and a **monolithic** (Newton/PETSc)
+FSI coupling approach, either in serial or parallel:
 
 ```bash
-#!/bin/bash
-
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
-
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
-
-# Check case version is correct
-solids4Foam::convertCaseFormat .
-
-# Create meshes
-solids4Foam::runApplication -s solid blockMesh -region solid
-solids4Foam::runApplication -s fluid blockMesh -region fluid
-
-# Run solver
-if [[ "$1" == "parallel" ]]; then
-    # Run parallel
-    solids4Foam::runApplication -s fluid decomposePar -region fluid
-    solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
-    solids4Foam::runApplication -s fluid reconstructPar -region fluid
-    solids4Foam::runApplication -s solid reconstructPar -region solid
-else
-    # Run serial
-    solids4Foam::runApplication solids4Foam
-fi
-
-# Create plots
-if command -v gnuplot &> /dev/null
-then
-    echo "Generating deflection.pdf using gnuplot"
-    gnuplot deflection.gnuplot &> /dev/null
-    echo "Generating force.pdf using gnuplot"
-    gnuplot force.gnuplot &> /dev/null
-else
-    echo "Please install gnuplot if you would like to generate the plots"
-fi
+./Allrun                     # partitioned (Aitken), serial
+./Allrun parallel            # partitioned (Aitken), parallel
+./Allrun monolithic          # monolithic (Newton/PETSc), serial
+./Allrun monolithic parallel # monolithic (Newton/PETSc), parallel
 ```
 
-where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
-case to make it compatible with your version of OpenFOAM/foam-extend. As can be
-seen, if the argument "parallel" is passed to the `Allrun` script (i.e.
-`> ./Allrun parallel`) it will run the case in parallel. After the solver has
-finished, `force.pdf` and `deflection.pdf` plots are generated if the `gnuplot`
-program is installed.
+The monolithic approach requires PETSc and does not run with foam-extend.
+
+After the solver has finished, `force.pdf` and `deflection.pdf` plots are
+generated if the `gnuplot` program is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
