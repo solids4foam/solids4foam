@@ -55,10 +55,7 @@ available:
 ```
 
 The `Allrun` script runs `blockMesh` for both `solid` and `fluid` regions,
-then launches the solver. For the monolithic variant, the case is run from
-`tutorials/fluidSolidInteraction.monolithic/cavityFlexibleBottom/base/quasiMonolitic/`;
-see the `README.md` there for PETSc options and mesh refinement variants.
-Optionally, if `gnuplot` is installed, a file `deflection.pdf` will be
+then launches the solver. Optionally, if `gnuplot` is installed, a file `deflection.pdf` will be
 created with the displacement history of point A, and a file `force.pdf`
 will be created with the history of the force on the interface.
 
@@ -116,7 +113,7 @@ in the solid part at the final time step, from [1].  Mesh spacing  0.025 m**
 
 ![.](images/cavityFlexibleBottom-TukovicEtAl-displacement.png)
 **Figure 6: Displacement of point A and force at the plate
-as a funcion of cell size [1]**
+as a function of cell size [1]**
 
 ---
 
