@@ -1,4 +1,4 @@
-tmp<volScalarField> rAU;
+//tmp<volScalarField> rAU;
 
 if (correctPhi)
 {

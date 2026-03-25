@@ -521,16 +521,22 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Calculate the volume preserving right Cauchy Green tensor
-    const volTensorField C(F().T() & F());
+    const volTensorField C(FT & F);
     // PC: this should be symmetric, we could do this:
     // const volTensorField C = symm(F().T() & F());
 
     // Define Fbar := J^(-1/3)*F
-    const volTensorField Fbar(pow(J, -1.0/3.0)*F());
+    const volTensorField Fbar(pow(J, -1.0/3.0)*F);
 
     // Define Cbar := J^(-2/3)*C
     const volTensorField Cbar(pow(J, -2.0/3.0)*C);
@@ -699,27 +705,31 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const surfaceTensorField& F = this->Ff();
+    const surfaceTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J(det(Ff()));
+    const surfaceScalarField J(det(F));
 
     // Calculate the volume preserving right Cauchy Green tensor
-    const surfaceTensorField C(Ff().T() & Ff());
-    // PC: this should be symmetric, we could do this:
-    // const surfaceTensorField C = symm(F().T() & F());
+    const surfaceSymmTensorField C(symm(FT & F));
 
     // Define Fbar := J^(-1/3)*F
-    const surfaceTensorField Fbar(pow(J, -1.0/3.0)*Ff());
+    const surfaceTensorField Fbar(pow(J, -1.0/3.0)*F);
 
     // Define Cbar := J^(-2/3)*C
-    const surfaceTensorField Cbar(pow(J, -2.0/3.0)*C);
+    const surfaceSymmTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
 #ifdef OPENFOAM_NOT_EXTEND
-    const tensorField& CI = C.primitiveField();
+    const symmTensorField& CI = C.primitiveField();
     const scalarField& JI = J.primitiveField();
     symmTensorField& transformNeededI = transformNeededf_.primitiveFieldRef();
 #else
-    const tensorField& CI = C.internalField();
+    const symmTensorField& CI = C.internalField();
     const scalarField& JI = J.internalField();
     symmTensorField& transformNeededI = transformNeededf_.internalField();
 #endif
@@ -763,7 +773,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     forAll(C.boundaryField(), patchI)
     {
         // Take references to the patch fields for efficiency
-        const tensorField& CP = C.boundaryField()[patchI];
+        const symmTensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
 #ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& transformNeededP =

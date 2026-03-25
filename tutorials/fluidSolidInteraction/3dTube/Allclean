@@ -6,18 +6,18 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+[ -f constant/solid/polyMesh/blockMeshDict ] && cp constant/solid/polyMesh/blockMeshDict system/solid/
+[ -f constant/fluid/polyMesh/blockMeshDict ] && cp constant/fluid/polyMesh/blockMeshDict system/fluid
 cleanCase
-cleanCase fluid
-cleanCase solid
-
-if [[ $WM_PROJECT == "foam" ]]
-then
+if [[ $WM_PROJECT = "foam" ]]; then
     foamClearPolyMesh -region fluid
     foamClearPolyMesh -region solid
-else
+elif [[ $WM_PROJECT_VERSION == v* ]]; then
     foamCleanPolyMesh -region fluid
     foamCleanPolyMesh -region solid
 fi
+[ -f system/solid/blockMeshDict ] && mkdir constant/solid/polyMesh && cp system/solid/blockMeshDict constant/solid/polyMesh/
+[ -f system/fluid/blockMeshDict ] && mkdir constant/fluid/polyMesh && cp system/fluid/blockMeshDict constant/fluid/polyMesh/
 
 rm -rf case.foam postProcessing residuals
 rm -rf radialDisplacement.pdf fsiConvergence.pdf axialDisplacement.pdf
@@ -37,7 +37,7 @@ then
 fi
 
 # Link files back to default with pimpleFluid
-for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+for file in $(find ./0 ./constant ./system -name '*.robin')
 do
     ln -vnsf ${file##*/} ${file%.*}
 done

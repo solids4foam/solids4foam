@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -40,12 +40,15 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
     stabilisation
     {
-        // Momentum stabilisation seems to contribute to sigmaHyd oscillations
-        //type none;
-        type RhieChow;
-        // type JamesonSchmidtTurkel;
+        momentum
+        {
+            // Momentum stabilisation seems to contribute to sigmaHyd oscillations
+            //type none;
+            type RhieChow;
+            // type JamesonSchmidtTurkel;
 
-        scaleFactor 0.1;
+            scaleFactor 0.1;
+        }
     }
 }
 

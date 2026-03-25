@@ -1,0 +1,102 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    rho
+    {}
+
+    "alpha.water.*"
+    {
+        nAlphaCorr      3;
+        nAlphaSubCycles 1;
+        cAlpha          1;
+
+        MULESCorr       yes;
+        nLimiterIter    5;
+
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-8;
+        relTol          0;
+    }
+
+    "pcorr|pcorrFinal"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-10;
+        relTol          0;
+    }
+
+    "pd|p_rgh"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-07;
+        relTol          0.05;
+    }
+
+    "pdFinal|p_rghFinal"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-07;
+        relTol          0;
+    }
+
+    "U|UFinal"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-06;
+        relTol          0;
+    }
+
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0.001;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor yes;
+    nOuterCorrectors 1;
+    nCorrectors     4;
+    nNonOrthogonalCorrectors 1;
+    //correctPhi yes;
+    moveMeshOuterCorrectors yes;
+}
+
+// ************************************************************************* //

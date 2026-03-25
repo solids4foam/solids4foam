@@ -17,8 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef OPENFOAM_ORG
-
 #include "enhancedVolPointInterpolation.H"
 #include "fvMesh.H"
 #include "volFields.H"
@@ -66,6 +64,14 @@ void Foam::enhancedVolPointInterpolation::calcBoundaryAddressing()
             << endl;
     }
 
+#ifdef OPENFOAM_COM
+    const label nBoundaryFaces = mesh().nBoundaryFaces();
+    const label nInternalFaces = mesh().nInternalFaces();
+#else
+    const label nInternalFaces = mesh().nInternalFaces();
+    const label nBoundaryFaces = mesh().nFaces() - nInternalFaces;
+#endif
+
     boundaryPtr_.reset
     (
         new primitivePatch
@@ -73,8 +79,8 @@ void Foam::enhancedVolPointInterpolation::calcBoundaryAddressing()
             SubList<face>
             (
                 mesh().faces(),
-                mesh().nBoundaryFaces(),
-                mesh().nInternalFaces()
+                nBoundaryFaces,
+                nInternalFaces
             ),
             mesh().points()
         )
@@ -131,8 +137,13 @@ void Foam::enhancedVolPointInterpolation::calcBoundaryAddressing()
     );
 
     // Convert to bitSet
+#ifdef OPENFOAM_COM
     isPatchPoint_.setSize(mesh().nPoints());
     isPatchPoint_.assign(isPatchPoint);
+#else
+    isPatchPoint_.setSize(mesh().nPoints(), false);
+    isPatchPoint_ = isPatchPoint;
+#endif
 
     if (debug)
     {
@@ -326,7 +337,7 @@ void Foam::enhancedVolPointInterpolation::interpolateOne
         addSeparated(pf);
 
         // Optionally normalise
-        if (tnormalisation)
+        if (tnormalisation.valid())
         {
             const scalarField& normalisation = tnormalisation();
             forAll(mp, i)
@@ -516,7 +527,5 @@ void Foam::enhancedVolPointInterpolation::interpolateDisplacement
 
     pcs.constrainDisplacement(pf, false);
 }
-
-#endif // not OPENFOAM_ORG
 
 // ************************************************************************* //

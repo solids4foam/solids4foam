@@ -49,6 +49,7 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "GeometricFields.H"
+#include "fvm.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -149,6 +150,45 @@ namespace Foam
         }
 
         return L; // NRVO/move on modern forks; fine for small lists regardless
+    }
+
+    // fvm::ddt(const volVectorField&) which is missing in foam-extend
+    inline Foam::tmp<Foam::fvMatrix<Foam::vector>>
+    fvmDdtVectorCompat(const Foam::volVectorField& D)
+    {
+    #ifdef FOAMEXTEND
+        return Foam::fvm::ddt(const_cast<Foam::volVectorField&>(D));
+    #else
+        return Foam::fvm::ddt(D);
+    #endif
+    }
+
+    // Provide OpenFOAM.com ends_with function
+    inline bool endsWith(const word& w, const char* s)
+    {
+        const auto len = std::strlen(s);
+        return
+            w.size() >= len
+         && !w.compare(w.size() - len, word::npos, s, len);
+    }
+
+    // Provide OpenFOAM.com ends_with function
+    inline bool endsWith(const word& w, const word& s)
+    {
+        return
+            w.size() >= s.size()
+         && !w.compare(w.size() - s.size(), word::npos, s);
+    }
+
+    // Return the dimensionedInternalField/internalField name
+    template<class T>
+    inline word internalFieldName(const fvPatchField<T>& patch)
+    {
+    #ifdef OPENFOAM_NOT_EXTEND
+        return patch.internalField().name();
+    #else
+        return patch.dimensionedInternalField().name();
+    #endif
     }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

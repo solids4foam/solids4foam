@@ -303,11 +303,17 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
+    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
 
     // Calculate the deviatoric stress
     const volSymmTensorField s(mu_*dev(bEbar));
@@ -370,11 +376,16 @@ void Foam::neoHookeanElastic::correctF
     const surfaceTensorField& F
 ) const
 {
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const surfaceTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & F.T()));
+    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
 
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(mu_*dev(bEbar));

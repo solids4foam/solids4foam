@@ -1,22 +1,32 @@
 ################################################################################
 # Dockerfile to build solids4foam with foam-extend-4.1
-# philip.cardiff@ucd.ie, Aug 2022
+# philip.cardiff@ucd.ie, January 2026
 ################################################################################
 
 # Set the base image
-FROM philippic/foam-extend-4.1-ubuntu18.04-v2:latest
+FROM philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas
 
 # File Author / Maintainer
-MAINTAINER Philip Cardiff <philip.cardiff@ucd.ie>
+LABEL maintainer="Philip Cardiff <philip.cardiff@ucd.ie>"
 
 # Change default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Add solids4Foam
-COPY . /home/dockeruser/solids4foam
+# Explicitly set PETSc env (inherited from base image; repeated here so derived
+# images carry it and it appears in "docker inspect" output for this image)
+ENV PETSC_DIR=/opt/petsc
 
-# Change ownership to dockeruser
-RUN chown -R dockeruser:dockeruser /home/dockeruser/solids4foam
+# Append PETSc env exports to foam-extend's etc/bashrc so that every
+# "source .../etc/bashrc" call (CI steps and interactive shells alike)
+# re-exports PETSC_DIR and adds /opt/petsc/lib to LD_LIBRARY_PATH after
+# foam-extend sets its own paths.
+RUN echo '' >> /home/dockeruser/foam/foam-extend-4.1/etc/bashrc && \
+    echo '# PETSc environment (added by solids4foam Dockerfile)' >> /home/dockeruser/foam/foam-extend-4.1/etc/bashrc && \
+    echo 'export PETSC_DIR=/opt/petsc' >> /home/dockeruser/foam/foam-extend-4.1/etc/bashrc && \
+    echo 'export LD_LIBRARY_PATH=/opt/petsc/lib:${LD_LIBRARY_PATH}' >> /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
+
+# Add solids4Foam
+COPY --chown=dockeruser:dockeruser . /home/dockeruser/solids4foam
 
 # Change user to dockeruser
 USER dockeruser

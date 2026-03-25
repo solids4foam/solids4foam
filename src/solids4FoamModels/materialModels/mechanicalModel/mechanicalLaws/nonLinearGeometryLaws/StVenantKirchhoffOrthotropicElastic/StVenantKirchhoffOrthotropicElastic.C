@@ -428,21 +428,26 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the right Cauchy–Green deformation tensor
-    const volSymmTensorField c = symm(F().T() & F());
+    const volSymmTensorField c(symm(FT & F));
 
     // Calculate the Green strain tensor
-    const volSymmTensorField E = 0.5*(c - I);
+    const volSymmTensorField E(0.5*(c - I));
 
     // Calculate the 2nd Piola Kirchhoff stress
-    const volSymmTensorField S = elasticC() && E;
+    const volSymmTensorField S(elasticC() && E);
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
-    // sigma = (1.0/J)*symm(F() & S & F().T());
-    sigma = (1.0/J)*transform(F(), S);
+    sigma = (1.0/J)*transform(F, S);
 }
 
 
@@ -459,21 +464,26 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const surfaceTensorField& F = this->Ff();
+    const surfaceTensorField FT(F.T());
+
     // Calculate the right Cauchy–Green deformation tensor
-    const surfaceSymmTensorField c = symm(Ff().T() & Ff());
+    const surfaceSymmTensorField c(symm(FT & F));
 
     // Calculate the Green strain tensor
-    const surfaceSymmTensorField E = 0.5*(c - I);
+    const surfaceSymmTensorField E(0.5*(c - I));
 
     // Calculate the 2nd Piola Kirchhoff stress
-    const surfaceSymmTensorField S = elasticCf() && E;
+    const surfaceSymmTensorField S(elasticCf() && E);
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J(det(Ff()));
+    const surfaceScalarField J(det(F));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
-    // sigma = (1.0/J)*symm(Ff() & S & Ff().T());
-    sigma = (1.0/J)*transform(Ff(), S);
+    sigma = (1.0/J)*transform(F, S);
 }
 
 

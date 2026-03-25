@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -39,11 +39,6 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/controlDict
-=======
-writeCompression off;
-
->>>>>>> development:tutorials/solids/linearElasticity/waveBar/system/controlDict
 timeFormat      general;
 
 timePrecision   6;
@@ -54,7 +49,6 @@ functions
 {
     cavityAnalytical
     {
-<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/controlDict
         type sphericalCavityAnalyticalSolution;
         farFieldTractionZ 1e6;
         cavityRadius 0.2;
@@ -64,13 +58,6 @@ functions
         pointDisplacement no;
         cellStress yes;
         pointStress no;
-=======
-        type           probes;
-        writeControl   timeStep;
-        writeInterval  1;
-        fields         (D sigma);
-        probeLocations ((0.1 0 0));
->>>>>>> development:tutorials/solids/linearElasticity/waveBar/system/controlDict
     }
 }
 

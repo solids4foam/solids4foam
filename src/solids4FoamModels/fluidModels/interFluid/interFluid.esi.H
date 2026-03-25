@@ -139,6 +139,25 @@ class interFluid
 
     // Private Member Functions
 
+        //- Update phiHbyA flux at elasticWall boundaries
+        void updateRobinFsiInterfacePhi
+        (
+            surfaceScalarField& phiHbyA,
+            const surfaceScalarField& phig,
+            const volScalarField& p,
+            const volVectorField& U,
+            const volScalarField& rAU
+        ) const;
+
+        //- Update rAU at elasticWall boundaries
+        void updateRobinFsiInterfaceRAU
+        (
+            volScalarField& rAU,
+            const volScalarField& p,
+            const volVectorField& U,
+            const volScalarField& rho
+        ) const;
+
         //- Disallow default bitwise copy construct
         interFluid(const interFluid&);
 
@@ -171,6 +190,18 @@ public:
 
         // Access
 
+            //- Return const solution pressure field
+            virtual const volScalarField& solutionP() const
+            {
+                return p_rgh_;
+            }
+
+            //- Return const solution pressure field
+            virtual volScalarField& solutionP()
+            {
+                return p_rgh_;
+            }
+
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
             (
@@ -179,6 +210,12 @@ public:
 
             //- Patch pressure force (N/m2)
             virtual tmp<scalarField> patchPressureForce
+            (
+                const label patchID
+            ) const;
+
+            //- Patch pressure force for the solution o field (N/m2)
+            virtual tmp<scalarField> patchSolutionPressureForce
             (
                 const label patchID
             ) const;

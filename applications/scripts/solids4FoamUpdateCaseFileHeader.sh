@@ -33,7 +33,7 @@
 #     where the address of this script is updated as appropriate.
 #
 #------------------------------------------------------------------------------
-solids4foamVersion=v2.0
+solids4foamVersion=v2.3
 
 usage() {
     cat<<USAGE

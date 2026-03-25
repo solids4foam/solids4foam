@@ -44,7 +44,6 @@ SourceFiles
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
-#include "momentumStabilisation.H"
 #include "globalPolyPatch.H"
 #include "setCellDisplacements.H"
 #include "OFstream.H"
@@ -55,6 +54,7 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "stabilisationModel.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -98,11 +98,11 @@ private:
 
     // Private data
 
-        //- Flag to record whether the mesh was created (and is owned by this
-        //  class) or was looked up from meory
-        const bool meshWasCreated_;
+        //- Pointer to the mesh if we created it
+        autoPtr<dynamicFvMesh> meshOwnerPtr_;
 
         //- Pointer to the mesh
+        //  This always points to the mesh we use (owned or borrowed)
         dynamicFvMesh* meshPtr_;
 
         //- Dual mesh
@@ -185,8 +185,11 @@ private:
         //- Damping coefficient
         const dimensionedScalar dampingCoeff_;
 
-        //- Stabilisation term for momentum equation
-        autoPtr<momentumStabilisation> stabilisationPtr_;
+        //- Optional stabilisation term for momentum equation
+        autoPtr<stabilisationModel> momentumStabilisationPtr_;
+
+        //- Optional stabilisation term for pressure equation
+        autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -403,10 +406,16 @@ protected:
             return maxIterReached_;
         }
 
-        //- Return const reference to stabilisation
-        const momentumStabilisation& stabilisation() const
+        //- Return const reference to momentum stabilisation
+        const stabilisationModel& momentumStabilisation() const
         {
-            return stabilisationPtr_();
+            return momentumStabilisationPtr_();
+        }
+
+        //- Return const reference to pressure stabilisation
+        const stabilisationModel& pressureStabilisation() const
+        {
+            return pressureStabilisationPtr_();
         }
 
         //- Make rhoD2dt2D

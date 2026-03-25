@@ -8,8 +8,8 @@ then
     exit 1
 else
     allowed_ver=(
-        "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312" "v2406" "v2412"
-        "4.1" "9"
+        "v2512" "v2506" "v2412" "v2406" "v2312" "v2306" "v2212" "v2206" "v2112"
+        "v2012" "v2106" "4.1" "9"
     )
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
         echo "Unsupported OpenFOAM version sourced!"

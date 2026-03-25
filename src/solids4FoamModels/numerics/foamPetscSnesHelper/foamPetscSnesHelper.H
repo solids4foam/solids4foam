@@ -115,11 +115,6 @@ public:
 
 private:
 
-    // Private static data
-
-        //- Number of helper instances participating in PETSc lifecycle
-        static label petscInitialisationCount_;
-
     // Private data
 
         //- Location of the solution unknowns, e.g. cells or points
@@ -431,7 +426,7 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const scalar scale = -1.0
+                const bool flipSign = true
             ) const;
 
             //- Insert linearisation of div(phi,U) into a PETSc matrix
@@ -447,12 +442,12 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const scalar scale = -1.0
+                const bool flipSign = true
             ) const;
 
             //- Insert div(U) into the scalar p equation of a a PETSc matrix
-            //  If "flipSign" is true, -div(U) is inserted rather than
-            //  div(U)
+            //  If "flipSign" is true, -div(phi,U) is inserted rather than
+            //  div(phi,U)
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -461,7 +456,7 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const scalar scale = 1.0
+                const bool flipSign = false
             ) const;
 
             //- Extract a subset of components a raw scalar array 'x' into the

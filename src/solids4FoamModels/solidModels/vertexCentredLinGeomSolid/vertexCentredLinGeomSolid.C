@@ -28,6 +28,7 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "linearElasticMisesPlastic.H"
 #include "compatibilityFunctions.H"
+#include <vector>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -80,11 +81,13 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
     // Calculate stress at dual faces
     dualMechanicalPtr_().correct(dualSigmaf);
 
-    // Calculate the tractions at the dual faces
-    surfaceVectorField dualTraction
-    (
-        (dualMesh().Sf()/dualMesh().magSf()) & dualSigmaf
-    );
+    // Dual mesh unit normals
+    const surfaceVectorField dualN(dualMesh().Sf()/dualMesh().magSf());
+
+    // Calculate the tractions on the dual faces
+    // Careful: strange bug previously when evaluating the normal within this
+    // expression on the fly => possible tmp lifetime issue
+    surfaceVectorField dualTraction(dualN & dualSigmaf_);
 
     // Enforce extract tractions on traction boundaries
     enforceTractionBoundaries

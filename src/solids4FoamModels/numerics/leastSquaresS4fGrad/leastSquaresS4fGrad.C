@@ -75,7 +75,7 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 #ifdef OPENFOAM_NOT_EXTEND
             extrapolatedCalculatedFvPatchField<GradType>::typeName
 #else
-            calculatedFvPatchField<GradType>::typeName
+            zeroGradientFvPatchField<GradType>::typeName
 #endif
         )
     );

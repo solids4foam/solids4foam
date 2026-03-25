@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+#------------------------------------------------------------------------------
+# License
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
+#
+# Script
+#     Alltest-regression
+#
+# Description
+#     Regression test driver - copies regression test cases to a separate
+#     directory and runs them there to avoid polluting the original tutorials.
+#
+#------------------------------------------------------------------------------
+
+echo "============================================================"
+echo "solids4Foam regression tests"
+echo "============================================================"
+
+ROOT_DIR="$(pwd)"
+REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
+
+get_num_cores()
+{
+    if command -v nproc >/dev/null 2>&1; then
+        nproc
+    else
+        sysctl -n hw.ncpu
+    fi
+}
+
+# Create regression root directory
+rm -rf "${REG_ROOT}"
+mkdir -p "${REG_ROOT}"
+
+# List of regression test directories (relative to tutorials/)
+REGRESSION_TESTS=(
+    "solids/elastoplasticity/perforatedPlate"
+    "solids/hyperelasticity/rigidRotation/rotatingSphere"
+    "solids/linearElasticity/plateHole"
+    "solids/linearElasticity/contactPatchTest"
+    "solids/poroelasticity/rodAndSeabed"
+    "solids/thermoelasticity/slabCooling"
+    "solids/viscoelasticity/viscoTube"
+    "fluidSolidInteraction/3dTube"
+    "fluidSolidInteraction/beamInCrossFlow"
+    "fluidSolidInteraction/cavityFlexibleBottom"
+    "fluidSolidInteraction/flexibleDamBreak"
+    "fluidSolidInteraction/perpendicularFlap"
+)
+
+failures=0
+MAX_JOBS="$(get_num_cores)"
+if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" -lt 1 ]]; then
+    MAX_JOBS=1
+fi
+
+echo "Using up to ${MAX_JOBS} parallel job(s)"
+
+run_regression_test()
+{
+    local testCase="$1"
+    local srcCase="${ROOT_DIR}/${testCase}"
+    local dstCase="${REG_ROOT}/${testCase}"
+    local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
+    local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+
+    {
+        echo
+        echo "------------------------------------------------------------"
+        echo "Running regression test: ${testCase}"
+        echo "------------------------------------------------------------"
+
+        rm -rf "${dstCase}"
+        mkdir -p "$(dirname "${dstCase}")"
+        cp -a "${srcCase}" "${dstCase}"
+
+        cd "${dstCase}"
+
+        if [[ ! -x ./regressionTest.sh ]]; then
+            echo "FAIL: regressionTest.sh not found or not executable in ${testCase}"
+            return 1
+        fi
+
+        ./regressionTest.sh
+    } > "${logFile}" 2>&1
+
+    echo "$?" > "${statusFile}"
+}
+
+active_jobs=0
+pids=()
+
+wait_for_available_slot()
+{
+    while (( active_jobs >= MAX_JOBS )); do
+        local live_pids=()
+
+        for pid in "${pids[@]}"; do
+            if kill -0 "${pid}" 2>/dev/null; then
+                live_pids+=("${pid}")
+            else
+                active_jobs=$((active_jobs - 1))
+            fi
+        done
+
+        pids=("${live_pids[@]}")
+
+        if (( active_jobs >= MAX_JOBS )); then
+            sleep 1
+        fi
+    done
+}
+
+for testCase in "${REGRESSION_TESTS[@]}"; do
+    wait_for_available_slot
+    run_regression_test "${testCase}" &
+    pids+=("$!")
+    active_jobs=$((active_jobs + 1))
+done
+
+wait
+
+for testCase in "${REGRESSION_TESTS[@]}"; do
+    LOG_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
+    STATUS_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+
+    echo
+    echo "------------------------------------------------------------"
+    echo "Regression test: ${testCase}"
+    echo "------------------------------------------------------------"
+
+    cat "${LOG_FILE}"
+
+    if [[ -f "${STATUS_FILE}" ]] && [[ "$(cat "${STATUS_FILE}")" == "0" ]]; then
+        echo "PASS: regression test passed in ${testCase}"
+    else
+        echo "FAIL: regression test failed in ${testCase}"
+        failures=$((failures + 1))
+    fi
+done
+
+echo
+echo "============================================================"
+
+if (( failures > 0 )); then
+    echo "Regression tests FAILED (${failures} failing case(s))"
+    exit 1
+else
+    echo "All regression tests PASSED"
+    exit 0
+fi

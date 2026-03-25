@@ -107,8 +107,14 @@ void Foam::OgdenElastic::correct
         return;
     }
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField& F = this->F();
+    const volTensorField FT(F.T());
+
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J(det(F()));
+    const volScalarField J(det(F));
 
     // Update the hydrostatic stress
     updateSigmaHyd
@@ -118,7 +124,7 @@ void Foam::OgdenElastic::correct
     );
 
     // Calculate the right Cauchy Green tensor
-    const volSymmTensorField C(symm(F().T() & F()));
+    const volSymmTensorField C(symm(FT & F));
 
     // Eigen value field of C
     // We will store the eigen values in a vector instead of a diagTensor
@@ -286,7 +292,9 @@ void Foam::OgdenElastic::correct
     sigma =
         (1.0/J)
        *(
-           dev(s - (mu1_ + mu2_ + mu3_)*I) + sigmaHyd()*I + symm(F() & sigma0() & F().T())
+            dev(s - (mu1_ + mu2_ + mu3_)*I)
+          + sigmaHyd()*I
+          + symm(F & sigma0() & FT)
         );
 }
 

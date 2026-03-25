@@ -35,8 +35,6 @@ License
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
-Foam::label Foam::foamPetscSnesHelper::petscInitialisationCount_ = 0;
-
 PetscErrorCode formResidualFoamPetscSnesHelper
 (
     SNES snes,    // snes object
@@ -76,14 +74,14 @@ PetscErrorCode formResidualFoamPetscSnesHelper
         PetscCall(SNESSetFunctionDomainError(snes));
 
         // Exit without an error code so SNES can exit "softly"
-        PetscFunctionReturn(PETSC_SUCCESS);
+        PetscFunctionReturn(0);
     }
 
     // Restore the solution and residual vectors
     CHKERRQ(VecRestoreArrayRead(x, &xx));
     CHKERRQ(VecRestoreArray(f, &ff));
 
-    PetscFunctionReturn(PETSC_SUCCESS);
+    PetscFunctionReturn(0);
 }
 
 
@@ -582,18 +580,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        PetscBool petscInitialised = PETSC_FALSE;
-        PetscBool petscFinalized = PETSC_FALSE;
-        PetscInitialized(&petscInitialised);
-        PetscFinalized(&petscFinalized);
-
-        if (!petscInitialised && !petscFinalized)
-        {
-            // Initialise PETSc without any options file
-            PetscInitialize(NULL, NULL, NULL, NULL);
-        }
-
-        ++petscInitialisationCount_;
+        // Initialise PETSc without any options file
+        PetscInitialize(NULL, NULL, NULL, NULL);
 
         // Create and store the options database from a dedicated options file
         // or from an OpenFOAM dict
@@ -666,8 +654,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
             {
                 FatalErrorInFunction
                     << "Cannot find the PETSc options file: " << optionsFile
-                    << ". Either provide an option file or add the PETSc "
-                    << "solver settings to fvSolution/solvers/" << fieldName
+                    << ". Either provide an option file or add 'solver petsc;' "
+                    << "to fvSolution/solvers/" << fieldName << " dictionary"
                     << exit(FatalError);
             }
 
@@ -690,14 +678,10 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
         PetscOptionsDestroy(&options_);
         snesUserPtr_.clear();
 
-        --petscInitialisationCount_;
-
-        if (petscInitialisationCount_ < 0)
-        {
-            FatalErrorInFunction
-                << "petscInitialisationCount_ is negative"
-                << abort(FatalError);
-        }
+        WarningInFunction
+            << "Find a neat solution to finalise PETSc only once"
+            << endl;
+        //PetscFinalize();
     }
 }
 
@@ -803,8 +787,7 @@ label foamPetscSnesHelper::initialiseJacobian
     else
     {
         FatalErrorInFunction
-            << "Unknown solution location = "
-            << solutionLocationNames_[location_]
+            << "Unknown solution location = " << location_
             << exit(FatalError);
     }
 
@@ -1011,7 +994,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const scalar scale
+    const bool flipSign
 ) const
 {
     // Get reference to least square vectors
@@ -1026,8 +1009,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalarField& VI = mesh.V();
 
-    // const scalar sign = flipSign ? -1.0 : 1.0;
-    const scalar sign = scale;
+    const scalar sign = flipSign ? -1.0 : 1.0;
 
     // Get the blockSize
     label blockSize;
@@ -1139,6 +1121,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             const labelList& neiGlobalFaceCells =
                 neiProcGlobalIDs(mesh)[patchI];
+            const scalarField& patchNeiVols = neiProcVolumes(mesh)[patchI];
+            const vectorField& patchNeiLs = neiLs.boundaryField()[patchI];
+            // const vectorField patchNeiLs(... patchNeighbourField());
 
             forAll(fp, patchFaceI)
             {
@@ -1170,12 +1155,12 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 const label globalBlockColI = neiGlobalFaceCells[patchFaceI];
 
                 // Off-proc off-diagonal coefficient
-                // mat(ownCellID, neiCellID) += VI[ownCellID]*ownLs[faceI];
+                // mat(ownCellID, neiCellID) += VI[ownCellID]*neiLs[faceI];
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =
-                        sign*VI[ownCellID]
-                       *patchOwnLs[patchFaceI][cmptI];
+                        sign*patchNeiVols[patchFaceI]
+                       *patchNeiLs[patchFaceI][cmptI];
                 }
                 AssertPETSc
                 (
@@ -1259,7 +1244,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const scalar scale
+    const bool flipSign
 ) const
 {
     // Take references for efficiency and brevity
@@ -1270,8 +1255,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const scalarField& wI = mesh.weights();
     const labelList& own = mesh.owner();
     const labelList& nei = mesh.neighbour();
-    // const scalar sign = flipSign ? -1 : 1;
-    const scalar sign = scale;
+    const scalar sign = flipSign ? -1 : 1;
     tensor coeff = tensor::zero;
 
     // Add segregated component of convection term
@@ -1549,11 +1533,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 
         if (patch.coupled())
         {
-            // TODO: add the extra Newton linearisation tensor terms
-            // (w*Sf*U and (1-w)*Sf*U) for processor faces. Omitting
-            // these only affects the Jacobian accuracy at processor
-            // boundaries; the segregated fvm::div part is already
-            // handled correctly by InsertFvMatrixIntoPETScMatrix.
+            notImplemented("div(phi,U) additional term for processors");
         }
         else if
         (
@@ -1611,13 +1591,12 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const scalar scale
+    const bool flipSign
 ) const
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = p.mesh();
-    //const scalar sign = flipSign ? -1 : 1;
-    const scalar sign = scale;
+    const scalar sign = flipSign ? -1 : 1;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
     {
@@ -1650,60 +1629,31 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
             const fvsPatchScalarField& pw = weights.boundaryField()[patchI];
             const labelUList& fc = patch.faceCells();
 
+            const vectorField internalCoeffs(pU.valueInternalCoeffs(pw));
+
+            // Diag contribution
+            forAll(pU, faceI)
+            {
+                diag[fc[faceI]] -=
+                    sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
+            }
+
             if (patch.coupled())
             {
-                if (patch.type() == "processor")
-                {
-                    // Set the fvMatrix coupled boundary coefficients so that
-                    // InsertFvMatrixIntoPETScMatrix handles the diagonal and
-                    // off-diagonal entries for processor patches.
-                    //
-                    // Convention: InsertFvMatrixIntoPETScMatrix inserts
-                    //   +internalCoeffs to the diagonal
-                    //   -boundaryCoeffs to the off-diagonal
-                    //
-                    // Internal face convention:
-                    //   lower[f] = w*Sf_cmpt
-                    //   upper[f] = (w-1)*Sf_cmpt
-                    //   negSumDiag: Diag[own] -= lower = -w*Sf_cmpt
-                    //
-                    // To match, the processor boundary needs:
-                    //   internalCoeffs = -w*Sf_cmpt (so +intCoeffs
-                    //     matches negSumDiag's -lower)
-                    //   boundaryCoeffs = (1-w)*Sf_cmpt (so -bndCoeffs
-                    //     = -(1-w)*Sf = (w-1)*Sf matches upper)
+                // Todo: add off-core coeffs
+                notImplemented("patch.coupled(): D-in-p");
 
-                    scalarField& patchIntCoeffs =
-                        divUCoeffs.internalCoeffs()[patchI];
-                    scalarField& patchBndCoeffs =
-                        divUCoeffs.boundaryCoeffs()[patchI];
+                // CoeffField<vector>::linearTypeField& pcoupleUpper =
+                //     bs.coupleUpper()[patchI].asLinear();
+                // CoeffField<vector>::linearTypeField& pcoupleLower =
+                //     bs.coupleLower()[patchI].asLinear();
 
-                    forAll(pU, faceI)
-                    {
-                        patchIntCoeffs[faceI] =
-                            -pw[faceI]*Sf[faceI][cmptI];
-                        patchBndCoeffs[faceI] =
-                            (1.0 - pw[faceI])*Sf[faceI][cmptI];
-                    }
-                }
-                else
-                {
-                    FatalErrorInFunction
-                        << "Coupled boundary type " << patch.type()
-                        << " not yet supported in InsertFvmDivUIntoPETScMatrix"
-                        << abort(FatalError);
-                }
-            }
-            else
-            {
-                // Non-coupled boundary: add diagonal contribution
-                const vectorField internalCoeffs(pU.valueInternalCoeffs(pw));
+                // const vectorField pcl = -pw*Sf;
+                // const vectorField pcu = pcl + Sf;
 
-                forAll(pU, faceI)
-                {
-                    diag[fc[faceI]] -=
-                        sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
-                }
+                // // Coupling  contributions
+                // pcoupleLower -= pcl;
+                // pcoupleUpper -= pcu;
             }
         }
 

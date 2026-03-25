@@ -4,17 +4,40 @@
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage:
-# ./Allrun                     -> partitioned (Aitken), serial
-# ./Allrun parallel            -> partitioned (Aitken), parallel
+# ./Allrun                     -> partitioned (IQNILS), serial
+# ./Allrun aitken              -> partitioned (Aitken), serial
 # ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
 # ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
+# ./Allrun aitken parallel     -> partitioned (Aitken), parallel
 
-# Parse arguments (order-independent)
+coupling=iqnils
+runMode=serial
+fvSolutionSuffix=""
 SOLVER="partitioned"
-PARALLEL=false
-for arg in "$@"; do
-    if [[ "$arg" == "monolithic" ]]; then SOLVER="monolithic"; fi
-    if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            SOLVER="partitioned"
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            SOLVER="partitioned"
+            ;;
+        monolithic)
+            SOLVER="monolithic"
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
 done
 
 # Source solids4Foam scripts
@@ -30,12 +53,20 @@ if [[ "$SOLVER" == "monolithic" ]]; then
     done
 else
     # Dirichlet-Neumann partitioned approach
-    echo "Using the partitioned Aitken approach"
+    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+        fvSolutionSuffix=".foamextend"
+    elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+        fvSolutionSuffix=".openfoamorg"
+    fi
+
+    echo "Using ${coupling} coupling setup"
+
+    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+    ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+    ln -vnsf "controlDict.${coupling}" system/controlDict
+    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+
     solids4Foam::convertCaseFormat .
-    for file in $(find ./0 ./constant ./system -name '*.partitioned')
-    do
-        ln -vnsf ${file##*/} ${file%.*}
-    done
 fi
 
 # Create meshes
@@ -43,13 +74,15 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if $PARALLEL; then
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
+    # Run serial
     solids4Foam::runApplication solids4Foam
 fi
 

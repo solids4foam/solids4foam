@@ -623,11 +623,10 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
-    meshWasCreated_(runTime.foundObject<dynamicFvMesh>(region) ? false : true),
-    meshPtr_
+    meshOwnerPtr_
     (
         runTime.foundObject<dynamicFvMesh>(region)
-      ? &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
+      ? Foam::autoPtr<Foam::dynamicFvMesh>()
       : dynamicFvMesh::New
         (
             IOobject
@@ -638,6 +637,12 @@ Foam::solidModel::solidModel
                 IOobject::MUST_READ
             )
         ).ptr()
+    ),
+    meshPtr_
+    (
+        meshOwnerPtr_.valid()
+      ? meshOwnerPtr_.ptr()
+      : &const_cast<dynamicFvMesh&>(runTime.lookupObject<dynamicFvMesh>(region))
     ),
     dualMeshPtr_(),
     solidProperties_
@@ -818,7 +823,8 @@ Foam::solidModel::solidModel
             dimensionedScalar("dampingCoeff", dimless/dimTime, 0)
         )
     ),
-    stabilisationPtr_(),
+    momentumStabilisationPtr_(),
+    pressureStabilisationPtr_(),
     solutionTol_
     (
         solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)
@@ -1011,25 +1017,67 @@ Foam::solidModel::solidModel
         }
     }
 
-    // Create stabilisation object
+    // Create momentum stabilisation
+
+    dictionary defaultStabSubDict;
+    defaultStabSubDict.add("type", "diffStencilLaplacian");
+    defaultStabSubDict.add("scaleFactor", 0.1);
 
     if (!solidModelDict().found("stabilisation"))
     {
         // If the stabilisation sub-dict is not found, we will add it with
         // default settings
         dictionary stabDict;
-        stabDict.add("type", "RhieChow");
-        stabDict.add("scaleFactor", 0.1);
+        stabDict.add("momentum", defaultStabSubDict);
+        stabDict.add("pressure", defaultStabSubDict);
+
+        // Add stabilisation dict
         solidModelDict().add("stabilisation", stabDict);
     }
 
-    stabilisationPtr_.set
-    (
-        new momentumStabilisation
+    dictionary& stabDict = solidModelDict().subDict("stabilisation");
+
+    // Check for previous stabilisation definition
+    if (stabDict.found("type") || stabDict.found("scaleFactor"))
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
+    }
+
+    if (!stabDict.found("momentum"))
+    {
+        stabDict.add("momentum", defaultStabSubDict);
+    }
+
+    if (!stabDict.found("pressure"))
+    {
+        stabDict.add("pressure", defaultStabSubDict);
+    }
+
+    momentumStabilisationPtr_ =
+        stabilisationModel::New
         (
-            solidModelDict().subDict("stabilisation")
-        )
-    );
+            mesh(),
+            stabDict.subDict("momentum"),
+            dimless
+        );
+
+    pressureStabilisationPtr_ =
+        stabilisationModel::New
+        (
+            mesh(),
+            stabDict.subDict("pressure"),
+            dimPressure/dimLength
+        );
+
+#ifdef OPENFOAM_COM
+    if (!fvOptions_.optionList::size())
+    {
+        Info<< "No finite volume options present" << endl;
+    }
+#endif
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())
@@ -1052,11 +1100,6 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
-
-    if (meshWasCreated_)
-    {
-        free(meshPtr_);
-    }
 }
 
 

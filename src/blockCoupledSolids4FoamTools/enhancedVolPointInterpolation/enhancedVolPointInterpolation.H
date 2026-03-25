@@ -40,18 +40,6 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
-
-    // For OpenFOAM.org, enhancedVolPointInterpolation is just an alias for
-    // volPointInterpolation
-    #include "volPointInterpolation.H"
-    namespace Foam
-    {
-        typedef volPointInterpolation enhancedVolPointInterpolation;
-    }
-
-#else
-
 #ifndef enhancedVolPointInterpolation_H
 #define enhancedVolPointInterpolation_H
 
@@ -88,11 +76,19 @@ class enhancedVolPointInterpolation
         autoPtr<primitivePatch> boundaryPtr_;
 
         //- Per boundary face whether is on non-coupled, non-empty patch
+#ifdef OPENFOAM_COM
         bitSet boundaryIsPatchFace_;
+#else
+        boolList boundaryIsPatchFace_;
+#endif
 
         //- Per mesh(!) point whether is on non-coupled, non-empty patch (on
         //  any processor)
+#ifdef OPENFOAM_COM
         bitSet isPatchPoint_;
+#else
+        boolList isPatchPoint_;
+#endif
 
         //- Per boundary point the weights per pointFaces.
         scalarListList boundaryPointWeights_;
@@ -346,7 +342,5 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
-
-#endif // not OPENFOAM_ORG
 
 // ************************************************************************* //

@@ -12,28 +12,66 @@ jobs:
     strategy:
       matrix:
         container-image:
+          # --------------------------------------------------
+          # OpenFOAM.com (no PETSc)
+          # --------------------------------------------------
+          - name: "OpenFOAM-v2512"
+            image: "philippic/openfoam-v2512:ubuntu-22.04"
+            source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
+            buildflags: "-j"
+
           - name: "OpenFOAM-v2412"
             image: "philippic/openfoam-v2412:ubuntu-22.04"
             source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
             buildflags: "-j"
+
           - name: "OpenFOAM-v2312"
             image: "opencfd/openfoam-dev:2312"
             source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
             buildflags: "-j"
-          - name: "OpenFOAM-v2012"
-            image: "philippic/openfoam-v2012-ubuntu20.04:latest"
-            source: "/usr/lib/openfoam/openfoam2012/etc/bashrc"
-            buildflags: "-j"
+
           - name: "OpenFOAM-9"
             image: "philippic/openfoam-9-ubuntu20.04:latest"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
+
           - name: "foam-extend-4.1"
             image: "philippic/foam-extend-4.1-ubuntu20.04:latest"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
+
+          # --------------------------------------------------
+          # OpenFOAM.com + PETSc
+          # --------------------------------------------------
+          - name: "OpenFOAM-v2512-PETSc"
+            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas"
+            source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-v2412-PETSc"
+            image: "philippic/openfoam-v2412:ubuntu-22.04-petsc-no-openmp-system-blas"
+            source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-v2312-PETSc"
+            image: "philippic/openfoam-v2312:ubuntu-22.04-petsc-no-openmp-system-blas"
+            source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-9-PETSc"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas"
+            source: "/opt/openfoam9/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "foam-extend-4.1-PETSc"
+            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas"
+            source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+            buildflags: ""
     container:
       image: ${{ matrix.container-image.image }}
+      options: --user 1001
+      env:
+        HOME: ${{ github.workspace }}
 
     steps:
       - uses: actions/checkout@v4
@@ -42,15 +80,22 @@ jobs:
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
-          (cd optionalFixes && ./Allreplace)
-          ./Allwmake ${{ matrix.container-image.buildflags }}
+          export S4F_NO_FILE_FIXES=1; ./Allwmake ${{ matrix.container-image.buildflags }}
+
+      - name: PETSc sanity check
+        if: contains(matrix.container-image.name, 'PETSc')
+        shell: bash -l {0}
+        run: |
+          source ${{ matrix.container-image.source }}
+          echo "PETSC_DIR = $PETSC_DIR"
+          test -d "$PETSC_DIR/include"
 
       - name: Alltest
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
           cd tutorials
-          ./Alltest
+          export OMP_NUM_THREADS=1; export OPENBLAS_NUM_THREADS=1; export MKL_NUM_THREADS=1; ./Alltest
 
       - name: Upload test logs
         if: ${{ failure() }}

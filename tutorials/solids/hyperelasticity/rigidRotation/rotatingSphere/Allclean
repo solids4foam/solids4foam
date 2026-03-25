@@ -12,3 +12,20 @@ cleanCase
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
+
+# Reset links to totalLagrangian approach
+link_files_for_suffix() {
+    # $1 = suffix (e.g. totalLagrangian)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find -L ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+link_files_for_suffix totalLagrangian
+(cd 0 && rm -f D* && ln -s org/D .)

@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -51,14 +51,14 @@ boundaryField
         normalContactModel standardPenalty;
         standardPenaltyNormalModelDict
         {
-            penaltyScale     1;
+            penaltyScale     0.5;
             relaxationFactor 0.02;
         }
         frictionContactModel standardPenalty;
         standardPenaltyFrictionModelDict
         {
-            relaxationFactor 0.02;
             penaltyScale     1;
+            relaxationFactor 0.02;
             frictionLaw     coulomb;
             frictionLawDict
             {

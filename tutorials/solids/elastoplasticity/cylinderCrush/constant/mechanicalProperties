@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -32,11 +32,11 @@ mechanical
 
         // Solve a Poisson equation to calculate the hydrostatic sigma/pressure
         // field
-        smoothPressure  yes;
+        solvePressureEqn  yes;
 
         // Scale the amount of smoothing applied to the pressure field
         // Defaults to 100
-        pressureSmoothingScaleFactor 1000;
+        //pressureSmoothingScaleFactor 100;
     }
 );
 

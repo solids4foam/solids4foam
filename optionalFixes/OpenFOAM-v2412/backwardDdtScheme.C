@@ -84,7 +84,7 @@ backwardDdtScheme<Type>::fvcDdt
     (
         "ddt("+dt.name()+')',
         mesh().time().timeName(),
-        mesh().thisDb()
+        mesh()
     );
 
     scalar deltaT = deltaT_();
@@ -119,7 +119,7 @@ backwardDdtScheme<Type>::fvcDdt
         ddtIOobject,
         mesh(),
         dimensioned<Type>(dt.dimensions()/dimTime, Zero),
-        fvPatchFieldBase::calculatedType()
+        calculatedFvPatchField<Type>::typeName
     );
 }
 
@@ -137,7 +137,7 @@ backwardDdtScheme<Type>::fvcDdt
     (
         "ddt("+vf.name()+')',
         mesh().time().timeName(),
-        mesh().thisDb()
+        mesh()
     );
 
     scalar deltaT = deltaT_();
@@ -149,7 +149,7 @@ backwardDdtScheme<Type>::fvcDdt
 
     if (mesh().moving())
     {
-        tmp<GeometricField<Type, fvPatchField, volMesh>> tdtdt
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
         (
             new GeometricField<Type, fvPatchField, volMesh>
             (
@@ -175,13 +175,6 @@ backwardDdtScheme<Type>::fvcDdt
                 )
             )
         );
-
-        // Different operation on boundary v.s. internal so re-evaluate
-        // coupled boundaries
-        tdtdt.ref().boundaryFieldRef().
-            template evaluateCoupled<coupledFvPatch>();
-
-        return tdtdt;
     }
     else
     {
@@ -216,7 +209,7 @@ backwardDdtScheme<Type>::fvcDdt
     (
         "ddt("+rho.name()+','+vf.name()+')',
         mesh().time().timeName(),
-        mesh().thisDb()
+        mesh()
     );
 
     scalar deltaT = deltaT_();
@@ -228,7 +221,7 @@ backwardDdtScheme<Type>::fvcDdt
 
     if (mesh().moving())
     {
-        tmp<GeometricField<Type, fvPatchField, volMesh>> tdtdt
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
         (
             new GeometricField<Type, fvPatchField, volMesh>
             (
@@ -254,13 +247,6 @@ backwardDdtScheme<Type>::fvcDdt
                 )
             )
         );
-
-        // Different operation on boundary v.s. internal so re-evaluate
-        // coupled boundaries
-        tdtdt.ref().boundaryFieldRef().
-            template evaluateCoupled<coupledFvPatch>();
-
-        return tdtdt;
     }
     else
     {
@@ -295,7 +281,7 @@ backwardDdtScheme<Type>::fvcDdt
     (
         "ddt("+rho.name()+','+vf.name()+')',
         mesh().time().timeName(),
-        mesh().thisDb()
+        mesh()
     );
 
     scalar deltaT = deltaT_();
@@ -307,7 +293,7 @@ backwardDdtScheme<Type>::fvcDdt
 
     if (mesh().moving())
     {
-        tmp<GeometricField<Type, fvPatchField, volMesh>> tdtdt
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
         (
             new GeometricField<Type, fvPatchField, volMesh>
             (
@@ -336,13 +322,6 @@ backwardDdtScheme<Type>::fvcDdt
                 )
             )
         );
-
-        // Different operation on boundary v.s. internal so re-evaluate
-        // coupled boundaries
-        tdtdt.ref().boundaryFieldRef().
-            template evaluateCoupled<coupledFvPatch>();
-
-        return tdtdt;
     }
     else
     {
@@ -378,7 +357,7 @@ backwardDdtScheme<Type>::fvcDdt
     (
         "ddt("+alpha.name()+','+rho.name()+','+vf.name()+')',
         mesh().time().timeName(),
-        mesh().thisDb()
+        mesh()
     );
 
     scalar deltaT = deltaT_();
@@ -390,7 +369,7 @@ backwardDdtScheme<Type>::fvcDdt
 
     if (mesh().moving())
     {
-        tmp<GeometricField<Type, fvPatchField, volMesh>> tdtdt
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
         (
             new GeometricField<Type, fvPatchField, volMesh>
             (
@@ -436,13 +415,6 @@ backwardDdtScheme<Type>::fvcDdt
                 )
             )
         );
-
-        // Different operation on boundary v.s. internal so re-evaluate
-        // coupled boundaries
-        tdtdt.ref().boundaryFieldRef().
-            template evaluateCoupled<coupledFvPatch>();
-
-        return tdtdt;
     }
     else
     {
@@ -711,7 +683,7 @@ backwardDdtScheme<Type>::fvcDdtUfCorr
             (
                 "ddtCorr(" + U.name() + ',' + Uf.name() + ')',
                 mesh().time().timeName(),
-                mesh().thisDb()
+                mesh()
             ),
             this->fvcDdtPhiCoeff(U.oldTime(), (mesh().Sf() & Uf.oldTime()))
            *rDeltaT
@@ -755,7 +727,7 @@ backwardDdtScheme<Type>::fvcDdtPhiCorr
             (
                 "ddtCorr(" + U.name() + ',' + phi.name() + ')',
                 mesh().time().timeName(),
-                mesh().thisDb()
+                mesh()
             ),
             this->fvcDdtPhiCoeff(U.oldTime(), phi.oldTime())
            *rDeltaT
@@ -815,7 +787,7 @@ backwardDdtScheme<Type>::fvcDdtUfCorr
                     "ddtCorr("
                   + rho.name() + ',' + U.name() + ',' + Uf.name() + ')',
                     mesh().time().timeName(),
-                    mesh().thisDb()
+                    mesh()
                 ),
                 this->fvcDdtPhiCoeff
                 (
@@ -849,7 +821,7 @@ backwardDdtScheme<Type>::fvcDdtUfCorr
                     "ddtCorr("
                   + rho.name() + ',' + U.name() + ',' + Uf.name() + ')',
                     mesh().time().timeName(),
-                    mesh().thisDb()
+                    mesh()
                 ),
                 this->fvcDdtPhiCoeff
                 (
@@ -926,7 +898,7 @@ backwardDdtScheme<Type>::fvcDdtPhiCorr
                     "ddtCorr("
                   + rho.name() + ',' + U.name() + ',' + phi.name() + ')',
                     mesh().time().timeName(),
-                    mesh().thisDb()
+                    mesh()
                 ),
                 this->fvcDdtPhiCoeff(rhoU0, phi.oldTime(), rho.oldTime())
                *rDeltaT
@@ -956,7 +928,7 @@ backwardDdtScheme<Type>::fvcDdtPhiCorr
                     "ddtCorr("
                   + rho.name() + ',' + U.name() + ',' + phi.name() + ')',
                     mesh().time().timeName(),
-                    mesh().thisDb()
+                    mesh()
                 ),
                 this->fvcDdtPhiCoeff(U.oldTime(), phi.oldTime(), rho.oldTime())
                *rDeltaT
@@ -1005,10 +977,10 @@ tmp<surfaceScalarField> backwardDdtScheme<Type>::meshPhi
             (
                 mesh().phi().name(),
                 mesh().time().timeName(),
-                mesh().thisDb(),
+                mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
-                IOobject::NO_REGISTER
+                false
             ),
             coefftn_0*mesh().phi() - coefft0_00*mesh().phi().oldTime()
         )

@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -18,12 +18,6 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 // M4
 
-
-
-
-
-
-
 // GEOMETRY
 // visina
 //m4_define(H, 0.010)
@@ -36,20 +30,13 @@ FoamFile
 
 // visina flapa
 
-
 // z koordinata
-
-
 
 // MESH
 // Abaqus mesh
 //m4_define(BLOCKSIZE, 40 54 1)
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 //m4_define(BLOCKSIZE1,  calc(H*1000) calc((L-l)*2000) 1)
-
-
-
-
 
 //m4_define(r2,calc(r1+h))
 //m4_define(angle, rad(45))

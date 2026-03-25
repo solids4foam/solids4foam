@@ -1,1 +1,96 @@
-fvSolution.pimpleFluid
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pFinal|pcorr|pcorrFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          1e-03;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-09;
+        relTol          0.001;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    "U|UFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-09;
+        relTol          0.001;
+        minIter         1;
+    }
+
+    // In sonicLiquidFluid, the continuity equation is solved explicitly and
+    // corrected in each time-step, so the choice of solver here is actually
+    // irrelevant, it is only needed so some OpenFOAM variants do not complain
+    "rho|rhoFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-09;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    nOuterCorrectors            20;
+    nCorrectors                 3;
+    nNonOrthogonalCorrectors    1;
+
+    residualControl
+    {
+        U
+        {
+            relTol    1e-5;
+            tolerance 1e-5;
+        }
+    }
+}
+
+// ************************************************************************* //

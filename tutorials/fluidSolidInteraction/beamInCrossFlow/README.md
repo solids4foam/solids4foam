@@ -155,17 +155,54 @@ ground, wall and outlet.
 ## Running the Case
 
 The tutorial case can be run using the included `Allrun` script. The case
-supports both a **partitioned** (Aitken) and a **monolithic** (Newton/PETSc)
+supports a **partitioned** (IQNILS or Aitken) and a **monolithic** (Newton/PETSc)
 FSI coupling approach, either in serial or parallel:
 
 ```bash
-./Allrun                     # partitioned (Aitken), serial
-./Allrun parallel            # partitioned (Aitken), parallel
+./Allrun                     # partitioned (IQNILS), serial
+./Allrun aitken              # partitioned (Aitken), serial
 ./Allrun monolithic          # monolithic (Newton/PETSc), serial
 ./Allrun monolithic parallel # monolithic (Newton/PETSc), parallel
+./Allrun aitken parallel     # partitioned (Aitken), parallel
 ```
 
 The monolithic approach requires PETSc and does not run with foam-extend.
+
+For a higher-level overview of the available FSI coupling schemes and the main
+`fluidSolidInterface` options, see the
+[`fluidSolidInterfaces` README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md).
+
+For the current settings, a fair comparison over the strongly-coupled transient
+window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,
+solid predictor, fluid residual control and shared FSI settings, gives:
+
+- Aitken: `279` outer FSI iterations and about `21.8 s` wall-clock.
+- IQNILS: `215` outer FSI iterations and about `16.3 s` wall-clock.
+
+So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
+iterations than Aitken.
+
+## Regression Test
+
+The case also includes a `regressionTest.sh` script which runs short regression
+checks for both coupling options:
+
+- `./regressionTest.sh`
+
+For efficiency, the script runs both the `aitken` and `iqnils` variants in
+local regression copies under `beamInCrossFlow/regressionTests/`, with the end
+time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
+then.
+
+The script checks that both variants converge to the same solution, within
+loose tolerances, by comparing:
+
+- the maximum tip `Dx`,
+- the final tip `Dx`,
+- the final total fluid force `Fx`.
+
+This is intended as a practical regression test for the case setup and the FSI
+coupling implementations, rather than as a strict bitwise comparison.
 
 After the solver has finished, `force.pdf` and `deflection.pdf` plots are
 generated if the `gnuplot` program is installed.

@@ -17,6 +17,13 @@
 #     https://www.gnu.org/licenses/lgpl-3.0.en.html
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+# On macOS, ensure OpenFOAM libraries remain discoverable for child processes.
+case "$(uname -s)" in
+Darwin)
+    export DYLD_LIBRARY_PATH="${FOAM_LIBBIN}:${FOAM_USER_LIBBIN}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    ;;
+esac
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # convertCaseFormat
 #     Converts a case from foam extend format to OpenFOAM format. No changes are
@@ -71,6 +78,12 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+        echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+    fi
+
     # Check all files in the 0 directory
     for FILE in $(find "${CASE_DIR}/0" -type f)
     do
@@ -100,6 +113,14 @@ function solids4Foam::convertCaseFormat()
         echo "Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
         \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
     fi
+
+    # faMeshDefinition - for now, only support OpenFOAM.com
+    # if [[ -f "${CASE_DIR}"/constant/faMesh/faMeshDefinition ]]
+    # then
+    #     echo "Moving constant/faMesh/faMeshDefinition to system/finite-area"
+    #     mkdir -p "${CASE_DIR}"/system/finite-area
+    #     \mv "${CASE_DIR}"/constant/faMesh/faMeshDefinition "${CASE_DIR}"/system/finite-area
+    # fi
 
     # Replace the functions file
     if [[ -f "${CASE_DIR}"/system/functions ]]
@@ -280,6 +301,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
+    then
+    echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
+        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+    fi
+
     for FILE in $(find "${CASE_DIR}/0" -type f)
     do
         if [[ -f "${FILE}" ]]
@@ -311,6 +338,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
     fi
+
+    # faMeshDefinition
+    # if [[ -f "${CASE_DIR}"/system/finite-area/faMeshDefinition ]]
+    # then
+    #     echo "Moving system/finite-area/faMeshDefinition to constant/faMesh"
+    #     mkdir -p "${CASE_DIR}"/constant/polyMesh
+    #     \mv "${CASE_DIR}"/system/finite-area/faMeshDefinition "${CASE_DIR}"/constant/faMesh
+    # fi
 
     if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
     then
@@ -568,10 +603,7 @@ function solids4Foam::removeEmptyDirs()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 function solids4Foam::runApplication()
 {
-    local appName appRun logFile logMode
-
-    # Any additional parsed arguments (eg, decomposeParDict)
-    local appArgs
+    local appName="" appRun="" logFile="" logMode="" appArgs=""
 
     # Parse options until executable is encountered
     while [ "$#" -gt 0 ] && [ -z "$appRun" ]

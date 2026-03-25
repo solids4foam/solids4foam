@@ -884,6 +884,7 @@ void Foam::mechanicalModel::interpolate
         );
     }
 
+    pointD.correctBoundaryConditions();
     correctSymmPlanes(pointD);
 }
 
@@ -901,11 +902,7 @@ void Foam::mechanicalModel::interpolate
 
     if (laws.size() == 1)
     {
-#ifdef OPENFOAM_COM
         volToPoint().interpolate(D, gradD, pointD);
-#else
-        volToPoint().interpolate(D, pointD);
-#endif
     }
     else
     {
@@ -920,9 +917,7 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshVolToPoint()[lawI].interpolate
             (
                 solSubMeshes().subMeshD()[lawI],
-#ifdef OPENFOAM_COM
                 solSubMeshes().subMeshGradD()[lawI],
-#endif
                 solSubMeshes().subMeshPointD()[lawI]
             );
         }
@@ -937,6 +932,7 @@ void Foam::mechanicalModel::interpolate
     this->interpolate(D, pointD, useVolFieldSigma);
 #endif
 
+    pointD.correctBoundaryConditions();
     correctSymmPlanes(pointD);
 }
 

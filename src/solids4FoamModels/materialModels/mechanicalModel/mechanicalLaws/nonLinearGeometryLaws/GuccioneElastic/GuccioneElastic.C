@@ -139,8 +139,13 @@ void Foam::GuccioneElastic::calculateStress
     // // Calculate the Jacobian of the deformation gradient
     // const surfaceScalarField J(det(F));
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    //const surfaceTensorField FT(F.T());
+
     // // Calculate the right Cauchy–Green deformation tensor
-    // const surfaceSymmTensorField C(symm(F.T() & F));
+    // const surfaceSymmTensorField C(symm(FT & F));
 
     // // Calculate the Green-Lagrange strain
     // const surfaceSymmTensorField E(0.5*(C - I));
@@ -709,8 +714,13 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
 
+    // NOTE [IMPORTANT]:
+    // Do NOT write F.T() & F directly: see the comment in
+    // StVenantKirchhoffElastic.C
+    const volTensorField FT(F.T());
+
     // Calculate the right Cauchy–Green deformation tensor
-    const volSymmTensorField C(symm(F.T() & F));
+    const volSymmTensorField C(symm(FT & F));
 
     // Calculate the Green-Lagrange strain
     const volSymmTensorField E(0.5*(C - I));
@@ -727,7 +737,8 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     if (useLocalCoordSys)
     {
         // Calculate the Green strain in the local coordinate system
-        const volSymmTensorField EStar("EStar", symm(R_.T() & E & R_));
+        const volTensorField RT(R_.T());
+        const volSymmTensorField EStar("EStar", symm(RT & E & R_));
 
         // Extract the components of EStar
         // Note: EStar is symmetric
@@ -775,7 +786,7 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
 
         // Rotate S from the local fibre coordinate system to the global
         // coordinate system
-        S_ = symm(R_ & S_ & R_.T());
+        S_ = symm(R_ & S_ & RT);
     }
     else
     {
@@ -812,7 +823,7 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
     // the deviatoric component
     // s = dev((1/J)*F & S & F.T)
-    const volSymmTensorField s(dev(symm(F & S_ & F.T()))/J);
+    const volSymmTensorField s(dev(symm(F & S_ & FT))/J);
 
     // Calculate the hydrostatic stress
     updateSigmaHyd

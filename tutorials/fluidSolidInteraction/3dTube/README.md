@@ -131,9 +131,9 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage
-# ./Allrun
+# ./Allrun # default behaviour is Robin-Neumann coupling
+# ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
-# ./Allrun robin
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -143,17 +143,17 @@ if [[ "$1" == "sonicLiquidFluid" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
-elif [[ "$1" == "robin" ]]; then
-    # Robin-Neumann pimpleFluid approach
-    echo "Using the Robin-Neumann sonicLiquidFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.robin')
+elif [[ "$1" == "dirichletNeumann" ]]; then
+    # Dirichlet-Neumann pimpleFluid approach
+    echo "Using the Dirichlet-Neumann pimpleFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
 else
-    # Dirichlet-Neumann pimpleFluid approach
-    echo "Using the Dirichlet-Neumann pimpleFluid approach"
-    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+    # Robin-Neumann pimpleFluid approach
+    echo "Using the Robin-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
@@ -196,24 +196,25 @@ fi
 ```
 
 As can be seen above, the `Allrun` script can be run with different values for
-the first argument `$1` passed to the script. Running the script without any
-argument (i.e., `./Allrun`) uses the FSI coupling approach 1 (Aitken's) or 2
-(IQNILS), depending on the value of `fluidSolidInterface` in `constant/fsiProperties`;
-for example, `fluidSolidInterface    IQNILS;`. The weakly compressible fluid
-model (approaches 3 and 4) can be used by running the `Allrun` script with the
-argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`. Once again,
-switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled via the
-`fluidSolidInterface` setting in `constant/fsiProperties`. Finally, the
-Robin-Neumann coupling approach (approach 5) can be used by executing the
-`Allrun` script as `./Allrun robin` for approach 5. Examining the `U` and `p`
-files in `0/fluid.robin/` shows that the Robin approach uses the custom
-conditions `elasticWallVelocity` and `elasticWallPressure` at the interface.
+ the first argument `$1` passed to the script. Running the script without any
+ argument (i.e., `./Allrun`) uses the Robin-Neumann coupling approach (approach
+ 5). The Dirchlet-Neumann coupling approaches (approaches 1 and 2) can be selected
+ by running the script as `./Allrun dirichletNeumann`, where Aitken's
+ (approach 1) or IQNILS (approach 2) can be used depending on the value of `fluidSolidInterface`
+ in `constant/fsiProperties`; for example, `fluidSolidInterface    IQNILS;`. The
+ weakly compressible fluid model (approaches 3 and 4) can be used by running the
+ `Allrun` script with the argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`.
+ Once again, switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled
+ via the `fluidSolidInterface` setting in `constant/fsiProperties`.
+ Examining the `U` and `p` files in `0/fluid.robin/` shows that the Robin
+ approach uses the custom conditions `elasticWallVelocity` and `elasticWallPressure`
+ at the interface.
 
 The `Allrun` script updates the case with links to the correct files to be used
-by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
-generate the meshes in the solid and fluid domains, followed by running the
-`solids4Foam` solver. Subsequently, if `gnuplot` is installed, three figures will
-be generated in the case directory:
+ by each approach. The Allrun script runs the OpenFOAM `blockMesh` utility to
+ generate the meshes in the solid and fluid domains, followed by running the
+ `solids4Foam` solver. Subsequently, if `gnuplot` is installed, three figures will
+ be generated in the case directory:
 
 - `axialDisplacement.pdf`: this plots the axial displacement of point A vs time.
 - `radialDisplacement.pdf`: this plots the radial displacement of point A vs

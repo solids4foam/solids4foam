@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     Info<< "Find faces inside bounding boxes" << endl;
     const polyPatch& ppatch = mesh.boundaryMesh()[patchToSplitID];
     const vectorField& patchCf = ppatch.faceCentres();
-    SLList<label> facesToSplit;
+    labelHashSet facesToSplit;
     forAll(boundBoxes, boxI)
     {
         const boundBox& bb = boundBoxes[boxI];
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 
 
     // Add faces to the new patch
-    const labelList facesToSplitList(facesToSplit);
+    const labelList facesToSplitList(facesToSplit.toc());
     Info<< "    faces found: " << facesToSplitList.size() << endl;
 
     const label newPatchID = mesh.boundaryMesh().size() - 1;

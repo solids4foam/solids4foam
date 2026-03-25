@@ -30,6 +30,7 @@ solvers
 
 relaxationFactors
 {
+<<<<<<<< HEAD:tutorials/fluidSolidInteraction/cavityFlexibleBottom/system/solid/fvSolution.partitioned
     equations
     {
         //"D|DD"   0.999;
@@ -37,6 +38,11 @@ relaxationFactors
     fields
     {
         "DD|D" 0.9;
+========
+    fields
+    {
+        D       0.1;
+>>>>>>>> development:tutorials/solids/linearElasticity/sphericalCavity/system/fvSolution
     }
 }
 

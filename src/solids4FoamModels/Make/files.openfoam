@@ -3,7 +3,6 @@ physicsModel/physicsModel.C
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/checkConvergence.C
-solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
@@ -38,7 +37,6 @@ fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
-/*fluidSolidInterfaces/newtonMonolithicCouplingInterface/newtonMonolithicCouplingInterface.C*/
 fluidSolidInterfaces/newtonQuasiMonolithicCouplingInterface/newtonQuasiMonolithicCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
@@ -151,6 +149,10 @@ $(pointNormalContactModels)/pointNormalContactModel/newPointNormalContactModel.C
 $(pointNormalContactModels)/pointStandardPenalty/pointStandardPenalty.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
+$(fluidFvPatchFields)/correctedFvPatchFields/fixedGradientCorrected/fixedGradientCorrectedFvPatchVectorField.C
+$(fluidFvPatchFields)/correctedFvPatchFields/fixedGradientCorrected/fixedGradientCorrectedFvPatchScalarField.C
+$(fluidFvPatchFields)/correctedFvPatchFields/fixedValueCorrected/fixedValueCorrectedFvPatchVectorField.C
+$(fluidFvPatchFields)/correctedFvPatchFields/fixedValueCorrected/fixedValueCorrectedFvPatchScalarField.C
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
@@ -240,11 +242,24 @@ numerics/pointFieldFunctions/pointFieldFunctions.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
+numerics/stabilisationModels/stabilisationModel/stabilisationModel.C
+numerics/stabilisationModels/alphaStab/alphaStab.C
+numerics/stabilisationModels/diffStencilLaplacianStab/diffStencilLaplacianStab.C
+numerics/stabilisationModels/diffStencilLaplacianStab/RhieChowStab/RhieChowStab.C
+numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOrderLaplacianStab.C
+numerics/stabilisationModels/gradDivStab/gradDivStab.C
+numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C
+numerics/stabilisationModels/laplacianStab/laplacianStab.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 
+higherOrderHelpers/movingLeastSquaresStencil/movingLeastSquaresStencil.C
+higherOrderHelpers/quadrature/quadrature.C
+higherOrderHelpers/quadrature/tetQuadrature.C
+higherOrderHelpers/quadrature/triQuadrature.C
+higherOrderHelpers/quadrature/lineQuadrature.C
 
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

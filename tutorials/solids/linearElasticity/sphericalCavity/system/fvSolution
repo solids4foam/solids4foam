@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -19,41 +19,21 @@ FoamFile
 
 solvers
 {
-<<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/fvSolution
     D
     {
         solver          PCG;
         preconditioner  FDIC;
         tolerance       1e-09;
         relTol          0.1;
-========
-    "T|D"
-    {
-        solver          PCG;
-        preconditioner  DIC;
-        tolerance       1e-10;
-        relTol          0.9;
-        minIter         1;
-        maxIter         100;
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/solid/fvSolution
     }
 }
 
 relaxationFactors
-<<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/fvSolution
 {
-    equations
-    {
-    //    D    0.999;
-    }
-
     fields
     {
         D       0.1;
     }
 }
-========
-{}
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/solid/fvSolution
 
 // ************************************************************************* //

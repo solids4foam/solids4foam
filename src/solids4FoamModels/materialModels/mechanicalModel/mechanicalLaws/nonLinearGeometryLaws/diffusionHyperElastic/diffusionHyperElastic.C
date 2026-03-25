@@ -181,12 +181,6 @@ Foam::tmp<Foam::volScalarField> Foam::diffusionHyperElastic::impK() const
 
 void Foam::diffusionHyperElastic::correct(volSymmTensorField& sigma)
 {
-    if (debug)
-    {
-        InfoInFunction
-            << "start" << endl;
-    }
-
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
     // enforced by the solver via the enforceLinear switch
@@ -198,16 +192,6 @@ void Foam::diffusionHyperElastic::correct(volSymmTensorField& sigma)
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F()));
 
-    // if (debug)
-    {
-        if (min(J).value() < SMALL)
-        {
-            J.write();
-            FatalErrorInFunction
-                << "stop: negative J" << exit(FatalError);
-        }
-    }
-
     // Calculate the volume preserving left Cauchy Green strain
     const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
 
@@ -216,12 +200,6 @@ void Foam::diffusionHyperElastic::correct(volSymmTensorField& sigma)
 
     // Calculate the Cauchy stress
     sigma = d_*(s + 0.5*K()*(pow(J, 2.0) - 1.0)*I)/J;
-
-    if (debug)
-    {
-        InfoInFunction
-            << "end" << endl;
-    }
 }
 
 

@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default         Euler;
+    // ddt(U)          backward;
+    // ddt(p)          backward;
+    // ddt(alpha)      Euler; //CrankNicolson 0.9;
+    // ddt(rho,U)      backward;
+}
+
+gradSchemes
+{
+    default         pointCellsLeastSquares;
+}
+
+divSchemes
+{
+    div(rhoPhi,U)  Gauss linearUpwind grad(U);
+    div(rho*phi,U)  Gauss limitedLinearV 1;
+    div(phi,alpha)  Gauss vanLeer01;
+    div(phirb,alpha) Gauss interfaceCompression;
+    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         none; //linear;
+    interpolate(yPatch) linear;
+    interpolate(U) skewCorrected linear;
+    interpolate(nHat) linear;
+    interpolate(rho) linear;
+    interpolate(alpha.water) linear;
+    interpolate((sigma*interfaceProperties:K)) linear;
+    interpolate((1|A(U))) linear;
+    flux(HbyA) linear;
+    interpolate(rAU) linear;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+
+fluxRequired
+{
+    default no;
+    p_rgh;
+    pcorr;
+    alpha;
+}
+
+// ************************************************************************* //
