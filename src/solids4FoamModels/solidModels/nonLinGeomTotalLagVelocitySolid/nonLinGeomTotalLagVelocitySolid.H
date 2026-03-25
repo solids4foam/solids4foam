@@ -92,6 +92,9 @@ class nonLinGeomTotalLagVelocitySolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- Flag to enable a linear elastic and linear geometry formulation
+        const Switch linearElasticFormulation_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 

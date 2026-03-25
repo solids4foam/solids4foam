@@ -125,6 +125,48 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::bulkModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "K",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_
+        )
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::shearModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "mu",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_
+        )
+    );
+}
+
+
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field

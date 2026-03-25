@@ -448,6 +448,13 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     rImpK_(1.0/impK_),
     pDiffusivityPtr_(),
     dpdtPtr_(),
+    linearElasticFormulation_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "linearElasticFormulation_", false
+        )
+    ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -496,6 +503,10 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     ),
     curTimeIndex_(-1)
 {
+    Info<< "linearElasticFormulation = " << linearElasticFormulation_ << nl
+        << "predictor = " << predictor_ << nl
+        << "solvePressure = " << solvePressure() << endl;
+
     DisRequired();
 
     // Ensure U is created (and possibly read)
@@ -513,7 +524,6 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     // constructor to allow it to correctly initialise fields
     mechanical().correct(sigma());
 
-    Info<< "solvePressure = " << solvePressure() << endl;
     if (solvePressure())
     {
         if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
@@ -650,37 +660,14 @@ bool nonLinGeomTotalLagVelocitySolid::evolve()
     {
         return evolveSnes();
     }
-    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
-    // {
-    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-    //     // could be combined with PETSc to achieve this.. todo!
-    //     return evolveImplicitCoupled();
-    // }
-    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
-    // {
-    //     return evolveImplicitSegregated();
-    // }
-    // else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
-    // {
-    //     return evolveExplicit();
-    // }
     else
     {
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
             << "Unrecognised solution algorithm. Available options are "
-            // << solutionAlgorithmNames_.names() << endl;
             << solidModel::solutionAlgorithmNames_
                [
                    solidModel::solutionAlgorithm::PETSC_SNES
                ]
-            // << solidModel::solutionAlgorithmNames_
-            //    [
-            //        solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
-            //    ]
-            // << solidModel::solutionAlgorithmNames_
-            //    [
-            //        solidModel::solutionAlgorithm::EXPLICIT
-            //    ]
             << endl;
     }
 
@@ -765,18 +752,12 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Calculate future-time gradient of displacement
     mechanical().grad(DFutureTime_, gradD());
 
-    // Lookup linear elastic formulation flag
-    const Switch linearElasticFormulation
-    (
-        solidModelDict().lookup("linearElasticFormulation")
-    );
-
-    if (linearElasticFormulation)
+    if (linearElasticFormulation_)
     {
-        // Hard-code linear elasticity
-        const dimensionedScalar mu(solidModelDict().lookup("mu"));
-        const dimensionedScalar lambda(solidModelDict().lookup("lambda"));
-        sigma() = 2*mu*symm(gradD()) + lambda*tr(gradD())*I;
+        // Linear elasticity
+        sigma() =
+            2.0*mechanical().shearModulus()*dev(symm(gradD()))
+          + mechanical().bulkModulus()*tr(gradD())*I;
     }
     else
     {
@@ -803,7 +784,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     // Calculate forceFutureTime
-    if (linearElasticFormulation)
+    if (linearElasticFormulation_)
     {
         // Future-time traction vectors at the faces
         surfaceVectorField traction(n & fvc::interpolate(sigma()));
