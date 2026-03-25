@@ -11,16 +11,29 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      thermalProperties;
+    class       pointVectorField;
+    object      pointD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-thermal
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
 {
-    type            constant;
-    C               C [0 2 -2 -1 0 0 0] 1010;
-    k               k [1 1 -3 -1 0 0 0] 0.04;
+    base
+    {
+        type            uniformFixedValue;
+        uniformValue    (0 0 0);
+    }
+    "newton|patch0"
+    {
+        type            pointSolidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
 }
 
 // ************************************************************************* //

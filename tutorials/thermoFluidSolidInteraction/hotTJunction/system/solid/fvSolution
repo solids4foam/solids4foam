@@ -19,14 +19,6 @@ FoamFile
 
 solvers
 {
-<<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/fvSolution
-    D
-    {
-        solver          PCG;
-        preconditioner  FDIC;
-        tolerance       1e-09;
-        relTol          0.1;
-========
     "T|D"
     {
         solver          PCG;
@@ -35,25 +27,10 @@ solvers
         relTol          0.9;
         minIter         1;
         maxIter         100;
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/solid/fvSolution
     }
 }
 
 relaxationFactors
-<<<<<<<< HEAD:tutorials/solids/linearElasticity/sphericalCavity/system/fvSolution
-{
-    equations
-    {
-    //    D    0.999;
-    }
-
-    fields
-    {
-        D       0.1;
-    }
-}
-========
 {}
->>>>>>>> development:tutorials/thermoFluidSolidInteraction/hotTJunction/system/solid/fvSolution
 
 // ************************************************************************* //

@@ -65,6 +65,7 @@ else
     ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
     ln -vnsf "controlDict.${coupling}" system/controlDict
     ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+    ln -vnsf "fluidProperties.partitioned" constant/fluid/fluidProperties
 
     solids4Foam::convertCaseFormat .
 fi
