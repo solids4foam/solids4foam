@@ -65,6 +65,36 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   retained.
 - `minSignificant`: absolute filtering tolerance for repeated or
   near-dependent modes.
+- `relMinSignificant`: optional relative QR2-style filtering tolerance based on
+  the fraction of new information in each older secant mode.
+- `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
+  pair before the QR solve to improve the conditioning of the least-squares
+  system.
+- `residualSumPreconditioning`: optionally scale each `V` column by the inverse
+  of the current residual magnitude before the QR solve, mimicking preCICE's
+  residual-sum approach.
+- `residualPreconditioningEpsilon`: regularization added to the residual
+  magnitude when computing the above scaling weight.
+- `reusePreviousStepModes`: optionally reuse the previous time step's cached
+  secants only in the first IQN-ILS solve of the new time step. If the
+  immediately previous time step converged in one iteration and generated no
+  new secants, the implementation falls back to the latest non-empty cached
+  time step instead, which is closer to preCICE's backup LS-system behavior.
+- `maxReuseUpdateNormRatio`: optional safeguard that caps the norm of that
+  first reused IQN-ILS correction relative to the current interface residual.
+- `combinedCouplingSystem`: optionally assemble one aligned least-squares
+  system across all coupled interfaces instead of solving one interface at a
+  time. On single-interface cases this should reproduce the per-interface
+  result; it is mainly a structural step toward a more preCICE-like assembly.
+  This can also be combined with `preciceStyleCouplingQR`.
+- `requireAllResidualMeasures`: optionally require all normalized residual
+  measures in the shared FSI convergence check to satisfy the tolerance.
+  Legacy behavior uses the minimum of the available residual measures, which
+  can stop earlier when only one measure has decayed.
+- `qrSolveTolerance`: relative cutoff used to ignore nearly singular
+  directions during the triangular back-substitution.
+- `reorthogonalizeCouplingColumns`: optionally apply a second
+  Gram-Schmidt-style correction while assembling the QR system.
 - `predictSolid`: optionally solve the solid once before the outer FSI loop.
 
 Implementation:

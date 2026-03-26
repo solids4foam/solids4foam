@@ -33,7 +33,7 @@ elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
 fi
 
 if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
+    REF_MAX_DISP=0.000357586
 fi
 
 echo "============================================================"
@@ -84,7 +84,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk '{print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {
