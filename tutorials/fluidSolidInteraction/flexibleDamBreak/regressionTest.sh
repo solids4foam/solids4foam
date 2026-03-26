@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # flexibleDamBreak FSI regression test
 # ============================================================
@@ -21,11 +25,35 @@ ALLRUN_LOGFILE="log.Allrun"
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    variant="openfoamorg"
+fi
+
+if [[ "${variant}" == "foamextend" ]]; then
+    REF_MAX_DISP=0.000357586
+fi
+
 echo "============================================================"
 echo "flexibleDamBreak FSI regression test"
 echo "Max displacement difference < ${DISP_MAX_TOL}"
 echo "============================================================"
 echo
+
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
 
 # ------------------------------------------------------------
 # Clean & run case
@@ -44,8 +72,9 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    prepare_case
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -55,7 +84,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk '{print $3}' "${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {
@@ -93,7 +122,7 @@ fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo

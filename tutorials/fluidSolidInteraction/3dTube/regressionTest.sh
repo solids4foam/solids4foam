@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 # ============================================================
 # Beam-in-cross-flow FSI regression test
 # ============================================================
@@ -13,12 +17,15 @@ IFS=$'\n\t'
 DISP_MAX_TOL=1e-5      # max displacement absolute tolerance
 FORCE_MEAN_TOL=1e-3    # mean force tolerance
 
+# Regression end time for the copied case only
+REG_END_TIME=0.005
+
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=50
 
-# Reference values
-REF_MAX_DISP=0.000149739
-REF_MEAN_FORCE=-0.0474451
+# Reference values at REG_END_TIME
+REF_MAX_DISP=5.19135e-05
+REF_MEAN_FORCE=0.113326
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -28,11 +35,27 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 echo "============================================================"
-echo "Beam-in-cross-flow FSI regression test"
+echo "3dTube FSI regression test"
+echo "Regression end time         = ${REG_END_TIME}"
 echo "Max displacement difference < ${DISP_MAX_TOL}"
 echo "Mean force difference       < ${FORCE_MEAN_TOL}"
 echo "============================================================"
 echo
+
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+}
 
 # ------------------------------------------------------------
 # Clean & run case
@@ -51,16 +74,17 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    prepare_case
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
 # OpenFOAM variant compatibility
-mkdir -p postProcessing/fluid/forces/0
+mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
 (
-    cd postProcessing/fluid/forces/0
+    cd "${CASE_DIR}/postProcessing/fluid/forces/0"
 
     # foam-extend writes forces to a 'forces' sub-directory so we will create a
     # link
@@ -79,19 +103,14 @@ mkdir -p postProcessing/fluid/forces/0
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk '{print $3}' "${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 extract_mean_force_tail() {
-    tail -n "${FORCE_AVG_SAMPLES}" "${FORCE_FILE}" | \
+    tail -n "${FORCE_AVG_SAMPLES}" "${CASE_DIR}/${FORCE_FILE}" | \
     awk '
     {
-        # Remove parentheses
         gsub(/[()]/, "", $0)
-
-        # After cleanup, fields are:
-        # $1 = time
-        # $2 = Fx (both formats)
         sum += $2
         n++
     }

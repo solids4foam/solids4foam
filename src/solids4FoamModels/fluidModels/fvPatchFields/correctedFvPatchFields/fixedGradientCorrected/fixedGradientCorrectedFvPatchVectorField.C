@@ -185,7 +185,7 @@ void fixedGradientCorrectedFvPatchVectorField::evaluate
         this->updateCoeffs();
     }
 
-    const word gradName(internalFieldName(*this));
+    const word gradName("grad(" + internalFieldName(*this) + ")");
 
     if (nonOrthogonalCorrections_ && db().foundObject<volTensorField>(gradName))
     {

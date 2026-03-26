@@ -17,32 +17,26 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel linearGeometry;
-//solidModel nonLinearGeometryUpdatedLagrangian;
-//solidModel unsNonLinearGeometryUpdatedLagrangian;
-//solidModel nonLinearGeometryTotalLagrangian;
-//solidModel nonLinearGeometryTotalLagrangianTotalDisplacement;
-solidModel unsNonLinearGeometryTotalLagrangian;
+//solidModel     linearGeometryTotalDisplacement;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-//linearGeometryCoeffs
-//nonLinearGeometryTotalLagrangianCoeffs
-//nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
-unsNonLinearGeometryTotalLagrangianCoeffs
+"linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
 {
-    // Maximum number of momentum correctors
-    nCorrectors             1000;
+    // Solution algorithm
+    solutionAlgorithm PETScSNES;
 
-    // Solution tolerance for displacement
-    solutionTolerance       1e-7;
+    // Predictor D at the start of a new time step using U and A
+    predictor yes;
 
-    // Relative solution tolerance for displacement in outer FSI iterations
-    relConvergenceTolerance 1e-3;
-
-    // Material law solution tolerance
-    //materialTolerance       1e-05;
-
-    // Write frequency for the residuals
-    infoFrequency           1000;
+    // Stabilisation
+    stabilisation
+    {
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.5;
+        }
+    }
 }
 
 // ************************************************************************* //

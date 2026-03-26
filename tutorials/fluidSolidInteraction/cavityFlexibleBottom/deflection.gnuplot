@@ -7,7 +7,7 @@ set y2label "u_y [m]"
 set grid
 
 set y2tics
-set yrange[0.001:0.002]
+set yrange[-0.0001:-0.0002]
 set y2range[-0.3:-0.05]
 
 plot [2:] \

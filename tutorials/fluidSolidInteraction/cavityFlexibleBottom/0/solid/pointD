@@ -46,7 +46,7 @@ boundaryField
        value           uniform (0 0 0);
     }
 
-    defaultFaces
+    frontAndBack
     {
         type           empty;
     }

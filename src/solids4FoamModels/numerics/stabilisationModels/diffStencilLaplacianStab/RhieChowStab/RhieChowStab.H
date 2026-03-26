@@ -16,25 +16,23 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    momentumStabilisation
+    RhieChowStab
 
 Description
-    Run-time selectable stabilisation (diffusion) term for the solid mechanics
-    momentum equation.
-
-Author
-    Philip Cardiff, UCD.
+    Backwards-compatibility alias for `diffStencilLaplacianStab`.
 
 SourceFiles
-    momentumStabilisation.C
+    RhieChowStab.C
+
+Author
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef momentumStabilisation_H
-#define momentumStabilisation_H
+#ifndef RhieChowStab_H
+#define RhieChowStab_H
 
-#include "dictionary.H"
-#include "volFields.H"
+#include "diffStencilLaplacianStab.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -42,64 +40,28 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                       Class momentumStabilisation Declaration
+                         Class RhieChowStab Declaration
 \*---------------------------------------------------------------------------*/
 
-class momentumStabilisation
+class RhieChowStab
+:
+    public diffStencilLaplacianStab
 {
-    // Private data
-
-        //- Copy of settings dict
-        const dictionary dict_;
-
-    // Private Member Functions
-
-        //- Disallow default bitwise copy construct
-        momentumStabilisation(const momentumStabilisation&);
-
-        //- Disallow default bitwise assignment
-        void operator=(const momentumStabilisation&);
 
 public:
 
     //- Runtime type information
-    TypeName("momentumStabilisation");
-
+    TypeName("RhieChow");
 
     // Constructors
 
         //- Construct from dictionary
-        momentumStabilisation
+        RhieChowStab
         (
-            const dictionary& dict
+            const fvMesh& mesh,
+            const dictionary& dict,
+            const dimensionSet& dims
         );
-
-
-    // Destructor
-
-        virtual ~momentumStabilisation()
-        {}
-
-
-    // Member Functions
-
-        // Access
-
-            //- Const access to the dict
-            const dictionary& dict() const
-            {
-                return dict_;
-            }
-
-        // Evaluation
-
-            //- Stabilisation term
-            tmp<volVectorField> stabilisation
-            (
-                const volVectorField& vf,
-                const volTensorField& gradVf,
-                const volScalarField& gamma
-            ) const;
 };
 
 
