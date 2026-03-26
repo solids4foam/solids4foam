@@ -40,7 +40,7 @@ This document defines how automated coding changes should be made in this reposi
 
 - Match existing shell script style in `Allwmake`, `Allrun`, `Alltest`, etc.
 - Keep Markdown concise, practical, and repository-specific.
-- All Markdown files must pass the Lint checker, e.g. `markdownlint README.md` 
+- All Markdown files must pass the Lint checker, e.g. `markdownlint README.md`
 
 ## 3) OpenFOAM Conventions to Follow
 
