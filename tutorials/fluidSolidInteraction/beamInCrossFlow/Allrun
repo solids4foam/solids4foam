@@ -61,11 +61,17 @@ else
 
     echo "Using ${coupling} coupling setup"
 
+    # Create all .partitioned symlinks
+    for file in $(find ./0 ./constant ./system -name '*.partitioned')
+    do
+        ln -vnsf "${file##*/}" "${file%.partitioned}"
+    done
+
+    # Override fvSolution to use coupling-specific version (iqnils or aitken)
+    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
     ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
     ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
     ln -vnsf "controlDict.${coupling}" system/controlDict
-    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
-    ln -vnsf "fluidProperties.partitioned" constant/fluid/fluidProperties
 
     solids4Foam::convertCaseFormat .
 fi
