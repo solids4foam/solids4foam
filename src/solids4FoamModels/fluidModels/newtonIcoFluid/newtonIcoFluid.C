@@ -360,22 +360,22 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
 {
     if
     (
-        runTime.controlDict().getOrDefault("adjustTimeStep", false)
+        runTime.controlDict().lookupOrDefault("adjustTimeStep", false)
      && foamPetscSnesHelper::snesHasRun()
     )
     {
         const scalar maxDeltaT =
-            runTime.controlDict().get<scalar>("maxDeltaT");
+            readScalar(runTime.controlDict().lookup("maxDeltaT"));
         const scalar minDeltaT =
-            runTime.controlDict().get<scalar>("minDeltaT");
+            readScalar(runTime.controlDict().lookup("minDeltaT"));
 
         const int minTargetNIter =
-            runTime.controlDict().getOrDefault<int>("minTargetNIter", 3);
+            runTime.controlDict().lookupOrDefault<int>("minTargetNIter", 3);
         const int maxTargetNIter =
-            runTime.controlDict().getOrDefault<int>("maxTargetNIter", 6);
+            runTime.controlDict().lookupOrDefault<int>("maxTargetNIter", 6);
 
         const Switch enableTimeStepLog =
-            runTime.controlDict().getOrDefault("logTimeStepAdjustments", true);
+            runTime.controlDict().lookupOrDefault("logTimeStepAdjustments", true);
 
         PetscInt numIter;
         SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
@@ -413,7 +413,7 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
                 factor = min(1.5, 1.1*scalar(maxTargetNIter)/numIter);
             }
 
-            newDeltaT = clamp(factor*currentDeltaT, minDeltaT, maxDeltaT);
+            newDeltaT = min(max(factor*currentDeltaT, minDeltaT), maxDeltaT);
         }
 
         Info<< "Nonlinear iterations = " << numIter << nl
@@ -427,7 +427,7 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
             if (tsLogPtr_.empty())
             {
                 const fileName timeStepLogFile =
-                    runTime.controlDict().getOrDefault<fileName>
+                    runTime.controlDict().lookupOrDefault<fileName>
                     (
                         "timeStepLogFile", "timeStepLog.dat"
                     );
