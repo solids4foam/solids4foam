@@ -975,7 +975,7 @@ label linGeomTotalDispSolid::formResidual
     {
         FatalErrorInFunction
                 << "solvePressure must be disbled when using high order "
-                << "residual calculation. Mixed approach not yet implemented!"
+                << "residual calculation. Mixed approach not yet supported!"
                 << abort(FatalError);
     }
 

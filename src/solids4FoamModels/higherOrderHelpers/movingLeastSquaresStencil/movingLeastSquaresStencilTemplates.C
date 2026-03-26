@@ -111,7 +111,7 @@ Foam::movingLeastSquaresStencil::remoteFieldPerProc
         }
 
 #ifdef OPENFOAM_COM
-        if( reqBufs.recvDataCount(procI))
+        if (!reqBufs.recvDataCount(procI))
         {
             continue;
         }
@@ -161,7 +161,7 @@ Foam::movingLeastSquaresStencil::remoteFieldPerProc
         }
 
 #ifdef OPENFOAM_COM
-        if (repBufs.recvDataCount(procI))
+        if (!repBufs.recvDataCount(procI))
         {
             FatalErrorInFunction
                 << "Did not receive field values from proc " << procI

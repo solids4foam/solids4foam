@@ -210,7 +210,7 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
             }
 
 #ifdef OPENFOAM_COM
-            if (sBufs.recvDataCount(from))
+            if (!sBufs.recvDataCount(from))
             {
                 continue;
             }
@@ -262,7 +262,7 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
         {
             const label fromProc = procToQuery[i];
 #ifdef OPENFOAM_COM
-            if (rBufs.recvDataCount(fromProc))
+            if (!rBufs.recvDataCount(fromProc))
             {
                 continue;
             }
@@ -328,7 +328,7 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
         }
 
 #ifdef OPENFOAM_COM
-        if (reqBufs.recvDataCount(fromProc))
+        if (!reqBufs.recvDataCount(fromProc))
         {
             continue;
         }
@@ -377,7 +377,7 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
         }
 
 #ifdef OPENFOAM_COM
-        if (repBufs.recvDataCount(p))
+        if (!repBufs.recvDataCount(p))
         {
             FatalErrorInFunction
                 << "Did not receive centres from proc " << p << nl
@@ -813,18 +813,6 @@ void movingLeastSquaresStencil::calcFacesStencil() const
         if (isA<emptyPolyPatch>(pp))
         {
             continue;
-        }
-
-        // Skip non-owned processor faces to avoid double counting
-        if (isA<processorPolyPatch>(pp))
-        {
-            const processorPolyPatch& ppp =
-                refCast<const processorPolyPatch>(pp);
-
-            if (!ppp.owner())
-            {
-                continue;
-            }
         }
 
         forAll(pp, i)

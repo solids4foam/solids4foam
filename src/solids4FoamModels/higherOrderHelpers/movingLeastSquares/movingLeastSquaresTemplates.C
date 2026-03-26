@@ -201,7 +201,7 @@ void movingLeastSquares::fGrad
     // Loop over internal faces
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
-        const auto stencil = stencils[faceI];
+        const UList<label> stencil = stencils[faceI];
         const auto coeffs = fGradCoeffs[faceI];
 
         forAll(faceQuadPts[faceI], qpI)
