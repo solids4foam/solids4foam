@@ -5,7 +5,7 @@ IFS=$'\n\t'
 # -------------------------------------------------------------------------
 # solids4Foam Allrun script
 # Allows selection of solution approach:
-#   petscSnes (default), unsCoupled
+#   petscSnes (default), segregated, unsCoupled
 # -------------------------------------------------------------------------
 
 usage() {
@@ -15,10 +15,12 @@ Usage:
 
 Where [approach] is one of:
   petscSnes       (default)
+  segregated
   unsCoupled
 
 Examples:
   ./Allrun
+  ./Allrun segregated
   ./Allrun unsCoupled
 EOF
 }
@@ -44,7 +46,7 @@ fi
 APPROACH="${1:-petscSnes}"
 
 case "$APPROACH" in
-    petscSnes|unsCoupled) ;;
+    petscSnes|segregated|unsCoupled) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -77,6 +79,10 @@ require_petsc_or_exit_silently() {
 
 select_approach() {
     case "$APPROACH" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
         unsCoupled)
             echo "Using the unsCoupled approach"
             solids4Foam::caseOnlyRunsWithFoamExtend
