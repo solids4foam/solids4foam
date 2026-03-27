@@ -51,6 +51,13 @@ prepare_case() {
     sed -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
+
+    if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
+        && [[ ! -f "${CASE_DIR}/constant/polyMesh/blockMeshDict" ]]; then
+        mkdir -p "${CASE_DIR}/constant/polyMesh"
+        cp -a "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" \
+            "${CASE_DIR}/constant/polyMesh/blockMeshDict"
+    fi
 }
 
 CHECK_ONLY=false
@@ -67,7 +74,6 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"

@@ -55,6 +55,8 @@ prepare_case() {
 find_force_file() {
     local candidate
     for candidate in \
+        "${CASE_DIR}/forces/0/forces.dat" \
+        "${CASE_DIR}/forces/0/force.dat" \
         "${CASE_DIR}/postProcessing/forces/0/force.dat" \
         "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
         "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
