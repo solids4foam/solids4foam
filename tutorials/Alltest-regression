@@ -23,6 +23,7 @@ echo "============================================================"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}"
 REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
+SOLIDS4FOAM_SCRIPTS="${ROOT_DIR}/../applications/scripts/solids4FoamScripts.sh"
 MAX_JOBS=""
 
 usage()
@@ -74,6 +75,13 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    # Regression scripts rely on the shared skip helper for cases that do not
+    # run in every OpenFOAM flavor.
+    source "${SOLIDS4FOAM_SCRIPTS}"
+    export -f solids4Foam::regressionCaseSkipped
+fi
 
 # Create regression root directory
 rm -rf "${REG_ROOT}"
@@ -143,12 +151,14 @@ run_regression_test()
     local dstCase="${REG_ROOT}/${testCase}"
     local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
     local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    local status=0
 
     echo
     echo "------------------------------------------------------------"
     echo "Running regression test: ${testCase}"
     echo "------------------------------------------------------------"
 
+    set +e
     {
         rm -rf "${dstCase}"
         mkdir -p "$(dirname "${dstCase}")"
@@ -163,8 +173,10 @@ run_regression_test()
 
         ./regressionTest.sh
     } > "${logFile}" 2>&1
+    status=$?
+    set -e
 
-    echo "$?" > "${statusFile}"
+    echo "${status}" > "${statusFile}"
 }
 
 active_jobs=0

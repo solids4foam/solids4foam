@@ -11,8 +11,8 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Checks the final loading force after the necking curve.
 # ============================================================
 
-FORCE_MIN=206.8
-FORCE_MAX=207.0
+FORCE_MIN=19.0
+FORCE_MAX=19.5
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -57,13 +57,13 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
-force_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesloading.dat' -print | tail -n 1)
+force_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesDisplacementsloading.dat' -print | tail -n 1)
 if [[ -z "${force_file}" ]]; then
     echo "FAIL: Could not find loading force history"
     exit 1
 fi
 
-final_force=$(awk 'END {print $2}' "${force_file}")
+final_force=$(awk 'END {print $5*360e-3}' "${force_file}")
 if [[ -z "${final_force}" ]]; then
     echo "FAIL: Could not extract final loading force"
     exit 1

@@ -5,6 +5,12 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+SOLIDS4FOAM_ROOT_ABS=$(cd "${SCRIPT_DIR}/../../../../" && pwd)
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # cantilever2d regression test
@@ -38,6 +44,13 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    # The regression copy lives deeper than the source tutorial, so the
+    # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
+    # the repository root.
+    sed -i.bak \
+        "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
+        "${CASE_DIR}/src/Make/options"
 }
 
 CHECK_ONLY=false
@@ -60,16 +73,21 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 extract_max_epsilon() {
-    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
         | tail -n 1 \
-        | awk '{print $NF}'
+        | awk '{print $NF}' || true
 }
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
         | tail -n 1 \
-        | awk '{print $NF}'
+        | awk '{print $NF}' || true
 }
 
 epsilon=$(extract_max_epsilon)

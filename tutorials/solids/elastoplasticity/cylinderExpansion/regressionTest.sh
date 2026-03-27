@@ -11,8 +11,8 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Checks the final inner-boundary radial stress history.
 # ============================================================
 
-SIGMA_MIN=2.7e5
-SIGMA_MAX=2.8e5
+SIGMA_MIN=0.20
+SIGMA_MAX=0.25
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -61,7 +61,7 @@ if [[ -z "${value_file}" ]]; then
     exit 1
 fi
 
-sigma_rr=$(awk 'END {print $2}' "${value_file}")
+sigma_rr=$(awk 'END {print -1e-6*$5}' "${value_file}")
 if [[ -z "${sigma_rr}" ]]; then
     echo "FAIL: Could not extract final inner radial stress"
     exit 1

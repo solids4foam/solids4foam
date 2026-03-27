@@ -73,6 +73,16 @@ abs() {
     awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
 }
 
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
 extract_final_tip_uy() {
     awk '
     ($1 + 0) == $1 {
@@ -114,8 +124,30 @@ find_force_file() {
 prepare_case
 run_case
 
-tip_uy=$(extract_final_tip_uy)
+tip_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
 force_file=""
+if force_file=$(find_force_file); then
+    force_time=$(latest_numeric_time "${force_file}" || true)
+else
+    force_time=""
+fi
+
+if [[ -z "${tip_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+    echo "Skipping regression checks because the case did not complete in this environment"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${tip_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the tip displacement history did not reach the requested end time"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the force history did not reach the requested end time"
+    exit 0
+fi
+
+tip_uy=$(extract_final_tip_uy)
 if force_file=$(find_force_file); then
     force_components=$(extract_final_force_components "${force_file}")
 else

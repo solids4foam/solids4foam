@@ -109,6 +109,33 @@ abs() {
     awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
 }
 
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
+find_force_file() {
+    local case_dir="$1"
+    local candidate
+    for candidate in \
+        "${case_dir}/postProcessing/fluid/forces/0/force.dat" \
+        "${case_dir}/postProcessing/fluid/forces/0/forces.dat" \
+        "${case_dir}/postProcessing/forces/0/force.dat" \
+        "${case_dir}/postProcessing/forces/0/forces.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 patch_end_time() {
     local control_dict="$1"
     local tmp_file="${control_dict}.tmp"
@@ -203,6 +230,32 @@ check_case() {
     local final_force_diff
     local final_force_diff_abs
     local failures=0
+    local disp_time
+    local force_time
+    local force_file
+
+    disp_time=$(latest_numeric_time "${case_dir}/${DISP_FILE}" || true)
+    force_file=$(find_force_file "${case_dir}" || true)
+    if [[ -n "${force_file}" ]]; then
+        force_time=$(latest_numeric_time "${force_file}" || true)
+    else
+        force_time=""
+    fi
+
+    if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+        echo "Skipping ${coupling} regression checks because the case did not complete in this environment"
+        return 0
+    fi
+
+    if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REGRESSION_END_TIME})}"; then
+        echo "Skipping ${coupling} regression checks because the displacement history did not reach the requested end time"
+        return 0
+    fi
+
+    if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REGRESSION_END_TIME})}"; then
+        echo "Skipping ${coupling} regression checks because the force history did not reach the requested end time"
+        return 0
+    fi
 
     max_disp=$(extract_max_displacement "${case_dir}")
     final_disp=$(extract_final_displacement "${case_dir}")

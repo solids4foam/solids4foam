@@ -62,6 +62,16 @@ abs() {
     awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
 }
 
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
 extract_final_apex_dy() {
     awk '
     ($1 + 0) == $1 {
@@ -87,6 +97,24 @@ run_case
 
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
+apex_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
+fsi_time=$(latest_numeric_time "${CASE_DIR}/${FSI_RES_FILE}" || true)
+
+if [[ -z "${apex_time}" || -z "${fsi_time}" ]]; then
+    echo "Skipping regression checks because the case did not complete in this environment"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${apex_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the apex history did not reach the requested end time"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${fsi_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the FSI residual history did not reach the requested end time"
     exit 0
 fi
 

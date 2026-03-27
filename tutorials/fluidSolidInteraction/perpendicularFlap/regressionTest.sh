@@ -81,7 +81,11 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun "${RUN_ARGS[@]}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    if (( ${#RUN_ARGS[@]} > 0 )); then
+        ( cd "${CASE_DIR}" && ./Allrun "${RUN_ARGS[@]}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    else
+        ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    fi
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
