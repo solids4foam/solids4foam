@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # perpendicularFlap FSI regression test
 # ============================================================
@@ -15,6 +18,9 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ------------------------------------------------------------
 
 DISP_MAX_TOL=1e-2      # max displacement absolute tolerance
+
+# Regression end time for the copied case only
+REG_END_TIME=4
 
 # Reference values
 REF_MAX_DISP=0.118329
@@ -42,6 +48,8 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------

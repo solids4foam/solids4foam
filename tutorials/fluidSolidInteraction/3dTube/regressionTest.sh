@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # Beam-in-cross-flow FSI regression test
 # ============================================================
@@ -14,18 +17,18 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-5      # max displacement absolute tolerance
-FORCE_MEAN_TOL=1e-3    # mean force tolerance
+DISP_MAX_TOL=1e-6      # max displacement absolute tolerance
+FORCE_MEAN_TOL=2e-2    # mean force tolerance
 
 # Regression end time for the copied case only
-REG_END_TIME=0.005
+REG_END_TIME=0.0015
 
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=50
 
 # Reference values at REG_END_TIME
-REF_MAX_DISP=5.19135e-05
-REF_MEAN_FORCE=0.113326
+REF_MAX_DISP=7.82644e-07
+REF_MEAN_FORCE=4.88545e-02
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

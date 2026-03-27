@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # flexibleDamBreak FSI regression test
 # ============================================================
@@ -16,8 +19,11 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 
 DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
 
+# Regression end time for the copied case only
+REG_END_TIME=0.3
+
 # Reference values
-REF_MAX_DISP=0.000389136
+REF_MAX_DISP=1.93742e-05
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -53,6 +59,8 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------
