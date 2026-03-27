@@ -25,6 +25,16 @@ REG_END_TIME=4
 # Reference values
 REF_MAX_DISP=0.118329
 
+RUN_ARGS=()
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+fi
+
+if [[ "${variant}" == "foamextend" ]]; then
+    RUN_ARGS=(aitken)
+fi
+
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -71,7 +81,7 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    ( cd "${CASE_DIR}" && ./Allrun "${RUN_ARGS[@]}" > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi

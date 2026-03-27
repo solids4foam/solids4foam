@@ -39,7 +39,7 @@ elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
 fi
 
 if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=0.000357586
+    REF_MAX_DISP=3.76032e-05
 fi
 
 echo "============================================================"

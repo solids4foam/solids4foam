@@ -20,7 +20,8 @@ echo "============================================================"
 echo "solids4Foam regression tests"
 echo "============================================================"
 
-ROOT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}"
 REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
 
 get_num_cores()
@@ -136,7 +137,11 @@ wait_for_available_slot()
             fi
         done
 
-        pids=("${live_pids[@]}")
+        if (( ${#live_pids[@]} > 0 )); then
+            pids=("${live_pids[@]}")
+        else
+            pids=()
+        fi
 
         if (( active_jobs >= MAX_JOBS )); then
             sleep 1
