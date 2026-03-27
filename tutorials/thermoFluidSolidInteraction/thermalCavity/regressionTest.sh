@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # thermalCavity regression test
@@ -20,7 +25,6 @@ N_FSI_CORRECTORS_MAX=50
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
-FSI_DATA="postProcessing/0/fsiConvergenceData.dat"
 
 echo "============================================================"
 echo "thermalCavity regression test"
@@ -45,6 +49,23 @@ shorten_case() {
     local controlDict="${CASE_DIR}/system/controlDict"
     sed -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
+}
+
+find_fsi_data() {
+    local candidate
+    for candidate in \
+        "${CASE_DIR}/postProcessing/0/fsiConvergenceData.dat" \
+        "${CASE_DIR}/postProcessing/fluid/0/fsiConvergenceData.dat" \
+        "${CASE_DIR}/postProcessing/solid/0/fsiConvergenceData.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    find "${CASE_DIR}/postProcessing" -name 'fsiConvergenceData.dat' -print 2>/dev/null \
+        | tail -n 1
 }
 
 # ------------------------------------------------------------
@@ -73,16 +94,22 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 # ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 
-if [[ ! -f "${CASE_DIR}/${FSI_DATA}" ]]; then
-    echo "FAIL: Could not find ${FSI_DATA}"
+fsi_data=$(find_fsi_data)
+if [[ -z "${fsi_data}" ]]; then
+    echo "FAIL: Could not find fsiConvergenceData output"
     exit 1
 fi
 
-n_fsi_correctors=$(grep -v '^[[:space:]]*#' "${CASE_DIR}/${FSI_DATA}" | tail -n 1 | awk '{print $2}')
+n_fsi_correctors=$(grep -v '^[[:space:]]*#' "${fsi_data}" | tail -n 1 | awk '{print $2}')
 
 if [[ -z "${n_fsi_correctors}" ]]; then
     echo "FAIL: Could not extract nFsiCorrectors"

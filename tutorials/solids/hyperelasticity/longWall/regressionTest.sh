@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # longWall regression test
@@ -17,8 +22,6 @@ SYY_MIN=9.99e7
 SYY_MAX=1.001e8
 
 ALLRUN_LOGFILE="log.Allrun"
-DISP_FILE="postProcessing/0/solidDisplacementstop.dat"
-STRESS_FILE="postProcessing/0/solidStressestop.dat"
 
 echo "============================================================"
 echo "longWall regression test"
@@ -38,6 +41,11 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+}
+
+find_history_file() {
+    local name="$1"
+    find "${CASE_DIR}/postProcessing" -name "${name}" -print 2>/dev/null | tail -n 1
 }
 
 CHECK_ONLY=false
@@ -60,13 +68,21 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
-if [[ ! -f "${CASE_DIR}/${DISP_FILE}" || ! -f "${CASE_DIR}/${STRESS_FILE}" ]]; then
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
+disp_file=$(find_history_file 'solidDisplacementstop.dat')
+stress_file=$(find_history_file 'solidStressestop.dat')
+
+if [[ -z "${disp_file}" || -z "${stress_file}" ]]; then
     echo "FAIL: Could not find one or more history files"
     exit 1
 fi
 
-top_uy=$(awk 'END {print $9}' "${CASE_DIR}/${DISP_FILE}")
-top_syy=$(awk 'END {print $5}' "${CASE_DIR}/${STRESS_FILE}")
+top_uy=$(awk 'END {print $9}' "${disp_file}")
+top_syy=$(awk 'END {print $5}' "${stress_file}")
 
 if [[ -z "${top_uy}" || -z "${top_syy}" ]]; then
     echo "FAIL: Could not extract top-surface values"

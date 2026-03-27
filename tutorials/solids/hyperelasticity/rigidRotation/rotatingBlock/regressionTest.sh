@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # -----------------------------------------------------------------------------
 # Regression test for rigid rotation of a hyperelastic block
@@ -60,6 +65,11 @@ for approach in "${APPROACHES[@]}"; do
 
     # Run case
     ( cd "${CASE_DIR}" && ./Allrun "${approach}" ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
+
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping regression checks because the tutorial skipped in this environment"
+        continue
+    fi
 
     # Extract final Max sigmaEq
     sigma=$(grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \

@@ -27,7 +27,6 @@ LIFT_MIN=0.0105
 LIFT_MAX=0.0115
 
 ALLRUN_LOGFILE="log.Allrun"
-FORCE_FILE="postProcessing/forces/0/force.dat"
 
 echo "============================================================"
 echo "cylinderInChannel regression test"
@@ -51,6 +50,22 @@ prepare_case() {
 
     sed -i.bak 's/^endTime[[:space:]]\+50;/endTime         5;/' "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
+}
+
+find_force_file() {
+    local candidate
+    for candidate in \
+        "${CASE_DIR}/postProcessing/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/forces.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # ------------------------------------------------------------
@@ -86,13 +101,14 @@ fi
 # Extract values
 # ------------------------------------------------------------
 
-if [[ ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
-    echo "FAIL: Could not find ${FORCE_FILE}"
+force_file=""
+if ! force_file=$(find_force_file); then
+    echo "FAIL: Could not find force history output"
     exit 1
 fi
 
-final_drag=$(awk 'END {print $2}' "${CASE_DIR}/${FORCE_FILE}")
-final_lift=$(awk 'END {print $3}' "${CASE_DIR}/${FORCE_FILE}")
+final_drag=$(awk 'END {print $2}' "${force_file}")
+final_lift=$(awk 'END {print $3}' "${force_file}")
 
 if [[ -z "${final_drag}" || -z "${final_lift}" ]]; then
     echo "FAIL: Could not extract final drag/lift"
