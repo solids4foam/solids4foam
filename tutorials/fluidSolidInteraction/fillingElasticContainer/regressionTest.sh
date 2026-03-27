@@ -84,6 +84,11 @@ extract_final_fsi_residual() {
 prepare_case
 run_case
 
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 apex_dy=$(extract_final_apex_dy)
 fsi_residual=$(extract_final_fsi_residual)
 

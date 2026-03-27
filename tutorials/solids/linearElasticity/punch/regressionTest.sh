@@ -63,6 +63,11 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 punch_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesDisplacementspunchLoading.dat' -print | tail -n 1)
 support_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesDisplacementscylinderFixed.dat' -print | tail -n 1)
 

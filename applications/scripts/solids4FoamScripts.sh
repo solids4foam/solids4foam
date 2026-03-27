@@ -561,6 +561,32 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# regressionCaseSkipped
+#     Return success when an Allrun log contains a known case-skip message.
+#     Regression scripts use this to exit cleanly when a tutorial is not
+#     intended to run in the current OpenFOAM flavour.
+# Arguments:
+#     1: LOG_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::regressionCaseSkipped()
+{
+    local LOG_FILE=$1
+
+    if [[ ! -f "${LOG_FILE}" ]]
+    then
+        return 1
+    fi
+
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
+    then
+        return 0
+    fi
+
+    return 1
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # removeEmptyDirs
 #     Ported from preCICE toolbox
 #     Remove empty time directories that are generated when running FSI cases

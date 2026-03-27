@@ -97,12 +97,12 @@ run_regression_test()
     local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
     local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
 
-    {
-        echo
-        echo "------------------------------------------------------------"
-        echo "Running regression test: ${testCase}"
-        echo "------------------------------------------------------------"
+    echo
+    echo "------------------------------------------------------------"
+    echo "Running regression test: ${testCase}"
+    echo "------------------------------------------------------------"
 
+    {
         rm -rf "${dstCase}"
         mkdir -p "$(dirname "${dstCase}")"
         cp -a "${srcCase}" "${dstCase}"
