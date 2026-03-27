@@ -107,8 +107,18 @@ if ! force_file=$(find_force_file); then
     exit 1
 fi
 
-final_drag=$(awk 'END {print $2}' "${force_file}")
-final_lift=$(awk 'END {print $3}' "${force_file}")
+final_drag=$(awk '
+    END {
+        gsub(/[()]/, "", $0)
+        print $2 + $5
+    }
+' "${force_file}")
+final_lift=$(awk '
+    END {
+        gsub(/[()]/, "", $0)
+        print $3 + $6
+    }
+' "${force_file}")
 
 if [[ -z "${final_drag}" || -z "${final_lift}" ]]; then
     echo "FAIL: Could not extract final drag/lift"

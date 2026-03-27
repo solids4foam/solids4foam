@@ -87,8 +87,6 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     shorten_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    shorten_case
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
