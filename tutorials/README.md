@@ -78,6 +78,12 @@ Runs a small number of **physics-based regression tests** on selected tutorial
 cases. These tests go beyond simply checking that a case runs, and instead verify
 that key numerical quantities remain within expected bounds.
 
+The script accepts a `-j` option to control parallel execution:
+
+- `./Alltest-regression -j 20` runs with up to 20 jobs in parallel
+- `./Alltest-regression -j` uses all available cores
+- `./Alltest-regression` also uses all available cores
+
 For example, some regression tests:
 
 - Extract scalar values from solver logs (e.g. stresses or residuals)

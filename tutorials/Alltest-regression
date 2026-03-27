@@ -23,15 +23,57 @@ echo "============================================================"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}"
 REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
+MAX_JOBS=""
+
+usage()
+{
+    cat <<'EOF'
+Usage: Alltest-regression [-j [N]]
+
+Run the regression tests in parallel.
+
+  -j [N]  Limit the number of parallel jobs. If N is omitted, use all
+          available cores.
+EOF
+}
 
 get_num_cores()
 {
     if command -v nproc >/dev/null 2>&1; then
         nproc
+    elif command -v getconf >/dev/null 2>&1; then
+        getconf _NPROCESSORS_ONLN
     else
         sysctl -n hw.ncpu
     fi
 }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -j)
+            if [[ $# -gt 1 && "$2" != -* ]]; then
+                MAX_JOBS="$2"
+                shift 2
+            else
+                MAX_JOBS="auto"
+                shift
+            fi
+            ;;
+        -j*)
+            MAX_JOBS="${1#-j}"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
 
 # Create regression root directory
 rm -rf "${REG_ROOT}"
@@ -83,9 +125,13 @@ REGRESSION_TESTS=(
 )
 
 failures=0
-MAX_JOBS="$(get_num_cores)"
-if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" -lt 1 ]]; then
-    MAX_JOBS=1
+if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" == "auto" ]]; then
+    MAX_JOBS="$(get_num_cores)"
+fi
+
+if ! [[ "${MAX_JOBS}" =~ ^[0-9]+$ ]] || [[ "${MAX_JOBS}" -lt 1 ]]; then
+    echo "Invalid job limit: ${MAX_JOBS}" >&2
+    exit 1
 fi
 
 echo "Using up to ${MAX_JOBS} parallel job(s)"
