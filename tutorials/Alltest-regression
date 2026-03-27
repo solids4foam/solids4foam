@@ -77,6 +77,8 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/cavityFlexibleBottom"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
+    "fluidSolidInteraction/HronTurekFsi3"
+    "fluidSolidInteraction/fillingElasticContainer"
 )
 
 failures=0
