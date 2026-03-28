@@ -60,9 +60,6 @@ for approach in "${APPROACHES[@]}"; do
     echo "Testing approach: ${approach}"
     echo "------------------------------------------------------------"
 
-    # Clean previous run
-    ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
-
     # Run case
     ( cd "${CASE_DIR}" && ./Allrun "${approach}" ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
 
