@@ -72,9 +72,9 @@ for approach in "${APPROACHES[@]}"; do
     fi
 
     # Extract final Max sigmaEq
-    sigma=$(grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
-        | awk '{print $NF}' \
-        | tail -n 1 || true)
+    sigma=$(grep "Max sigmaEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
+        | tail -n 1 \
+        | awk '{print $NF}' || true)
 
     if [[ -z "${sigma}" ]]; then
         echo "FAIL: Could not extract sigmaEq from log"
