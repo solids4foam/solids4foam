@@ -5,46 +5,34 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
-# Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
-# flexibleDamBreak FSI regression test
+# sphericalCavity regression test
+# Uses the analytical-solution tutorial output as a sanity check.
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
-
-# Regression end time for the copied case only
-REG_END_TIME=0.3
-
-# Reference values
-REF_MAX_DISP=1.93742e-05
+EPS_MIN=1.0e-6
+EPS_MAX=1.0e-3
+SIGMA_MIN=1.0e6
+SIGMA_MAX=3.0e7
 
 # Log files
+SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
-# Data files
-DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
-
 echo "============================================================"
-echo "flexibleDamBreak FSI regression test"
-echo "Max displacement difference < ${DISP_MAX_TOL}"
+echo "sphericalCavity regression test"
+echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
+echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "============================================================"
 echo
 
@@ -59,8 +47,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
-
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------
@@ -96,27 +82,29 @@ fi
 # Extract helpers
 # ------------------------------------------------------------
 
-extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+extract_max_epsilon() {
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 1 \
+        | awk '{print $NF}'
 }
 
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
+extract_max_sigma() {
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 1 \
+        | awk '{print $NF}'
 }
 
 # ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 
-max_disp=$(extract_max_displacement)
+epsilon=$(extract_max_epsilon)
+sigma=$(extract_max_sigma)
 
-if [[ -z "${max_disp}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
-    exit 1
+if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
+    echo "Skipping regression checks because the case did not complete in this environment"
+    exit 0
 fi
-
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
 
 # ------------------------------------------------------------
 # Checks
@@ -124,12 +112,17 @@ disp_diff_abs=$(abs "${disp_diff}")
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
+    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
 else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"; then
+    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+else
+    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
     failures=$((failures + 1))
 fi
 

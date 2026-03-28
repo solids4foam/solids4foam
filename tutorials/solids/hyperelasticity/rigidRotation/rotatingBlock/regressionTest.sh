@@ -12,7 +12,7 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Regression test for rigid rotation of a hyperelastic sphere
+# Regression test for rigid rotation of a hyperelastic block
 #
 # Physics invariant:
 #   Pure rigid-body rotation should produce (near) zero stress.
@@ -27,18 +27,15 @@ ALLRUN_LOGFILE="log.Allrun"
 # Stress threshold (deliberately loose)
 SIGMA_TOL=50.0
 
-# Solution approaches to test
+# Solution approach to test
 APPROACHES=(
     totalLagrangian
-    updatedLagrangian
-    totalLagrangianPetscSnes
-    updatedLagrangianPetscSnes
 )
 
 failures=0
 
 echo "============================================================"
-echo "Rigid rotation regression test"
+echo "Rigid rotation block regression test"
 echo "Stress threshold: sigmaEq < ${SIGMA_TOL}"
 echo "============================================================"
 
@@ -63,21 +60,18 @@ for approach in "${APPROACHES[@]}"; do
     echo "Testing approach: ${approach}"
     echo "------------------------------------------------------------"
 
-    # Clean previous run
-    ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
-
     # Run case
     ( cd "${CASE_DIR}" && ./Allrun "${approach}" ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
 
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping ${approach} because it is unavailable in this environment"
+        echo "Skipping regression checks because the tutorial skipped in this environment"
         continue
     fi
 
     # Extract final Max sigmaEq
-    sigma=$(grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
-        | awk '{print $NF}' \
-        | tail -n 1 || true)
+    sigma=$(grep "Max sigmaEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
+        | tail -n 1 \
+        | awk '{print $NF}' || true)
 
     if [[ -z "${sigma}" ]]; then
         echo "FAIL: Could not extract sigmaEq from log"

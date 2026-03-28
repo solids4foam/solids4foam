@@ -33,15 +33,9 @@ Usage:
 EOF
 }
 
-if ! command -v foamDictionary >/dev/null 2>&1
-then
-    echo; echo "The foamDictionary utility is required; please source an OpenFOAM environment"; echo
-    exit 1
-fi
-
 restore_default()
 {
-    foamDictionary -entry fluidSolidInterface -set IQNILS constant/fsiProperties >/dev/null 2>&1 || true
+    sed -i "s/^fluidSolidInterface .*/fluidSolidInterface IQNILS;/" constant/fsiProperties || true
 }
 trap restore_default EXIT
 
@@ -80,10 +74,7 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Set the requested coupling method before running the solvers
-if ! foamDictionary -entry fluidSolidInterface -set "${couplingMethod}" constant/fsiProperties >/dev/null 2>&1
-then
-    solids4Foam::err "Failed to set fluidSolidInterface to ${couplingMethod}"
-fi
+sed -i "s/^fluidSolidInterface .*/fluidSolidInterface ${couplingMethod};/" constant/fsiProperties
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid

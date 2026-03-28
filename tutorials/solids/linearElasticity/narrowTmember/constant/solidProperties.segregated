@@ -12,46 +12,32 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+solidModel     linearGeometryTotalDisplacement;
 
-ddtSchemes
+linearGeometryTotalDisplacementCoeffs
 {
-    default            steadyState;
-}
+    // Solution algorithm
+    solutionAlgorithm    implicitSegregated;
 
-gradSchemes
-{
-    // Gauss linear is ok since the mesh is mostly orthogonal
-    // pointCellsLeastSquares and leastSquaresS4f need updating for wedge
-    // patches
-    default            Gauss linear;
-}
+    // Maximum number of momentum correctors
+    nCorrectors     1000;
 
-divSchemes
-{
-    default            Gauss linear;
-}
+    // Solution tolerance for displacement
+    solutionTolerance 1e-06;
 
-laplacianSchemes
-{
-    default            Gauss linear corrected;
-}
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-07;
 
-snGradSchemes
-{
-    default            corrected;
-}
+    // Material law solution tolerance
+    materialTolerance 1e-05;
 
-interpolationSchemes
-{
-    default            linear;
+    // Write frequency for the residuals
+    infoFrequency   100;
 }
 
 // ************************************************************************* //

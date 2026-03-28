@@ -5,46 +5,34 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 
-# Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
-# flexibleDamBreak FSI regression test
+# cylinderInChannel regression test
+# Uses the force history as a cheap fluid benchmark check.
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
+REG_END_TIME=5
+DRAG_MIN=0.622
+DRAG_MAX=0.624
+LIFT_MIN=0.005
+LIFT_MAX=0.012
 
-# Regression end time for the copied case only
-REG_END_TIME=0.3
-
-# Reference values
-REF_MAX_DISP=1.93742e-05
-
-# Log files
 ALLRUN_LOGFILE="log.Allrun"
 
-# Data files
-DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
-
 echo "============================================================"
-echo "flexibleDamBreak FSI regression test"
-echo "Max displacement difference < ${DISP_MAX_TOL}"
+echo "cylinderInChannel regression test"
+echo "Regression end time = ${REG_END_TIME}"
+echo "Final drag in [${DRAG_MIN}, ${DRAG_MAX}]"
+echo "Final lift in [${LIFT_MIN}, ${LIFT_MAX}]"
 echo "============================================================"
 echo
 
@@ -60,7 +48,26 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    sed -i.bak 's/^endTime[[:space:]]\+50;/endTime         5;/' "${CASE_DIR}/system/controlDict"
+    rm -f "${CASE_DIR}/system/controlDict.bak"
+}
+
+find_force_file() {
+    local candidate
+    for candidate in \
+        "${CASE_DIR}/forces/0/forces.dat" \
+        "${CASE_DIR}/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/forces.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # ------------------------------------------------------------
@@ -93,30 +100,48 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
 fi
 
 # ------------------------------------------------------------
-# Extract helpers
-# ------------------------------------------------------------
-
-extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
-}
-
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
-}
-
-# ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 
-max_disp=$(extract_max_displacement)
-
-if [[ -z "${max_disp}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
+force_file=""
+if ! force_file=$(find_force_file); then
+    echo "FAIL: Could not find force history output"
     exit 1
 fi
 
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
+final_drag=$(awk '
+    END {
+        gsub(/[()]/, "", $0)
+
+        if (NF >= 13)
+        {
+            print $2 + $5
+        }
+        else if (NF >= 9)
+        {
+            print $2
+        }
+    }
+' "${force_file}")
+final_lift=$(awk '
+    END {
+        gsub(/[()]/, "", $0)
+
+        if (NF >= 13)
+        {
+            print $3 + $6
+        }
+        else if (NF >= 9)
+        {
+            print $3
+        }
+    }
+' "${force_file}")
+
+if [[ -z "${final_drag}" || -z "${final_lift}" ]]; then
+    echo "FAIL: Could not extract final drag/lift"
+    exit 1
+fi
 
 # ------------------------------------------------------------
 # Checks
@@ -124,12 +149,17 @@ disp_diff_abs=$(abs "${disp_diff}")
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+if awk "BEGIN {exit !(${final_drag} >= ${DRAG_MIN} && ${final_drag} <= ${DRAG_MAX})}"; then
+    printf "PASS: Final drag = %.6g\n" "${final_drag}"
 else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+    printf "FAIL: Final drag = %.6g\n" "${final_drag}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${final_lift} >= ${LIFT_MIN} && ${final_lift} <= ${LIFT_MAX})}"; then
+    printf "PASS: Final lift = %.6g\n" "${final_lift}"
+else
+    printf "FAIL: Final lift = %.6g\n" "${final_lift}"
     failures=$((failures + 1))
 fi
 

@@ -6,45 +6,31 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
-# Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
-
 # ============================================================
-# flexibleDamBreak FSI regression test
+# hotSphere regression test
+# Uses the tutorial's reported temperature and stress extrema.
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
-
-# Regression end time for the copied case only
-REG_END_TIME=0.3
-
-# Reference values
-REF_MAX_DISP=1.93742e-05
+T_MIN=339.5
+T_MAX=340.5
+EPS_MIN=1.5e-4
+EPS_MAX=2.5e-4
+SIGMA_MIN=3.8e7
+SIGMA_MAX=4.6e7
 
 # Log files
+SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
-# Data files
-DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
-
 echo "============================================================"
-echo "flexibleDamBreak FSI regression test"
-echo "Max displacement difference < ${DISP_MAX_TOL}"
+echo "hotSphere regression test"
+echo "Max T       in [${T_MIN}, ${T_MAX}]"
+echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
+echo "Max sigmaEq in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "============================================================"
 echo
 
@@ -59,8 +45,12 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+}
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+shorten_case() {
+    local controlDict="${CASE_DIR}/system/controlDict"
+    sed -i.bak 's/^endTime[[:space:]]\+5;/endTime         1;/' "${controlDict}"
+    rm -f "${controlDict}.bak"
 }
 
 # ------------------------------------------------------------
@@ -81,42 +71,46 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    shorten_case
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
-
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the tutorial skipped in this environment"
-    exit 0
 fi
 
 # ------------------------------------------------------------
 # Extract helpers
 # ------------------------------------------------------------
 
-extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+extract_max_temperature() {
+    grep "Max T" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 1 \
+        | awk '{print $NF}'
 }
 
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
+extract_max_epsilon() {
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 1 \
+        | awk '{print $NF}'
+}
+
+extract_max_sigma() {
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 1 \
+        | awk '{print $NF}'
 }
 
 # ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 
-max_disp=$(extract_max_displacement)
+temperature=$(extract_max_temperature)
+epsilon=$(extract_max_epsilon)
+sigma=$(extract_max_sigma)
 
-if [[ -z "${max_disp}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
+if [[ -z "${temperature}" || -z "${epsilon}" || -z "${sigma}" ]]; then
+    echo "FAIL: Could not extract one or more regression quantities"
     exit 1
 fi
-
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
 
 # ------------------------------------------------------------
 # Checks
@@ -124,12 +118,24 @@ disp_diff_abs=$(abs "${disp_diff}")
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+if awk "BEGIN {exit !(${temperature} >= ${T_MIN} && ${temperature} <= ${T_MAX})}"; then
+    printf "PASS: Max T = %.6g\n" "${temperature}"
 else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+    printf "FAIL: Max T = %.6g\n" "${temperature}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
+    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
+else
+    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${SIGMA_MAX} >= ${sigma})}"; then
+    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+else
+    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
     failures=$((failures + 1))
 fi
 

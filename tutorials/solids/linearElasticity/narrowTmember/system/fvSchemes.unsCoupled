@@ -12,46 +12,50 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 d2dt2Schemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 ddtSchemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 gradSchemes
 {
-    // Gauss linear is ok since the mesh is mostly orthogonal
-    // pointCellsLeastSquares and leastSquaresS4f need updating for wedge
-    // patches
-    default            Gauss linear;
+     default                none;
 }
 
 divSchemes
 {
-    default            Gauss linear;
+    default                 none;
+    fvmDiv(sigma)           pointGaussLeastSquares;
 }
 
 laplacianSchemes
 {
-    default            Gauss linear corrected;
+    default                 none;
+    fvmBlockLaplacian(D)    pointGaussLeastSquaresLaplacian;
+    fvmBlockLaplacianTranspose(D) pointGaussLeastSquaresLaplacianTranspose;
+    fvmBlockLaplacianTrace(D) pointGaussLeastSquaresLaplacianTrace;
 }
 
 snGradSchemes
 {
-    default            corrected;
+    default                 none;
 }
 
 interpolationSchemes
 {
-    default            linear;
+    default                 none;
+    mu                      linear;
+    lambda                  linear;
 }
 
 // ************************************************************************* //

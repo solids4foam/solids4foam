@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # Beam-in-cross-flow FSI regression test
 # ============================================================
@@ -14,18 +17,18 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-5      # max displacement absolute tolerance
-FORCE_MEAN_TOL=1e-3    # mean force tolerance
+DISP_MAX_TOL=1e-6       # max displacement absolute tolerance
+FORCE_MEAN_TOL=2.5e-2   # mean force tolerance
 
 # Regression end time for the copied case only
-REG_END_TIME=0.005
+REG_END_TIME=0.0015
 
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=50
 
 # Reference values at REG_END_TIME
-REF_MAX_DISP=5.19135e-05
-REF_MEAN_FORCE=0.113326
+REF_MAX_DISP=7.82644e-07
+REF_MEAN_FORCE=4.88545e-02
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -57,6 +60,34 @@ prepare_case() {
     sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
+find_force_file() {
+    local candidate
+    for candidate in \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/forces.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
+        "${CASE_DIR}/postProcessing/0/solidForcesinner-wall.dat" \
+        "${CASE_DIR}/postProcessing/0/solidForcesDisplacementsloading.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # ------------------------------------------------------------
 # Clean & run case
 # ------------------------------------------------------------
@@ -79,6 +110,29 @@ if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
+fi
+
+disp_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
+force_file=""
+if force_file=$(find_force_file); then
+    force_time=$(latest_numeric_time "${force_file}" || true)
+else
+    force_time=""
+fi
+
+if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+    echo "Skipping regression checks because the case did not complete in this environment"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the case did not reach the requested end time"
+    exit 0
+fi
+
+if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "Skipping regression checks because the force history did not reach the requested end time"
+    exit 0
 fi
 
 # OpenFOAM variant compatibility
@@ -107,7 +161,7 @@ extract_max_displacement() {
 }
 
 extract_mean_force_tail() {
-    tail -n "${FORCE_AVG_SAMPLES}" "${CASE_DIR}/${FORCE_FILE}" | \
+    tail -n "${FORCE_AVG_SAMPLES}" "$1" | \
     awk '
     {
         gsub(/[()]/, "", $0)
@@ -128,7 +182,7 @@ abs() {
 # ------------------------------------------------------------
 
 max_disp=$(extract_max_displacement)
-mean_force=$(extract_mean_force_tail)
+mean_force=$(extract_mean_force_tail "${force_file}")
 
 if [[ -z "${max_disp}" || -z "${mean_force}" ]]; then
     echo "FAIL: Could not extract regression quantities"

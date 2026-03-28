@@ -5,46 +5,32 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
-# Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
-# flexibleDamBreak FSI regression test
+# slidingFrictionBall regression test
+# Uses a short point-displacement history as a cheap contact check.
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
+REG_END_TIME=5
+DX_MIN=0.00199
+DX_MAX=0.00201
 
-# Regression end time for the copied case only
-REG_END_TIME=0.3
-
-# Reference values
-REF_MAX_DISP=1.93742e-05
-
-# Log files
 ALLRUN_LOGFILE="log.Allrun"
-
-# Data files
-DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
+POINT_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 
 echo "============================================================"
-echo "flexibleDamBreak FSI regression test"
-echo "Max displacement difference < ${DISP_MAX_TOL}"
+echo "slidingFrictionBall regression test"
+echo "Regression end time = ${REG_END_TIME}"
+echo "Final Dx in [${DX_MIN}, ${DX_MAX}] m"
 echo "============================================================"
 echo
 
@@ -59,8 +45,24 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+}
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+shorten_case() {
+    local controlDict="${CASE_DIR}/system/controlDict"
+    sed -i.bak 's/^endTime[[:space:]]\+100;/endTime         5;/' "${controlDict}"
+    rm -f "${controlDict}.bak"
+
+    cat >> "${controlDict}" <<'EOF'
+
+functions
+{
+    pointDisp
+    {
+        type    solidPointDisplacement;
+        point   (-1.2 0 0);
+    }
+}
+EOF
 }
 
 # ------------------------------------------------------------
@@ -81,6 +83,7 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
+    shorten_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
@@ -93,30 +96,20 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
 fi
 
 # ------------------------------------------------------------
-# Extract helpers
-# ------------------------------------------------------------
-
-extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
-}
-
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
-}
-
-# ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 
-max_disp=$(extract_max_displacement)
-
-if [[ -z "${max_disp}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
+if [[ ! -f "${CASE_DIR}/${POINT_FILE}" ]]; then
+    echo "FAIL: Could not find ${POINT_FILE}"
     exit 1
 fi
 
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
+final_dx=$(awk 'END {print $2}' "${CASE_DIR}/${POINT_FILE}")
+
+if [[ -z "${final_dx}" ]]; then
+    echo "FAIL: Could not extract final Dx"
+    exit 1
+fi
 
 # ------------------------------------------------------------
 # Checks
@@ -124,12 +117,10 @@ disp_diff_abs=$(abs "${disp_diff}")
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+if awk "BEGIN {exit !(${final_dx} >= ${DX_MIN} && ${final_dx} <= ${DX_MAX})}"; then
+    printf "PASS: Final Dx = %.6g\n" "${final_dx}"
 else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
+    printf "FAIL: Final Dx = %.6g\n" "${final_dx}"
     failures=$((failures + 1))
 fi
 
