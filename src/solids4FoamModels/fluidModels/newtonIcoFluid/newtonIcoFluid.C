@@ -132,7 +132,8 @@ newtonIcoFluid::newtonIcoFluid
     rho_(laminarTransport_.lookup("rho")),
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
-    blockSize_(fluidModel::twoD() ? 3 : 4)
+    blockSize_(fluidModel::twoD() ? 3 : 4),
+    tsLogPtr_()
 {
     setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
     //mesh().setFluxRequired(p().name());
@@ -355,6 +356,99 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
 }
 
 
+void newtonIcoFluid::setDeltaT(Time& runTime)
+{
+    if
+    (
+        runTime.controlDict().lookupOrDefault("adjustTimeStep", false)
+     && foamPetscSnesHelper::snesHasRun()
+    )
+    {
+        const scalar maxDeltaT =
+            readScalar(runTime.controlDict().lookup("maxDeltaT"));
+        const scalar minDeltaT =
+            readScalar(runTime.controlDict().lookup("minDeltaT"));
+
+        const int minTargetNIter =
+            runTime.controlDict().lookupOrDefault<int>("minTargetNIter", 3);
+        const int maxTargetNIter =
+            runTime.controlDict().lookupOrDefault<int>("maxTargetNIter", 6);
+
+        const Switch enableTimeStepLog =
+            runTime.controlDict().lookupOrDefault("logTimeStepAdjustments", true);
+
+        PetscInt numIter;
+        SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
+
+        SNESConvergedReason reason;
+        SNESGetConvergedReason(foamPetscSnesHelper::snes(), &reason);
+
+        const scalar currentDeltaT = runTime.deltaTValue();
+        scalar newDeltaT = currentDeltaT;
+
+        // if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
+        if (reason < 0)
+        {
+            // SNES failed to converge
+            newDeltaT = max(0.25*currentDeltaT, minDeltaT);
+            Info<< nl << "SNES failed to converge: "
+                << "reducing timestep to " << newDeltaT << endl;
+        }
+        else
+        {
+            // Guard against zero
+            if (numIter <= 0)
+            {
+                numIter = 1;
+            }
+
+            scalar factor = 1.0;
+
+            if (numIter > maxTargetNIter)
+            {
+                factor = max(0.5, 0.9*scalar(maxTargetNIter)/numIter);
+            }
+            else if (numIter < minTargetNIter)
+            {
+                factor = min(1.5, 1.1*scalar(maxTargetNIter)/numIter);
+            }
+
+            newDeltaT = min(max(factor*currentDeltaT, minDeltaT), maxDeltaT);
+        }
+
+        Info<< "Nonlinear iterations = " << numIter << nl
+            << "Old time step        = " << currentDeltaT << nl
+            << "New time step        = " << newDeltaT << nl << endl;
+
+        runTime.setDeltaT(newDeltaT);
+
+        if (enableTimeStepLog)
+        {
+            if (tsLogPtr_.empty())
+            {
+                const fileName timeStepLogFile =
+                    runTime.controlDict().lookupOrDefault<fileName>
+                    (
+                        "timeStepLogFile", "timeStepLog.dat"
+                    );
+
+                tsLogPtr_.set(new OFstream(timeStepLogFile));
+
+                tsLogPtr_()
+                    << "Time currentDeltaT newDeltaT numIter reason" << endl;
+            }
+
+            tsLogPtr_()
+                << runTime.timeName() << " "
+                << currentDeltaT << " "
+                << newDeltaT << " "
+                << numIter << " "
+                << reason << endl;
+        }
+    }
+}
+
+
 bool newtonIcoFluid::evolve()
 {
 #ifdef USE_PETSC
@@ -374,6 +468,11 @@ bool newtonIcoFluid::evolve()
 
     // Update U boundary conditions
     U.correctBoundaryConditions();
+
+    {
+        const Time& runTime = mesh.time();
+        #include "CourantNo.H"
+    }
 
     // Solution predictor
     const Switch predictor
@@ -484,9 +583,12 @@ bool newtonIcoFluid::evolve()
         fvc::makeRelative(phi, U);
     }
 
-    // Correct transport and turbulence models
-    // laminarTransport_.correct();
-    // turbulence_->correct();
+    // Correct transport and turbulence models once per call to evolve
+    Info<< nl << "Correcting the transport model" << endl;
+    laminarTransport_.correct();
+
+    Info<< nl << "Correcting the turbulence model" << endl;
+    turbulence_->correct();
 
 #else
 
@@ -962,9 +1064,14 @@ label newtonIcoFluid::formJacobian
     // Enforce the boundary conditions
     p.correctBoundaryConditions();
 
-    // Correct the transport and turbulence models
-    laminarTransport_.correct();
-    turbulence_->correct();
+    // Debug
+    // Info<< nl << "Correcting the turbulence model" << endl;
+    // turbulence_->correct();
+    // Info<< "Correcting the turbulence model: DONE" << endl;
+
+    // Correct the transport and turbulence models - do not call here
+    //laminarTransport_.correct();
+    //turbulence_->correct();
 
     // Calculate the segregated approximatoion of momentum equation Jacobian
     // Note: the nonlinear convection term is added separately below
