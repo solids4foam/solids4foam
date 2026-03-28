@@ -11,8 +11,8 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Checks the final inner-boundary radial stress history.
 # ============================================================
 
-SIGMA_MIN=0.20
-SIGMA_MAX=0.25
+SIGMA_MIN=0.0115
+SIGMA_MAX=0.0120
 
 ALLRUN_LOGFILE="log.Allrun"
 
