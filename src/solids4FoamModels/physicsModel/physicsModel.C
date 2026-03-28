@@ -28,6 +28,36 @@ namespace Foam
 {
     defineTypeNameAndDebug(physicsModel, 0);
     defineRunTimeSelectionTable(physicsModel, physicsModel);
+
+    namespace
+    {
+        fileName physicsPropertiesPath(Time& runTime, const word& region)
+        {
+            if (region != dynamicFvMesh::defaultRegion)
+            {
+                IOobject regionHeader
+                (
+                    "physicsProperties",
+                    runTime.caseConstant()/region,
+                    runTime,
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE,
+                    false
+                );
+
+#ifdef OPENFOAM_NOT_EXTEND
+                if (regionHeader.typeHeaderOk<IOdictionary>(true))
+#else
+                if (regionHeader.headerOk())
+#endif
+                {
+                    return fileName(runTime.caseConstant()/region);
+                }
+            }
+
+            return fileName(runTime.caseConstant());
+        }
+    }
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -44,9 +74,7 @@ Foam::physicsModel::physicsModel
         IOobject
         (
             "physicsProperties",
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+            physicsPropertiesPath(runTime, region),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -77,9 +105,7 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
         IOobject
         (
             "physicsProperties",
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+            physicsPropertiesPath(runTime, region),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE,
