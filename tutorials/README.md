@@ -78,11 +78,14 @@ Runs a small number of **physics-based regression tests** on selected tutorial
 cases. These tests go beyond simply checking that a case runs, and instead verify
 that key numerical quantities remain within expected bounds.
 
+Run it either from the repository root as `./tutorials/Alltest-regression`, or
+from within `tutorials/` as `./Alltest-regression`.
+
 The script accepts a `-j` option to control parallel execution:
 
-- `./Alltest-regression -j 20` runs with up to 20 jobs in parallel
-- `./Alltest-regression -j` uses all available cores
-- `./Alltest-regression` also uses all available cores
+- `./tutorials/Alltest-regression -j 20` runs with up to 20 jobs in parallel
+- `./tutorials/Alltest-regression -j` uses all available cores
+- `./tutorials/Alltest-regression` also uses all available cores
 
 For example, some regression tests:
 
