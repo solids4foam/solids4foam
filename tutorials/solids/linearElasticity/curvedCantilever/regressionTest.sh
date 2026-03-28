@@ -72,10 +72,13 @@ if [[ -z "${sample_file}" ]]; then
     exit 1
 fi
 
+# Do not check Z components as they are assumed zero for plane stress and the
+# solver values should not be interpretted
 max_error=$(awk '
 {
     d = 0;
-    for (i = 4; i <= 9; i++) {
+    m = 0;
+    for (i = 4; i <= 7; i++) {
         e = $(i) - $(i + 6);
         if (e < 0) {
             e = -e;
