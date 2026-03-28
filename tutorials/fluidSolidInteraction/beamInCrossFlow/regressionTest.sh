@@ -252,6 +252,98 @@ check_case() {
     return "${failures}"
 }
 
+RUN_MONOLITHIC=false
+CHECK_ONLY=false
+for arg in "$@"; do
+    case "$arg" in
+        --monolithic)
+            RUN_MONOLITHIC=true
+            ;;
+        --check-only|--no-run)
+            CHECK_ONLY=true
+            ;;
+    esac
+done
+
+prepare_case_monolithic() {
+    local case_dir="${REGRESSION_ROOT}/monolithic"
+
+    rm -rf "${case_dir}"
+    mkdir -p "${case_dir}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        local base_item
+        base_item=$(basename "${item}")
+        [[ "${base_item}" == "regressionTests" ]] && continue
+        cp -a "${item}" "${case_dir}/"
+    done
+
+    ( cd "${case_dir}" && patch_end_time system/controlDict ) > /dev/null
+
+    echo "${case_dir}"
+}
+
+run_case_monolithic() {
+    local case_dir="$1"
+    ( cd "${case_dir}"
+      ./Allclean > /dev/null 2>&1 || true
+      ./Allrun monolithic > "${ALLRUN_LOGFILE}" 2>&1
+      mkdir -p postProcessing/fluid/forces/0
+      cd postProcessing/fluid/forces/0
+      if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
+          ln -s ../../../../forces/0/forces.dat force.dat
+      fi
+      if [[ ! -e force.dat && -f forces.dat ]]; then
+          ln -s forces.dat force.dat
+      fi
+    )
+}
+
+if [ "${RUN_MONOLITHIC}" = true ]; then
+    # --------------------------------------------------------
+    # Monolithic (Newton/PETSc) variant
+    # --------------------------------------------------------
+    echo "============================================================"
+    echo "Beam-in-cross-flow FSI regression test (monolithic)"
+    echo "Regression end time          = ${REGRESSION_END_TIME}"
+    echo "Max tip Dx difference       < ${DISP_MAX_TOL}"
+    echo "Final tip Dx difference     < ${DISP_FINAL_TOL}"
+    echo "Final total force Fx diff   < ${FORCE_FINAL_TOL}"
+    echo "============================================================"
+    echo
+
+    REF_MAX_DISP_MONO=0.033417
+    REF_FINAL_DISP_MONO=0.033159
+    REF_FINAL_FORCE_MONO=4.348082
+
+    mono_case="${REGRESSION_ROOT}/monolithic"
+
+    if [ "${CHECK_ONLY}" = false ]; then
+        mono_case=$(prepare_case_monolithic)
+        run_case_monolithic "${mono_case}"
+    else
+        echo "Running in check-only mode: skipping Allclean and Allrun"
+    fi
+
+    failures=0
+    check_case monolithic "${mono_case}" \
+        "${REF_MAX_DISP_MONO}" "${REF_FINAL_DISP_MONO}" "${REF_FINAL_FORCE_MONO}" \
+        || failures=$((failures + $?))
+
+    echo
+    if (( failures == 0 )); then
+        echo "============================================================"
+        echo "Regression test PASSED"
+        echo "============================================================"
+        exit 0
+    else
+        echo "============================================================"
+        echo "Regression test FAILED (${failures} checks)"
+        echo "============================================================"
+        exit 1
+    fi
+fi
+
 if [[ "${variant}" == "foamextend" ]]; then
     REF_MAX_DISP=0.040466
     REF_FINAL_DISP=0.039857

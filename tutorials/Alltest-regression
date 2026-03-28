@@ -32,6 +32,14 @@ get_num_cores()
     fi
 }
 
+clean_copied_case_artifacts()
+{
+    local dir="$1"
+
+    find "$dir" -type f -name "log.*" -delete
+    find "$dir" -type d \( -name postProcessing -o -name dynamicCode -o -name "processor*" \) -prune -exec rm -rf {} +
+}
+
 # Create regression root directory
 rm -rf "${REG_ROOT}"
 mkdir -p "${REG_ROOT}"
@@ -77,6 +85,7 @@ run_regression_test()
         rm -rf "${dstCase}"
         mkdir -p "$(dirname "${dstCase}")"
         cp -a "${srcCase}" "${dstCase}"
+        clean_copied_case_artifacts "${dstCase}"
 
         cd "${dstCase}"
 

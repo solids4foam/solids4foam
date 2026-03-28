@@ -123,6 +123,14 @@ function runCases()
     fi
 }
 
+function cleanCopiedCaseArtifacts()
+{
+    local dir="$1"
+
+    find "$dir" -type f -name "log.*" -delete
+    find "$dir" -type d \( -name postProcessing -o -name dynamicCode -o -name "processor*" \) -prune -exec rm -rf {} +
+}
+
 
 #
 # PRELIMINARIES
@@ -167,6 +175,9 @@ cp -a "$rootDir" "$TEST_RUN_DIR"
 
 # Enter test directory
 cd "$TEST_RUN_DIR" || exit
+
+echo "Removing copied logs and generated case output"
+cleanCopiedCaseArtifacts .
 
 # Modify controlDicts
 echo "Modifying the case controlDicts to run only one time step"
