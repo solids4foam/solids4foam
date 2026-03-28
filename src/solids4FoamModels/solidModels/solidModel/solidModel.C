@@ -609,7 +609,7 @@ Foam::solidModel::solidModel
     const word& region
 )
 :
-    physicsModel(type, runTime),
+    physicsModel(type, runTime, region),
     regIOobject // ZT, Jul18: allow for multiple solid regions
     (
         IOobject
