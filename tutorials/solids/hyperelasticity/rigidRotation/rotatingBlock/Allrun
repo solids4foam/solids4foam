@@ -79,14 +79,30 @@ link_files_for_suffix() {
     fi
 }
 
+require_petsc_or_exit_silently() {
+    if [[ -z "${PETSC_DIR:-}" ]]; then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "Please set the PETSC_DIR variable"
+        echo
+        exit 0
+    fi
+}
+
 select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
         totalLagrangian|totalLagrangianPetscSnes)
+            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+                require_petsc_or_exit_silently
+            fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/D .)
             ;;
         updatedLagrangian|updatedLagrangianPetscSnes)
+            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+                require_petsc_or_exit_silently
+            fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/DD .)
             ;;
