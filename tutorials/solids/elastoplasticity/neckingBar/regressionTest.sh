@@ -11,8 +11,8 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Checks the final loading force after the necking curve.
 # ============================================================
 
-FORCE_MIN=19.0
-FORCE_MAX=19.5
+FORCE_MIN=74.3
+FORCE_MAX=74.6
 
 ALLRUN_LOGFILE="log.Allrun"
 
