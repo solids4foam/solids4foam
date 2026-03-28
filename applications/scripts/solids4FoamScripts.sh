@@ -193,7 +193,7 @@ function solids4Foam::convertCaseFormat()
     # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
     #    the gradScheme for the solid in OpenFOAM.com, as these are the only
     #    schemes consistent with boundary non-orthogonal correction
-    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    if [[ $WM_PROJECT != "foam" ]]
     then
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
@@ -418,7 +418,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
     # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
     #    the gradScheme for the solid in OpenFOAM.com, as these are the only
     #    schemes consistent with boundary non-orthogonal correction
-    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    if [[ $WM_PROJECT != "foam" ]]
     then
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
