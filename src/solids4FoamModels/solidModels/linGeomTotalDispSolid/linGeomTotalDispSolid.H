@@ -82,10 +82,6 @@ class linGeomTotalDispSolid
         //  Used in the pressure Jacobian when solvePressure is enabled
         const volScalarField rKappa_;
 
-        //- Diffusivity for the pressure equation
-        //  This controls the amount of smoothing in the pressure equation
-        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
-
         //- Acceleration field
         //  Only used by the explicit solution scheme
         volVectorField A_;
@@ -125,12 +121,6 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
-
-        // Make the pDiffusivity field
-        void makePDiffusivity() const;
-
-        // Return a const reference to the pDiffusivity field
-        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
