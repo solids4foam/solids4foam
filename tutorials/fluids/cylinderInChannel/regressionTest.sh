@@ -112,13 +112,29 @@ fi
 final_drag=$(awk '
     END {
         gsub(/[()]/, "", $0)
-        print $2 + $5
+
+        if (NF >= 13)
+        {
+            print $2 + $5
+        }
+        else if (NF >= 9)
+        {
+            print $2
+        }
     }
 ' "${force_file}")
 final_lift=$(awk '
     END {
         gsub(/[()]/, "", $0)
-        print $3 + $6
+
+        if (NF >= 13)
+        {
+            print $3 + $6
+        }
+        else if (NF >= 9)
+        {
+            print $3
+        }
     }
 ' "${force_file}")
 
