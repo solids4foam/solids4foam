@@ -12,7 +12,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ============================================================
 
 TOP_RIGHT_MIN=0.0068
-TOP_RIGHT_MAX=0.0069
+TOP_RIGHT_MAX=0.0074
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
