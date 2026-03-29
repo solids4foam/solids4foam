@@ -206,9 +206,6 @@ private:
         //- Maximum number of momentum correctors
         const int nCorr_;
 
-        //- Minium number of momentum correctors
-        const int minCorr_;
-
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation
         int maxIterReached_;

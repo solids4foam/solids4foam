@@ -20,17 +20,68 @@ echo "============================================================"
 echo "solids4Foam regression tests"
 echo "============================================================"
 
-ROOT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}"
 REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
+SOLIDS4FOAM_SCRIPTS="${ROOT_DIR}/../applications/scripts/solids4FoamScripts.sh"
+MAX_JOBS=""
+
+usage()
+{
+    cat <<'EOF'
+Usage: Alltest-regression [-j [N]]
+
+Run the regression tests in parallel.
+
+  -j [N]  Limit the number of parallel jobs. If N is omitted, use all
+          available cores.
+EOF
+}
 
 get_num_cores()
 {
     if command -v nproc >/dev/null 2>&1; then
         nproc
+    elif command -v getconf >/dev/null 2>&1; then
+        getconf _NPROCESSORS_ONLN
     else
         sysctl -n hw.ncpu
     fi
 }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -j)
+            if [[ $# -gt 1 && "$2" != -* ]]; then
+                MAX_JOBS="$2"
+                shift 2
+            else
+                MAX_JOBS="auto"
+                shift
+            fi
+            ;;
+        -j*)
+            MAX_JOBS="${1#-j}"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    # Regression scripts rely on the shared skip helper for cases that do not
+    # run in every OpenFOAM flavor.
+    source "${SOLIDS4FOAM_SCRIPTS}"
+    export -f solids4Foam::regressionCaseSkipped
+fi
 
 clean_copied_case_artifacts()
 {
@@ -47,23 +98,56 @@ mkdir -p "${REG_ROOT}"
 # List of regression test directories (relative to tutorials/)
 REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
+    "solids/elastoplasticity/cooksMembrane"
+    "solids/elastoplasticity/curvedBeams"
+    "solids/elastoplasticity/cylinderExpansion"
+    "solids/elastoplasticity/neckingBar"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
+    "solids/hyperelasticity/rigidRotation/rotatingBlock"
+    "solids/hyperelasticity/rigidRotation/rotatingCylinder"
+    "solids/hyperelasticity/cylindricalPressureVessel"
+    "solids/hyperelasticity/cylinderCrush"
+    "solids/hyperelasticity/longWall"
+    "solids/beamsPlatesShells/squarePlate"
+    "solids/linearElasticity/cantilever2d"
+    "solids/linearElasticity/curvedCantilever"
+    "solids/linearElasticity/cooksMembrane"
     "solids/linearElasticity/plateHole"
     "solids/linearElasticity/contactPatchTest"
+    "solids/linearElasticity/narrowTmember"
+    "solids/linearElasticity/flatEndedRigidIndenter"
+    "solids/linearElasticity/patchTest"
+    "solids/linearElasticity/pressurisedCylinder"
+    "solids/linearElasticity/slidingFrictionBall"
+    "solids/linearElasticity/sphericalCavity"
+    "solids/linearElasticity/punch"
+    "solids/multiMaterial/layeredPipe"
     "solids/poroelasticity/rodAndSeabed"
+    "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
+    "solids/thermoelasticity/hotCylinder/hotCylinder"
     "solids/viscoelasticity/viscoTube"
+    "fluids/decayingTaylorGreenVortex"
+    "fluids/cylinderInChannel"
+    "thermoFluidSolidInteraction/thermalCavity"
+    "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"
     "fluidSolidInteraction/beamInCrossFlow"
     "fluidSolidInteraction/cavityFlexibleBottom"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
+    "fluidSolidInteraction/HronTurekFsi3"
+    "fluidSolidInteraction/fillingElasticContainer"
 )
 
 failures=0
-MAX_JOBS="$(get_num_cores)"
-if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" -lt 1 ]]; then
-    MAX_JOBS=1
+if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" == "auto" ]]; then
+    MAX_JOBS="$(get_num_cores)"
+fi
+
+if ! [[ "${MAX_JOBS}" =~ ^[0-9]+$ ]] || [[ "${MAX_JOBS}" -lt 1 ]]; then
+    echo "Invalid job limit: ${MAX_JOBS}" >&2
+    exit 1
 fi
 
 echo "Using up to ${MAX_JOBS} parallel job(s)"
@@ -75,13 +159,15 @@ run_regression_test()
     local dstCase="${REG_ROOT}/${testCase}"
     local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
     local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    local status=0
 
+    echo
+    echo "------------------------------------------------------------"
+    echo "Running regression test: ${testCase}"
+    echo "------------------------------------------------------------"
+
+    set +e
     {
-        echo
-        echo "------------------------------------------------------------"
-        echo "Running regression test: ${testCase}"
-        echo "------------------------------------------------------------"
-
         rm -rf "${dstCase}"
         mkdir -p "$(dirname "${dstCase}")"
         cp -a "${srcCase}" "${dstCase}"
@@ -96,8 +182,10 @@ run_regression_test()
 
         ./regressionTest.sh
     } > "${logFile}" 2>&1
+    status=$?
+    set -e
 
-    echo "$?" > "${statusFile}"
+    echo "${status}" > "${statusFile}"
 }
 
 active_jobs=0
@@ -116,7 +204,11 @@ wait_for_available_slot()
             fi
         done
 
-        pids=("${live_pids[@]}")
+        if (( ${#live_pids[@]} > 0 )); then
+            pids=("${live_pids[@]}")
+        else
+            pids=()
+        fi
 
         if (( active_jobs >= MAX_JOBS )); then
             sleep 1

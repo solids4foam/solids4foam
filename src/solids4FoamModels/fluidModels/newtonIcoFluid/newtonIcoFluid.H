@@ -104,6 +104,10 @@ class newtonIcoFluid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Optional file for recording the time step sizes and number of
+        //  nonlinear iterations
+        autoPtr<OFstream> tsLogPtr_;
+
 
     // Private Member Functions
 
@@ -214,6 +218,9 @@ public:
 
 
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the fluid model
             virtual bool evolve();

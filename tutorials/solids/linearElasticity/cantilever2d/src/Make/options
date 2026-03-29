@@ -6,6 +6,7 @@ sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 EXE_INC = \
     $(VERSION_SPECIFIC_INC) \
     -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/numerics/compatibilityFunctions \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
@@ -39,6 +40,8 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/tetMotionSolver/lnInclude  \
     -I$(LIB_SRC)/overset/oversetMesh/lnInclude
+
+LIB_INC = $(EXE_INC)
 
 EXE_LIBS = \
     -lfiniteVolume \

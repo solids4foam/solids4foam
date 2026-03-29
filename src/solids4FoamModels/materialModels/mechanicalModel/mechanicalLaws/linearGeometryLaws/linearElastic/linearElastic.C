@@ -74,14 +74,14 @@ Foam::linearElastic::linearElastic
         // Set the bulk modulus
         if (nu_.value() < 0.5)
         {
-	    if (planeStress())
+            if (planeStress())
             {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_;
-	    }
-	    else
-	    {
+            }
+            else
+            {
                 K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
-	    }
+            }
         }
         else
         {
@@ -117,7 +117,6 @@ Foam::linearElastic::linearElastic
         if (planeStress())
         {
             lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - nu_));
-            K_ = E_/(3.0*(1.0 - nu_));
 
             if (solvePressureEqn())
             {
@@ -131,7 +130,6 @@ Foam::linearElastic::linearElastic
         else
         {
             lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
-            K_ = E_/(3.0*(1.0 - 2.0*nu_));
         }
     }
     else

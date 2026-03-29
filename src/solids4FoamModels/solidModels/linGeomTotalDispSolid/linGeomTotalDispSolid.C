@@ -480,61 +480,6 @@ bool linGeomTotalDispSolid::evolveExplicit()
     return true;
 }
 
-void linGeomTotalDispSolid::makePDiffusivity() const
-{
-    if (pDiffusivityPtr_.valid())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    const scalar pressureSmoothingCoeff
-    (
-        readScalar(solidModelDict().lookup("pressureSmoothingCoeff"))
-    );
-
-    fvVectorMatrix approxJ
-    (
-        fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-      - rho()*fvm::d2dt2(D())
-    );
-
-    if (dampingCoeff().value() > SMALL)
-    {
-        approxJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D());
-    }
-
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
-
-    pDiffusivityPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "pDiffusivity",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            -pressureSmoothingCoeff*impKf_/fvc::interpolate(approxJ.A())
-        )
-    );
-}
-
-
-const surfaceScalarField& linGeomTotalDispSolid::pDiffusivity() const
-{
-    if (pDiffusivityPtr_.empty())
-    {
-        makePDiffusivity();
-    }
-
-    return autoPtrRef(pDiffusivityPtr_);
-}
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 linGeomTotalDispSolid::linGeomTotalDispSolid
@@ -568,7 +513,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     rKappa_(1.0/mechanical().bulkModulus()),
-    pDiffusivityPtr_(),
     A_
     (
         IOobject

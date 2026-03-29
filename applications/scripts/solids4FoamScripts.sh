@@ -193,15 +193,15 @@ function solids4Foam::convertCaseFormat()
     # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
     #    the gradScheme for the solid in OpenFOAM.com, as these are the only
     #    schemes consistent with boundary non-orthogonal correction
-    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    if [[ $WM_PROJECT != "foam" ]]
     then
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
-            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
+            echo "OpenFOAM[.com/.org] specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
             sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
         elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
         then
-            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
+            echo "OpenFOAM[.com/.org] specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
             sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
@@ -418,15 +418,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
     # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
     #    the gradScheme for the solid in OpenFOAM.com, as these are the only
     #    schemes consistent with boundary non-orthogonal correction
-    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    if [[ $WM_PROJECT != "foam" ]]
     then
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
-            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
+            echo "OpenFOAM[.com/.org] specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
             sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
         elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
         then
-            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
+            echo "OpenFOAM[.com/.org] specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
             sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
@@ -557,6 +557,32 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
             exit 0
         fi
     fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# regressionCaseSkipped
+#     Return success when an Allrun log contains a known case-skip message.
+#     Regression scripts use this to exit cleanly when a tutorial is not
+#     intended to run in the current OpenFOAM flavour.
+# Arguments:
+#     1: LOG_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::regressionCaseSkipped()
+{
+    local LOG_FILE=$1
+
+    if [[ ! -f "${LOG_FILE}" ]]
+    then
+        return 1
+    fi
+
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently working with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
+    then
+        return 0
+    fi
+
+    return 1
 }
 
 

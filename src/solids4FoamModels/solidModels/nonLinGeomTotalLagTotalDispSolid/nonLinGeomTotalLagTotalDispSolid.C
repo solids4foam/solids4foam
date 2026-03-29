@@ -463,62 +463,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 }
 
 
-void nonLinGeomTotalLagTotalDispSolid::makePDiffusivity() const
-{
-    if (pDiffusivityPtr_.valid())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    const scalar pressureSmoothingCoeff
-    (
-        readScalar(solidModelDict().lookup("pressureSmoothingCoeff"))
-    );
-
-    fvVectorMatrix approxJ
-    (
-        momentumStabilisation().vectorJacobian(D(), &impKf_)
-      - rho()*fvm::d2dt2(D())
-    );
-
-    if (dampingCoeff().value() > SMALL)
-    {
-        approxJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D());
-    }
-
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
-
-    pDiffusivityPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "pDiffusivity",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            -pressureSmoothingCoeff*impKf_/fvc::interpolate(approxJ.A())
-        )
-    );
-}
-
-
-const surfaceScalarField& nonLinGeomTotalLagTotalDispSolid::pDiffusivity() const
-{
-    if (pDiffusivityPtr_.empty())
-    {
-        makePDiffusivity();
-    }
-
-    return autoPtrRef(pDiffusivityPtr_);
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
@@ -600,7 +544,6 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     ),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
-    pDiffusivityPtr_(),
     dpdtPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_

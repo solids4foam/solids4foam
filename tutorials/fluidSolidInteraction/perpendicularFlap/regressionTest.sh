@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # perpendicularFlap FSI regression test
 # ============================================================
@@ -16,8 +19,21 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 
 DISP_MAX_TOL=1e-2      # max displacement absolute tolerance
 
+# Regression end time for the copied case only
+REG_END_TIME=4
+
 # Reference values
 REF_MAX_DISP=0.118329
+
+RUN_ARGS=()
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+fi
+
+if [[ "${variant}" == "foamextend" ]]; then
+    RUN_ARGS=(aitken)
+fi
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -42,6 +58,8 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------
@@ -63,9 +81,18 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    if (( ${#RUN_ARGS[@]} > 0 )); then
+        ( cd "${CASE_DIR}" && ./Allrun "${RUN_ARGS[@]}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    else
+        ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    fi
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
+fi
+
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
 fi
 
 # ------------------------------------------------------------
