@@ -225,7 +225,7 @@ public:
                     );
                 }
 
-                return tractionRatePtr_.ref();
+                return tractionRatePtr_();
             }
 
             virtual const scalarField& pressure() const

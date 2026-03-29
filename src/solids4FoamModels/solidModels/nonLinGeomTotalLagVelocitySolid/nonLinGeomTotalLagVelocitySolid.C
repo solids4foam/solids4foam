@@ -517,7 +517,9 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     // Store the old time stress
     sigma().storeOldTime();
+#ifndef OPENFOAM_ORG
     forceCurrentTime_.setOriented(true);
+#endif
     forceCurrentTime_.storeOldTime();
 
     // It is important to call the stress calculation procedure during the

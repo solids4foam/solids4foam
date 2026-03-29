@@ -94,13 +94,21 @@ public:
             const fvPatchFieldMapper& mapper
         )
         :
+#if defined(OPENFOAM_ORG) || defined(FOAMEXTEND)
+            Field<vector>(fld),
+#else
             Field<vector>(fld, mapper),
+#endif
             oldTimes_(fld.nOldTimes())
         {
             forAll(oldTimes_, i)
             {
                 oldTimes_[i] = fld.old(i);
             }
+
+#if defined(OPENFOAM_ORG) || defined(FOAMEXTEND)
+            autoMap(mapper);
+#endif
         }
 
     // Member functions
@@ -195,11 +203,23 @@ public:
                 const bool applyFlip = true
             )
             {
-                Field<vector>::autoMap(mapper, true);
+#ifdef OPENFOAM_ORG
+                mapper(*this, *this);
+#elif defined(FOAMEXTEND)
+                Field<vector>::operator=(mapper(*this));
+#else
+                Field<vector>::autoMap(mapper, applyFlip);
+#endif
 
                 forAll(oldTimes_, i)
                 {
-                    oldTimes_[i].autoMap(mapper, true);
+#ifdef OPENFOAM_ORG
+                    mapper(oldTimes_[i], oldTimes_[i]);
+#elif defined(FOAMEXTEND)
+                    oldTimes_[i] = mapper(oldTimes_[i]);
+#else
+                    oldTimes_[i].autoMap(mapper, applyFlip);
+#endif
                 }
             }
 

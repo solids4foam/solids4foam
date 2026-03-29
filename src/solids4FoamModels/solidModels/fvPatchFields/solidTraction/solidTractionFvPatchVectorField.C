@@ -235,13 +235,11 @@ solidTractionFvPatchVectorField
     fixedGradientFvPatchVectorField(pvf, p, iF, mapper),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
     useUndeformedArea_(pvf.useUndeformedArea_),
-#ifdef OPENFOAM_ORG
-    traction_(mapper(pvf.traction_)),
-    tractionRatePtr_(),
-    pressure_(mapper(pvf.pressure_)),
-#else
     traction_(pvf.traction_, mapper),
     tractionRatePtr_(),
+#ifdef OPENFOAM_ORG
+    pressure_(mapper(pvf.pressure_)),
+#else
     pressure_(pvf.pressure_, mapper),
 #endif
     tractionSeries_(pvf.tractionSeries_),
