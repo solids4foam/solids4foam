@@ -5,7 +5,7 @@ if [[ "${WM_PROJECT}" != "foam"* ]]
 then
     if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
     then
-        echo; echo "Skipping this case as it does not currently working with OpenFOAM.org"
+        echo; echo "Skipping this case as it does not currently run with OpenFOAM.org"
         echo
         exit 0
     fi
