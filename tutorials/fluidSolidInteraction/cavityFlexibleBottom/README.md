@@ -4,7 +4,7 @@ Prepared by Aaron Mullen-Hales, Philip Cardiff and Ivan Batistić
 
 ## Tutorial Aims
 
-* Demonstrates how to perform a internal flow fluid-solid interaction simulation
+* Demonstrates how to perform an internal-flow fluid-solid interaction simulation
 
 ## Case Overview
 
@@ -20,11 +20,11 @@ outlet, and no-slip boundary conditions are applied at the channel walls. The
 flexible elastic plate forming the bottom of the cavity has a density of $$1000\,\mathrm{kg/m^3}$$,
 a Young’s modulus of $$500\,\mathrm{N/m^2}$$, and a Poisson’s ratio of
 $$\nu = 0.4$$. Its deformation  is described using the Saint Venant–Kirchhoff
-constitutive model. The case is solved  as a transient problem until a
+constitutive model. The case is solved as a transient problem until a
 steady-state solution is reached. A first-order Euler time discretisation
 scheme is used for both the fluid and solid solvers. To accelerate
 convergence to the steady state and suppress transient oscillations, additional
-damping is applied to the solid domain via the `dampingCoeff` parameter in `constant/solid/solidPropertie`.
+damping is applied to the solid domain via the `dampingCoeff` parameter in `constant/solid/solidProperties`.
 
 ![Figure 1: Geometry of the spatial computational domain for the channel flow over a cavity with a flexible bottom.](images/cavityFlexibleBottom-geometry.png)
 **Figure 1: Geometry of the spatial computational domain for
@@ -44,7 +44,7 @@ executes `blockMesh` for both `solid` and `fluid` domains
 (`> blockMesh -region fluid` and `> blockMesh -region solid` ), and the
 `solids4foam` solver is used to run the case (`> solids4Foam`). Optionally, if
 `gnuplot` is installed, a file `deflection.pdf` will be created with the
-displacement history of point A and a file `force.pdf` will be created with the
+displacement history of point A, and a file `force.pdf` will be created with the
 history of the force on the interface.
 
 ---
@@ -92,7 +92,7 @@ The interface force reported in [1] is several orders of magnitude smaller
 
 For mesh with  $$0.1$$ m spacing, the vertical displacement reported in [1] is
 approximately $$-0.232\,\mathrm{m}$$ (estimated from the published diagram),
-whereas the solids4foam prediction is $$-0.2305\,\mathrm{m}$$.
+whereas the solids4foam prediction is $$-0.219\,\mathrm{m}$$.
 
 ![.](images/cavityFlexibleBottom-TukovicEtAl-results.png)
 
@@ -108,6 +108,6 @@ as a funcion of cell size [1]**
 ## References
 
 [1]
-[[Tuković, Ž., Karač, A., Cardiff, P., Jasak, H., and Ivanković, A.
+[Tuković, Ž., Karač, A., Cardiff, P., Jasak, H., and Ivanković, A.
 OpenFOAM finite volume solver for fluid-solid interaction.
  Transactions of FAMENA, 42(3), 1-31. (2018)](https://doi.org/10.21278/TOF.42301)

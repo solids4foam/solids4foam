@@ -12,50 +12,44 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 d2dt2Schemes
 {
-    default            backward;
+    default                 backward;
 }
 
 ddtSchemes
 {
-    default            backward;
+    default                 backward;
 }
 
 gradSchemes
 {
-    default            leastSquares;
+    default                 leastSquaresS4f;
 }
 
 divSchemes
 {
-    default            Gauss linear;
+    default                 Gauss linear;
 }
 
 laplacianSchemes
 {
-    default            none;
-    laplacian(DD,D)    Gauss linear corrected;
-    laplacian(DDD,DD)  Gauss linear corrected;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
+    default                 corrected;
 }
 
 interpolationSchemes
 {
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-    interpolate(grad(DD)) linear;
+    default                 linear;
 }
 
 // ************************************************************************* //

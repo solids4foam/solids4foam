@@ -1,5 +1,5 @@
 ---
-sort: 3
+sort: 5
 ---
 
 # Bash functions: `solids4FoamScripts.sh`

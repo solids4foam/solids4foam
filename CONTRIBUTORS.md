@@ -2,7 +2,7 @@
 sort: 2
 ---
 
-# List of conctributors
+# List of contributors
 
 This list has been generated using `git shortlog -s --all`. If your name is
 missing, please let <philip.cardiff@ucd.ie> know.
@@ -24,11 +24,15 @@ missing, please let <philip.cardiff@ucd.ie> know.
 - Cyrille Bonamy
 - Emad Tandis
 - Xiaohu Guo
-- Sindeev Sergey
+- Sergey Sindeev
 - Philipp Milovic
 - Patrick Höhn
-- Moretti Simona
+- Simona Moretti
 - Mark Olesen
 - Karen FitzGerald
 - Bruno Santos
 - Ali Bozorgzadeh
+- Andry Guillaume
+- Jean-Marie Monlon
+- Matheus Miguel
+- Stephan Arndt

@@ -2,6 +2,15 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
+
 # -----------------------------------------------------------------------------
 # Regression test for rigid rotation of a hyperelastic sphere
 #
@@ -33,6 +42,21 @@ echo "Rigid rotation regression test"
 echo "Stress threshold: sigmaEq < ${SIGMA_TOL}"
 echo "============================================================"
 
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+}
+
+prepare_case
+
 for approach in "${APPROACHES[@]}"; do
     echo
     echo "------------------------------------------------------------"
@@ -40,13 +64,18 @@ for approach in "${APPROACHES[@]}"; do
     echo "------------------------------------------------------------"
 
     # Clean previous run
-    ( ./Allclean ) >/dev/null 2>&1 || true
+    ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
 
     # Run case
-    ( ./Allrun "${approach}" ) > "${ALLRUN_LOGFILE}" 2>&1
+    ( cd "${CASE_DIR}" && ./Allrun "${approach}" ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
+
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping ${approach} because it is unavailable in this environment"
+        continue
+    fi
 
     # Extract final Max sigmaEq
-    sigma=$(grep "Max sigmaEq (von Mises stress)" "${SOLVER_LOGFILE}" \
+    sigma=$(grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | awk '{print $NF}' \
         | tail -n 1 || true)
 
@@ -67,7 +96,7 @@ for approach in "${APPROACHES[@]}"; do
 done
 
 # Clean the case
-( ./Allclean ) >/dev/null 2>&1 || true
+( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
 
 echo
 echo "============================================================"

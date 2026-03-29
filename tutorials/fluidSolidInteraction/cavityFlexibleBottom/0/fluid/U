@@ -1,4 +1,4 @@
-/*--------------------------------*- C++ -*----------------------------------* \
+/*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
 | Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
@@ -24,14 +24,7 @@ boundaryField
 {
     inlet
     {
-        type            fixedProfile;
-        profile         polynomial
-        (
-            ((1.5 0 0)  (0 0 0))  // Coefficient for y^0 = 1
-            ((-6 0 0) (2 0 0))    // Coefficient for y^2 = -6
-        );
-        direction       (0 1 0);
-        origin          0.5;
+        #include "velocityInletProfile"
     }
 
     walls
@@ -55,8 +48,10 @@ boundaryField
         value           uniform (0 0 0);
     }
 
-    defaultFaces
+    frontAndBack
     {
         type            empty;
     }
 }
+
+// ************************************************************************* //

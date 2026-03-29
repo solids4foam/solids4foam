@@ -947,7 +947,7 @@ void Foam::newAMIInterpolation<SourcePatch, TargetPatch>::update
         return;
     }
 
-    if (report)
+    if (report && debug)
     {
         Info<< indent
             << "AMI: Creating addressing and weights between "

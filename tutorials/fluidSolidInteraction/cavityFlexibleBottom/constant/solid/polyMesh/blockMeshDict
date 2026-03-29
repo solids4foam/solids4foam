@@ -16,67 +16,77 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-convertToMeters 1;
+scale 1;
 
 vertices
 (
-    (2 -1 0)//4 = 0
-    (2.25 -1 0)//5 =1
-    (5.75 -1 0)//6 = 2
-    (6 -1 0)//7 = 3
+    (2 -0.4 0)
+    (6 -0.4 0)
+    (6 0 0)
+    (2 0 0)
 
-    (2 -1.4 0)//S1 =4
-    (2.25 -1.4 0)//S2 = 5
-    (5.75 -1.4 0)//S3 = 6
-    (6 -1.4 0)//S4 = 7
-
-    (2 -1 1)//4.1 = 8
-    (2.25 -1 1)//5.1 = 9
-    (5.75 -1 1)//6.1 = 10
-    (6 -1 1)//7.1 = 11
-
-    (2 -1.4 1)//S1 = 12
-    (2.25 -1.4 1)//S2 = 13
-    (5.75 -1.4 1)//S3 = 14
-    (6 -1.4 1)//S4 = 15
+    (2 -0.4 1)
+    (6 -0.4 1)
+    (6 0 1)
+    (2 0 1)
 );
 
 blocks
 (
-    hex (4 5 1 0 12 13 9 8) (2 4 1) simpleGrading (1 1 1)
-    hex (5 6 2 1 13 14 10 9 ) (35 4 1) simpleGrading (1 1 1)
-    hex (6 7 3 2 14 15 11 10 ) (2 4 1) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) (40 4 1) simpleGrading (1 1 1)
 );
 
 edges
 (
 );
 
-patches
+boundary
 (
-    wall interface
-    (
-        (1 0 8 9)
-        (2 1 9 10)
-        (3 2 11 10)
-    )
+    interface
+    {
+        type patch;
+        faces
+        (
+            (3 7 6 2)
+        );
+    }
 
-    patch left
-    (
-        (0 4 12 8)
-    )
+    left
+    {
+        type patch;
+        faces
+        (
+           (0 4 7 3)
+        );
+    }
 
-    patch right
-    (
-        (7 3 11 15)
-    )
+    right
+    {
+        type patch;
+        faces
+        (
+            (2 6 5 1)
+        );
+    }
 
-    wall bottom
-    (
-        (4 5 13 12)
-        (5 6 14 13)
-        (6 7 15 14)
-    )
+    bottom
+    {
+        type patch;
+        faces
+        (
+            (4 0 1 5)
+        );
+    }
+
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (4 5 6 7)
+            (3 2 1 0)
+        );
+    }
 );
 
 mergePatchPairs

@@ -2,6 +2,13 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # perpendicularFlap FSI regression test
 # ============================================================
@@ -12,8 +19,21 @@ IFS=$'\n\t'
 
 DISP_MAX_TOL=1e-2      # max displacement absolute tolerance
 
+# Regression end time for the copied case only
+REG_END_TIME=4
+
 # Reference values
 REF_MAX_DISP=0.118329
+
+RUN_ARGS=()
+variant="openfoamcom"
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    variant="foamextend"
+fi
+
+if [[ "${variant}" == "foamextend" ]]; then
+    RUN_ARGS=(aitken)
+fi
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -26,6 +46,21 @@ echo "perpendicularFlap FSI regression test"
 echo "Max displacement difference < ${DISP_MAX_TOL}"
 echo "============================================================"
 echo
+
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+}
 
 # ------------------------------------------------------------
 # Clean & run case
@@ -44,10 +79,20 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
-    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    prepare_case
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    if (( ${#RUN_ARGS[@]} > 0 )); then
+        ( cd "${CASE_DIR}" && ./Allrun "${RUN_ARGS[@]}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    else
+        ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    fi
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
+fi
+
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
 fi
 
 # ------------------------------------------------------------
@@ -55,7 +100,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk '{print $2}' "${DISP_FILE}" | sort -g | tail -1
+    awk '{print $2}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {
@@ -93,7 +138,7 @@ fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
-    ./Allclean > /dev/null 2>&1 || true
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo

@@ -6,10 +6,15 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-solids4Foam::caseDoesNotRunWithFoamExtend
-
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT != *"v"* ]]
+then
+    cd 0/fluid/ && ln -sf inlet.fixedProfile velocityInletProfile && cd ../..
+else
+    cd 0/fluid/ && ln -sf inlet.parabolic velocityInletProfile && cd ../..
+fi
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
@@ -35,7 +40,7 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null

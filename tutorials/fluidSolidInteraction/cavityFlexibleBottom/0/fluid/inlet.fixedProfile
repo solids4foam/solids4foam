@@ -1,0 +1,8 @@
+type            fixedProfile;
+profile         polynomial
+(
+    ((1.5 0 0)  (0 0 0))  // Coefficient for y^0 = 1
+    ((-6 0 0) (2 0 0))    // Coefficient for y^2 = -6
+);
+direction       (0 1 0);
+origin          1.5;

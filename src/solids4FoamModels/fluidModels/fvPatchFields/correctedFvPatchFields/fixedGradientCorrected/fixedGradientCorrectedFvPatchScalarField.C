@@ -185,7 +185,7 @@ void fixedGradientCorrectedFvPatchScalarField::evaluate
         this->updateCoeffs();
     }
 
-    const word gradName(internalFieldName(*this));
+    const word gradName("grad(" + internalFieldName(*this) + ")");
 
     if (nonOrthogonalCorrections_ && db().foundObject<volVectorField>(gradName))
     {
@@ -240,6 +240,7 @@ void fixedGradientCorrectedFvPatchScalarField::evaluate
     {
         WarningInFunction
             << "Non-orthogonal corrections not applied on " << patch().name()
+            << nl << "Cannot find " << gradName
             << endl;
 
         Field<scalar>::operator=

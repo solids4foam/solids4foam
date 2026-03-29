@@ -12,3 +12,14 @@ rm -rf system/*Subset postProcessing postProcessing
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
+
+# Reset extendedLeastSquares to leastSquaresS4f for foam extend
+if [[ $WM_PROJECT = "foam" ]]
+then
+    echo "Switching the gradScheme to leastSquaresS4f"; echo
+    sed -i "s/ extendedLeastSquares 0;/ leastSquaresS4f;/g" system/fvSchemes
+elif [[ $WM_PROJECT == "OpenFOAM" && $WM_PROJECT_VERSION != v* ]]
+then
+    echo "Switching the gradScheme to leastSquaresS4f"; echo
+    sed -i "s/ pointCellsLeastSquares;/ leastSquaresS4f;/g" system/fvSchemes
+fi
