@@ -2073,8 +2073,8 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     volVectorField& UFluid = fluid().U();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
-    const label fluidSystemEnd = fluidMesh().nCells()*fluidBlockSize;
-    const label solidFirstEqnID = fluidSystemEnd;
+    // const label fluidSystemEnd = fluidMesh().nCells()*fluidBlockSize;
+    // const label solidFirstEqnID = fluidSystemEnd;
 
 
     // Considerations on the order of updating the fluid, solid, and mesh motion
