@@ -244,7 +244,10 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            );
+            )
+            {
+                return formResidual(f, x, false);
+            }
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector, with optional flux extrapolation
@@ -255,29 +258,23 @@ public:
                 const bool extrapolatedFlux
             );
 
-            //- Calculate the residual (PETSc array) given the solution (PETSc
-            //  array) vector, given a reference configuration (solid model
-            //  representing the fluid domain motion)
-            virtual label formResidual
-            (
-                Vec f,         // Residual
-                const Vec x,    // Solution
-                const solidModel& motion
-            );
-
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
-            );
+            )
+            {
+                return formJacobian(jac, x, false);
+            }
 
-            //- Form the Jacobian of the governing equation
+            //- Form the Jacobian of the governing equation, with optional
+            //  flux extrapolation
             virtual label formJacobian
             (
                 Mat jac,                    // Jacobian
                 const Vec x,                // Solution
-                const bool extrapolatedFlux // Extrapolate flux
+                const bool extrapolatedFlux
             );
 
 
