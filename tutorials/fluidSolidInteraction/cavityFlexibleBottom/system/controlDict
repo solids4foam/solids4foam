@@ -62,8 +62,8 @@ functions
         "pName|p"           p;
         "UName|U"           U;
         "rhoName|rho"       rhoInf;
-        log                 true;
-        rhoInf              1000;
+        log                 false;
+        rhoInf              1;
         CofR                (0.45 0.15 -0.15);
     }
     pointDisp

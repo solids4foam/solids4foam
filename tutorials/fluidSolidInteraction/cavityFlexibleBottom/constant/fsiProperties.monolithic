@@ -31,7 +31,8 @@ NewtonQuasiMonolithicCoeffs
     interfaceTransferMethod directMap;
 
     // PETSc SNES nonlinear solver settings file
-    optionsFile     petscOptions.mf_fieldsplit;
+    // optionsFile     petscOptions.mf_fieldsplit;
+    optionsFile     petscOptions.lu;
 
     // Pass viscous forces from fluid-to-solid interface (in addition to pressure
     // forces)

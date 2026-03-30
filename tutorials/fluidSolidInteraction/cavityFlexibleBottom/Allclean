@@ -21,5 +21,11 @@ fi
 
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing 0/fluid/velocityInletProfile
 
+# Reset links to the partitioned default
+for file in $(find ./0 ./constant ./system -name '*.partitioned')
+do
+    ln -vnsf ${file##*/} ${file%.*}
+done
+
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
