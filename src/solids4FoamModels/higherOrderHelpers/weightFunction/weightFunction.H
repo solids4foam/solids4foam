@@ -44,7 +44,11 @@ Author
 #define weightFunction_H
 
 #include "dictionary.H"
-#include "Enum.H"
+#ifdef OPENFOAM_COM
+    #include "Enum.H"
+#else
+    #include "NamedEnum.H"
+#endif
 #include "scalar.H"
 
 
@@ -67,7 +71,11 @@ public:
         };
 
         //- Weight funtions names
+#ifdef OPENFOAM_COM
         static const Enum<weightFunctionType> weightFunctionNames_;
+#else
+        static const NamedEnum<weightFunctionType, 4> weightFunctionNames_;
+#endif
 
 private:
 

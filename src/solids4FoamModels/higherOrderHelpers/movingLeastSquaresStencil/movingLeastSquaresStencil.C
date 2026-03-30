@@ -1054,7 +1054,7 @@ tmp<labelField> movingLeastSquaresStencil::cellFacesStencilSize() const
 {
     const fvMesh& mesh = mesh_;
 
-    auto tpnf = tmp<labelField>::New(mesh.nCells());
+    tmp<labelField> tpnf(new labelField(mesh.nCells()));
     labelField& pnf = tpnf.ref();
 
     // Get each face stencil

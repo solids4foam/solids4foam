@@ -33,6 +33,7 @@ Author
 #define linearElastic_H
 
 #include "mechanicalLaw.H"
+#include "CompactListList.H"
 #include "surfaceMesh.H"
 #include "zeroGradientFvPatchFields.H"
 

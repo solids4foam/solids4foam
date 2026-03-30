@@ -43,6 +43,7 @@ Author
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
 #include "mat66.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

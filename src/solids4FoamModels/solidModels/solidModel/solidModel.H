@@ -55,6 +55,7 @@ SourceFiles
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
 #include "stabilisationModel.H"
+#include "CompactListList.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -129,18 +130,11 @@ private:
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
 #ifndef FOAMEXTEND
-        //- Moving Least Squares (MLS) for high-order discretisation
-        mutable autoPtr<movingLeastSquares> movingLeastSquaresPtr_;
+        //- Moving Least Square operator for the displacement field
+        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
 
-        //- Moving Least Squares stencil
-        mutable autoPtr<movingLeastSquaresStencil>
-            movingLeastSquaresStencilPtr_;
-
-        //- Quadrature data storage
-        mutable autoPtr<fvMeshQuadrature> fvMeshQuadraturePtr_;
-
-        //- Weight function for MLS
-        mutable autoPtr<weightFunction> weightFunctionPtr_;
+        //- Moving Least Square operator for the pressure field
+        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
 #endif
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
@@ -285,10 +279,10 @@ private:
         //- Flag indicating that the pressure equation should be solved
         const Switch solvePressure_;
 
-        //- Calculate Jacobian using high order (for PETSc SNES)
+        //- Calculate Jacobian using high order
         Switch highOrderJacobian_;
 
-        //- High-order residual calculation (for PETSc SNES)
+        //- High-order residual calculation
         Switch highOrderResidual_;
 
         //- Pressure
@@ -324,17 +318,20 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Make the Moving Least Squares object
-        void makeMovingLeastSquares() const;
+        //- Make the displacement Moving Least Squares object
+        void makeDisplacementMLS() const;
 
-        //- Make the Moving Least Squares stencil
-        void makeMovingLeastSquaresStencil() const;
+        //- Make the pressure Moving Least Squares object
+        void makePressureMLS() const;
 
-        //- Make the fvMesh quadrature data for high order discretisation
-        void makeFvMeshQuadrature() const;
+        //- Return root high-order coefficients dictionary
+        const dictionary& highOrderCoeffsDict() const;
 
-        //- Make the weight funtion for high order discretisation
-        void makeWeightFunction() const;
+        //- Return high-order coefficients for displacement
+        const dictionary& displacementHighOrderCoeffs() const;
+
+        //- Return high-order coefficients for pressure
+        const dictionary& pressureHighOrderCoeffs() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -466,6 +463,9 @@ protected:
         //- Non-const access to the pressure
         volScalarField& p();
 
+        //- Const access to the pressure
+        const volScalarField& p() const;
+
 #ifdef OPENFOAM_COM
         //- Return non-const access to fvOptions
         fv::options& fvOptions()
@@ -569,6 +569,14 @@ public:
                 return
                     solutionAlg() == solutionAlgorithm::PETSC_SNES
                  && highOrderResidual_;
+            }
+
+            //- Return true if the high-order Jacobian is active
+            bool highOrderJacobian() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderJacobian_;
             }
 
             //- Is it a new time step? This function return true the first time
@@ -780,44 +788,24 @@ public:
                 return twoD_;
             }
 #ifndef FOAMEXTEND
-            //- Return moving least squares interpolation
-            const movingLeastSquares& MLS() const
+            //- Return displacement moving least squares interpolation
+            const movingLeastSquares& displacementMLS() const
             {
-                if (movingLeastSquaresPtr_.empty())
+                if (displacementMLSPtr_.empty())
                 {
-                    makeMovingLeastSquares();
+                    makeDisplacementMLS();
                 }
-                return autoPtrRef(movingLeastSquaresPtr_);
+                return autoPtrRef(displacementMLSPtr_);
             }
 
-            //- Return stencil for moving least squares
-            const movingLeastSquaresStencil& MLSStencil() const
+            //- Return pressure moving least squares interpolation
+            const movingLeastSquares& pressureMLS() const
             {
-                if (movingLeastSquaresStencilPtr_.empty())
+                if (pressureMLSPtr_.empty())
                 {
-                    makeMovingLeastSquaresStencil();
+                    makePressureMLS();
                 }
-                return autoPtrRef(movingLeastSquaresStencilPtr_);
-            }
-
-            //- Return quadrature class that stores data for integration
-            const fvMeshQuadrature& MLSQuadrature() const
-            {
-                if (fvMeshQuadraturePtr_.empty())
-                {
-                    makeFvMeshQuadrature();
-                }
-                return autoPtrRef(fvMeshQuadraturePtr_);
-            }
-
-            //- Return weight function used for weightening in moving least squares
-            const weightFunction& MLSWeightFunction() const
-            {
-                if (weightFunctionPtr_.empty())
-                {
-                    makeWeightFunction();
-                }
-                return autoPtrRef(weightFunctionPtr_);
+                return autoPtrRef(pressureMLSPtr_);
             }
 #endif
             //- Face zone point displacement increment

@@ -56,7 +56,9 @@ SourceFiles
 #define fvMeshQuadrature_H
 
 #include "fvMesh.H"
+#include "CompactListList.H"
 #include "compatibilityFunctions.H"
+#include "triFaceList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -119,6 +121,15 @@ private:
             const faceList& triFaces,
             const pointField& pts
         ) const;
+
+#ifdef OPENFOAM_ORG
+        //- OpenFOAM.org triangulation returns triFaceList instead of faceList
+        bool poorTriangulation
+        (
+            const triFaceList& triFaces,
+            const pointField& pts
+        ) const;
+#endif
 
         //- Calculate quadrature points and corresponding weights in 3D
         void calcQuadPointsAndWeights3D() const;

@@ -19,6 +19,9 @@ License
 
 #include "hofvc.H"
 #include "lookupSolidModel.H"
+#ifdef OPENFOAM_ORG
+    #include "fvSchemes.H"
+#endif
 
 // #include <functional>
 //#ifdef USE_PETSC
@@ -46,7 +49,7 @@ void hofvc::fGrad
 {
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
-    solMod.MLS().fGrad(D, gradDQuad);
+    solMod.displacementMLS().fGrad(D, gradDQuad);
 }
 
 
@@ -80,7 +83,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     // Reference to integration weights
     const solidModel& solMod = lookupSolidModel(mesh);
     const CompactListList<scalar>& quadW =
-        solMod.MLSQuadrature().faceQuadWeights();
+        solMod.displacementMLS().quadrature().faceQuadWeights();
 
     forAll (tf, faceI)
     {
@@ -156,13 +159,15 @@ tmp<volVectorField> hofvc::d2dt2
          )
     );
 
-    volVectorField& tf = tvf.ref();
-
     //Check what scheme is prescribed, continue only in the case of backward
     word schemeName;
+#ifdef OPENFOAM_ORG
+    static_cast<const fvSchemes&>(mesh).d2dt2Scheme(D.name()) >> schemeName;
+#else
     (mesh.d2dt2Schemes().found(D.name())
       ? mesh.d2dt2Schemes().lookup(D.name())
       : mesh.d2dt2Schemes().lookup("default")) >> schemeName;
+#endif
 
     if (schemeName != "backward")
     {

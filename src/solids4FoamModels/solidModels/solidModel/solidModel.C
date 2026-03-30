@@ -301,44 +301,110 @@ void Foam::solidModel::makeU() const
 }
 
 
-void Foam::solidModel::makeMovingLeastSquares() const
+namespace
 {
-    if (!movingLeastSquaresPtr_.empty())
+    template<class Type>
+    Foam::boolList fixedValuePatchMask
+    (
+        const Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>&
+            field
+    )
+    {
+        Foam::boolList includePatchInStencils
+        (
+            field.boundaryField().size(),
+            false
+        );
+
+        forAll(includePatchInStencils, patchI)
+        {
+            includePatchInStencils[patchI] =
+                field.boundaryField()[patchI].fixesValue();
+        }
+
+        return includePatchInStencils;
+    }
+}
+
+
+const Foam::dictionary& Foam::solidModel::highOrderCoeffsDict() const
+{
+    if (!solidModelDict().found("highOrderCoeffs"))
+    {
+        FatalErrorInFunction
+            << "The solid model dictionary does not contain 'highOrderCoeffs'."
+            << abort(FatalError);
+    }
+
+    return solidModelDict().subDict("highOrderCoeffs");
+}
+
+
+const Foam::dictionary& Foam::solidModel::displacementHighOrderCoeffs() const
+{
+    const dictionary& hoDict = highOrderCoeffsDict();
+
+    if (!hoDict.found("displacement"))
+    {
+        FatalErrorInFunction
+            << "Expected 'highOrderCoeffs.displacement' to be defined."
+            << abort(FatalError);
+    }
+
+    return hoDict.subDict("displacement");
+}
+
+
+const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
+{
+    const dictionary& hoDict = highOrderCoeffsDict();
+
+    if (!hoDict.found("pressure"))
+    {
+        FatalErrorInFunction
+            << "Expected 'highOrderCoeffs.pressure' to be defined."
+            << abort(FatalError);
+    }
+
+    return hoDict.subDict("pressure");
+}
+
+
+void Foam::solidModel::makeDisplacementMLS() const
+{
+    if (!displacementMLSPtr_.empty())
     {
         FatalErrorInFunction
             << "pointer already set!" << abort(FatalError);
     }
 
-    // Include fixedValue patches as ghost points in the least squares stencils
-    boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
-    forAll(includePatchInStencils, patchI)
-    {
-        if
-        (
-            isA<fixedDisplacementFvPatchVectorField>
-            (
-                D().boundaryField()[patchI]
-            )
-         || isA<fixedValueFvPatchVectorField>
-            (
-                D().boundaryField()[patchI]
-            )
-        )
-        {
-            includePatchInStencils[patchI] = true;
-        }
-    }
-
-    movingLeastSquaresPtr_.set
+    displacementMLSPtr_.set
     (
         new movingLeastSquares
         (
             mesh(),
-            MLSStencil(),
-            MLSQuadrature(),
-            MLSWeightFunction(),
-            includePatchInStencils,
-            solidModelDict().subDict("highOrderCoeffs")
+            fixedValuePatchMask(D()),
+            displacementHighOrderCoeffs()
+        )
+    );
+}
+
+
+void Foam::solidModel::makePressureMLS() const
+{
+    if (!pressureMLSPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    pressureMLSPtr_.set
+    (
+        new movingLeastSquares
+        (
+            mesh(),
+            fixedValuePatchMask(p()),
+            pressureHighOrderCoeffs()
         )
     );
 }
@@ -353,7 +419,7 @@ void Foam::solidModel::makeSigmaQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        MLSQuadrature().faceQuadPoints();
+        displacementMLS().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -374,120 +440,6 @@ void Foam::solidModel::makeSigmaQuad() const
 }
 
 
-void Foam::solidModel::makeMovingLeastSquaresStencil() const
-{
-    if (!movingLeastSquaresStencilPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!"
-            << abort(FatalError);
-    }
-
-    const dictionary& dict =
-        solidModelDict().subDict("highOrderCoeffs");
-
-    const label N = readInt(dict.lookup("order"));
-
-    const label minNn = (mesh().nGeometricD() == 2) ?
-        ((N+1)*(N+2)/2) :
-        ((N+1)*(N+2)*(N+3)/6);
-
-    // Number of cells in face stencil
-    const label faceNn = minNn + readInt(dict.lookup("faceStencilExtraCells"));
-
-    // Number of cells in cell stencil
-    const label cellNn =
-        dict.found("cellStencilExtraCells")
-        ? minNn + readInt(dict.lookup("cellStencilExtraCells"))
-        : faceNn;
-
-    // Check ratio of stencil size and minimum stencil size
-    const scalar faceNnRatio = scalar(faceNn) / scalar(minNn);
-    const scalar cellNnRatio = scalar(cellNn) / scalar(minNn);
-
-    if (cellNnRatio < 1.2 || cellNnRatio > 15.0)
-    {
-        WarningInFunction
-            << "Cell stencil size is outside valid range." << nl
-            << "cellNn/minNn = " << cellNnRatio << nl
-            << "Check 'cellStencilExtraCells' entry in the dictionary."
-            << endl;
-    }
-
-    if (faceNnRatio < 1.2 || faceNnRatio > 15.0)
-    {
-        WarningInFunction
-            << "Face stencil size is outside recommended range." << nl
-            << "faceNn/minNn = " << faceNnRatio << nl
-            << "Check 'faceStencilExtraCells' entry in the dictionary."
-            << endl;
-    }
-
-    // Maximum of neighbour first halo depth is multiplied with this scale
-    // factor to get estimated halo depth. This scale factor needs to be
-    // conservative but large value will slow down stencil construction
-    const scalar haloDepthScale =
-        dict.lookupOrDefault<scalar>("haloDepthScale", N*2.5);
-
-    movingLeastSquaresStencilPtr_.set
-    (
-        new movingLeastSquaresStencil
-        (
-            mesh(),
-            haloDepthScale,
-            faceNn,
-            cellNn
-        )
-    );
-}
-
-
-void Foam::solidModel::makeFvMeshQuadrature() const
-{
-    if (!fvMeshQuadraturePtr_.empty())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!"
-            << abort(FatalError);
-    }
-
-    const dictionary& dict =
-        solidModelDict().subDict("highOrderCoeffs");
-
-    // Exact inegration of volume inegrals up to Nv polynomial order
-    const label Nv = readInt(dict.lookup("order"));
-
-    // Exact inegration of surface inegrals (stress) up to N-1 order
-    const label Nf = Nv - 1;
-
-    fvMeshQuadraturePtr_.set
-    (
-        new fvMeshQuadrature(mesh(), Nv, Nf, true)
-    );
-}
-
-
-void Foam::solidModel::makeWeightFunction() const
-{
-    if (!weightFunctionPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!"
-            << abort(FatalError);
-    }
-    const dictionary& dict =
-        solidModelDict().subDict("highOrderCoeffs");
-
-    weightFunctionPtr_.set
-    (
-        new weightFunction
-        (
-            dict.subDict("weightFunctionCoeffs")
-        )
-    );
-}
-
-
 void Foam::solidModel::makeGradDQuad() const
 {
     if (!gradDQuadPtr_.empty())
@@ -497,7 +449,7 @@ void Foam::solidModel::makeGradDQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        MLSQuadrature().faceQuadPoints();
+        displacementMLS().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -817,6 +769,12 @@ Foam::volScalarField& Foam::solidModel::p()
 }
 
 
+const Foam::volScalarField& Foam::solidModel::p() const
+{
+    return const_cast<solidModel&>(*this).p();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -900,10 +858,8 @@ Foam::solidModel::solidModel
     thermalPtr_(),
     mechanicalPtr_(),
 #ifndef FOAMEXTEND
-    movingLeastSquaresPtr_(),
-    movingLeastSquaresStencilPtr_(),
-    fvMeshQuadraturePtr_(),
-    weightFunctionPtr_(),
+    displacementMLSPtr_(),
+    pressureMLSPtr_(),
 #endif
     useBoundaryFaceValuesD_
     (
@@ -1193,7 +1149,14 @@ Foam::solidModel::solidModel
 
     if (solidModelDict().found("highOrderCoeffs"))
     {
-        const dictionary& hoDict = solidModelDict().subDict("highOrderCoeffs");
+        const dictionary& hoDict = highOrderCoeffsDict();
+
+        if (!hoDict.found("displacement"))
+        {
+            FatalErrorInFunction
+                << "Expected 'highOrderCoeffs.displacement' to be defined."
+                << abort(FatalError);
+        }
 
         highOrderJacobian_ =
             hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
@@ -1901,7 +1864,8 @@ void Foam::solidModel::clearMovingLeastSquaresData()
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
 #ifndef FOAMEXTEND
-    movingLeastSquaresPtr_.clear();
+    displacementMLSPtr_.clear();
+    pressureMLSPtr_.clear();
 #endif
 }
 

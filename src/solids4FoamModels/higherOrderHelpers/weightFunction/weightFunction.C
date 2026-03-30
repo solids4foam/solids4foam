@@ -27,6 +27,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
+#ifdef OPENFOAM_COM
 const Enum<weightFunction::weightFunctionType>
 weightFunction::weightFunctionNames_
 ({
@@ -38,6 +39,19 @@ weightFunction::weightFunctionNames_
         "radiallySymmetricExponential"
     }
 });
+#else
+template<>
+const char* NamedEnum<weightFunction::weightFunctionType, 4>::names[] =
+{
+    "one",
+    "linear",
+    "inverseDistance",
+    "radiallySymmetricExponential"
+};
+
+const NamedEnum<weightFunction::weightFunctionType, 4>
+weightFunction::weightFunctionNames_;
+#endif
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -46,7 +60,7 @@ weightFunction::weightFunction
     const dictionary& dict
 )
 :
-    type_(weightFunctionNames_.get("type", dict)),
+    type_(weightFunctionNames_[dict.lookupOrDefault<word>("type", "one")]),
     k_(dict.lookupOrDefault<scalar>("k", 6.0)),
     expSqrK_(Foam::exp(-sqr(k_))),
     invDenom_(1.0 / (1.0 - expSqrK_)),

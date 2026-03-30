@@ -68,7 +68,8 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     const vectorField& gradFieldI = gradField.internalField();
     scalarField& faceFluxI = Foam::primitiveFieldRef(faceFlux);
     const solidModel& solMod = lookupSolidModel(field.mesh());
-    const label order = solMod.MLS().order();
+    const movingLeastSquares& displacementMLS = solMod.displacementMLS();
+    const label polynomialOrder = displacementMLS.polynomialOrder();
     const vectorField deltaI(deltaVectors(mesh));
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const vectorField& nI = n.internalField();
@@ -86,17 +87,17 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     const List<symmTensor3rdOrder>* thirdGrad = nullptr;
 
     // Second gradient is computed on demand by MLS
-    if (order >= 2)
+    if (polynomialOrder >= 2)
     {
-        tSecondGrad = solMod.MLS().secondGrad(field);
+        tSecondGrad = displacementMLS.secondGrad(field);
         tmpRef(tSecondGrad).correctBoundaryConditions();
         secondGradI = &tSecondGrad().internalField();
     }
 
     // Third gradient is computed on demand by MLS
-    if (order >= 3)
+    if (polynomialOrder >= 3)
     {
-        tThirdGrad = solMod.MLS().thirdGrad(field);
+        tThirdGrad = displacementMLS.thirdGrad(field);
         thirdGrad = &tThirdGrad();
     }
 
@@ -121,14 +122,14 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
         scalar uR = fieldI[neiCellID] + (dR & gradFieldI[neiCellID]);
 
         // Quadratic extrapolation term
-        if (order >= 2)
+        if (polynomialOrder >= 2)
         {
             uL += 0.5*(dL & ((*secondGradI)[ownCellID] & dL));
             uR += 0.5*(dR & ((*secondGradI)[neiCellID] & dR));
         }
 
         // Cubic extrapolation term
-        if (order >= 3)
+        if (polynomialOrder >= 3)
         {
             const scalar oneOverSix = 1.0/6.0;
             uL += oneOverSix*cubicForm((*thirdGrad)[ownCellID], dL);
@@ -174,7 +175,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
 
             Field<symmTensor3rdOrder> sendThirdGrad(faceCells.size());
             Field<symmTensor3rdOrder> neiProcThirdGrad(faceCells.size());
-            if (order >= 3)
+            if (polynomialOrder >= 3)
             {
                 forAll(faceCells, facei)
                 {
@@ -209,14 +210,14 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
                 scalar uR = neiProcField[facei] + (dR & neiProcGrad[facei]);
 
                 // Quadratic extrapolation term
-                if (order >= 2)
+                if (polynomialOrder >= 2)
                 {
                     uL += 0.5*(dL & ((*secondGradI)[ownCellID] & dL));
                     uR += 0.5*(dR & (neiProcSecondGrad[facei] & dR));
                 }
 
                 // Cubic extrapolation term
-                if (order >= 3)
+                if (polynomialOrder >= 3)
                 {
                     const scalar oneOverSix = 1.0/6.0;
                     uL += oneOverSix*cubicForm((*thirdGrad)[ownCellID], dL);
@@ -252,13 +253,13 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
                 const scalar uR = patchField[facei];
 
                 // Quadratic extrapolation term
-                if (order >= 2)
+                if (polynomialOrder >= 2)
                 {
                     uL += 0.5*(dL & ((*secondGradI)[ownCellID] & dL));
                 }
 
                 // Cubic extrapolation term
-                if (order >= 3)
+                if (polynomialOrder >= 3)
                 {
                     const scalar oneOverSix = 1.0/6.0;
                     uL += oneOverSix*cubicForm((*thirdGrad)[ownCellID], dL);
@@ -296,7 +297,8 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     const tensorField& gradFieldI = gradField.internalField();
     vectorField& faceFluxI = Foam::primitiveFieldRef(faceFlux);
     const solidModel& solMod = lookupSolidModel(field.mesh());
-    const label order = solMod.MLS().order();
+    const movingLeastSquares& displacementMLS = solMod.displacementMLS();
+    const label polynomialOrder = displacementMLS.polynomialOrder();
     const vectorField deltaI(deltaVectors(mesh));
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const vectorField& nI = n.internalField();
@@ -327,11 +329,11 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     const List<symmTensor3rdOrder>* thirdGradZ = nullptr;
 
     // Second gradient is computed on demand by MLS
-    if (order >= 2)
+    if (polynomialOrder >= 2)
     {
-        tSecondGradX = solMod.MLS().secondGrad(fieldX);
-        tSecondGradY = solMod.MLS().secondGrad(fieldY);
-        tSecondGradZ = solMod.MLS().secondGrad(fieldZ);
+        tSecondGradX = displacementMLS.secondGrad(fieldX);
+        tSecondGradY = displacementMLS.secondGrad(fieldY);
+        tSecondGradZ = displacementMLS.secondGrad(fieldZ);
         tmpRef(tSecondGradX).correctBoundaryConditions();
         tmpRef(tSecondGradY).correctBoundaryConditions();
         tmpRef(tSecondGradZ).correctBoundaryConditions();
@@ -342,11 +344,11 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     }
 
     // Third gradient is computed on demand by MLS
-    if (order >= 3)
+    if (polynomialOrder >= 3)
     {
-        tThirdGradX = solMod.MLS().thirdGrad(fieldX);
-        tThirdGradY = solMod.MLS().thirdGrad(fieldY);
-        tThirdGradZ = solMod.MLS().thirdGrad(fieldZ);
+        tThirdGradX = displacementMLS.thirdGrad(fieldX);
+        tThirdGradY = displacementMLS.thirdGrad(fieldY);
+        tThirdGradZ = displacementMLS.thirdGrad(fieldZ);
 
         thirdGradX = &tThirdGradX();
         thirdGradY = &tThirdGradY();
@@ -374,7 +376,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
         vector uR = fieldI[neiCellID] + (dR & gradFieldI[neiCellID]);
 
         // Quadratic extrapolation term
-        if (order >= 2)
+        if (polynomialOrder >= 2)
         {
             uL.x() += 0.5*(dL & ((*secondGradXI)[ownCellID] & dL));
             uL.y() += 0.5*(dL & ((*secondGradYI)[ownCellID] & dL));
@@ -386,7 +388,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
         }
 
         // Cubic extrapolation term
-        if (order >= 3)
+        if (polynomialOrder >= 3)
         {
             const scalar oneOverSix = 1.0/6.0;
             uL.x() += oneOverSix*cubicForm((*thirdGradX)[ownCellID], dL);
@@ -449,7 +451,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
             forAll(faceCells, facei)
             {
                 const label ownCellID = faceCells[facei];
-                if (order >= 3)
+                if (polynomialOrder >= 3)
                 {
                     sendThirdGradX[facei] = (*thirdGradX)[ownCellID];
                     sendThirdGradY[facei] = (*thirdGradY)[ownCellID];
@@ -462,7 +464,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
             Field<symmTensor3rdOrder> neiProcThirdGradZ(faceCells.size());
 
             // patchNeighbourField()x for symmTensor3rdOrder field
-            if (order >= 3)
+            if (polynomialOrder >= 3)
             {
                 exchangeProcessorPatchField
                 (
@@ -501,7 +503,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
                 vector uR = neiProcField[facei] + (dR & neiProcGrad[facei]);
 
                 // Quadratic extrapolation term
-                if (order >= 2)
+                if (polynomialOrder >= 2)
                 {
                     uL.x() += 0.5*(dL & ((*secondGradXI)[ownCellID] & dL));
                     uL.y() += 0.5*(dL & ((*secondGradYI)[ownCellID] & dL));
@@ -513,7 +515,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
                 }
 
                 // Cubic extrapolation term
-                if (order >= 3)
+                if (polynomialOrder >= 3)
                 {
                     const scalar oneOverSix = 1.0/6.0;
                     uL.x() += oneOverSix*cubicForm((*thirdGradX)[ownCellID], dL);
@@ -554,7 +556,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
                 const vector uR = patchField[facei];
 
                 // Quadratic extrapolation term
-                if (order >= 2)
+                if (polynomialOrder >= 2)
                 {
                     uL.x() += 0.5*(dL & ((*secondGradXI)[ownCellID] & dL));
                     uL.y() += 0.5*(dL & ((*secondGradYI)[ownCellID] & dL));
@@ -562,7 +564,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
                 }
 
                 // Cubic extrapolation term
-                if (order >= 3)
+                if (polynomialOrder >= 3)
                 {
                     const scalar oneOverSix = 1.0/6.0;
                     uL.x() += oneOverSix*cubicForm((*thirdGradX)[ownCellID], dL);

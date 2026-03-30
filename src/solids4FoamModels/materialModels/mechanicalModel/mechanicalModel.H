@@ -52,6 +52,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

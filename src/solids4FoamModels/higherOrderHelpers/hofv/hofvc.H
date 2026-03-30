@@ -36,6 +36,7 @@ Author
 //     #include <petscksp.h>
 // #endif
 
+#include "CompactListList.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
 #include "pointFields.H"

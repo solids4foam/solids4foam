@@ -26,6 +26,7 @@ License
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
+#include "hofvm.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -92,7 +93,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
             {
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
-                    MLSQuadrature().faceQuadWeights();
+                    displacementMLS().quadrature().faceQuadWeights();
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -402,7 +403,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     // Update gradient of displacement
     if (highOrderResidual())
     {
-        gradD() = MLS().grad(D());
+        gradD() = displacementMLS().grad(D());
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
@@ -535,48 +536,11 @@ bool linGeomTotalDispSolid::evolveExplicit()
 
 bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
 {
-//     Info<< "Evolving solid solver using an implicit coupled approach with"
-//         << "high order discretisation" << endl;
+    FatalErrorInFunction
+        << "evolveHighOrderImplicitCoupled() is not added yet"
+        << abort(FatalError);
 
-//     if (predictor_ && newTimeStep())
-//     {
-//         predict();
-//     }
-
-//     // Mesh update loop
-//     do
-//     {
-//         int iCorr = 0;
-//         scalar currentResidualNorm = 0;
-//         scalar initialResidualNorm = 0;
-//         scalar deltaXNorm = 0;
-//         scalar xNorm = 0;
-//         Info<< "Solving the momentum equation for D" << endl;
-
-//         // Momentum equation loop
-//         // We need to iterate until second and third derivatives in alpha
-//         // stabilisation converges. We can't put those in stiffness matrix
-//         do
-//         {
-
-
-//         }
-//         while
-//         (
-//             !checkConvergence
-//             (
-//                 currentResidualNorm,
-//                 initialResidualNorm,
-//                 deltaXNorm,
-//                 xNorm,
-//                 ++iCorr,
-//                 convParam
-//             )
-//         );
-
-//     }
-//     while (solidModel::mesh().update());
-    return true;
+    return false;
 }
 
 
@@ -938,6 +902,18 @@ bool linGeomTotalDispSolid::evolve()
 
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
+    if (highOrderJacobian())
+    {
+        return hofvm::initialiseJacobian
+        (
+            jac,
+            *this,
+            displacementMLS(),
+            D(),
+            blockSize_
+        );
+    }
+
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
@@ -1001,7 +977,7 @@ label linGeomTotalDispSolid::formResidual
     {
         // Update cell-centre gradient of displacement
         // Consider switching to mechanical().grad() interface
-        gradD() = MLS().grad(D);
+        gradD() = displacementMLS().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
@@ -1014,9 +990,6 @@ label linGeomTotalDispSolid::formResidual
     }
     else
     {
-        // Enforce the boundary conditions
-        D.correctBoundaryConditions();
-
         // Update gradient of displacement
         mechanical().grad(D, gradD());
 
@@ -1210,26 +1183,84 @@ label linGeomTotalDispSolid::formJacobian
         );
     }
 
-    // Calculate a segregated approximation of the Jacobian
-    fvVectorMatrix approxJ
-    (
-        momentumStabilisation().vectorJacobian(D, &impKf_)
-      - rho()*fvm::d2dt2(D)
-    );
-
-    if (dampingCoeff().value() > SMALL)
+    if (highOrderJacobian())
     {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+        tmp<volScalarField> tK = mechanical().bulkModulus();
+        const volScalarField& K = tK();
+
+        tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
+        const volScalarField& mu = tMu();
+
+        tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+        const volScalarField& lambda = tLambda();
+
+        const movingLeastSquares& mls = displacementMLS();
+
+        hofvm::laplacianIntoPETScMatrix
+        (
+            jac,
+            *this,
+            mls,
+            D,
+            mu
+        );
+
+        hofvm::laplacianTransposeIntoPETScMatrix
+        (
+            jac,
+            *this,
+            mls,
+            D,
+            mu
+        );
+
+        hofvm::laplacianTraceIntoPETScMatrix
+        (
+            jac,
+            *this,
+            mls,
+            D,
+            lambda
+        );
+
+        fvVectorMatrix transientJ
+        (
+          - rho()*hofvm::d2dt2(D)
+        );
+
+        if (dampingCoeff().value() > SMALL)
+        {
+            transientJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D);
+        }
+
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+        (
+            transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+        );
     }
+    else
+    {
+        // Calculate a segregated approximation of the Jacobian
+        fvVectorMatrix approxJ
+        (
+            momentumStabilisation().vectorJacobian(D, &impKf_)
+          - rho()*fvm::d2dt2(D)
+        );
 
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
+        if (dampingCoeff().value() > SMALL)
+        {
+            approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+        }
 
-    // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    (
-        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-    );
+        // Optional: under-relaxation of the linear system
+        approxJ.relax();
+
+        // Convert fvMatrix matrix to PETSc matrix
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+        (
+            approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+        );
+    }
 
     return 0;
 }

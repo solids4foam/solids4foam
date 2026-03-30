@@ -54,6 +54,7 @@ SourceFiles
 #define movingLeastSquares_H
 
 #include "fvMesh.H"
+#include "CompactListList.H"
 #include "globalIndex.H"
 #include <Eigen/Dense>
 #include "tensorList.H"
@@ -85,17 +86,29 @@ private:
         //- Const reference to the mesh
         const fvMesh& mesh_;
 
-        //- Const reference to Cell and face stencils
-        const movingLeastSquaresStencil& stencil_;
+        //- Cell and face stencil pointer
+        mutable autoPtr<movingLeastSquaresStencil> stencilPtr_;
 
-        //- Const reference to Quadrature points and weights
-        const fvMeshQuadrature& quadrature_;
+        //- Quadrature points and weights pointer
+        mutable autoPtr<fvMeshQuadrature> quadraturePtr_;
 
-        //- Const reference to weight function for MLS
-        const weightFunction& weightFunc_;
+        //- Weight function pointer
+        mutable autoPtr<weightFunction> weightFuncPtr_;
 
-        //- Order of interpolation
-        const label N_;
+        //- Polynomial order used for the local reconstruction
+        const label polynomialOrder_;
+
+        //- Additional cells in the face stencil
+        const label faceStencilExtraCells_;
+
+        //- Additional cells in the cell stencil
+        const label cellStencilExtraCells_;
+
+        //- Halo depth scaling used when building the stencil
+        const scalar haloDepthScale_;
+
+        //- Weight function coefficients dictionary
+        const dictionary weightFunctionCoeffs_;
 
         //- Include patch in the stencils as ghost point
         //  Used for patches with prescribed value
@@ -166,7 +179,7 @@ private:
 
     // Private Member Functions
 
-        //- Return minimum number of points in stencil for order N_
+        //- Return minimum number of points in stencil for polynomialOrder_
         label minNn() const;
 
         //- Calculate exponents for the Taylor series expansion terms
@@ -204,6 +217,15 @@ private:
         //- Make the face condition number field
         void makeFaceConditionNumber() const;
 
+        //- Make the cell and face stencil pointer
+        void makeStencils() const;
+
+        //- Make the fvMeshQuadrature pointer
+        void makeQuadrature() const;
+
+        //- Make the weight function
+        void makeWeightFunction() const;
+
         //- Calculate interpolation coefficients for the cell centres
         void calcCellCoeffs() const;
 
@@ -216,6 +238,9 @@ private:
             const Eigen::MatrixXd& Q,
             const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& W
         ) const;
+
+        //- Return the cell and face stencil
+        const movingLeastSquaresStencil& stencil() const;
 
         //- Return the cell centre interpolation coefficients
         const CompactListList<scalar>& cellInterpCoeffs() const;
@@ -261,9 +286,6 @@ private:
         movingLeastSquares
         (
             const fvMesh& mesh,
-            const movingLeastSquaresStencil& stencil,
-            const fvMeshQuadrature& quadrature,
-            const weightFunction& weightFunc,
             const boolList& includePatchInStencils,
             const dictionary& dict
         );
@@ -281,19 +303,47 @@ private:
             return mesh_;
         }
 
-        //- Return order of accuracy
-        label order() const
+        //- Return polynomial order of the local reconstruction
+        label polynomialOrder() const
         {
-            return N_;
+            return polynomialOrder_;
         };
 
         //- Const access to the weight function
         const weightFunction& weightFunc() const
         {
-            return weightFunc_;
+            if (weightFuncPtr_.empty())
+            {
+                makeWeightFunction();
+            }
+
+            return *weightFuncPtr_;
         }
 
-        //- Clear all data, call after mesh topology change
+        //- Const access to the quadrature data
+        const fvMeshQuadrature& quadrature() const
+        {
+            if (quadraturePtr_.empty())
+            {
+                makeQuadrature();
+            }
+
+            return *quadraturePtr_;
+        }
+
+        //- Read-only access to the MLS stencil data
+        const movingLeastSquaresStencil& stencilData() const
+        {
+            return stencil();
+        }
+
+        //- Read-only access to face-gradient interpolation coefficients
+        const List<CompactListList<vector>>& faceGradCoeffsData() const
+        {
+            return faceGradCoeffs();
+        }
+
+        //- Clear owned MLS data and cached coefficient data
         void clear() const;
 
     // Evaluation

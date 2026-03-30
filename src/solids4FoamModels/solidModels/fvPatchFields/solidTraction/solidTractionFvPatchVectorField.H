@@ -38,6 +38,7 @@ SourceFiles
 #endif
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
+#include "CompactListList.H"
 #include "Switch.H"
 #include "interpolationTable.H"
 
