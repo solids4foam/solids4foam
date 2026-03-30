@@ -8,6 +8,8 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+CASE_DIR="${REGRESSION_ROOT}/main"
 
 # ------------------------------------------------------------
 # Regression tolerances
@@ -199,6 +201,11 @@ run_case() {
         cd "${case_dir}"
         ./Allclean > /dev/null 2>&1 || true
         ./Allrun "${coupling}" > "${ALLRUN_LOGFILE}" 2>&1
+
+        if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+            echo "Skipping regression checks because the tutorial skipped in this environment"
+        exit 0
+        fi
 
         mkdir -p postProcessing/fluid/forces/0
         cd postProcessing/fluid/forces/0

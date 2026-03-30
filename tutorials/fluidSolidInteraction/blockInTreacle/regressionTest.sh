@@ -2,12 +2,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-
 # ============================================================
 # blockInTreacle FSI regression test
 # ============================================================
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+CASE_DIR="${REGRESSION_ROOT}/main"
 
 # ------------------------------------------------------------
 # Regression settings
@@ -126,7 +128,14 @@ if [ "${CHECK_ONLY}" = false ]; then
     done
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    # Run case
+    ( cd "${CASE_DIR}" && ./Allrun ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
+
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping regression checks because the tutorial skipped in this environment"
+        exit 0
+    fi
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
     CASE_DIR="${SCRIPT_DIR}"
