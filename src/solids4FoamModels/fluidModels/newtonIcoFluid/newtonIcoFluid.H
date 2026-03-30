@@ -46,6 +46,7 @@ SourceFiles
 #endif
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
+#include "stabilisationModel.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -93,8 +94,19 @@ class newtonIcoFluid
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
 
+        //- Momentum stabilisation model
+        autoPtr<stabilisationModel> momentumStabilisationPtr_;
+
+        //- Pressure stabilisation model
+        autoPtr<stabilisationModel> pressureStabilisationPtr_;
+
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
+
+        //- Optional file for recording the time step sizes and number of
+        //  nonlinear iterations
+        autoPtr<OFstream> tsLogPtr_;
 
 
     // Private Member Functions
@@ -191,8 +203,24 @@ public:
                 return rho_;
             }
 
+            //- Return const reference to the momentum stabilisation
+            const stabilisationModel& momentumStabilisation() const
+            {
+                return momentumStabilisationPtr_();
+            }
+
+            //- Return const reference to the pressure stabilisation
+            const stabilisationModel& pressureStabilisation() const
+            {
+                return pressureStabilisationPtr_();
+            }
+
+
 
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the fluid model
             virtual bool evolve();
@@ -216,13 +244,10 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            )
-            {
-                return formResidual(f, x, false);
-            }
+            );
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
-            //  array) vector
+            //  array) vector, with optional flux extrapolation
             virtual label formResidual
             (
                 Vec f,         // Residual
@@ -245,10 +270,7 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
-            )
-            {
-                return formJacobian(jac, x, false);
-            }
+            );
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
@@ -257,6 +279,7 @@ public:
                 const Vec x,                // Solution
                 const bool extrapolatedFlux // Extrapolate flux
             );
+
 
 #endif // USE_PETSC
 };
