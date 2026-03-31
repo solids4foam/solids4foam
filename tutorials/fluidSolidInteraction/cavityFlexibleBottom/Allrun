@@ -22,6 +22,7 @@ source solids4FoamScripts.sh
 
 if [[ "$SOLVER" == "monolithic" ]]; then
     solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     echo "Using the monolithic Newton/PETSc approach"
     for file in $(find ./0 ./constant ./system -name '*.monolithic')
     do

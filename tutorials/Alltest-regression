@@ -133,7 +133,7 @@ REGRESSION_TESTS=(
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"
     "fluidSolidInteraction/beamInCrossFlow"
-    "fluidSolidInteraction/blockInTreacle"
+    "fluidSolidInteraction/blobInTreacle"
     "fluidSolidInteraction/cavityFlexibleBottom"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
