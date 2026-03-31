@@ -3,8 +3,12 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
+# Example usage
+# ./Allrun
+# ./Allrun aitken
+# ./Allrun iqnils
+# ./Allrun parallel
+# ./Allrun aitken parallel
 
 # PETSc is required for this case
 if [[ -z "${PETSC_DIR:-}" ]]
@@ -14,15 +18,71 @@ then
     exit 0
 fi
 
+couplingMethod=IQNILS
+runParallel=no
+
+print_usage()
+{
+    cat <<'EOF'
+Usage:
+  ./Allrun              # default: IQNILS coupling
+  ./Allrun aitken       # run the Aitken under-relaxation scheme
+  ./Allrun iqnils       # run the IQNILS scheme
+  ./Allrun parallel     # run the case in parallel
+  ./Allrun aitken parallel
+EOF
+}
+
+restore_default()
+{
+    sed -i "s/^fluidSolidInterface .*/fluidSolidInterface IQNILS;/" constant/fsiProperties || true
+}
+trap restore_default EXIT
+
+for arg in "$@"
+do
+    argLower=$(printf '%s' "$arg" | tr '[:upper:]' '[:lower:]')
+    case "$argLower" in
+        aitken)
+            couplingMethod=Aitken
+            ;;
+        iqnils)
+            couplingMethod=IQNILS
+            ;;
+        parallel)
+            runParallel=yes
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${couplingMethod} fluidSolidInterface coupling"
+[[ "$runParallel" == "yes" ]] && echo "Running in parallel"
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+# Set the requested coupling method before running the solvers
+sed -i "s/^fluidSolidInterface .*/fluidSolidInterface ${couplingMethod};/" constant/fsiProperties
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "$runParallel" == "yes" ]]
+then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid

@@ -784,7 +784,7 @@ Foam::solidModel::solidModel
     const word& region
 )
 :
-    physicsModel(type, runTime),
+    physicsModel(type, runTime, region),
     regIOobject // ZT, Jul18: allow for multiple solid regions
     (
         IOobject
@@ -1026,7 +1026,6 @@ Foam::solidModel::solidModel
         solidModelDict().lookupOrAddDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidModelDict().lookupOrAddDefault<int>("nCorrectors", 10000)),
-    minCorr_(solidModelDict().lookupOrAddDefault<int>("minCorrectors", 1)),
     maxIterReached_(0),
     residualFilePtr_(),
     writeResidualField_

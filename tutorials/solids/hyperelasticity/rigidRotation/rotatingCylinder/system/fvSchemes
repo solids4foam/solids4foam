@@ -28,8 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    //default            Gauss linear;
-    default            leastSquares;
+    default            leastSquaresS4f;
 }
 
 divSchemes

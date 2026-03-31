@@ -28,7 +28,10 @@ ddtSchemes
 
 gradSchemes
 {
-    default            leastSquares;
+    // Gauss linear is ok since the mesh is mostly orthogonal
+    // pointCellsLeastSquares and leastSquaresS4f need updating for wedge
+    // patches
+    default            Gauss linear;
 }
 
 divSchemes
