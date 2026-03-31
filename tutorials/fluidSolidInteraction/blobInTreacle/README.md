@@ -97,6 +97,8 @@ NewtonQuasiMonolithicCoeffs
 }
 ```
 
+Make sure the mesh exposes the `interface` and `cylinder` patches referenced above (or update `fsiProperties` accordingly) so the solver can locate the solid and fluid boundaries.
+
 
 
 ## Results
@@ -110,6 +112,8 @@ Typical quantities of interest include:
 - Tip displacement of the cylinder
 - Velocity and pressure fields in the fluid
 - Convergence behaviour of the coupled solver
+
+The regression script (`regressionTest.sh`) tracks the tip displacement (`postProcessing/0/solidPointDisplacement_displacement.dat`) and total fluid force (`postProcessing/fluid/forces/0/force.dat`) at the final time (t = 2 s); the target values are ≈ 0.1989 m for the x-displacement and ≈ 15.77 N for the total x-force. Monitor `log.Allrun` for the residual history when evaluating convergence.
 
 ## References
 
