@@ -131,12 +131,6 @@ class linGeomTotalDispSolid
         //  and coupled solution strategy
         bool evolveHighOrderImplicitCoupled();
 
-        // Make the pDiffusivity field
-        void makePDiffusivity() const;
-
-        // Return a const reference to the pDiffusivity field
-        const surfaceScalarField& pDiffusivity() const;
-
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
 
