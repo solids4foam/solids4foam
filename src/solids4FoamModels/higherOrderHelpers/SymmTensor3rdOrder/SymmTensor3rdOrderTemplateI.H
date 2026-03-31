@@ -30,7 +30,18 @@ namespace Foam
 // Construct null
 template<class Cmpt>
 inline SymmTensor3rdOrder<Cmpt>::SymmTensor3rdOrder()
-{}
+{
+    this->v_[XXX] = 0;
+    this->v_[XXY] = 0;
+    this->v_[XXZ] = 0;
+    this->v_[XYY] = 0;
+    this->v_[XYZ] = 0;
+    this->v_[XZZ] = 0;
+    this->v_[YYY] = 0;
+    this->v_[YYZ] = 0;
+    this->v_[YZZ] = 0;
+    this->v_[ZZZ] = 0;
+}
 
 
 // Construct given VectorSpace
