@@ -491,7 +491,7 @@ void solidTractionFvPatchVectorField::evaluate
     fvPatchField<vector>::evaluate();
 }
 
-
+#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 solidTractionFvPatchVectorField::evaluateQuadrature() const
 {
@@ -584,7 +584,7 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
 
     return tQuadPointsValue;
 }
-
+#endif
 
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {

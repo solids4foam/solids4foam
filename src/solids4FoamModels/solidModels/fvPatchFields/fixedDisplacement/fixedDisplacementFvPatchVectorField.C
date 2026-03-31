@@ -357,7 +357,7 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
     }
 }
 
-
+#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 fixedDisplacementFvPatchVectorField::evaluateQuadrature
 () const
@@ -404,7 +404,7 @@ fixedDisplacementFvPatchVectorField::evaluateQuadrature
 
     return tQuadPointsValue;
 }
-
+#endif
 
 void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {

@@ -81,6 +81,7 @@ class alphaStab
         ) const;
 
         //- Template calculation of the high ordet stabilisation for scalar
+#ifndef FOAMEXTEND
         void computeDiffStencilHighOrderScalar
         (
             const volScalarField& field,
@@ -97,6 +98,7 @@ class alphaStab
             surfaceVectorField& faceFlux,
             scalar scaleFactor
         ) const;
+#endif
 
         //- Disallow default bitwise copy construct
         alphaStab(const alphaStab&);

@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef USE_PETSC
+#if defined(USE_PETSC) && !defined(FOAMEXTEND)
 
 #include <algorithm>
 

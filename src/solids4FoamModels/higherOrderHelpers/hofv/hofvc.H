@@ -41,7 +41,6 @@ Author
 #include "lookupSolidModel.H"
 #include "pointFields.H"
 #include "surfaceFields.H"
-#include "movingLeastSquares.H"
 
 // #include "sparseMatrix.H"
 // #include "scalarMatrices.H"

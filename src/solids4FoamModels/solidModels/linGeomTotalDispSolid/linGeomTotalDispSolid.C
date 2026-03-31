@@ -26,7 +26,9 @@ License
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
-#include "hofvm.H"
+#ifndef FOAMEXTEND
+    #include "hofvm.H"
+#endif
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -91,6 +93,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 
             if (highOrderResidual())
             {
+#ifndef FOAMEXTEND
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
                     displacementMLS().quadrature().faceQuadWeights();
@@ -126,6 +129,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
                     traction.boundaryFieldRef()[patchI][faceI]
                         *= (1.0/(magSf.boundaryField()[patchI][faceI]));
                 }
+#endif
             }
             else
             {
@@ -403,11 +407,13 @@ bool linGeomTotalDispSolid::evolveSnes()
     // Update gradient of displacement
     if (highOrderResidual())
     {
+#ifndef FOAMEXTEND
         gradD() = displacementMLS().grad(D());
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
         mechanical().correct(sigma());
+#endif
     }
     else
     {
@@ -531,16 +537,6 @@ bool linGeomTotalDispSolid::evolveExplicit()
        - dampingCoeff()*fvc::ddt(D);
 
     return true;
-}
-
-
-bool linGeomTotalDispSolid::evolveHighOrderImplicitCoupled()
-{
-    FatalErrorInFunction
-        << "evolveHighOrderImplicitCoupled() is not added yet"
-        << abort(FatalError);
-
-    return false;
 }
 
 
@@ -792,23 +788,12 @@ bool linGeomTotalDispSolid::evolve()
     {
         return evolveSnes();
     }
-    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
-    {
-        if (solidModelDict().found("highOrderCoeffs"))
-        {
-             return evolveHighOrderImplicitCoupled();
-        }
-        else
-        {
-            // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-            // could be combined with PETSc to achieve this.. todo!
-            FatalErrorInFunction
-                << "Coupled implicit solver not yet implemented here"
-                << abort(FatalError);
-
-            // return evolveImplicitCoupled();
-        }
-    }
+    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    // {
+    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+    //     // could be combined with PETSc to achieve this.. todo!
+    //     return evolveImplicitCoupled();
+    // }
     else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
         return evolveImplicitSegregated();
@@ -846,6 +831,7 @@ bool linGeomTotalDispSolid::evolve()
 
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
+#ifndef FOAMEXTEND
     if (highOrderJacobian())
     {
         return hofvm::initialiseJacobian
@@ -857,6 +843,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
             blockSize_
         );
     }
+#endif
 
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
@@ -919,6 +906,7 @@ label linGeomTotalDispSolid::formResidual
 
     if (highOrderResidual())
     {
+#ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
         // Consider switching to mechanical().grad() interface
         gradD() = displacementMLS().grad(D);
@@ -931,6 +919,7 @@ label linGeomTotalDispSolid::formResidual
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
+#endif
     }
     else
     {
@@ -1018,7 +1007,9 @@ label linGeomTotalDispSolid::formResidual
 
     if (highOrderResidual())
     {
+#ifndef FOAMEXTEND
         residual -= rho() * hofvc::d2dt2(D);
+#endif
     }
     else
     {
@@ -1129,6 +1120,7 @@ label linGeomTotalDispSolid::formJacobian
 
     if (highOrderJacobian())
     {
+#ifndef FOAMEXTEND
         tmp<volScalarField> tK = mechanical().bulkModulus();
         const volScalarField& K = tK();
 
@@ -1181,6 +1173,7 @@ label linGeomTotalDispSolid::formJacobian
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
         );
+#endif
     }
     else
     {

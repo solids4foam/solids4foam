@@ -127,10 +127,6 @@ class linGeomTotalDispSolid
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
 
-        //- Evolve the solid solver using the high order implicit discretisation
-        //  and coupled solution strategy
-        bool evolveHighOrderImplicitCoupled();
-
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
 

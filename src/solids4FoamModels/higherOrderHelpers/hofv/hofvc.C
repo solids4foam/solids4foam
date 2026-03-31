@@ -47,9 +47,11 @@ void hofvc::fGrad
     CompactListList<tensor>& gradDQuad
  )
 {
+#ifndef FOAMEXTEND
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
     solMod.displacementMLS().fGrad(D, gradDQuad);
+#endif
 }
 
 
@@ -59,6 +61,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const fvMesh& mesh
 )
 {
+#ifndef FOAMEXTEND
     tmp<surfaceVectorField> tsf
     (
         new surfaceVectorField
@@ -127,6 +130,9 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     }
 
     return tsf;
+#else
+    return tmp<surfaceVectorField>();
+#endif
 };
 
 tmp<volVectorField> hofvc::d2dt2

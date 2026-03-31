@@ -369,7 +369,7 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
     return hoDict.subDict("pressure");
 }
 
-
+#ifndef FOAMEXTEND
 void Foam::solidModel::makeDisplacementMLS() const
 {
     if (!displacementMLSPtr_.empty())
@@ -438,8 +438,10 @@ void Foam::solidModel::makeSigmaQuad() const
         }
     }
 }
+#endif
 
 
+#ifndef FOAMEXTEND
 void Foam::solidModel::makeGradDQuad() const
 {
     if (!gradDQuadPtr_.empty())
@@ -468,6 +470,7 @@ void Foam::solidModel::makeGradDQuad() const
         }
     }
 }
+#endif
 
 
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
@@ -1163,6 +1166,15 @@ Foam::solidModel::solidModel
 
         highOrderResidual_ =
             hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
+
+#ifdef FOAMEXTEND
+        if (highOrderJacobian_ || highOrderResidual_)
+        {
+            FatalErrorInFunction
+                << "High-order MLS discretisation is not supported on "
+                << "foam-extend." << abort(FatalError);
+        }
+#endif
 
         if
         (

@@ -31,7 +31,7 @@ Author
 #ifndef hofvm_H
 #define hofvm_H
 
-#ifdef USE_PETSC
+#if defined(USE_PETSC) && !defined(FOAMEXTEND)
 
 #include <petscsnes.h>
 #include "tensor.H"

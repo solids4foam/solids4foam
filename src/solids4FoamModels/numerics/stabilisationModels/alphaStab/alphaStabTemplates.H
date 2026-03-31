@@ -21,10 +21,11 @@ License
 #include "fvc.H"
 #include "compatibilityFunctions.H"
 #include "deltaVectors.H"
-#include "symmTensor3rdOrder.H"
 #include "processorPolyPatch.H"
 #include "processorFvPatch.H"
-
+#ifndef FOAMEXTEND
+#include "symmTensor3rdOrder.H"
+#endif
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
@@ -49,6 +50,7 @@ inline void Foam::alphaStab::exchangeProcessorPatchField
 }
 
 
+#ifndef FOAMEXTEND
 inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
 (
     const volScalarField& field,
@@ -584,6 +586,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
         }
     }
 }
+#endif
 
 
 template<class GeoField, class GradField, class SurfaceField>

@@ -312,6 +312,7 @@ private:
         //- Make the U field
         void makeU() const;
 
+#ifndef FOAMEXTEND
         //- Make the sigma at face quadrature points field
         void makeSigmaQuad() const;
 
@@ -323,6 +324,7 @@ private:
 
         //- Make the pressure Moving Least Squares object
         void makePressureMLS() const;
+#endif
 
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
@@ -689,6 +691,7 @@ public:
                 return gradD_;
             }
 
+#ifndef FOAMEXTEND
             //- Return non-const reference to gradD at face quadrature points
             virtual CompactListList<tensor>& gradDQuad()
             {
@@ -710,6 +713,7 @@ public:
 
                 return autoPtrRef(gradDQuadPtr_);
             }
+#endif
 
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
@@ -735,6 +739,7 @@ public:
                 return sigma_;
             }
 
+#ifndef FOAMEXTEND
             //- Return non-const reference to sigma at face quarature points
             virtual CompactListList<symmTensor>& sigmaQuad()
             {
@@ -756,6 +761,7 @@ public:
 
                 return autoPtrRef(sigmaQuadPtr_);
             }
+#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
