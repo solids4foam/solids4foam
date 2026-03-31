@@ -1164,7 +1164,6 @@ void Foam::movingLeastSquares::clear() const
 }
 
 
-template<>
 autoPtr<CompactListList<vector>>
 movingLeastSquares::patchFaceQuadValues
 (

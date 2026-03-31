@@ -373,7 +373,6 @@ private:
         ) const;
 
         //- Get patch face quadrature values for vector field
-        template<>
         autoPtr<CompactListList<vector>> patchFaceQuadValues
         (
             const GeometricField<vector, fvPatchField, volMesh>& vf,
