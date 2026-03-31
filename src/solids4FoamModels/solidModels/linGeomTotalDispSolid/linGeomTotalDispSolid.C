@@ -573,7 +573,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     rKappa_(1.0/mechanical().bulkModulus()),
-    pDiffusivityPtr_(),
     A_
     (
         IOobject

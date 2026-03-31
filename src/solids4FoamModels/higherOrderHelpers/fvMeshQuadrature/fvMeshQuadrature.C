@@ -354,7 +354,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
     faceQuadPointsPtr_.set(new CompactListList<point>(quadPtsPerFace));
     faceQuadWeightsPtr_.set(new CompactListList<scalar>(quadPtsPerFace));
 
-    CompactListList<point>&  faceQP  = *faceQuadPointsPtr_;
+    CompactListList<point>& faceQP = *faceQuadPointsPtr_;
     CompactListList<scalar>& faceQW = *faceQuadWeightsPtr_;
 
     forAll(faces, faceI)
@@ -376,8 +376,8 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
         forAll(curFaceEdges, edgeI)
         {
             const edge& curEdge = curFaceEdges[edgeI];
-            const vector e  = curEdge.vec(pts);
-            const vector eNorm = e / mag(e);
+            const vector e = curEdge.vec(pts);
+            const vector eNorm = e/mag(e);
 
             // In-plane edge, perpendicular to empty direction
             if (mag(eNorm & emptyDir) < SMALL)
@@ -400,7 +400,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
                 forAll(points, pI)
                 {
                     faceQP[faceI][pI] = points[pI];
-                    faceQW[faceI][pI] = weights[pI] * l.mag() * thickness;
+                    faceQW[faceI][pI] = weights[pI]*l.mag()*thickness;
                 }
 
                 // Go to next face, this face is done
@@ -541,7 +541,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
             forAll(points, i)
             {
                 cellQP[cellI][base + i] = points[i];
-                cellQW[cellI][base + i] = weights[i] * triArea * thickness;
+                cellQW[cellI][base + i] = weights[i]*triArea*thickness;
             }
         }
     }
@@ -712,8 +712,8 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
         }
 
         // Final number of quadrature points is:
-        // number of face triangles * quadrature points per triangle
-        quadPtsPerFace[faceI] = faceTri[faceI].size() * nTriQP;
+        // number of face triangles*quadrature points per triangle
+        quadPtsPerFace[faceI] = faceTri[faceI].size()*nTriQP;
     }
 
     if (fallbackActivated)
@@ -755,7 +755,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
             {
                 const label pos = tI*nTriQP + i;
                 faceQP[faceI][pos] = points[i];
-                faceQW[faceI][pos] = weights[i] * triArea;
+                faceQW[faceI][pos] = weights[i]*triArea;
             }
         }
     }
@@ -789,7 +789,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
                 const label faceI = c[fI];
                 cellTets += faceTri[faceI].size();
             }
-            quadPtsPerCell[cellI] = nTetQP * cellTets;
+            quadPtsPerCell[cellI] = nTetQP*cellTets;
         }
     }
 
@@ -858,7 +858,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
             forAll(points, i)
             {
                 cellQP[cellI][i] = points[i];
-                cellQW[cellI][i] = weights[i] * tetV;
+                cellQW[cellI][i] = weights[i]*tetV;
             }
         }
         else

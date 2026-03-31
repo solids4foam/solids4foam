@@ -31,7 +31,7 @@ deltaT          0.01;
 
 writeControl    timeStep;
 
-writeInterval   1; //250;
+writeInterval   10;
 
 cycleWrite      0;
 

@@ -19,34 +19,27 @@ FoamFile
 
 solvers
 {
-    // Coupled solver
-    "blockDD|blockD"
+    D
     {
-        // Direct solver
-        //solver              EigenSparseLU;
+        solver          petsc;
 
-        // Iterative solver
-        solver            BiCGStab;
-        preconditioner    myCholesky;
-        tolerance         1e-10;
-        relTol            0;
-        minIter           0;
-        maxIter           10000;
-    }
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
 
-    // Segregated solver
-    "D|DD"
-    {
-        tolerance       1e-8;
-        relTol          0.1;
-        maxIter         50;
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
 
-        solver          PCG;
-        preconditioner  FDIC;
+            pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
     }
 }
-
-relaxationFactors
-{}
 
 // ************************************************************************* //
