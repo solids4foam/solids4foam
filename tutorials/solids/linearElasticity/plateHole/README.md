@@ -40,8 +40,8 @@ right
 Symmetry boundary conditions are applied on
 boundaries AB and DE, while zero traction is specified on the hole boundary.
 The material properties are defined by a Young’s modulus of $$E = 200 GPa$$
- and a Poisson’s ratio of $$\nu = 0.3$$. Gravitational and inertial effects are neglected,
-and the case is solved using one loading increment.
+and a Poisson’s ratio of $$\nu = 0.3$$. Gravitational and inertial effects are
+neglected, and the case is solved using one loading increment.
 
 ![Geometry](./images/plateHole-geometry.png)
 
@@ -69,11 +69,11 @@ $$
 $$
 
 where $$r=\sqrt{x^2+y^2}$$ and $$\theta=\tan^{-1}(y/x)$$ are the usual polar co-ordinates.
-$$R$$ is the hole radius, .
+$$R$$ is the hole radius.
 
 A custom `plateHoleAnalyticalSolution` function object is added to the
- `controlDict` to calculate the analytical solutions for displacement and stress
- and compute the errors:
+`controlDict` to calculate the analytical solutions for displacement and stress
+and compute the errors:
 
 ```c++
 plateHoleAnalyticalSolution1
@@ -132,11 +132,10 @@ overall number of computational nodes, i.e. cells.
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/linearElasticity/plateHole`. The case
-can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case,
-the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`)
-followed by running the `solids4foam` solver (`> ./solids4Foam`) . Optionally,
-the case can be run in parallel using `./Allrun parallel`
+`solids4foam/tutorials/solids/linearElasticity/plateHole`. The case can be run
+using the included `Allrun` script (`> ./Allrun`). The script first creates the
+mesh with `blockMesh` (`> ./blockMesh`) and then runs the `solids4foam` solver
+(`> ./solids4Foam`). Optionally, run `./Allrun parallel`.
 
 ---
 

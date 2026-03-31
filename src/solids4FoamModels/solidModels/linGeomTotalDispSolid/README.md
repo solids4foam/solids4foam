@@ -41,7 +41,7 @@ are solved:
 | `implicitSegregated` | Default segregated solve | Recommended |
 | `PETScSNES` | Nonlinear solve via PETSc SNES | Requires PETSc |
 | `explicit` | Explicit time integration | Time-step limited by stability |
-| `implicitCoupled` | Not implemented for this model | Do not select this value |
+| `implicitCoupled` | Not implemented for this model | Do not use |
 
 The runtime type name for this class is `linearGeometryTotalDisplacement`.
 

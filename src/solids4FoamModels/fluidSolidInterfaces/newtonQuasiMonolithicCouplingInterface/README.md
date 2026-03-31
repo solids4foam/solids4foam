@@ -9,13 +9,14 @@ This interface assembles a monolithic system of equations coupling the fluid
 (velocity U, pressure p) and solid (displacement D) fields into a single PETSc
 SNES nonlinear solve per time step. The 2x2 block system takes the form:
 
-```
+```text
 | Aff  Afs | | x_fluid |   | f_fluid |
 |          | |         | = |         |
 | Asf  Ass | | x_solid |   | f_solid |
 ```
 
 where:
+
 - **Aff**: fluid momentum + pressure equations (assembled by `newtonIcoFluid`)
 - **Ass**: solid momentum equations (assembled by `nonLinGeomTotalLagVelocitySolid`
   or similar)

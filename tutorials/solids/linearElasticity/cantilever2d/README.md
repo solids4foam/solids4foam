@@ -80,22 +80,25 @@ In solids4foam, there are several solid models which can solve this problem;
  here, four approaches are considered:
 
 1. A **cell-centred** finite volume approach with a **Jacobian-free Newton-Krylov**
-   solution algorithm [2]. This is the default approach in the case, and is
-   selected by specifying `solidModel linearGeometryTotalDisplacement;` in `constant/solidProperties`,
-   with `solutionAlgorithm PETScSNES;` in `linearGeometryTotalDisplacementCoeffs`.
+   solution algorithm [2]. This is the default approach in the case. Select it by
+   specifying `solidModel linearGeometryTotalDisplacement;` in
+   `constant/solidProperties` and `solutionAlgorithm PETScSNES;` in
+   `linearGeometryTotalDisplacementCoeffs`.
 2. A **cell-centred** finite volume approach with a **segregated** solution
-   algorithm. This approach employs the same discretisation as in approach 1, but
-   solves the governing equations using the more common (in OpenFOAM) segregated
-   algorithm. This approach is selected by specifying `solidModel linearGeometryTotalDisplacement;`
-   in `constant/solidProperties`, with `solutionAlgorithm implicitSegregated;` in
+   algorithm. This approach uses the same discretisation as approach 1 but solves
+   the governing equations with the more common segregated algorithm.
+   Select it by specifying `solidModel linearGeometryTotalDisplacement;` in
+   `constant/solidProperties` and `solutionAlgorithm implicitSegregated;` in
    `linearGeometryTotalDisplacementCoeffs`.
 3. A **vertex-centred** finite volume approach with an **exact Jacobian coupled**
-   solution algorithm [3]. This approach is selected by specifying `solidModel vertexCentredLinearGeometry;`
-   in `constant/solidProperties`, with `solutionAlgorithm PETScSNES;` and
-   `approximateJacobian no;` in `vertexCentredLinearGeometryCoeffs`.
+   solution algorithm [3]. Select this option by setting
+   `solidModel vertexCentredLinearGeometry;` in `constant/solidProperties`, with
+   `solutionAlgorithm PETScSNES;` and `approximateJacobian no;` in
+   `vertexCentredLinearGeometryCoeffs`.
 4. A **cell-centred** finite volume approach with an **exact Jacobian coupled**
-   solution algorithm [4].  This approach is selected by specifying `solidModel coupledUnsLinearGeometryLinearElastic;`
-   in `constant/solidProperties`.
+   solution algorithm [4]. This approach is selected by specifying
+   `solidModel coupledUnsLinearGeometryLinearElastic;` in
+   `constant/solidProperties`.
 
 ```note
 Approach 4 uses simplified uniform displacement (left) and uniform traction
@@ -108,9 +111,8 @@ Approach 4 uses simplified uniform displacement (left) and uniform traction
 ## Running the Case
 
 The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cantilever2d`.
- The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In
- this case, the `Allrun` script optionally takes an argument which specifies
- which specifies the solution approach:
+The case can be run using the included `Allrun` script, i.e. `> ./Allrun`. The
+script optionally takes an argument that selects the solution approach:
 
 ```bash
 ./Allrun                # Defaults to approach 1 (petscSnes)
@@ -121,9 +123,9 @@ The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/c
 ```
 
 The `Allrun` script starts by updating the files in the case to match the
- selected approach; the following files are updated: `0/D`, `0/pointD`, `constant/solidProperties`,
- `system/fvSchemes`, and `system/fvSolution`. Subsequently, the mesh is
- created with `blockMesh`, following by running the solver `solids4Foam`.
+selected approach; the following files are updated: `0/D`, `0/pointD`,
+`constant/solidProperties`, `system/fvSchemes`, and `system/fvSolution`. The
+mesh is then created with `blockMesh` before running the solver `solids4Foam`.
 
 ---
 
