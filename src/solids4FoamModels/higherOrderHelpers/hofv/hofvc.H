@@ -31,24 +31,12 @@ Author
 #ifndef hofvc_H
 #define hofvc_H
 
-// #ifdef USE_PETSC
-//     #include <petscsnes.h>
-//     #include <petscksp.h>
-// #endif
-
 #include "CompactListList.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
 #include "pointFields.H"
 #include "surfaceFields.H"
 
-// #include "sparseMatrix.H"
-// #include "scalarMatrices.H"
-// #include "symmTensor.H"
-// #include "RectangularMatrix.H"
-// #include "cellPointLeastSquaresVectors.H"
-// #include "SparseMatrixTemplate.H"
-// #include "LRE.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -80,11 +68,6 @@ namespace hofvc
 } // End namespace hofvc
 
 } // End namespace Foam
-
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//##endif // #ifdef USE_PETSC
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

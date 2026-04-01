@@ -23,19 +23,6 @@ License
     #include "fvSchemes.H"
 #endif
 
-// #include <functional>
-//#ifdef USE_PETSC
-// #include "fvc.H"
-// #include "multiplyCoeff.H"
-// #include "multiplyCoeffExtended.H"
-// #include "sparseMatrixTools.H"
-// #include "cellPointLeastSquaresVectors.H"
-// #include "surfaceFields.H"
-// #include "processorPolyPatch.H"
-// #include "emptyPolyPatch.H"
-// #include "symmetryPolyPatch.H"
-// #include "fixedDisplacementFvPatchVectorField.H"
-// #include "solidTractionFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,6 +38,8 @@ void hofvc::fGrad
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
     solMod.displacementMLS().fGrad(D, gradDQuad);
+#else
+    notImplemented("Not implemented for foam extend");
 #endif
 }
 
@@ -131,6 +120,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     return tsf;
 #else
+    notImplemented("Not implemented for foam extend");
     return tmp<surfaceVectorField>();
 #endif
 };
