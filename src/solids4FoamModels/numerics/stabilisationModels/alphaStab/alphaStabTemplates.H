@@ -171,13 +171,11 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
                 gradField.boundaryField()[patchi].patchNeighbourField()
             );
             tmp<symmTensorField> tNeiProcSecondGrad;
-            const symmTensorField* neiProcSecondGrad = nullptr;
 
             if (polynomialOrder >= 2)
             {
                 tNeiProcSecondGrad =
                     tSecondGrad().boundaryField()[patchi].patchNeighbourField();
-                neiProcSecondGrad = &tNeiProcSecondGrad();
             }
 
             Field<symmTensor3rdOrder> sendThirdGrad(faceCells.size());
@@ -220,7 +218,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
                 if (polynomialOrder >= 2)
                 {
                     uL += 0.5*(dL & ((*secondGradI)[ownCellID] & dL));
-                    uR += 0.5*(dR & ((*neiProcSecondGrad)[facei] & dR));
+                    uR += 0.5*(dR & (tNeiProcSecondGrad()[facei] & dR));
                 }
 
                 // Cubic extrapolation term
