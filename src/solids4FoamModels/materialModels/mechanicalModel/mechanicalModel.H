@@ -176,15 +176,13 @@ public:
             );
 
             //- Calculate the stress at face quadrature points
+#ifndef FOAMEXTEND
             void correct
             (
-#ifdef FOAMEXTEND
-                CompactListList<tensor>& gradDQuad,
-#else
                 const CompactListList<tensor>& gradDQuad,
-#endif
                 CompactListList<symmTensor>& sigmaQuad
             );
+#endif
 
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);

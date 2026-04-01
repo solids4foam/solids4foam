@@ -1663,14 +1663,11 @@ void Foam::mechanicalLaw::correct
 }
 
 
+#ifndef FOAMEXTEND
 void Foam::mechanicalLaw::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
-#ifdef FOAMEXTEND
-    CompactListList<tensor>& gradDQuad
-#else
     const CompactListList<tensor>& gradDQuad
-#endif
 )
 {
     notImplemented
@@ -1680,6 +1677,7 @@ void Foam::mechanicalLaw::correct
         "\n for the " + type() + " mechanical law"
     );
 }
+#endif
 
 
 Foam::scalar Foam::mechanicalLaw::residual()
