@@ -877,6 +877,9 @@ label linGeomTotalDispSolid::formResidual
       : makeList<label>({0,1,2})
     );
 
+    // Enforce the boundary conditions
+    D.correctBoundaryConditions();
+
     if (solvePressure() && highOrderResidual())
     {
         FatalErrorInFunction
@@ -931,6 +934,9 @@ label linGeomTotalDispSolid::formResidual
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
+
+        // Calculate the traction at the faces
+        traction = (n & fvc::interpolate(sigma()));
     }
 
     // Update velocity
