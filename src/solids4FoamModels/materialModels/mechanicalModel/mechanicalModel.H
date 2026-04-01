@@ -195,11 +195,13 @@ public:
             );
 
             //- Update the gradient of displacement for face quadrature points
+#ifndef FOAMEXTEND
             void grad
             (
                 const volVectorField& D,
                 CompactListList<tensor>& gradDQuad
             );
+#endif
 
             //- Update the gradient of displacement vol field using pointD
             void grad
