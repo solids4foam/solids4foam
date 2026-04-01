@@ -23,6 +23,7 @@ License
 
 #include "hofvm.H"
 #include "fvc.H"
+#include "fvmD2dt2.H"
 #include "compatibilityFunctions.H"
 #include "surfaceFields.H"
 #include "petscErrorHandling.H"
@@ -143,12 +144,12 @@ Foam::tensor Foam::hofvm::laplacianTransposeCoeff
     const vector& n = faceNormal;
 
     return gammaMagSf*quadWeight
-       * tensor
-         (
-             c.x()*n.x(), c.x()*n.y(), c.x()*n.z(),
-             c.y()*n.x(), c.y()*n.y(), c.y()*n.z(),
-             c.z()*n.x(), c.z()*n.y(), c.z()*n.z()
-         );
+       *tensor
+        (
+            c.x()*n.x(), c.x()*n.y(), c.x()*n.z(),
+            c.y()*n.x(), c.y()*n.y(), c.y()*n.z(),
+            c.z()*n.x(), c.z()*n.y(), c.z()*n.z()
+        );
 }
 
 
@@ -164,19 +165,20 @@ Foam::tensor Foam::hofvm::laplacianTraceCoeff
     const vector& n = faceNormal;
 
     return gammaMagSf*quadWeight
-       * tensor
-         (
-             c.x()*n.x(), c.y()*n.x(), c.z()*n.x(),
-             c.x()*n.y(), c.y()*n.y(), c.z()*n.y(),
-             c.x()*n.z(), c.y()*n.z(), c.z()*n.z()
-         );
+       *tensor
+        (
+            c.x()*n.x(), c.y()*n.x(), c.z()*n.x(),
+            c.x()*n.y(), c.y()*n.y(), c.z()*n.y(),
+            c.x()*n.z(), c.y()*n.z(), c.z()*n.z()
+        );
 }
 
 
 Foam::tmp<Foam::fvVectorMatrix> Foam::hofvm::d2dt2(const volVectorField& D)
 {
-    // Just temporarly solution
-    return fvmDdtVectorCompat(D);
+    // Default to second-order method for now
+    // In the future, a consistent, higher-order scheme will be added
+    return fvm::d2dt2(D);
 }
 
 

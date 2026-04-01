@@ -19,6 +19,7 @@ License
 
 #include "hofvc.H"
 #include "lookupSolidModel.H"
+#include "fvcD2dt2.H"
 #ifdef OPENFOAM_ORG
     #include "fvSchemes.H"
 #endif
@@ -125,52 +126,15 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 #endif
 };
 
+
 tmp<volVectorField> hofvc::d2dt2
 (
     const volVectorField& D
 )
 {
-    // Hard-coded BDF2 scheme
-    const fvMesh& mesh = D.mesh();
-
-    tmp<volVectorField> tvf
-    (
-        new volVectorField
-        (
-            IOobject
-            (
-                 "d2dt2(" + D.name() + ")",
-                 mesh.time().timeName(),
-                 mesh,
-                 IOobject::NO_READ,
-                 IOobject::NO_WRITE
-            ),
-            mesh,
-            dimensionedVector
-            (
-                "zero",
-                D.dimensions()/(dimTime*dimTime),
-                vector::zero
-            )
-         )
-    );
-
-    //Check what scheme is prescribed, continue only in the case of backward
-    word schemeName;
-#ifdef OPENFOAM_ORG
-    static_cast<const fvSchemes&>(mesh).d2dt2Scheme(D.name()) >> schemeName;
-#else
-    (mesh.d2dt2Schemes().found(D.name())
-      ? mesh.d2dt2Schemes().lookup(D.name())
-      : mesh.d2dt2Schemes().lookup("default")) >> schemeName;
-#endif
-
-    if (schemeName != "backward")
-    {
-        return tvf;
-    }
-
-    return tvf;
+    // Default to second-order method for now
+    // In the future, a consistent, higher-order scheme will be added
+    return fvc::d2dt2(D);
 }
 
 // ************************************************************************* //
