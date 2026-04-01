@@ -118,18 +118,13 @@ private:
         //  have area ratio or quality below treshold values
         bool poorTriangulation
         (
-            const faceList& triFaces,
-            const pointField& pts
-        ) const;
-
 #ifdef OPENFOAM_ORG
-        //- OpenFOAM.org triangulation returns triFaceList instead of faceList
-        bool poorTriangulation
-        (
             const triFaceList& triFaces,
+#else
+            const faceList& triFaces,
+#endif
             const pointField& pts
         ) const;
-#endif
 
         //- Calculate quadrature points and corresponding weights in 3D
         void calcQuadPointsAndWeights3D() const;

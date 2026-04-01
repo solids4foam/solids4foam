@@ -125,9 +125,14 @@ const scalar fvMeshQuadrature::minTriQuality_
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
+
 bool fvMeshQuadrature::poorTriangulation
 (
+#ifdef OPENFOAM_ORG
+    const triFaceList& triFaces,
+#else
     const faceList& triFaces,
+#endif
     const pointField& pts
 ) const
 {
@@ -136,6 +141,16 @@ bool fvMeshQuadrature::poorTriangulation
     // Compute total area and check area of each triangle
     forAll(triFaces, triI)
     {
+#ifdef OPENFOAM_ORG
+        const triFace& triF = triFaces[triI];
+
+        const triPointRef tri
+        (
+            pts[triF[0]],
+            pts[triF[1]],
+            pts[triF[2]]
+        );
+#else
         const face& triF = triFaces[triI];
 
         const genericTriPoints tri
@@ -144,6 +159,7 @@ bool fvMeshQuadrature::poorTriangulation
             pts[triF[1]],
             pts[triF[2]]
         );
+#endif
         const scalar triArea = tri.mag();
         totalArea += triArea;
 
@@ -161,96 +177,44 @@ bool fvMeshQuadrature::poorTriangulation
     // Check individual triangles
     forAll(triFaces, triI)
     {
+#ifdef OPENFOAM_ORG
+        const triFace& triF = triFaces[triI];
+
+        const triPointRef tri
+        (
+            pts[triF[0]],
+            pts[triF[1]],
+            pts[triF[2]]
+        );
+#else
         const face& triF = triFaces[triI];
 
-        const triPoints tri
+        const genericTriPoints tri
         (
             pts[triF[0]],
             pts[triF[1]],
             pts[triF[2]]
         );
-
-        const scalar triArea = tri.mag();
-        const scalar areaRatio = triArea/(totalArea + VSMALL);
-
-        if (areaRatio < minTriAreaRatio_)
-        {
-            return true;
-        }
-
-        if (genericTriQuality(tri) < minTriQuality_)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-#ifdef OPENFOAM_ORG
-bool fvMeshQuadrature::poorTriangulation
-(
-    const triFaceList& triFaces,
-    const pointField& pts
-) const
-{
-    scalar totalArea = 0.0;
-
-    // Compute total area and check area of each triangle
-    forAll(triFaces, triI)
-    {
-        const triFace& triF = triFaces[triI];
-
-        const triPointRef tri
-        (
-            pts[triF[0]],
-            pts[triF[1]],
-            pts[triF[2]]
-        );
-        const scalar triArea = tri.mag();
-        totalArea += triArea;
-
-        if (triArea < SMALL)
-        {
-            return true;
-        }
-    }
-
-    if (totalArea < SMALL)
-    {
-        return true;
-    }
-
-    // Check individual triangles
-    forAll(triFaces, triI)
-    {
-        const triFace& triF = triFaces[triI];
-
-        const triPointRef tri
-        (
-            pts[triF[0]],
-            pts[triF[1]],
-            pts[triF[2]]
-        );
-
-        const scalar triArea = tri.mag();
-        const scalar areaRatio = triArea/(totalArea + VSMALL);
-
-        if (areaRatio < minTriAreaRatio_)
-        {
-            return true;
-        }
-
-        if (tri.quality() < minTriQuality_)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 #endif
+        const scalar triArea = tri.mag();
+        const scalar areaRatio = triArea/(totalArea + VSMALL);
+
+        if (areaRatio < minTriAreaRatio_)
+        {
+            return true;
+        }
+#ifdef OPENFOAM_ORG
+        if (tri.quality() < minTriQuality_)
+#else
+        if (genericTriQuality(tri) < minTriQuality_)
+#endif
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 
 void fvMeshQuadrature::calcQuadPointsAndWeights() const
