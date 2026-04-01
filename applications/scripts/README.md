@@ -244,7 +244,7 @@ is transformed into:
 ```
 
 **5.** If `sample` file is found in the `system/` directory and if the
-[OpenFOAM.org](OpenFOAM.org) version is used, `uniform` is replaced with
+[OpenFOAM.org](https://OpenFOAM.org) version is used, `uniform` is replaced with
 `lineUniform`:
 
 ```c++
@@ -361,10 +361,10 @@ is transformed into:
     └── fvSolution
 ```
 
-**9.** In case the [OpenFOAM.com](OpenFOAM.com) version is used to solve solid
-mechanics or fluid-solid interaction problems, the `leastSquare` gradient method
-in `fvSchemes` file is replaced with `pointCellsLeastSquares` to account for
-boundary non-orthogonal corrections:
+**9.** In case the [OpenFOAM.com](https://OpenFOAM.com) version is used to solve
+solid mechanics or fluid-solid interaction problems, the `leastSquare` gradient
+method in `fvSchemes` file is replaced with `pointCellsLeastSquares` to account
+for boundary non-orthogonal corrections:
 
 ```c++
 gradSchemes
@@ -448,8 +448,8 @@ located.
 ## `solids4foam::caseDoesNotRunWithFoamExtend()`
 
 - **Function purpose**
-  This function gives an error if the [OpenFOAM.com](OpenFOAM.com) or
-  [OpenFOAM.org](OpenFOAM.org) version is not sourced/loaded.
+  This function gives an error if the [OpenFOAM.com](https://OpenFOAM.com) or
+  [OpenFOAM.org](https://OpenFOAM.org) version is not sourced/loaded.
 
 - **Function arguments**
   None
