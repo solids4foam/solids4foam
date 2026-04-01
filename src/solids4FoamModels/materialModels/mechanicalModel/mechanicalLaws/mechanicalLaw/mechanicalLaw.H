@@ -554,7 +554,11 @@ public:
         virtual void correct
         (
             CompactListList<symmTensor>& sigmaQuad,
+#ifdef FOAMEXTEND
+            CompactListList<tensor>& gradDQuad
+#else
             const CompactListList<tensor>& gradDQuad
+#endif
         );
 
         //- Return material residual i.e. a measured of how convergence of

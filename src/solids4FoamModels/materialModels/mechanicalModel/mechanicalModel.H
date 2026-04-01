@@ -178,7 +178,11 @@ public:
             //- Calculate the stress at face quadrature points
             void correct
             (
+#ifdef FOAMEXTEND
+                CompactListList<tensor>& gradDQuad,
+#else
                 const CompactListList<tensor>& gradDQuad,
+#endif
                 CompactListList<symmTensor>& sigmaQuad
             );
 
