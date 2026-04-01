@@ -701,6 +701,7 @@ void Foam::mechanicalModel::grad
 }
 
 
+#ifndef FOAMEXTEND
 void Foam::mechanicalModel::grad
 (
     const volVectorField& D,
@@ -722,6 +723,7 @@ void Foam::mechanicalModel::grad
         );
     }
 }
+#endif
 
 
 void Foam::mechanicalModel::grad
