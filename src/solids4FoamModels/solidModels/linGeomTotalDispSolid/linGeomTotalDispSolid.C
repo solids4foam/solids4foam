@@ -123,11 +123,11 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
                     {
                         traction.boundaryFieldRef()[patchI][faceI] +=
                             quadratureValues[faceI][pointI]
-                          * faceQuadWeights[faceID][pointI];
+                           *faceQuadWeights[faceID][pointI];
                     }
                     // Divide with area because we use physical weights
-                    traction.boundaryFieldRef()[patchI][faceI]
-                        *= (1.0/(magSf.boundaryField()[patchI][faceI]));
+                    traction.boundaryFieldRef()[patchI][faceI] *=
+                        (1.0/(magSf.boundaryField()[patchI][faceI]));
                 }
 #endif
             }
@@ -1007,12 +1007,12 @@ label linGeomTotalDispSolid::formResidual
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND
-        residual -= rho() * hofvc::d2dt2(D);
+        residual -= rho()*hofvc::d2dt2(D);
 #endif
     }
     else
     {
-        residual -= rho() * fvc::d2dt2(D);
+        residual -= rho()*fvc::d2dt2(D);
     }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)

@@ -301,6 +301,34 @@ void Foam::solidModel::makeU() const
 }
 
 
+void Foam::solidModel::makeP() const
+{
+    if (!pPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makep() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    pPtr_.set
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "p",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0),
+            "zeroGradient"
+        )
+    );
+}
+
+
 namespace
 {
     template<class Type>
@@ -749,23 +777,7 @@ Foam::volScalarField& Foam::solidModel::p()
 {
     if (pPtr_.empty())
     {
-        pPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "p",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::AUTO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimPressure, 0.0),
-                "zeroGradient"
-            )
-        );
+        makeP();
     }
 
     return autoPtrRef(pPtr_);
@@ -774,7 +786,12 @@ Foam::volScalarField& Foam::solidModel::p()
 
 const Foam::volScalarField& Foam::solidModel::p() const
 {
-    return const_cast<solidModel&>(*this).p();
+    if (pPtr_.empty())
+    {
+        makeP();
+    }
+
+    return pPtr_();
 }
 
 

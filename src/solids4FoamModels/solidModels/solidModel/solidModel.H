@@ -284,7 +284,7 @@ private:
 
         //- Pressure
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
-        autoPtr<volScalarField> pPtr_;
+        mutable autoPtr<volScalarField> pPtr_;
 
 #ifdef OPENFOAM_COM
         //- fvOptions
@@ -308,6 +308,9 @@ private:
 
         //- Make the U field
         void makeU() const;
+
+        //- Make the p field
+        void makeP() const;
 
 #ifndef FOAMEXTEND
         //- Make the sigma at face quadrature points field
