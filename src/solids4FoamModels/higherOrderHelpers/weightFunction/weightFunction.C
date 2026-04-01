@@ -63,7 +63,7 @@ weightFunction::weightFunction
     type_(weightFunctionNames_[dict.lookupOrDefault<word>("type", "one")]),
     k_(dict.lookupOrDefault<scalar>("k", 6.0)),
     expSqrK_(Foam::exp(-sqr(k_))),
-    invDenom_(1.0 / (1.0 - expSqrK_)),
+    invDenom_(1.0/(1.0 - expSqrK_)),
     s_(dict.lookupOrDefault<scalar>("s", 1000)),
     b_(dict.lookupOrDefault<scalar>("b", 3))
 {
@@ -102,7 +102,7 @@ scalar weightFunction::weight(const scalar d, const scalar maxDist) const
     }
     else if (type_ == weightFunctionType::INV_DIST)
     {
-        w = 1.0 / (1.0 + s_*pow((d/(2*maxDist)),b_));
+        w = 1.0/(1.0 + s_*pow((d/(2*maxDist)),b_));
     }
     else if (type_ == weightFunctionType::RAD_SYMM_EXP)
     {
@@ -110,7 +110,7 @@ scalar weightFunction::weight(const scalar d, const scalar maxDist) const
         const scalar dm = 2*maxDist;
         const scalar sqrK = -sqr(k_);
 
-        w = (Foam::exp(sqr(d/dm)*sqrK) - expSqrK_) * invDenom_;
+        w = (Foam::exp(sqr(d/dm)*sqrK) - expSqrK_)*invDenom_;
     }
     else
     {
