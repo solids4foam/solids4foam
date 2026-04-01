@@ -65,9 +65,9 @@ namespace Foam
     template<>
     const char* NamedEnum<solidModel::solutionAlgorithm, 4>::names[] =
     {
-     	"PETScSNES",
+        "PETScSNES",
         "implicitCoupled",
-	"implicitSegregated",
+        "implicitSegregated",
         "explicit"
     };
 #endif
@@ -299,6 +299,206 @@ void Foam::solidModel::makeU() const
         )
     );
 }
+
+
+void Foam::solidModel::makeP() const
+{
+    if (!pPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makep() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    pPtr_.set
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "p",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0),
+            "zeroGradient"
+        )
+    );
+}
+
+
+namespace
+{
+    template<class Type>
+    Foam::boolList fixedValuePatchMask
+    (
+        const Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>&
+            field
+    )
+    {
+        Foam::boolList includePatchInStencils
+        (
+            field.boundaryField().size(),
+            false
+        );
+
+        forAll(includePatchInStencils, patchI)
+        {
+            includePatchInStencils[patchI] =
+                field.boundaryField()[patchI].fixesValue();
+        }
+
+        return includePatchInStencils;
+    }
+}
+
+
+const Foam::dictionary& Foam::solidModel::highOrderCoeffsDict() const
+{
+    if (!solidModelDict().found("highOrderCoeffs"))
+    {
+        FatalErrorInFunction
+            << "The solid model dictionary does not contain 'highOrderCoeffs'."
+            << abort(FatalError);
+    }
+
+    return solidModelDict().subDict("highOrderCoeffs");
+}
+
+
+const Foam::dictionary& Foam::solidModel::displacementHighOrderCoeffs() const
+{
+    const dictionary& hoDict = highOrderCoeffsDict();
+
+    if (!hoDict.found("displacement"))
+    {
+        FatalErrorInFunction
+            << "Expected 'highOrderCoeffs.displacement' to be defined."
+            << abort(FatalError);
+    }
+
+    return hoDict.subDict("displacement");
+}
+
+
+const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
+{
+    const dictionary& hoDict = highOrderCoeffsDict();
+
+    if (!hoDict.found("pressure"))
+    {
+        FatalErrorInFunction
+            << "Expected 'highOrderCoeffs.pressure' to be defined."
+            << abort(FatalError);
+    }
+
+    return hoDict.subDict("pressure");
+}
+
+#ifndef FOAMEXTEND
+void Foam::solidModel::makeDisplacementMLS() const
+{
+    if (!displacementMLSPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    displacementMLSPtr_.set
+    (
+        new movingLeastSquares
+        (
+            mesh(),
+            fixedValuePatchMask(D()),
+            displacementHighOrderCoeffs()
+        )
+    );
+}
+
+
+void Foam::solidModel::makePressureMLS() const
+{
+    if (!pressureMLSPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    pressureMLSPtr_.set
+    (
+        new movingLeastSquares
+        (
+            mesh(),
+            fixedValuePatchMask(p()),
+            pressureHighOrderCoeffs()
+        )
+    );
+}
+
+
+void Foam::solidModel::makeSigmaQuad() const
+{
+    if (!sigmaQuadPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    const CompactListList<point>& faceQuadPts =
+        displacementMLS().quadrature().faceQuadPoints();
+
+    labelList rowSizes(faceQuadPts.size(), 0);
+    forAll(faceQuadPts, faceI)
+    {
+        rowSizes[faceI] = faceQuadPts[faceI].size();
+    }
+
+    sigmaQuadPtr_.set(new CompactListList<symmTensor>(rowSizes));
+
+    CompactListList<symmTensor>& sigmaQuad = sigmaQuadPtr_();
+    forAll(sigmaQuad, faceI)
+    {
+        forAll(sigmaQuad[faceI], qpI)
+        {
+            sigmaQuad[faceI][qpI] = symmTensor::zero;
+        }
+    }
+}
+#endif
+
+
+#ifndef FOAMEXTEND
+void Foam::solidModel::makeGradDQuad() const
+{
+    if (!gradDQuadPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    const CompactListList<point>& faceQuadPts =
+        displacementMLS().quadrature().faceQuadPoints();
+
+    labelList rowSizes(faceQuadPts.size(), 0);
+    forAll(faceQuadPts, faceI)
+    {
+        rowSizes[faceI] = faceQuadPts[faceI].size();
+    }
+
+    gradDQuadPtr_.set(new CompactListList<tensor>(rowSizes));
+
+    CompactListList<tensor>& gradDQ = gradDQuadPtr_();
+    forAll(gradDQ, faceI)
+    {
+        forAll(gradDQ[faceI], qpI)
+        {
+            gradDQ[faceI][qpI] = tensor::zero;
+        }
+    }
+}
+#endif
 
 
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
@@ -577,26 +777,21 @@ Foam::volScalarField& Foam::solidModel::p()
 {
     if (pPtr_.empty())
     {
-        pPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "p",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::AUTO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimPressure, 0.0),
-                "zeroGradient"
-            )
-        );
+        makeP();
     }
 
     return autoPtrRef(pPtr_);
+}
+
+
+const Foam::volScalarField& Foam::solidModel::p() const
+{
+    if (pPtr_.empty())
+    {
+        makeP();
+    }
+
+    return pPtr_();
 }
 
 
@@ -682,6 +877,10 @@ Foam::solidModel::solidModel
     ),
     thermalPtr_(),
     mechanicalPtr_(),
+#ifndef FOAMEXTEND
+    displacementMLSPtr_(),
+    pressureMLSPtr_(),
+#endif
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -776,6 +975,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
+    gradDQuadPtr_(),
     gradDD_
     (
         IOobject
@@ -802,6 +1002,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    sigmaQuadPtr_(),
     curTimeIndex_(-1),
     rhoPtr_(),
     g_
@@ -895,6 +1096,8 @@ Foam::solidModel::solidModel
     (
         solidModelDict().lookupOrDefault<Switch>("solvePressure", false)
     ),
+    highOrderJacobian_(false),
+    highOrderResidual_(false),
     pPtr_()
 #ifdef OPENFOAM_COM
     ,
@@ -963,6 +1166,47 @@ Foam::solidModel::solidModel
         gradDD_.writeOpt() = IOobject::NO_WRITE;
     }
 
+    if (solidModelDict().found("highOrderCoeffs"))
+    {
+        const dictionary& hoDict = highOrderCoeffsDict();
+
+        if (!hoDict.found("displacement"))
+        {
+            FatalErrorInFunction
+                << "Expected 'highOrderCoeffs.displacement' to be defined."
+                << abort(FatalError);
+        }
+
+        highOrderJacobian_ =
+            hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
+
+        highOrderResidual_ =
+            hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
+
+#ifdef FOAMEXTEND
+        if (highOrderJacobian_ || highOrderResidual_)
+        {
+            FatalErrorInFunction
+                << "High-order MLS discretisation is not supported on "
+                << "foam-extend." << abort(FatalError);
+        }
+#endif
+
+        if
+        (
+            (highOrderJacobian_ || highOrderResidual_)
+         && solutionAlg() != solutionAlgorithm::PETSC_SNES
+        )
+        {
+            FatalErrorInFunction
+                << "highOrderResidual/highOrderJacobian are only supported "
+                << "with "
+                << solidModel::solutionAlgorithmNames_
+                   [solidModel::solutionAlgorithm::PETSC_SNES]
+                << abort(FatalError);
+        }
+    }
+
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
 
@@ -1018,6 +1262,23 @@ Foam::solidModel::solidModel
         stabDict.add("pressure", defaultStabSubDict);
     }
 
+    // Only alpha stabilisation is allowed with high-order residual calculation
+    if (stabDict.found("momentum"))
+    {
+        const dictionary& momentumDict = stabDict.subDict("momentum");
+
+        const word stabType =
+            momentumDict.lookupOrDefault<word>("type", "default");
+
+        if (stabType != "alpha" && highOrderResidual())
+        {
+            FatalErrorInFunction
+                << "Only alpha stabilisation is supported with high-order "
+                << "residual calculation"
+                << abort(FatalError);
+        }
+    }
+
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1055,6 +1316,10 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
+
+#ifndef FOAMEXTEND
+    clearMovingLeastSquaresData();
+#endif
 }
 
 
@@ -1620,6 +1885,18 @@ void Foam::solidModel::recalculateRho()
     rhoPtr_.clear();
     makeRho();
 }
+
+
+void Foam::solidModel::clearMovingLeastSquaresData()
+{
+    gradDQuadPtr_.clear();
+    sigmaQuadPtr_.clear();
+#ifndef FOAMEXTEND
+    displacementMLSPtr_.clear();
+    pressureMLSPtr_.clear();
+#endif
+}
+
 
 Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
 {
