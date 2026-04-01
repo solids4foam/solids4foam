@@ -431,7 +431,11 @@ void Foam::linearElastic::correct
 void Foam::linearElastic::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
-    const CompactListList<tensor>& gradDQuad
+#ifdef FOAMEXTEND
+      CompactListList<tensor>& gradDQuad
+#else
+      const CompactListList<tensor>& gradDQuad
+#endif
 )
 {
     // Initialise eps outside loop

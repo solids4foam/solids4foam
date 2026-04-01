@@ -1666,7 +1666,11 @@ void Foam::mechanicalLaw::correct
 void Foam::mechanicalLaw::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
+#ifdef FOAMEXTEND
+    CompactListList<tensor>& gradDQuad
+#else
     const CompactListList<tensor>& gradDQuad
+#endif
 )
 {
     notImplemented
