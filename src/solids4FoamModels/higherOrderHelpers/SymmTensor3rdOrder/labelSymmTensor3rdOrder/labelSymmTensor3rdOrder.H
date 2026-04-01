@@ -29,8 +29,8 @@ SourceFiles
 #ifndef labelSymmTensor3rdOrder_H
 #define labelSymmTensor3rdOrder_H
 
-#include "../SymmTensor3rdOrderTemplate.H"
-//#include "contiguous.H"
+#include "SymmTensor3rdOrderTemplate.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
