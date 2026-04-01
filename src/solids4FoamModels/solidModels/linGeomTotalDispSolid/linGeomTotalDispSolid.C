@@ -1120,6 +1120,10 @@ label linGeomTotalDispSolid::formJacobian
     if (highOrderJacobian())
     {
 #ifndef FOAMEXTEND
+        // Note: unlike the fallback fvVectorMatrix approxJ path below, we do
+        // not currently apply matrix under-relaxation to the high-order
+        // Jacobian assembled directly into PETSc. If this becomes important
+        // for robustness, an equivalent relaxation step may need to be added.
         tmp<volScalarField> tK = mechanical().bulkModulus();
         const volScalarField& K = tK();
 
