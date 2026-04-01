@@ -160,6 +160,7 @@ public:
         //  displacement gradient at quadrature points
         virtual void correct
         (
+            CompactListList<symmTensor>& sigmaQuad,
 #ifdef FOAMEXTEND
             CompactListList<tensor>& gradDQuad
 #else

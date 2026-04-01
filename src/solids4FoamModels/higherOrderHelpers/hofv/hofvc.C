@@ -77,7 +77,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const CompactListList<scalar>& quadW =
         solMod.displacementMLS().quadrature().faceQuadWeights();
 
-    forAll (tf, faceI)
+    forAll(tf, faceI)
     {
         // Sigma at the quadrature points on the face
         const UList<symmTensor>& faceQuadStress = quadSigma[faceI];
@@ -94,7 +94,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         tf[faceI] *= (1.0/magSf[faceI]);
     }
 
-    forAll (tf.boundaryField(), patchI)
+    forAll(tf.boundaryField(), patchI)
     {
         vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
         forAll(tfPatch, faceI)

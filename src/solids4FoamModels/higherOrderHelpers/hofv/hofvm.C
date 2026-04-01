@@ -43,7 +43,16 @@ namespace
 
 inline label nDisplacementEqns(const fvMesh& mesh)
 {
-    return mesh.nGeometricD() == 2 ? 2 : 3;
+    const label nD = mesh.nGeometricD();
+
+    if (nD < 2)
+    {
+        FatalErrorInFunction
+            << "Not implemented for nGeometricD = " << nD
+            << exit(FatalError);
+    }
+
+    return nD;
 }
 
 
