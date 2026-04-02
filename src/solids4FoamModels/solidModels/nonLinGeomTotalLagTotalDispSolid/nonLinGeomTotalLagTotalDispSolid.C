@@ -370,11 +370,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
-#ifdef OPENFOAM_NOT_EXTEND
-            D().primitiveFieldRef(),
-#else
-            D().internalField(),
-#endif
+            primitiveFieldRef(D()),
             foamPetscSnesHelper::solution(),
             0, // Location of first component
             solidModel::twoD()
@@ -675,11 +671,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
-                        D().boundaryFieldRef()[patchI]
-#else
-                        D().boundaryField()[patchI]
-#endif
+                        boundaryFieldRef(D())[patchI]
                     );
 
                 tracPatch.extrapolateValue() = true;

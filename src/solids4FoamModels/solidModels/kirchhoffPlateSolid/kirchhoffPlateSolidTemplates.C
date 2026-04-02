@@ -40,11 +40,7 @@ mapAreaFieldToSingleLayerVolumeField
     const label areaPatchID = areaPatch().index();
     const label pMeshNFaces = pMesh.nFaces();
     const Field<Type> afI = af.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
-    FieldField<fvPatchField, Type>& bf = vf.boundaryFieldRef();
-#else
-    FieldField<fvPatchField, Type>& bf = vf.boundaryField();
-#endif
+    FieldField<fvPatchField, Type>& bf = boundaryFieldRef(vf);
 
     // Check that bf area patch is not of type empty
     if (bf[areaPatchID].type() == "empty")

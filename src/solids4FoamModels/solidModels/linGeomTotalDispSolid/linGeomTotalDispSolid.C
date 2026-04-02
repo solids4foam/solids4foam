@@ -707,11 +707,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
-                        D().boundaryFieldRef()[patchI]
-#else
-                        D().boundaryField()[patchI]
-#endif
+                        boundaryFieldRef(D())[patchI]
                     );
 
                 tracPatch.extrapolateValue() = true;

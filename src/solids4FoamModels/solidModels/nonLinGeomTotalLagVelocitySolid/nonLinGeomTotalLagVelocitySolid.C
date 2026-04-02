@@ -284,6 +284,10 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
         // // Update dpdt
         // autoPtrRef(dpdtPtr_) = fvc::ddt(p());
     }
+    else
+    {
+        // Update p field, which we use
+    }
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
@@ -591,11 +595,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
-                        D().boundaryFieldRef()[patchI]
-#else
-                        D().boundaryField()[patchI]
-#endif
+                        boundaryFieldRef(D())[patchI]
                     );
 
                 tracPatch.extrapolateValue() = true;

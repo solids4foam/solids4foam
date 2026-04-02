@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "coordinateSystem.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -98,13 +99,8 @@ bool Foam::transformStressToCylindrical::writeData()
 
             const symmTensorField& sigmaP = sigma.boundaryField()[patchI];
 
-#ifdef OPENFOAM_NOT_EXTEND
             symmTensorField& sigmaTP =
-                sigmaTransformed.boundaryFieldRef()[patchI];
-#else
-            symmTensorField& sigmaTP =
-                sigmaTransformed.boundaryField()[patchI];
-#endif
+                boundaryFieldRef(sigmaTransformed)[patchI];
 
             forAll(sigmaTP, faceI)
             {
