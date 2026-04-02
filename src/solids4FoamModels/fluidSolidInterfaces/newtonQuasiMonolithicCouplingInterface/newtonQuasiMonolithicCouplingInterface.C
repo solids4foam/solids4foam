@@ -28,6 +28,7 @@ License
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "newtonIcoFluid.H"
+#include "linGeomVelocitySolid.H"
 #include "nonLinGeomTotalLagVelocitySolid.H"
 #include "dynamicMotionSolverFvMesh.H"
 #include "motionSolver.H"
@@ -2208,11 +2209,17 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     //    have displacement)
 
     // We must use a velocity formulation
-    if (!isA<solidModels::nonLinGeomTotalLagVelocitySolid>(solid()))
+    if
+    (
+        !isA<solidModels::nonLinGeomTotalLagVelocitySolid>(solid())
+     && !isA<solidModels::linGeomVelocitySolid>(solid())
+    )
     {
         FatalErrorInFunction
             << "Currently, the solid model must be of type "
             << solidModels::nonLinGeomTotalLagVelocitySolid::typeName
+            << " or "
+            << solidModels::linGeomVelocitySolid::typeName
             << abort(FatalError);
     }
 

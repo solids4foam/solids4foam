@@ -1,11 +1,13 @@
 # Matrix-free Jacobian + 2-level physics-based field split preconditioner
 #
 # Level 1: fluid / solid split (multiplicative = block Gauss-Seidel)
-# Level 2 (fluid): velocity / pressure split (block_size 4 for 3D)
+# Level 2 (fluid): velocity / pressure split (block_size 3 for 2D)
 #
 # Velocity: block Jacobi + ILU(0) per process
 # Pressure: Hypre BoomerAMG (single V-cycle)
 # Solid:    block Jacobi + LU per process
+#
+# Note: for 3D, change block_size to 4, 0_fields to 0,1,2, 1_fields to 3
 
 -snes_type newtonls
 -snes_linesearch_type l2

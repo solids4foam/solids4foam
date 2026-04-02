@@ -84,16 +84,12 @@ class nonLinGeomTotalLagVelocitySolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Diffusivity for the pressure equation
-        //  This controls the amount of smoothing in the pressure equation
-        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
-
         //- Time rate of pressure
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
-        //- Flag to enable a linear elastic and linear geometry formulation
-        const Switch linearElasticFormulation_;
+        //- Use the linear-geometry traction formulation
+        const Switch linearGeometryFormulation_;
 
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
@@ -136,12 +132,6 @@ class nonLinGeomTotalLagVelocitySolid
         //  works well with this approach
         bool evolveSnes();
 
-        // Make the pDiffusivity field
-        void makePDiffusivity() const;
-
-        // Return a const reference to the pDiffusivity field
-        const surfaceScalarField& pDiffusivity() const;
-
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagVelocitySolid
         (
@@ -155,6 +145,18 @@ class nonLinGeomTotalLagVelocitySolid
 protected:
 
     // Protected member functions
+
+        //- Return the solidModel type to initialise the base class with
+        static word modelTypeName();
+
+        //- Construct from components with an explicit model type
+        nonLinGeomTotalLagVelocitySolid
+        (
+            const word& modelType,
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion,
+            const bool linearGeometryFormulation = false
+        );
 
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const

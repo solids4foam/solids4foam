@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -32,6 +32,8 @@ NewtonQuasiMonolithicCoeffs
 
     // PETSc SNES nonlinear solver settings file
     optionsFile     petscOptions.mf_fieldsplit;
+    //optionsFile     petscOptions.lu;
+    //optionsFile     petscOptions.mf_bjacobi_lu;
 
     // Pass viscous forces from fluid-to-solid interface (in addition to pressure
     // forces)
@@ -40,6 +42,5 @@ NewtonQuasiMonolithicCoeffs
     // Scaling for fluid system to improve the condition number
     fluidSystemScaleFactor 1e+08;
 }
-
 
 // ************************************************************************* //

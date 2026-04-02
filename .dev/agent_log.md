@@ -1,1 +1,0 @@
-2026-03-29: Overnight Maintenance Mode. Normalised the OpenFOAM.org tutorial skip message in three `Allrun` scripts and updated `solids4Foam::regressionCaseSkipped()` to recognise both the previous typo and the new wording.

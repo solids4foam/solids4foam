@@ -309,59 +309,9 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
 }
 
 
-void nonLinGeomTotalLagVelocitySolid::makePDiffusivity() const
+word nonLinGeomTotalLagVelocitySolid::modelTypeName()
 {
-    if (pDiffusivityPtr_.valid())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    const scalar pressureSmoothingCoeff
-    (
-        readScalar(solidModelDict().lookup("pressureSmoothingCoeff"))
-    );
-
-    fvVectorMatrix approxJ
-    (
-        fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-      - rho()*fvm::d2dt2(D())
-    );
-
-    if (dampingCoeff().value() > SMALL)
-    {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(D());
-    }
-
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
-
-    pDiffusivityPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "pDiffusivity",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            -pressureSmoothingCoeff*impKf_/fvc::interpolate(approxJ.A())
-        )
-    );
-}
-
-
-const surfaceScalarField& nonLinGeomTotalLagVelocitySolid::pDiffusivity() const
-{
-    if (pDiffusivityPtr_.empty())
-    {
-        makePDiffusivity();
-    }
-
-    return autoPtrRef(pDiffusivityPtr_);
+    return typeName;
 }
 
 
@@ -373,7 +323,20 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     const word& region
 )
 :
-    solidModel(typeName, runTime, region),
+    nonLinGeomTotalLagVelocitySolid(modelTypeName(), runTime, region, false)
+{
+}
+
+
+nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
+(
+    const word& modelType,
+    Time& runTime,
+    const word& region,
+    const bool linearGeometryFormulation
+)
+:
+    solidModel(modelType, runTime, region),
     foamPetscSnesHelper
     (
         "U",
@@ -446,15 +409,8 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     ),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
-    pDiffusivityPtr_(),
     dpdtPtr_(),
-    linearElasticFormulation_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "linearElasticFormulation_", false
-        )
-    ),
+    linearGeometryFormulation_(linearGeometryFormulation),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -503,7 +459,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     ),
     curTimeIndex_(-1)
 {
-    Info<< "linearElasticFormulation = " << linearElasticFormulation_ << nl
+    Info<< "linearGeometryFormulation = " << linearGeometryFormulation_ << nl
         << "predictor = " << predictor_ << nl
         << "solvePressure = " << solvePressure() << endl;
 
@@ -754,7 +710,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Calculate future-time gradient of displacement
     mechanical().grad(DFutureTime_, gradD());
 
-    if (linearElasticFormulation_)
+    if (linearGeometryFormulation_)
     {
         // Linear elasticity
         sigma() =
@@ -786,7 +742,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     // Calculate forceFutureTime
-    if (linearElasticFormulation_)
+    if (linearGeometryFormulation_)
     {
         // Future-time traction vectors at the faces
         surfaceVectorField traction(n & fvc::interpolate(sigma()));
