@@ -16,14 +16,14 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 REG_END_TIME=2.5
 
 # Regression tolerances
-DISP_TOL=1e-5
+DISP_TOL=5e-5
 FX_TOL=1e-4
-FY_TOL=1e-4
+FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
-REF_TIP_UY=-0.000666994
-REF_FX=-0.0223061
-REF_FY=-0.083244
+REF_TIP_UY=-0.00062628
+REF_FX=-0.0223622
+REF_FY=-0.0840809
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"

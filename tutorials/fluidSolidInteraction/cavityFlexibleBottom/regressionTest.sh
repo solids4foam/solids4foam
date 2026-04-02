@@ -22,11 +22,11 @@ FORCE_AVG_SAMPLES=20
 
 # Reference values: near-steady-state values common to both methods
 REF_FINAL_DY=-0.22
-REF_MEAN_FORCE=-5150
+REF_MEAN_FORCE=-5.150
 
 # Tolerances: loosened slightly to accommodate both methods at t=100
 DISP_TOL=0.010       # covers partitioned (-0.218) and monolithic (-0.212)
-FORCE_TOL=150        # covers partitioned (-5150) and monolithic (-5117)
+FORCE_TOL=0.150      # covers partitioned (-5.150) and monolithic (-5.117)
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

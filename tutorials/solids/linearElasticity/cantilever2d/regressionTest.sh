@@ -7,6 +7,8 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 SOLIDS4FOAM_ROOT_ABS=$(cd "${SCRIPT_DIR}/../../../../" && pwd)
+REGRESSION_LIB_NAME="libcantileverAnalyticalRegression"
+LOCAL_LIBBIN="${CASE_DIR}/lib"
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
@@ -51,6 +53,13 @@ prepare_case() {
     sed -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
+    sed -i.bak \
+        "s|^LIB = .*|LIB = \$(FOAM_USER_LIBBIN)/${REGRESSION_LIB_NAME}|" \
+        "${CASE_DIR}/src/Make/files"
+    sed -i.bak \
+        "s|libcantileverAnalytical\\.so|${REGRESSION_LIB_NAME}.so|" \
+        "${CASE_DIR}/system/controlDict"
+    mkdir -p "${LOCAL_LIBBIN}"
 
     if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
         && [[ ! -f "${CASE_DIR}/constant/polyMesh/blockMeshDict" ]]; then
@@ -74,7 +83,10 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    (
+        cd "${CASE_DIR}"
+        FOAM_USER_LIBBIN="${LOCAL_LIBBIN}" ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
