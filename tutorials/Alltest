@@ -24,10 +24,12 @@ function usage()
     while [ "$#" -ge 1 ]; do echo "$1"; shift; done
     cat<<USAGE
 
-usage: ${0##*/} [OPTION]
+usage: ${0##*/} [-j [N]] [OPTION]
 
 options:
   -help         Print the usage
+  -j [N]        Limit the number of parallel jobs. If N is omitted, use all
+                available cores.
 
 Quickly tests the tutorials and writes out the scheme/solver information.
 
@@ -86,40 +88,97 @@ function logReport()
     fi
 }
 
-# Run cases (similar to foamRunTutorials)
-function runCases()
+function get_num_cores()
 {
-    thisScript=$0
-    if [ "/${thisScript#/}" != "$thisScript" ]
+    if command -v nproc > /dev/null 2>&1
     then
-        thisScript="$PWD/$thisScript"
-    fi
-
-    # If an argument is supplied do not execute ./Allrun to avoid recursion
-    if [ $# = 0 -a -f "./Allrun" ]
+        nproc
+    elif command -v getconf > /dev/null 2>&1
     then
-        echo; echo "execute Allrun"
-        # Specialised script.
-        ./Allrun
+        getconf _NPROCESSORS_ONLN
     else
-        # Loop over sub-directories and compile any applications
-        for case in *
+        sysctl -n hw.ncpu
+    fi
+}
+
+function compileApplications()
+{
+    find . -type d -name Make | while read -r makeDir
+    do
+        caseDir=$(dirname "$makeDir")
+        parentDir=$(dirname "$caseDir")
+        caseName=$(basename "$caseDir")
+
+        echo "compileApplication ${caseDir#./}"
+        (
+            cd "$parentDir" || exit 1
+            compileApplication "$caseName"
+        )
+    done
+}
+
+function runCase()
+{
+    caseDir="$1"
+
+    echo "Running ${caseDir#./}"
+    (
+        cd "$caseDir" || exit 1
+        ./Allrun > log.Allrun 2>&1
+    )
+}
+
+function waitForAvailableSlot()
+{
+    while [ "$ACTIVE_JOBS" -ge "$MAX_JOBS" ]
+    do
+        livePids=""
+
+        for pid in $PIDS
         do
-            if [ -d $case -a -d "$case/Make" ]
+            if kill -0 "$pid" 2> /dev/null
             then
-                (compileApplication $case)
+                livePids="${livePids} ${pid}"
+            else
+                ACTIVE_JOBS=$((ACTIVE_JOBS - 1))
             fi
         done
 
-        # Recurse to subdirectories
-        for case in *
-        do
-            if [ -d $case ]
-            then
-                echo "cd $case and runCases"
-                (cd $case && runCases)
-            fi
-        done
+        PIDS="${livePids# }"
+
+        if [ "$ACTIVE_JOBS" -ge "$MAX_JOBS" ]
+        then
+            sleep 1
+        fi
+    done
+}
+
+function runCasesInParallel()
+{
+    ACTIVE_JOBS=0
+    PIDS=""
+
+    while read -r allrunFile
+    do
+        caseDir=$(dirname "$allrunFile")
+
+        waitForAvailableSlot
+
+        runCase "$caseDir" &
+        pid=$!
+        ACTIVE_JOBS=$((ACTIVE_JOBS + 1))
+
+        if [ -n "$PIDS" ]
+        then
+            PIDS="${PIDS} ${pid}"
+        else
+            PIDS="${pid}"
+        fi
+    done < <(find . -type f -name Allrun | sort)
+
+    if [ -n "$PIDS" ]
+    then
+        wait $PIDS
     fi
 }
 
@@ -137,11 +196,24 @@ function cleanCopiedCaseArtifacts()
 #
 
 rootDir="./"
+MAX_JOBS=""
 
 # Parse options
 while [ "$#" -gt 0 ]
 do
     case "$1" in
+    -j)
+        if [ "$#" -gt 1 ] && [ "${2#-}" = "$2" ]
+        then
+            MAX_JOBS="$2"
+            shift
+        else
+            MAX_JOBS="auto"
+        fi
+        ;;
+    -j*)
+        MAX_JOBS="${1#-j}"
+        ;;
     -h | -help)
         usage
         ;;
@@ -157,6 +229,22 @@ done
 
 # Set test directory
 TEST_RUN_DIR=../tutorialsTest
+
+if [ -z "$MAX_JOBS" ] || [ "$MAX_JOBS" = "auto" ]
+then
+    MAX_JOBS=$(get_num_cores)
+fi
+
+case "$MAX_JOBS" in
+    ''|*[!0-9]*)
+        die "Invalid job limit: '$MAX_JOBS'"
+        ;;
+esac
+
+if [ "$MAX_JOBS" -lt 1 ]
+then
+    die "Invalid job limit: '$MAX_JOBS'"
+fi
 
 
 #
@@ -255,9 +343,13 @@ done
 # Remove high-level Allrun
 rm Allrun*
 
-# Run cases recursively
-echo "Running cases "; echo "    $PWD"; echo
-runCases
+# Compile any tutorial applications before running the cases
+echo "Compiling tutorial applications "; echo "    $PWD"; echo
+compileApplications
+
+# Run cases in parallel
+echo "Running cases with up to ${MAX_JOBS} parallel job(s)"; echo "    $PWD"; echo
+runCasesInParallel
 
 # Prepare summary files
 echo; echo "Preparing testLoopReport"
