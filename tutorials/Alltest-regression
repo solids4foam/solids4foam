@@ -20,6 +20,8 @@ echo "============================================================"
 echo "solids4Foam regression tests"
 echo "============================================================"
 
+START_TIME=${SECONDS}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}"
 REG_ROOT="${ROOT_DIR}/../tutorialsTest-regression"
@@ -47,6 +49,16 @@ get_num_cores()
     else
         sysctl -n hw.ncpu
     fi
+}
+
+format_elapsed_time()
+{
+    local elapsed="$1"
+    local hours=$((elapsed / 3600))
+    local minutes=$(((elapsed % 3600) / 60))
+    local seconds=$((elapsed % 60))
+
+    printf "%02dh:%02dm:%02ds" "${hours}" "${minutes}" "${seconds}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -133,6 +145,7 @@ REGRESSION_TESTS=(
 )
 
 failures=0
+failed_cases=()
 if [[ -z "${MAX_JOBS}" || "${MAX_JOBS}" == "auto" ]]; then
     MAX_JOBS="$(get_num_cores)"
 fi
@@ -232,14 +245,22 @@ for testCase in "${REGRESSION_TESTS[@]}"; do
     else
         echo "FAIL: regression test failed in ${testCase}"
         failures=$((failures + 1))
+        failed_cases+=("${testCase}")
     fi
 done
 
+ELAPSED_TIME=$((SECONDS - START_TIME))
+
 echo
 echo "============================================================"
+echo "Total time: $(format_elapsed_time "${ELAPSED_TIME}")"
 
 if (( failures > 0 )); then
     echo "Regression tests FAILED (${failures} failing case(s))"
+    echo "Failing cases:"
+    for failed_case in "${failed_cases[@]}"; do
+        echo "  ${failed_case}"
+    done
     exit 1
 else
     echo "All regression tests PASSED"
