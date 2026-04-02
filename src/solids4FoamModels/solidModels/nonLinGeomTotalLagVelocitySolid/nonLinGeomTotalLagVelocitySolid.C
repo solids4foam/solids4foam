@@ -118,7 +118,11 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             solidTractionFvPatchVectorField& tracPatch =
                 refCast<solidTractionFvPatchVectorField>
                 (
+#ifdef OPENFOAM_NOT_EXTEND
                     D.boundaryFieldRef()[patchI]
+#else
+                    D.boundaryField()[patchI]
+#endif
                 );
 
             //const vectorField& nPatch = nCurrent.boundaryField()[patchI];
@@ -186,12 +190,21 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             // correct them here
             if (tracPatch.useUndeformedArea())
             {
+#ifdef OPENFOAM_NOT_EXTEND
                 force.oldTime().boundaryFieldRef()[patchI] = trac*magSfPatch;
+#else
+                force.oldTime().boundaryField()[patchI] = trac*magSfPatch;
+#endif
             }
             else
             {
+#ifdef OPENFOAM_NOT_EXTEND
                 force.oldTime().boundaryFieldRef()[patchI] =
                     trac*magSfOldTimePatch;
+#else
+                force.oldTime().boundaryField()[patchI] =
+                    trac*magSfOldTimePatch;
+#endif
             }
         }
         else if
@@ -473,7 +486,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     // Store the old time stress
     sigma().storeOldTime();
-#ifndef OPENFOAM_ORG
+#ifdef OPENFOAM_COM
     forceCurrentTime_.setOriented(true);
 #endif
     forceCurrentTime_.storeOldTime();

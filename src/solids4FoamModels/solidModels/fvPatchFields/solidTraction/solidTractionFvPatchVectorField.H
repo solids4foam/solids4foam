@@ -205,7 +205,7 @@ public:
 
             virtual const fieldWithHistory& tractionRateHistory() const
             {
-                if (!tractionRatePtr_)
+                if (!tractionRatePtr_.valid())
                 {
                     tractionRatePtr_.reset
                     (
@@ -218,7 +218,7 @@ public:
 
             virtual fieldWithHistory& tractionRateHistory()
             {
-                if (!tractionRatePtr_)
+                if (!tractionRatePtr_.valid())
                 {
                     tractionRatePtr_.reset
                     (
