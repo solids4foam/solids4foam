@@ -1663,6 +1663,23 @@ void Foam::mechanicalLaw::correct
 }
 
 
+#ifndef FOAMEXTEND
+void Foam::mechanicalLaw::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    notImplemented
+    (
+        type() + "::correct(CompactListList<symmTensor>&)\n"
+        "The correct(CompactListList<symmTensor>&) function is not implemented"
+        "\n for the " + type() + " mechanical law"
+    );
+}
+#endif
+
+
 Foam::scalar Foam::mechanicalLaw::residual()
 {
     // Default to zero; this can be overwritten by any derived mechanical law

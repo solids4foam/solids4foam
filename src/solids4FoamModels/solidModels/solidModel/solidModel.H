@@ -55,11 +55,16 @@ SourceFiles
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
 #include "stabilisationModel.H"
+#include "CompactListList.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
 #else
     #include "NamedEnum.H"
+#endif
+
+#ifndef FOAMEXTEND
+    #include "movingLeastSquares.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -124,6 +129,14 @@ private:
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
+#ifndef FOAMEXTEND
+        //- Moving Least Square operator for the displacement field
+        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
+
+        //- Moving Least Square operator for the pressure field
+        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
+#endif
+
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
         boolIOList useBoundaryFaceValuesD_;
@@ -164,6 +177,10 @@ private:
         //- Gradient of total displacement
         volTensorField gradD_;
 
+        //- Gradient of total displacement at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -172,6 +189,10 @@ private:
         //  true (Cauchy) stress for nonlinear geometry (large strain)
         //  approaches
         volSymmTensorField sigma_;
+
+        //- Cauchy stress at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<symmTensor>> sigmaQuadPtr_;
 
         //- Time-step index used to determine when it is a new time-step
         mutable label curTimeIndex_;
@@ -273,9 +294,15 @@ private:
         //- Flag indicating that the pressure equation should be solved
         const Switch solvePressure_;
 
+        //- Calculate Jacobian using high order
+        Switch highOrderJacobian_;
+
+        //- High-order residual calculation
+        Switch highOrderResidual_;
+
         //- Pressure
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
-        autoPtr<volScalarField> pPtr_;
+        mutable autoPtr<volScalarField> pPtr_;
 
 #ifdef OPENFOAM_COM
         //- fvOptions
@@ -299,6 +326,32 @@ private:
 
         //- Make the U field
         void makeU() const;
+
+        //- Make the p field
+        void makeP() const;
+
+#ifndef FOAMEXTEND
+        //- Make the sigma at face quadrature points field
+        void makeSigmaQuad() const;
+
+        //- Make the gradD at face quadrature points field
+        void makeGradDQuad() const;
+
+        //- Make the displacement Moving Least Squares object
+        void makeDisplacementMLS() const;
+
+        //- Make the pressure Moving Least Squares object
+        void makePressureMLS() const;
+#endif
+
+        //- Return root high-order coefficients dictionary
+        const dictionary& highOrderCoeffsDict() const;
+
+        //- Return high-order coefficients for displacement
+        const dictionary& displacementHighOrderCoeffs() const;
+
+        //- Return high-order coefficients for pressure
+        const dictionary& pressureHighOrderCoeffs() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -430,6 +483,9 @@ protected:
         //- Non-const access to the pressure
         volScalarField& p();
 
+        //- Const access to the pressure
+        const volScalarField& p() const;
+
 #ifdef OPENFOAM_COM
         //- Return non-const access to fvOptions
         fv::options& fvOptions()
@@ -525,6 +581,22 @@ public:
             const solutionAlgorithm& solutionAlg() const
             {
                 return solutionAlgorithm_;
+            }
+
+            //- Return true if the high-order residual discretisation is active
+            bool highOrderResidual() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderResidual_;
+            }
+
+            //- Return true if the high-order Jacobian is active
+            bool highOrderJacobian() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderJacobian_;
             }
 
             //- Is it a new time step? This function return true the first time
@@ -637,6 +709,30 @@ public:
                 return gradD_;
             }
 
+#ifndef FOAMEXTEND
+            //- Return non-const reference to gradD at face quadrature points
+            virtual CompactListList<tensor>& gradDQuad()
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+
+            //- Return const reference to gradD at face quadrature points
+            virtual const CompactListList<tensor>& gradDQuad() const
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+#endif
+
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
             {
@@ -660,6 +756,30 @@ public:
             {
                 return sigma_;
             }
+
+#ifndef FOAMEXTEND
+            //- Return non-const reference to sigma at face quarature points
+            virtual CompactListList<symmTensor>& sigmaQuad()
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
+            }
+
+            //- Return const reference to sigma at face quadrature points
+            virtual const CompactListList<symmTensor>& sigmaQuad() const
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
+            }
+#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
@@ -691,7 +811,27 @@ public:
             {
                 return twoD_;
             }
+#ifndef FOAMEXTEND
+            //- Return displacement moving least squares interpolation
+            const movingLeastSquares& displacementMLS() const
+            {
+                if (displacementMLSPtr_.empty())
+                {
+                    makeDisplacementMLS();
+                }
+                return autoPtrRef(displacementMLSPtr_);
+            }
 
+            //- Return pressure moving least squares interpolation
+            const movingLeastSquares& pressureMLS() const
+            {
+                if (pressureMLSPtr_.empty())
+                {
+                    makePressureMLS();
+                }
+                return autoPtrRef(pressureMLSPtr_);
+            }
+#endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -851,6 +991,9 @@ public:
 
             //- Let the material model recalculate the density
             virtual void recalculateRho();
+
+            //- Clear Moving Least Squares interpolator
+            virtual void clearMovingLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);

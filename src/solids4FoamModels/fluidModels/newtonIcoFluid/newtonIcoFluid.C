@@ -358,6 +358,7 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
 
 void newtonIcoFluid::setDeltaT(Time& runTime)
 {
+#ifdef USE_PETSC
     if
     (
         runTime.controlDict().lookupOrDefault("adjustTimeStep", false)
@@ -446,6 +447,21 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
                 << reason << endl;
         }
     }
+#else
+    if (runTime.controlDict().lookupOrDefault("adjustTimeStep", false))
+    {
+        static bool warned = false;
+
+        if (!warned)
+        {
+            WarningInFunction
+                << "Ignoring adjustTimeStep because PETSc support is not "
+                << "enabled" << endl;
+
+            warned = true;
+        }
+    }
+#endif
 }
 
 

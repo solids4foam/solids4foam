@@ -428,5 +428,35 @@ void Foam::linearElastic::correct
     }
 }
 
+#ifndef FOAMEXTEND
+void Foam::linearElastic::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    // Initialise eps outside loop
+    symmTensor epsilon = symmTensor::zero;
+
+    // Get mu and lambda values
+    const scalar mu = mu_.value();
+    const scalar lambda = lambda_.value();
+
+    forAll(sigmaQuad, faceI)
+    {
+        UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            epsilon = symm(faceGradDQuad[qpI]);
+
+            faceSigmaQuad[qpI] = 2.0*mu*epsilon + lambda*tr(epsilon)*I;
+        }
+    }
+}
+#endif
+
+
 
 // ************************************************************************* //

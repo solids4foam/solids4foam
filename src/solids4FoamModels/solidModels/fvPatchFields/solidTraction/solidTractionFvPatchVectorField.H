@@ -38,6 +38,7 @@ SourceFiles
 #endif
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
+#include "CompactListList.H"
 #include "Switch.H"
 #include "interpolationTable.H"
 #include "fieldWithHistory.H"
@@ -67,13 +68,13 @@ class solidTractionFvPatchVectorField
         const Switch useUndeformedArea_;
 
         //- Traction field and, optionally, old-time traction fields
-        fieldWithHistory traction_;
+        mutable fieldWithHistory traction_;
 
         //- Optional: traction-rate field and old-time traction rate fields
         mutable autoPtr<fieldWithHistory> tractionRatePtr_;
 
         //- Pressure
-        scalarField pressure_;
+        mutable scalarField pressure_;
 
         //- Traction time series
         interpolationTable<vector> tractionSeries_;
@@ -102,7 +103,7 @@ class solidTractionFvPatchVectorField
         const scalar relaxFac_;
 
         //- Current time index
-        label curTimeIndex_;
+        mutable label curTimeIndex_;
 
 
 public:
@@ -250,6 +251,12 @@ public:
                 return useUndeformedArea_;
             }
 
+#ifndef FOAMEXTEND
+            //- Return face quadrature values
+            //  Used for high order solvers, argument is position of points
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
+#endif
 
         // Mapping functions
 

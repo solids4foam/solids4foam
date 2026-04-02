@@ -31,6 +31,7 @@ License
     #include "crackerFvMesh.H"
 #endif
 #include "lookupSolidModel.H"
+#include "hofvc.H"
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -611,6 +612,31 @@ void Foam::mechanicalModel::correct
 }
 
 
+#ifndef FOAMEXTEND
+void Foam::mechanicalModel::correct
+(
+    const CompactListList<tensor>& gradDQuad,
+    CompactListList<symmTensor>& sigmaQuad
+)
+{
+    PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        laws[0].correct(sigmaQuad, gradDQuad);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::correct(...): not implemented for more than "
+            "one material"
+        );
+    }
+}
+#endif
+
+
 void Foam::mechanicalModel::mapGradToSubMeshes(const volTensorField& gradD)
 {
     const PtrList<mechanicalLaw>& laws = *this;
@@ -673,6 +699,31 @@ void Foam::mechanicalModel::grad
         ).correctBoundaryConditions(D, gradD);
     }
 }
+
+
+#ifndef FOAMEXTEND
+void Foam::mechanicalModel::grad
+(
+    const volVectorField& D,
+    CompactListList<tensor>& gradDQuad
+)
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        hofvc::fGrad(D, gradDQuad);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::grad(...): not implemented for more than "
+            "one material"
+        );
+    }
+}
+#endif
 
 
 void Foam::mechanicalModel::grad

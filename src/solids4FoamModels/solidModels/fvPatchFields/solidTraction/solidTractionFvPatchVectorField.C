@@ -502,6 +502,100 @@ void solidTractionFvPatchVectorField::evaluate
     fvPatchField<vector>::evaluate();
 }
 
+#ifndef FOAMEXTEND
+autoPtr<CompactListList<vector>>
+solidTractionFvPatchVectorField::evaluateQuadrature() const
+{
+    if (curTimeIndex_ != db().time().timeIndex())
+    {
+        curTimeIndex_ = db().time().timeIndex();
+
+        // Called once per time-step
+
+        if (pressureFieldPtr_.valid())
+        {
+            // Force the pressure field boundary conditions to update
+            const_cast<volScalarField&>
+            (
+                pressureFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+
+        if (tractionFieldPtr_.valid())
+        {
+            // Force the traction field boundary conditions to update
+            const_cast<volVectorField&>
+            (
+                tractionFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+    }
+
+    if (tractionFieldPtr_.valid())
+    {
+        traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (tractionSeries_.size())
+    {
+        traction_ = tractionSeries_(this->db().time().timeOutputValue());
+    }
+
+    if (pressureFieldPtr_.valid())
+    {
+        pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (pressureSeries_.size())
+    {
+        pressure_ = pressureSeries_(this->db().time().timeOutputValue());
+    }
+
+    // Face unit normals
+    const vectorField n(patch().nf());
+
+    // Patch traction
+    const vectorField traction(traction_ - n*pressure_);
+
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is list for the  whole mesh
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementMLS().quadrature().faceQuadPoints();
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the same value to all quadrature points on this face
+        // We assume constant distribution of traction!
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            quadPointsValue[faceI][pointI] = traction[faceI];
+        }
+    }
+
+    return tQuadPointsValue;
+}
+#endif
 
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {
