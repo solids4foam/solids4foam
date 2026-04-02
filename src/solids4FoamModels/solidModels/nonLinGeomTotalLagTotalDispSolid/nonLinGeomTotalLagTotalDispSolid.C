@@ -100,11 +100,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
     // Enforce traction conditions
     forAll(D.boundaryField(), patchI)
     {
-#ifdef OPENFOAM_NOT_EXTEND
-        vectorField& forceP = force.boundaryFieldRef()[patchI];
-#else
-        vectorField& forceP = force.boundaryField()[patchI];
-#endif
+        vectorField& forceP = boundaryFieldRef(force)[patchI];
 
         if
         (

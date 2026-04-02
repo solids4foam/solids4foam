@@ -101,11 +101,7 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
     // Enforce traction conditions
     forAll(D.boundaryField(), patchI)
     {
-#ifdef OPENFOAM_NOT_EXTEND
-        vectorField& forceP = force.boundaryFieldRef()[patchI];
-#else
-        vectorField& forceP = force.boundaryField()[patchI];
-#endif
+        vectorField& forceP = boundaryFieldRef(force)[patchI];
 
         if
         (
@@ -118,11 +114,7 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             solidTractionFvPatchVectorField& tracPatch =
                 refCast<solidTractionFvPatchVectorField>
                 (
-#ifdef OPENFOAM_NOT_EXTEND
-                    D.boundaryFieldRef()[patchI]
-#else
-                    D.boundaryField()[patchI]
-#endif
+                    boundaryFieldRef(D)[patchI]
                 );
 
             //const vectorField& nPatch = nCurrent.boundaryField()[patchI];
@@ -190,21 +182,12 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             // correct them here
             if (tracPatch.useUndeformedArea())
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                force.oldTime().boundaryFieldRef()[patchI] = trac*magSfPatch;
-#else
-                force.oldTime().boundaryField()[patchI] = trac*magSfPatch;
-#endif
+                boundaryFieldRef(force.oldTime())[patchI] = trac*magSfPatch;
             }
             else
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                force.oldTime().boundaryFieldRef()[patchI] =
+                boundaryFieldRef(force.oldTime())[patchI] =
                     trac*magSfOldTimePatch;
-#else
-                force.oldTime().boundaryField()[patchI] =
-                    trac*magSfOldTimePatch;
-#endif
             }
         }
         else if
