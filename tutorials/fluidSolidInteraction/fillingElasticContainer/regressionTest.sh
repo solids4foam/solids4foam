@@ -15,12 +15,12 @@ REG_END_TIME=2
 MODE="iqnils"
 
 # Regression tolerances
-APEX_DISP_TOL=1e-3
+APEX_DISP_TOL=1e-4
 FSI_RES_TOL=1e-6
 
 # Reference values at REG_END_TIME
 REF_APEX_DY=-0.534218
-REF_FSI_RES=5.31615e-06
+REF_FSI_RES=5.35591e-06
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_disp.dat"

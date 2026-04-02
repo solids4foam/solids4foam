@@ -205,9 +205,9 @@ public:
 
             virtual const fieldWithHistory& tractionRateHistory() const
             {
-                if (tractionRatePtr_.empty())
+                if (!tractionRatePtr_)
                 {
-                    tractionRatePtr_.set
+                    tractionRatePtr_.reset
                     (
                         new fieldWithHistory(traction_.size())
                     );
@@ -218,9 +218,9 @@ public:
 
             virtual fieldWithHistory& tractionRateHistory()
             {
-                if (tractionRatePtr_.empty())
+                if (!tractionRatePtr_)
                 {
-                    tractionRatePtr_.set
+                    tractionRatePtr_.reset
                     (
                         new fieldWithHistory(traction_.size())
                     );
