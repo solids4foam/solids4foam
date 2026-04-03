@@ -249,6 +249,7 @@ numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOr
 numerics/stabilisationModels/gradDivStab/gradDivStab.C
 numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C
 numerics/stabilisationModels/laplacianStab/laplacianStab.C
+numerics/stabilisationModels/multipleStabilisationModels/multipleStabilisationModels.C
 /*numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C

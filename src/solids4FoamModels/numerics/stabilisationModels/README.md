@@ -50,6 +50,7 @@ The currently available model types in this directory are:
 - `gradDiv`
 - `JamesonSchmidtTurkel`
 - `laplacian`
+- `multiple` — composite model combining two or more models (see below)
 
 `RhieChow` is implemented as a helper under
 [`diffStencilLaplacianStab/RhieChowStab`](./diffStencilLaplacianStab/RhieChowStab).
@@ -135,6 +136,46 @@ because the relevant coefficients or matrix structure have changed, it can pass
 For the current development work, the solid-model call sites are left on the
 default behaviour, so no existing solver logic changes.
 
+## Combining Multiple Models
+
+The `multiple` type combines two or more stabilisation models at run time. Their
+face contributions are summed and an optional outer `scaleFactor` (defaults to
+`1.0`) is applied to the total. The Jacobian is delegated to a single
+user-nominated sub-model.
+
+```text
+stabilisation
+{
+    momentum
+    {
+        type            multiple;
+        // scaleFactor 1.0;  // optional outer scale; defaults to 1.0
+        models          ( stab1  stab2 );
+        jacobianModel   stab1;
+
+        stab1
+        {
+            type        laplacian;
+            scaleFactor 0.1;
+        }
+
+        stab2
+        {
+            type        gradDiv;
+            scaleFactor 0.05;
+        }
+    }
+}
+```
+
+Each entry in `models` must correspond to a named sub-dictionary in the same
+dictionary. The `jacobianModel` entry names whichever sub-model provides the
+Jacobian (it must be one of the entries in `models`).
+
+The `highOrderResidual` option is allowed with `multiple` only if every
+sub-model returns `true` from `supportsHighOrderResidual()`. Currently only the
+`alpha` model satisfies this requirement.
+
 ## Notes For Extension
 
 When adding a new stabilisation model:
@@ -144,7 +185,9 @@ When adding a new stabilisation model:
 - register with `addToRunTimeSelectionTable(...)` in the source,
 - add the source to the relevant build lists,
 - keep the interface consistent with the existing `update...()` and cached
-  accessor pattern unless there is a strong reason to change the framework.
+  accessor pattern unless there is a strong reason to change the framework,
+- if the new model is compatible with `highOrderResidual` calculation, override
+  `supportsHighOrderResidual()` to return `true`.
 
 The current framework is being validated first with
 `linGeomTotalDispSolid`. Wider adoption across the other solid models can

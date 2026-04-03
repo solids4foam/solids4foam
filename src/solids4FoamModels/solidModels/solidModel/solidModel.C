@@ -1300,23 +1300,6 @@ Foam::solidModel::solidModel
         stabDict.add("pressure", defaultStabSubDict);
     }
 
-    // Only alpha stabilisation is allowed with high-order residual calculation
-    if (stabDict.found("momentum"))
-    {
-        const dictionary& momentumDict = stabDict.subDict("momentum");
-
-        const word stabType =
-            momentumDict.lookupOrDefault<word>("type", "default");
-
-        if (stabType != "alpha" && highOrderResidual())
-        {
-            FatalErrorInFunction
-                << "Only alpha stabilisation is supported with high-order "
-                << "residual calculation"
-                << abort(FatalError);
-        }
-    }
-
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1324,6 +1307,18 @@ Foam::solidModel::solidModel
             stabDict.subDict("momentum"),
             dimless
         );
+
+    // Only stabilisation models that support high-order residual calculation
+    // are allowed when highOrderResidual is enabled
+    if (highOrderResidual() && !momentumStabilisation().supportsHighOrderResidual())
+    {
+        FatalErrorInFunction
+            << "Only stabilisation models that support high-order residual "
+            << "calculation can be used with highOrderResidual = true. "
+            << "Model type " << momentumStabilisation().type()
+            << " does not support it."
+            << abort(FatalError);
+    }
 
     pressureStabilisationPtr_ =
         stabilisationModel::New
