@@ -17,11 +17,46 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# Build the utility for initialising the solution
-wmake initialiseTaylorGreenVortex
+# Return zero when the decaying Taylor Green Vortex binaries/libraries are missing.
+decayingTaylorGreenVortexNeedsBuild()
+{
+    if ! command -v initialiseTaylorGreenVortex >/dev/null 2>&1
+    then
+        return 0
+    fi
 
-# Build boundary condition and mesh motion libraries
-(cd src && ./Allwmake)
+    local platformsDir="${WM_PROJECT_DIR}/platforms"
+    if [ ! -d "${platformsDir}" ]
+    then
+        return 0
+    fi
+
+    local libs=( \
+        libdecayingTaylorGreenVortexFvPatchVectorField.so \
+        libdecayingTaylorGreenVortexMeshMotion.so \
+    )
+
+    for lib in "${libs[@]}"
+    do
+        if [ -z "$(find "${platformsDir}" -maxdepth 3 -name "${lib}" -print -quit 2>/dev/null)" ]
+        then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Build the utility for initialising the solution
+if decayingTaylorGreenVortexNeedsBuild
+then
+    wmake initialiseTaylorGreenVortex
+
+    # Build boundary condition and mesh motion libraries
+    (cd src && ./Allwmake)
+else
+    echo "decayingTaylorGreenVortex binaries already installed; skipping rebuild"
+fi
 
 # Copy 0.orig to 0
 restore0Dir
