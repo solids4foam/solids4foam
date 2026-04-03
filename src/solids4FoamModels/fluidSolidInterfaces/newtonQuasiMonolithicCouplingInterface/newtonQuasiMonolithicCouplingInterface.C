@@ -2509,7 +2509,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
 
 } // End namespace Foam
 
-#endif // OPENFOAM_NOT_EXTEND
+#endif // OPENFOAM_COM
 
 #endif // ifdef USE_PETSC
 
