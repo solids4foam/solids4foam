@@ -259,6 +259,7 @@ then
 fi
 
 # Copy tutorials
+echo "Copying $rootDir to $TEST_RUN_DIR"
 cp -a "$rootDir" "$TEST_RUN_DIR"
 
 # Enter test directory
