@@ -1665,6 +1665,23 @@ void Foam::solidModel::end()
 }
 
 
+Foam::tmp<Foam::volTensorField> Foam::solidModel::couplingField
+(
+    const word& fieldName
+) const
+{
+    FatalErrorInFunction
+        << "Coupling field \"" << fieldName
+        << "\" requested from solidModel type " << type() << nl
+        << "This solidModel does not support coupling fields." << nl
+        << "Override couplingField() in the derived class to enable coupling."
+        << abort(FatalError);
+
+    // Keep compiler happy
+    return tmp<volTensorField>(nullptr);
+}
+
+
 Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 (
     Time& runTime,
