@@ -15,12 +15,15 @@
 #------------------------------------------------------------------------------
 
 
-echo "Cleaning backup files"
-find . -type f \( -name "*~" -o -name "*.bak" \) -exec rm {} \;
-find . \( -name 'core' -o -name 'core.[1-9]*' \) -exec rm {} \;
-find . \( -name '*.pvs' -o -name '*.foam' \) -exec rm {} \;
-rm logs > /dev/null 2>&1
-rm testLoopReport > /dev/null 2>&1
+echo "Cleaning backup and test files"
+
+find . -type f \( -name "*~" -o -name "*.bak" \) -delete
+find . -type f \( -name 'core' -o -name 'core.[1-9]*' \) -delete
+find . -type f \( -name '*.pvs' -o -name '*.foam' \) -delete
+
+find . -depth -type d -name regressionTests -exec rm -rf {} +
+
+rm -f logs testLoopReport
 
 echo ""
 
