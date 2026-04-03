@@ -28,6 +28,7 @@ Author
 
 #include "logVolFields.H"
 #include "emptyFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -142,11 +143,7 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
             // Take references
             const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
-            symmTensorField& resultB = result.boundaryFieldRef()[patchI];
-#else
-            symmTensorField& resultB = result.boundaryField()[patchI];
-#endif
+            symmTensorField& resultB = boundaryFieldRef(result)[patchI];
 
             forAll(eigenValB, faceI)
             {

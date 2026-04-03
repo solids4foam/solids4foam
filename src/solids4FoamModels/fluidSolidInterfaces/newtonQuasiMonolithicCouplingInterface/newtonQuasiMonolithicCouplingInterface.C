@@ -34,6 +34,7 @@ License
 #include "motionSolver.H"
 #include "meshMotionSolidModelFvMotionSolver.H"
 #include "globalIndex.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1116,7 +1117,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
     // Lookup the fluid interface patch
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
     fvPatchVectorField& fluidPatchU =
-        fluid().U().boundaryFieldRef()[fluidPatchID];
+        boundaryFieldRef(fluid().U())[fluidPatchID];
     if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
     {
         FatalErrorInFunction
@@ -1167,7 +1168,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Lookup the mesh motion displacement field
     fvPatchVectorField& motionPatchD =
-        motionSolid().D().boundaryFieldRef()[fluidPatchID];
+        boundaryFieldRef(motionSolid().D())[fluidPatchID];
     if (!isA<fixedValueFvPatchVectorField>(motionPatchD))
     {
         FatalErrorInFunction
@@ -1177,7 +1178,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Lookup the mesh motion velocity field
     fvPatchVectorField& motionPatchU =
-        motionSolid().U().boundaryFieldRef()[fluidPatchID];
+        boundaryFieldRef(motionSolid().U())[fluidPatchID];
 
     // Lookup the solid interface patch
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
@@ -1302,7 +1303,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     (
         !isA<fixedValuePointPatchVectorField>
         (
-            motionSolid().pointD().boundaryFieldRef()[fluidPatchID]
+            boundaryFieldRef(motionSolid().pointD())[fluidPatchID]
         )
     )
     {
@@ -1313,7 +1314,7 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Set the mesh interface pointD
     // Use "==" to reassign fixedValue
-    motionSolid().pointD().boundaryFieldRef()[fluidPatchID] == meshPatchPointD;
+    boundaryFieldRef(motionSolid().pointD())[fluidPatchID] == meshPatchPointD;
 
     // Correct boundary conditions to enforce the new patch values on the
     // internal field
@@ -1422,7 +1423,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     foamPetscSnesHelper::ExtractFieldComponents
     (
         xx,
-        UFluid.primitiveFieldRef(),
+        primitiveFieldRef(UFluid),
         0, // Location of U
         fluidBlockSize,
         twoD ? labelList({0,1}) : labelList({0,1,2})
@@ -1433,7 +1434,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     foamPetscSnesHelper::ExtractFieldComponents
     (
         xx,
-        p.primitiveFieldRef(),
+        primitiveFieldRef(p),
         fluidBlockSize - 1, // Location of p component
         fluidBlockSize
     );
@@ -1444,7 +1445,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     foamPetscSnesHelper::ExtractFieldComponents
     (
         &xx[solidFirstEqnID],
-        USolid.primitiveFieldRef(),
+        primitiveFieldRef(USolid),
         0, // Location of first component
         solidBlockSize,
         twoD ? labelList({0,1}) : labelList({0,1,2})
@@ -2189,7 +2190,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
 
     // Lookup the displacement interface traction patch and set the traction
     fvPatchVectorField& solidPatchD =
-        solid().D().boundaryFieldRef()[solidPatchID];
+        boundaryFieldRef(solid().D())[solidPatchID];
     if (!isA<solidTractionFvPatchVectorField>(solidPatchD))
     {
         FatalErrorInFunction
