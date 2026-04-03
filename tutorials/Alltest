@@ -54,6 +54,9 @@ function die()
 # Extracts useful info from log file.
 function logReport()
 {
+    # Return if a directory is provided
+    [ -f "$1" ] || return
+
     case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
     app=`echo $1 | sed s/"\(.*\)\."/""/g`
     if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
@@ -90,6 +93,27 @@ function logReport()
 
 function get_num_cores()
 {
+    # Linux: physical cores
+    if command -v lscpu > /dev/null 2>&1
+    then
+        cores=$(lscpu | awk '/^Core\(s\) per socket:/ {c=$4} /^Socket\(s\):/ {s=$2} END {if (c && s) print c*s}')
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
+    fi
+
+    # macOS / BSD: physical cores
+    if command -v sysctl > /dev/null 2>&1
+    then
+        cores=$(sysctl -n hw.physicalcpu 2>/dev/null)
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
+    fi
+
+    # Fallback: logical CPUs
     if command -v nproc > /dev/null 2>&1
     then
         nproc
@@ -109,12 +133,74 @@ function compileApplications()
         parentDir=$(dirname "$caseDir")
         caseName=$(basename "$caseDir")
 
+        if shouldSkipCaseDueToRuntimeSelection "$parentDir"
+        then
+            echo "Skipping compile for ${parentDir#./}: case is not intended to run under ${WM_PROJECT} ${WM_PROJECT_VERSION}"
+            continue
+        fi
+
         echo "compileApplication ${caseDir#./}"
         (
             cd "$parentDir" || exit 1
             compileApplication "$caseName"
         )
     done
+}
+
+function shouldSkipCaseDueToRuntimeSelection()
+{
+    local dir="$1"
+    local allrunDir=""
+
+    while [[ "$dir" != "." && "$dir" != "/" && -n "$dir" ]]
+    do
+        if [[ -f "$dir/Allrun" ]]
+        then
+            allrunDir="$dir"
+            break
+        fi
+        dir=$(dirname "$dir")
+    done
+
+    if [[ -z "$allrunDir" ]]
+    then
+        return 1
+    fi
+
+    local allrunFile="${allrunDir}/Allrun"
+    local project="${WM_PROJECT:-}"
+    local version="${WM_PROJECT_VERSION:-}"
+
+    if [[ -z "$project" || -z "$version" ]]
+    then
+        return 1
+    fi
+
+    if grep -qF "solids4Foam::caseDoesNotRunWithOpenFOAMOrg" "$allrunFile"
+    then
+    if [[ "$project" == "OpenFOAM" && "$version" != v* ]]
+    then
+        return 0
+    fi
+    fi
+
+    if grep -qF "solids4Foam::caseDoesNotRunWithFoamExtend" "$allrunFile"
+    then
+        if [[ "$project" == "foam" ]]
+        then
+            return 0
+        fi
+    fi
+
+    if grep -qF "solids4Foam::caseOnlyRunsWithFoamExtend" "$allrunFile"
+    then
+        if [[ "$project" != "foam" ]]
+        then
+            return 0
+        fi
+    fi
+
+    return 1
 }
 
 function runCase()
@@ -162,6 +248,12 @@ function runCasesInParallel()
     do
         caseDir=$(dirname "$allrunFile")
 
+        if [[ "$SKIP_PRECICE_CASES" -eq 1 && "$caseDir" == ./*fluidSolidInteraction-preCICE* ]]
+        then
+            echo "Skipping preCICE case: ${caseDir#./}"
+            continue
+        fi
+
         waitForAvailableSlot
 
         runCase "$caseDir" &
@@ -190,6 +282,23 @@ function cleanCopiedCaseArtifacts()
     find "$dir" -type d \( -name postProcessing -o -name dynamicCode -o -name "processor*" \) -prune -exec rm -rf {} +
 }
 
+function preciceAdapterAvailable()
+{
+    local libDirs=()
+    [[ -n "${FOAM_USER_LIBBIN}" ]] && libDirs+=("${FOAM_USER_LIBBIN}")
+    [[ -n "${FOAM_LIBBIN}" ]] && libDirs+=("${FOAM_LIBBIN}")
+
+    for libDir in "${libDirs[@]}"
+    do
+        if [[ -f "${libDir}/libpreciceAdapterFunctionObject.so" ]] || \
+           [[ -f "${libDir}/libpreciceAdapterFunctionObject.dylib" ]]
+        then
+            return 0
+        fi
+    done
+    return 1
+}
+
 
 #
 # PRELIMINARIES
@@ -197,6 +306,7 @@ function cleanCopiedCaseArtifacts()
 
 rootDir="./"
 MAX_JOBS=""
+SKIP_PRECICE_CASES=0
 
 # Parse options
 while [ "$#" -gt 0 ]
@@ -233,6 +343,7 @@ TEST_RUN_DIR=../tutorialsTest
 if [ -z "$MAX_JOBS" ] || [ "$MAX_JOBS" = "auto" ]
 then
     MAX_JOBS=$(get_num_cores)
+    echo "MAX_JOBS = $MAX_JOBS"
 fi
 
 case "$MAX_JOBS" in
@@ -244,6 +355,12 @@ esac
 if [ "$MAX_JOBS" -lt 1 ]
 then
     die "Invalid job limit: '$MAX_JOBS'"
+fi
+
+if ! preciceAdapterAvailable
+then
+    echo "preCICE adapter not detected; skipping fluidSolidInteraction-preCICE tutorials."
+    SKIP_PRECICE_CASES=1
 fi
 
 

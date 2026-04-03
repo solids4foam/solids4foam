@@ -40,11 +40,34 @@ Run the regression tests in parallel.
 EOF
 }
 
-get_num_cores()
+function get_num_cores()
 {
-    if command -v nproc >/dev/null 2>&1; then
+    # Linux: physical cores
+    if command -v lscpu > /dev/null 2>&1
+    then
+        cores=$(lscpu | awk '/^Core\(s\) per socket:/ {c=$4} /^Socket\(s\):/ {s=$2} END {if (c && s) print c*s}')
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
+    fi
+
+    # macOS / BSD: physical cores
+    if command -v sysctl > /dev/null 2>&1
+    then
+        cores=$(sysctl -n hw.physicalcpu 2>/dev/null)
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
+    fi
+
+    # Fallback: logical CPUs
+    if command -v nproc > /dev/null 2>&1
+    then
         nproc
-    elif command -v getconf >/dev/null 2>&1; then
+    elif command -v getconf > /dev/null 2>&1
+    then
         getconf _NPROCESSORS_ONLN
     else
         sysctl -n hw.ncpu

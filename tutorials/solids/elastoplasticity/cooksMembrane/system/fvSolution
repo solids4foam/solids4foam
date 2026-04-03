@@ -45,7 +45,7 @@ relaxationFactors
 
     fields
     {
-        //DD       0.7;
+        DD       0.7;
         sigmaHyd    0.5;
     }
 }
