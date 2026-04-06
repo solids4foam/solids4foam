@@ -22,10 +22,11 @@ mechanical
 (
     rubber
     {
-        type        diffusionHyperElastic;
+        type        diffusionElastic;
+        //type        diffusionHyperElastic;
         rho         rho [1 -3 0 0 0 0 0] 1;
         mu          mu [1 -1 -2 0 0 0 0] 1;
-        K           K [1 -1 -2 0 0 0 0]  3;
+        "K|kappa"   K [1 -1 -2 0 0 0 0]  3;
         diffusivity quadratic inverseDistance (interface);
         regionName fluid;
         writeStiffScaleFactor no;

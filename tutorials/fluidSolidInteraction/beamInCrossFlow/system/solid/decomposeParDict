@@ -12,16 +12,13 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      solidProperties;
+    object      decomposeParDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel    linearGeometryTotalDisplacement;
-// solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+numberOfSubdomains 2;
 
-"linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
-{
-    solutionAlgorithm    PETScSNES;
-}
+method scotch;
+
 
 // ************************************************************************* //
