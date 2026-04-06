@@ -63,7 +63,6 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
         isFluid_ != nullptr
      || isFluidVelocity_ != nullptr
      || isFluidPressure_ != nullptr
-     // || isMotion_ != nullptr
      || isSolid_ != nullptr
     )
     {
@@ -1414,88 +1413,6 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 }
 
 
-// void newtonQuasiMonolithicCouplingInterface::resetFieldsToOldTime()
-// {
-//     Info<< "Resetting primary fields to their old time values" << nl << endl;
-
-//     // Velocity
-//     fluid().U() = fluid().U().oldTime();
-
-//     // Pressure
-//     fluid().p() = fluid().p().oldTime();
-
-//     // Displacement
-//     solid().D() = solid().D().oldTime();
-
-//     // Mesh motion
-//     motionSolid().D() = motionSolid().D().oldTime();
-
-//     // Update the interface fields
-//     mapInterfaceSolidToMeshMotion();
-//     mapInterfaceMotionUToFluidU();
-
-//     // Insert the OpenFOAM fields into the PETSc solution vector
-
-//     // Set twoD flag
-//     const bool twoD = fluid().twoD();
-
-//     // Set fluid and solid block sizes
-//     const label fluidBlockSize = twoD ? 3 : 4;
-//     const label solidBlockSize = twoD ? 2 : 3;
-
-//     // The scalar row at which the solid equations start
-//     const label solidFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-//     // The scalar row at which the motion equations start
-//     const label motionFirstEqnID = fluidMesh().nCells()*fluidBlockSize;
-
-//     // Access the raw solution data
-//     PetscScalar *xx;
-//     VecGetArray(foamPetscSnesHelper::solution(), &xx);
-
-//     // Insert the fluid velocity
-//     foamPetscSnesHelper::InsertFieldComponents
-//     (
-//         fluid().U().primitiveFieldRef(),
-//         xx,
-//         0, // Location of U
-//         fluidBlockSize,
-//         twoD ? labelList({0,1}) : labelList({0,1,2})
-//     );
-
-//     // Insert the fluid pressure
-//     foamPetscSnesHelper::InsertFieldComponents
-//     (
-//         fluid().p().primitiveFieldRef(),
-//         xx,
-//         fluidBlockSize - 1, // Location of p component
-//         fluidBlockSize
-//     );
-
-//     // Insert the displacement
-//     foamPetscSnesHelper::InsertFieldComponents
-//     (
-//         solid().D().primitiveFieldRef(),
-//         &xx[solidFirstEqnID],
-//         0, // Location of first component
-//         solidBlockSize,
-//         twoD ? labelList({0,1}) : labelList({0,1,2})
-//     );
-
-//     // Insert the motion displacement
-//     foamPetscSnesHelper::InsertFieldComponents
-//     (
-//         motionSolid().D().primitiveFieldRef(),
-//         &xx[motionFirstEqnID],
-//         0, // Location of first component
-//         solidBlockSize,
-//         twoD ? labelList({0,1}) : labelList({0,1,2})
-//     );
-
-//     // Restore the solution vector
-//     VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
-// }
-
 void newtonQuasiMonolithicCouplingInterface::retrieveSolution
 (
     Vec solution,
@@ -1626,15 +1543,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     nestMat_(nullptr),
     Pmat_(nullptr),
     tsLogPtr_()
-    // oldTimeValue_(runTime.value()),
-    // nConsecutiveFailedSolves_(0),
-    // maxAllowedConsecutiveFailedSolves_
-    // (
-    //     fsiProperties().lookupOrDefault<label>
-    //     (
-    //         "maxAllowedConsecutiveFailedSolves", 5
-    //     )
-    // )
 {
     if (solid().twoD() != fluid().twoD())
     {
@@ -1688,13 +1596,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     solid().D().storeOldTime();
     motionSolid().D().storeOldTime();
     solid().sigma().storeOldTime();
-
-    // Info<< "fluidToSolidCoupling: " << fluidToSolidCoupling_ << nl
-    //     << "meshToFluidCoupling: " << meshToFluidCoupling_ << nl
-    //     << "solidToMeshCoupling: " << solidToMeshCoupling_ << nl
-    //     << "extrapolateSolidInterfaceDisplacement: "
-    //     << extrapolateSolidInterfaceDisplacement_ << nl
-    //     << "passViscousStress: " << passViscousStress_ << endl;
 }
 
 
