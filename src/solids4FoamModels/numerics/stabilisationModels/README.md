@@ -51,6 +51,8 @@ The currently available model types in this directory are:
 - `JamesonSchmidtTurkel`
 - `laplacian`
 - `multiple` — composite model combining two or more models (see below)
+- `volStrainRate` — temporal stabilisation based on the rate of change of
+  volumetric strain (see below)
 
 `RhieChow` is implemented as a helper under
 [`diffStencilLaplacianStab/RhieChowStab`](./diffStencilLaplacianStab/RhieChowStab).
@@ -175,6 +177,70 @@ Jacobian (it must be one of the entries in `models`).
 The `highOrderResidual` option is allowed with `multiple` only if every
 sub-model returns `true` from `supportsHighOrderResidual()`. Currently only the
 `alpha` model satisfies this requirement.
+
+## Volumetric Strain Rate Stabilisation
+
+The `volStrainRate` type targets temporal oscillations in the volumetric
+strain `tr(gradD)` rather than spatial oscillations.  The face stabilisation
+vector is:
+
+```text
+faceVector_f = scaleFactor * C(mode) * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
+```
+
+Four modes are available, selected via the `mode` entry:
+
+| mode | C(mode) | Vanishes as |
+|---|---|---|
+| `physicalDamping` | `tau/deltaT` | never — permanent physical damping |
+| `firstOrderTemporal` | `1` | O(deltaT) |
+| `secondOrderTemporal` | `deltaT` | O(deltaT^2) |
+| `spatioTemporal` | `h^2/m^2` | O(h^2 * deltaT) |
+| `h2PhysicalDamping` | `h^2/(m^2*deltaT)` | O(h^2) as h→0; O(1) as deltaT→0 |
+
+The gradient pointer (`gradPtr`) passed to `updateVector` must be non-null
+and must carry an old-time level (i.e. `gradPtr->oldTime()` must be valid).
+In `nonLinGeomTotalLagVelocitySolid` this is satisfied by passing `&gradD()`.
+
+```text
+stabilisation
+{
+    momentum
+    {
+        type            volStrainRate;
+        scaleFactor     0.1;
+        mode            firstOrderTemporal;
+    }
+}
+```
+
+For `physicalDamping` mode, an additional `tau` entry (in seconds) sets the
+damping time scale:
+
+```text
+        type            volStrainRate;
+        scaleFactor     0.1;
+        mode            physicalDamping;
+        tau             1e-4;
+```
+
+The `h2PhysicalDamping` mode combines the O(h²) spatial scaling of
+`spatioTemporal` with the Δt-persistence of `physicalDamping`.  It is the
+recommended mode when the instability is a *temporal* pressure pulsation
+(whole-domain oscillation) that worsens as Δt decreases, and when spatial
+consistency under mesh refinement is also required.  No `tau` parameter is
+needed; the time scale is folded into `scaleFactor`.
+
+```text
+        type            volStrainRate;
+        scaleFactor     0.1;
+        mode            h2PhysicalDamping;
+```
+
+An approximate Laplacian Jacobian is provided via `vectorJacobian`.  For
+modes whose coefficient depends on `deltaT` (`physicalDamping`,
+`secondOrderTemporal`, and `h2PhysicalDamping`), the Jacobian should be
+rebuilt each time step by calling `vectorJacobian(field, gammaPtr, true)`.
 
 ## Notes For Extension
 

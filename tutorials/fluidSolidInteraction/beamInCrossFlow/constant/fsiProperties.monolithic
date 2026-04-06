@@ -41,6 +41,11 @@ NewtonQuasiMonolithicCoeffs
 
     // Scaling for fluid system to improve the condition number
     fluidSystemScaleFactor 1e+08;
+
+    // Scale solid equations to balance their contribution to the SNES norm.
+    // Default (~0.014 at dt=0.02) leaves the solid 7e9× weaker than the
+    // fluid in the residual norm, so Newton converges the fluid only.
+    //solidSystemScaleFactor 1e+08;
 }
 
 // ************************************************************************* //

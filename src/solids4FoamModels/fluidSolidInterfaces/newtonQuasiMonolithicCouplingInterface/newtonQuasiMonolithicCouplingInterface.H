@@ -92,6 +92,15 @@ class newtonQuasiMonolithicCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
+        //- Use the Liu (2014) Eq.31 interface velocity condition
+        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
+        //  This condition is from Liu et al., JCP 270, 2014, Section 4.
+        //  Note: in the FVM-ALE context, this condition creates a mismatch
+        //  between the mesh velocity (U_solid) and the fluid BC (Liu combo),
+        //  violating the GCL for interface-adjacent cells. This causes
+        //  pressure oscillations in practice. Defaults to no.
+        const Switch liuInterfaceCondition_;
+
         //- Number of sub-regions: 2 == fluid + solid
         const label nRegions_;
 
@@ -263,6 +272,12 @@ class newtonQuasiMonolithicCouplingInterface
 
         //- Map the velocity from the mesh motion to the fluid interface
         void mapInterfaceMotionUToFluidU();
+
+        //- Set the fluid interface velocity using Liu (2014) Eq.31
+        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
+        //  This replaces mapInterfaceMotionUToFluidU() when
+        //  liuInterfaceCondition_ is enabled
+        void setLiuInterfaceVelocity();
 
         //- Map the displacement and velocity from the solid to the mesh motion
         //  interface. Three fields are mapped: D, U and pointD

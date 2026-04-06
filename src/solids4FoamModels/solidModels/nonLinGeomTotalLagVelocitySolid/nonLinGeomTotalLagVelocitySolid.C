@@ -139,47 +139,68 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
                 tracPatch.tractionRateHistory().storeOldTimes(1);
             }
 
-            // Lookup the current, old and old-old tractions
+            // Lookup the current traction (set by boundary condition or
+            // FSI coupling)
             const vectorField& trac = tracPatch.traction();
-            const vectorField& tracOld = tracPatch.tractionHistory().old();
-            const vectorField& tracOldOld =
-                tracPatch.tractionHistory().oldOld();
 
-            // Lookup the current and old traction rates
-            vectorField& tracRate = tracPatch.tractionRateHistory();
-            const vectorField& tracRateOld =
-                tracPatch.tractionRateHistory().old();
-
-            // Update the traction rate
             const fvMesh& mesh = D.mesh();
-            const scalar deltaT = mesh.time().deltaTValue();
-            tracRate = (3.0*trac - 4*tracOld + tracOldOld)/deltaT;
-
-            // Extrapolate in time to calculate the future traction
-            const vectorField tracFuture
-            (
-                trac + 0.5*deltaT*(3*tracRate - tracRateOld)
-            );
-
             const scalarField& magSfPatch = mesh.boundary()[patchI].magSf();
             const scalarField& magSfCurrentPatch =
                 magSfCurrent.boundaryField()[patchI];
             const scalarField& magSfOldTimePatch =
                 magSfOldTime.boundaryField()[patchI];
 
-            // Enforce tracFuture on the forceFutureTime boundary
-            if (tracPatch.useUndeformedArea())
+            if (extrapolateTractionBoundaries_)
             {
-                forceP = tracFuture*magSfPatch;
+                // Extrapolate the traction to the future time level using
+                // BDF2 rate estimation + Adams-Bashforth prediction.
+                // This is correct for solid-only problems where the
+                // traction is prescribed externally.
+                const vectorField& tracOld =
+                    tracPatch.tractionHistory().old();
+                const vectorField& tracOldOld =
+                    tracPatch.tractionHistory().oldOld();
+
+                vectorField& tracRate = tracPatch.tractionRateHistory();
+                const vectorField& tracRateOld =
+                    tracPatch.tractionRateHistory().old();
+
+                const scalar deltaT = mesh.time().deltaTValue();
+                tracRate = (3.0*trac - 4*tracOld + tracOldOld)/deltaT;
+
+                const vectorField tracFuture
+                (
+                    trac + 0.5*deltaT*(3*tracRate - tracRateOld)
+                );
+
+                if (tracPatch.useUndeformedArea())
+                {
+                    forceP = tracFuture*magSfPatch;
+                }
+                else
+                {
+                    forceP = tracFuture*magSfCurrentPatch;
+                }
             }
             else
             {
-                forceP = tracFuture*magSfCurrentPatch;
+                // Use the current traction directly without temporal
+                // extrapolation. This is appropriate for monolithic FSI
+                // coupling where the traction is an implicit function of
+                // the solution and extrapolation amplifies interface
+                // pressure oscillations.
+                if (tracPatch.useUndeformedArea())
+                {
+                    forceP = trac*magSfPatch;
+                }
+                else
+                {
+                    forceP = trac*magSfCurrentPatch;
+                }
             }
 
-            // We will also enforce the exact values on the old-time field, as
-            // these were extrapolated in the previous time-step and we can
-            // correct them here
+            // Correct the old-time force boundary values using the
+            // current traction (which is exact, not extrapolated)
             if (tracPatch.useUndeformedArea())
             {
                 boundaryFieldRef(force.oldTime())[patchI] = trac*magSfPatch;
@@ -457,10 +478,20 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         mesh(),
         dimensionedVector("0", dimForce, vector::zero)
     ),
+    extrapolateTractionBoundaries_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "extrapolateTractionBoundaries",
+            false
+        )
+    ),
     curTimeIndex_(-1)
 {
     Info<< "linearGeometryFormulation = " << linearGeometryFormulation_ << nl
         << "predictor = " << predictor_ << nl
+        << "extrapolateTractionBoundaries = "
+        << extrapolateTractionBoundaries_ << nl
         << "solvePressure = " << solvePressure() << endl;
 
     DisRequired();
@@ -659,6 +690,20 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
 
     const fvMesh& mesh = this->mesh();
     const dimensionedScalar& deltaT = runTime().deltaT();
+
+    // At the start of each new time step, update the current-time force
+    // field from the previous step's converged future-time force.
+    // This is needed for the trapezoidal stress averaging:
+    //   residual = 0.5*div(forceCurrentTime_.oldTime() + forceFutureTime_)
+    // Without this update, forceCurrentTime_ stays at its initial (zero)
+    // value when formResidual is called from external solvers (e.g. FSI
+    // coupling interface) rather than from evolveSnes().
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+        forceCurrentTime_ =
+            surfaceVectorField(forceCurrentTime_.name(), forceFutureTime_);
+    }
 
     // Copy x into the U field
     volVectorField& U = const_cast<volVectorField&>(this->U());

@@ -40,6 +40,7 @@ NewtonQuasiMonolithicCoeffs
     coupled             yes;
     interfaceTransferMethod directMap;
     passViscousStress   yes;
+    liuInterfaceCondition no;   // Liu (2014) Eq.31 — disabled (GCL issue in FVM)
     optionsFile         petscOptions.mf_bjacobi_lu;  // PETSc SNES/KSP/PC options
 }
 ```

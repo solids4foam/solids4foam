@@ -190,6 +190,7 @@ functionObjects/solidPointDisplacement/solidPointDisplacement.C
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
+functionObjects/solidPressureMinMax/solidPressureMinMax.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
@@ -250,6 +251,7 @@ numerics/stabilisationModels/gradDivStab/gradDivStab.C
 numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C
 numerics/stabilisationModels/laplacianStab/laplacianStab.C
 numerics/stabilisationModels/multipleStabilisationModels/multipleStabilisationModels.C
+numerics/stabilisationModels/volStrainRateStab/volStrainRateStab.C
 /*numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C

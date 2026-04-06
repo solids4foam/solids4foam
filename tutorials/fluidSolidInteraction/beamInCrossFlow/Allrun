@@ -12,8 +12,9 @@ then
 fi
 
 # Example usage:
-# ./Allrun                     -> partitioned (IQNILS), serial
+# ./Allrun                     -> [default] partitioned (IQNILS), serial
 # ./Allrun aitken              -> partitioned (Aitken), serial
+# ./Allrun iqnils              -> partitioned (IQNILS), serial
 # ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
 # ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
 # ./Allrun aitken parallel     -> partitioned (Aitken), parallel
@@ -90,7 +91,6 @@ else
     ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
     ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
     ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
-    ln -vnsf "controlDict.${coupling}" system/controlDict
 
     solids4Foam::convertCaseFormat .
 fi

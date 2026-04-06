@@ -106,6 +106,14 @@ class nonLinGeomTotalLagVelocitySolid
         //- Force at the future time (extrapolated)
         surfaceVectorField forceFutureTime_;
 
+        //- Extrapolate traction boundaries in time for the centered stress
+        //  averaging. Defaults to true, which is correct for solid-only
+        //  problems with prescribed traction. Should be set to false when
+        //  used in a monolithic FSI coupling, where the traction is an
+        //  implicit function of the solution and extrapolation amplifies
+        //  interface pressure oscillations.
+        const Switch extrapolateTractionBoundaries_;
+
         //- Current time index is used for updating the old force fields
         label curTimeIndex_;
 

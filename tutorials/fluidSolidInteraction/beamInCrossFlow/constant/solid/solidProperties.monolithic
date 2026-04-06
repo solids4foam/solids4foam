@@ -20,20 +20,16 @@ solidModel    nonLinearGeometryTotalLagrangianVelocity;
 
 nonLinearGeometryTotalLagrangianVelocityCoeffs
 {
-    dampingCoeff [0 0 -1 0 0 0 0] 1e-1;
+    // Disable temporal extrapolation of traction boundaries
+    extrapolateTractionBoundaries no;
 
+    // Stabilisation
     stabilisation
     {
         momentum
         {
-            type        diffStencilLaplacian;
-            scaleFactor 0.1;
-        }
-
-        pressure
-        {
-            type        diffStencilLaplacian;
-            scaleFactor 0.1;
+            type            diffStencilLaplacian;
+            scaleFactor     0.5;
         }
     }
 }
