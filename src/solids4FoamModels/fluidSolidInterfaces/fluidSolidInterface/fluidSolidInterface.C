@@ -45,6 +45,64 @@ namespace Foam
     defineTypeNameAndDebug(fluidSolidInterface, 0);
     defineRunTimeSelectionTable(fluidSolidInterface, dictionary);
     addToRunTimeSelectionTable(physicsModel, fluidSolidInterface, physicsModel);
+
+    namespace
+    {
+        word resolvedRegion
+        (
+            const Time& runTime,
+            const dictionary& fsiProperties,
+            const word& modelName,
+            const word& defaultRegion
+        )
+        {
+            const word controlDictRegion
+            (
+                runTime.controlDict().subOrEmptyDict(modelName)
+                    .lookupOrDefault<word>("region", defaultRegion)
+            );
+
+            return fsiProperties.lookupOrDefault<word>
+            (
+                modelName + "Region",
+                controlDictRegion
+            );
+        }
+
+
+        void warnOnConflictingRegion
+        (
+            const Time& runTime,
+            const dictionary& fsiProperties,
+            const word& modelName,
+            const word& resolvedRegionName,
+            const word& defaultRegion
+        )
+        {
+            if
+            (
+                fsiProperties.found(modelName + "Region")
+             && runTime.controlDict().subOrEmptyDict(modelName).found("region")
+            )
+            {
+                const word controlDictRegion
+                (
+                    runTime.controlDict().subOrEmptyDict(modelName)
+                        .lookupOrDefault<word>("region", defaultRegion)
+                );
+
+                if (controlDictRegion != resolvedRegionName)
+                {
+                    WarningInFunction
+                        << "Conflicting " << modelName << " region settings: "
+                        << "using '" << resolvedRegionName << "' from "
+                        << "fsiProperties and ignoring '" << controlDictRegion
+                        << "' from controlDict/" << modelName
+                        << "/region" << endl;
+                }
+            }
+        }
+    }
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -271,7 +329,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const word& region
 )
 :
-    physicsModel(type, runTime),
+    physicsModel(type, runTime, region),
     IOdictionary
     (
         IOobject
@@ -284,8 +342,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
         )
     ),
     fsiProperties_(subDict(type + "Coeffs")),
-    fluid_(fluidModel::New(runTime, "fluid")),
-    solid_(solidModel::New(runTime, "solid")),
+    fluid_(),
+    solid_(),
     solidPatchNames_(),
     fluidPatchNames_(),
     solidPatchIndices_(),
@@ -362,6 +420,37 @@ Foam::fluidSolidInterface::fluidSolidInterface
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
+    const word fluidRegion
+    (
+        resolvedRegion(runTime, fsiProperties_, "fluid", "fluid")
+    );
+
+    const word solidRegion
+    (
+        resolvedRegion(runTime, fsiProperties_, "solid", "solid")
+    );
+
+    warnOnConflictingRegion
+    (
+        runTime,
+        fsiProperties_,
+        "fluid",
+        fluidRegion,
+        "fluid"
+    );
+
+    warnOnConflictingRegion
+    (
+        runTime,
+        fsiProperties_,
+        "solid",
+        solidRegion,
+        "solid"
+    );
+
+    fluid_ = fluidModel::New(runTime, fluidRegion);
+    solid_ = solidModel::New(runTime, solidRegion);
+
     Info<< "additionalMeshCorrection: " << additionalMeshCorrection_ << endl;
 
     // Check if couplingStartTime is specified

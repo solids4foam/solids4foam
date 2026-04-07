@@ -20,6 +20,7 @@ License
 #include "alphaStab.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#include "fvmLaplacian.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -99,8 +100,27 @@ void Foam::alphaStab::updateScalar
 #endif
     }
 
-    // Update the stabilisation
-    computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
+    const solidModel& solMod = lookupSolidModel(p.mesh());
+
+    if (solMod.highOrderResidual())
+    {
+#ifndef FOAMEXTEND
+        computeDiffStencilHighOrderScalar
+        (
+            p,
+            gradP,
+            autoPtrRef(faceScalarPtr()),
+            scaleFactor_
+        );
+#else
+        computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
+#endif
+    }
+    else
+    {
+        // Update the stabilisation
+        computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
+    }
 }
 
 
@@ -147,8 +167,86 @@ void Foam::alphaStab::updateVector
 #endif
     }
 
-    // Update the stabilisation
-    computeDiffStencil(p, gradP, autoPtrRef(faceVectorPtr()), scaleFactor_);
+    const solidModel& solMod = lookupSolidModel(p.mesh());
+
+    if (solMod.highOrderResidual())
+    {
+#ifndef FOAMEXTEND
+        // Update the high-order stabilisation
+        computeDiffStencilHighOrderVector
+        (
+            p,
+            gradP,
+            autoPtrRef(faceVectorPtr()),
+            scaleFactor_
+        );
+#else
+        computeDiffStencil
+        (
+            p,
+            gradP,
+            autoPtrRef(faceVectorPtr()),
+            scaleFactor_
+        );
+#endif
+    }
+    else
+    {
+        // Update the second-order stabilisation
+        computeDiffStencil
+        (
+            p,
+            gradP,
+            autoPtrRef(faceVectorPtr()),
+            scaleFactor_
+        );
+    }
+}
+
+
+const Foam::fvVectorMatrix& Foam::alphaStab::vectorJacobian
+(
+    const volVectorField& field,
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
+) const
+{
+    // Vector Jacobian taken from diffStencilLaplacianStab
+    // Residual can use alpha stabilisation but Jacobian is build using
+    // implicit Laplacian. Alpha implicit Laplacian will be similar so this
+    // is ok workaround
+    if (vectorJacobianPtr().empty() || rebuild)
+    {
+        if (gammaPtr == nullptr)
+        {
+            vectorJacobianPtr().reset
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            vectorJacobianPtr().reset
+            (
+                new fvVectorMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return vectorJacobianPtr()();
 }
 
 // ************************************************************************* //

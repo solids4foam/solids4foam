@@ -294,7 +294,14 @@ $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 higherOrderHelpers/quadrature/quadrature.C
 higherOrderHelpers/quadrature/tetQuadrature.C
 higherOrderHelpers/quadrature/triQuadrature.C
-higherOrderHelpers/quadrature/lineQuadrature.C*/
+higherOrderHelpers/quadrature/lineQuadrature.C
+higherOrderHelpers/fvMeshQuadrature/fvMeshQuadrature.C
+higherOrderHelpers/weightFunction/weightFunction.C
+higherOrderHelpers/SymmTensor3rdOrder/labelSymmTensor3rdOrder/labelSymmTensor3rdOrder.C
+higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
+higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
+higherOrderHelpers/hofv/hofvm.C
+higherOrderHelpers/hofv/hofvc.C*/
 
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

@@ -38,6 +38,7 @@ Author
 #define alphaStab_H
 
 #include "stabilisationModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,6 +61,15 @@ class alphaStab
 
     // Private Member Functions
 
+         //- Same as patchNeighbourField() function, added for third gradient
+        template<class Type>
+        void exchangeProcessorPatchField
+        (
+            const processorFvPatch& procPatch,
+            const Field<Type>& sendField,
+            Field<Type>& recvField
+        ) const;
+
         //- Template calculation of the stabilisation
         template<class GeoField, class GradField, class SurfaceField>
         void computeDiffStencil
@@ -69,6 +79,26 @@ class alphaStab
             SurfaceField& faceFlux,
             scalar scaleFactor
         ) const;
+
+        //- Template calculation of the high ordet stabilisation for scalar
+#ifndef FOAMEXTEND
+        void computeDiffStencilHighOrderScalar
+        (
+            const volScalarField& field,
+            const volVectorField& gradField,
+            surfaceScalarField& faceFlux,
+            scalar scaleFactor
+        ) const;
+
+        //- Template calculation of the high ordet stabilisation for vector
+        void computeDiffStencilHighOrderVector
+        (
+            const volVectorField& field,
+            const volTensorField& gradField,
+            surfaceVectorField& faceFlux,
+            scalar scaleFactor
+        ) const;
+#endif
 
         //- Disallow default bitwise copy construct
         alphaStab(const alphaStab&);
@@ -115,6 +145,14 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
+            ) const;
+
+            //- Provide an approximate implicit Jacobian contribution
+            virtual const fvVectorMatrix& vectorJacobian
+            (
+                const volVectorField& field,
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 };
 
