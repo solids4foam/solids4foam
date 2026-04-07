@@ -12,32 +12,39 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fluidProperties;
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel    newtonIcoFluid;
-
-newtonIcoFluidCoeffs
+solvers
 {
-    // Force an implicit flux
-    forceImplicitFlux yes;
-
-    // If the flux is explicit, specific the extrapolation approach
-    // This is not used if forceImplicitFlux is enabled
-    fluidFluxExtrapolationAlgorithm1 yes;
-
-    // Additional divU term which is meant to improve convergence
-    addDivPhiUDamping no;
-
-    // Scaling of pressure equation relative to the momentum
-    pressureScaleFactor 1.0;
-
-    // Pressure stabilisation approach
-    stabilisation
+    UpU
     {
-        type RhieChow;
-        scaleFactor 1.0;
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-6";
+            snes_stol "1e-6";
+            snes_max_it "100";
+            snes_monitor;
+            snes_converged_reason;
+
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type bjacobi;
+            sub_pc_type lu;
+
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
     }
 }
 

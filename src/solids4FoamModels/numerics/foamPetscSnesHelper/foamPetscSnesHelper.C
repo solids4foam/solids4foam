@@ -25,6 +25,7 @@ License
 #include "leastSquaresVectors.H"
 #include "fvm.H"
 #include "IFstream.H"
+#include "IOdictionary.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
 #include <petsc/private/pcimpl.h>
@@ -443,6 +444,155 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
 }
 
 
+autoPtr<IOdictionary> foamPetscSnesHelper::makeSolutionDictOverride() const
+{
+    if (fvSolutionLocation_.empty())
+    {
+        return autoPtr<IOdictionary>();
+    }
+
+    autoPtr<IOdictionary> solutionDictPtr
+    (
+        new IOdictionary
+        (
+            IOobject
+            (
+                "fvSolution",
+                fvSolutionLocation_,
+                mesh_.time(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            )
+        )
+    );
+
+    if (!solutionDictPtr().headerOk())
+    {
+        solutionDictPtr.clear();
+    }
+
+    return solutionDictPtr;
+}
+
+
+bool foamPetscSnesHelper::populateOptionsFromDict
+(
+    const dictionary& solutionDict,
+    const fileName& solutionDictPath
+)
+{
+    if (!solutionDict.found("solvers"))
+    {
+        return false;
+    }
+
+    const dictionary& solversDict = solutionDict.subDict("solvers");
+
+    if (!solversDict.found(fieldName_))
+    {
+        return false;
+    }
+
+    const dictionary& solverDict = solversDict.subDict(fieldName_);
+
+    if (solverDict.empty())
+    {
+        return false;
+    }
+
+    if (solverDict.lookupOrDefault<word>("solver", "none") != "petsc")
+    {
+        return false;
+    }
+
+    Info<< "Reading the PETSc options from " << solutionDictPath
+        << " for " << fieldName_ << endl;
+
+    const dictionary& optionsDict = solverDict.subDict("options");
+
+    // We will load (push) the empty options database and populate it
+    // with options from the the dictionary, then unload (pop) the
+    // database
+    AssertPETSc(PetscOptionsPush(options_));
+
+    // Populate the database
+    PetscUtils::setFlags("", optionsDict, debug);
+
+    // Unload (pop) the database
+    AssertPETSc(PetscOptionsPop());
+
+    return true;
+}
+
+
+void foamPetscSnesHelper::loadOptions()
+{
+    if (optionsLoaded_)
+    {
+        return;
+    }
+
+    if (!options_)
+    {
+        AssertPETSc(PetscOptionsCreate(&options_));
+    }
+
+    bool useDict = false;
+    const fileName fvSolutionPath =
+        fvSolutionLocation_.empty()
+      ? fileName("fvSolution")
+      : fvSolutionLocation_/"fvSolution";
+
+    if (fvSolutionLocation_.empty())
+    {
+        useDict = populateOptionsFromDict(mesh_.solutionDict(), fvSolutionPath);
+    }
+    else
+    {
+        autoPtr<IOdictionary> solutionDictPtr = makeSolutionDictOverride();
+
+        if (solutionDictPtr.valid())
+        {
+            useDict = populateOptionsFromDict(solutionDictPtr(), fvSolutionPath);
+        }
+    }
+
+    if (!useDict)
+    {
+        fileName optionsFile(optionsFile_);
+
+        Info<< "Reading the PETSc options from the " << optionsFile
+            << " file" << endl;
+
+        // Expand the options file name
+        optionsFile.expand();
+
+        // Check the options file exists
+        IFstream is(optionsFile);
+        if (!is.good())
+        {
+            FatalErrorInFunction
+                << "Cannot find the PETSc options file: " << optionsFile
+                << ". Either provide an option file or add 'solver petsc;' "
+                << "to " << fvSolutionPath << "/solvers/" << fieldName_
+                << " dictionary"
+                << exit(FatalError);
+        }
+
+        // Populate the options database with the options file
+        AssertPETSc
+        (
+            PetscOptionsInsertFile
+            (
+                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
+            )
+        );
+    }
+
+    optionsLoaded_ = true;
+}
+
+
 label foamPetscSnesHelper::initialiseSnes()
 {
     if (snes_.s)
@@ -549,12 +699,18 @@ foamPetscSnesHelper::foamPetscSnesHelper
     const fvMesh& mesh,
     const solutionLocation& location,
     const Switch stopOnPetscError,
-    const Switch initialise
+    const Switch initialise,
+    const fileName& fvSolutionLocation
 )
 :
     location_(location),
     initialised_(initialise),
+    fieldName_(fieldName),
+    optionsFile_(optionsFile),
+    mesh_(mesh),
+    fvSolutionLocation_(fvSolutionLocation),
     options_(nullptr),
+    optionsLoaded_(false),
     stopOnPetscError_(stopOnPetscError),
     diverged_(false),
     snes_(),
@@ -580,91 +736,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        // Initialise PETSc without any options file
+        // Initialise PETSc without any options file or fvSolution lookup
         PetscInitialize(NULL, NULL, NULL, NULL);
-
-        // Create and store the options database from a dedicated options file
-        // or from an OpenFOAM dict
-
-        // Lookup the solver in fvSolution and check if PETSc is specified
-        bool useDict = false;
-#ifdef OPENFOAM_COM
-        if (mesh.solversDict().found(fieldName))
-        {
-            const dictionary& solverDict = mesh.solverDict(fieldName);
-#else
-        if (mesh.solutionDict().subDict("solvers").found(fieldName))
-        {
-            const dictionary& solverDict =
-                mesh.solutionDict().subDict("solvers").subDict(fieldName);
-#endif
-
-            if (!solverDict.empty())
-            {
-                if
-                (
-                    solverDict.lookupOrDefault<word>("solver", "none")
-                 == "petsc"
-                )
-                {
-                    useDict = true;
-                }
-            }
-        }
-
-        // Create an empty options database
-        PetscOptionsCreate(&options_);
-
-        // Populate the options database from the dict or options file
-        if (useDict)
-        {
-            Info<< "Reading the PETSc options from fvSolution" << endl;
-
-            // We will load (push) the empty options database and populate it
-            // with options from the the dictionary, then unload (pop) the
-            // database
-#ifdef OPENFOAM_NOT_EXTEND
-            const dictionary& optionsDict =
-                mesh.solverDict(fieldName).subDict("options");
-#else
-            const dictionary& optionsDict =
-                mesh.solutionDict().solverDict(fieldName).subDict("options");
-#endif
-
-            // Load (push) the database
-            AssertPETSc(PetscOptionsPush(options_));
-
-            // Populate the database
-            PetscUtils::setFlags("", optionsDict, debug);
-
-            // Unload (pop) the database
-            AssertPETSc(PetscOptionsPop());
-        }
-        else
-        {
-            Info<< "Reading the PETSc options from the " << optionsFile
-                << " file" << endl;
-
-            // Expand the options file name
-            optionsFile.expand();
-
-            // Check the options file exists
-            IFstream is(optionsFile);
-            if (!is.good())
-            {
-                FatalErrorInFunction
-                    << "Cannot find the PETSc options file: " << optionsFile
-                    << ". Either provide an option file or add 'solver petsc;' "
-                    << "to fvSolution/solvers/" << fieldName << " dictionary"
-                    << exit(FatalError);
-            }
-
-            // Populate the options database with the options file
-            PetscOptionsInsertFile
-            (
-                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
-            );
-        }
     }
 }
 
@@ -675,7 +748,10 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 {
     if (initialised_)
     {
-        PetscOptionsDestroy(&options_);
+        if (options_)
+        {
+            PetscOptionsDestroy(&options_);
+        }
         snesUserPtr_.clear();
 
         WarningInFunction
@@ -1726,9 +1802,11 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
         }
     }
 
+    loadOptions();
+
     // Load the correct options database
-    PetscOptionsPush(options_);
-    SNESSetFromOptions(snes_.s);
+    AssertPETSc(PetscOptionsPush(options_));
+    AssertPETSc(SNESSetFromOptions(snes_.s));
 
     // Allow derived classes to adjust PC, KSP, etc.
     this->customiseSolver();
@@ -1740,7 +1818,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
 
     // Un-load the options file
-    PetscOptionsPop();
+    AssertPETSc(PetscOptionsPop());
 
     // Check convergence
     SNESConvergedReason reason;

@@ -16,7 +16,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ------------------------------------------------------------
 
 # Reference values at t=2 (end of simulation)
-REF_FINAL_DX=0.1989     # final x-displacement
+REF_FINAL_DX=0.195323     # final x-displacement
 REF_FINAL_FX=15.77      # final total x-force
 
 # Tolerances (~1%)

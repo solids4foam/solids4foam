@@ -42,9 +42,6 @@ newtonIcoFluidCoeffs
         // type laplacian;
         // omega omega [0 -2 1 0 0 0 0] 1.0;
     }
-
-    // Unused
-    optionsFile    petscOptions.Up;
 }
 
 // ************************************************************************* //

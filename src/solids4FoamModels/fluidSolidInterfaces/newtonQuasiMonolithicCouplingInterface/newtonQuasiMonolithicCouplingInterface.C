@@ -1485,10 +1485,11 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
                 "optionsFile", "petscOptions"
             )
         ),
-        fluid().mesh(), // Should not be used
+        fluid().mesh(), // Used by helper utilities; fvSolution is overridden
         solutionLocation::CELLS, // Used by helper functions
         fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
-        true // Will PETSc be used
+        true, // Will PETSc be used
+        runTime.system()
     ),
     fluidSystemScaleFactor_
     (

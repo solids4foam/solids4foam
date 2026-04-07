@@ -30,10 +30,7 @@ solidModel     linearGeometryTotalDisplacement;
     // 1 -> less accurate but oscillations less likely
     //zeta           0.1;
 
-    // PETSc options
-    //optionsFile petscOptions.mumps;
-    //optionsFile petscOptions.hypre;
-    optionsFile petscOptions.mf.hypre;
+    // PETSc options are defined in system/fvSolution.
 }
 
 // ************************************************************************* //

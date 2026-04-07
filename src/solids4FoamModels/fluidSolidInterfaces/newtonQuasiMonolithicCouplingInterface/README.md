@@ -41,9 +41,20 @@ NewtonQuasiMonolithicCoeffs
     interfaceTransferMethod directMap;
     passViscousStress   yes;
     liuInterfaceCondition no;   // Liu (2014) Eq.31 — disabled (GCL issue in FVM)
-    optionsFile         petscOptions.mf_bjacobi_lu;  // PETSc SNES/KSP/PC options
+    // Optional PETSc SNES/KSP/PC options file for the UpU system
+    optionsFile         petscOptions.mf_bjacobi_lu;
 }
 ```
+
+## PETSc Options
+
+PETSc options for the monolithic `UpU` solver can be defined either in the
+case-level `system/fvSolution` under `solvers/UpU`, or via the optional
+`optionsFile` entry shown above.
+
+If both are available, the `fvSolution` entry takes precedence. The
+`optionsFile` remains useful as a compact alternative and for quick solver
+switching.
 
 ## PETSc Options Files
 

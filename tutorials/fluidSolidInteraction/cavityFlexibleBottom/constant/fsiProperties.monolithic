@@ -30,9 +30,10 @@ NewtonQuasiMonolithicCoeffs
     // Mapping data across the solid-fluid interface
     interfaceTransferMethod directMap;
 
-    // PETSc SNES nonlinear solver settings file
-    // optionsFile     petscOptions.mf_fieldsplit;
-    optionsFile     petscOptions.lu;
+    // PETSc SNES options for the monolithic UpU system are defined in
+    // system/fvSolution. Alternatively, an optionsFile can be specified here.
+    //optionsFile     petscOptions.mf_fieldsplit;
+    //optionsFile     petscOptions.lu;
 
     // Pass viscous forces from fluid-to-solid interface (in addition to pressure
     // forces)

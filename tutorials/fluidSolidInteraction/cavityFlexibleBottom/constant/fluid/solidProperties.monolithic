@@ -21,7 +21,6 @@ solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    PETScSNES;
-    optionsFile    petscOptions.meshMotion;
 }
 
 // ************************************************************************* //

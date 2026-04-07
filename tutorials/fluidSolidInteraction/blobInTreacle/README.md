@@ -95,9 +95,12 @@ NewtonQuasiMonolithicCoeffs
     interfaceTransferMethod directMap;
     writeResidualsToFile yes;
     passViscousStress yes;
-    optionsFile petscOptions.lu;
 }
 ```
+
+PETSc options for the monolithic `UpU` system are defined in
+`system/fvSolution`, while the fluid mesh-motion `D` solve is defined in
+`system/fluid/fvSolution`.
 
 Make sure the mesh exposes the `interface` and `cylinder` patches referenced
 above. Update `fsiProperties` accordingly if you change the patch names so the

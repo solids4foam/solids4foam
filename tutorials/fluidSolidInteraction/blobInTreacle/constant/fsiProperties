@@ -25,7 +25,9 @@ NewtonQuasiMonolithicCoeffs
     interfaceTransferMethod directMap;
     writeResidualsToFile yes;
     passViscousStress yes;
-    optionsFile petscOptions.lu;
+    // PETSc SNES options for the monolithic UpU system are defined in
+    // system/fvSolution. Alternatively, an optionsFile can be specified here.
+    //optionsFile petscOptions.lu;
     //optionsFile petscOptions.mf_fieldsplit;
 }
 
