@@ -16,10 +16,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Note: this decomposeParDict is not used but it must be present to keep
-// argList happy. Use instead the decomposeParDicts in system/fluid and
-// system/solid
+// Keep this top-level processor count consistent with the region
+// decomposeParDicts because the parallel tutorial wrapper uses it to choose
+// the MPI size for the monolithic run.
 
-numberOfSubdomains 2;
+numberOfSubdomains 4;
 
 // ************************************************************************* //

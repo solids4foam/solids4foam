@@ -25,6 +25,38 @@ License
 #include "compatibilityFunctions.H"
 
 
+namespace
+{
+
+void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
+{
+    matrix.diag() *= scale;
+
+    if (matrix.hasUpper())
+    {
+        matrix.upper() *= scale;
+    }
+
+    if (matrix.hasLower())
+    {
+        matrix.lower() *= scale;
+    }
+
+    Foam::FieldField<Foam::Field, Foam::scalar>& internalCoeffs =
+        matrix.internalCoeffs();
+    Foam::FieldField<Foam::Field, Foam::scalar>& boundaryCoeffs =
+        matrix.boundaryCoeffs();
+
+    forAll(internalCoeffs, patchI)
+    {
+        internalCoeffs[patchI] *= scale;
+        boundaryCoeffs[patchI] *= scale;
+    }
+}
+
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -132,6 +164,10 @@ newtonIcoFluid::newtonIcoFluid
     rho_(laminarTransport_.lookup("rho")),
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
+    pressureScaleFactor_
+    (
+        fluidProperties().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    ),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -286,6 +322,11 @@ newtonIcoFluid::newtonIcoFluid
     const fvMesh& mesh = this->mesh();
     const surfaceScalarField& phi = this->phi();
     #include "CourantNo.H"
+
+    if (mag(pressureScaleFactor_ - 1.0) > SMALL)
+    {
+        Info<< "pressureScaleFactor = " << pressureScaleFactor_ << endl;
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -793,6 +834,11 @@ label newtonIcoFluid::formResidual
         p[pRefCell_] = pRefValue_;
     }
 
+    if (pressureScaleFactor_ != 1.0)
+    {
+        pressureResidual *= pressureScaleFactor_;
+    }
+
     foamPetscSnesHelper::InsertFieldComponents<scalar>
     (
         pressureResidual, f, blockSize_ - 1
@@ -932,6 +978,11 @@ label newtonIcoFluid::formJacobian
         pEqn.diag()[pRefCell_] = -1.0;
     }
 
+    if (pressureScaleFactor_ != 1.0)
+    {
+        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+    }
+
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
     (
         pEqn, jac, blockSize_ - 1, blockSize_ - 1, 1
@@ -944,7 +995,8 @@ label newtonIcoFluid::formJacobian
         jac,
         blockSize_ - 1,
         0,
-        fluidModel::twoD() ? 2 : 3
+        fluidModel::twoD() ? 2 : 3,
+        pressureScaleFactor_
     );
 
     foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix

@@ -52,6 +52,19 @@ addToRunTimeSelectionTable
     fluidSolidInterface, newtonQuasiMonolithicCouplingInterface, dictionary
 );
 
+namespace
+{
+
+PetscBool petscOptionEnabled(const char* name)
+{
+    PetscBool enabled = PETSC_FALSE;
+    PetscOptionsGetBool(nullptr, nullptr, name, &enabled, nullptr);
+
+    return enabled;
+}
+
+}
+
 
 // * * * * * * * * * * * Private Member Functions* * * * * * * * * * * * * * //
 
@@ -727,6 +740,8 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // (The Liu interface condition modifies only the residual; the Jacobian
     // approximation is kept as the direct-mapping baseline for consistency.)
     const scalar liuScale = 1.0;
+    const scalar pressureScale =
+        refCast<const fluidModels::newtonIcoFluid>(fluid()).pressureScaleFactor();
 
     // First we will insert the contribution to the fluid momentum equation
     // coming from the diffusion term
@@ -833,7 +848,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
 
         // Manually insert the 3 scalar coefficients (2 in 2-D)
         // (scaled by liuScale for the Liu Eq.31 interface condition)
-        value = liuScale*fluidPatchPressureCoeffs[fluidFaceI][vector::X];
+        value =
+            pressureScale*liuScale
+           *fluidPatchPressureCoeffs[fluidFaceI][vector::X];
 
         globalRowI++; // pressure equation
         globalColI = globalBlockColI*solidBlockSize; // x velocity
@@ -845,7 +862,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
             )
         );
 
-        value = liuScale*fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
+        value =
+            pressureScale*liuScale
+           *fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
         globalColI++; // y velocity
         CHKERRQ
         (
@@ -857,7 +876,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
 
         if (!twoD)
         {
-            value = liuScale*fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
+            value =
+                pressureScale*liuScale
+               *fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
             globalColI++; // z velocity
             CHKERRQ
             (
@@ -2073,6 +2094,9 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     const Vec x
 )
 {
+    const PetscBool reportBlockResiduals =
+        petscOptionEnabled("-s4f_petsc_report_block_residuals");
+
     // Set twoD flag
     const bool twoD = fluid().twoD();
 
@@ -2313,6 +2337,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     }
 
     // 7. Report per-block residual norms (diagnostic)
+    if (reportBlockResiduals)
     {
         PetscReal fluidNormScaled = 0;
         PetscReal solidNormScaled = 0;

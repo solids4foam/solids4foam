@@ -72,7 +72,7 @@ solvers
             fieldsplit_fluid_fieldsplit_1_pc_hypre_type boomeramg;
             fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
                 //fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.25";
-            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.7";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
             fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
             fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
             fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";

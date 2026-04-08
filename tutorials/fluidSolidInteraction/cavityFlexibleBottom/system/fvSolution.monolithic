@@ -25,25 +25,55 @@ solvers
         options
         {
             snes_type newtonls;
-            snes_linesearch_type basic;
-            snes_rtol "1e-6";
-            snes_stol "1e-6";
-            snes_max_it "100";
+            snes_linesearch_type l2;
+            snes_rtol "1e-4";
+            snes_stol "1e-4";
             snes_monitor;
             snes_converged_reason;
 
-            snes_mf;
             snes_mf_operator;
 
             ksp_type lgmres;
-            ksp_gmres_restart "100";
+            ksp_gmres_restart "200";
+            ksp_rtol "1e-4";
             ksp_converged_reason;
+            ksp_max_it "1000";
 
-            pc_type bjacobi;
-            sub_pc_type lu;
+            pc_type fieldsplit;
+            pc_fieldsplit_type multiplicative;
 
-            snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
+            fieldsplit_fluid_ksp_type preonly;
+            fieldsplit_fluid_pc_type fieldsplit;
+            fieldsplit_fluid_pc_fieldsplit_type schur;
+            fieldsplit_fluid_pc_fieldsplit_schur_fact_type lower;
+            fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp;
+            fieldsplit_fluid_pc_fieldsplit_block_size "3";
+            fieldsplit_fluid_pc_fieldsplit_0_fields "0,1";
+            fieldsplit_fluid_pc_fieldsplit_1_fields "2";
+
+            fieldsplit_fluid_fieldsplit_0_ksp_type preonly;
+            fieldsplit_fluid_fieldsplit_0_pc_type bjacobi;
+            fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu;
+            fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels "0";
+
+            fieldsplit_fluid_fieldsplit_1_ksp_type preonly;
+            fieldsplit_fluid_fieldsplit_1_pc_type hypre;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
+
+            fieldsplit_solid_ksp_type preonly;
+            fieldsplit_solid_pc_type bjacobi;
+            fieldsplit_solid_sub_pc_type lu;
         }
     }
 }

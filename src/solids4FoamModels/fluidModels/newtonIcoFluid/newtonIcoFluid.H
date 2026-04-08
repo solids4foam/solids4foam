@@ -100,6 +100,10 @@ class newtonIcoFluid
         //- Pressure stabilisation model
         autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
+        //- Scale factor applied to the pressure-equation residual and
+        //  Jacobian rows relative to the momentum equations
+        const scalar pressureScaleFactor_;
+
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -213,6 +217,12 @@ public:
             const stabilisationModel& pressureStabilisation() const
             {
                 return pressureStabilisationPtr_();
+            }
+
+            //- Return the pressure-equation scaling factor
+            scalar pressureScaleFactor() const
+            {
+                return pressureScaleFactor_;
             }
 
 

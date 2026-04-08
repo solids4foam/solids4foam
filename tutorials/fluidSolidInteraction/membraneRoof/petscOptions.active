@@ -1,4 +1,5 @@
-# Same as the fast fluid/solid split, but with a slightly higher outer KSP cap
+# Active default: general monolithic fluid/solid split with a nested fluid U/p
+# Schur block and full pressure AMG tuned from the local cross-case screen.
 -snes_type newtonls
 -snes_linesearch_type l2
 -snes_rtol 1e-4
@@ -11,16 +12,35 @@
 -ksp_gmres_restart 200
 -ksp_rtol 1e-4
 -ksp_converged_reason
--ksp_max_it 200
+-ksp_max_it 1000
 -pc_type fieldsplit
 -pc_fieldsplit_type multiplicative
 -fieldsplit_fluid_ksp_type preonly
--fieldsplit_fluid_pc_type asm
--fieldsplit_fluid_pc_asm_overlap 1
--fieldsplit_fluid_sub_pc_type ilu
--fieldsplit_fluid_sub_pc_factor_levels 1
+-fieldsplit_fluid_pc_type fieldsplit
+-fieldsplit_fluid_pc_fieldsplit_type schur
+-fieldsplit_fluid_pc_fieldsplit_schur_fact_type lower
+-fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp
+-fieldsplit_fluid_pc_fieldsplit_block_size 4
+-fieldsplit_fluid_pc_fieldsplit_0_fields 0,1,2
+-fieldsplit_fluid_pc_fieldsplit_1_fields 3
+-fieldsplit_fluid_fieldsplit_0_ksp_type preonly
+-fieldsplit_fluid_fieldsplit_0_pc_type bjacobi
+-fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu
+-fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels 0
+-fieldsplit_fluid_fieldsplit_1_ksp_type preonly
+-fieldsplit_fluid_fieldsplit_1_pc_type hypre
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_type boomeramg
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_iter 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold 0.6
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_nl 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_num_paths 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_levels 25
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_P_max 1
+-fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_truncfactor 0.3
 -fieldsplit_solid_ksp_type preonly
 -fieldsplit_solid_pc_type bjacobi
 -fieldsplit_solid_sub_pc_type lu
--s4f_petsc_report_timing true
--s4f_petsc_report_matrix_info true
