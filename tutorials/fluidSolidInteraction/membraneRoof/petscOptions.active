@@ -1,0 +1,26 @@
+# Same as the fast fluid/solid split, but with a slightly higher outer KSP cap
+-snes_type newtonls
+-snes_linesearch_type l2
+-snes_rtol 1e-4
+-snes_stol 1e-4
+-snes_max_linear_solve_fail 10000000
+-snes_monitor
+-snes_converged_reason
+-snes_mf_operator
+-ksp_type lgmres
+-ksp_gmres_restart 200
+-ksp_rtol 1e-4
+-ksp_converged_reason
+-ksp_max_it 200
+-pc_type fieldsplit
+-pc_fieldsplit_type multiplicative
+-fieldsplit_fluid_ksp_type preonly
+-fieldsplit_fluid_pc_type asm
+-fieldsplit_fluid_pc_asm_overlap 1
+-fieldsplit_fluid_sub_pc_type ilu
+-fieldsplit_fluid_sub_pc_factor_levels 1
+-fieldsplit_solid_ksp_type preonly
+-fieldsplit_solid_pc_type bjacobi
+-fieldsplit_solid_sub_pc_type lu
+-s4f_petsc_report_timing true
+-s4f_petsc_report_matrix_info true
