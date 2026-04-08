@@ -2048,15 +2048,21 @@ void newtonQuasiMonolithicCouplingInterface::customiseSolver()
     KSPGetPC(ksp, &pc);
     PCGetType(pc, &pct);
 
-    // If a split preconditioner is used, let is know where the fluid unknowns
-    // and solid unknowns are located
-    // CHECK: is it ok to only call this for timeIndex == 1?
-    if (pct && !std::strcmp(pct, PCFIELDSPLIT) && runTime().timeIndex() == 1)
+    // If a split preconditioner is used, let it know where the fluid unknowns
+    // and solid unknowns are located. Guard with configuredNestedFluidSplit_ to
+    // avoid duplicate IS registration (formJacobian also sets IS).
+    if
+    (
+        pct
+     && !std::strcmp(pct, PCFIELDSPLIT)
+     && !configuredNestedFluidSplit_
+    )
     {
         Info<< "    Defining the fluid-solid field indices for the fluid-solid"
             << nl << "    split preconditioner" << endl;
         PCFieldSplitSetIS(pc, "fluid", isFluid());
         PCFieldSplitSetIS(pc, "solid", isSolid());
+        configuredNestedFluidSplit_ = true;
     }
 }
 
@@ -2306,6 +2312,34 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         VecRestoreSubVector(f, isSolid(), &fSolid);
     }
 
+    // 7. Report per-block residual norms (diagnostic)
+    {
+        PetscReal fluidNormScaled = 0;
+        PetscReal solidNormScaled = 0;
+
+        Vec fFluid = nullptr;
+        VecGetSubVector(f, isFluid(), &fFluid);
+        VecNorm(fFluid, NORM_2, &fluidNormScaled);
+        VecRestoreSubVector(f, isFluid(), &fFluid);
+
+        Vec fSolid = nullptr;
+        VecGetSubVector(f, isSolid(), &fSolid);
+        VecNorm(fSolid, NORM_2, &solidNormScaled);
+        VecRestoreSubVector(f, isSolid(), &fSolid);
+
+        const PetscReal fluidNorm =
+            fluidNormScaled/mag(fluidSystemScaleFactor_);
+        const PetscReal solidNorm =
+            solidNormScaled/mag(solidSystemScaleFactor_);
+
+        Info<< "    Per-block residual norms:"
+            << " fluid(scaled)=" << fluidNormScaled
+            << " solid(scaled)=" << solidNormScaled
+            << " fluid(unscaled)=" << fluidNorm
+            << " solid(unscaled)=" << solidNorm
+            << endl;
+    }
+
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -2439,11 +2473,11 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
     MatScale(subMats[1][0], solidSystemScaleFactor_);
     MatScale(subMats[1][1], solidSystemScaleFactor_);
 
-    // In parallel, convert the assembled MatNest to monolithic MPIAIJ for
-    // preconditioning. This allows standard PCs (LU, ILU, bjacobi, etc.)
-    // to work with the block-structured system.
-    // In serial, PETSc handles the MatNest natively.
-    if (Pstream::parRun())
+    // Convert the assembled MatNest to monolithic AIJ for preconditioning.
+    // This allows standard PCs (LU, ILU, ASM, bjacobi, etc.) to work with the
+    // block-structured system. Required in both serial and parallel because
+    // MatNest does not support operations like MatIncreaseOverlap (ASM).
+    const bool firstMatConvert = (Pmat_ == nullptr);
     {
         if (Pmat_ == nullptr)
         {
@@ -2471,13 +2505,12 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         }
         else
         {
-            // Subsequent calls: reuse the existing MPIAIJ structure
+            // Subsequent calls: reuse the existing AIJ structure
             CHKERRQ
             (
                 MatConvert(assemblyMat, MATAIJ, MAT_REUSE_MATRIX, &Pmat_)
             );
         }
-
     }
 
     // Configure field split index sets when the top-level PC is fieldsplit.
@@ -2520,6 +2553,69 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             // sub-block is configured via PETSc command-line options
             // using block_size (e.g. -fieldsplit_fluid_pc_fieldsplit_
             // block_size 3 for 2D, 4 for 3D).
+        }
+    }
+
+    // One-time check: in parallel, a direct solver (LU/Cholesky) on the
+    // solid sub-block crashes with SIGBUS because the fieldsplit sub-matrix
+    // is distributed.  Use "redundant" to gather the small solid block to
+    // one rank instead.
+    if (firstMatConvert && Pstream::parRun())
+    {
+        KSP ksp;
+        PC pc;
+        const char* pct = nullptr;
+
+        SNESGetKSP(snes(), &ksp);
+        KSPGetPC(ksp, &pc);
+        PCGetType(pc, &pct);
+
+        if (pct && std::strcmp(pct, PCFIELDSPLIT) == 0)
+        {
+            KSPSetOperators
+            (
+                ksp,
+                assemblyMat,
+                Pmat_ ? Pmat_ : assemblyMat
+            );
+            PCSetUp(pc);
+
+            PetscInt nSub = 0;
+            KSP* subKSPs = nullptr;
+            PCFieldSplitGetSubKSP(pc, &nSub, &subKSPs);
+
+            // Solid is the last split (index nSub - 1)
+            if (nSub >= 2)
+            {
+                PC solidPC;
+                KSPGetPC(subKSPs[nSub - 1], &solidPC);
+
+                const char* solidPCType = nullptr;
+                PCGetType(solidPC, &solidPCType);
+
+                if
+                (
+                    solidPCType
+                 && (
+                        !std::strcmp(solidPCType, PCLU)
+                     || !std::strcmp(solidPCType, PCCHOLESKY)
+                    )
+                )
+                {
+                    FatalErrorInFunction
+                        << "The solid sub-block uses direct solver '"
+                        << solidPCType
+                        << "' in parallel, which causes bus errors." << nl
+                        << "Use 'redundant' to gather the solid block"
+                        << " to one rank:" << nl << nl
+                        << "    fieldsplit_solid_pc_type redundant;" << nl
+                        << "    fieldsplit_solid_redundant_pc_type lu;"
+                        << nl << nl
+                        << exit(FatalError);
+                }
+            }
+
+            PetscFree(subKSPs);
         }
     }
 
