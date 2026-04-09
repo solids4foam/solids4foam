@@ -110,11 +110,26 @@ Primary goal:
   found a real foil MPI solid-response regression at 4+ ranks
 - [x] Completed the larger-machine MPI scaling assessment of the current
   preset candidate
-- [ ] Resolve the `foilInWind` MPI solid-response regression before treating
-  the current preset as a universal default recommendation
-- [ ] Test whether tighter outer Newton tolerances reduce the foil MPI
-  `sigmaEq` drift that now appears with both the `strong_threshold 0.6` and
-  `0.7` presets
+- [x] Identified root cause of `foilInWind` MPI solid-response regression:
+  `bjacobi+lu` on the solid sub-block applies per-rank LU which becomes too
+  approximate at high rank counts; replaced with `redundant+lu` (global exact
+  LU gathered to rank 0) which gives the correct answer at all rank counts
+- [x] Validated that `redundant+lu` solid PC fully resolves the MPI
+  `sigmaEq` regression: 8-rank `foilInWind` now gives `sigmaEq 4.994` vs
+  the reference `4.99`, compared to `2.12` with the previous `bjacobi+lu`
+- [x] Confirmed that `upper` Schur factorization gives 24% fewer KSP
+  iterations than `lower` on `foilInWind` (the most representative case);
+  difference is negligible on the small 2-D cases
+- [x] Updated all monolithic tutorial defaults to the combined best preset:
+  `upper` Schur + `redundant+lu` solid + `bjacobi+ilu(0)` velocity +
+  HYPRE BoomerAMG `strong_threshold 0.6` with full tuning
+- [x] Verified combined best preset: `foilInWind` serial 321 KSP, 85 s;
+  8-rank parallel 340 KSP, 16 s, `sigmaEq 4.994`
+- [ ] Re-run remote (xenosim) scaling with `redundant+lu` solid PC to
+  verify that the foil MPI regression is also resolved at 16-32 ranks;
+  note that `redundant+lu` gathers the solid to rank 0 so solid scaling
+  will plateau — this is acceptable for tutorial-sized meshes but should
+  be flagged for large-solid-mesh use cases
 
 ## Ground Rules
 

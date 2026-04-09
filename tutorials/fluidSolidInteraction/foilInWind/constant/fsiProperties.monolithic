@@ -25,19 +25,14 @@ NewtonQuasiMonolithicCoeffs
     fluidPatch flag;
 
     // Enable coupling from 2.0 s
-    coupled  yes;
-    //couplingStartTime 2.0;
+    coupled  no;
+    couplingStartTime 2.0;
 
     // Mapping data across the solid-fluid interface
     interfaceTransferMethod directMap;
 
     // PETSc SNES options for the monolithic UpU system are defined in
-    // system/fvSolution. Alternatively, an optionsFile can be specified here
-    // instead.
-    optionsFile     petscOptions.active;
-    //optionsFile     petscOptions.mf_fieldsplit;
-    //optionsFile     petscOptions.lu;
-    //optionsFile     petscOptions.mf_bjacobi_lu;
+    // system/fvSolution.
 
     // Pass viscous forces from fluid-to-solid interface (in addition to pressure
     // forces)

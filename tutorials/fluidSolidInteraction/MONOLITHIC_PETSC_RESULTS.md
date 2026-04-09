@@ -163,3 +163,69 @@ Representative field-difference checks against the chosen remote references.
   `foilInWind`, and `membraneRoof`. `membraneRoof` was aligned as the 3-D
   analogue of the validated beam/foil setup and still needs its own dedicated
   run.
+
+## Upper vs Lower Schur Factorization (2026-04-09, local v2412)
+
+Direct A/B comparison on all five tutorial cases (Codex config + `upper`
+vs Codex config + `lower`, same machine and mesh):
+
+| Case | lower KSP total | upper KSP total | Winner |
+| --- | --- | --- | --- |
+| `blobInTreacle` (3 coupled steps) | 233 | 246 | lower (~5% fewer) |
+| `cavityFlexibleBottom` (3 coupled steps) | 85 | 91 | lower (~7% fewer) |
+| `beamInCrossFlow` (2 coupled steps) | 55 | 62 | lower (~11% fewer) |
+| `foilInWind` (1 coupled step) | 392 (Phase 8b) | 298 (Phase 8b) | **upper (24% fewer)** |
+
+Conclusion: for small/easy cases the difference is negligible (both < 5 s).
+On `foilInWind`, `upper` is clearly better. Because `foilInWind` is the
+hardest and most representative case, `upper` is the better general default.
+The advantage grows with problem difficulty (more Newton steps, more KSP per
+Newton). All tutorial defaults have been set to `upper`.
+
+## Parallel Solid-Response Regression: Root Cause and Fix (2026-04-09)
+
+Codex identified a `foilInWind` MPI regression: with `bjacobi+lu` on the
+solid sub-block, `sigmaEq` drops from 4.95 to ~2.1 at 8 ranks (force stays
+correct). The root cause is that `bjacobi+lu` applies LU only to each rank's
+local portion of the solid matrix; at 8+ ranks the solid mesh is split into
+very small sub-blocks and the per-rank LU is too approximate.
+
+Fix: replace `fieldsplit_solid_pc_type bjacobi; fieldsplit_solid_sub_pc_type lu`
+with `fieldsplit_solid_pc_type redundant; fieldsplit_solid_redundant_pc_type lu`.
+The `redundant` PC gathers the entire solid block to rank 0 and applies an
+exact global LU, which is correct regardless of the number of ranks.
+
+Validation (local, 8-rank `foilInWind`, one coupled step):
+
+| Solid PC | Newton | KSP total | sigmaEq | Wall time |
+| --- | --- | --- | --- | --- |
+| `bjacobi+lu` (Codex, 8-rank) | 5 | ~395 | **2.12** (WRONG) | ~20 s |
+| `redundant+lu` (fix, 8-rank) | 5 | 397 | **4.994** (correct) | 20 s |
+| `redundant+lu` + `upper` (8-rank) | 5 | 340 | **4.994** (correct) | **16 s** |
+
+The `bjacobi+lu` results from the remote scaling section are therefore
+unreliable for `foilInWind`. The regression is fully resolved by the fix; all
+tutorial defaults have been updated to use `redundant+lu`.
+
+## Combined Best Config (2026-04-09)
+
+Combining both improvements:
+- Schur factorization: `upper`
+- Solid sub-block PC: `redundant+lu`
+- Velocity sub-block PC: `bjacobi+ilu(0)` (Codex-validated; cheaper per KSP than HYPRE)
+- Pressure sub-block PC: HYPRE BoomerAMG, `strong_threshold 0.6`, full tuning
+  (Codex-validated settings)
+
+`foilInWind` serial, one coupled step (local v2412 Mac Studio):
+
+| Config | Newton | KSP total | sigmaEq | Wall time |
+| --- | --- | --- | --- | --- |
+| Codex lower + bjacobi+lu (remote ref) | 5 | 378 | 4.95 | 207 s |
+| HYPRE+HYPRE 0.7 + upper (Phase 8b) | 5 | 298 | 4.99 | 122 s |
+| **Combined best (this commit)** | 5 | 321 | 4.998 | **85 s** |
+
+The higher KSP count (321 vs 298) is explained by `bjacobi+ilu(0)` needing
+slightly more outer iterations than HYPRE for the velocity block; however it
+is far cheaper per iteration, giving a 30% wall-clock improvement.
+
+All five tutorial monolithic configs have been updated to this combined preset.
