@@ -104,8 +104,17 @@ Primary goal:
 - [x] Updated the shipped monolithic tutorial defaults to use the current
   working preset in `blobInTreacle`, `cavityFlexibleBottom`,
   `beamInCrossFlow`, `foilInWind`, and `membraneRoof`
-- [ ] Confirm the same preset remains robust under larger-machine MPI scaling
-  before treating it as the default recommendation for the repo
+- [x] Completed the larger-machine remote scaling pass on xenosim for
+  `blobInTreacle`, `cavityFlexibleBottom`, `beamInCrossFlow`, and
+  `foilInWind`; confirmed clean MPI behaviour on the first three cases and
+  found a real foil MPI solid-response regression at 4+ ranks
+- [x] Completed the larger-machine MPI scaling assessment of the current
+  preset candidate
+- [ ] Resolve the `foilInWind` MPI solid-response regression before treating
+  the current preset as a universal default recommendation
+- [ ] Test whether tighter outer Newton tolerances reduce the foil MPI
+  `sigmaEq` drift that now appears with both the `strong_threshold 0.6` and
+  `0.7` presets
 
 ## Ground Rules
 

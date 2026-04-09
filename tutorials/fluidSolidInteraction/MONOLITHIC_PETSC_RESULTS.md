@@ -72,6 +72,74 @@ screening work on `feature-petsc-snes-quasi-monolithic`.
 | `beamInCrossFlow` | `/private/tmp/monolithicPetscValidate.kUAclp/beamInCrossFlow-ref` | `/private/tmp/monolithicPetscValidate.kUAclp/beamInCrossFlow-hybrid06full` | `5.87e-07`, `5.15e-07`, `5.08e-06`, `5.14e-06` | final total force stayed at `1.29019e-01, -2.55603e-01, 2.59067e-01`; `Max sigmaEq` stayed `4.42764` | passes cleanly against the tighter monolithic reference |
 | `foilInWind` | `/private/tmp/monolithicPetscScreen.kUAclp/foilInWind-currentSplit` | `/private/tmp/monolithicPetscScreen.kUAclp/foilInWind-hybrid06full` | `1.46e-06`, `4.74e-06`, `4.38e-03`, `1.37e-04` | final total force stayed at `7.72069e-05, ~-1e-10, ~1e-11`; `Max sigmaEq` `4.99774 -> 4.99808` | acceptance remains effectively unchanged while the fast cases improve |
 
+## Remote Scaling (xenosim, 2026-04-09)
+
+OpenFOAM-v2512 remote scaling and validation pass on branch
+`feature-petsc-snes-quasi-monolithic`.
+
+| Case | Ranks | Preset | Newton | Linear iters | Wall time | Status | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `blobInTreacle` | 1 | `baseline06-ref` | 2 | 55 | 0.43 s | complete | reference equals current checked-in default |
+| `blobInTreacle` | 1 | `winner06-serial` | 2 | 55 | 0.41 s | complete | matches the checked-in reference exactly on the remote machine |
+| `blobInTreacle` | 2 | `winner06-r2` | 2 | 77 | 0.25 s | complete | useful first speedup despite higher iteration count |
+| `blobInTreacle` | 4 | `winner06-r4` | 2 | 96 | 0.25 s | complete | wall time already flat by 4 ranks; setup cost dominates |
+| `blobInTreacle` | 8 | `winner06-r8` | 2 | 101 | 0.24 s | complete | little gain beyond 2 ranks; fields remain close |
+| `cavityFlexibleBottom` | 1 | `baseline06-ref` | 2 | 20 | 0.39 s | complete | reference equals current checked-in default |
+| `cavityFlexibleBottom` | 1 | `winner06-serial` | 2 | 20 | 0.38 s | complete | matches the checked-in reference exactly on the remote machine |
+| `cavityFlexibleBottom` | 2 | `winner06-r2` | 2 | 27 | 0.16 s | complete | clean MPI scaling with stable observables |
+| `cavityFlexibleBottom` | 4 | `winner06-r4` | 2 | 25 | 0.17 s | complete | still clean; 2 and 4 ranks are close in cost |
+| `cavityFlexibleBottom` | 8 | `winner06-r8` | 2 | 27 | 0.12 s | complete | best remote cavity scaling point; force and stress stay stable |
+| `beamInCrossFlow` | 1 | `monoLU-ref` | 2 | 25 | 25.85 s | complete | robust monolithic `bjacobi+lu` reference, but much slower than the split winner |
+| `beamInCrossFlow` | 1 | `winner06-serial` | 2 | 23 | 4.41 s | complete | same answer as the monolithic reference at much lower cost |
+| `beamInCrossFlow` | 2 | `winner06-r2` | 2 | 30 | 2.20 s | complete | clean scaling and stable beam response |
+| `beamInCrossFlow` | 4 | `winner06-r4` | 2 | 36 | 0.98 s | complete | strong speedup with only tiny field drift |
+| `beamInCrossFlow` | 8 | `winner06-r8` | 2 | 42 | 0.64 s | complete | still clean; iteration growth is modest |
+| `beamInCrossFlow` | 16 | `winner06-r16` | 2 | 49 | 0.52 s | complete | best clean remote beam scaling point |
+| `foilInWind` | 1 | `foil07-ref` | 5 | 378 | 207.28 s | complete | serial reference on the remote machine |
+| `foilInWind` | 1 | `winner06-serial` | 5 | 378 | 222.86 s | complete | matches foil scalar observables in serial but is slightly slower on this machine |
+| `foilInWind` | 2 | `winner06-r2` | 5 | 383 | 146.77 s | complete | force stays stable, but `Max sigmaEq` already drops materially |
+| `foilInWind` | 4 | `winner06-r4` | 5 | 390 | 62.87 s | complete | clear MPI solid-response drift; see field validation below |
+| `foilInWind` | 4 | `foil07-r4` | 5 | 390 | 55.86 s | complete | matches the `winner06` 4-rank foil behaviour; threshold change does not cure the drift |
+| `foilInWind` | 8 | `winner06-r8` | 5 | 399 | 42.17 s | complete | force remains stable while solid fields drift strongly |
+| `foilInWind` | 8 | `foil07-r8` | 5 | 399 | 40.88 s | complete | again matches the `winner06` MPI foil behaviour |
+| `foilInWind` | 16 | `winner06-r16` | 5 | 396 | 28.27 s | complete | still converges, but the solid response is no longer close to the serial reference |
+| `foilInWind` | 32 | `winner06-r32` | 5 | 402 | 17.82 s | complete | severe MPI solid-response drift despite a nearly unchanged force vector |
+
+## Remote Field Validation
+
+Representative field-difference checks against the chosen remote references.
+
+| Case | Reference | Candidate | Relative L2 (`fluid/U`, `fluid/p`, `solid/U`, `solid/sigmaEq`) | Scalar check | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| `blobInTreacle` | `baseline06-ref` | `winner06-serial` | `0`, `0`, `0`, `0` | force unchanged; `Max sigmaEq` `8.10187e-03 -> 8.10187e-03` | serial equivalence |
+| `blobInTreacle` | `baseline06-ref` | `winner06-r8` | `9.31e-05`, `4.91e-05`, `5.41e-04`, `8.72e-04` | force stable; `Max sigmaEq` `8.10187e-03 -> 8.10054e-03` | clean MPI agreement |
+| `cavityFlexibleBottom` | `baseline06-ref` | `winner06-serial` | `0`, `0`, `0`, `0` | force unchanged; `Max sigmaEq` `2.06904e-03 -> 2.06904e-03` | serial equivalence |
+| `cavityFlexibleBottom` | `baseline06-ref` | `winner06-r8` | `5.57e-07`, `5.05e-07`, `5.49e-05`, `9.95e-05` | force stable; `Max sigmaEq` `2.06904e-03 -> 2.06908e-03` | clean MPI agreement |
+| `beamInCrossFlow` | `monoLU-ref` | `winner06-serial` | `4.78e-07`, `6.59e-07`, `3.87e-06`, `3.95e-06` | force stable; `Max sigmaEq` `4.42653 -> 4.42653` | serial equivalence to the conservative monolithic reference |
+| `beamInCrossFlow` | `monoLU-ref` | `winner06-r16` | `1.11e-06`, `1.02e-06`, `1.07e-05`, `1.42e-05` | force stable; `Max sigmaEq` `4.42653 -> 4.42649` | clean MPI agreement |
+| `foilInWind` | `foil07-ref` | `winner06-serial` | `0`, `0`, `0`, `0` | force unchanged; `Max sigmaEq` `4.94872 -> 4.94872` | serial equivalence |
+| `foilInWind` | `foil07-ref` | `foil07-r8` | `1.41e-05`, `4.44e-05`, `5.71e-01`, `5.64e-01` | force stable; `Max sigmaEq` `4.94872 -> 2.12045` | large MPI solid drift |
+| `foilInWind` | `foil07-ref` | `winner06-r32` | `2.29e-05`, `6.96e-05`, `8.01e-01`, `7.91e-01` | force stable; `Max sigmaEq` `4.94872 -> 1.08098` | severe MPI solid drift |
+
+## Remote Conclusion
+
+- `strong_threshold 0.6` still looks like the best general preset on the
+  remote machine for `blobInTreacle`, `cavityFlexibleBottom`, and
+  `beamInCrossFlow`.
+- A different preset is not clearly better at higher rank counts on
+  `foilInWind`: the older `0.7` foil preset reproduces essentially the same
+  4-rank and 8-rank MPI foil behaviour.
+- The real remote regression is `foilInWind` under MPI. Scaling in wall time
+  still improves with rank, but the solid response drifts badly while the
+  force stays nearly unchanged.
+- The small number of foil solid cells per rank may contribute to degraded
+  scaling, but it does not by itself explain the answer change. A more likely
+  explanation is that the current outer Newton tolerances are loose enough
+  that solver-dependent iteration error survives in MPI and contaminates the
+  solid `sigmaEq` response. The next foil-specific check should therefore be a
+  tighter-Newton-tolerance MPI rerun rather than another `strong_threshold`
+  sweep.
+
 ## Notes
 
 - Use clean scratch copies only.
