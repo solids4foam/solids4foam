@@ -140,6 +140,83 @@ Representative field-difference checks against the chosen remote references.
   tighter-Newton-tolerance MPI rerun rather than another `strong_threshold`
   sweep.
 
+## Foil Newton Tolerance Sweep (xenosim, 2026-04-09)
+
+Follow-up remote foil check on the current `winner06` preset, sweeping the
+outer Newton tolerances only:
+`snes_rtol = snes_stol = 1e-5` and `1e-6`.
+
+| Tolerance | Ranks | Newton | Linear iters | Wall time | Final force | Max sigmaEq | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `1e-4` | 1 | 5 | 378 | 222.86 s | `(7.720687e-05, -1.4111325e-10, 9.31478e-12)` | `4.94872` | existing remote `winner06` serial baseline |
+| `1e-4` | 8 | 5 | 399 | 42.17 s | `(7.720708e-05, 2.1156424e-10, 7.758601e-12)` | `2.12045` | existing remote MPI foil-drift point |
+| `1e-4` | 32 | 5 | 402 | 17.82 s | `(7.720689e-05, 2.95105466e-10, 8.4239e-12)` | `1.08098` | existing remote worst-rank foil-drift point |
+| `1e-5` | 1 | 5 | 378 | 361.21 s | `(7.720687e-05, -1.4111325e-10, 9.31478e-12)` | `4.94872` | exactly the same answer as `1e-4`; only wall time changed |
+| `1e-5` | 8 | 5 | 399 | 42.81 s | `(7.720708e-05, 2.1156424e-10, 7.758601e-12)` | `2.12045` | exactly the same MPI answer as `1e-4` |
+| `1e-5` | 32 | 5 | 402 | 19.17 s | `(7.720689e-05, 2.95105466e-10, 8.4239e-12)` | `1.08098` | exactly the same MPI answer as `1e-4` |
+| `1e-6` | 1 | 6 | 452 | 362.74 s | `(7.720707e-05, -2.5057671e-10, 9.05256e-12)` | `4.94893` | serial answer moved only slightly; one extra Newton step |
+| `1e-6` | 8 | 6 | 474 | 53.53 s | `(7.720718e-05, 5.826131e-11, 8.043359e-12)` | `2.43799` | MPI answer shifts, but still remains far from serial |
+| `1e-6` | 32 | 6 | 475 | 23.22 s | `(7.720728e-05, 1.53783326e-10, 7.978215e-12)` | `1.2266` | MPI answer shifts modestly toward serial, but the large solid drift remains |
+
+| Comparison | Relative L2 (`fluid/U`, `fluid/p`, `solid/U`, `solid/sigmaEq`) | Outcome |
+| --- | --- | --- |
+| `1e-4` serial vs `1e-5` serial | `0`, `0`, `0`, `0` | tightening by one order does nothing at all |
+| `1e-4` serial vs `1e-6` serial | `7.16e-05`, `3.80e-04`, `3.83e-03`, `1.07e-04` | the serial foil answer is already essentially converged by `1e-4` |
+| `1e-5` serial vs `1e-5` rank-8 | `1.41e-05`, `4.44e-05`, `5.71e-01`, `5.64e-01` | unchanged from the loose-tolerance foil drift |
+| `1e-5` serial vs `1e-5` rank-32 | `2.29e-05`, `6.96e-05`, `8.01e-01`, `7.91e-01` | unchanged from the loose-tolerance foil drift |
+| `1e-6` serial vs `1e-6` rank-8 | `2.74e-07`, `1.28e-06`, `5.07e-01`, `5.02e-01` | modest improvement, but the solid-field mismatch is still very large |
+| `1e-6` serial vs `1e-6` rank-32 | `3.16e-07`, `1.35e-06`, `7.64e-01`, `7.55e-01` | modest improvement, but the severe high-rank solid drift remains |
+
+The sweep shows that tighter outer Newton tolerances do influence the foil MPI
+answer, but they do not resolve the issue. Tightening from `1e-4` to `1e-5`
+changes nothing. Tightening to `1e-6` adds one Newton step and substantially
+more linear work, while the serial reference barely moves and the MPI solid
+fields remain far from serial. The foil MPI regression therefore is not just a
+loose-Newton-tolerance artifact; tolerance tightening alone is not sufficient.
+
+## Foil Fluid-System Scaling Sweep (xenosim, 2026-04-09)
+
+Follow-up remote foil check on the current `winner06` preset, with the tighter
+outer Newton tolerances held fixed at `snes_rtol = snes_stol = 1e-6` while
+sweeping `fluidSystemScaleFactor`.
+
+| Fluid system scale | Ranks | Newton | Linear iters | Wall time | Final force | Max sigmaEq | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `1e6` | 1 | 6 | 452 | 455.50 s | `(7.720707e-05, -2.5069823e-10, 9.03687e-12)` | `4.94866` | lower fluid scaling; serial answer remains essentially unchanged |
+| `1e7` | 1 | 6 | 452 | 473.96 s | `(7.720707e-05, -2.4973641e-10, 9.03671e-12)` | `4.94878` | same serial answer within noise |
+| `1e8` | 1 | 6 | 452 | 481.57 s | `(7.720707e-05, -2.5057671e-10, 9.05256e-12)` | `4.94893` | current checked-in fluid-system scale |
+| `1e9` | 1 | 6 | 452 | 440.12 s | `(7.720707e-05, -2.5061518e-10, 9.0367e-12)` | `4.94871` | higher fluid scaling; same serial answer within noise |
+| `1e6` | 8 | 6 | 474 | 65.57 s | `(7.720718e-05, 5.806094e-11, 8.053506e-12)` | `2.43806` | same MPI foil drift as the baseline scale |
+| `1e7` | 8 | 6 | 474 | 67.80 s | `(7.720718e-05, 5.815102e-11, 8.048088e-12)` | `2.43825` | same MPI foil drift as the baseline scale |
+| `1e8` | 8 | 6 | 474 | 97.20 s | `(7.720718e-05, 5.826131e-11, 8.043359e-12)` | `2.43799` | current checked-in fluid-system scale |
+| `1e9` | 8 | 6 | 474 | 109.67 s | `(7.720718e-05, 5.815706e-11, 8.055255e-12)` | `2.43845` | same MPI foil drift as the baseline scale |
+| `1e6` | 16 | 6 | 471 | 34.26 s | `(7.720728e-05, 1.47632263e-10, 6.217675e-12)` | `2.4857` | lower fluid scaling; same answer within noise |
+| `1e8` | 16 | 6 | 471 | 34.60 s | `(7.720728e-05, 1.47609324e-10, 6.216343e-12)` | `2.48515` | current checked-in fluid-system scale |
+| `1e9` | 16 | 6 | 471 | 35.14 s | `(7.720728e-05, 1.47605895e-10, 6.215752e-12)` | `2.48481` | higher fluid scaling; same answer within noise |
+
+| Comparison | Relative L2 (`fluid/U`, `fluid/p`, `solid/U`, `solid/sigmaEq`) | Outcome |
+| --- | --- | --- |
+| serial `1e6` vs serial `1e9` | `6.54e-09`, `1.41e-08`, `1.33e-04`, `3.53e-05` | changing the fluid-system scale across three orders of magnitude barely moves the serial foil solution |
+| serial `1e6` vs rank-8 `1e6` | `2.73e-07`, `1.28e-06`, `5.07e-01`, `5.02e-01` | large solid-field drift remains |
+| serial `1e8` vs rank-8 `1e8` | `2.74e-07`, `1.28e-06`, `5.07e-01`, `5.02e-01` | unchanged from `1e6` |
+| serial `1e9` vs rank-8 `1e9` | `2.73e-07`, `1.28e-06`, `5.07e-01`, `5.02e-01` | unchanged from `1e6` and `1e8` |
+| serial `1e6` vs rank-16 `1e6` | `2.73e-07`, `1.16e-06`, `8.85e-01`, `8.43e-01` | large solid-field drift remains |
+| serial `1e8` vs rank-16 `1e8` | `2.73e-07`, `1.16e-06`, `8.85e-01`, `8.43e-01` | unchanged from `1e6` |
+| serial `1e9` vs rank-16 `1e9` | `2.73e-07`, `1.15e-06`, `8.85e-01`, `8.43e-01` | unchanged from `1e6` and `1e8` |
+| rank-8 `1e6` vs rank-8 `1e9` | `9.17e-09`, `3.07e-08`, `2.34e-04`, `1.67e-04` | the rank-8 MPI solution itself barely moves across the scale sweep |
+| rank-16 `1e6` vs rank-16 `1e9` | `5.49e-09`, `4.98e-08`, `5.03e-04`, `4.40e-04` | the rank-16 MPI solution itself barely moves across the scale sweep |
+
+This sweep does not support the fluid-system scaling as the main cause of the
+foil MPI regression, at least over the practical range `1e6` to `1e9`.
+Changing the scale by three orders of magnitude barely moves the serial foil
+solution and barely moves the MPI foil solution at 8 and 16 ranks, while the
+serial-vs-MPI solid-field mismatch remains essentially unchanged. The current
+foil drift therefore is more likely tied to something else in the nonlinear or
+preconditioning path than to the fluid-system scaling alone. The
+`-s4f_petsc_report_block_residuals` flag was added for this sweep, but the
+current foil run path did not emit the expected per-block residual diagnostic,
+so that specific block-wise convergence data is still missing.
+
 ## Notes
 
 - Use clean scratch copies only.
