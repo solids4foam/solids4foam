@@ -125,6 +125,14 @@ Primary goal:
   HYPRE BoomerAMG `strong_threshold 0.6` with full tuning
 - [x] Verified combined best preset: `foilInWind` serial 321 KSP, 85 s;
   8-rank parallel 340 KSP, 16 s, `sigmaEq 4.994`
+- [x] Confirmed independently (remote, xenosim) that tighter outer Newton
+  tolerances (`snes_rtol = snes_stol = 1e-5` and `1e-6`) do not resolve the
+  MPI regression with `bjacobi+lu` — consistent with the fix being a solid PC
+  change to `redundant+lu` rather than a tolerance issue
+- [x] Confirmed independently (remote, xenosim) that sweeping
+  `fluidSystemScaleFactor` (`1e6`–`1e9`) does not resolve the MPI regression
+  with `bjacobi+lu` — consistent with the root cause being the per-rank solid
+  LU, not fluid-system scaling
 - [ ] Re-run remote (xenosim) scaling with `redundant+lu` solid PC to
   verify that the foil MPI regression is also resolved at 16-32 ranks;
   note that `redundant+lu` gathers the solid to rank 0 so solid scaling
