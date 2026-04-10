@@ -8,6 +8,8 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf processor* force.pdf case.foam constant/polyMesh
+cp -f constant/fluidProperties.pimpleFluid constant/fluidProperties
+cp -f system/fvSolution.pimpleFluid system/fvSolution
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

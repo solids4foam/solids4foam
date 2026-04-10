@@ -12,56 +12,43 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-ddtSchemes
-{
-    default backward;
-}
+fluidModel newtonIcoFluid;
 
-gradSchemes
+newtonIcoFluidCoeffs
 {
-    default leastSquares;
-}
+    predictor no;
 
-divSchemes
-{
-    default none;
-    jacobian-div(phi,U) Gauss upwind;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-    div((nuEff*dev(T(grad(U))))) Gauss linear;
-    div(U) Gauss linear;
-}
+    // Force an implicit flux
+    forceImplicitFlux yes;
 
-laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear corrected;
-    laplacian((1|A(U)),p) Gauss linear corrected;
-    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
+    // If the flux is explicit, specify the extrapolation approach
+    // This is not used if forceImplicitFlux is enabled
+    fluidFluxExtrapolationAlgorithm1 yes;
 
-    laplacian(rAU,p) Gauss linear corrected;
-    laplacian(rAUf,p) Gauss linear corrected;
-}
+    // Additional divU term which is meant to improve convergence
+    addDivPhiUDamping no;
 
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
-}
+    // Scaling of pressure equation relative to the momentum
+    pressureScaleFactor 1.0;
 
-snGradSchemes
-{
-    default corrected;
-}
+    stabilisation
+    {
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.0;
+        }
 
-fluxRequired
-{
-    default no;
-    p;
+        pressure
+        {
+            type        RhieChow;
+            scaleFactor 1.0;
+        }
+    }
 }
 
 // ************************************************************************* //

@@ -3,11 +3,33 @@
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Example usage:
+# ./Allrun                 -> pimpleFluid + residualControl 1e-4
+# ./Allrun newtonIcoFluid  -> newtonIcoFluid + lagged PETSc Schur
+#                           fieldsplit + lagged Jacobian
+
+# Parse arguments
+SOLVER="pimpleFluid"
+for arg in "$@"; do
+    if [[ "$arg" == "newtonIcoFluid" ]]; then
+        SOLVER="newtonIcoFluid"
+    fi
+done
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+# Select the fluid solver and fvSolution
+cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
+cp -f "system/fvSolution.${SOLVER}" system/fvSolution
+if [[ "${SOLVER}" == "newtonIcoFluid" ]]; then
+    echo "Using ${SOLVER} with lagged PETSc Schur fieldsplit preconditioning"
+else
+    echo "Using ${SOLVER} with residualControl 1e-4"
+fi
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
@@ -19,7 +41,7 @@ solids4Foam::runApplication solids4Foam
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null

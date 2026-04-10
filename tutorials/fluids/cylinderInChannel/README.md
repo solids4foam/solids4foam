@@ -40,7 +40,15 @@ $$
 + \boldsymbol{f_b}
 $$
 
-We will use the PIMPLE pressure-velocity coupling algorithm:
+The tutorial now supports two solver configurations through `Allrun`:
+
+- `./Allrun`: `pimpleFluid` with PIMPLE `residualControl` of `1e-4` for both
+  `U` and `p`.
+- `./Allrun newtonIcoFluid`: `newtonIcoFluid` with a lagged PETSc Schur
+  `fieldsplit` preconditioner, lagged Jacobian reuse, and SNES stopping
+  tolerances of `1e-4`.
+
+The default option uses the PIMPLE pressure-velocity coupling algorithm:
 
 ```pseudocode
 for all time-steps
@@ -67,8 +75,13 @@ Peric (2002)**
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e.
-`> ./Allrun`. In this case, the `Allrun` script is
+The tutorial case can be run using the included `Allrun` script:
+
+- `./Allrun` runs the residual-controlled `pimpleFluid` setup.
+- `./Allrun newtonIcoFluid` runs the coupled `newtonIcoFluid` setup with the
+  tuned PETSc options.
+
+The current `Allrun` script is
 
 ```bash
 #!/bin/bash
@@ -76,11 +89,33 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Example usage:
+# ./Allrun                 -> pimpleFluid + residualControl 1e-4
+# ./Allrun newtonIcoFluid  -> newtonIcoFluid + lagged PETSc Schur
+#                           fieldsplit + lagged Jacobian
+
+# Parse arguments
+SOLVER="pimpleFluid"
+for arg in "$@"; do
+    if [[ "$arg" == "newtonIcoFluid" ]]; then
+        SOLVER="newtonIcoFluid"
+    fi
+done
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+# Select the fluid solver and fvSolution
+cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
+cp -f "system/fvSolution.${SOLVER}" system/fvSolution
+if [[ "${SOLVER}" == "newtonIcoFluid" ]]; then
+    echo "Using ${SOLVER} with lagged PETSc Schur fieldsplit preconditioning"
+else
+    echo "Using ${SOLVER} with residualControl 1e-4"
+fi
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
@@ -92,11 +127,8 @@ solids4Foam::runApplication solids4Foam
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    if [[ -f "./postProcessing/forces/0/forces.dat" ]]
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.of9.gnuplot &> /dev/null
-    else
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null
     fi
@@ -107,13 +139,15 @@ fi
 
 where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
 case to make it compatible with your version of OpenFOAM/foam-extend. As can be
-seen, the mesh in the fluent format is converted to the OpenFOAM format before
-running the `solids4Foam` solver. After the solver has finished, a `force.pdf`
-plot is generated if the `gnuplot` program is installed.
+seen, the script first selects either the `pimpleFluid` or
+`newtonIcoFluid` dictionaries, then converts the mesh in the fluent format to
+the OpenFOAM format before running `solids4Foam`. After the solver has
+finished, a `force.pdf` plot is generated if the `gnuplot` program is
+installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
- `Allrun` script, i.e. `./Allclean`.
+`Allclean` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -188,8 +222,11 @@ pimpleFluidCoeffs
 
 ```note
 The `pimpleFluid` fluid model does not require any settings to be specified.
- Parameters related to the PIMPLE algorithm as instead specified in
- `system/fvSolution`, just like for the `pimpleFoam` solver.
+Parameters related to the PIMPLE algorithm are instead specified in
+`system/fvSolution`, just like for the `pimpleFoam` solver. In this tutorial,
+`system/fvSolution.pimpleFluid` stores the residual-controlled PIMPLE setup,
+while `system/fvSolution.newtonIcoFluid` stores the tuned PETSc options for the
+coupled Newton solve.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`
