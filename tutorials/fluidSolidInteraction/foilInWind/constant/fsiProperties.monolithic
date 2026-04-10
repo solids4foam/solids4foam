@@ -25,8 +25,8 @@ NewtonQuasiMonolithicCoeffs
     fluidPatch flag;
 
     // Enable coupling from 2.0 s
-    coupled  no;
-    couplingStartTime 2.0;
+    coupled  yes;
+    //couplingStartTime 2.0;
 
     // Mapping data across the solid-fluid interface
     interfaceTransferMethod directMap;
