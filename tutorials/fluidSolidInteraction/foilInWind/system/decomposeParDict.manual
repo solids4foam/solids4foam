@@ -16,31 +16,15 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Keep this in sync with system/decomposeParDict.monolithic when using
+// decomposeParMonolithic -decompose-only followed by manual decomposePar calls.
 numberOfSubdomains 4;
 
-method          scotch;
+method          manual;
 
-monolithicCoeffs
+manualCoeffs
 {
-    regions (fluid solid);
-
-    // Optional per-region cell weights
-    // DOF-based: fluid has 4 DOFs/cell (p,Ux,Uy,Uz), solid has 3 (Dx,Dy,Dz)
-    regionWeights
-    {
-        fluid   4;
-        solid   3;
-    }
-
-    interfaces
-    (
-        {
-            regionA     fluid;
-            patchA      flag;
-            regionB     solid;
-            patchB      interface;
-        }
-    );
+    dataFile    "cellDecomposition";
 }
 
 // ************************************************************************* //

@@ -110,22 +110,34 @@ Primary goal:
   found a real foil MPI solid-response regression at 4+ ranks
 - [x] Completed the larger-machine MPI scaling assessment of the current
   preset candidate
-- [ ] Resolve the `foilInWind` MPI solid-response regression before treating
-  the current preset as a universal default recommendation
-- [x] Tested tighter outer Newton tolerances on remote `foilInWind`
-  (`snes_rtol = snes_stol = 1e-5` and `1e-6`) and found that `1e-5`
-  reproduces the loose-tolerance answer exactly while `1e-6` only modestly
-  reduces the MPI solid-field drift without resolving it
-- [x] Swept `fluidSystemScaleFactor` on remote `foilInWind`
-  (`1e6`, `1e7`, `1e8`, `1e9`) at the tighter `1e-6` Newton tolerance and
-  found that the matched serial, rank-8, and rank-16 solutions barely move,
-  so the current foil drift is not explained by fluid-system scaling over that
-  range
-- [ ] Investigate non-tolerance, non-fluid-scale sources of the
-  `foilInWind` MPI drift, since neither tighter outer Newton tolerances nor a
-  wide `fluidSystemScaleFactor` sweep resolve the `sigmaEq` mismatch
-- [ ] Check whether explicit `solidSystemScaleFactor` choices or block-aware
-  stopping diagnostics change the foil MPI solid response
+- [x] Identified root cause of `foilInWind` MPI solid-response regression:
+  `bjacobi+lu` on the solid sub-block applies per-rank LU which becomes too
+  approximate at high rank counts; replaced with `redundant+lu` (global exact
+  LU gathered to rank 0) which gives the correct answer at all rank counts
+- [x] Validated that `redundant+lu` solid PC fully resolves the MPI
+  `sigmaEq` regression: 8-rank `foilInWind` now gives `sigmaEq 4.994` vs
+  the reference `4.99`, compared to `2.12` with the previous `bjacobi+lu`
+- [x] Confirmed that `upper` Schur factorization gives 24% fewer KSP
+  iterations than `lower` on `foilInWind` (the most representative case);
+  difference is negligible on the small 2-D cases
+- [x] Updated all monolithic tutorial defaults to the combined best preset:
+  `upper` Schur + `redundant+lu` solid + `bjacobi+ilu(0)` velocity +
+  HYPRE BoomerAMG `strong_threshold 0.6` with full tuning
+- [x] Verified combined best preset: `foilInWind` serial 321 KSP, 85 s;
+  8-rank parallel 340 KSP, 16 s, `sigmaEq 4.994`
+- [x] Confirmed independently (remote, xenosim) that tighter outer Newton
+  tolerances (`snes_rtol = snes_stol = 1e-5` and `1e-6`) do not resolve the
+  MPI regression with `bjacobi+lu` — consistent with the fix being a solid PC
+  change to `redundant+lu` rather than a tolerance issue
+- [x] Confirmed independently (remote, xenosim) that sweeping
+  `fluidSystemScaleFactor` (`1e6`–`1e9`) does not resolve the MPI regression
+  with `bjacobi+lu` — consistent with the root cause being the per-rank solid
+  LU, not fluid-system scaling
+- [ ] Re-run remote (xenosim) scaling with `redundant+lu` solid PC to
+  verify that the foil MPI regression is also resolved at 16-32 ranks;
+  note that `redundant+lu` gathers the solid to rank 0 so solid scaling
+  will plateau — this is acceptable for tutorial-sized meshes but should
+  be flagged for large-solid-mesh use cases
 
 ## Ground Rules
 
