@@ -49,11 +49,22 @@ The script:
 3. Runs `blockMesh` for fluid and solid regions
 4. Refines the fluid mesh with `setSet` + `refineMesh`
 5. Initialises the fluid velocity with `potentialFoam`
-6. Runs `solids4Foam` (serial or parallel)
-7. Generates deflection and force plots with gnuplot (if available)
+6. For monolithic parallel runs, calls `decomposeParMonolithic -force`
+7. For partitioned parallel runs, calls `decomposePar` independently for the
+   fluid and solid regions
+8. Runs `solids4Foam` (serial or parallel)
+9. Generates deflection and force plots with gnuplot (if available)
 
 The monolithic approach requires OpenFOAM.com (ESI) and a PETSc installation
 with `PETSC_DIR` set. It does not run with foam-extend or OpenFOAM.org.
+
+If `decomposeParMonolithic` has not been built yet, rebuild the applications
+before running the parallel monolithic case, for example:
+
+```bash
+cd applications/utilities/decomposeParMonolithic
+wmake
+```
 
 ---
 
@@ -126,6 +137,76 @@ The fluid model is `newtonIcoFluid` (see
 `constant/fluid/fluidProperties.monolithic`). The solid model is
 `nonLinearGeometryTotalLagrangianVelocity` (see
 `constant/solid/solidProperties.monolithic`).
+
+---
+
+## Monolithic decomposition
+
+The monolithic parallel branch no longer decomposes the two regions
+independently. Instead, `Allrun monolithic parallel` uses the custom
+`decomposeParMonolithic` utility.
+
+The active decomposition dictionary is `system/decomposeParDict`, which is
+symlinked by `Allrun` to `system/decomposeParDict.monolithic` in monolithic
+mode. For this case it contains:
+
+```foam
+numberOfSubdomains 4;
+
+method scotch;
+
+monolithicCoeffs
+{
+    regions (fluid solid);
+
+    regionWeights
+    {
+        fluid 4;
+        solid 3;
+    }
+
+    interfaces
+    (
+        {
+            regionA fluid;
+            patchA  flag;
+            regionB solid;
+            patchB  interface;
+        }
+    );
+}
+```
+
+### What the utility does
+
+- Loads the `fluid` and `solid` meshes and decomposes them as one combined
+  graph.
+- Uses the internal mesh connectivity within each region plus extra graph edges
+  across the `flag`/`interface` FSI patch pair.
+- Applies the optional `regionWeights` as per-cell weights in the combined
+  graph.
+- Runs the selected decomposition method once, then writes the normal
+  `processor*/fluid/...` and `processor*/solid/...` directories by calling the
+  standard `decomposePar` utility internally with `method manual`.
+
+On this case, the resulting decomposition typically leaves some ranks with zero
+solid cells, which is the intended behaviour for a strongly fluid-dominated
+monolithic FSI problem.
+
+### Current v1 assumptions
+
+- The coupled patches must be conformal and have the same number of faces.
+- The current implementation matches the two interface patches by nearest face
+  centre, which is appropriate for this case's conformal `flag`/`interface`
+  pair.
+- No separate mapping mode is read from `monolithicCoeffs`; the utility always
+  uses this conformal nearest-face-centre matching.
+- `Allrun` uses the normal full workflow. The optional
+  `decomposeParMonolithic -decompose-only` mode is mainly for debugging.
+
+If you do use `-decompose-only`, make sure that any follow-up manual
+`decomposeParDict` uses the same `numberOfSubdomains` as
+`system/decomposeParDict.monolithic`.
 
 ---
 

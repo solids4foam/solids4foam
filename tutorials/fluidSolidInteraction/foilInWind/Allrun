@@ -111,8 +111,14 @@ solids4Foam::runApplication potentialFoam -region fluid
 # Run solver
 if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
-    solids4Foam::runApplication -s fluid decomposePar -region fluid
-    solids4Foam::runApplication -s solid decomposePar -region solid
+    if [[ "$SOLVER" == "monolithic" ]]; then
+        # Monolithic: coupled decomposition across fluid+solid
+        solids4Foam::runApplication decomposeParMonolithic -force
+    else
+        # Partitioned: independent decomposition per region
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    fi
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
