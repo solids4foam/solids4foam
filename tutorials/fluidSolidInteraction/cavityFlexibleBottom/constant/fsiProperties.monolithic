@@ -43,5 +43,4 @@ NewtonQuasiMonolithicCoeffs
     fluidSystemScaleFactor 1e+08;
 }
 
-
 // ************************************************************************* //

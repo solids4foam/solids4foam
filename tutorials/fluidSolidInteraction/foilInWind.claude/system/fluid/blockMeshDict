@@ -205,7 +205,6 @@ blocks
     hex (83 84 89 88   113 114 119 118) ($nx4 $ny5 $nz3) simpleGrading ($gx3 $gy4 $gz2)
 );
 
-
 edges
 (
 );
