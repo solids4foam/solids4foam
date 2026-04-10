@@ -127,6 +127,13 @@ class newtonIcoFluid
         //- Correct phi function
         void correctPhi();
 
+        //- Restore the flow fields and mesh after a failed PETSc solve
+        void restoreOldTimeState
+        (
+            const pointField& oldPoints,
+            const bool meshMoved
+        );
+
         //- Solve pressure equation
         void solvePEqn
         (

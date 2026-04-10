@@ -54,6 +54,30 @@ void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
     }
 }
 
+
+class retryTimeStateBuilder
+:
+    public Foam::TimeState
+{
+public:
+
+    static Foam::TimeState rollbackState(const Foam::Time& runTime)
+    {
+        retryTimeStateBuilder state;
+
+        static_cast<Foam::TimeState&>(state) =
+            static_cast<const Foam::TimeState&>(runTime);
+
+        // Restore the previous successful time-step length as the "saved"
+        // value so the retry does not treat the failed step as the last
+        // accepted one when operator++() updates deltaT0.
+        state.deltaTSave_ = runTime.deltaT0Value();
+        state.writeTime_ = false;
+
+        return state;
+    }
+};
+
 }
 
 
@@ -119,6 +143,37 @@ surfaceScalarField& newtonIcoFluid::rAUf()
     }
 
     return autoPtrRef(rAUfPtr_);
+}
+
+
+void newtonIcoFluid::restoreOldTimeState
+(
+    const pointField& oldPoints,
+    const bool meshMoved
+)
+{
+    dynamicFvMesh& mesh = this->mesh();
+    volVectorField& U = this->U();
+    volScalarField& p = this->p();
+    surfaceScalarField& phi = this->phi();
+
+    U = U.oldTime();
+    U.correctBoundaryConditions();
+
+    p = p.oldTime();
+    p.correctBoundaryConditions();
+
+    if (meshMoved)
+    {
+        mesh.movePoints(oldPoints);
+    }
+
+    phi = fvc::interpolate(U) & mesh.Sf();
+
+    if (meshMoved)
+    {
+        fvc::makeRelative(phi, U);
+    }
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -513,6 +568,7 @@ bool newtonIcoFluid::evolve()
 
     // Take references
     // const Time& runTime = fluidModel::runTime();
+    Time& time = physicsModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
     volVectorField& U = this->U();
     volScalarField& p = this->p();
@@ -523,72 +579,142 @@ bool newtonIcoFluid::evolve()
     //const bool checkMeshCourantNo = checkMeshCourantNo_;
     //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
-    // Update U boundary conditions
-    U.correctBoundaryConditions();
-
-    {
-        const Time& runTime = mesh.time();
-        #include "CourantNo.H"
-    }
-
     // Solution predictor
     const Switch predictor
     (
         fluidProperties().lookupOrDefault<Switch>("predictor", false)
     );
 
-    if (predictor && runTime().timeIndex() > 1) // && newTimeStep())
+    const Switch adjustTimeStep
+    (
+        time.controlDict().lookupOrDefault("adjustTimeStep", false)
+    );
+
+    const label maxTimeStepRetries
+    (
+        fluidProperties().lookupOrDefault<label>("maxTimeStepRetries", 10)
+    );
+
+    label timeStepRetry = 0;
+
+    while (true)
     {
-        Info<< "Applying a linear predictor to velocity" << endl;
-        //predict();
-        // Applying a linear predictor to velocity
-        U = 2.0*U.oldTime() - U.oldTime().oldTime();
-        Info<< "Applying a linear predictor to velocity: done" << endl;
+        // Update U boundary conditions
+        U.correctBoundaryConditions();
 
-        // We could optionally apply a correction to this velocity field to
-        // ensure it is divergence free, i.e. solve for potential and apply
-        //  the correction
+        {
+            const Time& runTime = mesh.time();
+            #include "CourantNo.H"
+        }
 
-        // Access the raw solution data
-        // const PetscScalar *xx;
-        // VecGetArray(foamPetscSnesHelper::solution(), &xx);
+        const scalar failedTimeValue = time.value();
+        const scalar failedDeltaT = time.deltaTValue();
+        const label oldTimeIndex = time.timeIndex() - 1;
+        const scalar oldTimeValue = failedTimeValue - failedDeltaT;
+        const pointField oldPoints(mesh.points());
+        const TimeState retryTimeState =
+            retryTimeStateBuilder::rollbackState(time);
 
-        // Map the U field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
-        (
-            U,
-            foamPetscSnesHelper::solution(),
-            blockSize_,
-            fluidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
-        );
+        if (predictor && time.timeIndex() > 1) // && newTimeStep())
+        {
+            Info<< "Applying a linear predictor to velocity" << endl;
+            U = 2.0*U.oldTime() - U.oldTime().oldTime();
+            Info<< "Applying a linear predictor to velocity: done" << endl;
 
-        // Restore the solution vector
-        // VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
-    }
+            foamPetscSnesHelper::InsertFieldComponents<vector>
+            (
+                U,
+                foamPetscSnesHelper::solution(),
+                blockSize_,
+                fluidModel::twoD()
+              ? makeList<label>({0,1})
+              : makeList<label>({0,1,2})
+            );
+        }
 
-    // Update the mesh
+        // Update the mesh
 #ifdef OPENFOAM_COM
-    mesh.controlledUpdate();
+        mesh.controlledUpdate();
 #else
-    mesh.update();
+        mesh.update();
 #endif
 
-    // Update the flux
-    phi = fvc::interpolate(U) & mesh.Sf();
+        const bool meshMoved = mesh.changing();
 
-    // If the mesh moved, update the flux and make it relative to the mesh
-    // motion
-    if (mesh.changing())
-    {
-        // Make the flux relative to the mesh motion
-        fvc::makeRelative(phi, U);
+        // Update the flux
+        phi = fvc::interpolate(U) & mesh.Sf();
+
+        // If the mesh moved, update the flux and make it relative to the mesh
+        // motion
+        if (meshMoved)
+        {
+            // Make the flux relative to the mesh motion
+            fvc::makeRelative(phi, U);
+        }
+
+        // Keep the pre-solve state so a failed SNES solve can be retried.
+        foamPetscSnesHelper::storeSolutionBackup();
+
+        // Solve the nonlinear system and check the convergence
+        Info<< "Solving the fluid for U and p" << endl;
+        const int solveStatus = foamPetscSnesHelper::solve(true);
+
+        if (solveStatus >= 0)
+        {
+            break;
+        }
+
+        VecCopy
+        (
+            foamPetscSnesHelper::solutionBackup(),
+            foamPetscSnesHelper::solution()
+        );
+
+        restoreOldTimeState(oldPoints, meshMoved);
+
+        if (!adjustTimeStep)
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge and the previous time-step "
+                << "state has been restored, but `adjustTimeStep` is disabled."
+                << nl << "Enable `adjustTimeStep` to retry the failed time "
+                << "step with a reduced deltaT."
+                << abort(FatalError);
+        }
+
+        ++timeStepRetry;
+
+        if (timeStepRetry > maxTimeStepRetries)
+        {
+            FatalErrorInFunction
+                << "Exceeded the maximum number of failed PETSc retries ("
+                << maxTimeStepRetries << ") at time " << failedTimeValue
+                << " with deltaT = " << failedDeltaT << nl
+                << "Set a larger `maxTimeStepRetries` if you would like more "
+                << "recovery attempts."
+                << abort(FatalError);
+        }
+
+        static_cast<TimeState&>(time) = retryTimeState;
+        time.setTime(oldTimeValue, oldTimeIndex);
+        setDeltaT(time);
+
+        if (time.deltaTValue() >= failedDeltaT*(1.0 - SMALL))
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge at the minimum allowed time "
+                << "step. The old-time state has been restored, but deltaT "
+                << "could not be reduced below " << failedDeltaT
+                << " for a retry."
+                << abort(FatalError);
+        }
+
+        ++time;
+
+        Info<< "Retrying the failed PETSc time step with deltaT = "
+            << time.deltaTValue() << " at Time = "
+            << time.timeName() << nl << endl;
     }
-
-    // Solve the nonlinear system and check the convergence
-    Info<< "Solving the fluid for U and p" << endl;
-    foamPetscSnesHelper::solve();
 
     // Access the raw solution data
     const PetscScalar *xx;
@@ -656,7 +782,7 @@ bool newtonIcoFluid::evolve()
 
 #endif
 
-    return 0;
+    return true;
 }
 
 

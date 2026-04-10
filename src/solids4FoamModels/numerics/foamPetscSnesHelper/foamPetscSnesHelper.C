@@ -1823,6 +1823,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     // Check convergence
     SNESConvergedReason reason;
     SNESGetConvergedReason(snes_.s, &reason);
+    diverged_ = (reason < 0);
 
     if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
     {
@@ -1830,7 +1831,10 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
             << "PETSc SNES solver returned a diverged function domain: "
             << "returning" << endl;
 
-        return 0;
+        if (returnOnSnesError)
+        {
+            return reason;
+        }
     }
     else if (reason < 0)
     {
