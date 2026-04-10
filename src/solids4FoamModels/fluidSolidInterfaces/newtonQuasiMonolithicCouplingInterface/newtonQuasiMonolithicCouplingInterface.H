@@ -283,9 +283,8 @@ class newtonQuasiMonolithicCouplingInterface
         //  interface. Three fields are mapped: D, U and pointD
         void mapInterfaceSolidToMeshMotion();
 
-        //- Reset the fields to the old time fields, e.g. after a failed time
-        //  step
-        // void resetFieldsToOldTime();
+        //- Restore the coupled fields and fluid mesh after a failed PETSc solve
+        void restoreOldTimeState(const pointField& oldFluidPoints);
 
         //- Retrieve UFluid, p and USolid from the PETSc solution vector
         void retrieveSolution

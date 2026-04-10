@@ -63,6 +63,30 @@ PetscBool petscOptionEnabled(const char* name)
     return enabled;
 }
 
+
+class retryTimeStateBuilder
+:
+    public Foam::TimeState
+{
+public:
+
+    static Foam::TimeState rollbackState(const Foam::Time& runTime)
+    {
+        retryTimeStateBuilder state;
+
+        static_cast<Foam::TimeState&>(state) =
+            static_cast<const Foam::TimeState&>(runTime);
+
+        // Restore the previous successful time-step length as the "saved"
+        // value so the retry does not treat the failed step as the last
+        // accepted one when operator++() updates deltaT0.
+        state.deltaTSave_ = runTime.deltaT0Value();
+        state.writeTime_ = false;
+
+        return state;
+    }
+};
+
 }
 
 
@@ -1434,6 +1458,58 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::restoreOldTimeState
+(
+    const pointField& oldFluidPoints
+)
+{
+    dynamicFvMesh& fMesh = fluidMesh();
+    volVectorField& UFluid = fluid().U();
+    volScalarField& p = fluid().p();
+    surfaceScalarField& phi = fluid().phi();
+    volVectorField& USolid = solid().U();
+    volVectorField& D = solid().D();
+    volVectorField& DMotion = motionSolid().D();
+
+    UFluid = UFluid.oldTime();
+    UFluid.correctBoundaryConditions();
+
+    p = p.oldTime();
+    p.correctBoundaryConditions();
+
+    USolid = USolid.oldTime();
+    USolid.correctBoundaryConditions();
+
+    D = D.oldTime();
+    D.correctBoundaryConditions();
+
+    solid().mechanical().grad(D, solid().gradD());
+    solid().mechanical().interpolate(D, solid().gradD(), solid().pointD());
+    solid().pointD().correctBoundaryConditions();
+
+    solid().sigma() = solid().sigma().oldTime();
+    solid().sigma().correctBoundaryConditions();
+
+    DMotion = DMotion.oldTime();
+    DMotion.correctBoundaryConditions();
+
+    motionSolid().pointD() = motionSolid().pointD().oldTime();
+    motionSolid().pointD().correctBoundaryConditions();
+
+    motionSolid().sigma() = motionSolid().sigma().oldTime();
+    motionSolid().sigma().correctBoundaryConditions();
+
+    fMesh.movePoints(oldFluidPoints);
+
+    phi = fvc::interpolate(UFluid) & fMesh.Sf();
+
+    if (fMesh.changing())
+    {
+        fvc::makeRelative(phi, UFluid);
+    }
+}
+
+
 void newtonQuasiMonolithicCouplingInterface::retrieveSolution
 (
     Vec solution,
@@ -1766,155 +1842,246 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     }
 
     // Preliminaries
+    Time& time = physicsModel::runTime();
     volVectorField& UFluid = fluid().U();
     surfaceScalarField& phi = fluid().phi();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
     volVectorField& D = solid().D();
     volVectorField& DMotion = motionSolid().D();
-    const dimensionedScalar& deltaT = runTime().deltaT();
     const bool twoD = fluid().twoD();
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    // Ensure boundary conditions are up-to-date
-    UFluid.correctBoundaryConditions();
-    p.correctBoundaryConditions();
-    USolid.correctBoundaryConditions();
-    D.correctBoundaryConditions();
-    DMotion.correctBoundaryConditions();
-
-    //    (a) Explicitly update the solid displacement field D[n]:
-    //          D[n] = D[n-1] + (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2]
-    D = D.oldTime()
-      + (3.0*deltaT/2.0)*USolid.oldTime()
-      - (deltaT/2.0)*USolid.oldTime().oldTime();
-
-    // Update displacement gradient
-    solid().mechanical().grad(D, solid().gradD());
-
-    // Interpolate cell displacements to vertices
-    solid().mechanical().interpolate
+    const Switch adjustTimeStep
     (
-        D, solid().gradD(), solid().pointD()
+        time.controlDict().lookupOrDefault("adjustTimeStep", false)
     );
-    solid().pointD().correctBoundaryConditions();
 
-
-    //    (b) Determine new positions of the vertices on the fluid domain
-    //        mesh given D[n] on the fluid-solid interface, where D is known on
-    //        the interface from the step (a)
-
-    // First, we will map DSolid to DMotion at the interface
-    // This function maps DSolid to DMotion, pointDSolid to pointDMotion,
-    // and USolid to UFluid at the interface
-    // NOTE: mapping of USolid to UFluid is not needed here, but I already had
-    // this function which did this - todo: we can remove that step
-    mapInterfaceSolidToMeshMotion();
-
-
-    //    (c) Update the fluid mesh motion based on the result from (b),
-    //        i.e. fluidMesh.update()
-    // This updates DMotion based on the interface D which was set in step (b)
-    // In addition, this function moves the fluid mesh using this D field
-    fluidMesh().update();
-
-    // Print the mesh Courant number
-    {
-        const scalarField sumPhi
-        (
-            fvc::surfaceSum(mag(fluidMesh().phi()))().primitiveField()
-        );
-
-        const scalar meshCoNum =
-            0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
-
-        const scalar meanMeshCoNum =
-            0.5*(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
-
-        Info<< "Fluid mesh Courant number mean: " << meanMeshCoNum
-            << " max: " << meshCoNum << endl;
-    }
-
-
-    //    (d) Evaluate the predicted fluid fluid (phi) and fluid mesh fluid
-    //        (phiMotion): these are used for the linearised fluid convection
-    //        term
-
-    // Extrapolate the fluid velocity
-    if
+    const label maxTimeStepRetries
     (
-        Switch
-        (
-            fluid().fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
-        )
-    )
-    {
-        // Equation 6.10
-        phi = fvc::interpolate
-              (
-                  2.0*UFluid.oldTime() - UFluid.oldTime().oldTime()
-              ) & fluidMesh().Sf();
-    }
-    else
-    {
-        // Equation 6.30
-        phi = fvc::interpolate
-              (
-                  2.25*UFluid.oldTime()
-                - 1.5*UFluid.oldTime().oldTime()
-                + 0.25*UFluid.oldTime().oldTime().oldTime()
-              ) & fluidMesh().Sf();
-    }
+        fsiProperties().lookupOrDefault<label>("maxTimeStepRetries", 10)
+    );
 
-    // Print the Courant number
+    label timeStepRetry = 0;
+
+    while (true)
     {
-        const scalarField sumPhi
+        const dimensionedScalar& deltaT = time.deltaT();
+        const scalar failedTimeValue = time.value();
+        const scalar failedDeltaT = time.deltaTValue();
+        const label oldTimeIndex = time.timeIndex() - 1;
+        const scalar oldTimeValue = failedTimeValue - failedDeltaT;
+        const pointField oldFluidPoints(fluidMesh().points());
+        const TimeState retryTimeState =
+            retryTimeStateBuilder::rollbackState(time);
+
+        // Ensure boundary conditions are up-to-date
+        UFluid.correctBoundaryConditions();
+        p.correctBoundaryConditions();
+        USolid.correctBoundaryConditions();
+        D.correctBoundaryConditions();
+        DMotion.correctBoundaryConditions();
+
+        //    (a) Explicitly update the solid displacement field D[n]:
+        //          D[n] = D[n-1] + (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2]
+        D = D.oldTime()
+          + (3.0*deltaT/2.0)*USolid.oldTime()
+          - (deltaT/2.0)*USolid.oldTime().oldTime();
+
+        // Update displacement gradient
+        solid().mechanical().grad(D, solid().gradD());
+
+        // Interpolate cell displacements to vertices
+        solid().mechanical().interpolate
         (
-            fvc::surfaceSum(mag(phi))().primitiveField()
+            D, solid().gradD(), solid().pointD()
+        );
+        solid().pointD().correctBoundaryConditions();
+
+
+        //    (b) Determine new positions of the vertices on the fluid domain
+        //        mesh given D[n] on the fluid-solid interface, where D is known
+        //        on the interface from the step (a)
+
+        // First, we will map DSolid to DMotion at the interface
+        // This function maps DSolid to DMotion, pointDSolid to pointDMotion,
+        // and USolid to UFluid at the interface
+        // NOTE: mapping of USolid to UFluid is not needed here, but I already
+        // had this function which did this - todo: we can remove that step
+        mapInterfaceSolidToMeshMotion();
+
+
+        //    (c) Update the fluid mesh motion based on the result from (b),
+        //        i.e. fluidMesh.update()
+        // This updates DMotion based on the interface D which was set in
+        // step (b). In addition, this function moves the fluid mesh using this
+        // D field
+        fluidMesh().update();
+
+        // Print the mesh Courant number
+        {
+            const scalarField sumPhi
+            (
+                fvc::surfaceSum(mag(fluidMesh().phi()))().primitiveField()
+            );
+
+            const scalar meshCoNum =
+                0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
+
+            const scalar meanMeshCoNum =
+                0.5
+               *(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+
+            Info<< "Fluid mesh Courant number mean: " << meanMeshCoNum
+                << " max: " << meshCoNum << endl;
+        }
+
+
+        //    (d) Evaluate the predicted fluid fluid (phi) and fluid mesh fluid
+        //        (phiMotion): these are used for the linearised fluid
+        //        convection term
+
+        // Extrapolate the fluid velocity
+        if
+        (
+            Switch
+            (
+                fluid().fluidProperties().lookup
+                (
+                    "fluidFluxExtrapolationAlgorithm1"
+                )
+            )
+        )
+        {
+            // Equation 6.10
+            phi = fvc::interpolate
+                  (
+                      2.0*UFluid.oldTime() - UFluid.oldTime().oldTime()
+                  ) & fluidMesh().Sf();
+        }
+        else
+        {
+            // Equation 6.30
+            phi = fvc::interpolate
+                  (
+                      2.25*UFluid.oldTime()
+                    - 1.5*UFluid.oldTime().oldTime()
+                    + 0.25*UFluid.oldTime().oldTime().oldTime()
+                  ) & fluidMesh().Sf();
+        }
+
+        // Print the Courant number
+        {
+            const scalarField sumPhi
+            (
+                fvc::surfaceSum(mag(phi))().primitiveField()
+            );
+
+            const scalar CoNum =
+                0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
+
+            const scalar meanCoNum =
+                0.5
+               *(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+
+            Info<< "Fluid Courant number mean: " << meanCoNum
+                << " max: " << CoNum << endl;
+        }
+
+        // In Jamain and Joshi, they update the motionU (fluid mesh velocity)
+        // based on the current, old and old-old fluid mesh positions (or
+        // equivalently the displacements) using a 2nd order method. These mesh
+        // velocities are used in the linearised convection term.
+        // In OpenFOAM, mesh.phi() will already return a 2nd order
+        // approximation of the fluid mesh fluid (velocity times area at the
+        // faces), which is also consistent with the geometric conservation law,
+        // assuming we use a 2nd order time discretisation.
+        // So we don't need to do anything here; we just need to use mesh.phi()
+
+
+        //    (e) Compute the element-level stabilisation parameters : this step
+        //        is not required in our finite volume implementation. Instead,
+        //        we will incorporate typical finite volume stabilisation terms
+        //        (e.g., Rhie-Chow) when forming the monolithic system in
+        //        step (f)
+        //
+        // Nothing to do here.
+
+
+        //    (f) Solve the coupled monolithic system for UFluid[n], pFluid[n],
+        //        and USolid[n] using the fluid mesh from step (c) and the
+        //        linear linearised mesh flux from step (d)
+
+        // Keep the pre-solve state so a failed SNES solve can be retried.
+        foamPetscSnesHelper::storeSolutionBackup();
+
+        // We will call PETSc SNES to form and solve the coupled monolithic
+        // system. Note that this will call formResidual, formJacobian,
+        // initialiseResidual, initialiseJacobian as defined above.
+        // This coupled system will be linear so the PETSc options should be
+        // selected with this in mind.
+        Info<< "Solving the monolithic momentum-continuity system for Up using "
+            << "PETSc SNES" << endl;
+        const int solveStatus = foamPetscSnesHelper::solve(true);
+
+        if (solveStatus >= 0)
+        {
+            break;
+        }
+
+        VecCopy
+        (
+            foamPetscSnesHelper::solutionBackup(),
+            foamPetscSnesHelper::solution()
         );
 
-        const scalar CoNum =
-            0.5*gMax(sumPhi/fluidMesh().V().field())*deltaT.value();
+        restoreOldTimeState(oldFluidPoints);
 
-        const scalar meanCoNum =
-            0.5*(gSum(sumPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+        if (!adjustTimeStep)
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge and the previous "
+                << "fluid-solid time-step state has been restored, but "
+                << "`adjustTimeStep` is disabled." << nl
+                << "Enable `adjustTimeStep` to retry the failed time step "
+                << "with a reduced deltaT."
+                << abort(FatalError);
+        }
 
-        Info<< "Fluid Courant number mean: " << meanCoNum
-            << " max: " << CoNum << endl;
+        ++timeStepRetry;
+
+        if (timeStepRetry > maxTimeStepRetries)
+        {
+            FatalErrorInFunction
+                << "Exceeded the maximum number of failed PETSc retries ("
+                << maxTimeStepRetries << ") at time " << failedTimeValue
+                << " with deltaT = " << failedDeltaT << nl
+                << "Set a larger `maxTimeStepRetries` if you would like more "
+                << "recovery attempts."
+                << abort(FatalError);
+        }
+
+        static_cast<TimeState&>(time) = retryTimeState;
+        time.setTime(oldTimeValue, oldTimeIndex);
+        setDeltaT(time);
+
+        if (time.deltaTValue() >= failedDeltaT*(1.0 - SMALL))
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge at the minimum allowed time "
+                << "step. The old-time state has been restored, but deltaT "
+                << "could not be reduced below " << failedDeltaT
+                << " for a retry."
+                << abort(FatalError);
+        }
+
+        ++time;
+
+        Info<< "Retrying the failed PETSc time step with deltaT = "
+            << time.deltaTValue() << " at Time = "
+            << time.timeName() << nl << endl;
     }
-
-    // In Jamain and Joshi, they update the motionU (fluid mesh velocity) based
-    // on the current, old and old-old fluid mesh positions (or equivalently the
-    // displacements) using a 2nd order method. These mesh velocities are used
-    // in the linearised convection term.
-    // In OpenFOAM, mesh.phi() will already return a 2nd order approximation of
-    // the fluid mesh fluid (velocity times area at the faces), which is also
-    // consistent with the geometric conservation law, assuming we use a 2nd
-    // order time discretisation.
-    // So we don't need to do anything here; we just need to use mesh.phi()
-
-
-    //    (e) Compute the element-level stabilisation parameters : this step is
-    //        not required in our finite volume implementation. Instead, we will
-    //        incorporate typical finite volume stabilisation terms (e.g.,
-    //        Rhie-Chow) when forming the monolithic system in step (f)
-    //
-    // Nothing to do here.
-
-
-    //    (f) Solve the coupled monolithic system for UFluid[n], pFluid[n], and
-    //        USolid[n] using the fluid mesh from step (c) and the linear
-    //        linearised mesh flux from step (d)
-
-    // We will call PETSc SNES to form and solve the coupled monolithic system
-    // Note that this will call formResidual, formJacobian, initialiseResidual,
-    // initialiseJacobian as defined above
-    // This could system will be linear so the PETSc option should be selected
-    // with this in mind
-    Info<< "Solving the monolithic momentum-continuity system for Up using "
-        << "PETSc SNES" << endl;
-    foamPetscSnesHelper::solve();
 
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
     retrieveSolution
@@ -1925,7 +2092,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         twoD
     );
 
-    return 0;
+    return true;
 }
 
 

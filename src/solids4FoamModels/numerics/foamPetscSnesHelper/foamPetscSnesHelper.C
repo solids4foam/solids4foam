@@ -1814,6 +1814,10 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     // Set the snesHasRun flag
     snesHasRun_ = true;
 
+    // Clear any divergence flag from a previous failed solve before entering
+    // the next SNES convergence check.
+    diverged_ = false;
+
     // Solve the nonlinear system
     AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
 
