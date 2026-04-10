@@ -2612,7 +2612,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         VecSetBlockSize(xFluid, fluidBlockSize);
         refCast<fluidModels::newtonIcoFluid>(fluid()).formJacobian
         (
-            subMats[0][0], xFluid, true // use explicit flux
+            subMats[0][0], xFluid, true // allow explicit flux
         );
         VecRestoreSubVector(x, isFluid(), &xFluid);
     }

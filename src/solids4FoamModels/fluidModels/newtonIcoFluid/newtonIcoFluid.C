@@ -956,8 +956,7 @@ label newtonIcoFluid::formResidual
 
     if (pRefCell_ != -1)
     {
-        pressureResidual[pRefCell_] = pRefValue_;
-        p[pRefCell_] = pRefValue_;
+        pressureResidual[pRefCell_] = pRefValue_ - p[pRefCell_];
     }
 
     if (pressureScaleFactor_ != 1.0)
@@ -1004,7 +1003,20 @@ label newtonIcoFluid::formJacobian
     U.correctBoundaryConditions();
 
     surfaceScalarField& phi = this->phi();
-    if (extrapolatedFlux)
+    const Switch forceImplicitFlux =
+        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
+
+    if (forceImplicitFlux || !extrapolatedFlux)
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+    else if
+    (
+        Switch
+        (
+            fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+        )
+    )
     {
         phi =
             fvc::interpolate
@@ -1014,7 +1026,13 @@ label newtonIcoFluid::formJacobian
     }
     else
     {
-        phi = fvc::interpolate(U) & mesh.Sf();
+        phi =
+            fvc::interpolate
+            (
+                2.25*U.oldTime()
+              - 1.5*U.oldTime().oldTime()
+              + 0.25*U.oldTime().oldTime().oldTime()
+            ) & mesh.Sf();
     }
 
     const surfaceScalarField phiAbs("phiAbs", phi);
@@ -1052,7 +1070,7 @@ label newtonIcoFluid::formJacobian
 
     UEqn.relax();
 
-    if (extrapolatedFlux)
+    if (extrapolatedFlux && !forceImplicitFlux)
     {
         UEqn -= fvm::div(phi, U, "jacobian-div(phi,U)");
 
@@ -1081,7 +1099,7 @@ label newtonIcoFluid::formJacobian
 
     // Add advection term to UEqn to allow the correct central coefficient to
     // be calculated for pressure stabilisation
-    if (!extrapolatedFlux)
+    if (!extrapolatedFlux || forceImplicitFlux)
     {
         UEqn -= fvm::div(phi, U);
     }
