@@ -798,6 +798,45 @@ void foamPetscSnesHelper::resetSnes()
 }
 
 
+void foamPetscSnesHelper::resetSnesSolverState()
+{
+    if (!snes_)
+    {
+        return;
+    }
+
+    Info<< "Resetting PETSc SNES/KSP/PC state" << endl;
+
+    SNESLineSearch lineSearch = nullptr;
+    AssertPETSc(SNESGetLineSearch(snes_.s, &lineSearch));
+
+    if (lineSearch)
+    {
+        AssertPETSc(SNESLineSearchReset(lineSearch));
+    }
+
+    KSP ksp = nullptr;
+    AssertPETSc(SNESGetKSP(snes_.s, &ksp));
+
+    if (ksp)
+    {
+        PC pc = nullptr;
+        AssertPETSc(KSPGetPC(ksp, &pc));
+
+        if (pc)
+        {
+            AssertPETSc(PCReset(pc));
+        }
+
+        AssertPETSc(KSPReset(ksp));
+    }
+
+    this->resetCustomSolverState();
+
+    diverged_ = false;
+}
+
+
 label foamPetscSnesHelper::initialiseJacobian
 (
     Mat& jac,

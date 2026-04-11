@@ -348,6 +348,10 @@ public:
             virtual void customiseSolver()
             {}
 
+            //- Called after resetting the SNES/KSP/PC setup
+            virtual void resetCustomSolverState()
+            {}
+
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
@@ -356,6 +360,9 @@ public:
 
             //- Reset the solution and snes object
             void resetSnes();
+
+            //- Reset the SNES/KSP/PC setup while preserving the solution vector
+            void resetSnesSolverState();
 
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of

@@ -375,6 +375,9 @@ public:
             //- Called after SNESSetFromOptions(), before first SNESSolve()
             virtual void customiseSolver();
 
+            //- Called after resetting the SNES/KSP/PC setup
+            virtual void resetCustomSolverState();
+
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector
             virtual label formResidual

@@ -2076,6 +2076,8 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
                 << abort(FatalError);
         }
 
+        foamPetscSnesHelper::resetSnesSolverState();
+
         ++time;
 
         Info<< "Retrying the failed PETSc time step with deltaT = "
@@ -2252,6 +2254,12 @@ void newtonQuasiMonolithicCouplingInterface::customiseSolver()
         PCFieldSplitSetIS(pc, "solid", isSolid());
         configuredNestedFluidSplit_ = true;
     }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::resetCustomSolverState()
+{
+    configuredNestedFluidSplit_ = false;
 }
 
 

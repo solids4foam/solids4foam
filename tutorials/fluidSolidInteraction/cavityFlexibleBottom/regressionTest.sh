@@ -113,6 +113,7 @@ run_petsc_retry_check() {
     local solver_log="${PETSC_RETRY_CASE_DIR}/log.solids4Foam"
     local retry_count=0
     local max_it_count=0
+    local reset_count=0
     local failures=0
 
     echo "============================================================"
@@ -143,6 +144,7 @@ run_petsc_retry_check() {
 
     retry_count=$(grep -c "Retrying the failed PETSc time step" "${solver_log}" || true)
     max_it_count=$(grep -c "DIVERGED_MAX_IT" "${solver_log}" || true)
+    reset_count=$(grep -c "Resetting PETSc SNES/KSP/PC state" "${solver_log}" || true)
 
     if [[ "${retry_count}" -ge 2 ]]; then
         printf "PASS: observed %d PETSc retry attempts\n" "${retry_count}"
@@ -162,6 +164,13 @@ run_petsc_retry_check() {
         echo "PASS: retry cap failure was reported"
     else
         echo "FAIL: retry cap failure was not reported"
+        failures=$((failures + 1))
+    fi
+
+    if [[ "${reset_count}" -ge 2 ]]; then
+        printf "PASS: observed %d PETSc state resets\n" "${reset_count}"
+    else
+        printf "FAIL: observed %d PETSc state resets\n" "${reset_count}"
         failures=$((failures + 1))
     fi
 

@@ -66,9 +66,19 @@ solvers
 
             // Pressure block
             fieldsplit_1_ksp_type preonly;
-            fieldsplit_1_pc_type asm;
-            fieldsplit_1_sub_pc_type ilu;
-            fieldsplit_1_sub_pc_factor_levels "3";
+            fieldsplit_1_pc_type hypre;
+            fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
         }
     }
 

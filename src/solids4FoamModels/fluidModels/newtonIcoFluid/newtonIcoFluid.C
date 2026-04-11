@@ -709,6 +709,8 @@ bool newtonIcoFluid::evolve()
                 << abort(FatalError);
         }
 
+        foamPetscSnesHelper::resetSnesSolverState();
+
         ++time;
 
         Info<< "Retrying the failed PETSc time step with deltaT = "

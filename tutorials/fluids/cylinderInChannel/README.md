@@ -45,8 +45,8 @@ The tutorial now supports two solver configurations through `Allrun`:
 - `./Allrun`: `pimpleFluid` with PIMPLE `residualControl` of `1e-4` for both
   `U` and `p`.
 - `./Allrun newtonIcoFluid`: `newtonIcoFluid` with a lagged PETSc Schur
-  `fieldsplit` preconditioner, lagged Jacobian reuse, and SNES stopping
-  tolerances of `1e-4`.
+  `fieldsplit` preconditioner, hypre BoomerAMG on the pressure block, lagged
+  Jacobian reuse, and SNES stopping tolerances of `1e-4`.
 
 The default option uses the PIMPLE pressure-velocity coupling algorithm:
 
@@ -78,8 +78,8 @@ Peric (2002)**
 The tutorial case can be run using the included `Allrun` script:
 
 - `./Allrun` runs the residual-controlled `pimpleFluid` setup.
-- `./Allrun newtonIcoFluid` runs the coupled `newtonIcoFluid` setup with the
-  tuned PETSc options.
+- `./Allrun newtonIcoFluid` runs the coupled `newtonIcoFluid` setup with
+  hypre BoomerAMG pressure-block preconditioning in the tuned PETSc options.
 
 The current `Allrun` script is
 
@@ -92,7 +92,7 @@ The current `Allrun` script is
 # Example usage:
 # ./Allrun                 -> pimpleFluid + residualControl 1e-4
 # ./Allrun newtonIcoFluid  -> newtonIcoFluid + lagged PETSc Schur
-#                           fieldsplit + lagged Jacobian
+#                           fieldsplit + hypre pressure block
 
 # Parse arguments
 SOLVER="pimpleFluid"
@@ -226,7 +226,7 @@ Parameters related to the PIMPLE algorithm are instead specified in
 `system/fvSolution`, just like for the `pimpleFoam` solver. In this tutorial,
 `system/fvSolution.pimpleFluid` stores the residual-controlled PIMPLE setup,
 while `system/fvSolution.newtonIcoFluid` stores the tuned PETSc options for the
-coupled Newton solve.
+coupled Newton solve, including hypre BoomerAMG pressure-block preconditioning.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`
