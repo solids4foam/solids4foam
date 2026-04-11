@@ -44,9 +44,9 @@ The tutorial now supports two solver configurations through `Allrun`:
 
 - `./Allrun`: `pimpleFluid` with PIMPLE `residualControl` of `1e-4` for both
   `U` and `p`.
-- `./Allrun newtonIcoFluid`: `newtonIcoFluid` with a lagged PETSc Schur
-  `fieldsplit` preconditioner, hypre BoomerAMG on the pressure block, lagged
-  Jacobian reuse, and SNES stopping tolerances of `1e-4`.
+- `./Allrun newtonIcoFluid`: `newtonIcoFluid` with a PETSc Schur `fieldsplit`
+  preconditioner, hypre BoomerAMG on the pressure block, and SNES stopping
+  tolerances of `1e-4`.
 
 The default option uses the PIMPLE pressure-velocity coupling algorithm:
 
@@ -91,8 +91,8 @@ The current `Allrun` script is
 
 # Example usage:
 # ./Allrun                 -> pimpleFluid + residualControl 1e-4
-# ./Allrun newtonIcoFluid  -> newtonIcoFluid + lagged PETSc Schur
-#                           fieldsplit + hypre pressure block
+# ./Allrun newtonIcoFluid  -> newtonIcoFluid + PETSc Schur fieldsplit
+#                           + hypre pressure block
 
 # Parse arguments
 SOLVER="pimpleFluid"
@@ -112,7 +112,7 @@ solids4Foam::convertCaseFormat .
 cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
 cp -f "system/fvSolution.${SOLVER}" system/fvSolution
 if [[ "${SOLVER}" == "newtonIcoFluid" ]]; then
-    echo "Using ${SOLVER} with lagged PETSc Schur fieldsplit preconditioning"
+    echo "Using ${SOLVER} with PETSc Schur fieldsplit preconditioning"
 else
     echo "Using ${SOLVER} with residualControl 1e-4"
 fi

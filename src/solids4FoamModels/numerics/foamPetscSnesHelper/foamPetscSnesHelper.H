@@ -152,6 +152,9 @@ private:
         //- Flag to track if SNES diverged
         bool diverged_;
 
+        //- Force stale lagged Jacobian/preconditioner state to rebuild
+        bool forceSnesSolverStateRebuild_;
+
         //- Pointer to the PETSc SNES object
         //  Note that SNES is a pointer type
         SnesHandle snes_;
@@ -186,6 +189,9 @@ private:
 
         //- A flag indicating if the solve function has been called
         bool snesHasRun_;
+
+        //- A flag indicating if SNESSetFromOptions has been applied
+        bool snesOptionsApplied_;
 
 
     // Private Member Functions
@@ -344,7 +350,7 @@ public:
 
         // Edit
 
-            //- Called after SNESSetFromOptions(), before first SNESSolve()
+            //- Called after the PETSc options are pushed, before SNESSolve()
             virtual void customiseSolver()
             {}
 
@@ -361,7 +367,8 @@ public:
             //- Reset the solution and snes object
             void resetSnes();
 
-            //- Reset the SNES/KSP/PC setup while preserving the solution vector
+            //- Reset retry-sensitive SNES/KSP state while preserving the
+            //  solution vector
             void resetSnesSolverState();
 
             //- Initialise the Jacobian matrix

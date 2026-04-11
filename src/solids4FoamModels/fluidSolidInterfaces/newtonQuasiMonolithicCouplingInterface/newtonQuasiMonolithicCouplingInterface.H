@@ -372,7 +372,7 @@ public:
             //  This procedure should set the size of the solution vector
             virtual label initialiseSolution(Vec& x);
 
-            //- Called after SNESSetFromOptions(), before first SNESSolve()
+            //- Called after the PETSc options are pushed, before SNESSolve()
             virtual void customiseSolver();
 
             //- Called after resetting the SNES/KSP/PC setup

@@ -5,8 +5,8 @@
 
 # Example usage:
 # ./Allrun                 -> pimpleFluid + residualControl 1e-4
-# ./Allrun newtonIcoFluid  -> newtonIcoFluid + lagged PETSc Schur
-#                           fieldsplit + lagged Jacobian
+# ./Allrun newtonIcoFluid  -> newtonIcoFluid + PETSc Schur fieldsplit
+#                           + hypre pressure block
 
 # Parse arguments
 SOLVER="pimpleFluid"
@@ -26,7 +26,7 @@ solids4Foam::convertCaseFormat .
 cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
 cp -f "system/fvSolution.${SOLVER}" system/fvSolution
 if [[ "${SOLVER}" == "newtonIcoFluid" ]]; then
-    echo "Using ${SOLVER} with lagged PETSc Schur fieldsplit preconditioning"
+    echo "Using ${SOLVER} with PETSc Schur fieldsplit preconditioning"
 else
     echo "Using ${SOLVER} with residualControl 1e-4"
 fi

@@ -112,6 +112,8 @@ run_petsc_retry_check() {
     local retry_log="${PETSC_RETRY_CASE_DIR}/${PETSC_RETRY_LOGFILE}"
     local solver_log="${PETSC_RETRY_CASE_DIR}/log.solids4Foam"
     local retry_count=0
+    local same_deltaT_retry_count=0
+    local reduced_deltaT_retry_count=0
     local max_it_count=0
     local reset_count=0
     local failures=0
@@ -143,17 +145,37 @@ run_petsc_retry_check() {
     fi
 
     retry_count=$(grep -c "Retrying the failed PETSc time step" "${solver_log}" || true)
+    same_deltaT_retry_count=$(grep -c "unchanged deltaT" "${solver_log}" || true)
+    reduced_deltaT_retry_count=$(grep -c "with deltaT =" "${solver_log}" || true)
     max_it_count=$(grep -c "DIVERGED_MAX_IT" "${solver_log}" || true)
-    reset_count=$(grep -c "Resetting PETSc SNES/KSP/PC state" "${solver_log}" || true)
+    reset_count=$(grep -c "Resetting PETSc SNES/KSP retry state" "${solver_log}" || true)
 
-    if [[ "${retry_count}" -ge 2 ]]; then
+    if [[ "${retry_count}" -ge 3 ]]; then
         printf "PASS: observed %d PETSc retry attempts\n" "${retry_count}"
     else
         printf "FAIL: observed %d PETSc retry attempts\n" "${retry_count}"
         failures=$((failures + 1))
     fi
 
-    if [[ "${max_it_count}" -ge 3 ]]; then
+    if [[ "${same_deltaT_retry_count}" -ge 1 ]]; then
+        printf "PASS: observed %d same-deltaT PETSc reset retries\n" \
+            "${same_deltaT_retry_count}"
+    else
+        printf "FAIL: observed %d same-deltaT PETSc reset retries\n" \
+            "${same_deltaT_retry_count}"
+        failures=$((failures + 1))
+    fi
+
+    if [[ "${reduced_deltaT_retry_count}" -ge 2 ]]; then
+        printf "PASS: observed %d reduced-deltaT PETSc retries\n" \
+            "${reduced_deltaT_retry_count}"
+    else
+        printf "FAIL: observed %d reduced-deltaT PETSc retries\n" \
+            "${reduced_deltaT_retry_count}"
+        failures=$((failures + 1))
+    fi
+
+    if [[ "${max_it_count}" -ge 4 ]]; then
         printf "PASS: observed %d DIVERGED_MAX_IT reports\n" "${max_it_count}"
     else
         printf "FAIL: observed %d DIVERGED_MAX_IT reports\n" "${max_it_count}"
@@ -167,7 +189,7 @@ run_petsc_retry_check() {
         failures=$((failures + 1))
     fi
 
-    if [[ "${reset_count}" -ge 2 ]]; then
+    if [[ "${reset_count}" -ge 3 ]]; then
         printf "PASS: observed %d PETSc state resets\n" "${reset_count}"
     else
         printf "FAIL: observed %d PETSc state resets\n" "${reset_count}"
@@ -179,6 +201,13 @@ run_petsc_retry_check() {
         failures=$((failures + 1))
     else
         echo "PASS: no stale DIVERGED_FUNCTION_DOMAIN on retry"
+    fi
+
+    if grep -Eq "Segmentation Violation|MPI_ABORT|Caught signal" "${solver_log}"; then
+        echo "FAIL: PETSc retry path crashed"
+        failures=$((failures + 1))
+    else
+        echo "PASS: PETSc retry path did not crash"
     fi
 
     if [[ "${run_status}" -eq 0 ]]; then

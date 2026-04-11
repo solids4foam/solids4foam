@@ -1864,6 +1864,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     );
 
     label timeStepRetry = 0;
+    bool retriedCurrentDeltaT = false;
 
     while (true)
     {
@@ -2038,12 +2039,31 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
         restoreOldTimeState(oldFluidPoints);
 
+        static_cast<TimeState&>(time) = retryTimeState;
+        time.setTime(oldTimeValue, oldTimeIndex);
+
+        if (!retriedCurrentDeltaT)
+        {
+            retriedCurrentDeltaT = true;
+
+            foamPetscSnesHelper::resetSnesSolverState();
+
+            ++time;
+
+            Info<< "Retrying the failed PETSc time step at unchanged deltaT = "
+                << time.deltaTValue() << " after resetting PETSc solver state"
+                << " at Time = " << time.timeName() << nl << endl;
+
+            continue;
+        }
+
         if (!adjustTimeStep)
         {
             FatalErrorInFunction
                 << "PETSc SNES failed to converge and the previous "
-                << "fluid-solid time-step state has been restored, but "
-                << "`adjustTimeStep` is disabled." << nl
+                << "fluid-solid time-step state has been restored, and a "
+                << "same-deltaT PETSc reset retry has already been attempted, "
+                << "but `adjustTimeStep` is disabled." << nl
                 << "Enable `adjustTimeStep` to retry the failed time step "
                 << "with a reduced deltaT."
                 << abort(FatalError);
@@ -2062,8 +2082,6 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
                 << abort(FatalError);
         }
 
-        static_cast<TimeState&>(time) = retryTimeState;
-        time.setTime(oldTimeValue, oldTimeIndex);
         setDeltaT(time);
 
         if (time.deltaTValue() >= failedDeltaT*(1.0 - SMALL))

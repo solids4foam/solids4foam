@@ -713,6 +713,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
     optionsLoaded_(false),
     stopOnPetscError_(stopOnPetscError),
     diverged_(false),
+    forceSnesSolverStateRebuild_(false),
     snes_(),
     x_(),
     xBackup_(),
@@ -732,7 +733,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
     ),
     neiProcGlobalIDs_(),
     neiProcVolumes_(),
-    snesHasRun_(false)
+    snesHasRun_(false),
+    snesOptionsApplied_(false)
 {
     if (initialise)
     {
@@ -771,6 +773,7 @@ void foamPetscSnesHelper::resetSnes()
     x_.reset();
     A_.reset();
     snesUserPtr_.clear();
+    snesOptionsApplied_ = false;
 
     if (initialiseSnes() != 0)
     {
@@ -805,7 +808,7 @@ void foamPetscSnesHelper::resetSnesSolverState()
         return;
     }
 
-    Info<< "Resetting PETSc SNES/KSP/PC state" << endl;
+    Info<< "Resetting PETSc SNES/KSP retry state" << endl;
 
     SNESLineSearch lineSearch = nullptr;
     AssertPETSc(SNESGetLineSearch(snes_.s, &lineSearch));
@@ -820,19 +823,11 @@ void foamPetscSnesHelper::resetSnesSolverState()
 
     if (ksp)
     {
-        PC pc = nullptr;
-        AssertPETSc(KSPGetPC(ksp, &pc));
-
-        if (pc)
-        {
-            AssertPETSc(PCReset(pc));
-        }
-
-        AssertPETSc(KSPReset(ksp));
+        AssertPETSc(KSPSetReusePreconditioner(ksp, PETSC_FALSE));
     }
 
-    this->resetCustomSolverState();
-
+    snesOptionsApplied_ = false;
+    forceSnesSolverStateRebuild_ = true;
     diverged_ = false;
 }
 
@@ -1845,10 +1840,42 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     // Load the correct options database
     AssertPETSc(PetscOptionsPush(options_));
-    AssertPETSc(SNESSetFromOptions(snes_.s));
+
+    if (!snesOptionsApplied_)
+    {
+        AssertPETSc(SNESSetFromOptions(snes_.s));
+        snesOptionsApplied_ = true;
+    }
 
     // Allow derived classes to adjust PC, KSP, etc.
     this->customiseSolver();
+
+    PetscInt lagJacobian = 1;
+    PetscInt lagPreconditioner = 1;
+    const bool forceSolverStateRebuild = forceSnesSolverStateRebuild_;
+
+    if (forceSolverStateRebuild)
+    {
+        AssertPETSc(SNESGetLagJacobian(snes_.s, &lagJacobian));
+        AssertPETSc(SNESGetLagPreconditioner(snes_.s, &lagPreconditioner));
+
+        if (lagJacobian == -1)
+        {
+            AssertPETSc(SNESSetLagJacobian(snes_.s, -2));
+        }
+
+        if (lagPreconditioner == -1)
+        {
+            AssertPETSc(SNESSetLagPreconditioner(snes_.s, -2));
+        }
+
+        if (lagJacobian < 0 || lagPreconditioner < 0)
+        {
+            Info<< "Forcing PETSc Jacobian/preconditioner rebuild" << endl;
+        }
+
+        forceSnesSolverStateRebuild_ = false;
+    }
 
     // Set the snesHasRun flag
     snesHasRun_ = true;
@@ -1859,6 +1886,22 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
 
     // Solve the nonlinear system
     AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
+
+    if (forceSolverStateRebuild)
+    {
+        if (lagJacobian == -2)
+        {
+            lagJacobian = -1;
+        }
+
+        if (lagPreconditioner == -2)
+        {
+            lagPreconditioner = -1;
+        }
+
+        AssertPETSc(SNESSetLagJacobian(snes_.s, lagJacobian));
+        AssertPETSc(SNESSetLagPreconditioner(snes_.s, lagPreconditioner));
+    }
 
     // Un-load the options file
     AssertPETSc(PetscOptionsPop());
