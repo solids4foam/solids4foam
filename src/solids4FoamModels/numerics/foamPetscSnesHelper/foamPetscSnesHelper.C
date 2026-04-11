@@ -44,15 +44,9 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     void *ctx     // user context
 )
 {
-    const PetscScalar *xx;
-    PetscScalar       *ff;
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
     PetscFunctionBeginUser;
-
-    // Access x and f data
-    CHKERRQ(VecGetArrayRead(x, &xx));
-    CHKERRQ(VecGetArray(f, &ff));
 
     // Compute the residual
     if (user->solMod_.formResidual(f, x) != 0)
@@ -78,10 +72,6 @@ PetscErrorCode formResidualFoamPetscSnesHelper
         PetscFunctionReturn(0);
     }
 
-    // Restore the solution and residual vectors
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
-    CHKERRQ(VecRestoreArray(f, &ff));
-
     PetscFunctionReturn(0);
 }
 
@@ -99,10 +89,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
     // re-building the matrix
 
-    // Get pointer to solution data
-    const PetscScalar *xx;
-    CHKERRQ(VecGetArrayRead(x, &xx));
-
     // Access the OpenFOAM data
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
@@ -117,9 +103,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
             << "formJacobian(B, xx) returned an error code!"
             << Foam::abort(Foam::FatalError);
     }
-
-    // Restore solution vector
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
 
     // Complete matrix assembly
     CHKERRQ(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));

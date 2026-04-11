@@ -44,7 +44,8 @@ then
     if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
-        gnuplot force.gnuplot &> /dev/null
+        gnuplot force.gnuplot &> /dev/null \
+            || echo "Could not generate force.pdf using gnuplot"
     fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
