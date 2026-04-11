@@ -66,11 +66,13 @@ fi
 if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
-    gnuplot deflection.gnuplot &> /dev/null
+    gnuplot deflection.gnuplot &> /dev/null \
+        || echo "Could not generate deflection.pdf using gnuplot"
     if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
-        gnuplot force.gnuplot &> /dev/null
+        gnuplot force.gnuplot &> /dev/null \
+            || echo "Could not generate force.pdf using gnuplot"
     fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
