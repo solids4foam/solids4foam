@@ -44,7 +44,7 @@ solvers
             pc_fieldsplit_block_size "3";
             pc_fieldsplit_type schur;
             pc_fieldsplit_schur_factorization_type full;
-            pc_fieldsplit_schur_precondition selfp;
+            pc_fieldsplit_schur_precondition a11;
 
             // Velocity in 2-D
             pc_fieldsplit_0_fields "0,1";
