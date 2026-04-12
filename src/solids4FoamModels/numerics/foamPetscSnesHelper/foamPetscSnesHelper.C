@@ -30,6 +30,7 @@ License
 #include "petscErrorHandling.H"
 #include <petsc/private/pcimpl.h>
 #include "petscdmshell.h"
+#include <cstring>
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlaneFvPatchFields.H"
 #endif
@@ -148,11 +149,41 @@ PetscErrorCode convergenceCheckFoamPetscSnesHelper
 }
 
 
+struct physicsPCData
+{
+    KSP ksp{nullptr};
+    bool useOperator{false};
+};
+
+
 static PetscErrorCode PCApplyPhysics(PC pc, Vec x, Vec y)
 {
     PetscFunctionBeginUser;
 
-    // Retreive the solid model context from the DM
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
+
+    if (data && data->useOperator)
+    {
+        PetscCall(KSPSolve(data->ksp, x, y));
+
+        KSPConvergedReason reason;
+        PetscCall(KSPGetConvergedReason(data->ksp, &reason));
+
+        if (reason < 0)
+        {
+            SETERRQ
+            (
+                PetscObjectComm((PetscObject)pc),
+                PETSC_ERR_CONV_FAILED,
+                "Inner physics operator KSP failed with reason %d",
+                (int)reason
+            );
+        }
+
+        PetscFunctionReturn(0);
+    }
+
+    // Retrieve the model context from the DM
     DM dm = nullptr;
     AssertPETSc(PCGetDM(pc, &dm));
     appCtxfoamPetscSnesHelper* user = nullptr;
@@ -181,34 +212,75 @@ static PetscErrorCode PCSetUpPhysics(PC pc)
 {
     PetscFunctionBeginUser;
 
-    // // Retreive the solid model context from the DM
-    // DM dm = nullptr;
-    // AssertPETSc(PCGetDM(pc, &dm));
-    // appCtxfoamPetscSnesHelper* user = nullptr;
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
 
-    // if (dm)
-    // {
-    //     AssertPETSc(DMGetApplicationContext(dm, (void**)&user));
-    // }
+    char pcType[32] = "model";
+    PetscCall
+    (
+        PetscOptionsGetString
+        (
+            nullptr,
+            nullptr,
+            "-pc_physics_type",
+            pcType,
+            sizeof(pcType),
+            nullptr
+        )
+    );
 
-    // if (!user)
-    // {
-    //     Foam::FatalError
-    //         << "The solid model context needs to be attached to the SNES "
-    //         << "object via a DM"
-    //         << Foam::abort(Foam::FatalError);
-    // }
+    const bool useModel = (std::strcmp(pcType, "model") == 0);
+    data->useOperator = (std::strcmp(pcType, "operator") == 0);
 
-    // Read any runtime knobs and set them in my solid model
-    // char variant[64] = "schur";
-    // PetscOptionsGetString
-    // (
-    //     nullptr, nullptr, "-pc_physics_variant", variant, sizeof(variant), nullptr
-    // );
-    // PetscInt steps = 3;
-    // PetscReal tol = 1e-1;
-    // PetscOptionsGetInt(nullptr, nullptr, "-pc_physics_steps", &steps, nullptr);
-    // PetscOptionsGetReal(nullptr, nullptr, "-pc_physics_tol", &tol, nullptr);
+    if (!useModel && !data->useOperator)
+    {
+        SETERRQ
+        (
+            PetscObjectComm((PetscObject)pc),
+            PETSC_ERR_ARG_WRONG,
+            "Unknown pc_physics_type '%s'; expected 'model' or 'operator'",
+            pcType
+        );
+    }
+
+    if (data->useOperator)
+    {
+        Mat mat = nullptr;
+        Mat pmat = nullptr;
+        PetscCall(PCGetOperators(pc, &mat, &pmat));
+
+        if (!pmat)
+        {
+            SETERRQ
+            (
+                PetscObjectComm((PetscObject)pc),
+                PETSC_ERR_ARG_NULL,
+                "No preconditioning matrix available for pc_physics_type operator"
+            );
+        }
+
+        if (!data->ksp)
+        {
+            PetscCall
+            (
+                KSPCreate(PetscObjectComm((PetscObject)pc), &data->ksp)
+            );
+            PetscCall(KSPSetOptionsPrefix(data->ksp, "pc_physics_operator_"));
+        }
+
+        PetscCall(KSPSetOperators(data->ksp, pmat, pmat));
+        PetscCall(KSPSetType(data->ksp, KSPPREONLY));
+
+        PC innerPc = nullptr;
+        PetscCall(KSPGetPC(data->ksp, &innerPc));
+        PetscCall(PCSetType(innerPc, PCLU));
+
+        PetscCall(KSPSetFromOptions(data->ksp));
+        PetscCall(KSPSetUp(data->ksp));
+    }
+    else if (data->ksp)
+    {
+        PetscCall(KSPReset(data->ksp));
+    }
 
     PetscFunctionReturn(0);
 }
@@ -218,7 +290,14 @@ static PetscErrorCode PCDestroyPhysics(PC pc)
 {
     PetscFunctionBeginUser;
 
-    // Nothing to do
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
+
+    if (data)
+    {
+        PetscCall(KSPDestroy(&data->ksp));
+        delete data;
+        pc->data = nullptr;
+    }
 
     PetscFunctionReturn(0);
 }
@@ -227,6 +306,8 @@ static PetscErrorCode PCDestroyPhysics(PC pc)
 static PetscErrorCode PCCreatePhysics(PC pc)
 {
     PetscFunctionBeginUser;
+
+    pc->data = new physicsPCData;
 
     pc->ops->setup   = PCSetUpPhysics;
     pc->ops->apply   = PCApplyPhysics;
