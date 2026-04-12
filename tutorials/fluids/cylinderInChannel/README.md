@@ -80,6 +80,8 @@ The tutorial case can be run using the included `Allrun` script:
 - `./Allrun` runs the residual-controlled `pimpleFluid` setup.
 - `./Allrun newtonIcoFluid` runs the coupled `newtonIcoFluid` setup with
   hypre BoomerAMG pressure-block preconditioning in the tuned PETSc options.
+- `./Allrun newtonIcoFluidPhysicsPC` runs the coupled `newtonIcoFluid` setup
+  with the opt-in SIMPLE-type physics preconditioner.
 
 The current `Allrun` script is
 
@@ -90,15 +92,25 @@ The current `Allrun` script is
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage:
-# ./Allrun                 -> pimpleFluid + residualControl 1e-4
-# ./Allrun newtonIcoFluid  -> newtonIcoFluid + PETSc Schur fieldsplit
-#                           + hypre pressure block
+# ./Allrun                         -> pimpleFluid + residualControl 1e-4
+# ./Allrun newtonIcoFluid          -> newtonIcoFluid + PETSc Schur fieldsplit
+#                                   + hypre pressure block
+# ./Allrun newtonIcoFluidPhysicsPC -> newtonIcoFluid + SIMPLE-type physics PC
 
 # Parse arguments
 SOLVER="pimpleFluid"
+FV_SOLUTION="pimpleFluid"
+SOLVER_DESCRIPTION="residualControl 1e-4"
 for arg in "$@"; do
     if [[ "$arg" == "newtonIcoFluid" ]]; then
         SOLVER="newtonIcoFluid"
+        FV_SOLUTION="newtonIcoFluid"
+        SOLVER_DESCRIPTION="PETSc Schur fieldsplit preconditioning"
+    elif [[ "$arg" == "newtonIcoFluidPhysicsPC" \
+        || "$arg" == "newtonIcoFluid.physicsPC" ]]; then
+        SOLVER="newtonIcoFluid"
+        FV_SOLUTION="newtonIcoFluid.physicsPC"
+        SOLVER_DESCRIPTION="PETSc SIMPLE-type physics preconditioning"
     fi
 done
 
@@ -110,12 +122,8 @@ solids4Foam::convertCaseFormat .
 
 # Select the fluid solver and fvSolution
 cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
-cp -f "system/fvSolution.${SOLVER}" system/fvSolution
-if [[ "${SOLVER}" == "newtonIcoFluid" ]]; then
-    echo "Using ${SOLVER} with PETSc Schur fieldsplit preconditioning"
-else
-    echo "Using ${SOLVER} with residualControl 1e-4"
-fi
+cp -f "system/fvSolution.${FV_SOLUTION}" system/fvSolution
+echo "Using ${SOLVER} with ${SOLVER_DESCRIPTION}"
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
@@ -227,6 +235,9 @@ Parameters related to the PIMPLE algorithm are instead specified in
 `system/fvSolution.pimpleFluid` stores the residual-controlled PIMPLE setup,
 while `system/fvSolution.newtonIcoFluid` stores the tuned PETSc options for the
 coupled Newton solve, including hypre BoomerAMG pressure-block preconditioning.
+The opt-in `system/fvSolution.newtonIcoFluid.physicsPC` variant uses a
+SIMPLE-type physics preconditioner with one fixed `dU` correction and one fixed
+`dp` correction per preconditioner application.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`

@@ -46,6 +46,8 @@ laplacianSchemes
 
     laplacian(rAU,p) Gauss linear corrected;
     laplacian(rAUf,p) Gauss linear corrected;
+    laplacian(nuEff,dU) Gauss linear corrected;
+    laplacian(rAUf,dp) Gauss linear corrected;
 }
 
 interpolationSchemes
