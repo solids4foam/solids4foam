@@ -1181,6 +1181,184 @@ label newtonIcoFluid::formJacobian
     return 0;
 }
 
+
+label newtonIcoFluid::precondition
+(
+    Vec y,
+    const Vec x
+)
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const fvMesh& mesh = this->mesh();
+    const volVectorField& U = this->U();
+    const volScalarField& p = this->p();
+    const surfaceScalarField& phi = this->phi();
+
+    volVectorField dU
+    (
+        IOobject
+        (
+            "dU",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("zero", dimVelocity, vector::zero),
+        U.boundaryField().types()
+    );
+
+    volScalarField dp
+    (
+        IOobject
+        (
+            "dp",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", p.dimensions(), 0.0),
+        p.boundaryField().types()
+    );
+
+    vectorField momentumRhs(dU.primitiveField().size(), vector::zero);
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        momentumRhs,
+        0,
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    scalarField pressureRhs(dp.primitiveField().size(), 0.0);
+    foamPetscSnesHelper::ExtractFieldComponents<scalar>
+    (
+        x, pressureRhs, blockSize_ - 1
+    );
+
+    // Use the same approximate momentum block as the assembled Jacobian's
+    // segregated part.  The extra forceImplicitFlux tensor terms are left to
+    // the assembled PETSc matrix path; this preconditioner stays deliberately
+    // cheap and local.
+    fvVectorMatrix UEqn
+    (
+        fvm::laplacian(turbulence_->nuEff(), dU)
+      - fvm::ddt(dU)
+      - fvm::div(phi, dU, "jacobian-div(phi,U)")
+    );
+
+    UEqn.relax();
+
+    if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
+    {
+        const surfaceScalarField phiAbs("phiAbs", phi);
+        UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), dU);
+    }
+
+    UEqn.source() = momentumRhs;
+    dU.primitiveFieldRef() = vector::zero;
+    dU.correctBoundaryConditions();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const int oldVectorSolverDebug = SolverPerformance<vector>::debug;
+    const int oldScalarSolverDebug = SolverPerformance<scalar>::debug;
+    SolverPerformance<vector>::debug = 0;
+    SolverPerformance<scalar>::debug = 0;
+#else
+    const int oldBlockLduDebug = blockLduMatrix::debug;
+    blockLduMatrix::debug = 0;
+#endif
+
+    UEqn.solve(mesh.solverDict("dU"));
+
+    volScalarField rAU("rAU", 1.0/UEqn.A());
+
+    // Match the pressure-block sign convention in formJacobian().
+    rAUf() = -fvc::interpolate(rAU);
+
+    surfaceScalarField phiHbyA
+    (
+        "phiHbyA",
+        fvc::interpolate(dU) & mesh.Sf()
+    );
+
+    fvScalarMatrix pEqn
+    (
+        pressureStabilisation().scalarJacobian(dp, &rAUf(), true)
+    );
+
+    scalarField pSource
+    (
+        pressureRhs
+      + pressureScaleFactor_
+       *fvc::div(phiHbyA)().primitiveField()*mesh.V()
+    );
+
+    if (pRefCell_ != -1)
+    {
+#ifdef OPENFOAM_COM
+        pEqn.setValues(labelList(1, pRefCell_), 0.0);
+#else
+        pEqn.setValues(labelList(1, pRefCell_), scalarField(1, 0.0));
+#endif
+        pEqn.diag()[pRefCell_] = -1.0;
+        pSource[pRefCell_] = pressureRhs[pRefCell_];
+    }
+
+    if (pressureScaleFactor_ != 1.0)
+    {
+        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+    }
+
+    pEqn.source() = pSource;
+    dp.primitiveFieldRef() = 0.0;
+    dp.correctBoundaryConditions();
+
+    pEqn.solve(mesh.solverDict("dp"));
+
+    dU += rAU*fvc::grad(dp);
+    dU.correctBoundaryConditions();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector>::debug = oldVectorSolverDebug;
+    SolverPerformance<scalar>::debug = oldScalarSolverDebug;
+#else
+    blockLduMatrix::debug = oldBlockLduDebug;
+#endif
+
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        dU.primitiveField(),
+        y,
+        0,
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    foamPetscSnesHelper::InsertFieldComponents<scalar>
+    (
+        dp.primitiveField(), y, blockSize_ - 1
+    );
+
+    if (debug)
+    {
+        Info<< "End" << endl;
+    }
+
+    return 0;
+}
+
 #endif // USE_PETSC
 
 

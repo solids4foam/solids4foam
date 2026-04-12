@@ -294,6 +294,15 @@ public:
                 const bool extrapolatedFlux
             );
 
+            //- Apply a SIMPLE-type segregated preconditioner
+            //  Approximately solves y = M^{-1} x using one SIMPLE iteration
+            //  when PETSc uses the `physics` preconditioner
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            );
+
 
 #endif // USE_PETSC
 };
