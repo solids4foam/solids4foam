@@ -24,6 +24,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "leastSquaresVectors.H"
 #include "DynamicList.H"
+#include "HashSet.H"
 #include "fvm.H"
 #include "IFstream.H"
 #include "IOdictionary.H"
@@ -993,29 +994,53 @@ label foamPetscSnesHelper::initialiseJacobian
     // Count the neighbours
     if (location_ == solutionLocation::CELLS)
     {
-        // Count neighbours sharing an internal face
+        List<labelHashSet> gradCols(blockn);
+        List<labelHashSet> rowCols(blockn);
+
+        forAll(rowCols, cellI)
+        {
+            gradCols[cellI] = labelHashSet(16);
+            rowCols[cellI] = labelHashSet(32);
+
+            const label globalCellID = globalCells().toGlobal(cellI);
+            gradCols[cellI].insert(globalCellID);
+            rowCols[cellI].insert(globalCellID);
+        }
+
         const Foam::labelUList& own = mesh.owner();
         const Foam::labelUList& nei = mesh.neighbour();
         forAll(own, faceI)
         {
             const Foam::label ownCellID = own[faceI];
             const Foam::label neiCellID = nei[faceI];
-            d_nnz[ownCellID]++;
-            d_nnz[neiCellID]++;
+
+            const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+            const label globalNeiCellID = globalCells().toGlobal(neiCellID);
+
+            gradCols[ownCellID].insert(globalNeiCellID);
+            gradCols[neiCellID].insert(globalOwnCellID);
+
+            rowCols[ownCellID].insert(globalNeiCellID);
+            rowCols[neiCellID].insert(globalOwnCellID);
         }
 
-        // Count off-processor neighbour cells
+        const PtrList<labelList>& neiProcGlobalIDs =
+            this->neiProcGlobalIDs(mesh);
+
         forAll(mesh.boundary(), patchI)
         {
             if (mesh.boundary()[patchI].type() == "processor")
             {
                 const Foam::labelUList& faceCells =
                     mesh.boundary()[patchI].faceCells();
+                const labelList& neiGlobalFaceCells =
+                    neiProcGlobalIDs[patchI];
 
                 forAll(faceCells, fcI)
                 {
                     const Foam::label cellID = faceCells[fcI];
-                    o_nnz[cellID]++;
+                    gradCols[cellID].insert(neiGlobalFaceCells[fcI]);
+                    rowCols[cellID].insert(neiGlobalFaceCells[fcI]);
                 }
             }
             else if (mesh.boundary()[patchI].coupled())
@@ -1024,6 +1049,55 @@ label foamPetscSnesHelper::initialiseJacobian
                 Foam::FatalError
                     << "Coupled boundary are not implemented, except for"
                     << " processor boundaries" << Foam::abort(Foam::FatalError);
+            }
+        }
+
+        auto insertSet =
+            [](labelHashSet& row, const labelHashSet& cols)
+            {
+                forAllConstIter(labelHashSet, cols, iter)
+                {
+                    row.insert(iter.key());
+                }
+            };
+
+        // The pressure stabilisation may contain div(interpolate(grad(p))).
+        // This reaches the gradient stencil of the neighbouring cell across
+        // each internal face, not just the direct face-neighbour stencil.
+        forAll(own, faceI)
+        {
+            const Foam::label ownCellID = own[faceI];
+            const Foam::label neiCellID = nei[faceI];
+
+            insertSet(rowCols[ownCellID], gradCols[neiCellID]);
+            insertSet(rowCols[neiCellID], gradCols[ownCellID]);
+        }
+
+#ifdef OPENFOAM_ORG
+        const label myProcNo = Pstream::myProcNo();
+        const label gStart = globalCells().offset(myProcNo);
+        const label gEnd = gStart + globalCells().localSize(myProcNo);
+#else
+        const label gStart = globalCells().localStart();
+        const label gEnd = globalCells().localEnd();
+#endif
+
+        d_nnz = 0;
+
+        forAll(rowCols, cellI)
+        {
+            forAllConstIter(labelHashSet, rowCols[cellI], iter)
+            {
+                const label gCol = iter.key();
+
+                if (gCol >= gStart && gCol < gEnd)
+                {
+                    ++d_nnz[cellI];
+                }
+                else
+                {
+                    ++o_nnz[cellI];
+                }
             }
         }
     }
@@ -1065,12 +1139,12 @@ label foamPetscSnesHelper::initialiseJacobian
     }
 
     // Allocate parallel matrix
-    //AssertPETSc(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
-    // Allocate parallel matrix with the same conservative stencil per node
-    //AssertPETSc(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    AssertPETSc(MatMPIBAIJSetPreallocation
+    AssertPETSc
     (
-        jac, blockSize, 0, d_nnz.data(), 0, o_nnz.data())
+        MatXAIJSetPreallocation
+        (
+            jac, blockSize, d_nnz.data(), o_nnz.data(), NULL, NULL
+        )
     );
 
     // Raise an error if mallocs are required during matrix assembly
