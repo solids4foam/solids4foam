@@ -23,6 +23,7 @@ License
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
 #include "leastSquaresVectors.H"
+#include "DynamicList.H"
 #include "fvm.H"
 #include "IFstream.H"
 #include "IOdictionary.H"
@@ -1367,6 +1368,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             if (useBoundaryFaceValues[patchI])
             {
+                const fvPatchScalarField& pp = p.boundaryField()[patchI];
+                const scalarField intCoeffs(pp.valueInternalCoeffs(fp.weights()));
+
                 forAll(faceCells, patchFaceI)
                 {
                     // Explicit calculation
@@ -1389,7 +1393,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                     {
                         values[cmptI*blockSize + colOffset] =
-                            -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
+                            sign*VI[ownCellID]
+                           *(intCoeffs[patchFaceI] - 1.0)
+                           *patchOwnLs[patchFaceI][cmptI];
                     }
                     AssertPETSc
                     (
@@ -1401,6 +1407,246 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                         )
                     );
                 }
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
+(
+    const volScalarField& p,
+    const surfaceScalarField& gamma,
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const scalar scale
+) const
+{
+    const fvMesh& mesh = p.mesh();
+    const leastSquaresS4fVectors& lsv = lsVectors(p);
+
+    const surfaceVectorField& ownLs = lsv.pVectors();
+    const surfaceVectorField& neiLs = lsv.nVectors();
+    const boolList& useBoundaryFaceValues = lsv.useBoundaryFaceValues();
+
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+
+    List<DynamicList<label>> gradCols(mesh.nCells());
+    List<DynamicList<vector>> gradCoeffs(mesh.nCells());
+
+    auto appendGradCoeff =
+        [&](const label cellI, const label globalColI, const vector& coeff)
+        {
+            gradCols[cellI].append(globalColI);
+            gradCoeffs[cellI].append(coeff);
+        };
+
+    forAll(own, faceI)
+    {
+        const label ownCellID = own[faceI];
+        const label neiCellID = nei[faceI];
+
+        const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+        const label globalNeiCellID = globalCells().toGlobal(neiCellID);
+
+        appendGradCoeff(ownCellID, globalOwnCellID, -ownLs[faceI]);
+        appendGradCoeff(ownCellID, globalNeiCellID, ownLs[faceI]);
+
+        appendGradCoeff(neiCellID, globalNeiCellID, -neiLs[faceI]);
+        appendGradCoeff(neiCellID, globalOwnCellID, neiLs[faceI]);
+    }
+
+    const PtrList<labelList>& neiProcGlobalIDs = this->neiProcGlobalIDs(mesh);
+
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        const labelUList& faceCells = fp.faceCells();
+        const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchI];
+
+        if (fp.type() == "processor")
+        {
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+
+                appendGradCoeff
+                (
+                    ownCellID, globalOwnCellID, -patchOwnLs[patchFaceI]
+                );
+                appendGradCoeff
+                (
+                    ownCellID,
+                    neiGlobalFaceCells[patchFaceI],
+                    patchOwnLs[patchFaceI]
+                );
+            }
+        }
+        else if (fp.coupled())
+        {
+            // Coupled non-processor patches are not handled elsewhere in the
+            // PETSc helper either.
+            FatalErrorInFunction
+                << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(fp.patch())
+#ifdef OPENFOAM_NOT_EXTEND
+         || isA<symmetryPlanePolyPatch>(fp.patch())
+#endif
+        )
+        {
+            // The scalar jump across a symmetry plane is zero.
+        }
+        else if (useBoundaryFaceValues[patchI])
+        {
+            const fvPatchScalarField& pp = p.boundaryField()[patchI];
+            const scalarField intCoeffs(pp.valueInternalCoeffs(fp.weights()));
+
+            forAll(faceCells, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+
+                appendGradCoeff
+                (
+                    ownCellID,
+                    globalOwnCellID,
+                    (intCoeffs[patchFaceI] - 1.0)*patchOwnLs[patchFaceI]
+                );
+            }
+        }
+    }
+
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
+    const label nCoeffCmpts = blockSize*blockSize;
+    List<PetscScalar> values(nCoeffCmpts, 0.0);
+    const label valueOffset = rowOffset*blockSize + colOffset;
+
+    auto insertGradDivStencil =
+        [&]
+        (
+            const label rowCellID,
+            const vector& faceCoeff,
+            const DynamicList<label>& cols,
+            const DynamicList<vector>& coeffs
+        )
+        {
+            const label globalBlockRowI = globalCells().toGlobal(rowCellID);
+
+            forAll(cols, coeffI)
+            {
+                const scalar value = faceCoeff & coeffs[coeffI];
+
+                if (mag(value) > VSMALL)
+                {
+                    const label globalBlockColI = cols[coeffI];
+
+                    values[valueOffset] = value;
+                    AssertPETSc
+                    (
+                        MatSetValuesBlocked
+                        (
+                            jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                            values.cdata(),
+                            ADD_VALUES
+                        )
+                    );
+                    values[valueOffset] = 0.0;
+                }
+            }
+        };
+
+    const scalarField& gammaI = gamma;
+    const vectorField& SfI = mesh.Sf();
+    const scalarField& wI = mesh.weights();
+
+    forAll(own, faceI)
+    {
+        const label ownCellID = own[faceI];
+        const label neiCellID = nei[faceI];
+
+        const vector ownFaceCoeff =
+            scale*gammaI[faceI]*wI[faceI]*SfI[faceI];
+        const vector neiFaceCoeff =
+            scale*gammaI[faceI]*(1.0 - wI[faceI])*SfI[faceI];
+
+        insertGradDivStencil
+        (
+            ownCellID, ownFaceCoeff,
+            gradCols[ownCellID], gradCoeffs[ownCellID]
+        );
+        insertGradDivStencil
+        (
+            ownCellID, neiFaceCoeff,
+            gradCols[neiCellID], gradCoeffs[neiCellID]
+        );
+
+        insertGradDivStencil
+        (
+            neiCellID, -ownFaceCoeff,
+            gradCols[ownCellID], gradCoeffs[ownCellID]
+        );
+        insertGradDivStencil
+        (
+            neiCellID, -neiFaceCoeff,
+            gradCols[neiCellID], gradCoeffs[neiCellID]
+        );
+    }
+
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        const labelUList& faceCells = fp.faceCells();
+        const vectorField& pSf = fp.Sf();
+        const fvsPatchScalarField& pGamma = gamma.boundaryField()[patchI];
+
+        if (fp.type() == "empty")
+        {
+            continue;
+        }
+        else if (fp.coupled())
+        {
+            const fvsPatchScalarField& pw =
+                mesh.weights().boundaryField()[patchI];
+
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const vector faceCoeff =
+                    scale*pGamma[patchFaceI]*pw[patchFaceI]*pSf[patchFaceI];
+
+                insertGradDivStencil
+                (
+                    ownCellID, faceCoeff,
+                    gradCols[ownCellID], gradCoeffs[ownCellID]
+                );
+            }
+        }
+        else
+        {
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const vector faceCoeff =
+                    scale*pGamma[patchFaceI]*pSf[patchFaceI];
+
+                insertGradDivStencil
+                (
+                    ownCellID, faceCoeff,
+                    gradCols[ownCellID], gradCoeffs[ownCellID]
+                );
             }
         }
     }

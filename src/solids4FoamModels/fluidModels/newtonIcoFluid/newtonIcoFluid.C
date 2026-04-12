@@ -1153,6 +1153,24 @@ label newtonIcoFluid::formJacobian
         pEqn, jac, blockSize_ - 1, blockSize_ - 1, 1
     );
 
+    const word pressureStabType(pressureStabilisation().type());
+    if
+    (
+        pressureStabType == "RhieChow"
+     || pressureStabType == "diffStencilLaplacian"
+    )
+    {
+        foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
+        (
+            p,
+            rAUf(),
+            jac,
+            blockSize_ - 1,
+            blockSize_ - 1,
+           -pressureScaleFactor_*pressureStabilisation().scaleFactorJacobian()
+        );
+    }
+
     foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     (
         p,

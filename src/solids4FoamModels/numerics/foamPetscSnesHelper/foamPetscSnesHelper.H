@@ -478,6 +478,19 @@ public:
                 const scalar scale = -1.0
             ) const;
 
+            //- Insert V*div(gamma*SfHat & interpolate(grad(p))) into a PETSc
+            //  matrix. This is the least-squares gradient-interpolation part of
+            //  the diff-stencil pressure stabilisation.
+            label InsertFvcDivGradInterpolateIntoPETScMatrix
+            (
+                const volScalarField& p,
+                const surfaceScalarField& gamma,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const scalar scale = 1.0
+            ) const;
+
             //- Insert linearisation of div(phi,U) into a PETSc matrix
             //  where phi = Sf & Uf
             //  An upwind discretisation is assumed
