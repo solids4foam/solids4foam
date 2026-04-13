@@ -12,17 +12,20 @@ then
 fi
 
 # Example usage:
-# ./Allrun                     -> [default] partitioned (IQNILS), serial
-# ./Allrun aitken              -> partitioned (Aitken), serial
-# ./Allrun iqnils              -> partitioned (IQNILS), serial
-# ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
-# ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
-# ./Allrun aitken parallel     -> partitioned (Aitken), parallel
+# ./Allrun                              -> [default] partitioned (IQNILS), serial
+# ./Allrun aitken                       -> partitioned (Aitken), serial
+# ./Allrun iqnils                       -> partitioned (IQNILS), serial
+# ./Allrun monolithic                   -> monolithic (Newton/PETSc), serial
+# ./Allrun monolithic parallel          -> monolithic (Newton/PETSc), parallel
+# ./Allrun monolithic schurTuned        -> monolithic, tuned Schur fieldsplit
+# ./Allrun monolithic physicsPC         -> monolithic, SIMPLE-type physics PC
+# ./Allrun aitken parallel              -> partitioned (Aitken), parallel
 
 coupling=iqnils
 runMode=serial
 fvSolutionSuffix=""
 SOLVER="partitioned"
+MONO_VARIANT=""
 
 for arg in "$@"
 do
@@ -38,12 +41,18 @@ do
         monolithic)
             SOLVER="monolithic"
             ;;
+        schurTuned)
+            MONO_VARIANT="schurTuned"
+            ;;
+        physicsPC)
+            MONO_VARIANT="physicsPC"
+            ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [schurTuned|physicsPC] [parallel]"
             exit 1
             ;;
     esac
@@ -61,6 +70,17 @@ if [[ "$SOLVER" == "monolithic" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
+
+    # Override fvSolution with a variant if requested
+    if [[ -n "$MONO_VARIANT" ]]; then
+        variant="system/fvSolution.monolithic.${MONO_VARIANT}"
+        if [[ -f "$variant" ]]; then
+            ln -vnsf "fvSolution.monolithic.${MONO_VARIANT}" system/fvSolution
+            echo "Using monolithic variant: ${MONO_VARIANT}"
+        else
+            echo "Warning: ${variant} not found, using default fvSolution"
+        fi
+    fi
 else
     # Dirichlet-Neumann partitioned approach
     if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
