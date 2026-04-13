@@ -6,17 +6,19 @@ Prepared by Ivan Batistić, Philip Cardiff
 
 - Demonstrate a three-dimensional fluid-structure interaction benchmark with a
   very slender membrane roof.
-- Show the partitioned Dirichlet-Neumann coupling and the monolithic fluid-solid interaction
-  solver.
+- Show the partitioned Dirichlet-Neumann coupling and the monolithic
+  fluid-solid interaction solver.
 
 ## Case Overview
 
 This tutorial studies a rectangular building covered by a flexible
-$10 \times 10$ m membrane roof and exposed to an incoming three-dimensional flow; see Figure 1.
+$10 \times 10$ m membrane roof and exposed to an incoming
+three-dimensional flow; see Figure 1.
 The setup follows the membrane-roof example described in Section 5.1 of the
-paper by von Scheven and Ramm [1], which extends the earlier two-dimensional benchmark
-from [2]. With a roof length of $10$ m, the length-to-thickness ratio is $1000$, so the structure is
-extremely slender.
+paper by von Scheven and Ramm [1], which extends the earlier
+two-dimensional benchmark from [2]. With a roof length of $10$ m, the
+length-to-thickness ratio is $1000$, so the structure is extremely
+slender.
 
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-geometry.png)
 
@@ -40,18 +42,23 @@ The physical parameters of the problem are:
   - Density ($\rho_f$): $1.25$ $\mathrm{kg/m}^3$
   - Kinematic viscosity ($\nu_f$): $0.08$ $\mathrm{m}^2$/s
 
-As in the reference paper [1], the case is solved using $600$ uniform time steps of $\Delta t = 0.02$ s.
-The published study reports that the maximum inlet speed is $71.26$ m/s, reached at $z = 75$ m and
-$t = 5$ s, corresponding to $Re \approx 8900$ when the roof length is used as the characteristic length.
+As in the reference paper [1], the case is solved using $600$ uniform
+time steps of $\Delta t = 0.02$ s.
+The published study reports that the maximum inlet speed is $71.26$ m/s,
+reached at $z = 75$ m and $t = 5$ s, corresponding to
+$Re \approx 8900$ when the roof length is used as the characteristic
+length.
 
-At the inlet boundary ($x = 0$), the paper prescribes the streamwise velocity $u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z).$
+At the inlet boundary ($x = 0$), the paper prescribes the streamwise
+velocity $u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z).$
 
 The spatial and temporal factors are given by (see Figure 2):
 
 - $\hat{u}_z(z) = (z/350)^{0.22}$
-- $\hat{u}_t(t) = 0.5 [ sin(\pi (t/5 - 0.5)) + 1 ]$ for $t < 5$ s and $\hat{u}_t(t) = 1$ for $t >= 5$ s
+- $\hat{u}_t(t) = 0.5 [ sin(\pi (t/5 - 0.5)) + 1 ]$ for $t < 5$ s and
+  $\hat{u}_t(t) = 1$ for $t >= 5$ s
 
-<img src="./images/membraneRoof-inlet.png" alt="Spatial (left) and temporal (right) parts of the inlet velocity profile" style="zoom:25%;" />
+![Spatial (left) and temporal (right) parts of the inlet velocity profile](./images/membraneRoof-inlet.png)
 
 **Figure 2:** Spatial and temporal variations of the inflow boundary condition.
 
@@ -67,12 +74,11 @@ In this tutorial mesh, the coordinate corresponding to the paper's vertical
 boundary condition evaluates the profile using the patch-face `y` coordinate,
 rather than the case `z` coordinate.
 
-
-
 ## Mesh Generation
 
 The tutorial uses a coarser mesh intended for routine testing and demonstration.
-The fluid mesh consists of $28 028$ cells, and the solid mesh consists of $1 536$ cells.
+The fluid mesh consists of $28 028$ cells, and the solid mesh consists
+of $1 536$ cells.
 
 For the fluid region, the mesh is generated with `blockMesh` and then refined
 locally above and around the roof using `setSet` and `refineMesh`. The `setSet`
@@ -87,7 +93,8 @@ Figure 3 shows the block-structured layout used to generate the base fluid mesh.
 
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-refinement.png)
 
-**Figure 4:** Base `blockMesh` mesh (left) and mesh after refinement using `refineMesh` utility (right).
+**Figure 4:** Base `blockMesh` mesh (left) and mesh after refinement
+using `refineMesh` utility (right).
 
 ## Running the Case
 
@@ -121,14 +128,14 @@ To clean the generated files, use
 ```
 
 ```note
-For more information about the monolithic approach, as well as the Aitken and IQNILS approaches, see the other FSI tutorials.
+For more information about the monolithic approach, as well as the
+Aitken and IQNILS approaches, see the other FSI tutorials.
 ```
-
-
 
 ## Results
 
-The solution shows vortex shedding around the building and a transition of the membrane roof shape from concave to convex.
+The solution shows vortex shedding around the building and a transition
+of the membrane roof shape from concave to convex.
 
 One useful quantity of interest is the membrane displacement at the roof centre point.
 In this case it is recorded by the `solidPointDisplacement` function object in
@@ -142,15 +149,14 @@ In this case it is recorded by the `solidPointDisplacement` function object in
     }
 ```
 
-
-
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-deflection.png)
 
 **Figure 5:** Deflection of the roof centre point $(50, 5, 0)$.
 
-Other useful outputs to check are the interface forces from the `forces` function object
-and the number of fluid-structure coupling iterations per time step, which are also reported
-using function objects in `system/controlDict`. These are plotted using a gnuplot script that
+Other useful outputs to check are the interface forces from the `forces`
+function object and the number of fluid-structure coupling iterations
+per time step, which are also reported using function objects in
+`system/controlDict`. These are plotted using a gnuplot script that
 generates `deflection.pdf`, `force.pdf`, and `iterations.pdf`.
 
 The regression script (`regressionTest.sh`) tracks the tip displacement in
