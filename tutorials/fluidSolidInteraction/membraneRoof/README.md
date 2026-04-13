@@ -29,16 +29,16 @@ The physical parameters of the problem are:
   - Building height: $5$ m
   - Overall domain size ($L \times W \times H$): $150 \times 100 \times 75$ m
   - Membrane thickness: $0.01$ m
-  - Gravity ($g$): $0$ m/s$^2$
+  - Gravity ($g$): $0$ $\mathrm{m/s}^2$
 - **Solid**
   - St. Venant-Kirchhoff material model
-  - Density ($\rho_s$): $1000$ kg/m$^3$
+  - Density ($\rho_s$): $1000$ $\mathrm{kg/m}^3$
   - Young’s modulus ($E_s$): $1\cdot10^9$ Pa
   - Poisson’s ratio ($\nu_s$): $0$
 - **Fluid**
   - Laminar flow
-  - Density ($\rho_f$): $1.25$ kg/m$^3$
-  - Kinematic viscosity ($\nu_f$): $0.08$ m$^2$/s
+  - Density ($\rho_f$): $1.25$ $\mathrm{kg/m}^3$
+  - Kinematic viscosity ($\nu_f$): $0.08$ $\mathrm{m}^2$/s
 
 As in the reference paper [1], the case is solved using $600$ uniform time steps of $\Delta t = 0.02$ s.
 The published study reports that the maximum inlet speed is $71.26$ m/s, reached at $z = 75$ m and
