@@ -19,7 +19,7 @@ fi
 [ -f system/solid/blockMeshDict ] && mkdir constant/solid/polyMesh && cp system/solid/blockMeshDict constant/solid/polyMesh/
 [ -f system/fluid/blockMeshDict ] && mkdir constant/fluid/polyMesh && cp system/fluid/blockMeshDict constant/fluid/polyMesh/
 
-rm -rf case.foam residuals force.pdf deflection.pdf postProcessing iterations.pdf
+rm -rf 0 case.foam residuals force.pdf deflection.pdf postProcessing iterations.pdf
 
 # Remove symlinks created by Allrun for monolithic/partitioned switching
 find ./0.orig ./constant ./system -maxdepth 3 -type l -exec rm -f {} \; 2>/dev/null

@@ -48,7 +48,7 @@ if [[ "$SOLVER" == "monolithic" ]]; then
         ln -vnsf ${file##*/} ${file%.*}
     done
 else
-    echo "Using ${coupling} coupling setup"
+    echo "Using partitioned coupling setup"
 
     # Remove monolithic-only files that may have been copied in from a dirty
     # case tree after a previous monolithic run.
@@ -78,9 +78,18 @@ solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
 solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
 
 # Run solver
-if $PARALLEL; then
-    solids4Foam::runApplication -s fluid decomposePar -region fluid
-    solids4Foam::runApplication -s solid decomposePar -region solid
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    if [[ "$SOLVER" == "monolithic" ]]; then
+        # Monolithic: coupled decomposition across fluid+solid
+        #solids4Foam::runApplication decomposeParMonolithic -force
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    else
+        # Partitioned: independent decomposition per region
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    fi
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
