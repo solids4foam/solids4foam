@@ -29,25 +29,23 @@ The physical parameters of the problem are:
   - Building height: $5$ m
   - Overall domain size ($L \times W \times H$): $150 \times 100 \times 75$ m
   - Membrane thickness: $0.01$ m
-  - Gravity ($g$): $0$ m/s$$^2$$
+  - Gravity ($g$): $0$ m/s$^2$
 - **Solid**
   - St. Venant-Kirchhoff material model
-  - Density ($\rho_s$): $1000$ kg/m$$^3$$
+  - Density ($\rho_s$): $1000$ kg/m$^3$
   - Young’s modulus ($E_s$): $1\cdot10^9$ Pa
   - Poisson’s ratio ($\nu_s$): $0$
 - **Fluid**
   - Laminar flow
-  - Density ($\rho_f$): $1.25$ kg/m$$^3$$
-  - Kinematic viscosity ($\nu_f$): $0.08$ m$$^2$$/s
+  - Density ($\rho_f$): $1.25$ kg/m$^3$
+  - Kinematic viscosity ($\nu_f$): $0.08$ m$^2$/s
 
 As in the reference paper [1], the case is solved using $600$ uniform time steps of $\Delta t = 0.02$ s.
 The published study reports that the maximum inlet speed is $71.26$ m/s, reached at $z = 75$ m and
 $t = 5$ s, corresponding to $Re \approx 8900$ when the roof length is used as the characteristic length.
 
-At the inlet boundary ($x = 0$), the paper prescribes the streamwise velocity 
-$$
-u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z)$.
-$$
+At the inlet boundary ($x = 0$), the paper prescribes the streamwise velocity $u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z).$
+
 The spatial and temporal factors are given by (see Figure 2):
 
 - $\hat{u}_z(z) = (z/350)^{0.22}$
@@ -58,7 +56,7 @@ The spatial and temporal factors are given by (see Figure 2):
 **Figure 2:** Spatial and temporal variations of the inflow boundary condition.
 
 The inlet condition is implemented as a tutorial-local library in
-[`src/membraneRoofVelocityFvPatchVectorField`](/Volumes/OpenFOAM/work/solids4foam-dev-v2412/tutorials/fluidSolidInteraction/membraneRoof/src/membraneRoofVelocityFvPatchVectorField)
+`src/membraneRoofVelocityFvPatchVectorField`
 and loaded through `system/controlDict`. This avoids `codedFixedValue`, which
 is not portable across all supported OpenFOAM forks.
 
@@ -74,7 +72,7 @@ rather than the case `z` coordinate.
 ## Mesh Generation
 
 The tutorial uses a coarser mesh intended for routine testing and demonstration.
-The fluid mesh consists of 28,028 cells, and the solid mesh consists of 1,536 cells.
+The fluid mesh consists of $28 028$ cells, and the solid mesh consists of $1 536$ cells.
 
 For the fluid region, the mesh is generated with `blockMesh` and then refined
 locally above and around the roof using `setSet` and `refineMesh`. The `setSet`
@@ -122,8 +120,11 @@ To clean the generated files, use
 ./Allclean
 ```
 
-For more information about the monolithic approach, as well as the Aitken and
-IQN-ILS approaches, see the other FSI tutorials.
+```note
+For more information about the monolithic approach, as well as the Aitken and IQNILS approaches, see the other FSI tutorials.
+```
+
+
 
 ## Results
 
@@ -145,7 +146,7 @@ In this case it is recorded by the `solidPointDisplacement` function object in
 
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-deflection.png)
 
-**Figure 5:** Deflection of the roof centre point (50, 5, 0).
+**Figure 5:** Deflection of the roof centre point $(50, 5, 0)$.
 
 Other useful outputs to check are the interface forces from the `forces` function object
 and the number of fluid-structure coupling iterations per time step, which are also reported
