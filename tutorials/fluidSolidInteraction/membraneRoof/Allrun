@@ -9,12 +9,25 @@
 # ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
 # ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
 
-# Parse arguments (order-independent)
+runMode=serial
+fvSolutionSuffix=""
 SOLVER="partitioned"
-PARALLEL=false
-for arg in "$@"; do
-    if [[ "$arg" == "monolithic" ]]; then SOLVER="monolithic"; fi
-    if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
+
+for arg in "$@"
+do
+    case "$arg" in
+        monolithic)
+            SOLVER="monolithic"
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
 done
 
 # Source solids4Foam scripts
@@ -22,6 +35,9 @@ source solids4FoamScripts.sh
 
 echo "Compiling membraneRoof tutorial libraries"
 (cd src && ./Allwmake)
+
+# Restore 0 directory
+restore0Dir
 
 if [[ "$SOLVER" == "monolithic" ]]; then
     solids4Foam::caseDoesNotRunWithFoamExtend
@@ -32,22 +48,34 @@ if [[ "$SOLVER" == "monolithic" ]]; then
         ln -vnsf ${file##*/} ${file%.*}
     done
 else
-    # Dirichlet-Neumann partitioned approach
-    echo "Using the partitioned Aitken approach"
-    solids4Foam::convertCaseFormat .
+    echo "Using ${coupling} coupling setup"
+
+    # Remove monolithic-only files that may have been copied in from a dirty
+    # case tree after a previous monolithic run.
+    rm -f \
+        0/fluid/D \
+        0/fluid/pointD \
+        0/fluid/pointDisplacement \
+        0/solid/U \
+        constant/fluid/mechanicalProperties \
+        constant/fluid/solidProperties
+
+    # Create all .partitioned symlinks
     for file in $(find ./0 ./constant ./system -name '*.partitioned')
     do
-        ln -vnsf ${file##*/} ${file%.*}
+        ln -vnsf "${file##*/}" "${file%.partitioned}"
     done
+
+    solids4Foam::convertCaseFormat .
 fi
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
-# Refine the mesh
-#solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
-#solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
+# Refine the fluid mesh
+solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
+solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
 
 # Run solver
 if $PARALLEL; then
@@ -57,6 +85,7 @@ if $PARALLEL; then
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
+    # Run serial
     solids4Foam::runApplication solids4Foam
 fi
 

@@ -7,16 +7,20 @@ Prepared by Philip Cardiff, Ivan Batistić
 - Demonstrate a three-dimensional fluid-structure interaction benchmark with a
   very slender membrane roof.
 - Show the partitioned Dirichlet-Neumann coupling and monolithic fluid-solid interaction 
-  solver on a case with strong added-mass effects.
+  solver.
 
 ## Case Overview
 
 This tutorial studies a rectangular building covered by a flexible
-$10 \times 10$ m membrane roof and exposed to an incoming three-dimensional flow, see Fig 1.
+$10 \times 10$ m membrane roof and exposed to an incoming three-dimensional flow, see Figure 1.
 The setup follows the membrane-roof example described in Section 5.1 of
 von Scheven and Ramm paper [1], which extends the earlier two-dimensional benchmark
 from [2]. With a roof length of $10$ m, this gives a length-to-thickness ratio of $1000$, so the structure is
 extremely slender.
+
+![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-geometry.png)
+
+**Figure 1:** Geometry and boundary conditions for the membrane-roof benchmark.
 
 Problem Physical Parameters are:
 
@@ -32,35 +36,24 @@ Problem Physical Parameters are:
   - Young’s modulus ($E_s$): $1\cdot10^9$ Pa
   - Poisson’s ratio ($\nu_s$): $0$
 - **Fluid**
+  - Laminar flow
   - Density ($\rho_f$): $1.25$ kg/m$$^3$$
   - Kinematic viscosity ($\nu_f$): $0.08$ m$$^2$$/s
 
-Same as in the reference paper [1] the case is solved with `600` uniform time steps of $\Delta t = 0.02$ s
-The published study reports
-that the maximum inlet speed is $71.26$ m/s, reached at $z = 75$ m and
-$t = 5$ s, corresponding to $Re \approx 8900$ when the roof length is used as
-the characteristic length.
+Same as in the reference paper [1] the case is solved with $600$ uniform time steps of $\Delta t = 0.02$ s
+The published study reports that the maximum inlet speed is $71.26$ m/s, reached at $z = 75$ m and
+$t = 5$ s, corresponding to $Re \approx 8900$ when the roof length is used as the characteristic length.
 
-![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-geometry.png)
-
-**Figure 1:** Geometry and boundary conditions for the membrane-roof benchmark.
-
-At the inlet boundary ($x = 0$), the paper prescribes the streamwise velocity
-
-$u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z)$.
-
-From Equation (29) in [1], the spatial and temporal factors are
+At the inlet boundary ($x = 0$), the paper prescribes the streamwise velocity 
+$$
+u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z)$.
+$$
+The spatial and temporal factors are (see Figure 2):
 
 - $\hat{u}_z(z) = (z/350)^{0.22}$
-- $\hat{u}_t(t) = 0.5 [ sin(\pi (t/5 - 0.5)) + 1 ]$ for $t < 5$ s
-- $\hat{u}_t(t) = 1$ for $t >= 5$ s
+- $\hat{u}_t(t) = 0.5 [ sin(\pi (t/5 - 0.5)) + 1 ]$ for $t < 5$ s and $\hat{u}_t(t) = 1$ for $t >= 5$ s
 
-In this tutorial mesh, the coordinate corresponding to the paper's vertical
-`z` direction is the case `y` direction. For that reason, the compiled inlet
-boundary condition evaluates the profile with the patch-face `y` coordinate,
-not the case `z` coordinate.
-
-![Spatial (left) and temporal (right) parts of the inlet velocity profile](./images/membraneRoof-inlet.png)
+<img src="./images/membraneRoof-inlet.png" alt="Spatial (left) and temporal (right) parts of the inlet velocity profile" style="zoom:25%;" />
 
 **Figure 2:** Spatial and temporal variations of the inflow boundary condition.
 
@@ -71,51 +64,45 @@ is not portable across all supported OpenFOAM forks.
 
 The library is compiled automatically by `./Allrun` through `src/Allwmake`.
 
+In this tutorial mesh, the coordinate corresponding to the paper's vertical
+`z` direction is the case `y` direction. For that reason, the compiled inlet
+boundary condition evaluates the profile with the patch-face `y` coordinate,
+not the case `z` coordinate.
+
+
+
 ## Mesh Generation
 
-The original publication used a fluid mesh with `163008` eight-node hexahedral
-elements and a shell discretization with `144` bilinear shell elements [1].
-The default `solids4Foam` tutorial uses a coarser mesh intended for routine
-testing and demonstration.
+The tutorial uses a coarser mesh intended for routine testing and demonstration. The fluid mesh consist of 28028 cells and the solid mesh of 1536. 
 
 For the fluid region, the mesh is generated with `blockMesh` and then refined
-locally above and around the roof using `setSet` and `refineMesh`. The solid
-region is generated separately with its own `blockMeshDict`. The relevant files
-are
-
-- `system/fluid/blockMeshDict`
-- `system/fluid/refineMeshDict`
-- `setSet.batch`
-- `system/solid/blockMeshDict`
-
-The figure below shows the block-structured layout used to generate the base
+locally above and around the roof using `setSet` and `refineMesh`.  `setSet` command is making `cellsToRefine` set of the cells specified in setSet.batch file `cellSet cellsToRefine new boxToCell (43 0 -7) (70 10 7);` `refineMesh` utility, guided using system/fluid/refineMeshDict is used to refine the mesh, i.e. to uniformly split each cell into 8 cells, see Fig 4. 
+The Figure 3 below shows the block-structured layout used to generate the base
 fluid mesh.
 
 ![Base blockMesh layout used for the fluid region](./images/membraneRoof-blockMeshDict.png)
 
 **Figure 3:** Base `blockMesh` layout for the fluid region.
 
-
-
-
-
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-refinement.png)
 
-**Figure 4:** Base `blockMesh` layout for the fluid region.
+**Figure 4:** Base `blockMesh` mesh (left) and mesh after refinement using `refineMesh` utility (right).
 
 ## Running the Case
 
 From the case directory, run
 
 ```bash
-./Allrun
+./Allrun                      # partitioned (IQNILS), serial
+./Allrun aitken               # partitioned (Aitken), serial
+./Allrun monolithic           # monolithic (Newton/PETSc), serial
+./Allrun monolithic parallel  # monolithic (Newton/PETSc), parallel
+./Allrun aitken parallel      # partitioned (Aitken), parallel
 ```
 
-This selects the partitioned Aitken-accelerated coupling by default. The case
-also provides a monolithic option:
-
-```bash
-./Allrun monolithic
+```note
+The monolithic approach requires OpenFOAM.com (ESI) and a PETSc installation
+with `PETSC_DIR` set. It does not run with foam-extend or OpenFOAM.org.
 ```
 
 The `Allrun` script will
@@ -125,6 +112,7 @@ The `Allrun` script will
 3. Generate the fluid and solid meshes.
 4. Refine the fluid mesh.
 5. Run `solids4Foam`.
+6. Generates deflection and force plots with gnuplot (if available)
 
 To clean the generated files, use
 
@@ -132,30 +120,37 @@ To clean the generated files, use
 ./Allclean
 ```
 
+```
+For more informations about monolithic aproach, as well as aitken and IQNILS approaches check other FSI tutoroals.
+```
+
 ## Results
 
-The coupled solution shows vortex shedding around the building and irregular
-three-dimensional oscillation of the membrane roof, consistent with the
-behaviour described in [1]. The benchmark is especially sensitive because the
-roof is thin and light relative to the surrounding incompressible flow, so
-small changes in discretization or coupling strategy can alter the detailed
-response.
+The solution shows vortex shedding shedding around the building and concave to convex transition of the membrane roof shape.
 
-One useful quantity of interest is the membrane displacement at the roof apex.
+One useful quantity of interest is the membrane displacement at the roof centre point.
 In this case it is recorded by the `solidPointDisplacement` function object in
 `system/controlDict`.
 
-Other useful outputs are
-
-- fluid pressure and velocity fields
-- interface forces from the `forces` function object
-- the number of fluid-structure coupling iterations per time step
+```c++
+    pointDisp
+    {
+        type                solidPointDisplacement;
+        point               (50 5 0);
+    }
+```
 
 
 
 ![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-deflection.png)
 
 **Figure 5:** Deflection of the roof centre point (50, 5, 0).
+
+Other useful otuputs to checka are interface forces from the `forces` function object and the number of fluid-structure coupling iterations per time step which are also reported using functionObjects in `system/controlDict`. All of these are ploted with gnuplot script that generates deflection.pfd, force.pdf and iterations.pdf files.
+
+The regression script (`regressionTest.sh`) tracks the tip displacement in
+`postProcessing/0/solidPointDisplacement_displacement.dat` and the total fluid
+force in `postProcessing/fluid/forces/0/force.dat` at the final time ($t = 12$ s).
 
 ## References
 

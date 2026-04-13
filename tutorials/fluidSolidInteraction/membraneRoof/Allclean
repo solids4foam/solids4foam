@@ -21,11 +21,8 @@ fi
 
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing iterations.pdf
 
-# Reset links to the partitioned default
-for file in $(find ./0 ./constant ./system -name '*.partitioned')
-do
-    ln -vnsf ${file##*/} ${file%.*}
-done
+# Remove symlinks created by Allrun for monolithic/partitioned switching
+find ./0.orig ./constant ./system -maxdepth 3 -type l -exec rm -f {} \; 2>/dev/null
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
