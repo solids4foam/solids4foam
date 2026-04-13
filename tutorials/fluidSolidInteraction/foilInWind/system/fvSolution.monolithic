@@ -1,4 +1,5 @@
-/*--------------------------------*- C++ -*----------------------------------*| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
 | Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
