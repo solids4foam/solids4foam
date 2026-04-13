@@ -20,6 +20,9 @@ done
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+echo "Compiling membraneRoof tutorial libraries"
+(cd src && ./Allwmake)
+
 if [[ "$SOLVER" == "monolithic" ]]; then
     solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
@@ -43,8 +46,8 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Refine the mesh
-solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
-solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
+#solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
+#solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
 
 # Run solver
 if $PARALLEL; then
