@@ -12,7 +12,7 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volVectorField;
-    object      U;
+    object      DFutureTime;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -30,8 +30,10 @@ boundaryField
 
     bottom
     {
-       type            calculated;
-       value           uniform (0 0 0);
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
     }
 
     sides
