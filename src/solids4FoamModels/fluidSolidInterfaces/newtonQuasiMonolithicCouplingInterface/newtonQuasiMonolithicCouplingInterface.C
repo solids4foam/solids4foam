@@ -1640,6 +1640,7 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     configuredNestedFluidSplit_(false),
     nestMat_(nullptr),
     Pmat_(nullptr),
+    solidSubKSP_(nullptr),
     tsLogPtr_()
 {
     if (solid().twoD() != fluid().twoD())
@@ -2278,6 +2279,13 @@ void newtonQuasiMonolithicCouplingInterface::customiseSolver()
 void newtonQuasiMonolithicCouplingInterface::resetCustomSolverState()
 {
     configuredNestedFluidSplit_ = false;
+
+    // Destroy the solid sub-KSP so it is recreated with fresh operators
+    if (solidSubKSP_ != nullptr)
+    {
+        KSPDestroy(&solidSubKSP_);
+        solidSubKSP_ = nullptr;
+    }
 }
 
 
@@ -2835,6 +2843,132 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
 
             PetscFree(subKSPs);
         }
+    }
+
+    return 0;
+}
+
+
+label newtonQuasiMonolithicCouplingInterface::precondition
+(
+    Vec y,
+    const Vec x
+)
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const bool twoD = fluid().twoD();
+    const label fluidBlockSize = twoD ? 3 : 4;
+    const label solidBlockSize = twoD ? 2 : 3;
+
+    // ---- Fluid block: delegate to newtonIcoFluid SIMPLE-type PC ----
+
+    {
+        Vec xFluid = nullptr;
+        VecGetSubVector(x, isFluid(), &xFluid);
+
+        Vec yFluid = nullptr;
+        VecGetSubVector(y, isFluid(), &yFluid);
+        VecSetBlockSize(yFluid, fluidBlockSize);
+
+        // The fluid equations in the monolithic Jacobian are scaled by
+        // fluidSystemScaleFactor, but the fluid SIMPLE PC works with
+        // unscaled equations. Create a temporary copy and rescale.
+        Vec xFluidScaled = nullptr;
+        VecDuplicate(xFluid, &xFluidScaled);
+        VecCopy(xFluid, xFluidScaled);
+        VecSetBlockSize(xFluidScaled, fluidBlockSize);
+
+        if (mag(fluidSystemScaleFactor_ - 1.0) > SMALL)
+        {
+            VecScale(xFluidScaled, 1.0/fluidSystemScaleFactor_);
+        }
+
+        refCast<fluidModels::newtonIcoFluid>(fluid()).precondition
+        (
+            yFluid, xFluidScaled
+        );
+
+        VecDestroy(&xFluidScaled);
+
+        VecRestoreSubVector(x, isFluid(), &xFluid);
+        VecRestoreSubVector(y, isFluid(), &yFluid);
+    }
+
+    // ---- Solid block: one approximate solve using the solid sub-matrix ----
+
+    {
+        Vec xSolid = nullptr;
+        VecGetSubVector(x, isSolid(), &xSolid);
+        VecSetBlockSize(xSolid, solidBlockSize);
+
+        Vec ySolid = nullptr;
+        VecGetSubVector(y, isSolid(), &ySolid);
+        VecSetBlockSize(ySolid, solidBlockSize);
+
+        // Get the solid-solid sub-matrix from the MatNest
+        Mat Ass = nullptr;
+        MatNestGetSubMat(nestMat_, 1, 1, &Ass);
+
+        // Create or update the solid sub-KSP
+        const bool firstSolidKSP = (solidSubKSP_ == nullptr);
+
+        if (firstSolidKSP)
+        {
+            KSPCreate(PETSC_COMM_WORLD, &solidSubKSP_);
+            KSPSetType(solidSubKSP_, KSPPREONLY);
+
+            KSPSetTolerances
+            (
+                solidSubKSP_, PETSC_DEFAULT, PETSC_DEFAULT,
+                PETSC_DEFAULT, 1
+            );
+
+            PC solidPC;
+            KSPGetPC(solidSubKSP_, &solidPC);
+
+            if (Pstream::parRun())
+            {
+                PCSetType(solidPC, PCREDUNDANT);
+            }
+            else
+            {
+                PCSetType(solidPC, PCLU);
+            }
+        }
+
+        // Update the operator (Ass may have changed since last formJacobian)
+        KSPSetOperators(solidSubKSP_, Ass, Ass);
+
+        // On the first call in parallel, configure the inner LU after setup
+        if (firstSolidKSP && Pstream::parRun())
+        {
+            KSPSetUp(solidSubKSP_);
+
+            PC solidPC;
+            KSPGetPC(solidSubKSP_, &solidPC);
+
+            KSP innerKSP;
+            PCRedundantGetKSP(solidPC, &innerKSP);
+
+            PC innerPC;
+            KSPGetPC(innerKSP, &innerPC);
+            PCSetType(innerPC, PCLU);
+        }
+
+        KSPSolve(solidSubKSP_, xSolid, ySolid);
+
+        VecRestoreSubVector(x, isSolid(), &xSolid);
+        VecRestoreSubVector(y, isSolid(), &ySolid);
+    }
+
+    if (debug)
+    {
+        Info<< "End" << endl;
     }
 
     return 0;

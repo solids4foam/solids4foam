@@ -132,6 +132,9 @@ class newtonQuasiMonolithicCouplingInterface
         //- Converted monolithic MPIAIJ preconditioner matrix (owned)
         Mat Pmat_;
 
+        //- Cached KSP for the solid sub-block in the physics preconditioner
+        mutable KSP solidSubKSP_;
+
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
@@ -344,6 +347,9 @@ public:
             // Free the converted preconditioner matrix
             MatDestroy(&Pmat_);
 
+            // Free the solid sub-KSP
+            KSPDestroy(&solidSubKSP_);
+
             // Free index sets
             ISDestroy(&isFluid_);
             ISDestroy(&isFluidVelocity_);
@@ -391,6 +397,15 @@ public:
             (
                 Mat jac,     // Jacobian
                 const Vec x  // Solution
+            );
+
+            //- Apply a block physics preconditioner
+            //  Fluid block: delegates to newtonIcoFluid SIMPLE-type PC
+            //  Solid block: one approximate solve using the solid sub-matrix
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
             );
 };
 
