@@ -1,4 +1,5 @@
-/*--------------------------------*- C++ -*----------------------------------*| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
 | Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
@@ -30,7 +31,7 @@ solvers
             snes_monitor;
             snes_converged_reason;
             snes_max_linear_solve_fail "100";
-            
+
             snes_mf_operator;
 
             ksp_type lgmres;
