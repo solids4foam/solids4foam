@@ -13,49 +13,33 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSchemes;
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
+solvers
 {
-    default     steadyState;
-}
+    D
+    {
+        solver          petsc;
 
-ddtSchemes
-{
-    default     steadyState;
-}
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
 
-gradSchemes
-{
-     default                none;
-     grad(D)                leastSquaresS4f;
-     grad(dD)               Gauss linear;
-}
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
 
-divSchemes
-{
-    default                 none;
-    div(sigma)              Gauss linear;
-    div((impK*grad(D)))      Gauss linear;
-}
-
-laplacianSchemes
-{
-    default                 Gauss linear corrected;
-}
-
-snGradSchemes
-{
-    default                 corrected;
-}
-
-interpolationSchemes
-{
-    default                 linear;
-    mu                      linear;
-    lambda                  linear;
+            pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
+    }
 }
 
 // ************************************************************************* //
