@@ -934,9 +934,6 @@ label linGeomTotalDispSolid::formResidual
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
-
-        // Calculate the traction at the faces
-        traction = (n & fvc::interpolate(sigma()));
     }
 
     // Update velocity
@@ -970,13 +967,37 @@ label linGeomTotalDispSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
-        // Calculate pressure equation residual
-        scalarField pressureResidual
-        (
-          - p*rKappa_
-          + pressureStabilisation().cellScalar(&impKf_, true)*one
-          - tr(gradD())
-        );
+        scalarField pressureResidual(mesh.nCells(), 0.0);
+
+        if (pressureStabilisation().usesAdaptiveScalarGamma())
+        {
+            const tmp<surfaceScalarField> tGamma =
+                pressureStabilisation().adaptiveScalarGamma
+                (
+                    D,
+                    impKf_,
+                    rho(),
+                    dampingCoeff()
+                );
+            const surfaceScalarField& gamma = tGamma();
+
+            pressureResidual =
+            (
+              - p*rKappa_
+              + fvc::laplacian(gamma, p, "laplacian(Dp,p)")
+              - fvc::div(gamma*mesh.Sf() & fvc::interpolate(gradp))
+              - tr(gradD())
+            );
+        }
+        else
+        {
+            pressureResidual =
+            (
+              - p*rKappa_
+              + pressureStabilisation().cellScalar(&impKf_, true)*one
+              - tr(gradD())
+            );
+        }
 
         // Make residual extensive
         pressureResidual *= mesh.V();
@@ -986,6 +1007,13 @@ label linGeomTotalDispSolid::formResidual
         (
             pressureResidual, f, blockSize_ - 1
         );
+    }
+
+    // Calculate the traction at the faces (must be after sigma() has had the
+    // pressure component applied when solvePressure is active)
+    if (!highOrderResidual())
+    {
+        traction = (n & fvc::interpolate(sigma()));
     }
 
     // Add stabilisation to the traction
@@ -1080,6 +1108,30 @@ label linGeomTotalDispSolid::formJacobian
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
+        if (pressureStabilisation().usesAdaptiveScalarGamma())
+        {
+            const tmp<surfaceScalarField> tGamma =
+                pressureStabilisation().adaptiveScalarGamma
+                (
+                    D,
+                    impKf_,
+                    rho(),
+                    dampingCoeff()
+                );
+            const surfaceScalarField& gamma = tGamma();
+
+            fvScalarMatrix approxPressureJ
+            (
+              - fvm::Sp(rKappa_, p)
+              + fvm::laplacian(gamma, p, "laplacian(Dp,p)")
+            );
+
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+            );
+        }
+        else
         {
             // Dimensional consistency factor
             const dimensionedScalar one

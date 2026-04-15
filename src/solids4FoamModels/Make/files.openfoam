@@ -240,6 +240,7 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/stabilisationModels/stabilisationModel/stabilisationModel.C
+numerics/stabilisationModels/adaptiveRhieChowStab/adaptiveRhieChowStab.C
 numerics/stabilisationModels/alphaStab/alphaStab.C
 numerics/stabilisationModels/diffStencilLaplacianStab/diffStencilLaplacianStab.C
 numerics/stabilisationModels/diffStencilLaplacianStab/RhieChowStab/RhieChowStab.C
