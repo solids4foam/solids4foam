@@ -359,30 +359,6 @@ public:
                 std::abort();
             }
 
-            //- Return true if the model builds a problem-dependent scalar
-            //  diffusivity externally to the cached face stabilisation field
-            virtual bool usesAdaptiveScalarGamma() const
-            {
-                return false;
-            }
-
-            //- Build an adaptive scalar diffusivity coefficient for the
-            //  current problem state
-            virtual tmp<surfaceScalarField> adaptiveScalarGamma
-            (
-                const volVectorField& D,
-                const surfaceScalarField& impKf,
-                const volScalarField& rho,
-                const dimensionedScalar& dampingCoeff
-            ) const
-            {
-                FatalErrorInFunction
-                    << "adaptiveScalarGamma not supported by "
-                    << type() << exit(FatalError);
-
-                // Keep the compiler happy
-                std::abort();
-            }
 };
 
 
