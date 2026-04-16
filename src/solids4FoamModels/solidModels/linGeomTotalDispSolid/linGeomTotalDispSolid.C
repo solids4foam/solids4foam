@@ -50,6 +50,55 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
+void linGeomTotalDispSolid::makeRAUf() const
+{
+    if (rAUfPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rAUfPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "rAUf",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+const surfaceScalarField& linGeomTotalDispSolid::rAUf() const
+{
+    if (rAUfPtr_.empty())
+    {
+        makeRAUf();
+    }
+
+    return autoPtrRef(rAUfPtr_);
+}
+
+
+surfaceScalarField& linGeomTotalDispSolid::rAUf()
+{
+    if (rAUfPtr_.empty())
+    {
+        makeRAUf();
+    }
+
+    return autoPtrRef(rAUfPtr_);
+}
+
+
 void linGeomTotalDispSolid::predict()
 {
     Info<< "Applying linear predictor to D" << endl;
@@ -605,7 +654,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         ),
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
-    )
+    ),
+    rAUfPtr_()
 {
     DisRequired();
 
@@ -967,37 +1017,26 @@ label linGeomTotalDispSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
-        scalarField pressureResidual(mesh.nCells(), 0.0);
-
-        if (pressureStabilisation().usesAdaptiveScalarGamma())
+        // Compute the face-interpolated reciprocal of the approximate momentum
+        // equation diagonal. This is the solid analogue of rAUf in
+        // pressure-velocity coupling and has units of [Pa].
         {
-            const tmp<surfaceScalarField> tGamma =
-                pressureStabilisation().adaptiveScalarGamma
-                (
-                    D,
-                    impKf_,
-                    rho(),
-                    dampingCoeff()
-                );
-            const surfaceScalarField& gamma = tGamma();
+            fvVectorMatrix approxMomJ
+            (
+                fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+              - rho()*fvm::d2dt2(D)
+            );
+            approxMomJ.relax();
+            rAUf() = 1.0/(fvc::interpolate(approxMomJ.A())*one);
+        }
 
-            pressureResidual =
-            (
-              - p*rKappa_
-              + fvc::laplacian(gamma, p, "laplacian(Dp,p)")
-              - fvc::div(gamma*mesh.Sf() & fvc::interpolate(gradp))
-              - tr(gradD())
-            );
-        }
-        else
-        {
-            pressureResidual =
-            (
-              - p*rKappa_
-              + pressureStabilisation().cellScalar(&impKf_, true)*one
-              - tr(gradD())
-            );
-        }
+        // Calculate pressure equation residual
+        scalarField pressureResidual
+        (
+          - p*rKappa_
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
+          - tr(gradD())
+        );
 
         // Make residual extensive
         pressureResidual *= mesh.V();
@@ -1009,8 +1048,9 @@ label linGeomTotalDispSolid::formResidual
         );
     }
 
-    // Calculate the traction at the faces (must be after sigma() has had the
-    // pressure component applied when solvePressure is active)
+    // Calculate the traction at the faces. This must be placed after the
+    // pressure solve so that sigma() already carries the pressure component
+    // when solvePressure() is active.
     if (!highOrderResidual())
     {
         traction = (n & fvc::interpolate(sigma()));
@@ -1108,30 +1148,6 @@ label linGeomTotalDispSolid::formJacobian
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        if (pressureStabilisation().usesAdaptiveScalarGamma())
-        {
-            const tmp<surfaceScalarField> tGamma =
-                pressureStabilisation().adaptiveScalarGamma
-                (
-                    D,
-                    impKf_,
-                    rho(),
-                    dampingCoeff()
-                );
-            const surfaceScalarField& gamma = tGamma();
-
-            fvScalarMatrix approxPressureJ
-            (
-              - fvm::Sp(rKappa_, p)
-              + fvm::laplacian(gamma, p, "laplacian(Dp,p)")
-            );
-
-            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-            (
-                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-            );
-        }
-        else
         {
             // Dimensional consistency factor
             const dimensionedScalar one
@@ -1139,10 +1155,22 @@ label linGeomTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
+            // Compute the face-interpolated reciprocal of the approximate
+            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            {
+                fvVectorMatrix approxMomJ
+                (
+                    fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                  - rho()*fvm::d2dt2(D)
+                );
+                approxMomJ.relax();
+                rAUf() = 1.0/(fvc::interpolate(approxMomJ.A())*one);
+            }
+
             fvScalarMatrix approxPressureJ
             (
               - fvm::Sp(rKappa_, p)
-              + one*pressureStabilisation().scalarJacobian(p, &impKf_)
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation

@@ -96,8 +96,22 @@ class linGeomTotalDispSolid
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
 
+        //- Reciprocal of the momentum equation diagonal, face-interpolated
+        //  Used as the stabilisation diffusivity in the pressure equation,
+        //  analogous to rAUf in pressure-velocity coupling
+        mutable autoPtr<surfaceScalarField> rAUfPtr_;
+
 
     // Private Member Functions
+
+        //- Allocate the rAUf field
+        void makeRAUf() const;
+
+        //- Return const access to rAUf (lazy construction)
+        const surfaceScalarField& rAUf() const;
+
+        //- Return non-const access to rAUf (lazy construction)
+        surfaceScalarField& rAUf();
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
