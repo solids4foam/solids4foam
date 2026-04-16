@@ -121,6 +121,22 @@ bool unsLinGeomSolid::evolve()
         D().storePrevIter();
 
         // Linear momentum equation total displacement form
+#ifndef OPENFOAM_COM
+        // Assemble the RHS in stages.
+        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
+        tmpRef(tRhsEqn) += fvc::div(mesh().Sf() & sigmaf_);
+        tmpRef(tRhsEqn) += rho()*g();
+
+        fvVectorMatrix DEqn
+        (
+            rho()*fvm::d2dt2(D()) == tRhsEqn
+        );
+#else
         fvVectorMatrix DEqn
         (
             rho()*fvm::d2dt2(D())
@@ -129,6 +145,7 @@ bool unsLinGeomSolid::evolve()
           + fvc::div(mesh().Sf() & sigmaf_)
           + rho()*g()
         );
+#endif
 
         // Under-relaxation the linear system
         DEqn.relax();

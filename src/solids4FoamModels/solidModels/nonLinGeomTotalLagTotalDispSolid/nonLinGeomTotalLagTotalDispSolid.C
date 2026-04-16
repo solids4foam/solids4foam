@@ -236,8 +236,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
 
         // Momentum equation total displacement total Lagrangian form
 #ifndef OPENFOAM_COM
-        // OpenFOAM.org: assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is unstable on OF9.
+        // Assemble the RHS in stages.
+        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
