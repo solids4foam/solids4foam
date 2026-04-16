@@ -223,6 +223,24 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
 
         // Momentum equation incremental updated Lagrangian form
+#ifdef OPENFOAM_ORG
+        // OpenFOAM.org: assemble the RHS in stages.
+        // The equivalent chained tmp fvMatrix expression is unstable on OF9.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+        );
+        tRhsEqn.ref() -= fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)");
+        tRhsEqn.ref() += fvc::div(force);
+        tRhsEqn.ref() += rho_*g();
+
+        fvVectorMatrix DDEqn
+        (
+            fvm::d2dt2(rho_, DD())
+          + fvc::d2dt2(rho_, D().oldTime())
+         == tRhsEqn
+        );
+#else
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
@@ -232,6 +250,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
           + fvc::div(force)
           + rho_*g()
         );
+#endif
 
         // Under-relax the linear system
         DDEqn.relax();

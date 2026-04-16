@@ -224,6 +224,22 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             enforceTractionBoundaries(traction, D(), n);
 
             // Linear momentum equation total displacement form
+#ifdef OPENFOAM_ORG
+            // OpenFOAM.org: assemble the RHS in stages.
+            // The equivalent chained tmp fvMatrix expression is unstable on OF9.
+            tmp<fvVectorMatrix> tRhsEqn
+            (
+                fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+            );
+            tRhsEqn.ref() -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
+            tRhsEqn.ref() += fvc::div(mesh().magSf()*traction);
+            tRhsEqn.ref() += rho()*g();
+
+            fvVectorMatrix DEqn
+            (
+                rho()*fvm::d2dt2(D()) == tRhsEqn
+            );
+#else
             fvVectorMatrix DEqn
             (
                 rho()*fvm::d2dt2(D())
@@ -235,6 +251,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
               + fvOptions()(ds_, D())
 #endif
             );
+#endif
 
             // Add damping
             if (dampingCoeff().value() > SMALL)
