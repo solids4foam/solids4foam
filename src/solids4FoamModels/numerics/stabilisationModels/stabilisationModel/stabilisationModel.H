@@ -358,7 +358,6 @@ public:
                 // Keep the compiler happy
                 std::abort();
             }
-
 };
 
 
