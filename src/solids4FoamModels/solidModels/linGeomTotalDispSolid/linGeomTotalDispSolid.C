@@ -1034,7 +1034,7 @@ label linGeomTotalDispSolid::formResidual
         scalarField pressureResidual
         (
           - p*rKappa_
-          + pressureStabilisation().cellScalar(&rAUf(), true)*one
+          - pressureStabilisation().cellScalar(&rAUf(), true)*one
           - tr(gradD())
         );
 
