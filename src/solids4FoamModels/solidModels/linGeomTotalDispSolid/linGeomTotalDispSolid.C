@@ -1170,7 +1170,7 @@ label linGeomTotalDispSolid::formJacobian
             fvScalarMatrix approxPressureJ
             (
               - fvm::Sp(rKappa_, p)
-              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
+              - one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation
