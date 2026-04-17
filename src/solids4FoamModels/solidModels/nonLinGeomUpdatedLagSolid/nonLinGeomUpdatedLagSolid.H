@@ -98,6 +98,10 @@ class nonLinGeomUpdatedLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure Jacobian when solvePressure is enabled
+        const volScalarField rKappa_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 

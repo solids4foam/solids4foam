@@ -50,55 +50,6 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
-void linGeomTotalDispSolid::makeRAUf() const
-{
-    if (rAUfPtr_.valid())
-    {
-        FatalErrorInFunction
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    rAUfPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "rAUf",
-                runTime().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("0", dimPressure, 0.0)
-        )
-    );
-}
-
-
-const surfaceScalarField& linGeomTotalDispSolid::rAUf() const
-{
-    if (rAUfPtr_.empty())
-    {
-        makeRAUf();
-    }
-
-    return autoPtrRef(rAUfPtr_);
-}
-
-
-surfaceScalarField& linGeomTotalDispSolid::rAUf()
-{
-    if (rAUfPtr_.empty())
-    {
-        makeRAUf();
-    }
-
-    return autoPtrRef(rAUfPtr_);
-}
-
-
 void linGeomTotalDispSolid::predict()
 {
     Info<< "Applying linear predictor to D" << endl;
@@ -654,8 +605,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         ),
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
-    ),
-    rAUfPtr_()
+    )
 {
     DisRequired();
 
@@ -1017,8 +967,8 @@ label linGeomTotalDispSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
-        // Compute the face-interpolated reciprocal of the approximate momentum
-        // equation diagonal. This is the solid analogue of rAUf in
+        // Compute the positive face-interpolated reciprocal of the approximate
+        // momentum equation diagonal. This is the solid analogue of rAUf in
         // pressure-velocity coupling and has units of [Pa].
         {
             fvVectorMatrix approxMomJ
@@ -1027,14 +977,14 @@ label linGeomTotalDispSolid::formResidual
               - rho()*fvm::d2dt2(D)
             );
             approxMomJ.relax();
-            rAUf() = 1.0/(fvc::interpolate(approxMomJ.A())*one);
+            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
         }
 
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
           - p*rKappa_
-          - pressureStabilisation().cellScalar(&rAUf(), true)*one
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
           - tr(gradD())
         );
 
@@ -1155,7 +1105,7 @@ label linGeomTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the face-interpolated reciprocal of the approximate
+            // Compute the positive face-interpolated reciprocal of the approximate
             // momentum equation diagonal (solid analogue of rAUf), [Pa]
             {
                 fvVectorMatrix approxMomJ
@@ -1164,13 +1114,13 @@ label linGeomTotalDispSolid::formJacobian
                   - rho()*fvm::d2dt2(D)
                 );
                 approxMomJ.relax();
-                rAUf() = 1.0/(fvc::interpolate(approxMomJ.A())*one);
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
             }
 
             fvScalarMatrix approxPressureJ
             (
               - fvm::Sp(rKappa_, p)
-              - one*pressureStabilisation().scalarJacobian(p, &rAUf())
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation

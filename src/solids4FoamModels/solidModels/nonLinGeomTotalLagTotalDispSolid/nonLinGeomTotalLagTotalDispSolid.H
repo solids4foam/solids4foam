@@ -89,6 +89,10 @@ class nonLinGeomTotalLagTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure Jacobian when solvePressure is enabled
+        const volScalarField rKappa_;
+
         //- Time rate of pressure
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;

@@ -107,12 +107,35 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 }
 
 
+void Foam::stabilisationModel::checkGamma
+(
+    const surfaceScalarField* gammaPtr
+) const
+{
+    if (gammaPtr != nullptr)
+    {
+        const scalar minGamma = gMin(*gammaPtr);
+
+        if (minGamma < 0.0)
+        {
+            FatalErrorInFunction
+                << "Negative gamma field " << gammaPtr->name()
+                << " supplied to stabilisation model " << type()
+                << ": min(gamma) = " << minGamma
+                << abort(FatalError);
+        }
+    }
+}
+
+
 const Foam::volScalarField& Foam::stabilisationModel::cellScalar
 (
     const surfaceScalarField* gammaPtr,
     const bool rebuild
 ) const
 {
+    checkGamma(gammaPtr);
+
     if (cellScalarPtr_.empty() || rebuild)
     {
         if (faceScalarPtr_.empty())
@@ -146,6 +169,8 @@ const Foam::volVectorField& Foam::stabilisationModel::cellVector
     const bool rebuild
 ) const
 {
+    checkGamma(gammaPtr);
+
     if (cellVectorPtr_.empty() || rebuild)
     {
         if (faceVectorPtr_.empty())

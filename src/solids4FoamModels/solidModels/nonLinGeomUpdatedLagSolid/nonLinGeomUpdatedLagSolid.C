@@ -515,6 +515,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
+    rKappa_(1.0/mechanical().bulkModulus()),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -788,11 +789,24 @@ label nonLinGeomUpdatedLagSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
+        // Compute the positive face-interpolated reciprocal of the approximate
+        // momentum equation diagonal. This is the solid analogue of rAUf in
+        // pressure-velocity coupling and has units of [Pa].
+        {
+            fvVectorMatrix approxMomJ
+            (
+                fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+              - rho()*fvm::d2dt2(DD)
+            );
+            approxMomJ.relax();
+            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+        }
+
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
-          - p*(1.0/mechanical().bulkModulus())
-          + pressureStabilisation().cellScalar(&impKf_, true)*one
+          - p*rKappa_
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
@@ -908,10 +922,22 @@ label nonLinGeomUpdatedLagSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
+            // Compute the positive face-interpolated reciprocal of the approximate
+            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            {
+                fvVectorMatrix approxMomJ
+                (
+                    fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+                  - rho()*fvm::d2dt2(DD)
+                );
+                approxMomJ.relax();
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+            }
+
             fvScalarMatrix approxPressureJ
             (
-              - fvm::Sp(1.0/mechanical().bulkModulus(), p)
-              + one*pressureStabilisation().scalarJacobian(p, &impKf_)
+              - fvm::Sp(rKappa_, p)
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation
