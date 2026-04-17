@@ -321,6 +321,29 @@ public:
                 std::abort();
             }
 
+            //- Return true if this model provides an adaptive scalar gamma
+            virtual bool usesAdaptiveScalarGamma() const
+            {
+                return false;
+            }
+
+            //- Provide an adaptive scalar gamma field when supported
+            virtual tmp<surfaceScalarField> adaptiveScalarGamma
+            (
+                const volVectorField& D,
+                const surfaceScalarField& impKf,
+                const volScalarField& rho,
+                const dimensionedScalar& dampingCoeff
+            ) const
+            {
+                FatalErrorInFunction
+                    << "adaptiveScalarGamma not supported by "
+                    << type() << exit(FatalError);
+
+                // Keep the compiler happy
+                std::abort();
+            }
+
             //- Provide an implicit approximation of the stabilisation
             //  This is an approximate Jacobian of the stabilisation term
             //  Provide the primary variable field and optionally a surface
