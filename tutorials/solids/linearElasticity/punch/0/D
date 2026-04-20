@@ -44,7 +44,7 @@ boundaryField
         standardPenaltyNormalModelDict
         {
             relaxationFactor 0.01;
-            penaltyScale     5;
+            penaltyScale     4;
         }
         //frictionContactModel frictionless;
         frictionContactModel standardPenalty;
@@ -58,6 +58,10 @@ boundaryField
                 frictionCoeff 0.1;
             }
         }
+
+        // FE41 only option: segment-to-segment procedure
+        integralNormalGap false;
+
         value           uniform (0 0 0);
     }
     cylinderContact
