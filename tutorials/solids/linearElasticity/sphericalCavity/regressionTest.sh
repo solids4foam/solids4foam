@@ -83,15 +83,15 @@ fi
 # ------------------------------------------------------------
 
 extract_max_epsilon() {
-    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+    grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
         | tail -n 1 \
-        | awk '{print $NF}'
+        | awk '{print $NF}' || true
 }
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
         | tail -n 1 \
-        | awk '{print $NF}'
+        | awk '{print $NF}' || true
 }
 
 # ------------------------------------------------------------
