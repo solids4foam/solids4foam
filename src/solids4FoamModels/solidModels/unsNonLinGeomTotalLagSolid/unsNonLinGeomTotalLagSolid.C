@@ -263,13 +263,18 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
         // Construct momentum equation in total Lagrangian form where gradients
         // are calculated directly at the faces
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
+        tmpRef(tRhsEqn) += fvc::div((Jf_*Finvf_.T() & mesh().Sf()) & sigmaf_);
+        tmpRef(tRhsEqn) += rho()*g();
+
         fvVectorMatrix DEqn
         (
-            rho()*fvm::d2dt2(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div((Jf_*Finvf_.T() & mesh().Sf()) & sigmaf_)
-          + rho()*g()
+            rho()*fvm::d2dt2(D()) == tRhsEqn
         );
 
         // Add damping
