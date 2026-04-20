@@ -38,6 +38,7 @@ SourceFiles
 #endif
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
+#include "CompactListList.H"
 #include "Switch.H"
 #include "interpolationTable.H"
 
@@ -66,10 +67,10 @@ class solidTractionFvPatchVectorField
         const Switch useUndeformedArea_;
 
         //- Traction
-        vectorField traction_;
+        mutable vectorField traction_;
 
         //- Pressure
-        scalarField pressure_;
+        mutable scalarField pressure_;
 
         //- Traction time series
         interpolationTable<vector> tractionSeries_;
@@ -98,7 +99,7 @@ class solidTractionFvPatchVectorField
         const scalar relaxFac_;
 
         //- Current time index
-        label curTimeIndex_;
+        mutable label curTimeIndex_;
 
 
 public:
@@ -210,7 +211,6 @@ public:
                 return useUndeformedArea_;
             }
 
-
         // Mapping functions
 
             //- Map (and resize as needed) from self given a mapping object
@@ -239,6 +239,13 @@ public:
             const Pstream::commsTypes commsType = Pstream::blocking
 #endif
         );
+
+#ifndef FOAMEXTEND
+        //- Return face quadrature values, used for high order solvers
+        virtual autoPtr<CompactListList<vector>>
+           evaluateQuadrature() const;
+#endif
+
 
         //- Write
         virtual void write(Ostream&) const;

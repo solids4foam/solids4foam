@@ -296,14 +296,19 @@ bool poroLinGeomSolid::evolve()
         momentumStabilisation().updateVector(D(), &gradD());
 
         // Linear momentum equation total displacement form
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
+        tmpRef(tRhsEqn) += fvc::div(sigma(), "div(sigma)");
+        tmpRef(tRhsEqn) += rho()*g();
+        tmpRef(tRhsEqn) += impK_*momentumStabilisation().cellVector(nullptr, true);
+
         fvVectorMatrix DEqn
         (
-            rho()*fvm::d2dt2(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + impK_*momentumStabilisation().cellVector(nullptr, true)
+            rho()*fvm::d2dt2(D()) == tRhsEqn
         );
 
         // Under-relaxation the linear system
