@@ -12,80 +12,55 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 solvers
 {
-    "p|pFinal"
+    D
+    {
+        solver          petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            // fgmres is required because the physics PC is variable
+            ksp_type fgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type physics;
+            pc_physics_type model;
+        }
+    }
+
+    // Inner solver for the physics preconditioner correction field.
+    // One cheap application (1 GAMG V-cycle) is sufficient; with
+    // nPCCorrectors 2 (default) this gives the best wall-clock time.
+    dD
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       0;
         relTol          0;
         minIter         1;
-        maxIter         1000;
-        smoother        GaussSeidel;
+        maxIter         1;
+        smoother        symGaussSeidel;
         nPreSweeps      0;
-        nPostSweeps     2;
-        nFinestSweeps   2;
+        nPostSweeps     1;
+        nFinestSweeps   1;
         scaleCorrection true;
         directSolveCoarsest false;
         cacheAgglomeration true;
         nCellsInCoarsestLevel 20;
         agglomerator    faceAreaPair;
         mergeLevels     1;
-    }
-
-    cellMotionU
-    {
-        solver          GAMG;
-        tolerance       1e-06;
-        relTol          0;
-        minIter         1;
-        maxIter         100;
-        smoother        GaussSeidel;
-        nPreSweeps      0;
-        nPostSweeps     2;
-        nFinestSweeps   2;
-        scaleCorrection true;
-        directSolveCoarsest false;
-        cacheAgglomeration true;
-        nCellsInCoarsestLevel 20;
-        agglomerator    faceAreaPair;
-        mergeLevels     1;
-    }
-
-    "U|UFinal"
-    {
-        solver          PBiCG;
-        preconditioner  DILU;
-        tolerance       1e-06;
-        relTol          0;
-        minIter         1;
-    }
-}
-
-PIMPLE
-{
-    momentumPredictor   on;
-    nOuterCorrectors    20;
-    nCorrectors         3;
-    nNonOrthogonalCorrectors 1;
-
-    residualControl
-    {
-        U
-        {
-            relTol    1e-4;
-            tolerance 1e-4;
-        }
-
-        p
-        {
-            relTol    1e-4;
-            tolerance 1e-4;
-        }
     }
 }
 

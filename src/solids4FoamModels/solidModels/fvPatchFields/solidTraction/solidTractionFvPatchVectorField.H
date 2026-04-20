@@ -251,13 +251,6 @@ public:
                 return useUndeformedArea_;
             }
 
-#ifndef FOAMEXTEND
-            //- Return face quadrature values
-            //  Used for high order solvers, argument is position of points
-            virtual autoPtr<CompactListList<vector>>
-            evaluateQuadrature() const;
-#endif
-
         // Mapping functions
 
             //- Map (and resize as needed) from self given a mapping object
@@ -286,6 +279,13 @@ public:
             const Pstream::commsTypes commsType = Pstream::blocking
 #endif
         );
+
+#ifndef FOAMEXTEND
+        //- Return face quadrature values, used for high order solvers
+        virtual autoPtr<CompactListList<vector>>
+           evaluateQuadrature() const;
+#endif
+
 
         //- Write
         virtual void write(Ostream&) const;

@@ -25,9 +25,9 @@ solvers
         options
         {
             snes_type newtonls;
-            snes_linesearch_type basic;
-            snes_rtol "1e-6";
-            snes_stol "1e-6";
+            snes_linesearch_type l2;
+            snes_rtol "1e-4";
+            snes_stol "1e-4";
             snes_monitor;
             snes_converged_reason;
             snes_max_linear_solve_fail "100";
@@ -49,19 +49,20 @@ solvers
             fieldsplit_solid_pc_type redundant;
             fieldsplit_solid_redundant_pc_type lu;
 
-            // Fluid: nested velocity/pressure Schur (2-D: block_size 3)
+            // Fluid: nested velocity/pressure Schur (3-D: block_size 4)
+            // Tuned: full factorisation, a11 Schur precondition, ASM+ILU
             fieldsplit_fluid_ksp_type preonly;
             fieldsplit_fluid_pc_type fieldsplit;
             fieldsplit_fluid_pc_fieldsplit_type schur;
-            fieldsplit_fluid_pc_fieldsplit_schur_fact_type upper;
-            fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp;
-            fieldsplit_fluid_pc_fieldsplit_block_size "3";
-            fieldsplit_fluid_pc_fieldsplit_0_fields "0,1";
-            fieldsplit_fluid_pc_fieldsplit_1_fields "2";
+            fieldsplit_fluid_pc_fieldsplit_schur_fact_type full;
+            fieldsplit_fluid_pc_fieldsplit_schur_precondition a11;
+            fieldsplit_fluid_pc_fieldsplit_block_size "4";
+            fieldsplit_fluid_pc_fieldsplit_0_fields "0,1,2";
+            fieldsplit_fluid_pc_fieldsplit_1_fields "3";
 
-            // Velocity sub-block: bjacobi + ILU(0)
+            // Velocity sub-block: ASM + ILU(0)
             fieldsplit_fluid_fieldsplit_0_ksp_type preonly;
-            fieldsplit_fluid_fieldsplit_0_pc_type bjacobi;
+            fieldsplit_fluid_fieldsplit_0_pc_type asm;
             fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu;
             fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels "0";
 

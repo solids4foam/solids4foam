@@ -12,62 +12,34 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    location    "system";
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
+solvers
 {
-    default            none;
-    d2dt2(D)           steadyState;
-}
+    D
+    {
+        solver          petsc;
 
-ddtSchemes
-{
-    default            none;
-    ddt(U)             Euler;
-    ddt(dU)            Euler;
-    ddt(p)             Euler;
-    ddt(D)             steadyState;
-    d2dt2(D)           steadyState;
-}
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
 
-gradSchemes
-{
-    default            leastSquares;
-    grad(D)            leastSquaresS4f;
-}
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
 
-divSchemes
-{
-    default            none;
-    jacobian-div(phi,U) Gauss upwind;
-    div(phi,U)         Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-    div((nuEff*dev(T(grad(U))))) Gauss linear;
-    div(U)             Gauss linear;
-}
-
-laplacianSchemes
-{
-    default Gauss linear corrected;
-}
-
-interpolationSchemes
-{
-    default            linear;
-    interpolate(U)     skewCorrected linear;
-}
-
-snGradSchemes
-{
-    default            corrected;
-}
-
-fluxRequired
-{
-    default            no;
-    p;
+            pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
+    }
 }
 
 // ************************************************************************* //

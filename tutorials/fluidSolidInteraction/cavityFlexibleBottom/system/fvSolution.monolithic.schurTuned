@@ -50,18 +50,19 @@ solvers
             fieldsplit_solid_redundant_pc_type lu;
 
             // Fluid: nested velocity/pressure Schur (2-D: block_size 3)
+            // Tuned: full factorisation, a11 Schur precondition, ASM+ILU
             fieldsplit_fluid_ksp_type preonly;
             fieldsplit_fluid_pc_type fieldsplit;
             fieldsplit_fluid_pc_fieldsplit_type schur;
-            fieldsplit_fluid_pc_fieldsplit_schur_fact_type upper;
-            fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp;
+            fieldsplit_fluid_pc_fieldsplit_schur_fact_type full;
+            fieldsplit_fluid_pc_fieldsplit_schur_precondition a11;
             fieldsplit_fluid_pc_fieldsplit_block_size "3";
             fieldsplit_fluid_pc_fieldsplit_0_fields "0,1";
             fieldsplit_fluid_pc_fieldsplit_1_fields "2";
 
-            // Velocity sub-block: bjacobi + ILU(0)
+            // Velocity sub-block: ASM + ILU(0)
             fieldsplit_fluid_fieldsplit_0_ksp_type preonly;
-            fieldsplit_fluid_fieldsplit_0_pc_type bjacobi;
+            fieldsplit_fluid_fieldsplit_0_pc_type asm;
             fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu;
             fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels "0";
 

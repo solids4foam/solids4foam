@@ -26,6 +26,7 @@ ddtSchemes
 {
     default            none;
     ddt(U)             backward;
+    ddt(dU)            backward;
     ddt(p)             backward;
     ddt(D)             steadyState;
     d2dt2(D)           steadyState;

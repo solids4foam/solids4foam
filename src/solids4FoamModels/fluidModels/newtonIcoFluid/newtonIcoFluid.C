@@ -1217,6 +1217,38 @@ label newtonIcoFluid::precondition
     const volScalarField& p = this->p();
     const surfaceScalarField& phi = this->phi();
 
+    // Build safe BC types for the correction fields.  Using
+    // U.boundaryField().types() directly would propagate codedFixedValue
+    // entries, which require a codeDict file that only exists inside the
+    // original field specification.  For the correction fields, Dirichlet
+    // boundaries are simply fixedValue (zero) and Neumann boundaries are
+    // zeroGradient.
+    wordList dUBCTypes(U.boundaryField().size());
+    forAll(dUBCTypes, patchI)
+    {
+        if (U.boundaryField()[patchI].fixesValue())
+        {
+            dUBCTypes[patchI] = fixedValueFvPatchVectorField::typeName;
+        }
+        else
+        {
+            dUBCTypes[patchI] = U.boundaryField().types()[patchI];
+        }
+    }
+
+    wordList dpBCTypes(p.boundaryField().size());
+    forAll(dpBCTypes, patchI)
+    {
+        if (p.boundaryField()[patchI].fixesValue())
+        {
+            dpBCTypes[patchI] = fixedValueFvPatchScalarField::typeName;
+        }
+        else
+        {
+            dpBCTypes[patchI] = p.boundaryField().types()[patchI];
+        }
+    }
+
     volVectorField dU
     (
         IOobject
@@ -1229,7 +1261,7 @@ label newtonIcoFluid::precondition
         ),
         mesh,
         dimensionedVector("zero", dimVelocity, vector::zero),
-        U.boundaryField().types()
+        dUBCTypes
     );
 
     volScalarField dp
@@ -1244,7 +1276,7 @@ label newtonIcoFluid::precondition
         ),
         mesh,
         dimensionedScalar("zero", p.dimensions(), 0.0),
-        p.boundaryField().types()
+        dpBCTypes
     );
 
     vectorField momentumRhs(dU.primitiveField().size(), vector::zero);
@@ -1279,7 +1311,13 @@ label newtonIcoFluid::precondition
 
     if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
     {
-        const surfaceScalarField phiAbs("phiAbs", phi);
+        surfaceScalarField phiAbs("phiAbs", phi);
+
+        if (mesh.changing())
+        {
+            fvc::makeAbsolute(phiAbs, U);
+        }
+
         UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), dU);
     }
 

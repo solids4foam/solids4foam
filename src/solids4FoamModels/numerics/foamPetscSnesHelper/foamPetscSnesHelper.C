@@ -1621,24 +1621,25 @@ label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
 
             forAll(cols, coeffI)
             {
-                const scalar value = faceCoeff & coeffs[coeffI];
+                const label globalBlockColI = cols[coeffI];
 
-                if (mag(value) > VSMALL)
-                {
-                    const label globalBlockColI = cols[coeffI];
-
-                    values[valueOffset] = value;
-                    AssertPETSc
+                // Insert unconditionally to establish the full sparsity
+                // pattern on the first assembly.  PETSc compresses the
+                // storage after MatAssemblyEnd, so skipping zero entries
+                // would lose their positions; on a moving mesh the
+                // coefficients may later become nonzero, triggering a
+                // MAT_NEW_NONZERO_ALLOCATION_ERR.
+                values[valueOffset] = faceCoeff & coeffs[coeffI];
+                AssertPETSc
+                (
+                    MatSetValuesBlocked
                     (
-                        MatSetValuesBlocked
-                        (
-                            jac, 1, &globalBlockRowI, 1, &globalBlockColI,
-                            values.cdata(),
-                            ADD_VALUES
-                        )
-                    );
-                    values[valueOffset] = 0.0;
-                }
+                        jac, 1, &globalBlockRowI, 1, &globalBlockColI,
+                        values.cdata(),
+                        ADD_VALUES
+                    )
+                );
+                values[valueOffset] = 0.0;
             }
         };
 

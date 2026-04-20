@@ -4,17 +4,22 @@
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 # Example usage:
-# ./Allrun                     -> partitioned (Aitken), serial
-# ./Allrun parallel            -> partitioned (Aitken), parallel
-# ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
-# ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
+# ./Allrun                              -> partitioned (Aitken), serial
+# ./Allrun parallel                     -> partitioned (Aitken), parallel
+# ./Allrun monolithic                   -> monolithic (Newton/PETSc), serial
+# ./Allrun monolithic parallel          -> monolithic (Newton/PETSc), parallel
+# ./Allrun monolithic schurTuned        -> monolithic, tuned Schur fieldsplit
+# ./Allrun monolithic physicsPC         -> monolithic, SIMPLE-type physics PC
 
 # Parse arguments (order-independent)
 SOLVER="partitioned"
 PARALLEL=false
+MONO_VARIANT=""
 for arg in "$@"; do
     if [[ "$arg" == "monolithic" ]]; then SOLVER="monolithic"; fi
     if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
+    if [[ "$arg" == "schurTuned" ]]; then MONO_VARIANT="schurTuned"; fi
+    if [[ "$arg" == "physicsPC" ]];  then MONO_VARIANT="physicsPC";  fi
 done
 
 # Source solids4Foam scripts
@@ -28,6 +33,17 @@ if [[ "$SOLVER" == "monolithic" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
+
+    # Override fvSolution with a variant if requested
+    if [[ -n "$MONO_VARIANT" ]]; then
+        variant="system/fvSolution.monolithic.${MONO_VARIANT}"
+        if [[ -f "$variant" ]]; then
+            ln -vnsf "fvSolution.monolithic.${MONO_VARIANT}" system/fvSolution
+            echo "Using monolithic variant: ${MONO_VARIANT}"
+        else
+            echo "Warning: ${variant} not found, using default fvSolution"
+        fi
+    fi
 else
     # Dirichlet-Neumann partitioned approach
     echo "Using the partitioned Aitken approach"

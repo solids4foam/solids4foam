@@ -19,7 +19,7 @@ FoamFile
 
 surfaceFile "punch_bottom.ftr";
 
-maxCellSize 16.0;
+maxCellSize 10.0;
 
 //boundaryCellSize 8.0;
 
