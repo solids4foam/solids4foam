@@ -268,9 +268,7 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
         DD().storePrevIter();
 
         // Momentum equation incremental updated Lagrangian form
-#ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
@@ -286,17 +284,6 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
           + fvc::d2dt2(rho_, D().oldTime())
          == tRhsEqn
         );
-#else
-        fvVectorMatrix DDEqn
-        (
-            fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_)
-          + rho()*g()
-        );
-#endif
 
         // Under-relax the linear system
         DDEqn.relax();

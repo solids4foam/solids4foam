@@ -235,9 +235,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, D(), nCurrent, magSfCurrent);
 
         // Momentum equation total displacement total Lagrangian form
-#ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
@@ -251,16 +249,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
             rho()*fvm::d2dt2(D())
          == tRhsEqn
         );
-#else
-        fvVectorMatrix DEqn
-        (
-            rho()*fvm::d2dt2(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(force)
-          + rho()*g()
-        );
-#endif
 
         // Add damping
         if (dampingCoeff().value() > SMALL)

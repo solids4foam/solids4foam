@@ -314,9 +314,7 @@ bool thermalLinGeomSolid::evolve()
         momentumStabilisation().updateVector(D(), &gradD());
 
         // Linear momentum equation total displacement form
-#ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
@@ -330,17 +328,6 @@ bool thermalLinGeomSolid::evolve()
         (
             rho()*fvm::d2dt2(D()) == tRhsEqn
         );
-#else
-        fvVectorMatrix DEqn
-        (
-            rho()*fvm::d2dt2(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + impK_*momentumStabilisation().cellVector(nullptr, true)
-        );
-#endif
 
         // Under-relaxation the linear system
         DEqn.relax();
