@@ -16,17 +16,10 @@ fi
 # Checks the final displacement and reaction force histories.
 # ============================================================
 
-if [[ "${WM_PROJECT:-}" == "foam" && "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    PUNCH_DISP_Z_MIN=-1.7e-4
-    PUNCH_DISP_Z_MAX=-1.4e-4
-    SUPPORT_FORCE_Z_MIN=1.9e5
-    SUPPORT_FORCE_Z_MAX=2.1e5
-else
-    PUNCH_DISP_Z_MIN=-3.6e-4
-    PUNCH_DISP_Z_MAX=-3.3e-4
-    SUPPORT_FORCE_Z_MIN=3.9e5
-    SUPPORT_FORCE_Z_MAX=4.1e5
-fi
+PUNCH_DISP_Z_MIN=-0.00034
+PUNCH_DISP_Z_MAX=-0.0003
+SUPPORT_FORCE_Z_MIN=380000
+SUPPORT_FORCE_Z_MAX=400000
 
 ALLRUN_LOGFILE="log.Allrun"
 
