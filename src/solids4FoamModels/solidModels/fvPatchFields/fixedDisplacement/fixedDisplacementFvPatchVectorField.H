@@ -184,8 +184,8 @@ public:
             virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
 
 #ifndef FOAMEXTEND
-            //- Return face quadrature points values
-            //  Used for high order solvers, argument is position of points
+            //- Return face quadrature points values,
+            //  used for high order solvers
             virtual autoPtr<CompactListList<vector>>
             evaluateQuadrature() const;
 #endif

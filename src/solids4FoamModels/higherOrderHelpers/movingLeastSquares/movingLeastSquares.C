@@ -1095,6 +1095,14 @@ movingLeastSquares::movingLeastSquares
     cellConditionNumberPtr_(),
     faceConditionNumberPtr_()
 {
+    if (polynomialOrder_ > 3 || polynomialOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "Choosen polynomial order " << polynomialOrder_
+            << " is not supported. Supported orders are: 1, 2 and 3."
+            << abort(FatalError);
+    }
+
     const label minStencilSize = minNn();
 
     // Number of cells in face stencil
