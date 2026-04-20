@@ -223,14 +223,20 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
 
         // Momentum equation incremental updated Lagrangian form
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)");
+        tmpRef(tRhsEqn) += fvc::div(force);
+        tmpRef(tRhsEqn) += rho_*g();
+
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
           + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(force)
-          + rho_*g()
+         == tRhsEqn
         );
 
         // Under-relax the linear system
