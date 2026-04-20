@@ -40,6 +40,7 @@ SourceFiles
 #include "dictionary.H"
 #include "fvMesh.H"
 #include "OFstream.H"
+#include "vector.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,13 +70,32 @@ class solidPointDisplacement
         //  to preserve backwards compatibility
         word region_;
 
+        //- The specified point location
+        vector point_;
+
         //- Point ID
         label pointID_;
+
+        //- Cell ID, used for extrapolation mode
+        label cellID_;
+
+#ifndef FOAMEXTEND
+        //- Extrapolate displacement from the nearest cell centre
+        bool extrapolate_;
+#endif
 
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;
 
     // Private Member Functions
+
+#ifndef FOAMEXTEND
+        //- Write extrapolated point displacement
+        void extrapolatedPointDisplacement();
+#endif
+
+        //- Write closest point displacement
+        void closestPointDisplacement();
 
         //- Write data
         bool writeData();

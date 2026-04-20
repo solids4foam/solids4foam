@@ -22,6 +22,10 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
+#include "lookupSolidModel.H"
+#ifndef FOAMEXTEND
+    #include "symmTensor3rdOrder.H"
+#endif
 #ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
@@ -48,7 +52,114 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-bool Foam::solidPointDisplacement::writeData()
+#ifndef FOAMEXTEND
+void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
+{
+    // Lookup the solid mesh
+    const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
+
+    // Lookup solid model
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // Initialise resulting displacement
+    vector pointDValue = vector::zero;
+
+    if (mesh.foundObject<volVectorField>("D"))
+    {
+        if (cellID_ > -1)
+        {
+            const volVectorField& D = mesh.lookupObject<volVectorField>("D");
+            pointDValue = D[cellID_];
+
+            const vector distance = point_ - mesh.C()[cellID_];
+
+            if (mesh.foundObject<volTensorField>("grad(D)"))
+            {
+                const volTensorField& gradD =
+                    mesh.lookupObject<volTensorField>("grad(D)");
+
+                pointDValue += distance & gradD[cellID_];
+            }
+            else
+            {
+                InfoInFunction
+                    << "volTensorField grad(D) not found" << endl;
+
+                // Without gradient available we will write closest cell centre
+                // displacement
+                closestPointDisplacement();
+            }
+
+            // Extrapolate from cell using higher order gradient
+            if
+            (
+                solMod.highOrderResidual()
+             && solMod.displacementMLS().polynomialOrder() >= 2
+            )
+            {
+                volScalarField Dx(D.component(vector::X));
+                volScalarField Dy(D.component(vector::Y));
+                volScalarField Dz(D.component(vector::Z));
+
+                tmp<volSymmTensorField> tSecondGradDx =
+                    solMod.displacementMLS().secondGrad(Dx);
+                tmp<volSymmTensorField> tSecondGradDy =
+                    solMod.displacementMLS().secondGrad(Dy);
+                tmp<volSymmTensorField> tSecondGradDz =
+                    solMod.displacementMLS().secondGrad(Dz);
+
+                pointDValue.x() +=
+                    0.5*(distance & tSecondGradDx().internalField()[cellID_]
+                      & distance);
+                pointDValue.y() +=
+                    0.5*(distance & tSecondGradDy().internalField()[cellID_]
+                      & distance);
+                pointDValue.z() +=
+                    0.5*(distance & tSecondGradDz().internalField()[cellID_]
+                      & distance);
+
+                if (solMod.displacementMLS().polynomialOrder() >= 3)
+                {
+                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDx =
+                        solMod.displacementMLS().thirdGrad(Dx);
+                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDy =
+                        solMod.displacementMLS().thirdGrad(Dy);
+                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDz =
+                        solMod.displacementMLS().thirdGrad(Dz);
+
+                    pointDValue.x() +=
+                        (1.0/6.0)*cubicForm((*tThirdGradDx)[cellID_], distance);
+                    pointDValue.y() +=
+                        (1.0/6.0)*cubicForm((*tThirdGradDy)[cellID_], distance);
+                    pointDValue.z() +=
+                        (1.0/6.0)*cubicForm((*tThirdGradDz)[cellID_], distance);
+                }
+            }
+        }
+    }
+    else
+    {
+        InfoInFunction
+            << "volVectorField D not found" << endl;
+    }
+
+    reduce(pointDValue, sumOp<vector>());
+
+    if (Pstream::master())
+    {
+        historyFilePtr_()
+            << time_.time().value()
+            << " " << pointDValue.x()
+            << " " << pointDValue.y()
+            << " " << pointDValue.z()
+            << " " << mag(pointDValue)
+            << endl;
+    }
+}
+#endif
+
+
+void Foam::solidPointDisplacement::closestPointDisplacement()
 {
     // Lookup the solid mesh
     const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
@@ -82,6 +193,23 @@ bool Foam::solidPointDisplacement::writeData()
         InfoIn(this->name() + " function object constructor")
             << "pointVectorField pointD not found" << endl;
     }
+}
+
+
+bool Foam::solidPointDisplacement::writeData()
+{
+#ifndef FOAMEXTEND
+    if (extrapolate_)
+    {
+        extrapolatedPointDisplacement();
+    }
+    else
+    {
+        closestPointDisplacement();
+    }
+#else
+    closestPointDisplacement();
+#endif
 
     return true;
 }
@@ -99,7 +227,12 @@ Foam::solidPointDisplacement::solidPointDisplacement
     name_(name),
     time_(t),
     region_(dict.lookupOrDefault<word>("region", "UNDEFINED")),
+    point_(dict.lookup("point")),
     pointID_(-1),
+    cellID_(-1),
+#ifndef FOAMEXTEND
+    extrapolate_(dict.lookupOrDefault<bool>("extrapolate", false)),
+#endif
     historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
@@ -118,9 +251,6 @@ Foam::solidPointDisplacement::solidPointDisplacement
     }
     Info<< "    region = " << region_ << endl;
 
-    // Lookup the point
-    const vector point(dict.lookup("point"));
-
     const fvMesh* meshPtr = NULL;
     if (time_.foundObject<fvMesh>("solid"))
     {
@@ -136,49 +266,87 @@ Foam::solidPointDisplacement::solidPointDisplacement
     if (historyFilePtr_.empty())
     {
         // Find the closest point
-        scalar minDist = GREAT;
+        scalar minPointDist = GREAT;
 
         forAll(mesh.points(), pI)
         {
-            scalar dist = mag(mesh.points()[pI] - point);
+            scalar dist = mag(mesh.points()[pI] - point_);
 
-            if (dist < minDist)
+            if (dist < minPointDist)
             {
-                minDist = dist;
+                minPointDist = dist;
                 pointID_ = pI;
             }
         }
 
-        // Find global closest point
-        const scalar globalMinDist = returnReduce(minDist, minOp<scalar>());
-        int procNo = -1;
-        if (mag(globalMinDist - minDist) < SMALL)
+        // Find the closest cell
+        scalar minCellDist = GREAT;
+
+        forAll(mesh.C(), cellI)
         {
-            procNo = Pstream::myProcNo();
+            const scalar dist = mag(mesh.C()[cellI] - point_);
+
+            if (dist < minCellDist)
+            {
+                minCellDist = dist;
+                cellID_ = cellI;
+            }
+        }
+
+        // Find global closest point
+        const scalar globalPointMinDist =
+            returnReduce(minPointDist, minOp<scalar>());
+        int pointProcNo = -1;
+        if (mag(globalPointMinDist - minPointDist) < SMALL)
+        {
+            pointProcNo = Pstream::myProcNo();
         }
         else
         {
             pointID_ = -1;
         }
 
+        // Find global closest cell
+        const scalar globalCellMinDist =
+            returnReduce(minCellDist, minOp<scalar>());
+        int cellProcNo = -1;
+        if (mag(globalCellMinDist - minCellDist) < SMALL)
+        {
+            cellProcNo = Pstream::myProcNo();
+        }
+        else
+        {
+            cellID_ = -1;
+        }
+
         // More than one processor can have the point so we will take the proc
         // with the highest processor number
-        const int globalMaxProc = returnReduce(procNo, maxOp<int>());
-        if (mag(globalMaxProc - procNo) > SMALL)
+        const int globalMaxPointProc = returnReduce(pointProcNo, maxOp<int>());
+        if (globalMaxPointProc != pointProcNo)
         {
             pointID_ = -1;
         }
 
         if (pointID_ > -1)
         {
-            Pout<< "    distance from specified point is " << minDist
+            Pout<< "    distance from specified point is " << minPointDist
                 << endl;
         }
 
-        if (returnReduce(pointID_, maxOp<int>()) == -1)
+        const int globalMaxCellProc = returnReduce(cellProcNo, maxOp<int>());
+        if (globalMaxCellProc != cellProcNo)
+        {
+            cellID_ = -1;
+        }
+
+        if
+	(
+	    returnReduce(pointID_, maxOp<int>()) == -1
+	 || returnReduce(cellID_, maxOp<int>()) == -1
+	)
         {
             FatalErrorIn("solidPointDisplacement::solidPointDisplacement")
-                << "Something went wrong: no proc found a point!"
+                << "Something went wrong: no proc found a closest point/cell!"
                 << abort(FatalError);
         }
 
