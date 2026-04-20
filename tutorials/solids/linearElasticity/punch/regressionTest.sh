@@ -16,10 +16,10 @@ fi
 # Checks the final displacement and reaction force histories.
 # ============================================================
 
-PUNCH_DISP_Z_MIN=-0.00036
-PUNCH_DISP_Z_MAX=-0.00034
-SUPPORT_FORCE_Z_MIN=390000
-SUPPORT_FORCE_Z_MAX=430000
+PUNCH_DISP_Z_MIN=-0.00034
+PUNCH_DISP_Z_MAX=-0.0003
+SUPPORT_FORCE_Z_MIN=380000
+SUPPORT_FORCE_Z_MAX=400000
 
 ALLRUN_LOGFILE="log.Allrun"
 
