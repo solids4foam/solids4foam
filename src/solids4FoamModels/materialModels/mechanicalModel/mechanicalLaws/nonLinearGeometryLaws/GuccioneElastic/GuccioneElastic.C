@@ -50,11 +50,23 @@ Foam::IOobject findFibreFieldIOobject
         Foam::IOobject::NO_WRITE
     );
 
+#ifdef FOAMEXTEND
+    if (!io.headerOk())
+#elif defined(OPENFOAM_ORG)
+    if (!io.typeHeaderOk<Foam::volVectorField>(true))
+#else
     if (!io.typeHeaderOk<Foam::volVectorField>(true, false, false))
+#endif
     {
         io.instance() = "0";
 
+#ifdef FOAMEXTEND
+        if (!io.headerOk())
+#elif defined(OPENFOAM_ORG)
+        if (!io.typeHeaderOk<Foam::volVectorField>(true))
+#else
         if (!io.typeHeaderOk<Foam::volVectorField>(true, false, false))
+#endif
         {
             FatalErrorInFunction
                 << "Cannot find required fibre field " << fieldName
@@ -63,7 +75,7 @@ Foam::IOobject findFibreFieldIOobject
         }
     }
 
-    io.readOpt(Foam::IOobject::MUST_READ);
+    io.readOpt() = Foam::IOobject::MUST_READ;
 
     return io;
 }

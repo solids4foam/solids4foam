@@ -90,8 +90,8 @@ class nonLinGeomTotalLagTotalDispSolid
         const volScalarField rImpK_;
 
         //- Reciprocal of the bulk modulus
-        //  Used in the pressure Jacobian when solvePressure is enabled
-        const volScalarField rKappa_;
+        //  Used in the pressure equation when solvePressure is enabled
+        mutable autoPtr<volScalarField> rKappaPtr_;
 
         //- Time rate of pressure
         //  This is used by the optional linear predictor
@@ -109,6 +109,12 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Allocate the reciprocal of the bulk modulus
+        void makeRKappa() const;
+
+        //- Return const access to the reciprocal of the bulk modulus
+        const volScalarField& rKappa() const;
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries

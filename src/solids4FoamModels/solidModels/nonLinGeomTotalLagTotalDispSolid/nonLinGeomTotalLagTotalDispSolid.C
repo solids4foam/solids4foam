@@ -562,7 +562,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     ),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
-    rKappa_(1.0/mechanical().bulkModulus()),
+    rKappaPtr_(),
     dpdtPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
@@ -709,6 +709,29 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             }
         }
     }
+}
+
+
+void nonLinGeomTotalLagTotalDispSolid::makeRKappa() const
+{
+    if (rKappaPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+}
+
+
+const volScalarField& nonLinGeomTotalLagTotalDispSolid::rKappa() const
+{
+    if (rKappaPtr_.empty())
+    {
+        makeRKappa();
+    }
+
+    return rKappaPtr_();
 }
 
 
@@ -868,7 +891,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
-          - p*rKappa_
+          - p*rKappa()
           + pressureStabilisation().cellScalar(&rAUf(), true)*one
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
@@ -1002,7 +1025,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
 
             fvScalarMatrix approxPressureJ
             (
-              - fvm::Sp(rKappa_, p)
+              - fvm::Sp(rKappa(), p)
               + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
