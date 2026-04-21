@@ -106,6 +106,9 @@ class stabilisationModel
             cellVectorPtr_.clear();
         }
 
+        //- Check that an optional face diffusivity field is non-negative
+        void checkGamma(const surfaceScalarField* gammaPtr) const;
+
 
     // Private Member Functions
 
@@ -315,29 +318,6 @@ public:
             {
                 FatalErrorInFunction
                     << "vector stabilisation not supported by "
-                    << type() << exit(FatalError);
-
-                // Keep the compiler happy
-                std::abort();
-            }
-
-            //- Return true if this model provides an adaptive scalar gamma
-            virtual bool usesAdaptiveScalarGamma() const
-            {
-                return false;
-            }
-
-            //- Provide an adaptive scalar gamma field when supported
-            virtual tmp<surfaceScalarField> adaptiveScalarGamma
-            (
-                const volVectorField& D,
-                const surfaceScalarField& impKf,
-                const volScalarField& rho,
-                const dimensionedScalar& dampingCoeff
-            ) const
-            {
-                FatalErrorInFunction
-                    << "adaptiveScalarGamma not supported by "
                     << type() << exit(FatalError);
 
                 // Keep the compiler happy
