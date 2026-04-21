@@ -771,10 +771,10 @@ label newtonIcoFluid::formResidual
       - fvm::div(phi, U)
     );
 
-    rAUf() = fvc::interpolate(1.0/pressureStabUEqn.A());
+    rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
 
     pressureStabilisation().updateScalar(p, &gradp());
-    pressureResidual -= pressureStabilisation().cellScalar(&rAUf(), true);
+    pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
 
     // Make residual extensive
     pressureResidual *= mesh.V();
@@ -1001,10 +1001,10 @@ label newtonIcoFluid::formResidual
       - fvm::div(phi, U)
     );
 
-    rAUf() = fvc::interpolate(1.0/pressureStabUEqn.A());
+    rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
 
     pressureStabilisation().updateScalar(p, &gradp());
-    pressureResidual -= pressureStabilisation().cellScalar(&rAUf(), true);
+    pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
 
     // Make residual extensive
     pressureResidual *= mesh.V();
