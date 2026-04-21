@@ -1,14 +1,18 @@
-#!/bin/sh
+#!/bin/bash
 
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
+fi
 
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
-
-solids4Foam::caseOnlyRunsWithFoamExtend
 
 set -e
 
