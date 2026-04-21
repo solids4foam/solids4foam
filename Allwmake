@@ -60,8 +60,9 @@ then
     exit 1
 else
     echo "There were no build errors: enjoy solids4foam!"; echo
-    echo "To test the installation, run:"
-    echo "    > cd tutorials && ./Alltest"
+    echo "To test the installation:"
+    echo "    > cd tutorials && ./Alltest            # quick 'smoke test'"
+    echo "    > cd tutorials && ./Alltest-regression # comprehensive (can be slow)"
 fi
 echo
 

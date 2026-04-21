@@ -37,6 +37,6 @@ fi
 
 # Clear all build logs
 echo; echo "Removing all log.Allwmake build logs"; echo
-find . -name log.Allwmake | xargs rm
+find . -name log.Allwmake -exec rm -f {} +
 
 #------------------------------------------------------------------------------

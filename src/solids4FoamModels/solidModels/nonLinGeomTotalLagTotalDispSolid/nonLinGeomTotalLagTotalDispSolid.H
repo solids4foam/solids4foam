@@ -89,9 +89,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Diffusivity for the pressure equation
-        //  This controls the amount of smoothing in the pressure equation
-        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure equation when solvePressure is enabled
+        mutable autoPtr<volScalarField> rKappaPtr_;
 
         //- Time rate of pressure
         //  This is used by the optional linear predictor
@@ -110,6 +110,12 @@ class nonLinGeomTotalLagTotalDispSolid
         //  previous time-steps
         void predict();
 
+        //- Allocate the reciprocal of the bulk modulus
+        void makeRKappa() const;
+
+        //- Return const access to the reciprocal of the bulk modulus
+        const volScalarField& rKappa() const;
+
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
         (
@@ -127,12 +133,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-
-        // Make the pDiffusivity field
-        void makePDiffusivity() const;
-
-        // Return a const reference to the pDiffusivity field
-        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid

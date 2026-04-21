@@ -3,7 +3,9 @@
 
 notes.txt
 todo*
-tutorialsTest
+tutorialsTest*
+regressionTests*
+codex*.md
 
 # Build log files
 log.Allwmake

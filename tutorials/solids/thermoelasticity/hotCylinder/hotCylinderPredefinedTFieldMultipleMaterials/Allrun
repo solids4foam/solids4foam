@@ -19,8 +19,10 @@ solids4Foam::runApplication setsToZones
 # Fix for symmetry type
 if [[ $WM_PROJECT != "foam" ]]
 then
-    echo "Replacing symmetryPlane with symmetry for T files in hotCylinderTemperatureField"
-    find hotCylinderTemperatureField -name T | xargs sed -i 's\symmetryPlane\symmetry\g'
+    echo "Replacing symmetryPlane and symmetryPlanePlane with symmetry for T files in hotCylinderTemperatureField"
+    find hotCylinderTemperatureField -name T | xargs sed -i \
+        -e 's\symmetryPlanePlane\symmetry\g' \
+        -e 's\symmetryPlane\symmetry\g'
 fi
 
 # Run the solver

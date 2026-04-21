@@ -3,6 +3,57 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Example usage
+# ./Allrun            # default behaviour is the tuned IQNILS setup
+# ./Allrun aitken
+# ./Allrun parallel
+# ./Allrun aitken parallel
+
+# PETSc is required for this case
+if [[ -z "${PETSC_DIR:-}" ]]
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
+    exit 0
+fi
+
+coupling=iqnils
+runMode=serial
+fvSolutionSuffix=""
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    fvSolutionSuffix=".foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    fvSolutionSuffix=".openfoamorg"
+fi
+
+echo "Using ${coupling} coupling setup"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+ln -vnsf "controlDict.${coupling}" system/controlDict
+ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
@@ -14,7 +65,7 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid

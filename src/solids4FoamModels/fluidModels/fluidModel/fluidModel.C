@@ -35,6 +35,15 @@ namespace Foam
     defineTypeNameAndDebug(fluidModel, 0);
     defineRunTimeSelectionTable(fluidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, fluidModel, physicsModel);
+
+    namespace
+    {
+        word resolvedFluidRegion(const Time& runTime, const word& region)
+        {
+            return runTime.controlDict().subOrEmptyDict("fluid")
+                .lookupOrDefault<word>("region", region);
+        }
+    }
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -490,7 +499,7 @@ Foam::fluidModel::fluidModel
     const bool constructNull
 )
 :
-    physicsModel(type, runTime),
+    physicsModel(type, runTime, region),
     IOdictionary
     (
         // If region == "region0" then read from the main case
@@ -997,6 +1006,8 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
     const word& region
 )
 {
+    const word runRegion(resolvedFluidRegion(runTime, region));
+
     // NB: dictionary must be unregistered to avoid adding to the database
 
     IOdictionary props
@@ -1004,9 +1015,9 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
         IOobject
         (
             "fluidProperties",
-            bool(region == dynamicFvMesh::defaultRegion)
+            bool(runRegion == dynamicFvMesh::defaultRegion)
           ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+          : fileName(runTime.caseConstant()/runRegion),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE,
@@ -1051,7 +1062,7 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<fluidModel>(ctorPtr(runTime, region));
+    return autoPtr<fluidModel>(ctorPtr(runTime, runRegion));
 }
 
 

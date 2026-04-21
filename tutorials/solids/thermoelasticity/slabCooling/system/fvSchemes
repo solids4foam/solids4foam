@@ -49,6 +49,7 @@ laplacianSchemes
 snGradSchemes
 {
     default                none;
+    snGrad(D)              corrected;
 }
 
 interpolationSchemes

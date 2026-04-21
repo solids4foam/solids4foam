@@ -52,6 +52,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -174,6 +175,15 @@ public:
                 pointSymmTensorField& sigma, const pointTensorField& gradD
             );
 
+            //- Calculate the stress at face quadrature points
+#ifndef FOAMEXTEND
+            void correct
+            (
+                const CompactListList<tensor>& gradDQuad,
+                CompactListList<symmTensor>& sigmaQuad
+            );
+#endif
+
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);
 
@@ -183,6 +193,15 @@ public:
                 const volVectorField& D,
                 volTensorField& gradD
             );
+
+            //- Update the gradient of displacement for face quadrature points
+#ifndef FOAMEXTEND
+            void grad
+            (
+                const volVectorField& D,
+                CompactListList<tensor>& gradDQuad
+            );
+#endif
 
             //- Update the gradient of displacement vol field using pointD
             void grad

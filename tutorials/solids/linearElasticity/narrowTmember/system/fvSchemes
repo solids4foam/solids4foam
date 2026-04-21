@@ -30,30 +30,29 @@ ddtSchemes
 gradSchemes
 {
      default                none;
+     grad(D)                leastSquaresS4f;
 }
 
 divSchemes
 {
     default                 none;
-    fvmDiv(sigma)           pointGaussLeastSquares;
+    div(sigma)              Gauss linear;
+    div((impK*grad(D)))      Gauss linear;
 }
 
 laplacianSchemes
 {
-    default                 none;
-    fvmBlockLaplacian(D)    pointGaussLeastSquaresLaplacian;
-    fvmBlockLaplacianTranspose(D) pointGaussLeastSquaresLaplacianTranspose;
-    fvmBlockLaplacianTrace(D) pointGaussLeastSquaresLaplacianTrace;
+    default                 Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default                 none;
+    default                 corrected;
 }
 
 interpolationSchemes
 {
-    default                 none;
+    default                 linear;
     mu                      linear;
     lambda                  linear;
 }

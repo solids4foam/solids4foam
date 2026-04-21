@@ -50,6 +50,7 @@ if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
 fi
 
 APPROACH="${1:-totalLagrangian}"
+CASE_SUFFIX=""
 
 # Validate approach name
 case "$APPROACH" in
@@ -60,6 +61,12 @@ case "$APPROACH" in
         exit 1
         ;;
 esac
+
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    CASE_SUFFIX=".foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" == "9" ]]; then
+    CASE_SUFFIX=".openfoamorg"
+fi
 
 # -------------------------------------------------------------------------
 # Functions
@@ -79,15 +86,37 @@ link_files_for_suffix() {
     fi
 }
 
+require_petsc_or_exit_silently() {
+    if [[ -z "${PETSC_DIR:-}" ]]; then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "Please set the PETSC_DIR variable"
+        echo
+        exit 0
+    fi
+}
+
 select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
         totalLagrangian|totalLagrangianPetscSnes)
+            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+                require_petsc_or_exit_silently
+            fi
             link_files_for_suffix "$APPROACH"
+            if [[ -n "$CASE_SUFFIX" ]]; then
+                link_files_for_suffix "${APPROACH}${CASE_SUFFIX}"
+            fi
             (cd 0 && rm -f D* && ln -s org/D .)
             ;;
         updatedLagrangian|updatedLagrangianPetscSnes)
+            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+                require_petsc_or_exit_silently
+            fi
             link_files_for_suffix "$APPROACH"
+            if [[ -n "$CASE_SUFFIX" ]]; then
+                link_files_for_suffix "${APPROACH}${CASE_SUFFIX}"
+            fi
             (cd 0 && rm -f D* && ln -s org/DD .)
             ;;
     esac

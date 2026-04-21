@@ -33,6 +33,7 @@ Author
 #define linearElastic_H
 
 #include "mechanicalLaw.H"
+#include "CompactListList.H"
 #include "surfaceMesh.H"
 #include "zeroGradientFvPatchFields.H"
 
@@ -154,6 +155,16 @@ public:
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+#ifndef FOAMEXTEND
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+#endif
 };
 
 

@@ -42,6 +42,7 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -78,9 +79,9 @@ class linGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Diffusivity for the pressure equation
-        //  This controls the amount of smoothing in the pressure equation
-        mutable autoPtr<surfaceScalarField> pDiffusivityPtr_;
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure Jacobian when solvePressure is enabled
+        const volScalarField rKappa_;
 
         //- Acceleration field
         //  Only used by the explicit solution scheme
@@ -94,7 +95,6 @@ class linGeomTotalDispSolid
 
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
-
 
     // Private Member Functions
 
@@ -121,12 +121,6 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
-
-        // Make the pDiffusivity field
-        void makePDiffusivity() const;
-
-        // Return a const reference to the pDiffusivity field
-        const surfaceScalarField& pDiffusivity() const;
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);

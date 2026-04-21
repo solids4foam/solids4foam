@@ -213,11 +213,8 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
         // is set to zero on traction boundaries
-        // To-do: add a stabilisation traction function to momentumStabilisation
-        const scalar scaleFactor =
-            readScalar(stabilisation().dict().lookup("scaleFactor"));
-        const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
-        traction += scaleFactor*impKf_*(fvc::snGrad(DD()) - (n & gradDDf));
+        momentumStabilisation().updateVector(DD(), &gradDD());
+        traction += impKf_*momentumStabilisation().faceVector();
 
         // Calculate the force at the faces
         surfaceVectorField force(magSfCurrent*traction);
@@ -226,14 +223,20 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
 
         // Momentum equation incremental updated Lagrangian form
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)");
+        tmpRef(tRhsEqn) += fvc::div(force);
+        tmpRef(tRhsEqn) += rho_*g();
+
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
           + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(force)
-          + rho_*g()
+         == tRhsEqn
         );
 
         // Under-relax the linear system
@@ -518,13 +521,13 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
+    rKappaPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
-      label(solidModel::twoD() ? 2 : 3)
-      //   solvePressure() // not yet implemented in this solid model
-      // ? label(solidModel::twoD() ? 3 : 4)
-      // : label(solidModel::twoD() ? 2 : 3)
+        solvePressure()
+      ? label(solidModel::twoD() ? 3 : 4)
+      : label(solidModel::twoD() ? 2 : 3)
     )
 {
     DDisRequired();
@@ -538,6 +541,23 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         // It is important to call the stress calculation procedure during the
         // constructor to allow it to correctly initialise fields
         mechanical().correct(sigma());
+    }
+
+    if (solvePressure())
+    {
+        if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
+        {
+            FatalErrorInFunction
+                << "The solution algorithm must be "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " when solvePressure is enabled" << abort(FatalError);
+        }
+
+        // Ensure p is created and the oldTime is stored
+        p().oldTime();
     }
 
     if (predictor_)
@@ -629,6 +649,29 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             }
         }
     }
+}
+
+
+void nonLinGeomUpdatedLagSolid::makeRKappa() const
+{
+    if (rKappaPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+}
+
+
+const volScalarField& nonLinGeomUpdatedLagSolid::rKappa() const
+{
+    if (rKappaPtr_.empty())
+    {
+        makeRKappa();
+    }
+
+    return rKappaPtr_();
 }
 
 
@@ -747,6 +790,65 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
+    if (solvePressure())
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_ - 1
+        );
+
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+
+        // Replace the pressure component of stress
+        sigma() = dev(sigma()) - p*I;
+
+        // Calculate the pressure gradient
+        const volVectorField gradp(fvc::grad(p));
+
+        // Re-calculate the pressure stabilisation parameter
+        pressureStabilisation().updateScalar(p, &gradp);
+
+        // Dimensional consistency factor
+        const dimensionedScalar one
+        (
+            "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
+        );
+
+        // Compute the positive face-interpolated reciprocal of the approximate
+        // momentum equation diagonal. This is the solid analogue of rAUf in
+        // pressure-velocity coupling and has units of [Pa].
+        {
+            fvVectorMatrix approxMomJ
+            (
+                fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+              - rho()*fvm::d2dt2(DD)
+            );
+            approxMomJ.relax();
+            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+        }
+
+        // Calculate pressure equation residual
+        scalarField pressureResidual
+        (
+          - p*rKappa()
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
+          - 0.5*(pow(J_, 2.0) - 1.0)/J_
+        );
+
+        // Make residual extensive
+        pressureResidual *= mesh().V();
+
+        // Copy the pressureResidual into the f field as the final equation
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pressureResidual, f, blockSize_ - 1
+        );
+    }
+
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh().Sf()/mesh().magSf());
     const surfaceVectorField SfCurrent
@@ -763,11 +865,8 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
     // is set to zero on traction boundaries
-    // To-do: add a stabilisation traction function to momentumStabilisation
-    const scalar scaleFactor =
-        readScalar(stabilisation().dict().lookup("scaleFactor"));
-    const surfaceTensorField gradDDf(fvc::interpolate(gradDD()));
-    traction += scaleFactor*impKf_*(fvc::snGrad(DD) - (n & gradDDf));
+    momentumStabilisation().updateVector(DD, &gradDD());
+    traction += impKf_*momentumStabilisation().faceVector();
 
     // Calculate the force at the faces
     surfaceVectorField force(magSfCurrent*traction);
@@ -806,11 +905,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    if (solvePressure())
-    {
-        notImplemented("Not implemented for active 'solvePressure'");
-    }
-
     return 0;
 }
 
@@ -837,10 +931,77 @@ label nonLinGeomUpdatedLagSolid::formJacobian
     // Enforce the boundary conditions
     DD.correctBoundaryConditions();
 
+    if (solvePressure())
+    {
+        // Copy x into the p field
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_ - 1
+        );
+
+        // Enforce the boundary conditions
+        p.correctBoundaryConditions();
+
+        {
+            // Dimensional consistency factor
+            const dimensionedScalar one
+            (
+                "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
+            );
+
+            // Compute the positive face-interpolated reciprocal of the approximate
+            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            {
+                fvVectorMatrix approxMomJ
+                (
+                    fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+                  - rho()*fvm::d2dt2(DD)
+                );
+                approxMomJ.relax();
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+            }
+
+            fvScalarMatrix approxPressureJ
+            (
+              - fvm::Sp(rKappa(), p)
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
+            );
+
+            // Insert the pressure equation
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+            );
+        }
+
+        // Insert DD-in-p equation coeffs coming from tr(grad(DD)) == div(DD)
+        foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
+        (
+            p,
+            DD,
+            jac,
+            blockSize_ - 1,            // row offset
+            0,                         // column offset
+            solidModel::twoD() ? 2 : 3 // number of scalar components of DD
+        );
+
+        // Insert p-in-DD term
+        foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+        (
+            p,
+            jac,
+            0,                         // row offset
+            blockSize_ - 1,            // column offset
+            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        );
+    }
+
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
     (
-        fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+        momentumStabilisation().vectorJacobian(DD, &impKf_)
       - rho()*fvm::d2dt2(DD)
     );
 
