@@ -115,6 +115,13 @@ class HolzapfelGasserOgdenElastic
 
     // Private Member Functions
 
+        //- Calculate the stress on faces (shared by correct(surfaceSymmTensorField&))
+        void correctF
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& Ff
+        );
+
         //- Calculate Cauchy stress as a function of deformation gradient
         void calcDevCauchy
         (

@@ -358,25 +358,16 @@ void Foam::HolzapfelGasserOgdenElastic::correct(volSymmTensorField& sigma)
 }
 
 
-void Foam::HolzapfelGasserOgdenElastic::correct(surfaceSymmTensorField& sigma)
+void Foam::HolzapfelGasserOgdenElastic::correctF
+(
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& Ff
+)
 {
-    // Update the deformation gradient field
-    // Note: if true is returned, it means that linearised elasticity was
-    // enforced by the solver via the enforceLinear switch
-    dimensionedScalar K_("K", mu_.dimensions(), 0);
-    if (updateF(sigma, mu_, K_))
-    {
-        return;
-    }
-
     // NOTE [IMPORTANT]:
     // Do NOT write F.T() & F directly: see the comment in
     // StVenantKirchhoffElastic.C
-    const surfaceTensorField& Ff = this->Ff();
     const surfaceTensorField FfT("FfT", Ff.T());
-
-    // Calculate the Jacobian of the deformation gradient
-    // const surfaceScalarField J = det(Ff()); // J=1
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     const surfaceSymmTensorField b("b", symm(Ff & FfT));
@@ -393,7 +384,7 @@ void Foam::HolzapfelGasserOgdenElastic::correct(surfaceSymmTensorField& sigma)
 
     // Anisotropic (HolzapfelGasserOgdenElastic) part
 
-    //- Right Cauchy-Green tenso
+    //- Right Cauchy-Green tensor
     const surfaceSymmTensorField Cf("Cf", symm(FfT & Ff));
 
     //- Fibre directions
@@ -440,6 +431,21 @@ void Foam::HolzapfelGasserOgdenElastic::correct(surfaceSymmTensorField& sigma)
     //- Add anisotropic part of Cauchy stress
     sigma += sigmaAniso4;
     sigma += sigmaAniso6;
+}
+
+
+void Foam::HolzapfelGasserOgdenElastic::correct(surfaceSymmTensorField& sigma)
+{
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    dimensionedScalar K_("K", mu_.dimensions(), 0);
+    if (updateF(sigma, mu_, K_))
+    {
+        return;
+    }
+
+    correctF(sigma, this->Ff());
 }
 
 void Foam::HolzapfelGasserOgdenElastic::setRestart()
