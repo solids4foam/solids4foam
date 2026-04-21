@@ -22,11 +22,11 @@ This plan records the cleanup needed before merging PR #248 from
     `neoHookeanElastic`.
   - [x] Remove `pdNeoHookeanElastic` from build lists once no references
     remain.
-- [ ] Align `pdGuccioneElastic` with `GuccioneElastic`.
-  - [ ] Reuse the existing fibre-field creation logic where possible.
-  - [ ] Avoid duplicating the Guccione invariant/stress assembly.
+- [x] Align `pdGuccioneElastic` with `GuccioneElastic`.
+  - [x] Reuse the existing fibre-field creation logic where possible.
+  - [x] Avoid duplicating the Guccione invariant/stress assembly.
   - [x] Fix the duplicated `R_`/`Rf_` component assignments.
-  - [ ] Decide whether the pressure-displacement behavior is a mode of
+  - [x] Decide whether the pressure-displacement behavior is a mode of
     `GuccioneElastic` or a thin derived/sibling law.
 - [ ] Align and rename `HolzapfelGasserOgdenElastic`.
   - [x] Rename without the `pd` prefix.

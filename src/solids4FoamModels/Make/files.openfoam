@@ -69,7 +69,6 @@ $(nonLinGeomLaws)/diffusionHyperElastic/diffusionHyperElastic.C
 $(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
 $(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
-$(nonLinGeomLaws)/pdGuccioneElastic/pdGuccioneElastic.C
 $(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
 $(nonLinGeomLaws)/isotropicFungElastic/isotropicFungElastic.C
 $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C

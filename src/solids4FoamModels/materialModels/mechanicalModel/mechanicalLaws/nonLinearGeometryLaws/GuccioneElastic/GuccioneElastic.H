@@ -67,6 +67,12 @@ class GuccioneElastic
         //- Shear modulus in the limited of small strains
         dimensionedScalar mu_;
 
+        //- Pressure-displacement formulation
+        const Switch pressureDisplacement_;
+
+        //- Effective shear modulus for the pressure-displacement formulation
+        volScalarField muEff_;
+
         //- Flag to indicate a uniform fibre field
         //  If true, the fibre direction is read from mechanicalProperties
         //  If false, the fibre field is read from the starting time directory
@@ -99,6 +105,12 @@ class GuccioneElastic
         volSymmTensorField S_;
         surfaceSymmTensorField Sf_;
 
+        //- Exponential of Qf for the pressure-displacement formulation
+        surfaceScalarField expQf_;
+
+        //- Scaling coeff for the pressure-displacement impK
+        const scalar impKcoeff_;
+
 
     // Private Member Functions
 
@@ -124,6 +136,21 @@ class GuccioneElastic
             surfaceSymmTensorField& sigma,
             const surfaceTensorField& gradD
         );
+
+        //- Calculate deviatoric Cauchy stress from a deformation gradient
+        void calcDevCauchy
+        (
+            const tensor& F,
+            const symmTensor& f0f0,
+            const tensor& R,
+            symmTensor& devCauchy
+        ) const;
+
+        //- Calculate initial shear modulus by F perturbation
+        void calcInitialShearModulus();
+
+        //- Calculate effective shear modulus
+        void calcEffectiveShearModulus();
 
         //- Disallow default bitwise copy construct
         GuccioneElastic(const GuccioneElastic&);
@@ -180,6 +207,9 @@ public:
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly
         virtual void setRestart();
+
+        //- Update total accumulated fields
+        virtual void updateTotalFields();
 };
 
 
