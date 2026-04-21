@@ -361,6 +361,14 @@ public:
                 // Keep the compiler happy
                 std::abort();
             }
+
+            //- Return true if this model is compatible with high-order
+            //  residual calculation. Defaults to false; overridden by
+            //  models that are known to be compatible (e.g. alphaStab).
+            virtual bool supportsHighOrderResidual() const
+            {
+                return false;
+            }
 };
 
 

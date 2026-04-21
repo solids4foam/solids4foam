@@ -1,0 +1,22 @@
+name: Check Tutorial READMEs
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  check-tutorial-readmes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tutorial README.md files
+        id: check-readmes
+        continue-on-error: true
+        run: ./.github/scripts/checkTutorialReadmes.sh
+
+      - name: Report advisory result
+        if: steps.check-readmes.outcome == 'failure'
+        run: |
+          echo "::warning::Some tutorial cases are missing README.md files. This check is advisory only."

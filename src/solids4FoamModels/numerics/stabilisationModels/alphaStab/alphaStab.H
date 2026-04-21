@@ -154,6 +154,12 @@ public:
                 const surfaceScalarField* gammaPtr = nullptr,
                 const bool rebuild = false
             ) const;
+
+            //- alpha stabilisation supports high-order residual calculation
+            virtual bool supportsHighOrderResidual() const
+            {
+                return true;
+            }
 };
 
 
