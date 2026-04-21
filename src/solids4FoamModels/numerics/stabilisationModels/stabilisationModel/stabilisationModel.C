@@ -44,7 +44,7 @@ Foam::stabilisationModel::stabilisationModel
     mesh_(mesh),
     dict_(dict),
     dims_(dims),
-    scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
+    scaleFactor_(dict.lookupOrDefault<scalar>("scaleFactor", 1.0)),
     scaleFactorJacobian_
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
