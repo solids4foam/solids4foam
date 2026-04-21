@@ -19,6 +19,29 @@ Class
     HolzapfelGasserOgdenElastic
 
 Description
+    Incompressible Holzapfel-Gasser-Ogden anisotropic hyperelastic law for
+    pressure-displacement solid formulations.
+
+    The law requires the following entries in mechanicalProperties:
+
+    \verbatim
+        type            HolzapfelGasserOgdenElastic;
+        rho             rho [1 -3 0 0 0 0 0] <value>;
+        E               E   [1 -1 -2 0 0 0 0] <value>;
+        nu              nu  [0 0 0 0 0 0 0] 0.5;
+        // or
+        mu              mu  [1 -1 -2 0 0 0 0] <value>;
+
+        fibreAngle      fibreAngle [0 0 0 0 0 0 0] <degrees>;
+        k1              k1 [1 -1 -2 0 0 0 0] <value>;
+        k2              k2 [0 0 0 0 0 0 0] <value>;
+        impKcoeff       <optional scalar>;
+    \endverbatim
+
+    The local cylindrical material directions must be present as volVectorFields
+    Ec, Ea and Er, and as surfaceVectorFields Ecf, Eaf and Erf. For cases such
+    as arterial geometries these fields are typically generated before running
+    the solver.
 
 SourceFiles
     HolzapfelGasserOgdenElastic.C
@@ -39,7 +62,7 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class linearElastic Declaration
+              Class HolzapfelGasserOgdenElastic Declaration
 \*---------------------------------------------------------------------------*/
 
 class HolzapfelGasserOgdenElastic

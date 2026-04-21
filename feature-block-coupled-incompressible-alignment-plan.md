@@ -31,7 +31,7 @@ This plan records the cleanup needed before merging PR #248 from
 - [ ] Align and rename `HolzapfelGasserOgdenElastic`.
   - [x] Rename without the `pd` prefix.
   - [x] Keep `TypeName` and file/class names consistent.
-  - [ ] Document required direction fields and dictionary entries.
+  - [x] Document required direction fields and dictionary entries.
   - [ ] Factor duplicated volume/surface stress code into shared helpers where
     practical.
   - [x] Keep direct `p`/`pf` coupling explicit if required by the coupled
