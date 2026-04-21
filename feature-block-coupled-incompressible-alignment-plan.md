@@ -80,6 +80,19 @@ This plan records the cleanup needed before merging PR #248 from
 - [x] Decide supported OpenFOAM targets for `coupledPressureDisplacementSolid`.
   Decision: FE-only for this PR. Added explanatory comment to
   `src/solids4FoamModels/Make/files.foamextend`.
-- [ ] Run targeted tutorial checks for the changed pressure-displacement cases.
-- [ ] Make clean `/tmp` copies for FE41 and OF9 builds where supported.
-- [ ] Run relevant regression tests before finalizing.
+- [x] Run targeted tutorial checks for the changed pressure-displacement cases.
+  - FE41: `plateHole/pressureDisplacement/incompressible/plateHoleHex/coarse`
+    and `cylindricalPressureVessel/pressureDisplacement/cylinder` both ran to
+    completion (verified via `Allrun`). The pressure-displacement cases do not
+    carry `regressionTest.sh` scripts; `Allrun` success is the available check.
+- [x] Make clean `/tmp` copies for FE41 and OF9 builds where supported.
+  - FE41: built from feature branch working directory (FE41 wmake stores objects
+    in `~/foam/philipc-4.1/` relative to source path; `/tmp` clone produced no
+    separate objects). Library rebuilt at 20:07; two tutorials verified.
+  - OF9: `/tmp/s4f-of9-test` clean build — exits 0, "enjoy solids4foam!"
+    (Note: `Make/files` symlinks must be intact — `cp -r` resolves them;
+    a fix was committed to the two Allwmake scripts so `ln -sf` now
+    correctly replaces a regular file with the right symlink.)
+- [x] Run relevant regression tests before finalizing.
+  - `linearElasticity/plateHole/regressionTest.sh` (non-pd, OF-v2512):
+    DDifference LInf 4.2e-08, pointDDifference 6.4e-08, stress 105024 — PASS.
