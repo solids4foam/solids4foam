@@ -24,8 +24,8 @@ boundaryField
 {
     inlet
     {
-        type            fixedValue;
-        value           uniform (1 0 0);
+        type            membraneRoofVelocity;
+        value           uniform (0 0 0);
     }
 
     outlet
