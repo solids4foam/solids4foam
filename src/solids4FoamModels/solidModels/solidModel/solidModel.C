@@ -19,6 +19,7 @@ License
 
 #include "solidModel.H"
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
@@ -97,6 +98,55 @@ void Foam::solidModel::makeDualMesh() const
     Info<< "Creating dualMesh" << endl;
 
     dualMeshPtr_.set(new meshDual(mesh(), solidModelDict()));
+}
+
+
+void Foam::solidModel::makeRAUf() const
+{
+    if (rAUfPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rAUfPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "rAUf",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+const Foam::surfaceScalarField& Foam::solidModel::rAUf() const
+{
+    if (rAUfPtr_.empty())
+    {
+        makeRAUf();
+    }
+
+    return autoPtrRef(rAUfPtr_);
+}
+
+
+Foam::surfaceScalarField& Foam::solidModel::rAUf()
+{
+    if (rAUfPtr_.empty())
+    {
+        makeRAUf();
+    }
+
+    return autoPtrRef(rAUfPtr_);
 }
 
 
@@ -1026,6 +1076,7 @@ Foam::solidModel::solidModel
     ),
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
+    rAUfPtr_(),
     solutionTol_
     (
         solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)

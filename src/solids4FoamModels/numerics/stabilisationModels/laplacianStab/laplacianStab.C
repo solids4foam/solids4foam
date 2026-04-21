@@ -131,6 +131,8 @@ const Foam::fvScalarMatrix& Foam::laplacianStab::scalarJacobian
     const bool rebuild
 ) const
 {
+    checkGamma(gammaPtr);
+
     // If required, initialise the face stabilisation field
     if (scalarJacobianPtr().empty() || rebuild)
     {
@@ -174,6 +176,8 @@ const Foam::fvVectorMatrix& Foam::laplacianStab::vectorJacobian
     const bool rebuild
 ) const
 {
+    checkGamma(gammaPtr);
+
     // If required, initialise the face stabilisation field
     if (vectorJacobianPtr().empty() || rebuild)
     {
