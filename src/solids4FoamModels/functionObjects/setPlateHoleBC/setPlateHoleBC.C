@@ -34,7 +34,6 @@ Author
 #include "OFstream.H"
 
 #include "linearElastic.H"
-#include "pdNeoHookeanElastic.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -157,27 +156,7 @@ Foam::vector Foam::setPlateHoleBC::plateHoleDisplacement(const vector& C) const
     // Lookup the solidModel object
     const solidModel& solMod = lookupSolidModel(mesh);
 
-    const PtrList<mechanicalLaw>& laws = solMod.mechanical();
-    scalar mu = 0;
-    if (isA<linearElastic>(laws[0]))
-    {
-        mu = refCast<const linearElastic>(laws[0]).mu().value();
-    }
-    else if (isA<pdNeoHookeanElastic>(laws[0]))
-    {
-        mu =
-            refCast<const pdNeoHookeanElastic>
-            (
-                laws[0]
-            ).mu().value();
-    }
-    else
-    {
-        FatalErrorIn("setPlateHoleBC::plateHoleDisplacement(const vector)")
-            << "Mehanical law: " << laws[0].type()
-            << " is not supported."
-            << abort(FatalError);
-    }
+    scalar mu = solMod.mechanical().shearModulus()()[0];
 
     scalar K = solMod.mechanical().bulkModulus()()[0];
 
@@ -235,27 +214,7 @@ Foam::scalar Foam::setPlateHoleBC::plateHoleHydPressure
     // Lookup the solidModel object
     const solidModel& solMod = lookupSolidModel(mesh);
 
-    const PtrList<mechanicalLaw>& laws = solMod.mechanical();
-    scalar mu = 0;
-    if (isA<linearElastic>(laws[0]))
-    {
-        mu = refCast<const linearElastic>(laws[0]).mu().value();
-    }
-    else if (isA<pdNeoHookeanElastic>(laws[0]))
-    {
-        mu =
-            refCast<const pdNeoHookeanElastic>
-            (
-                laws[0]
-            ).mu().value();
-    }
-    else
-    {
-        FatalErrorIn("setPlateHoleBC::plateHoleDisplacement(const vector)")
-            << "Mehanical law: " << laws[0].type()
-            << " is not supported."
-            << abort(FatalError);
-    }
+    scalar mu = solMod.mechanical().shearModulus()()[0];
 
     scalar K = solMod.mechanical().bulkModulus()()[0];
 

@@ -80,9 +80,8 @@ $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 $(nonLinGeomLaws)/YeohElastic/YeohElastic.C
-$(nonLinGeomLaws)/pdNeoHookeanElastic/pdNeoHookeanElastic.C
 $(nonLinGeomLaws)/pdGuccioneElastic/pdGuccioneElastic.C
-$(nonLinGeomLaws)/pdHGO/pdHGO.C
+$(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
 
 
 materialModels/thermalModel/thermalModel.C

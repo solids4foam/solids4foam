@@ -16,20 +16,20 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    pdHGO
+    HolzapfelGasserOgdenElastic
 
 Description
 
 SourceFiles
-    pdHGO.C
+    HolzapfelGasserOgdenElastic.C
 
 Author
     Zeljko Tukovic, FSB Zagreb. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef pdHGO_H
-#define pdHGO_H
+#ifndef HolzapfelGasserOgdenElastic_H
+#define HolzapfelGasserOgdenElastic_H
 
 #include "mechanicalLaw.H"
 
@@ -42,7 +42,7 @@ namespace Foam
                          Class linearElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class pdHGO
+class HolzapfelGasserOgdenElastic
 :
     public mechanicalLaw
 {
@@ -109,15 +109,15 @@ class pdHGO
         void calcEffectiveShearModulus();
 
         //- Disallow default bitwise copy construct
-        pdHGO(const pdHGO&);
+        HolzapfelGasserOgdenElastic(const HolzapfelGasserOgdenElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const pdHGO&);
+        void operator=(const HolzapfelGasserOgdenElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("pdHGO");
+    TypeName("HolzapfelGasserOgdenElastic");
 
     // Static data members
 
@@ -125,7 +125,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        pdHGO
+        HolzapfelGasserOgdenElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -136,7 +136,7 @@ public:
 
     // Destructor
 
-        virtual ~pdHGO();
+        virtual ~HolzapfelGasserOgdenElastic();
 
 
     // Member Functions

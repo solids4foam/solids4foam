@@ -17,25 +17,27 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "pdHGO.H"
+#include "HolzapfelGasserOgdenElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "calculatedFvPatchFields.H"
 #include "eig3.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(pdHGO, 0);
+    defineTypeNameAndDebug(HolzapfelGasserOgdenElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, pdHGO, nonLinGeomMechLaw
+        mechanicalLaw, HolzapfelGasserOgdenElastic, nonLinGeomMechLaw
     );
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
-Foam::pdHGO::pdHGO
+Foam::HolzapfelGasserOgdenElastic::HolzapfelGasserOgdenElastic
 (
     const word& name,
     const fvMesh& mesh,
@@ -199,13 +201,13 @@ Foam::pdHGO::pdHGO
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::pdHGO::~pdHGO()
+Foam::HolzapfelGasserOgdenElastic::~HolzapfelGasserOgdenElastic()
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::pdHGO::rho() const
+Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::rho() const
 {
     return tmp<volScalarField>
     (
@@ -227,7 +229,7 @@ Foam::tmp<Foam::volScalarField> Foam::pdHGO::rho() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::pdHGO::impK() const
+Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::impK() const
 {
     return tmp<volScalarField>
     (
@@ -249,7 +251,7 @@ Foam::tmp<Foam::volScalarField> Foam::pdHGO::impK() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::pdHGO::bulkModulus() const
+Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::bulkModulus() const
 {
     return tmp<volScalarField>
     (
@@ -270,7 +272,7 @@ Foam::tmp<Foam::volScalarField> Foam::pdHGO::bulkModulus() const
 }
 
 
-void Foam::pdHGO::correct(volSymmTensorField& sigma)
+void Foam::HolzapfelGasserOgdenElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
@@ -285,16 +287,16 @@ void Foam::pdHGO::correct(volSymmTensorField& sigma)
     // Do NOT write F.T() & F directly: see the comment in
     // StVenantKirchhoffElastic.C
     const volTensorField& F = this->F();
-    const volTensorField FT(F.T());
+    const volTensorField FT("FT", F.T());
 
     // Calculate the Jacobian of the deformation gradient
     // const volScalarField J = det(F()); / J=1
 
     // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField b = symm(F & FT);
+    const volSymmTensorField b("b", symm(F & FT));
 
     // Calculate the deviatoric stress
-    const volSymmTensorField s = mu_*(b - I);
+    const volSymmTensorField s("s", mu_*(b - I));
 
     // Lookup pressure field
     const volScalarField& p =
@@ -304,39 +306,51 @@ void Foam::pdHGO::correct(volSymmTensorField& sigma)
     sigma = -p*I + s;
 
 
-    // Anisotropic (pdHGO) part
+    // Anisotropic (HolzapfelGasserOgdenElastic) part
 
     //- Right Cauchy-Green tenso
-    const volSymmTensorField C = symm(FT & F);
+    const volSymmTensorField C("C", symm(FT & F));
 
     //- Fibre directions
-    const volVectorField N4 =
+    const volVectorField N4
+    (
+        "N4",
         cos(fibreAngle_)*Ec_ +
         sin(fibreAngle_)*Ea_ +
-        0.0*Er_;
-    const volVectorField n4 = (F & N4);
+        0.0*Er_
+    );
+    const volVectorField n4("n4", F & N4);
 
-    const volVectorField N6 =
+    const volVectorField N6
+    (
+        "N6",
        -cos(fibreAngle_)*Ec_ +
         sin(fibreAngle_)*Ea_ +
-        0.0*Er_;
-    const volVectorField n6 = (F & N6);
+        0.0*Er_
+    );
+    const volVectorField n6("n6", F & N6);
 
     //- Direction matrices
-    const volSymmTensorField N4N4 = symm(N4*N4);
-    const volSymmTensorField N6N6 = symm(N6*N6);
-    const volSymmTensorField n4n4 = symm(n4*n4);
-    const volSymmTensorField n6n6 = symm(n6*n6);
+    const volSymmTensorField N4N4("N4N4", symm(N4*N4));
+    const volSymmTensorField N6N6("N6N6", symm(N6*N6));
+    const volSymmTensorField n4n4("n4n4", symm(n4*n4));
+    const volSymmTensorField n6n6("n6n6", symm(n6*n6));
 
     //- Fibre invariants
-    const volScalarField I4 = (C && N4N4);
-    const volScalarField I6 = (C && N6N6);
+    const volScalarField I4("I4", C && N4N4);
+    const volScalarField I6("I6", C && N6N6);
 
     //- Anisotropic part of Cauchy stress
-    const volSymmTensorField sigmaAniso4 =
-        2*k1_*(I4-1.0)*exp(k2_*pow(I4-1.0, 2))*n4n4;
-    const volSymmTensorField sigmaAniso6 =
-        2*k1_*(I6-1.0)*exp(k2_*pow(I6-1.0, 2))*n6n6;
+    const volSymmTensorField sigmaAniso4
+    (
+        "sigmaAniso4",
+        2*k1_*(I4-1.0)*exp(k2_*pow(I4-1.0, 2))*n4n4
+    );
+    const volSymmTensorField sigmaAniso6
+    (
+        "sigmaAniso6",
+        2*k1_*(I6-1.0)*exp(k2_*pow(I6-1.0, 2))*n6n6
+    );
 
     //- Add anisotropic part of Cauchy stress
     sigma += sigmaAniso4;
@@ -344,7 +358,7 @@ void Foam::pdHGO::correct(volSymmTensorField& sigma)
 }
 
 
-void Foam::pdHGO::correct(surfaceSymmTensorField& sigma)
+void Foam::HolzapfelGasserOgdenElastic::correct(surfaceSymmTensorField& sigma)
 {
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
@@ -359,16 +373,16 @@ void Foam::pdHGO::correct(surfaceSymmTensorField& sigma)
     // Do NOT write F.T() & F directly: see the comment in
     // StVenantKirchhoffElastic.C
     const surfaceTensorField& Ff = this->Ff();
-    const surfaceTensorField FfT(Ff.T());
+    const surfaceTensorField FfT("FfT", Ff.T());
 
     // Calculate the Jacobian of the deformation gradient
     // const surfaceScalarField J = det(Ff()); // J=1
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField b = symm(Ff & FfT);
+    const surfaceSymmTensorField b("b", symm(Ff & FfT));
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s = mu_*(b-I);
+    const surfaceSymmTensorField s("s", mu_*(b-I));
 
     // Lookup pressure field
     const surfaceScalarField& pf =
@@ -377,53 +391,65 @@ void Foam::pdHGO::correct(surfaceSymmTensorField& sigma)
     // Calculate the Cauchy stress
     sigma = -pf*I + s;
 
-    // Anisotropic (pdHGO) part
+    // Anisotropic (HolzapfelGasserOgdenElastic) part
 
     //- Right Cauchy-Green tenso
-    const surfaceSymmTensorField Cf = symm(FfT & Ff);
+    const surfaceSymmTensorField Cf("Cf", symm(FfT & Ff));
 
     //- Fibre directions
-    const surfaceVectorField N4 =
+    const surfaceVectorField N4
+    (
+        "N4",
         cos(fibreAngle_)*Ecf_ +
         sin(fibreAngle_)*Eaf_ +
-        0.0*Erf_;
-    const surfaceVectorField n4 = (Ff & N4);
+        0.0*Erf_
+    );
+    const surfaceVectorField n4("n4", Ff & N4);
 
-    const surfaceVectorField N6 =
+    const surfaceVectorField N6
+    (
+        "N6",
        -cos(fibreAngle_)*Ecf_ +
         sin(fibreAngle_)*Eaf_ +
-        0.0*Erf_;
-    const surfaceVectorField n6 = (Ff & N6);
+        0.0*Erf_
+    );
+    const surfaceVectorField n6("n6", Ff & N6);
 
     //- Direction matrices
-    const surfaceSymmTensorField N4N4 = symm(N4*N4);
-    const surfaceSymmTensorField N6N6 = symm(N6*N6);
-    const surfaceSymmTensorField n4n4 = symm(n4*n4);
-    const surfaceSymmTensorField n6n6 = symm(n6*n6);
+    const surfaceSymmTensorField N4N4("N4N4", symm(N4*N4));
+    const surfaceSymmTensorField N6N6("N6N6", symm(N6*N6));
+    const surfaceSymmTensorField n4n4("n4n4", symm(n4*n4));
+    const surfaceSymmTensorField n6n6("n6n6", symm(n6*n6));
 
     //- Fibre invariants
-    const surfaceScalarField I4 = (Cf && N4N4);
-    const surfaceScalarField I6 = (Cf && N6N6);
+    const surfaceScalarField I4("I4", Cf && N4N4);
+    const surfaceScalarField I6("I6", Cf && N6N6);
 
     //- Anisotropic part of Cauchy stress
-    const surfaceSymmTensorField sigmaAniso4 =
-        2*k1_*(I4-1.0)*exp(k2_*pow(I4-1.0, 2))*n4n4;
-    const surfaceSymmTensorField sigmaAniso6 =
-        2*k1_*(I6-1.0)*exp(k2_*pow(I6-1.0, 2))*n6n6;
+    const surfaceSymmTensorField sigmaAniso4
+    (
+        "sigmaAniso4",
+        2*k1_*(I4-1.0)*exp(k2_*pow(I4-1.0, 2))*n4n4
+    );
+    const surfaceSymmTensorField sigmaAniso6
+    (
+        "sigmaAniso6",
+        2*k1_*(I6-1.0)*exp(k2_*pow(I6-1.0, 2))*n6n6
+    );
 
     //- Add anisotropic part of Cauchy stress
     sigma += sigmaAniso4;
     sigma += sigmaAniso6;
 }
 
-void Foam::pdHGO::setRestart()
+void Foam::HolzapfelGasserOgdenElastic::setRestart()
 {
     F().writeOpt() = IOobject::AUTO_WRITE;
     Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
 
 //- Calculate Cauchy stress as a function of deformation gradient
-void Foam::pdHGO::calcDevCauchy
+void Foam::HolzapfelGasserOgdenElastic::calcDevCauchy
 (
     const tensor& F,
     const vector& Ec,
@@ -443,7 +469,7 @@ void Foam::pdHGO::calcDevCauchy
     devSigma = s;
 
 
-    // Anisotropic (pdHGO) part
+    // Anisotropic (HolzapfelGasserOgdenElastic) part
 
     //- Right Cauchy-Green tenso
     const symmTensor C = symm(FT & F);
@@ -482,7 +508,7 @@ void Foam::pdHGO::calcDevCauchy
     devSigma += sigmaAniso6;
 }
 
-void Foam::pdHGO::calcInitialShearModulus()
+void Foam::HolzapfelGasserOgdenElastic::calcInitialShearModulus()
 {
     // max(mu_12, mu_13, mu_23))
 
@@ -537,20 +563,24 @@ void Foam::pdHGO::calcInitialShearModulus()
 }
 
 
-void Foam::pdHGO::calcEffectiveShearModulus()
+void Foam::HolzapfelGasserOgdenElastic::calcEffectiveShearModulus()
 {
     // This function will update shear modulus muEff_ at the end of time step,
     // using current state of deformation
 
     const volTensorField& F = this->F();
     const tensorField& FI = F.internalField();
-    const tensorField FIT = FI.T();
+    const tensorField FIT(FI.T()());
 
     const vectorField& EcI = Ec_.internalField();
     const vectorField& EaI = Ea_.internalField();
     const vectorField& ErI = Er_.internalField();
 
+#ifdef OPENFOAM_NOT_EXTEND
+    scalarField& muEffI = muEff_.primitiveFieldRef();
+#else
     scalarField& muEffI = muEff_.internalField();
+#endif
 
     forAll(muEffI, cellI)
     {
@@ -689,7 +719,7 @@ void Foam::pdHGO::calcEffectiveShearModulus()
 }
 
 
-void Foam::pdHGO::updateTotalFields()
+void Foam::HolzapfelGasserOgdenElastic::updateTotalFields()
 {
     calcEffectiveShearModulus();
 }

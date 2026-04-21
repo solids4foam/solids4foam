@@ -226,7 +226,11 @@ Foam::pdGuccioneElastic::pdGuccioneElastic
 {
     // Check f0 are unit vectors
 
+#ifdef OPENFOAM_NOT_EXTEND
+    if (min(mag(mag(f0_.primitiveField()))) < SMALL)
+#else
     if (min(mag(mag(f0_.internalField()))) < SMALL)
+#endif
     {
         FatalErrorIn
         (
@@ -257,14 +261,20 @@ Foam::pdGuccioneElastic::pdGuccioneElastic
 
     // Check for any vectors with zero magnitude; if found, then use the j
     // direction
-    const volScalarField magS0 = mag(s0_) -
-        dimensionedScalar("SMALL", dimless, SMALL);
-    const volScalarField posMagS0(pos(magS0));
+    const volScalarField magS0
+    (
+        "magS0",
+        mag(s0_) - dimensionedScalar("SMALL", dimless, SMALL)
+    );
+    const volScalarField posMagS0("posMagS0", pos(magS0));
     s0_ = posMagS0*s0_ + (1.0 - posMagS0)*((I - f0f0_) & vector(0, 1, 0));
 
-    const surfaceScalarField magS0f = mag(s0f_) -
-        dimensionedScalar("SMALL", dimless, SMALL);
-    const surfaceScalarField posMagS0f(pos(magS0f));
+    const surfaceScalarField magS0f
+    (
+        "magS0f",
+        mag(s0f_) - dimensionedScalar("SMALL", dimless, SMALL)
+    );
+    const surfaceScalarField posMagS0f("posMagS0f", pos(magS0f));
     s0f_ = posMagS0f*s0f_ + (1.0 - posMagS0f)*((I - f0f0f_) & vector(0, 1, 0));
 
     // Make s0 unit vectors
@@ -281,20 +291,20 @@ Foam::pdGuccioneElastic::pdGuccioneElastic
     R_.replace(tensor::XX, f0_.component(vector::X));
     R_.replace(tensor::YX, f0_.component(vector::Y));
     R_.replace(tensor::ZX, f0_.component(vector::Z));
-    R_.replace(tensor::YY, s0_.component(vector::X));
+    R_.replace(tensor::XY, s0_.component(vector::X));
     R_.replace(tensor::YY, s0_.component(vector::Y));
     R_.replace(tensor::ZY, s0_.component(vector::Z));
-    R_.replace(tensor::YZ, n0_.component(vector::X));
+    R_.replace(tensor::XZ, n0_.component(vector::X));
     R_.replace(tensor::YZ, n0_.component(vector::Y));
     R_.replace(tensor::ZZ, n0_.component(vector::Z));
 
     Rf_.replace(tensor::XX, f0f_.component(vector::X));
     Rf_.replace(tensor::YX, f0f_.component(vector::Y));
     Rf_.replace(tensor::ZX, f0f_.component(vector::Z));
-    Rf_.replace(tensor::YY, s0f_.component(vector::X));
+    Rf_.replace(tensor::XY, s0f_.component(vector::X));
     Rf_.replace(tensor::YY, s0f_.component(vector::Y));
     Rf_.replace(tensor::ZY, s0f_.component(vector::Z));
-    Rf_.replace(tensor::YZ, n0f_.component(vector::X));
+    Rf_.replace(tensor::XZ, n0f_.component(vector::X));
     Rf_.replace(tensor::YZ, n0f_.component(vector::Y));
     Rf_.replace(tensor::ZZ, n0f_.component(vector::Z));
 
@@ -385,16 +395,16 @@ void Foam::pdGuccioneElastic::correct(volSymmTensorField& sigma)
     // Take a reference to the deformation gradient to make the code easier to
     // read
     const volTensorField& F = this->F();
-    const volTensorField FT = F.T();
+    const volTensorField FT("FT", F.T());
 
     // Calculate the Jacobian of the deformation gradient
     // const volScalarField J(det(F)); // J=1
 
     // Calculate the right Cauchy–Green deformation tensor
-    const volSymmTensorField C(symm(FT & F));
+    const volSymmTensorField C("C", symm(FT & F));
 
     // Calculate the Green-Lagrange strain
-    const volSymmTensorField E(0.5*(C - I));
+    const volSymmTensorField E("E", 0.5*(C - I));
 
     const Switch useLocalCoordSys
     (
@@ -408,7 +418,7 @@ void Foam::pdGuccioneElastic::correct(volSymmTensorField& sigma)
     if (useLocalCoordSys)
     {
         // Calculate the Green strain in the local coordinate system
-        const volTensorField RT(R_.T());
+        const volTensorField RT("RT", R_.T());
         const volSymmTensorField EStar("EStar", symm(RT & E & R_));
 
         // Extract the components of EStar
@@ -462,13 +472,13 @@ void Foam::pdGuccioneElastic::correct(volSymmTensorField& sigma)
     else
     {
         // Calculate E . E
-        const volSymmTensorField sqrE(symm(E & E));
+        const volSymmTensorField sqrE("sqrE", symm(E & E));
 
         // Calculate the invariants of E
-        const volScalarField I1(tr(E));
-        const volScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
-        const volScalarField I4(E && f0f0_);
-        const volScalarField I5(sqrE && f0f0_);
+        const volScalarField I1("I1", tr(E));
+        const volScalarField I2("I2", 0.5*(sqr(tr(E)) - tr(sqrE)));
+        const volScalarField I4("I4", E && f0f0_);
+        const volScalarField I5("I5", sqrE && f0f0_);
 
         // Calculate Q
         const volScalarField Q
@@ -494,7 +504,7 @@ void Foam::pdGuccioneElastic::correct(volSymmTensorField& sigma)
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
     // the deviatoric component
     // const volSymmTensorField s(symm(F & S_ & FT));
-    const volSymmTensorField s(dev(symm(F & S_ & FT)));
+    const volSymmTensorField s("s", dev(symm(F & S_ & FT)));
     // const volSymmTensorField s(dev(J*symm(F & S_ & F.T())));
 
     // Calculate the hydrostatic stress
@@ -533,16 +543,16 @@ void Foam::pdGuccioneElastic::correct(surfaceSymmTensorField& sigma)
     // Take a reference to the deformation gradient to make the code easier to
     // read
     const surfaceTensorField& Ff = this->Ff();
-    const surfaceTensorField FfT(Ff.T());
+    const surfaceTensorField FfT("FfT", Ff.T());
 
     // Calculate the Jacobian of the deformation gradient
     // const volScalarField J(det(F)); // J=1
 
     // Calculate the right Cauchy–Green deformation tensor
-    const surfaceSymmTensorField C(symm(FfT & Ff));
+    const surfaceSymmTensorField C("C", symm(FfT & Ff));
 
     // Calculate the Green-Lagrange strain
-    const surfaceSymmTensorField E(0.5*(C - I));
+    const surfaceSymmTensorField E("E", 0.5*(C - I));
 
     const Switch useLocalCoordSys
     (
@@ -556,7 +566,7 @@ void Foam::pdGuccioneElastic::correct(surfaceSymmTensorField& sigma)
     if (useLocalCoordSys)
     {
         // Calculate the Green strain in the local coordinate system
-        const surfaceTensorField RfT(Rf_.T());
+        const surfaceTensorField RfT("RfT", Rf_.T());
         const surfaceSymmTensorField EStar("EStar", symm(RfT & E & Rf_));
 
         // Extract the components of EStar
@@ -614,13 +624,13 @@ void Foam::pdGuccioneElastic::correct(surfaceSymmTensorField& sigma)
     else
     {
         // Calculate E.E
-        const surfaceSymmTensorField sqrE(symm(E & E));
+        const surfaceSymmTensorField sqrE("sqrE", symm(E & E));
 
         // Calculate the invariants of E
-        const surfaceScalarField I1(tr(E));
-        const surfaceScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
-        const surfaceScalarField I4(E && f0f0f_);
-        const surfaceScalarField I5(sqrE && f0f0f_);
+        const surfaceScalarField I1("I1", tr(E));
+        const surfaceScalarField I2("I2", 0.5*(sqr(tr(E)) - tr(sqrE)));
+        const surfaceScalarField I4("I4", E && f0f0f_);
+        const surfaceScalarField I5("I5", sqrE && f0f0f_);
 
         // Calculate Q
         const surfaceScalarField Q
@@ -654,7 +664,7 @@ void Foam::pdGuccioneElastic::correct(surfaceSymmTensorField& sigma)
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
     // the deviatoric component
     // const surfaceSymmTensorField sf(symm(Ff & Sf_ & FfT));
-    const surfaceSymmTensorField sf(dev(symm(Ff & Sf_ & FfT)));
+    const surfaceSymmTensorField sf("sf", dev(symm(Ff & Sf_ & FfT)));
     // const volSymmTensorField s(dev(J*symm(F & S_ & F.T())));
 
     // Calculate the hydrostatic stress
@@ -849,12 +859,16 @@ void Foam::pdGuccioneElastic::calcEffectiveShearModulus()
 
     const volTensorField& F = this->F();
     const tensorField& FI = F.internalField();
-    const tensorField FIT(FI.T());
+    const tensorField FIT(FI.T()());
 
     const symmTensorField& f0f0I = f0f0_.internalField();
     const tensorField& RI = R_.internalField();
 
+#ifdef OPENFOAM_NOT_EXTEND
+    scalarField& muEffI = muEff_.primitiveFieldRef();
+#else
     scalarField& muEffI = muEff_.internalField();
+#endif
 
     forAll(muEffI, cellI)
     {
