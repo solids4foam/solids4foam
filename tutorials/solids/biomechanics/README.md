@@ -12,7 +12,7 @@ pressure-displacement solver (`coupledPressureDisplacementSolid`).
 | Case | Description | Mechanical law |
 |---|---|---|
 | `heartTissueBeam` | Beam of cardiac tissue under time-dependent pressure | `GuccioneElastic` |
-| `ventricle_symm` | Idealised symmetric left ventricle | `GuccioneElastic` |
+| `ventricleSymm` | Idealised symmetric left ventricle | `GuccioneElastic` |
 
 ## vascular
 

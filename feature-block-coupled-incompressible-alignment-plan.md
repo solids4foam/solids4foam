@@ -56,12 +56,12 @@ This plan records the cleanup needed before merging PR #248 from
 
 - [x] Move `tutorials/solids/coupledPressureDisplacement` cases into existing
   `tutorials/solids` families.
-  - [x] cylinder, cylinder_lin, cylinder_unsteady →
+  - [x] cylinder, cylinderLin, cylinderUnsteady →
     `hyperelasticity/cylindricalPressureVessel/pressureDisplacement/`
   - [x] plateHole →
     `linearElasticity/plateHole/pressureDisplacement/`
     (compressible/ and incompressible/ subtrees preserved)
-  - [x] heartTissueBeam, ventricle_symm →
+  - [x] heartTissueBeam, ventricleSymm →
     `biomechanics/cardiac/`
   - [x] HGO/ratCarotid →
     `biomechanics/vascular/HGO/ratCarotid/`
@@ -69,7 +69,7 @@ This plan records the cleanup needed before merging PR #248 from
   - [x] New `tutorials/solids/biomechanics/README.md` added.
 - [x] Update `Allrun`, `Allclean`, `README.md`, and regression hooks after
   moving cases.
-  - Added `caseOnlyRunsWithFoamExtend` guard to `ventricle_symm/Allrun` and
+  - Added `caseOnlyRunsWithFoamExtend` guard to `ventricleSymm/Allrun` and
     `heartTissueBeam/Allrun` (the others already had it).
 
 ## Verification
