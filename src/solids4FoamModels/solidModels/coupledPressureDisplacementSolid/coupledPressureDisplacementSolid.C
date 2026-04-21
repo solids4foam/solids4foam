@@ -971,6 +971,8 @@ bool coupledPressureDisplacementSolid::evolve()
             #include "calcTraction.H"
 
             Info << "Assembling momentum equaton" << endl;
+            momentumStabilisation().updateVector(DD(), &gradDD());
+
             // Construct momentum equation in total Lagrangian
             // form where gradients are calculated directly at the faces
             fvVectorMatrix DDEqn
@@ -979,12 +981,7 @@ bool coupledPressureDisplacementSolid::evolve()
               - fvc::div(impKf_*tGradDDn_*mesh().magSf())
               - fvc::div(nonLinForceCorrection_)
               - fvc::div(force_.oldTime())
-              - stabilisation().stabilisation
-                (
-                    DD(),
-                    gradDD(),
-                    mechanical().impK()
-                )
+              - momentumStabilisation().cellVector(&impKf_, true)
              == rho()*g()
             );
 

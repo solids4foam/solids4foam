@@ -36,11 +36,20 @@ coupledPressureDisplacementSolidCoeffs
 
     stabilisation
     {
-        // Momentum stabilisation seems to contribute to sigmaHyd oscillations
-        type none;
-        // type RhieChow;
-        // type JamesonSchmidtTurkel;
-        // scaleFactor 0.1;
+        momentum
+        {
+            // Momentum stabilisation seems to contribute to sigmaHyd oscillations
+            type laplacian;
+            scaleFactor 0;
+            scaleFactorJacobian 0;
+        }
+
+        pressure
+        {
+            type laplacian;
+            scaleFactor 0;
+            scaleFactorJacobian 0;
+        }
     }
 
     nonLinear           false;
