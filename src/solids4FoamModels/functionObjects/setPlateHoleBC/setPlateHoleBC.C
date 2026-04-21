@@ -18,6 +18,13 @@ License
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved
 
+Note
+    The Kirsch plate-hole stress and displacement kernel implemented here
+    duplicates the one in analyticalPlateHoleTractionFvPatchVectorField and
+    plateHoleAnalyticalSolution. Consolidation would require extending those
+    classes to support tractionPressureDisplacementFvPatchVectorField, which
+    is out of scope for the current PR but should be addressed in a follow-up.
+
 \*----------------------------------------------------------------------------*/
 
 #include "setPlateHoleBC.H"

@@ -21,6 +21,10 @@ solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+// coupledPressureDisplacementSolid is foam-extend only: it depends on
+// fvBlockMatrix for block-coupled pressure-displacement assembly.
+// Porting to files.openfoam requires replacing fvBlockMatrix with an
+// OpenFOAM-compatible block-matrix approach.
 solidModels/coupledPressureDisplacementSolid/coupledPressureDisplacementSolid.C
 
 fluidModels/fluidModel/fluidModel.C
