@@ -49,7 +49,6 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-
 void linGeomTotalDispSolid::predict()
 {
     Info<< "Applying linear predictor to D" << endl;
