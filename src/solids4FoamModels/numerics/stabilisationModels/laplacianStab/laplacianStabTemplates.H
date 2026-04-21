@@ -46,7 +46,7 @@ void Foam::laplacianStab::computeDiffStencil
     const dimensionedScalar one("one", dimless/sqr(dimLength), 1.0);
 
     // Outer pass: orthogonal diffusion of L1, scaled by h^2
-    faceFlux = -scaleFactor*one*h2f*op.snGrad(field);
+    faceFlux = scaleFactor*one*h2f*op.snGrad(field);
 }
 
 

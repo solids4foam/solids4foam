@@ -19,6 +19,7 @@ License
 
 #include "GuccioneElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -29,6 +30,56 @@ namespace Foam
     (
         mechanicalLaw, GuccioneElastic, nonLinGeomMechLaw
     );
+}
+
+namespace
+{
+
+Foam::IOobject findFibreFieldIOobject
+(
+    const Foam::word& fieldName,
+    const Foam::fvMesh& mesh
+)
+{
+    Foam::IOobject io
+    (
+        fieldName,
+        mesh.time().timeName(),
+        mesh,
+        Foam::IOobject::READ_IF_PRESENT,
+        Foam::IOobject::NO_WRITE
+    );
+
+#ifdef FOAMEXTEND
+    if (!io.headerOk())
+#elif defined(OPENFOAM_ORG)
+    if (!io.typeHeaderOk<Foam::volVectorField>(true))
+#else
+    if (!io.typeHeaderOk<Foam::volVectorField>(true, false, false))
+#endif
+    {
+        io.instance() = "0";
+
+#ifdef FOAMEXTEND
+        if (!io.headerOk())
+#elif defined(OPENFOAM_ORG)
+        if (!io.typeHeaderOk<Foam::volVectorField>(true))
+#else
+        if (!io.typeHeaderOk<Foam::volVectorField>(true, false, false))
+#endif
+        {
+            FatalErrorInFunction
+                << "Cannot find required fibre field " << fieldName
+                << " in either " << mesh.time().timeName() << " or 0"
+                << exit(Foam::FatalError);
+        }
+    }
+
+    io.readOpt() = Foam::IOobject::MUST_READ;
+
+    return io;
+}
+
 }
 
 
@@ -65,14 +116,7 @@ Foam::tmp<Foam::volVectorField> Foam::GuccioneElastic::makeF0
     (
         new volVectorField
         (
-            IOobject
-            (
-                "f0",
-                mesh.time().timeName(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            ),
+            findFibreFieldIOobject("f0", mesh),
             mesh
         )
     );
@@ -115,10 +159,17 @@ Foam::tmp<Foam::surfaceVectorField> Foam::GuccioneElastic::makeF0f
                 "f0f",
                 mesh.time().timeName(),
                 mesh,
-                IOobject::MUST_READ,
+                IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            mesh
+            fvc::interpolate
+            (
+                volVectorField
+                (
+                    findFibreFieldIOobject("f0", mesh),
+                    mesh
+                )
+            )
         )
     );
 }
@@ -466,19 +517,19 @@ Foam::GuccioneElastic::GuccioneElastic
     R_.replace(tensor::XX, f0_.component(vector::X));
     R_.replace(tensor::YX, f0_.component(vector::Y));
     R_.replace(tensor::ZX, f0_.component(vector::Z));
-    R_.replace(tensor::YY, s0_.component(vector::X));
+    R_.replace(tensor::XY, s0_.component(vector::X));
     R_.replace(tensor::YY, s0_.component(vector::Y));
     R_.replace(tensor::ZY, s0_.component(vector::Z));
-    R_.replace(tensor::YZ, n0_.component(vector::X));
+    R_.replace(tensor::XZ, n0_.component(vector::X));
     R_.replace(tensor::YZ, n0_.component(vector::Y));
     R_.replace(tensor::ZZ, n0_.component(vector::Z));
     Rf_.replace(tensor::XX, f0f_.component(vector::X));
     Rf_.replace(tensor::YX, f0f_.component(vector::Y));
     Rf_.replace(tensor::ZX, f0f_.component(vector::Z));
-    Rf_.replace(tensor::YY, s0f_.component(vector::X));
+    Rf_.replace(tensor::XY, s0f_.component(vector::X));
     Rf_.replace(tensor::YY, s0f_.component(vector::Y));
     Rf_.replace(tensor::ZY, s0f_.component(vector::Z));
-    Rf_.replace(tensor::YZ, n0f_.component(vector::X));
+    Rf_.replace(tensor::XZ, n0f_.component(vector::X));
     Rf_.replace(tensor::YZ, n0f_.component(vector::Y));
     Rf_.replace(tensor::ZZ, n0f_.component(vector::Z));
 
