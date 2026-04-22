@@ -40,17 +40,19 @@ This plan records the cleanup needed before merging PR #248 from
 
 ## Plate-Hole Boundary Conditions and Validation
 
-- [~] Replace or shrink `setPlateHoleBC`.
-  - Treat it as a case-specific boundary-condition mutator and validation
-    helper, not as a general function object. ✓ (it already is; no code removed)
-  - Reuse `analyticalPlateHoleTraction` for boundary tractions. DEFERRED —
-    requires extending that BC to support
-    `tractionPressureDisplacementFvPatchVectorField`, which is out of scope.
-  - Reuse or extend `plateHoleAnalyticalSolution` for analytical error fields
-    and sampled outputs. DEFERRED (same reason).
-  - Avoid duplicate Kirsch/plate-hole analytical kernels in separate classes.
-    Added a comment in `setPlateHoleBC.C` documenting the duplication as a
-    future TODO.
+- [x] Replace or shrink `setPlateHoleBC`.
+  - [x] Treat it as a case-specific boundary-condition mutator and validation
+    helper, not as a general function object.
+  - [x] Add shared `plateHoleAnalyticalFields` Kirsch stress, displacement,
+    hydrostatic pressure and traction helpers.
+  - [x] Reuse the shared helpers in `analyticalPlateHoleTraction`,
+    `pointAnalyticalPlateHoleTraction`, `plateHoleAnalyticalSolution` and
+    `setPlateHoleBC`.
+  - [x] Add foam-extend-only
+    `analyticalPlateHolePressureDisplacementTraction` for direct
+    `tractionPressureDisplacementFvPatchVectorField` analytical tractions.
+  - [x] Switch plate-hole pressure-displacement tutorials to the analytical
+    pressure-displacement traction BC on the loaded patches.
 
 ## Tutorials
 

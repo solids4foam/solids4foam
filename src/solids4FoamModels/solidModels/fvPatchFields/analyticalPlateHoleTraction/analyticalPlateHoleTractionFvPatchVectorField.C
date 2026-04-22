@@ -24,8 +24,8 @@ License
 #include "volFields.H"
 #include "fvc.H"
 #include "fixedValueFvPatchFields.H"
-#include "coordinateSystem.H"
 #include "lookupSolidModel.H"
+#include "plateHoleAnalyticalFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -39,46 +39,7 @@ symmTensor analyticalPlateHoleTractionFvPatchVectorField::plateHoleSolution
     const vector& C
 ) const
 {
-    tensor sigma = tensor::zero;
-
-    // Calculate radial coordinate
-    scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
-
-    // Calculate circumferential coordinate
-    scalar theta = Foam::atan2(C.y(), C.x());
-
-    coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
-
-    sigma.xx() =
-        T_*(1 - sqr(holeR_)/sqr(r))/2
-      + T_
-       *(1 + 3*pow(holeR_,4)/pow(r,4) - 4*sqr(holeR_)/sqr(r))*::cos(2*theta)/2;
-
-    sigma.xy() =
-      - T_
-       *(1 - 3*pow(holeR_,4)/pow(r,4) + 2*sqr(holeR_)/sqr(r))*::sin(2*theta)/2;
-
-    sigma.yx() = sigma.xy();
-
-    sigma.yy() =
-        T_*(1 + sqr(holeR_)/sqr(r))/2
-      - T_*(1 + 3*pow(holeR_,4)/pow(r,4))*::cos(2*theta)/2;
-
-
-    // Transformation to Cartesian coordinate system
-#ifdef OPENFOAM_ORG
-    sigma = ((cs.R().R() & sigma) & cs.R().R().T());
-#else
-    sigma = ((cs.R() & sigma) & cs.R().T());
-#endif
-
-    symmTensor S = symmTensor::zero;
-
-    S.xx() = sigma.xx();
-    S.xy() = sigma.xy();
-    S.yy() = sigma.yy();
-
-    return S;
+    return plateHoleAnalyticalFields::stress(C, T_, holeR_);
 }
 
 
@@ -204,7 +165,8 @@ void analyticalPlateHoleTractionFvPatchVectorField::updateCoeffs()
             curN = -curC/mag(curC);
         }
 
-        trac[faceI] = (n[faceI] & plateHoleSolution(curC));
+        trac[faceI] =
+            plateHoleAnalyticalFields::traction(curC, curN, T_, holeR_);
     }
 
     solidTractionFvPatchVectorField::updateCoeffs();
@@ -253,7 +215,13 @@ analyticalPlateHoleTractionFvPatchVectorField::evaluateQuadrature() const
         {
             const point quadPoint = faceQuadPoints[globalFaceID][pointI];
             quadPointsValue[faceI][pointI] =
-                n[faceI] & plateHoleSolution(quadPoint);
+                plateHoleAnalyticalFields::traction
+                (
+                    quadPoint,
+                    n[faceI],
+                    T_,
+                    holeR_
+                );
         }
     }
 

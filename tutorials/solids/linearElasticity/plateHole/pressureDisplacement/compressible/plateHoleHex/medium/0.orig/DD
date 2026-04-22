@@ -30,7 +30,9 @@ boundaryField
 
     right
     {
-        type		tractionPressureDisplacement;
+        type		analyticalPlateHolePressureDisplacementTraction;
+        farFieldTractionX 1e6;
+        holeRadius      1;
         traction	uniform (0 0 0);
         pressure	uniform 0;
         value		uniform (0 0 0);
@@ -38,7 +40,9 @@ boundaryField
 
     up
     {
-        type		tractionPressureDisplacement;
+        type		analyticalPlateHolePressureDisplacementTraction;
+        farFieldTractionX 1e6;
+        holeRadius      1;
         traction	uniform (0 0 0);
         pressure	uniform 0;
         value		uniform (0 0 0);

@@ -19,11 +19,9 @@ Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved
 
 Note
-    The Kirsch plate-hole stress and displacement kernel implemented here
-    duplicates the one in analyticalPlateHoleTractionFvPatchVectorField and
-    plateHoleAnalyticalSolution. Consolidation would require extending those
-    classes to support tractionPressureDisplacementFvPatchVectorField, which
-    is out of scope for the current PR but should be addressed in a follow-up.
+    This function object remains as a pressure-displacement case setup and
+    validation helper. The shared Kirsch analytical kernel is implemented in
+    plateHoleAnalyticalFields.
 
 \*----------------------------------------------------------------------------*/
 
@@ -39,6 +37,7 @@ Note
 #include "linearElastic.H"
 #include "lookupSolidModel.H"
 #include "OFstream.H"
+#include "plateHoleAnalyticalFields.H"
 
 #include "linearElastic.H"
 
@@ -107,55 +106,12 @@ bool Foam::setPlateHoleBC::planeStress() const
 
 Foam::symmTensor Foam::setPlateHoleBC::plateHoleStress(const vector& C) const
 {
-    tensor sigma = tensor::zero;
-
-    // scalar T = 1e6;
-    // scalar a = 1;
-
-    scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
-    scalar theta = atan2(C.y(), C.x());
-
-    sigma.xx() =
-        T_
-       *(
-           1.0
-         - (sqr(a_)/sqr(r))*(3*cos(2*theta)/2 + cos(4*theta))
-         + (3*pow(a_,4)/(2*pow(r,4)))*cos(4*theta)
-        );
-
-    sigma.yy() =
-        T_
-       *(
-         - (sqr(a_)/sqr(r))*(cos(2*theta)/2 - cos(4*theta))
-         - (3*pow(a_,4)/(2*pow(r,4)))*cos(4*theta)
-        );
-
-    sigma.xy() =
-        T_
-       *(
-         - (sqr(a_)/sqr(r))*(sin(2*theta)/2 + sin(4*theta))
-         + (3*pow(a_,4)/(2*pow(r,4)))*sin(4*theta)
-        );
-
-    sigma.yx() = sigma.xy();
-
-    symmTensor S = symmTensor::zero;
-
-    S.xx() = sigma.xx();
-    S.xy() = sigma.xy();
-    S.yy() = sigma.yy();
-
-    return S;
+    return plateHoleAnalyticalFields::stress(C, T_, a_);
 }
 
 
 Foam::vector Foam::setPlateHoleBC::plateHoleDisplacement(const vector& C) const
 {
-    vector displacement = vector::zero;
-
-    // scalar T = 1e6;
-    // scalar a = 1;
-
     // Reference to fvMesh
     const fvMesh& mesh =
         time_.lookupObject<fvMesh>(regionName_);
@@ -185,26 +141,7 @@ Foam::vector Foam::setPlateHoleBC::plateHoleDisplacement(const vector& C) const
         kappa = (3.0-nu)/(1.0+nu);
     }
 
-    scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
-    scalar theta = atan2(C.y(), C.x());
-
-    displacement.x() =
-        (a_*T_/(8*mu))
-       *(
-           (r/a_)*(kappa+1)*cos(theta)
-         + (2*a_/r)*((1+kappa)*cos(theta) + cos(3*theta))
-         - (2*pow(a_,3)/pow(r,3))*cos(3*theta)
-        );
-
-    displacement.y() =
-        (a_*T_/(8*mu))
-       *(
-           (r/a_)*(kappa-3)*sin(theta)
-         + (2*a_/r)*((1-kappa)*sin(theta) + sin(3*theta))
-         - (2*pow(a_,3)/pow(r,3))*sin(3*theta)
-        );
-
-    return displacement;
+    return plateHoleAnalyticalFields::displacement(C, T_, a_, mu, kappa);
 }
 
 Foam::scalar Foam::setPlateHoleBC::plateHoleHydPressure
@@ -212,8 +149,6 @@ Foam::scalar Foam::setPlateHoleBC::plateHoleHydPressure
     const vector& C
 ) const
 {
-    scalar hydPressure = 0;
-
     // Reference to fvMesh
     const fvMesh& mesh =
         time_.lookupObject<fvMesh>(regionName_);
@@ -236,13 +171,7 @@ Foam::scalar Foam::setPlateHoleBC::plateHoleHydPressure
         }
     }
 
-    symmTensor sigma = plateHoleStress(C);
-
-    scalar sigmaZZ = nu*(sigma.xx() + sigma.yy());
-
-    hydPressure = -(sigma.xx() + sigma.yy() + sigmaZZ)/3;
-
-    return hydPressure;
+    return plateHoleAnalyticalFields::hydPressure(C, T_, a_, nu);
 }
 
 
