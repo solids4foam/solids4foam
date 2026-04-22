@@ -96,7 +96,6 @@ class linGeomTotalDispSolid
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
 
-
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the
