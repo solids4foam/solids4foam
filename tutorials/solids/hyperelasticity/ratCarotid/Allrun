@@ -11,6 +11,12 @@ solids4Foam::convertCaseFormat .
 
 solids4Foam::caseOnlyRunsWithFoamExtend
 
+if ! command -v calcLocCoordinates &> /dev/null
+then
+    echo; echo "Skipping this case as calcLocCoordinates is not installed"; echo
+    exit 0
+fi
+
 # Create mesh
 m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh

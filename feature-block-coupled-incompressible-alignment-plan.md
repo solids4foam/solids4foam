@@ -62,11 +62,11 @@ This plan records the cleanup needed before merging PR #248 from
     `linearElasticity/plateHole/pressureDisplacement/`
     (compressible/ and incompressible/ subtrees preserved)
   - [x] heartTissueBeam, ventricleSymm →
-    `biomechanics/cardiac/`
+    `hyperelasticity/`
   - [x] HGO/ratCarotid →
-    `biomechanics/vascular/HGO/ratCarotid/`
+    `hyperelasticity/ratCarotid/`
   - [x] `tutorials/solids/coupledPressureDisplacement/` removed.
-  - [x] New `tutorials/solids/biomechanics/README.md` added.
+  - [x] Temporary `tutorials/solids/biomechanics/` grouping removed.
 - [x] Update `Allrun`, `Allclean`, `README.md`, and regression hooks after
   moving cases.
   - Added `caseOnlyRunsWithFoamExtend` guard to `ventricleSymm/Allrun` and
@@ -96,3 +96,7 @@ This plan records the cleanup needed before merging PR #248 from
 - [x] Run relevant regression tests before finalizing.
   - `linearElasticity/plateHole/regressionTest.sh` (non-pd, OF-v2512):
     DDifference LInf 4.2e-08, pointDDifference 6.4e-08, stress 105024 — PASS.
+- [ ] Re-run PR CI after the `ratCarotid` guard fix.
+  - PR #248 failed the plain foam-extend-4.1 build because that image lacks
+    `calcLocCoordinates`, so `ratCarotid/Allrun` now skips before launching
+    `solids4Foam` when the utility is unavailable.
