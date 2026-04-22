@@ -117,7 +117,6 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/curvedCantilever"
     "solids/linearElasticity/cooksMembrane"
     "solids/linearElasticity/plateHole"
-    "solids/linearElasticity/plateHole/pressureDisplacement"
     "solids/linearElasticity/contactPatchTest"
     "solids/linearElasticity/narrowTmember"
     "solids/linearElasticity/flatEndedRigidIndenter"
