@@ -24,6 +24,7 @@ License
 #include "surfaceFields.H"
 #include "volFields.H"
 #include "plateHoleAnalyticalFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -218,7 +219,7 @@ void Foam::plateHoleAnalyticalSolution::writePressureDisplacementData
 
         const vectorField& DI = D.internalField();
         const vectorField& C = mesh.C().internalField();
-        vectorField& DError = Derror.primitiveFieldRef();
+        vectorField& DError = Foam::primitiveFieldRef(Derror);
 
         forAll(DError, cellI)
         {
@@ -272,7 +273,7 @@ void Foam::plateHoleAnalyticalSolution::writePressureDisplacementData
                 const vector curR(points[pointI].x(), points[pointI].y(), 0);
                 const vector curDa = plateHoleDisplacement(curR, mesh);
 
-                pointDerror.primitiveFieldRef()[pointI] =
+                Foam::primitiveFieldRef(pointDerror)[pointI] =
                     pointDI[pointI] - curDa;
             }
 
@@ -343,10 +344,10 @@ void Foam::plateHoleAnalyticalSolution::writePressureDisplacementData
             dimensionedScalar("zero", dimPressure, 0)
         );
 
-        scalarField& sigmaXXErrI = sigmaXXErr.primitiveFieldRef();
-        scalarField& sigmaXYErrI = sigmaXYErr.primitiveFieldRef();
-        scalarField& sigmaYYErrI = sigmaYYErr.primitiveFieldRef();
-        scalarField& pErrI = pErr.primitiveFieldRef();
+        scalarField& sigmaXXErrI = Foam::primitiveFieldRef(sigmaXXErr);
+        scalarField& sigmaXYErrI = Foam::primitiveFieldRef(sigmaXYErr);
+        scalarField& sigmaYYErrI = Foam::primitiveFieldRef(sigmaYYErr);
+        scalarField& pErrI = Foam::primitiveFieldRef(pErr);
 
         const volSymmTensorField& sigma =
             mesh.lookupObject<volSymmTensorField>("sigma");
