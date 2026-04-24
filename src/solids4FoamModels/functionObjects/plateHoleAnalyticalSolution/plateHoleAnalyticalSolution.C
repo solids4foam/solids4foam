@@ -19,8 +19,10 @@ License
 
 #include "plateHoleAnalyticalSolution.H"
 #include "addToRunTimeSelectionTable.H"
-#include "volFields.H"
+#include "lookupSolidModel.H"
 #include "pointFields.H"
+#include "surfaceFields.H"
+#include "volFields.H"
 #include "plateHoleAnalyticalFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -40,10 +42,67 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+const Foam::fvMesh& Foam::plateHoleAnalyticalSolution::mesh() const
+{
+    if (time_.foundObject<fvMesh>(regionName_))
+    {
+        return time_.lookupObject<fvMesh>(regionName_);
+    }
+    else if (time_.foundObject<fvMesh>("solid"))
+    {
+        return time_.lookupObject<fvMesh>("solid");
+    }
+
+    return time_.lookupObject<fvMesh>("region0");
+}
+
+
+bool Foam::plateHoleAnalyticalSolution::planeStress(const fvMesh& mesh) const
+{
+    if (mesh.foundObject<IOdictionary>("mechanicalProperties"))
+    {
+        return Switch
+        (
+            mesh.lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
+    }
+    else if
+    (
+        mesh.objectRegistry::parent().foundObject<objectRegistry>("region0")
+    )
+    {
+        return Switch
+        (
+            mesh.objectRegistry::parent().subRegistry
+            (
+                "region0"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
+    }
+
+    return Switch
+    (
+        mesh.objectRegistry::parent().subRegistry
+        (
+            "solid"
+        ).lookupObject<IOdictionary>
+        (
+            "mechanicalProperties"
+        ).lookup("planeStress")
+    );
+}
+
+
 Foam::symmTensor Foam::plateHoleAnalyticalSolution::plateHoleStress
 (
     const vector& C
-)
+) const
 {
     return plateHoleAnalyticalFields::stress(C, T_, holeR_);
 }
@@ -51,33 +110,280 @@ Foam::symmTensor Foam::plateHoleAnalyticalSolution::plateHoleStress
 
 Foam::vector Foam::plateHoleAnalyticalSolution::plateHoleDisplacement
 (
-    const vector& C, const symmTensor& sigma
-)
+    const vector& C,
+    const fvMesh& mesh
+) const
 {
+    if (!deriveMaterialProperties_)
+    {
+        return plateHoleAnalyticalFields::displacement
+        (
+            C,
+            T_,
+            holeR_,
+            E_,
+            nu_,
+            planeStress(mesh)
+        );
+    }
+
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    const scalar mu = solMod.mechanical().shearModulus()()[0];
+    const scalar K = solMod.mechanical().bulkModulus()()[0];
+
+    scalar nu = 0.5;
+    if (K + SMALL < GREAT)
+    {
+        nu = (3*K - 2*mu)/(2*(3*K + mu));
+
+        if (planeStress(mesh))
+        {
+            nu = (K - mu)/(K + mu);
+        }
+    }
+
+    scalar kappa = 3 - 4*nu;
+    if (planeStress(mesh))
+    {
+        kappa = (3.0 - nu)/(1.0 + nu);
+    }
+
     return plateHoleAnalyticalFields::displacement
     (
         C,
         T_,
         holeR_,
-        E_,
-        nu_,
-        false
+        mu,
+        kappa
     );
+}
+
+
+Foam::scalar Foam::plateHoleAnalyticalSolution::plateHoleHydPressure
+(
+    const vector& C,
+    const fvMesh& mesh
+) const
+{
+    scalar nu = nu_;
+
+    if (deriveMaterialProperties_)
+    {
+        const solidModel& solMod = lookupSolidModel(mesh);
+
+        const scalar mu = solMod.mechanical().shearModulus()()[0];
+        const scalar K = solMod.mechanical().bulkModulus()()[0];
+
+        nu = 0.5;
+        if (K + SMALL < GREAT)
+        {
+            nu = (3*K - 2*mu)/(2*(3*K + mu));
+
+            if (planeStress(mesh))
+            {
+                nu = (K - mu)/(K + mu);
+            }
+        }
+    }
+
+    return plateHoleAnalyticalFields::hydPressure(C, T_, holeR_, nu);
+}
+
+
+void Foam::plateHoleAnalyticalSolution::writePressureDisplacementData
+(
+    const fvMesh& mesh,
+    const pointMesh& pMesh
+) const
+{
+    if (time_.outputTime())
+    {
+        volVectorField Derror
+        (
+            IOobject
+            (
+                "Derror",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedVector("zero", dimLength, vector::zero)
+        );
+
+        const volVectorField& D =
+            mesh.lookupObject<volVectorField>("D");
+
+        const vectorField& DI = D.internalField();
+        const vectorField& C = mesh.C().internalField();
+        vectorField& DError = Derror.primitiveFieldRef();
+
+        forAll(DError, cellI)
+        {
+            const vector curR(C[cellI].x(), C[cellI].y(), 0);
+            const vector curDa = plateHoleDisplacement(curR, mesh);
+
+            DError[cellI] = DI[cellI] - curDa;
+        }
+
+        Info<< "DError, max : " << gMax(mag(DError)) << endl;
+        Derror.write();
+    }
+
+    if (mesh.foundObject<pointVectorField>("pointD"))
+    {
+        const pointVectorField& pointD =
+            mesh.lookupObject<pointVectorField>("pointD");
+
+        const vectorField& pointDI = pointD.internalField();
+        const vectorField& points = mesh.points();
+        scalarField pointDError(pointDI.size(), 0);
+
+        forAll(pointDError, pointI)
+        {
+            const vector curR(points[pointI].x(), points[pointI].y(), 0);
+            const vector curDa = plateHoleDisplacement(curR, mesh);
+
+            pointDError[pointI] = mag(pointDI[pointI] - curDa);
+        }
+
+        Info<< "pointDError, max : " << gMax(pointDError) << endl;
+
+        if (time_.outputTime())
+        {
+            pointVectorField pointDerror
+            (
+                IOobject
+                (
+                    "pointDerror",
+                    time_.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                pMesh,
+                dimensionedVector("zero", dimLength, vector::zero)
+            );
+
+            forAll(pointDError, pointI)
+            {
+                const vector curR(points[pointI].x(), points[pointI].y(), 0);
+                const vector curDa = plateHoleDisplacement(curR, mesh);
+
+                pointDerror.primitiveFieldRef()[pointI] =
+                    pointDI[pointI] - curDa;
+            }
+
+            pointDerror.write();
+        }
+    }
+
+    if
+    (
+        time_.outputTime()
+     && mesh.foundObject<volSymmTensorField>("sigma")
+     && mesh.foundObject<volScalarField>("p")
+    )
+    {
+        volScalarField sigmaXXErr
+        (
+            IOobject
+            (
+                "sigmaXXErr",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0)
+        );
+
+        volScalarField sigmaXYErr
+        (
+            IOobject
+            (
+                "sigmaXYErr",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0)
+        );
+
+        volScalarField sigmaYYErr
+        (
+            IOobject
+            (
+                "sigmaYYErr",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0)
+        );
+
+        volScalarField pErr
+        (
+            IOobject
+            (
+                "pErr",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0)
+        );
+
+        scalarField& sigmaXXErrI = sigmaXXErr.primitiveFieldRef();
+        scalarField& sigmaXYErrI = sigmaXYErr.primitiveFieldRef();
+        scalarField& sigmaYYErrI = sigmaYYErr.primitiveFieldRef();
+        scalarField& pErrI = pErr.primitiveFieldRef();
+
+        const volSymmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>("sigma");
+        const volScalarField& p =
+            mesh.lookupObject<volScalarField>("p");
+
+        const symmTensorField& sigmaI = sigma.internalField();
+        const scalarField& pI = p.internalField();
+        const vectorField& C = mesh.C().internalField();
+
+        forAll(sigmaI, cellI)
+        {
+            const vector curR(C[cellI].x(), C[cellI].y(), 0);
+            const symmTensor curSigmaA = plateHoleStress(curR);
+            const scalar curHydPressureA = plateHoleHydPressure(curR, mesh);
+
+            sigmaXXErrI[cellI] = mag(sigmaI[cellI].xx() - curSigmaA.xx());
+            sigmaXYErrI[cellI] = mag(sigmaI[cellI].xy() - curSigmaA.xy());
+            sigmaYYErrI[cellI] = mag(sigmaI[cellI].yy() - curSigmaA.yy());
+            pErrI[cellI] = mag(pI[cellI] - curHydPressureA);
+        }
+
+        Info<< "sigmaXXErr, max : " << gMax(sigmaXXErr) << endl;
+        Info<< "sigmaXYErr, max : " << gMax(sigmaXYErr) << endl;
+        Info<< "sigmaYYErr, max : " << gMax(sigmaYYErr) << endl;
+        Info<< "pErr, max : " << gMax(pErr) << endl;
+
+        sigmaXXErr.write();
+        sigmaXYErr.write();
+        sigmaYYErr.write();
+        pErr.write();
+    }
 }
 
 bool Foam::plateHoleAnalyticalSolution::writeData()
 {
-    // Lookup the solid mesh
-    const fvMesh* meshPtr = NULL;
-    if (time_.foundObject<fvMesh>("solid"))
-    {
-        meshPtr = &(time_.lookupObject<fvMesh>("solid"));
-    }
-    else
-    {
-        meshPtr = &(time_.lookupObject<fvMesh>("region0"));
-    }
-    const fvMesh& mesh = *meshPtr;
+    const fvMesh& mesh = this->mesh();
 
     // Lookup the point mesh
     const pointMesh& pMesh = mesh.lookupObject<pointMesh>("pointMesh");
@@ -143,7 +449,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
             if (cellDisplacement_)
             {
-                aDI[cellI] = plateHoleDisplacement(CI[cellI], sI[cellI]);
+                aDI[cellI] = plateHoleDisplacement(CI[cellI], mesh);
             }
         }
 
@@ -170,7 +476,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                     if (cellDisplacement_)
                     {
                         aDP[faceI] =
-                            plateHoleDisplacement(CP[faceI], sP[faceI]);
+                            plateHoleDisplacement(CP[faceI], mesh);
                     }
                 }
             }
@@ -288,7 +594,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
             if (pointDisplacement_)
             {
-                aDI[pointI] = plateHoleDisplacement(points[pointI], sI[pointI]);
+                aDI[pointI] = plateHoleDisplacement(points[pointI], mesh);
             }
         }
 
@@ -332,6 +638,11 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
         }
     }
 
+    if (pressureDisplacement_)
+    {
+        writePressureDisplacementData(mesh, pMesh);
+    }
+
     return true;
 }
 
@@ -347,10 +658,17 @@ Foam::plateHoleAnalyticalSolution::plateHoleAnalyticalSolution
     functionObject(name),
     name_(name),
     time_(t),
+    regionName_(dict.lookupOrDefault<word>("region", polyMesh::defaultRegion)),
     T_(readScalar(dict.lookup("farFieldTractionX"))),
     holeR_(readScalar(dict.lookup("holeRadius"))),
-    E_(readScalar(dict.lookup("E"))),
-    nu_(readScalar(dict.lookup("nu"))),
+    E_(dict.found("E") ? readScalar(dict.lookup("E")) : -1.0),
+    nu_(dict.found("nu") ? readScalar(dict.lookup("nu")) : -1.0),
+    deriveMaterialProperties_
+    (
+        dict.lookupOrDefault<Switch>("deriveMaterialProperties", false)
+     || !dict.found("E")
+     || !dict.found("nu")
+    ),
     cellDisplacement_
     (
         dict.lookupOrDefault<Switch>("cellDisplacement", true)
@@ -366,6 +684,10 @@ Foam::plateHoleAnalyticalSolution::plateHoleAnalyticalSolution
     pointStress_
     (
         dict.lookupOrDefault<Switch>("pointStress", true)
+    ),
+    pressureDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("pressureDisplacement", false)
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
@@ -377,7 +699,11 @@ Foam::plateHoleAnalyticalSolution::plateHoleAnalyticalSolution
             << abort(FatalError);
     }
 
-    if (E_ < SMALL || nu_ < SMALL)
+    if
+    (
+        !deriveMaterialProperties_
+     && (E_ < SMALL || nu_ < SMALL)
+    )
     {
         FatalErrorIn(this->name() + " function object constructor")
             << "E and nu should be positive!"

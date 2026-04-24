@@ -53,11 +53,15 @@ functions
     //     refHistoryPoint	( 0.2 0 0.005 );
     // }
 
-    setPlateHoleBC
+    plateHoleAnalyticalSolution1
     {
-        type setPlateHoleBC;
-        radius 1.0;
-        traction 1e6;
+        type plateHoleAnalyticalSolution;
+        farFieldTractionX 1e6;
+        holeRadius    1.0;
+        pressureDisplacement yes;
+        cellStress    no;
+        pointStress   no;
+        deriveMaterialProperties yes;
     }
 );
 
