@@ -19,8 +19,9 @@ Typedef
     Foam::fv::scalarUpdatedLagGaussGrad
 
 Description
-    Specialisation of gaussGrad for scalars. Needed for implicit fvmGrad
-    operator for block coupled systems.
+    Specialisation of updatedLagGaussGrad for scalars.
+    Provides the implicit fvmGrad operator needed by
+    coupledPressureDisplacementSolid pressure-displacement systems.
 
 SourceFiles
     scalarUpdatedLagGaussGrad.C

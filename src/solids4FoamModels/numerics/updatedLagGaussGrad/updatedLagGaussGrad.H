@@ -134,7 +134,7 @@ public:
         ) const;
 
         //- Return the BlockLduSystem corresponding to the implicit grad
-        // discretization. For block coupled systems.
+        //  discretisation for coupledPressureDisplacementSolid
         tmp
         <
             BlockLduSystem<vector, typename outerProduct<vector, Type>::type>

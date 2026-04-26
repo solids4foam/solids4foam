@@ -70,7 +70,7 @@ class GuccioneElastic
         //- Pressure-displacement formulation
         const Switch pressureDisplacement_;
 
-        //- Effective shear modulus for the pressure-displacement formulation
+        //- Effective shear modulus for coupledPressureDisplacementSolid
         volScalarField muEff_;
 
         //- Flag to indicate a uniform fibre field
@@ -105,10 +105,10 @@ class GuccioneElastic
         volSymmTensorField S_;
         surfaceSymmTensorField Sf_;
 
-        //- Exponential of Qf for the pressure-displacement formulation
+        //- Exponential of Qf for coupledPressureDisplacementSolid
         surfaceScalarField expQf_;
 
-        //- Scaling coeff for the pressure-displacement impK
+        //- Scaling coefficient for coupledPressureDisplacementSolid impK
         const scalar impKcoeff_;
 
 

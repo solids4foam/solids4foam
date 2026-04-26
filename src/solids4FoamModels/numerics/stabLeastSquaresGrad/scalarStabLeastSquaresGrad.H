@@ -20,7 +20,8 @@ Typedef
 
 Description
     Specialisation of stabLeastSquaresGrad for scalars.
-    Needed for implicit fvmGrad operator for block coupled systems.
+    Provides the implicit fvmGrad operator needed by
+    coupledPressureDisplacementSolid pressure-displacement systems.
 
 SourceFiles
     scalarStabLeastSquaresGrad.C

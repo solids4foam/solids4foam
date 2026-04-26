@@ -94,8 +94,8 @@ public:
             const word& name
         ) const;
 
-        //- Return the BlockLduSystem corresponding to the implicit least
-        // quares grad discretization. For block coupled systems.
+        //- Return the BlockLduSystem corresponding to the implicit
+        //  least-squares grad discretisation for coupledPressureDisplacementSolid
         tmp
         <
             BlockLduSystem<vector, typename outerProduct<vector, Type>::type>

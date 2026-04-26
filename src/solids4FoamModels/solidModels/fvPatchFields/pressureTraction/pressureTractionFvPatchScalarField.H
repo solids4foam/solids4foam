@@ -19,8 +19,8 @@ Class
     pressureTractionFvPatchScalarField
 
 Description
-    Fixed traction boundary condition for the standard linear elastic, fixed
-    coefficient displacement equation (stressedFoam).
+    Pressure-increment boundary condition paired with
+    tractionPressureDisplacement in coupledPressureDisplacementSolid cases.
 
 SourceFiles
     pressureTractionFvPatchScalarField.C

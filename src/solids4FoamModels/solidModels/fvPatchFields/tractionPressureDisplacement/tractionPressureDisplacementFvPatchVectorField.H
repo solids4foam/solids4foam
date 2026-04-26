@@ -19,8 +19,10 @@ Class
     tractionPressureDisplacementFvPatchVectorField
 
 Description
-    Fixed traction boundary condition for the standard linear elastic, fixed
-    coefficient displacement equation (stressedFoam).
+    Traction boundary condition for the displacement-increment field in
+    coupledPressureDisplacementSolid cases.
+
+    The matching scalar pressure boundary condition is pressureTraction.
 
 SourceFiles
     tractionPressureDisplacementFvPatchVectorField.C

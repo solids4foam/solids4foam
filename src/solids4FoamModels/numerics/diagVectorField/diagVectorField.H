@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Description
-    Transform vectorField to diagTensorField
+    Transform a vectorField to a diagTensorField.
 
 Author
     Zeljko Tuković, FAMENA Zagreb
@@ -32,7 +32,7 @@ Author
 
 namespace Foam
 {
-    // Natural log of a symmTensor field
+    //- Construct a diagonal tensor field from vector components
     tmp<diagTensorField> diag(const vectorField& vf);
 
 } // End namespace Foam

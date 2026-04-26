@@ -19,6 +19,11 @@ Class
     coupledPressureDisplacementSolid
 
 Description
+    Block-coupled pressure-displacement solid model for incompressible and
+    nearly incompressible solids.
+
+    The model solves displacement increment and hydrostatic pressure increment
+    in a coupled system and is currently available for foam-extend builds.
 
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.

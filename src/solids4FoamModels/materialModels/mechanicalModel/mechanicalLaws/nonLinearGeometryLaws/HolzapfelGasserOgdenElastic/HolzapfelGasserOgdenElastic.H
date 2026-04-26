@@ -20,7 +20,7 @@ Class
 
 Description
     Incompressible Holzapfel-Gasser-Ogden anisotropic hyperelastic law for
-    pressure-displacement solid formulations.
+    coupledPressureDisplacementSolid pressure-displacement formulations.
 
     The law requires the following entries in mechanicalProperties:
 
