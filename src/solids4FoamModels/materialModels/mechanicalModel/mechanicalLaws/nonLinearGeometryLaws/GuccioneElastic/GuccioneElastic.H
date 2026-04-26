@@ -44,7 +44,7 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class linearElastic Declaration
+                         Class GuccioneElastic Declaration
 \*---------------------------------------------------------------------------*/
 
 class GuccioneElastic

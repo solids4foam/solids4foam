@@ -328,12 +328,12 @@ void Foam::neoHookeanElastic::materialTangentField(List<mat66>& matTan) const
                     // Zero the tangent
                     curMatTan.clear();
 
-                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
-                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
-                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
-                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
-                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
+                    curMatTan(XX, cmptI) = tangCmptP[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptP[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptP[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptP[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptP[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptP[fI][XZ];
                 }
             }
         }

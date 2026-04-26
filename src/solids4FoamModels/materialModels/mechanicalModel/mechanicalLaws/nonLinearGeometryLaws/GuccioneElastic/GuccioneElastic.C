@@ -205,134 +205,6 @@ void Foam::GuccioneElastic::calculateStress
 {
     // Disable for now as we do not create f0f
     notImplemented("calculateStress(surfaceSymmTensorField&)");
-
-    // // Calculate F
-    // const surfaceTensorField F(I + gradD.T());
-
-    // // Calculate the Jacobian of the deformation gradient
-    // const surfaceScalarField J(det(F));
-
-    // NOTE [IMPORTANT]:
-    // Do NOT write F.T() & F directly: see the comment in
-    // StVenantKirchhoffElastic.C
-    //const surfaceTensorField FT(F.T());
-
-    // // Calculate the right Cauchy–Green deformation tensor
-    // const surfaceSymmTensorField C(symm(FT & F));
-
-    // // Calculate the Green-Lagrange strain
-    // const surfaceSymmTensorField E(0.5*(C - I));
-
-    // const Switch useLocalCoordSys
-    // (
-    //     dict().lookupOrDefault<Switch>
-    //     (
-    //         "calculateStressInLocalCoordinateSystem",
-    //         Switch(false)
-    //     )
-    // );
-
-    // if (useLocalCoordSys)
-    // {
-    //     // Calculate the Green strain in the local coordinate system
-    //     const surfaceSymmTensorField EStar("EStar", symm(Rf_.T() & E & Rf_));
-
-    //     // Extract the components of EStar
-    //     // Note: EStar is symmetric
-    //     const surfaceScalarField E11("E11", EStar.component(symmTensor::XX));
-    //     const surfaceScalarField E12("E12", EStar.component(symmTensor::XY));
-    //     const surfaceScalarField E13("E13", EStar.component(symmTensor::XZ));
-    //     const surfaceScalarField E22("E22", EStar.component(symmTensor::YY));
-    //     const surfaceScalarField E23("E23", EStar.component(symmTensor::YZ));
-    //     const surfaceScalarField E33("E33", EStar.component(symmTensor::ZZ));
-
-    //     // Calculate Q
-    //     const surfaceScalarField Q
-    //     (
-    //         "Q",
-    //         cf_*sqr(E11)
-    //       + ct_*(sqr(E22) + sqr(E33) + 2*sqr(E23))
-    //       + cfs_*(2*sqr(E12) + 2*sqr(E13))
-    //     );
-
-    //     // Calculate the derivative of Q wrt to EStar
-    //     surfaceSymmTensorField dQdEStar
-    //     (
-    //         IOobject
-    //         (
-    //             "dQdEStar",
-    //             mesh().time().timeName(),
-    //             mesh(),
-    //             IOobject::NO_READ,
-    //             IOobject::NO_WRITE
-    //         ),
-    //         mesh(),
-    //         dimensionedSymmTensor("0", dimless, symmTensor::zero)
-    //     );
-
-    //     dQdEStar.replace(symmTensor::XX, 2*cf_*E11);
-    //     dQdEStar.replace(symmTensor::XY, 2*cfs_*E12);
-    //     dQdEStar.replace(symmTensor::XZ, 2*cfs_*E13);
-    //     dQdEStar.replace(symmTensor::YY, 2*ct_*E22);
-    //     dQdEStar.replace(symmTensor::YZ, 2*ct_*E23);
-    //     dQdEStar.replace(symmTensor::ZZ, 2*ct_*E33);
-
-    //     // Calculate the local 2nd Piola-Kirchhoff stress (without the
-    //     // hydrostatic term)
-    //     Sf_ = dQdEStar*0.5*k_*exp(Q);
-
-    //     // Rotate S from the local fibre coordinate system to the global
-    //     // coordinate system
-    //     Sf_ = symm(Rf_ & Sf_ & Rf_.T());
-    // }
-    // else
-    // {
-    //     // Calculate E . E
-    //     const surfaceSymmTensorField sqrE(symm(E & E));
-
-    //     // Calculate the invariants of E
-    //     const surfaceScalarField I1(tr(E));
-    //     const surfaceScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
-    //     const surfaceScalarField I4(E && f0f0f_);
-    //     const surfaceScalarField I5(sqrE && f0f0f_);
-
-    //     // Calculate Q
-    //     const surfaceScalarField Q
-    //     (
-    //         ct_*sqr(I1)
-    //       - 2.0*ct_*I2
-    //      + (cf_ - 2.0*cfs_ + ct_)*sqr(I4)
-    //      + 2.0*(cfs_ - ct_)*I5
-    //     );
-
-    //     // Calculate the derivative of Q wrt to E
-    //     const surfaceSymmTensorField dQdE
-    //     (
-    //         2.0*ct_*E
-    //       + 2.0*(cf_ - 2.0*cfs_ + ct_)*I4*f0f0f_
-    //       + 2.0*(cfs_ - ct_)*symm((E & f0f0f_) + (f0f0f_ & E))
-    //     );
-
-    //     // Update the 2nd Piola-Kirchhoff stress (without the hydrostatic term)
-    //     Sf_ = dQdE*0.5*k_*exp(Q);
-    // }
-
-    // // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
-    // // the deviatoric component
-    // const surfaceSymmTensorField s(dev(J*symm(F & Sf_ & F.T())));
-
-    // // Calculate the hydrostatic stress
-    // const surfaceScalarField sigmaHyd(0.5*bulkModulus_*(pow(J, 2.0) - 1.0)/J);
-    // // Not implemented for faces
-    // // updateSigmaHyd
-    // // (
-    // //     0.5*bulkModulus_*(pow(J, 2.0) - 1.0)/J,
-    // //     (4.0/3.0)*mu_ + bulkModulus_
-    // // );
-
-    // // Convert the second Piola-Kirchhoff deviatoric stress to the Cauchy stress
-    // // and add hydrostatic stress term
-    // sigma = s + sigmaHyd*I;
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -352,8 +224,10 @@ Foam::GuccioneElastic::GuccioneElastic
     cf_(readScalar(dict.lookup("cf"))),
     ct_(readScalar(dict.lookup("ct"))),
     cfs_(readScalar(dict.lookup("cfs"))),
-    // Check: is this mu equivalent to the linearised shear modulus?
-    mu_(0.75*(cf_ - 2.0*cfs_ + 2.0*cfs_)*k_),
+    // Linearised (small-strain) shear modulus: average of the three
+    // material constants scaled by k. Same form is used in both the
+    // pressure-displacement and standard branches.
+    mu_(0.5*k_*(cf_ + cfs_ + ct_)/3.0),
     pressureDisplacement_
     (
         dict.lookupOrDefault<Switch>("pressureDisplacement", false)
@@ -504,16 +378,15 @@ Foam::GuccioneElastic::GuccioneElastic
 {
     if (pressureDisplacement_)
     {
-        mu_ = 0.5*k_*(cf_ + cfs_ + ct_)/3.0;
         muEff_ = mu_;
     }
 
     // Check f0 are unit vectors
 
 #ifdef OPENFOAM_NOT_EXTEND
-    if (min(mag(mag(f0_.primitiveField()))) < SMALL)
+    if (min(mag(f0_.primitiveField())) < SMALL)
 #else
-    if (min(mag(mag(f0_.internalField()))) < SMALL)
+    if (min(mag(f0_.internalField())) < SMALL)
 #endif
     {
         FatalErrorIn("GuccioneElastic::GuccioneElastic()")
@@ -522,9 +395,9 @@ Foam::GuccioneElastic::GuccioneElastic
     }
 
 #ifdef OPENFOAM_NOT_EXTEND
-    if (min(mag(mag(f0f_.primitiveField()))) < SMALL)
+    if (min(mag(f0f_.primitiveField())) < SMALL)
 #else
-    if (min(mag(mag(f0f_.internalField()))) < SMALL)
+    if (min(mag(f0f_.internalField())) < SMALL)
 #endif
     {
         FatalErrorIn("GuccioneElastic::GuccioneElastic()")
@@ -657,7 +530,7 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::impK() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            (cf_ - 2.0*cfs_ + 2.0*cfs_)*k_ + bulkModulus_
+            (4.0/3.0)*mu_ + bulkModulus_
         )
     );
 }
@@ -781,12 +654,12 @@ void Foam::GuccioneElastic::materialTangentField(List<mat66>& matTan) const
                     // Zero the tangent
                     curMatTan.clear();
 
-                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
-                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
-                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
-                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
-                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
+                    curMatTan(XX, cmptI) = tangCmptP[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptP[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptP[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptP[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptP[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptP[fI][XZ];
                 }
             }
         }
@@ -802,7 +675,7 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::bulkModulus() const
         (
             IOobject
             (
-                "impK",
+                "bulkModulus",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -823,7 +696,7 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::shearModulus() const
         (
             IOobject
             (
-                "impK",
+                "shearModulus",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -1265,139 +1138,6 @@ void Foam::GuccioneElastic::correct(surfaceSymmTensorField& sigma)
 
     // Disable for now as we do not create f0f
     notImplemented("correct(surfaceSymmTensorField&)");
-
-    // // Update the deformation gradient field
-    // // Note: if true is returned, it means that linearised elasticity was
-    // // enforced by the solver via the enforceLinear switch
-    // if (updateF(sigma, mu_, bulkModulus_))
-    // {
-    //     return;
-    // }
-
-    // // Take a reference to the deformation gradient to make the code easier to
-    // // read
-    // const surfaceTensorField& F = this->Ff();
-
-    // // Calculate the Jacobian of the deformation gradient
-    // const surfaceScalarField J(det(F));
-
-    // // Calculate the right Cauchy–Green deformation tensor
-    // const surfaceSymmTensorField C(symm(F.T() & F));
-
-    // // Calculate the Green-Lagrange strain
-    // const surfaceSymmTensorField E(0.5*(C - I));
-
-    // const Switch useLocalCoordSys
-    // (
-    //     dict().lookupOrDefault<Switch>
-    //     (
-    //         "calculateStressInLocalCoordinateSystem",
-    //         Switch(false)
-    //     )
-    // );
-
-    // if (useLocalCoordSys)
-    // {
-    //     // Calculate the Green strain in the local coordinate system
-    //     const surfaceSymmTensorField EStar("EStar", symm(Rf_.T() & E & Rf_));
-
-    //     // Extract the components of EStar
-    //     // Note: EStar is symmetric
-    //     const surfaceScalarField E11("E11", EStar.component(symmTensor::XX));
-    //     const surfaceScalarField E12("E12", EStar.component(symmTensor::XY));
-    //     const surfaceScalarField E13("E13", EStar.component(symmTensor::XZ));
-    //     const surfaceScalarField E22("E22", EStar.component(symmTensor::YY));
-    //     const surfaceScalarField E23("E23", EStar.component(symmTensor::YZ));
-    //     const surfaceScalarField E33("E33", EStar.component(symmTensor::ZZ));
-
-    //     // Calculate Q
-    //     const surfaceScalarField Q
-    //     (
-    //         "Q",
-    //         cf_*sqr(E11)
-    //       + ct_*(sqr(E22) + sqr(E33) + 2*sqr(E23))
-    //       + cfs_*(2*sqr(E12) + 2*sqr(E13))
-    //     );
-
-    //     // Calculate the derivative of Q wrt to EStar
-    //     surfaceSymmTensorField dQdEStar
-    //     (
-    //         IOobject
-    //         (
-    //             "dQdEStar",
-    //             mesh().time().timeName(),
-    //             mesh(),
-    //             IOobject::NO_READ,
-    //             IOobject::NO_WRITE
-    //         ),
-    //         mesh(),
-    //         dimensionedSymmTensor("0", dimless, symmTensor::zero)
-    //     );
-
-    //     dQdEStar.replace(symmTensor::XX, 2*cf_*E11);
-    //     dQdEStar.replace(symmTensor::XY, 2*cfs_*E12);
-    //     dQdEStar.replace(symmTensor::XZ, 2*cfs_*E13);
-    //     dQdEStar.replace(symmTensor::YY, 2*ct_*E22);
-    //     dQdEStar.replace(symmTensor::YZ, 2*ct_*E23);
-    //     dQdEStar.replace(symmTensor::ZZ, 2*ct_*E33);
-
-    //     // Calculate the local 2nd Piola-Kirchhoff stress (without the
-    //     // hydrostatic term)
-    //     Sf_ = dQdEStar*0.5*k_*exp(Q);
-
-    //     // Rotate S from the local fibre coordinate system to the global
-    //     // coordinate system
-    //     Sf_ = symm(Rf_ & Sf_ & Rf_.T());
-    // }
-    // else
-    // {
-    //     // Calculate E . E
-    //     const surfaceSymmTensorField sqrE(symm(E & E));
-
-    //     // Calculate the invariants of E
-    //     const surfaceScalarField I1(tr(E));
-    //     const surfaceScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
-    //     const surfaceScalarField I4(E && f0f0f_);
-    //     const surfaceScalarField I5(sqrE && f0f0f_);
-
-    //     // Calculate Q
-    //     const surfaceScalarField Q
-    //     (
-    //         ct_*sqr(I1)
-    //       - 2.0*ct_*I2
-    //      + (cf_ - 2.0*cfs_ + ct_)*sqr(I4)
-    //      + 2.0*(cfs_ - ct_)*I5
-    //     );
-
-    //     // Calculate the derivative of Q wrt to E
-    //     const surfaceSymmTensorField dQdE
-    //     (
-    //         2.0*ct_*E
-    //       + 2.0*(cf_ - 2.0*cfs_ + ct_)*I4*f0f0f_
-    //       + 2.0*(cfs_ - ct_)*symm((E & f0f0f_) + (f0f0f_ & E))
-    //     );
-
-    //     // Update the 2nd Piola-Kirchhoff stress (without the hydrostatic term)
-    //     Sf_ = dQdE*0.5*k_*exp(Q);
-    // }
-
-    // // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
-    // // the deviatoric component
-    // s = dev((1/J)*F & S & F.T)
-    //const surfaceSymmTensorField s(dev(symm(F & Sf_ & F.T()))/J);
-
-    // // Calculate the hydrostatic stress
-    // const surfaceScalarField sigmaHyd(0.5*bulkModulus_*(pow(J, 2.0) - 1.0)/J);
-    // // Not implemented for faces
-    // // updateSigmaHyd
-    // // (
-    // //     0.5*bulkModulus_*(pow(J, 2.0) - 1.0)/J,
-    // //     (4.0/3.0)*mu_ + bulkModulus_
-    // // );
-
-    // // Convert the second Piola-Kirchhoff deviatoric stress to the Cauchy stress
-    // // and add hydrostatic stress term
-    // sigma = s + sigmaHyd*I;
 }
 
 
