@@ -1,0 +1,187 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   petsc                 (default; PETSc SNES)
+#   pressureDisplacement  (foam-extend; coupled pressure-displacement)
+# -------------------------------------------------------------------------
+
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  petsc                                (default)
+  pressureDisplacement
+  parallel                             (shorthand for: petsc parallel)
+
+Examples:
+  ./Allrun
+  ./Allrun petsc
+  ./Allrun petsc parallel
+  ./Allrun pressureDisplacement
+  ./Allrun parallel
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-petsc}"
+RUN_PARALLEL=false
+
+if [[ "${APPROACH}" == "parallel" ]]; then
+    APPROACH="petsc"
+    RUN_PARALLEL=true
+elif [[ "${2:-}" == "parallel" ]]; then
+    RUN_PARALLEL=true
+fi
+
+case "${APPROACH}" in
+    petsc)
+        solids4Foam::caseDoesNotRunWithFoamExtend
+        solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+        if [[ -z "${PETSC_DIR:-}" ]]; then
+            echo
+            echo "Skipping this case as PETSc is not installed"
+            echo "Please set the PETSC_DIR variable and rebuild solids4foam"
+            echo
+            exit 0
+        fi
+        ;;
+    pressureDisplacement)
+        solids4Foam::caseOnlyRunsWithFoamExtend
+        ;;
+    *)
+        echo "Error: Unknown approach '${APPROACH}'"
+        usage
+        exit 1
+        ;;
+esac
+
+copy_contents() {
+    local src="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}"
+    cp -a "${src}/." "${dst}/"
+}
+
+reset_active_case() {
+    rm -rf 0
+    rm -rf constant/polyMesh
+
+    rm -f constant/dynamicMeshDict
+    rm -f constant/g
+    rm -f constant/mechanicalProperties
+    rm -f constant/physicsProperties
+    rm -f constant/solidProperties
+    rm -f constant/timeVsPressure
+
+    rm -f system/blockMeshDict
+    rm -f system/controlDict
+    rm -f system/createPatchDict
+    rm -f system/decomposeParDict
+    rm -f system/extrudeMeshDict
+    rm -f system/fvSchemes
+    rm -f system/fvSolution
+    rm -f system/sampleDict
+
+    rm -f petscOptions.*
+    rm -f ventricle_ideal_*.msh.gz
+    rm -f epicard_apex.txt
+    rm -f tipPointDisplacement*.gplt
+}
+
+select_petsc_case() {
+    echo "Using petsc approach"
+
+    reset_active_case
+
+    copy_contents caseOptions/petsc/0 0
+    copy_contents caseOptions/petsc/constant constant
+    copy_contents caseOptions/petsc/system system
+
+    cp -a caseOptions/petsc/petscOptions.* .
+}
+
+select_pressure_displacement_case() {
+    echo "Using pressureDisplacement approach"
+
+    reset_active_case
+
+    copy_contents caseOptions/pressureDisplacement/0 0
+    copy_contents caseOptions/pressureDisplacement/constant constant
+    copy_contents caseOptions/pressureDisplacement/system system
+
+    cp -a caseOptions/pressureDisplacement/ventricle_ideal_coarse.msh.gz .
+    cp -a caseOptions/pressureDisplacement/ventricle_ideal_fine.msh.gz .
+    cp -a caseOptions/pressureDisplacement/epicard_apex.txt .
+    cp -a caseOptions/pressureDisplacement/tipPointDisplacement.gplt .
+    cp -a caseOptions/pressureDisplacement/tipPointDisplacement_epi.gplt .
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+case "${APPROACH}" in
+    petsc)
+        select_petsc_case
+        ;;
+    pressureDisplacement)
+        select_pressure_displacement_case
+        ;;
+esac
+
+echo
+solids4Foam::convertCaseFormat .
+
+# -------------------------------------------------------------------------
+# Mesh generation
+# -------------------------------------------------------------------------
+
+echo
+if [[ "${APPROACH}" == "petsc" ]]; then
+    solids4Foam::runApplication blockMesh
+    solids4Foam::runApplication extrudeMesh
+    solids4Foam::runApplication createPatch -overwrite
+else
+    gunzip -k ventricle_ideal_coarse.msh.gz
+    solids4Foam::runApplication fluent3DMeshToFoam ventricle_ideal_coarse.msh
+    rm -f ventricle_ideal_coarse.msh
+    solids4Foam::runApplication createPatch -overwrite
+fi
+
+# -------------------------------------------------------------------------
+# Solver
+# -------------------------------------------------------------------------
+
+echo
+if [[ "${RUN_PARALLEL}" == true ]]; then
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
+else
+    solids4Foam::runApplication solids4Foam
+fi

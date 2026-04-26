@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+mechanical
+(
+    heartTissue
+    {
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 3000;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 0.0;
+        rampTime        0.0;
+        passiveMechanicalLaw
+        {
+            type            GuccioneElastic;
+            calculateStressInLocalCoordinateSystem no;
+            k               k [1 -1 -2 0 0 0 0] 10e3;
+            cf              1.0;
+            ct              1.0;
+            cfs             1.0;
+
+            // Specify uniform fibre field, otherwise it is read from a time
+            // directory
+            // In this case, the properties are isotropic so the fibre direction
+            // does not matter; we pick the z direction for symmetry but it
+            // should not matter
+            uniformFibreField yes;
+            f0              (0 0 1);
+
+            // The bulk modulus acts as a penalty factor to enforce
+            // incompressiblity
+            // Aim for 100 x shear modulus
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+        }
+    }
+);
+
+// ************************************************************************* //
