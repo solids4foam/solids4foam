@@ -26,8 +26,8 @@ solvers
         {
             snes_type newtonls;
             snes_linesearch_type l2;
-            snes_rtol "1e-4";
-            snes_stol "1e-4";
+            snes_rtol "1e-6";
+            snes_stol "1e-6";
             snes_monitor;
             snes_converged_reason;
             snes_max_linear_solve_fail "100";
