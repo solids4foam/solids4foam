@@ -296,6 +296,16 @@ public:
             //- Non-const access to the PETSc solution vector
             Vec solutionBackup()
             {
+                if (!x_.v)
+                {
+                    // Initialise snes object
+                    if (initialiseSnes() != 0)
+                    {
+                        FatalErrorInFunction
+                        << "initialiseSnes failed" << abort(FatalError);
+                    }
+                }
+
                 if (!xBackup_.v)
                 {
                     // Initialise based on x
@@ -361,7 +371,9 @@ public:
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
-                VecCopy(solution(), solutionBackup());
+                Vec x = solution();
+                Vec xBackup = solutionBackup();
+                VecCopy(x, xBackup);
             }
 
             //- Reset the solution and snes object
