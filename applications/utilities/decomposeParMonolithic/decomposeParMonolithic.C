@@ -56,7 +56,6 @@ Usage
 \*---------------------------------------------------------------------------*/
 
 #include "argList.H"
-#include "Time.H"
 #include "fvMesh.H"
 #include "IOdictionary.H"
 #include "labelIOList.H"
@@ -72,10 +71,10 @@ using namespace Foam;
 
 static bool optionFound(const argList& args, const word& opt)
 {
-#ifdef OPENFOAM_ORG
-    return args.optionFound(opt);
-#else
+#ifdef OPENFOAM_COM
     return args.found(opt);
+#else
+    return args.optionFound(opt);
 #endif
 }
 
@@ -87,20 +86,20 @@ static bool optionReadIfPresent
     fileName& value
 )
 {
-#ifdef OPENFOAM_ORG
-    return args.optionReadIfPresent(opt, value);
-#else
+#ifdef OPENFOAM_COM
     return args.readIfPresent(opt, value);
+#else
+    return args.optionReadIfPresent(opt, value);
 #endif
 }
 
 
 static label regionIndex(const wordList& names, const word& name)
 {
-#ifdef OPENFOAM_ORG
-    return findIndex(names, name);
-#else
+#ifdef OPENFOAM_COM
     return names.find(name);
+#else
+    return findIndex(names, name);
 #endif
 }
 
@@ -282,7 +281,7 @@ int main(int argc, char *argv[])
      && !decompDictFile.empty() && !decompDictFile.isAbsolute()
     )
     {
-        decompDictFile = runTime.globalPath()/decompDictFile;
+        decompDictFile = runTime.path()/decompDictFile;
     }
 
     // Find the dictionary
