@@ -17,4 +17,8 @@ EXE_LIBS = \
     -ldecompose \
     -lscotchDecomp \
     -L$(FOAM_LIBBIN)/dummy \
-    -lmetisDecomp -lkahipDecomp
+    -lmetisDecomp
+
+ifneq (,$(findstring -DOPENFOAM_COM, $(VERSION_SPECIFIC_INC)))
+    EXE_LIBS += -lkahipDecomp
+endif

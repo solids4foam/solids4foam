@@ -70,6 +70,41 @@ using namespace Foam;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+static bool optionFound(const argList& args, const word& opt)
+{
+#ifdef OPENFOAM_ORG
+    return args.optionFound(opt);
+#else
+    return args.found(opt);
+#endif
+}
+
+
+static bool optionReadIfPresent
+(
+    const argList& args,
+    const word& opt,
+    fileName& value
+)
+{
+#ifdef OPENFOAM_ORG
+    return args.optionReadIfPresent(opt, value);
+#else
+    return args.readIfPresent(opt, value);
+#endif
+}
+
+
+static label regionIndex(const wordList& names, const word& name)
+{
+#ifdef OPENFOAM_ORG
+    return findIndex(names, name);
+#else
+    return names.find(name);
+#endif
+}
+
+
 // Build face-centre matching between two conformal patches.
 // Returns list of (ownerCellA, ownerCellB) pairs.
 List<labelPair> matchConformalInterface
@@ -230,11 +265,11 @@ int main(int argc, char *argv[])
     #include "setRootCase.H"
     #include "createTime.H"
 
-    const bool writeCellDist = args.found("cellDist");
-    const bool decomposeOnly = args.found("decompose-only");
-    const bool forceOverwrite = args.found("force");
-    const bool copyZero = args.found("copy-zero");
-    const bool noFields = args.found("no-fields");
+    const bool writeCellDist = optionFound(args, "cellDist");
+    const bool decomposeOnly = optionFound(args, "decompose-only");
+    const bool forceOverwrite = optionFound(args, "force");
+    const bool copyZero = optionFound(args, "copy-zero");
+    const bool noFields = optionFound(args, "no-fields");
 
     // -----------------------------------------------------------------------
     // Read dictionary
@@ -243,7 +278,7 @@ int main(int argc, char *argv[])
     fileName decompDictFile;
     if
     (
-        args.readIfPresent("decomposeParDict", decompDictFile)
+        optionReadIfPresent(args, "decomposeParDict", decompDictFile)
      && !decompDictFile.empty() && !decompDictFile.isAbsolute()
     )
     {
@@ -253,28 +288,34 @@ int main(int argc, char *argv[])
     // Find the dictionary
     IOdictionary decompDict
     (
-        IOobject::selectIO
+        decompDictFile.empty()
+      ? IOobject
         (
-            IOobject
-            (
-                "decomposeParDict",
-                runTime.system(),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                IOobject::NO_REGISTER
-            ),
-            decompDictFile
+            "decomposeParDict",
+            runTime.system(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
+      : IOobject
+        (
+            decompDictFile,
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
         )
     );
 
-    const label nDomains = decompDict.get<label>("numberOfSubdomains");
+    const label nDomains =
+        readLabel(decompDict.lookup("numberOfSubdomains"));
 
     Info<< "Number of subdomains: " << nDomains << nl << endl;
 
     // Read monolithicCoeffs
     const dictionary& monoDict = decompDict.subDict("monolithicCoeffs");
-    const wordList regionNames(monoDict.get<wordList>("regions"));
+    const wordList regionNames(monoDict.lookup("regions"));
 
     if (regionNames.size() < 2)
     {
@@ -370,14 +411,14 @@ int main(int argc, char *argv[])
     {
         const dictionary& ifDict = interfaceDicts[ii];
 
-        const word regionAName = ifDict.get<word>("regionA");
-        const word patchAName = ifDict.get<word>("patchA");
-        const word regionBName = ifDict.get<word>("regionB");
-        const word patchBName = ifDict.get<word>("patchB");
+        const word regionAName(ifDict.lookup("regionA"));
+        const word patchAName(ifDict.lookup("patchA"));
+        const word regionBName(ifDict.lookup("regionB"));
+        const word patchBName(ifDict.lookup("patchB"));
 
         // Find region indices
-        const label riA = regionNames.find(regionAName);
-        const label riB = regionNames.find(regionBName);
+        const label riA = regionIndex(regionNames, regionAName);
+        const label riB = regionIndex(regionNames, regionBName);
 
         if (riA < 0)
         {
@@ -493,7 +534,7 @@ int main(int argc, char *argv[])
                 mesh,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
-                IOobject::NO_REGISTER
+                false
             ),
             regionCellToProc
         );
@@ -501,7 +542,7 @@ int main(int argc, char *argv[])
         cellDecomposition.write();
 
         Info<< "  Region " << regionNames[ri] << ": wrote "
-            << cellDecomposition.objectRelPath() << endl;
+            << cellDecomposition.objectPath() << endl;
 
         // Optional: write as volScalarField
         if (writeCellDist)
@@ -515,7 +556,7 @@ int main(int argc, char *argv[])
                     mesh,
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE,
-                    IOobject::NO_REGISTER
+                    false
                 ),
                 mesh,
                 dimensionedScalar("cellDist", dimless, 0)
@@ -529,7 +570,7 @@ int main(int argc, char *argv[])
             cellDist.write();
 
             Info<< "  Region " << regionNames[ri] << ": wrote "
-                << cellDist.objectRelPath() << endl;
+                << cellDist.objectPath() << endl;
         }
     }
 
