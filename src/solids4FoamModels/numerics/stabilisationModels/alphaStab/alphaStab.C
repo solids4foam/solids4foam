@@ -211,6 +211,8 @@ const Foam::fvVectorMatrix& Foam::alphaStab::vectorJacobian
     const bool rebuild
 ) const
 {
+    checkGamma(gammaPtr);
+
     // Vector Jacobian taken from diffStencilLaplacianStab
     // Residual can use alpha stabilisation but Jacobian is build using
     // implicit Laplacian. Alpha implicit Laplacian will be similar so this

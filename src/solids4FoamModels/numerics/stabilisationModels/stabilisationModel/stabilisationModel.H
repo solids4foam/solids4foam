@@ -106,6 +106,9 @@ class stabilisationModel
             cellVectorPtr_.clear();
         }
 
+        //- Check that an optional face diffusivity field is non-negative
+        void checkGamma(const surfaceScalarField* gammaPtr) const;
+
 
     // Private Member Functions
 

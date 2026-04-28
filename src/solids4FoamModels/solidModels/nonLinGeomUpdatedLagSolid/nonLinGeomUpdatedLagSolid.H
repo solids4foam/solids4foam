@@ -98,6 +98,10 @@ class nonLinGeomUpdatedLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Reciprocal of the bulk modulus
+        //  Used in the pressure equation when solvePressure is enabled
+        mutable autoPtr<volScalarField> rKappaPtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
@@ -110,6 +114,12 @@ class nonLinGeomUpdatedLagSolid
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Allocate the reciprocal of the bulk modulus
+        void makeRKappa() const;
+
+        //- Return const access to the reciprocal of the bulk modulus
+        const volScalarField& rKappa() const;
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries

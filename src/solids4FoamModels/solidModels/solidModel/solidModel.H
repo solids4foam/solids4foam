@@ -212,6 +212,11 @@ private:
         //- Optional stabilisation term for pressure equation
         autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
+        //- Reciprocal of the momentum equation diagonal, face-interpolated
+        //  Used as the stabilisation diffusivity in the pressure equation,
+        //  analogous to rAUf in pressure-velocity coupling
+        mutable autoPtr<surfaceScalarField> rAUfPtr_;
+
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -467,6 +472,15 @@ protected:
         {
             return pressureStabilisationPtr_();
         }
+
+        //- Allocate the rAUf field
+        void makeRAUf() const;
+
+        //- Return const access to rAUf (lazy construction)
+        const surfaceScalarField& rAUf() const;
+
+        //- Return non-const access to rAUf (lazy construction)
+        surfaceScalarField& rAUf();
 
         //- Make rhoD2dt2D
         void makeRhoD2dt2D() const;
