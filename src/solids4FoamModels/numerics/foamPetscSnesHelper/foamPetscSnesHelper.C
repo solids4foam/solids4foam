@@ -1073,7 +1073,7 @@ label foamPetscSnesHelper::initialiseJacobian
             insertSet(rowCols[neiCellID], gradCols[ownCellID]);
         }
 
-#ifdef OPENFOAM_ORG
+#if defined(OPENFOAM_ORG) || defined(FOAMEXTEND)
         const label myProcNo = Pstream::myProcNo();
         const label gStart = globalCells().offset(myProcNo);
         const label gEnd = gStart + globalCells().localSize(myProcNo);

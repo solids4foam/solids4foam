@@ -22,6 +22,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "findRefCell.H"
+#include "fixedValueFvPatchFields.H"
 #include "compatibilityFunctions.H"
 
 
@@ -55,6 +56,20 @@ void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
 }
 
 
+const Foam::dictionary& solverControls
+(
+    const Foam::fvMesh& mesh,
+    const Foam::word& fieldName
+)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    return mesh.solverDict(fieldName);
+#else
+    return mesh.solutionDict().solver(fieldName);
+#endif
+}
+
+
 class retryTimeStateBuilder
 :
     public Foam::TimeState
@@ -72,7 +87,9 @@ public:
         // value so the retry does not treat the failed step as the last
         // accepted one when operator++() updates deltaT0.
         state.deltaTSave_ = runTime.deltaT0Value();
+#ifdef OPENFOAM_NOT_EXTEND
         state.writeTime_ = false;
+#endif
 
         return state;
     }
@@ -1279,7 +1296,7 @@ label newtonIcoFluid::precondition
         dpBCTypes
     );
 
-    vectorField momentumRhs(dU.primitiveField().size(), vector::zero);
+    vectorField momentumRhs(Foam::primitiveFieldRef(dU).size(), vector::zero);
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         x,
@@ -1290,7 +1307,7 @@ label newtonIcoFluid::precondition
       : makeList<label>({0,1,2})
     );
 
-    scalarField pressureRhs(dp.primitiveField().size(), 0.0);
+    scalarField pressureRhs(Foam::primitiveFieldRef(dp).size(), 0.0);
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
     (
         x, pressureRhs, blockSize_ - 1
@@ -1322,7 +1339,7 @@ label newtonIcoFluid::precondition
     }
 
     UEqn.source() = momentumRhs;
-    dU.primitiveFieldRef() = vector::zero;
+    Foam::primitiveFieldRef(dU) = vector::zero;
     dU.correctBoundaryConditions();
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1331,11 +1348,11 @@ label newtonIcoFluid::precondition
     SolverPerformance<vector>::debug = 0;
     SolverPerformance<scalar>::debug = 0;
 #else
-    const int oldBlockLduDebug = blockLduMatrix::debug;
+    const int oldBlockLduDebug = blockLduMatrix::debug();
     blockLduMatrix::debug = 0;
 #endif
 
-    UEqn.solve(mesh.solverDict("dU"));
+    UEqn.solve(solverControls(mesh, "dU"));
 
     volScalarField rAU("rAU", 1.0/UEqn.A());
 
@@ -1353,11 +1370,22 @@ label newtonIcoFluid::precondition
         pressureStabilisation().scalarJacobian(dp, &rAUf(), true)
     );
 
+#ifdef OPENFOAM_NOT_EXTEND
+    const scalarField divPhiHbyAV
+    (
+        fvc::div(phiHbyA)().primitiveField()*mesh.V()
+    );
+#else
+    const scalarField divPhiHbyAV
+    (
+        fvc::div(phiHbyA)().internalField()*mesh.V()
+    );
+#endif
+
     scalarField pSource
     (
         pressureRhs
-      + pressureScaleFactor_
-       *fvc::div(phiHbyA)().primitiveField()*mesh.V()
+      + pressureScaleFactor_*divPhiHbyAV
     );
 
     if (pRefCell_ != -1)
@@ -1377,10 +1405,10 @@ label newtonIcoFluid::precondition
     }
 
     pEqn.source() = pSource;
-    dp.primitiveFieldRef() = 0.0;
+    Foam::primitiveFieldRef(dp) = 0.0;
     dp.correctBoundaryConditions();
 
-    pEqn.solve(mesh.solverDict("dp"));
+    pEqn.solve(solverControls(mesh, "dp"));
 
     dU += rAU*fvc::grad(dp);
     dU.correctBoundaryConditions();
@@ -1394,7 +1422,7 @@ label newtonIcoFluid::precondition
 
     foamPetscSnesHelper::InsertFieldComponents<vector>
     (
-        dU.primitiveField(),
+        Foam::primitiveFieldRef(dU),
         y,
         0,
         fluidModel::twoD()
@@ -1404,7 +1432,7 @@ label newtonIcoFluid::precondition
 
     foamPetscSnesHelper::InsertFieldComponents<scalar>
     (
-        dp.primitiveField(), y, blockSize_ - 1
+        Foam::primitiveFieldRef(dp), y, blockSize_ - 1
     );
 
     if (debug)
