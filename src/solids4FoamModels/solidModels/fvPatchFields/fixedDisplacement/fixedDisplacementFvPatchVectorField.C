@@ -27,6 +27,7 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -102,14 +103,10 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
             fixedValuePointPatchVectorField& patchPointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-                    const_cast<pointVectorField&>
+                    boundaryFieldRef
                     (
-                        pointD
-#ifdef OPENFOAM_NOT_EXTEND
-                    ).boundaryFieldRef()[patch().index()]
-#else
-                    ).boundaryField()[patch().index()]
-#endif
+                        const_cast<pointVectorField&>(pointD)
+                    )[patch().index()]
                 );
 
             // Interpolate face values to the points
