@@ -202,6 +202,7 @@ functionObjects/squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
 functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
+functionObjects/fsiSteadyStateControl/fsiSteadyStateControl.C
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/AMIInterpolationS4F/AMIInterpolationS4F.C
