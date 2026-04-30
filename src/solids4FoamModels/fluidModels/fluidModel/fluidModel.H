@@ -212,18 +212,6 @@ protected:
 
     // Protected member functions
 
-        //- Return fluid properties dictionary
-        dictionary& fluidProperties()
-        {
-            return fluidProperties_;
-        }
-
-        //- Return fluid properties dictionary
-        const dictionary& fluidProperties() const
-        {
-            return fluidProperties_;
-        }
-
         //- Update Robin boundary conditions, if found
         void updateRobinFsiInterface
         (
@@ -315,6 +303,18 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return fluid properties dictionary
+            dictionary& fluidProperties()
+            {
+                return fluidProperties_;
+            }
+
+            //- Return fluid properties dictionary
+            const dictionary& fluidProperties() const
+            {
+                return fluidProperties_;
+            }
 
             //- Return reference to the mesh
             dynamicFvMesh& mesh()
