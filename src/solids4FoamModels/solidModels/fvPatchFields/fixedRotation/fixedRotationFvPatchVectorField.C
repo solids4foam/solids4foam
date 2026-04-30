@@ -25,6 +25,7 @@ License
 #include "RodriguesRotation.H"
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -321,11 +322,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             fixedValuePointPatchVectorField& pointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-#ifdef OPENFOAM_NOT_EXTEND
-                    pointDField.boundaryFieldRef()[patch().index()]
-#else
-                    pointDField.boundaryField()[patch().index()]
-#endif
+                    boundaryFieldRef(pointDField)[patch().index()]
                 );
 
             const vectorField newPatchPoints

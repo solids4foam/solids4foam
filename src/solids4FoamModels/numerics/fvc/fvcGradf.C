@@ -28,6 +28,7 @@ License
 #include "wedgeFvPatch.H"
 #include "fvc.H"
 #include "zeroGradientFvPatchFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -168,11 +169,7 @@ tmp
 
     if (!axisymmetric)
     {
-#ifdef OPENFOAM_NOT_EXTEND
-        Field<GradType>& gradI = tGrad.ref().primitiveFieldRef();
-#else
-        Field<GradType>& gradI = tGrad().internalField();
-#endif
+        Field<GradType>& gradI = primitiveFieldRef(tmpRef(tGrad));
 
         const vectorField& points = mesh.points();
         const faceList& faces = mesh.faces();
@@ -231,11 +228,7 @@ tmp
 
         forAll(tGrad().boundaryField(), patchI)
         {
-#ifdef OPENFOAM_NOT_EXTEND
-            Field<GradType>& patchGrad = tGrad.ref().boundaryFieldRef()[patchI];
-#else
-            Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
-#endif
+            Field<GradType>& patchGrad = boundaryFieldRef(tmpRef(tGrad))[patchI];
 
             const vectorField& patchN = n.boundaryField()[patchI];
 
@@ -481,11 +474,7 @@ tmp
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    Field<GradType>& iGrad = tGrad.ref().primitiveFieldRef();
-#else
-    Field<GradType>& iGrad = tGrad().internalField();
-#endif
+    Field<GradType>& iGrad = primitiveFieldRef(tmpRef(tGrad));
 
     const vectorField& points = mesh.points();
 
@@ -708,13 +697,8 @@ tmp
                 pf.boundaryField()[patchI].patchInternalField()
             );
 
-#ifdef OPENFOAM_NOT_EXTEND
-            tGrad.ref().boundaryFieldRef()[patchI] ==
+            boundaryFieldRef(tmpRef(tGrad))[patchI] ==
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
-#else
-            tGrad().boundaryField()[patchI] ==
-                fGrad(mesh.boundaryMesh()[patchI], ppf);
-#endif
         }
 #ifndef OPENFOAM_NOT_EXTEND
         else if (isA<ggiFvPatch>(mesh.boundary()[patchI]))
@@ -767,11 +751,7 @@ tmp
         {
             const vectorField n(vf.mesh().boundary()[patchi].nf());
 
-#ifdef OPENFOAM_NOT_EXTEND
-            tGrad.ref().boundaryFieldRef()[patchi] +=
-#else
-            tGrad().boundaryField()[patchi] +=
-#endif
+            boundaryFieldRef(tmpRef(tGrad))[patchi] +=
             n
            *(
                 vf.boundaryField()[patchi].snGrad()
