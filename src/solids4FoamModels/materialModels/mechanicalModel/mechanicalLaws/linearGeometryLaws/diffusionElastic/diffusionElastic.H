@@ -67,7 +67,7 @@ class diffusionElastic
 
         //- Maximum factor
         //  The max value of d is limit to maxFactor*average(d)
-        //  Defaults to 10
+        //  Defaults to 100
         const scalar maxFactor_;
 
         //- Minimum factor
