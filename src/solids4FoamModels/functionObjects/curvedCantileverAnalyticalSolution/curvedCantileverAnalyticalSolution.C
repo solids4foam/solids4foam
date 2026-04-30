@@ -23,6 +23,7 @@ License
 #include "pointFields.H"
 #include "coordinateSystem.H"
 #include "symmTensor.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -159,11 +160,7 @@ bool Foam::curvedCantileverAnalyticalSolution::writeData()
     {
         if (mesh.boundary()[patchI].type() != "empty")
         {
-#ifdef OPENFOAM_NOT_EXTEND
-            symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
-#else
-            symmTensorField& sP = analyticalStress.boundaryField()[patchI];
-#endif
+            symmTensorField& sP = boundaryFieldRef(analyticalStress)[patchI];
             const vectorField& CP = C.boundaryField()[patchI];
 
             forAll(sP, faceI)

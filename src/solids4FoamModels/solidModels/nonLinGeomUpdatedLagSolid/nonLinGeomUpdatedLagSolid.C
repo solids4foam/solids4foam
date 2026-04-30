@@ -94,11 +94,7 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
     // Enforce traction conditions
     forAll(D.boundaryField(), patchI)
     {
-#ifdef OPENFOAM_NOT_EXTEND
-        vectorField& forceP = force.boundaryFieldRef()[patchI];
-#else
-        vectorField& forceP = force.boundaryField()[patchI];
-#endif
+        vectorField& forceP = boundaryFieldRef(force)[patchI];
 
         if
         (
@@ -345,11 +341,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::InsertFieldComponents<vector>
         (
-#ifdef OPENFOAM_NOT_EXTEND
-            DD().primitiveFieldRef(),
-#else
-            DD().internalField(),
-#endif
+            primitiveFieldRef(DD()),
             foamPetscSnesHelper::solution(),
             0, // Location of first component
             solidModel::twoD()
@@ -366,11 +358,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         foamPetscSnesHelper::solution(),
-#ifdef OPENFOAM_NOT_EXTEND
-        DD().primitiveFieldRef(),
-#else
-        DD().internalField(),
-#endif
+        primitiveFieldRef(DD()),
         0, // Location of first component
         solidModel::twoD()
       ? makeList<label>({0,1})
@@ -638,11 +626,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 solidTractionFvPatchVectorField& tracPatch =
                     refCast<solidTractionFvPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
-                        DD().boundaryFieldRef()[patchI]
-#else
-                        DD().boundaryField()[patchI]
-#endif
+                        boundaryFieldRef(DD())[patchI]
                     );
 
                 tracPatch.extrapolateValue() = true;

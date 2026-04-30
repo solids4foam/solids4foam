@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -90,11 +91,7 @@ bool Foam::solidTractions::writeData()
                 if (!traction.boundaryField()[patchI].coupled())
                 {
                     // It is assumed that sigma is the true (Cauchy) stress
-#ifdef OPENFOAM_NOT_EXTEND
-                    traction.boundaryFieldRef()[patchI] =
-#else
-                    traction.boundaryField()[patchI] =
-#endif
+                    boundaryFieldRef(traction)[patchI] =
                         mesh.boundary()[patchI].nf()
                       & sigma.boundaryField()[patchI];
                 }
@@ -138,11 +135,7 @@ bool Foam::solidTractions::writeData()
                     nCurrent /= mag(nCurrent);
 
                    // It is assumed that sigma is the true (Cauchy) stress
-#ifdef OPENFOAM_NOT_EXTEND
-                   traction.boundaryFieldRef()[patchI] =
-#else
-                   traction.boundaryField()[patchI] =
-#endif
+                   boundaryFieldRef(traction)[patchI] =
                       nCurrent & sigma.boundaryField()[patchI];
                 }
             }
@@ -172,11 +165,7 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
-#ifdef OPENFOAM_NOT_EXTEND
-                    traction.boundaryFieldRef()[patchI] =
-#else
-                    traction.boundaryField()[patchI] =
-#endif
+                    boundaryFieldRef(traction)[patchI] =
                         mesh.boundary()[patchI].nf()
                       & sigma.boundaryField()[patchI];
                 }

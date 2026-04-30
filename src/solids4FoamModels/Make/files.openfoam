@@ -188,6 +188,7 @@ functionObjects/solidPointDisplacementAlongLine/solidPointDisplacementAlongLine.
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
+functionObjects/solidPressureMinMax/solidPressureMinMax.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
