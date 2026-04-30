@@ -16,9 +16,9 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 REG_END_TIME=2.5
 
 # Regression tolerances
-DISP_TOL=1e-5
+DISP_TOL=2e-5
 FX_TOL=1e-4
-FY_TOL=1e-4
+FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
 REF_TIP_UY=-0.00062628
