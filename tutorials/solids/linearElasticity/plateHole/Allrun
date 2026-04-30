@@ -1,25 +1,195 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   displacement (default)
+#   pressureDisplacementCompressible [coarse|medium]
+#   pressureDisplacementIncompressible [coarse|medium|poly]
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach] [mesh]
+
+Where [approach] is one of:
+  displacement                         (default)
+  pressureDisplacementCompressible
+  pressureDisplacementIncompressible
+
+The optional [mesh] is used for pressure-displacement approaches:
+  coarse                               (default)
+  medium
+  poly                                 (incompressible only)
+
+Examples:
+  ./Allrun
+  ./Allrun displacement
+  ./Allrun parallel
+  ./Allrun pressureDisplacementCompressible medium
+  ./Allrun pressureDisplacementIncompressible poly
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
-# Check case version is correct
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-displacement}"
+MESH="${2:-coarse}"
+RUN_PARALLEL=false
+
+if [[ "${APPROACH}" == "parallel" ]]; then
+    APPROACH="displacement"
+    RUN_PARALLEL=true
+elif [[ "${APPROACH}" == "displacement" && "${MESH}" == "parallel" ]]; then
+    MESH="coarse"
+    RUN_PARALLEL=true
+fi
+
+case "${APPROACH}" in
+    displacement)
+        ;;
+    pressureDisplacementCompressible)
+        solids4Foam::caseOnlyRunsWithFoamExtend
+        case "${MESH}" in
+            coarse|medium) ;;
+            *)
+                echo "Error: Unknown mesh '${MESH}' for ${APPROACH}"
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
+    pressureDisplacementIncompressible)
+        solids4Foam::caseOnlyRunsWithFoamExtend
+        case "${MESH}" in
+            coarse|medium|poly) ;;
+            *)
+                echo "Error: Unknown mesh '${MESH}' for ${APPROACH}"
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
+    *)
+        echo "Error: Unknown approach '${APPROACH}'"
+        usage
+        exit 1
+        ;;
+esac
+
+copy_contents() {
+    local src="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}"
+    cp -a "${src}/." "${dst}/"
+}
+
+reset_active_case() {
+    rm -rf 0
+    rm -rf constant/polyMesh
+
+    rm -f constant/dynamicMeshDict
+    rm -f constant/g
+    rm -f constant/mechanicalProperties
+    rm -f constant/physicsProperties
+    rm -f constant/solidProperties
+    rm -f constant/timeVsPressure
+    rm -f constant/timeVsTraction
+
+    rm -f system/controlDict
+    rm -f system/createPatchDict
+    rm -f system/decomposeParDict
+    rm -f system/fvSchemes
+    rm -f system/fvSolution
+    rm -f system/sampleDict
+
+    rm -f postProcessing.gplt
+}
+
+select_displacement_case() {
+    echo "Using displacement approach"
+
+    reset_active_case
+
+    copy_contents caseOptions/displacement/0 0
+    copy_contents caseOptions/displacement/constant constant
+    copy_contents caseOptions/displacement/system system
+}
+
+select_pressure_displacement_case() {
+    local material="$1"
+
+    echo "Using ${APPROACH} approach with ${MESH} mesh"
+
+    reset_active_case
+
+    copy_contents caseOptions/pressureDisplacement/common/0 0
+    copy_contents caseOptions/pressureDisplacement/common/constant constant
+    copy_contents caseOptions/pressureDisplacement/common/system system
+    copy_contents "caseOptions/pressureDisplacement/${material}/constant" constant
+
+    if [[ "${MESH}" == "poly" ]]; then
+        copy_contents caseOptions/pressureDisplacement/poly/constant constant
+        copy_contents caseOptions/pressureDisplacement/poly/system system
+    else
+        copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
+        copy_contents caseOptions/pressureDisplacement/hex/common/system system
+        copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
+        cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
+    fi
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+case "${APPROACH}" in
+    displacement)
+        select_displacement_case
+        ;;
+    pressureDisplacementCompressible)
+        select_pressure_displacement_case compressible
+        ;;
+    pressureDisplacementIncompressible)
+        select_pressure_displacement_case incompressible
+        ;;
+esac
+
+echo
 solids4Foam::convertCaseFormat .
 
-# Create mesh
-solids4Foam::runApplication blockMesh
+if [[ "${APPROACH}" == "displacement" || "${MESH}" != "poly" ]]; then
+    echo
+    solids4Foam::runApplication blockMesh
+fi
 
-# Run solver
-if [[ "$1" == "parallel" ]]
-then
-    # Number of cores passed as an argument
+if [[ "${APPROACH}" == "displacement" && "${RUN_PARALLEL}" == true ]]; then
+    echo
     solids4Foam::runApplication decomposePar
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication reconstructPar
 else
-    # Case runs in serial if no argument is passed or if the argument is 1
+    echo
     solids4Foam::runApplication solids4Foam
 fi

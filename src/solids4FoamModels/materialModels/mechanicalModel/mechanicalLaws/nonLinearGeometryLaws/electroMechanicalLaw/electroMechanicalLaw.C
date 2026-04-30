@@ -167,7 +167,7 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     // Add active stress to the passive stress
     // Note that the active stress is converted from a 2nd Piola-Kirchhoff
     // stress to a Cauchy stress
-    sigma += J*symm(F & (currentTa*f0f0) & F.T());
+    sigma += symm(F & (currentTa*f0f0) & F.T())/J;
 }
 
 

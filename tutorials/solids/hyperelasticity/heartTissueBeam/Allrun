@@ -1,0 +1,32 @@
+#!/bin/bash
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
+fi
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+set -e
+
+# reset
+rm -rf 0
+cp -rf 0.orig 0
+
+# paraview file
+touch case.foam
+
+
+# mesh
+runApplication blockMesh
+
+#before running the case, run blockMesh command in openfoam2206 or openfoam2306
+# run
+runApplication solids4Foam

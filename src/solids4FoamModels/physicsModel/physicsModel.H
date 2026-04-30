@@ -59,12 +59,6 @@ class physicsModel
         //- Reference to the master time object
         Time& runTime_;
 
-        //- Fluid mesh pointer
-        autoPtr<dynamicFvMesh> fluidMeshPtr_;
-
-        //- Solid mesh pointer
-        autoPtr<dynamicFvMesh> solidMeshPtr_;
-
         //- Flag to indicate whether info statements should be printed to
         //  std out or not. Defaults to true but can be modified by the
         //  printInfo() access function

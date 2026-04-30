@@ -69,17 +69,16 @@ $(nonLinGeomLaws)/diffusionHyperElastic/diffusionHyperElastic.C
 $(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
 $(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
+$(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
 $(nonLinGeomLaws)/isotropicFungElastic/isotropicFungElastic.C
 $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
 $(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(nonLinGeomLaws)/rotationInvariantLinearElastic/rotationInvariantLinearElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 $(nonLinGeomLaws)/YeohElastic/YeohElastic.C
-
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws
 $(thermalLaws)/thermalLaw/thermalLaw.C
@@ -112,7 +111,6 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
-
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
@@ -174,6 +172,7 @@ functionObjects/curvedCantileverAnalyticalSolution/curvedCantileverAnalyticalSol
 functionObjects/contactPatchTestAnalyticalSolution/contactPatchTestAnalyticalSolution.C
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
+functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalFields.C
 functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
 functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityAnalyticalSolution.C
 functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityStressDisplacement.C
@@ -197,7 +196,6 @@ functionObjects/squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
 functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
-
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/AMIInterpolationS4F/AMIInterpolationS4F.C
 numerics/AMIInterpolationS4F/AMIInterpolationS4FNew.C
@@ -247,6 +245,8 @@ numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOr
 numerics/stabilisationModels/gradDivStab/gradDivStab.C
 numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C
 numerics/stabilisationModels/laplacianStab/laplacianStab.C
+numerics/stabilisationModels/multipleStabilisationModels/multipleStabilisationModels.C
+numerics/stabilisationModels/volStrainRateStab/volStrainRateStab.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
@@ -257,6 +257,13 @@ higherOrderHelpers/quadrature/quadrature.C
 higherOrderHelpers/quadrature/tetQuadrature.C
 higherOrderHelpers/quadrature/triQuadrature.C
 higherOrderHelpers/quadrature/lineQuadrature.C
+higherOrderHelpers/fvMeshQuadrature/fvMeshQuadrature.C
+higherOrderHelpers/weightFunction/weightFunction.C
+higherOrderHelpers/SymmTensor3rdOrder/labelSymmTensor3rdOrder/labelSymmTensor3rdOrder.C
+higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
+higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
+higherOrderHelpers/hofv/hofvm.C
+higherOrderHelpers/hofv/hofvc.C
 
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

@@ -43,6 +43,7 @@ Author
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
 #include "mat66.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -547,6 +548,16 @@ public:
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+#ifndef FOAMEXTEND
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+#endif
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

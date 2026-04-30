@@ -42,6 +42,7 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -94,7 +95,6 @@ class linGeomTotalDispSolid
 
         //- Field to provide fvOptions with the correct dimensions
         volScalarField ds_;
-
 
     // Private Member Functions
 

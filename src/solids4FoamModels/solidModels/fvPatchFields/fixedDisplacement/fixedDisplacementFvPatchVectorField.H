@@ -39,6 +39,7 @@ Author
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
 #include "primitivePatchInterpolation.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -181,6 +182,13 @@ public:
             //- Return the matrix source coefficients corresponding to the
             //  evaluation of the gradient of this patchField
             virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
+
+#ifndef FOAMEXTEND
+            //- Return face quadrature points values,
+            //  used for high order solvers
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
+#endif
 
         // Mapping functions
 

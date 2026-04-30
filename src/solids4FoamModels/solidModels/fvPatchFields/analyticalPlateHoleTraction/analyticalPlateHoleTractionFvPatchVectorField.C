@@ -24,7 +24,8 @@ License
 #include "volFields.H"
 #include "fvc.H"
 #include "fixedValueFvPatchFields.H"
-#include "coordinateSystem.H"
+#include "lookupSolidModel.H"
+#include "plateHoleAnalyticalFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -36,48 +37,9 @@ namespace Foam
 symmTensor analyticalPlateHoleTractionFvPatchVectorField::plateHoleSolution
 (
     const vector& C
-)
+) const
 {
-    tensor sigma = tensor::zero;
-
-    // Calculate radial coordinate
-    scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
-
-    // Calculate circumferential coordinate
-    scalar theta = Foam::atan2(C.y(), C.x());
-
-    coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
-
-    sigma.xx() =
-        T_*(1 - sqr(holeR_)/sqr(r))/2
-      + T_
-       *(1 + 3*pow(holeR_,4)/pow(r,4) - 4*sqr(holeR_)/sqr(r))*::cos(2*theta)/2;
-
-    sigma.xy() =
-      - T_
-       *(1 - 3*pow(holeR_,4)/pow(r,4) + 2*sqr(holeR_)/sqr(r))*::sin(2*theta)/2;
-
-    sigma.yx() = sigma.xy();
-
-    sigma.yy() =
-        T_*(1 + sqr(holeR_)/sqr(r))/2
-      - T_*(1 + 3*pow(holeR_,4)/pow(r,4))*::cos(2*theta)/2;
-
-
-    // Transformation to Cartesian coordinate system
-#ifdef OPENFOAM_ORG
-    sigma = ((cs.R().R() & sigma) & cs.R().R().T());
-#else
-    sigma = ((cs.R() & sigma) & cs.R().T());
-#endif
-
-    symmTensor S = symmTensor::zero;
-
-    S.xx() = sigma.xx();
-    S.xy() = sigma.xy();
-    S.yy() = sigma.yy();
-
-    return S;
+    return plateHoleAnalyticalFields::stress(C, T_, holeR_);
 }
 
 
@@ -203,11 +165,69 @@ void analyticalPlateHoleTractionFvPatchVectorField::updateCoeffs()
             curN = -curC/mag(curC);
         }
 
-        trac[faceI] = (n[faceI] & plateHoleSolution(curC));
+        trac[faceI] =
+            plateHoleAnalyticalFields::traction(curC, curN, T_, holeR_);
     }
 
     solidTractionFvPatchVectorField::updateCoeffs();
 }
+
+#ifndef FOAMEXTEND
+autoPtr<CompactListList<vector>>
+analyticalPlateHoleTractionFvPatchVectorField::evaluateQuadrature() const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is list for the  whole mesh
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementMLS().quadrature().faceQuadPoints();
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Patch unit normals
+    vectorField n(patch().nf());
+
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the same value to all quadrature points on this face
+        // We assume constant distribution of traction!
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const point quadPoint = faceQuadPoints[globalFaceID][pointI];
+            quadPointsValue[faceI][pointI] =
+                plateHoleAnalyticalFields::traction
+                (
+                    quadPoint,
+                    n[faceI],
+                    T_,
+                    holeR_
+                );
+        }
+    }
+
+    return tQuadPointsValue;
+}
+#endif
 
 
 // Write

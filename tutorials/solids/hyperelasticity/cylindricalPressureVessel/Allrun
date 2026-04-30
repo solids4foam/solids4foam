@@ -1,19 +1,157 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   displacement (default)
+#   pressureDisplacement
+#   pressureDisplacementLinear
+#   pressureDisplacementUnsteady
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  displacement                         (default)
+  pressureDisplacement
+  pressureDisplacementLinear
+  pressureDisplacementUnsteady
+
+Examples:
+  ./Allrun
+  ./Allrun displacement
+  ./Allrun pressureDisplacement
+  ./Allrun pressureDisplacementLinear
+  ./Allrun pressureDisplacementUnsteady
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
 # Case only run with foam-extend
 solids4Foam::caseOnlyRunsWithFoamExtend
 
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-displacement}"
+
+case "${APPROACH}" in
+    displacement)
+        OPTION="displacement"
+        ;;
+    pressureDisplacement|cylinder)
+        APPROACH="pressureDisplacement"
+        OPTION="pressureDisplacement/cylinder"
+        ;;
+    pressureDisplacementLinear|cylinderLin)
+        APPROACH="pressureDisplacementLinear"
+        OPTION="pressureDisplacement/cylinderLin"
+        ;;
+    pressureDisplacementUnsteady|cylinderUnsteady)
+        APPROACH="pressureDisplacementUnsteady"
+        OPTION="pressureDisplacement/cylinderUnsteady"
+        ;;
+    *)
+        echo "Error: Unknown approach '${APPROACH}'"
+        usage
+        exit 1
+        ;;
+esac
+
+copy_contents() {
+    local src="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}"
+    cp -a "${src}/." "${dst}/"
+}
+
+reset_active_case() {
+    rm -rf 0
+    rm -rf constant/polyMesh
+    rm -rf analyticalSolution
+
+    rm -f constant/cellDecomposition
+    rm -f constant/dynamicMeshDict
+    rm -f constant/g
+    rm -f constant/mechanicalProperties
+    rm -f constant/physicsProperties
+    rm -f constant/solidProperties
+    rm -f constant/timeVsPressure
+
+    rm -f system/controlDict
+    rm -f system/decomposeParDict
+    rm -f system/fvSchemes
+    rm -f system/fvSolution
+    rm -f system/sampleDict
+
+    rm -f innerRadius.gplt
+    rm -f postProcessing.gplt
+    rm -f pressure.gplt
+    rm -f solidEnergy.gplt
+}
+
+select_case() {
+    echo "Using ${APPROACH} approach"
+
+    reset_active_case
+
+    copy_contents "caseOptions/${OPTION}/0" 0
+    copy_contents "caseOptions/${OPTION}/constant" constant
+    copy_contents "caseOptions/${OPTION}/system" system
+
+    if [[ -d "caseOptions/${OPTION}/analyticalSolution" ]]; then
+        copy_contents "caseOptions/${OPTION}/analyticalSolution" analyticalSolution
+    fi
+
+    for plot in caseOptions/"${OPTION}"/*.gplt; do
+        [[ -e "${plot}" ]] || continue
+        cp -a "${plot}" .
+    done
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+select_case
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Create mesh
+if [[ -f constant/polyMesh/blockMeshDict.m4 ]]; then
+    m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+fi
+
 solids4Foam::runApplication blockMesh
 
 # Run solver
 solids4Foam::runApplication solids4Foam
+
+if [[ "${APPROACH}" == "pressureDisplacement" ||
+      "${APPROACH}" == "pressureDisplacementLinear" ]]; then
+    solids4Foam::runApplication foamCalc components sigma:Transformed
+    solids4Foam::runApplication sample
+    gnuplot ./postProcessing.gplt
+fi

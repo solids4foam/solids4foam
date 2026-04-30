@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+if ! command -v calcLocCoordinates &> /dev/null
+then
+    echo; echo "Skipping this case as calcLocCoordinates is not installed"; echo
+    exit 0
+fi
+
+# Create mesh
+m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+runApplication blockMesh
+
+# Create 0 folder
+mkdir 0
+cp -r 0.orig/Dp ./0
+cp -r 0.orig/DD ./0
+cp -r 0.orig/pointDD ./0
+cp -r 0.orig/psi0 ./0
+cp -r 0.orig/psi1 ./0
+
+# Calculate local coordinate systems
+runApplication calcLocCoordinates
+
+# Run solver
+runApplication solids4Foam
+
+
+# ----------------------------------------------------------------- end-of-file

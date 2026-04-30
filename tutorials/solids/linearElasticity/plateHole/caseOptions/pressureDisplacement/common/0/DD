@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      DD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    hole
+    {
+        type		tractionPressureDisplacement;
+        traction	uniform (0 0 0);
+        pressure	uniform 0;
+        value		uniform (0 0 0);
+    }
+
+    right
+    {
+        type		analyticalPlateHolePressureDisplacementTraction;
+        farFieldTractionX 1e6;
+        holeRadius      1;
+        traction	uniform (0 0 0);
+        pressure	uniform 0;
+        value		uniform (0 0 0);
+    }
+
+    up
+    {
+        type		analyticalPlateHolePressureDisplacementTraction;
+        farFieldTractionX 1e6;
+        holeRadius      1;
+        traction	uniform (0 0 0);
+        pressure	uniform 0;
+        value		uniform (0 0 0);
+    }
+
+    down
+    {
+        // type            symmetryPlane;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+        // type            blockSymmPlane;
+    }
+
+    left
+    {
+        // type            symmetryPlane;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //

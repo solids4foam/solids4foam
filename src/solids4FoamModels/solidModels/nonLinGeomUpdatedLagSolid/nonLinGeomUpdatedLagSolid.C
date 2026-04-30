@@ -223,14 +223,20 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, DD(), nCurrent, magSfCurrent);
 
         // Momentum equation incremental updated Lagrangian form
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)");
+        tmpRef(tRhsEqn) += fvc::div(force);
+        tmpRef(tRhsEqn) += rho_*g();
+
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
           + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(force)
-          + rho_*g()
+         == tRhsEqn
         );
 
         // Under-relax the linear system
@@ -515,6 +521,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
+    rKappaPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -642,6 +649,29 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             }
         }
     }
+}
+
+
+void nonLinGeomUpdatedLagSolid::makeRKappa() const
+{
+    if (rKappaPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+}
+
+
+const volScalarField& nonLinGeomUpdatedLagSolid::rKappa() const
+{
+    if (rKappaPtr_.empty())
+    {
+        makeRKappa();
+    }
+
+    return rKappaPtr_();
 }
 
 
@@ -788,11 +818,24 @@ label nonLinGeomUpdatedLagSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
+        // Compute the positive face-interpolated reciprocal of the approximate
+        // momentum equation diagonal. This is the solid analogue of rAUf in
+        // pressure-velocity coupling and has units of [Pa].
+        {
+            fvVectorMatrix approxMomJ
+            (
+                fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+              - rho()*fvm::d2dt2(DD)
+            );
+            approxMomJ.relax();
+            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+        }
+
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
-          - p*(1.0/mechanical().bulkModulus())
-          + pressureStabilisation().cellScalar(&impKf_, true)*one
+          - p*rKappa()
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
@@ -908,10 +951,22 @@ label nonLinGeomUpdatedLagSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
+            // Compute the positive face-interpolated reciprocal of the approximate
+            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            {
+                fvVectorMatrix approxMomJ
+                (
+                    fvm::laplacian(impKf_, DD, "laplacian(DDD,DD)")
+                  - rho()*fvm::d2dt2(DD)
+                );
+                approxMomJ.relax();
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+            }
+
             fvScalarMatrix approxPressureJ
             (
-              - fvm::Sp(1.0/mechanical().bulkModulus(), p)
-              + one*pressureStabilisation().scalarJacobian(p, &impKf_)
+              - fvm::Sp(rKappa(), p)
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation

@@ -235,6 +235,23 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         enforceTractionBoundaries(force, D(), nCurrent, magSfCurrent);
 
         // Momentum equation total displacement total Lagrangian form
+#ifndef OPENFOAM_COM
+        // Assemble the RHS in stages.
+        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
+        tmpRef(tRhsEqn) += fvc::div(force);
+        tmpRef(tRhsEqn) += rho()*g();
+
+        fvVectorMatrix DEqn
+        (
+            rho()*fvm::d2dt2(D())
+         == tRhsEqn
+        );
+#else
         fvVectorMatrix DEqn
         (
             rho()*fvm::d2dt2(D())
@@ -243,6 +260,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
           + fvc::div(force)
           + rho()*g()
         );
+#endif
 
         // Add damping
         if (dampingCoeff().value() > SMALL)
@@ -544,6 +562,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     ),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
+    rKappaPtr_(),
     dpdtPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
@@ -693,6 +712,29 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 }
 
 
+void nonLinGeomTotalLagTotalDispSolid::makeRKappa() const
+{
+    if (rKappaPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+}
+
+
+const volScalarField& nonLinGeomTotalLagTotalDispSolid::rKappa() const
+{
+    if (rKappaPtr_.empty())
+    {
+        makeRKappa();
+    }
+
+    return rKappaPtr_();
+}
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
@@ -833,11 +875,24 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
         );
 
+        // Compute the positive face-interpolated reciprocal of the approximate
+        // momentum equation diagonal. This is the solid analogue of rAUf in
+        // pressure-velocity coupling and has units of [Pa].
+        {
+            fvVectorMatrix approxMomJ
+            (
+                fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+              - rho()*fvm::d2dt2(D)
+            );
+            approxMomJ.relax();
+            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+        }
+
         // Calculate pressure equation residual
         scalarField pressureResidual
         (
-          - p*(1.0/mechanical().bulkModulus())
-          + pressureStabilisation().cellScalar(&impKf_, true)*one
+          - p*rKappa()
+          + pressureStabilisation().cellScalar(&rAUf(), true)*one
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
@@ -956,19 +1011,29 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
+            // Compute the positive face-interpolated reciprocal of the approximate
+            // momentum equation diagonal (solid analogue of rAUf), [Pa]
             {
-                fvScalarMatrix approxPressureJ
+                fvVectorMatrix approxMomJ
                 (
-                  - fvm::Sp(1.0/mechanical().bulkModulus(), p)
-                  + one*pressureStabilisation().scalarJacobian(p, &impKf_)
+                    fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                  - rho()*fvm::d2dt2(D)
                 );
-
-                // Insert the pressure equation
-                foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
-                (
-                    approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
-                );
+                approxMomJ.relax();
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
             }
+
+            fvScalarMatrix approxPressureJ
+            (
+              - fvm::Sp(rKappa(), p)
+              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
+            );
+
+            // Insert the pressure equation
+            foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+            (
+                approxPressureJ, jac, blockSize_ - 1, blockSize_ - 1, 1
+            );
 
             // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
             foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
