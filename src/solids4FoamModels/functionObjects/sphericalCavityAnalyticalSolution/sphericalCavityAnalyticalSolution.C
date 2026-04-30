@@ -23,6 +23,7 @@ License
 #include "pointFields.H"
 #include "sphericalCavityStressDisplacement.H"
 #include "OSspecific.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -136,13 +137,8 @@ bool Foam::sphericalCavityAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
-                vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
-#else
-                symmTensorField& sP = analyticalStress.boundaryField()[patchI];
-                vectorField& aDP = analyticalD.boundaryField()[patchI];
-#endif
+                symmTensorField& sP = boundaryFieldRef(analyticalStress)[patchI];
+                vectorField& aDP = boundaryFieldRef(analyticalD)[patchI];
                 const vectorField& CP = C.boundaryField()[patchI];
 
                 forAll(sP, faceI)

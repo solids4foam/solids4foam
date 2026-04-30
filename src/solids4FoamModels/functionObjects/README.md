@@ -749,6 +749,55 @@ equal to $$3-4\nu$$.
 
 ---
 
+## `solidPressureMinMax`
+
+- **Function object purpose**
+  Reports the minimum and maximum values of the solid hydrostatic pressure:
+
+  $$
+  p = -\frac{1}{3}\text{tr}(\boldsymbol{\sigma}).
+  $$
+
+  where $$\boldsymbol{\sigma}$$ is the Cauchy stress tensor field `sigma`.
+
+- **Example of usage**
+
+  ```c++
+  functions
+  {
+      pressureMinMax
+      {
+          type    solidPressureMinMax;
+      }
+  }
+  ```
+
+- **Arguments**
+
+  - None.
+
+- **Optional arguments**
+
+  - None.
+
+- **Outputs**
+
+  - Output file: `postProcessing/0/solidPressureMinMax.dat` ;
+
+  - Output file format:
+
+      ```c++
+      # Time  p_min  p_max  trSigma_min  trSigma_max
+      1 150 500 -1500 -450
+      2 160 510 -1530 -480
+      ...
+      ```
+
+- **Tutorial case in which it is used:**
+  None
+
+---
+
 ## `solidPointDisplacement`
 
 - **Function object purpose**

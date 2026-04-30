@@ -23,6 +23,7 @@ License
 #include "pointFields.H"
 #include "coordinateSystem.H"
 #include "symmTensor.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -100,11 +101,7 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
     {
         if (mesh.boundary()[patchI].type() != "empty")
         {
-#ifdef OPENFOAM_NOT_EXTEND
-            symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
-#else
-            symmTensorField& sP = analyticalStress.boundaryField()[patchI];
-#endif
+            symmTensorField& sP = boundaryFieldRef(analyticalStress)[patchI];
             forAll(sP, faceI)
             {
                 sP[faceI] = contactPatchTestStress();
@@ -148,11 +145,7 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                scalarField& sP = relError.boundaryFieldRef()[patchI];
-#else
-                scalarField& sP = relError.boundaryField()[patchI];
-#endif
+                scalarField& sP = boundaryFieldRef(relError)[patchI];
                 forAll(sP, faceI)
                 {
                     sP[faceI] =
