@@ -752,13 +752,16 @@ equal to $$3-4\nu$$.
 ## `solidPressureMinMax`
 
 - **Function object purpose**
-  Reports the minimum and maximum values of the solid hydrostatic pressure:
+  Reports the minimum and maximum values of the solid hydrostatic pressure
+  from the Cauchy stress tensor field `sigma`:
 
   $$
   p = -\frac{1}{3}\text{tr}(\boldsymbol{\sigma}).
   $$
 
-  where $$\boldsymbol{\sigma}$$ is the Cauchy stress tensor field `sigma`.
+  where $$\boldsymbol{\sigma}$$ is the Cauchy stress tensor field. The function
+  object looks for the solid mesh named `solid`; if that mesh is not found, it
+  uses `region0`.
 
 - **Example of usage**
 
@@ -783,6 +786,8 @@ equal to $$3-4\nu$$.
 - **Outputs**
 
   - Output file: `postProcessing/0/solidPressureMinMax.dat` ;
+
+  - In parallel runs, the output file is written once by the master process;
 
   - Output file format:
 
