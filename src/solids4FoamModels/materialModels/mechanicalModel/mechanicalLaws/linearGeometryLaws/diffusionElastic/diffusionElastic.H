@@ -21,7 +21,7 @@ Class
 Description
     Linear elasticity where the stress is given as:
 
-        sigma = K*I*tr(gradD) + mu*dev(symm(gradD))
+        sigma = d*(mu*dev(symm(gradD)) K*I*tr(gradD))
 
     and mu and K are user-defined scalar stiffness parameters and d is a
     diffusivity field specified by the "diffusivity" user setting, e.g. inverse
