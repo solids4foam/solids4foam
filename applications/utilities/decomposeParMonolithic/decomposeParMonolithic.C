@@ -20,9 +20,11 @@ Application
 
 Description
     Decomposes multiple volume regions as one coupled graph for monolithic
-    FSI solvers.  By default it also runs the standard decomposePar utility
+    FSI cases. By default it also runs the standard decomposePar utility
     internally (via method manual) so that a single command produces the
-    full processor directory tree for every region.
+    full processor directory tree for every region. The generated
+    per-region decomposition can be used by other multi-region solvers that
+    support processor ranks with zero cells in some regions.
 
     This avoids the inefficiency of independent per-region decomposition
     when one region is much smaller than the other. With a coupled
@@ -104,6 +106,22 @@ static label regionIndex(const wordList& names, const word& name)
 }
 
 
+static bool appendIfAbsent(labelList& labels, const label value)
+{
+    forAll(labels, i)
+    {
+        if (labels[i] == value)
+        {
+            return false;
+        }
+    }
+
+    labels.append(value);
+
+    return true;
+}
+
+
 // Build face-centre matching between two conformal patches.
 // Returns list of (ownerCellA, ownerCellB) pairs.
 List<labelPair> matchConformalInterface
@@ -169,8 +187,9 @@ List<labelPair> matchConformalInterface
 
     List<labelPair> pairs(cfA.size());
 
-    // For each face in patchA, find the matching face in patchB
-    // by nearest face centre. For conformal meshes this should be exact.
+    // For each face in patchA, find the matching face in patchB by nearest
+    // face centre. For conformal meshes this should be exact. This is an
+    // O(n^2) search and can be revisited if it becomes a bottleneck.
     labelList usedB(cfB.size(), -1);
 
     forAll(cfA, faceI)
@@ -448,7 +467,10 @@ int main(int argc, char *argv[])
         const label offsetA = regionOffset[riA];
         const label offsetB = regionOffset[riB];
 
-        // Add bidirectional edges
+        label nDuplicateEdges = 0;
+
+        // Add bidirectional edges. Multiple matching boundary faces may
+        // connect the same cell pair, so collapse duplicates in the graph.
         forAll(pairs, pi)
         {
             const label globalA = pairs[pi].first() + offsetA;
@@ -456,11 +478,20 @@ int main(int argc, char *argv[])
 
             // Add B to A's neighbours
             labelList& nbrsA = globalCellCells[globalA];
-            nbrsA.append(globalB);
+            if (!appendIfAbsent(nbrsA, globalB))
+            {
+                nDuplicateEdges++;
+            }
 
             // Add A to B's neighbours
             labelList& nbrsB = globalCellCells[globalB];
-            nbrsB.append(globalA);
+            appendIfAbsent(nbrsB, globalA);
+        }
+
+        if (nDuplicateEdges > 0)
+        {
+            Info<< "  Collapsed " << nDuplicateEdges
+                << " duplicate interface graph edges" << endl;
         }
     }
 

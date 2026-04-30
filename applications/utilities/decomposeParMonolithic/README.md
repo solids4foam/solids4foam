@@ -14,6 +14,11 @@ the other. Instead of forcing every rank to own both fluid and solid cells, the
 combined decomposition can assign some ranks only fluid cells, some only solid
 cells, and some both.
 
+The name reflects this target monolithic FSI workflow, but the utility is not
+tied to a specific solver class. The generated per-region decomposition can be
+used by other multi-region solvers if they support processor ranks with zero
+cells in some regions.
+
 ## Current workflow
 
 The utility:
@@ -89,11 +94,14 @@ The current implementation is intentionally narrow:
 
 - it expects conformal interface patches
 - it requires the paired patches to have the same number of faces
-- it matches the two patches by nearest face centre
+- it matches the two patches by nearest face centre using an O(n^2) search
 - it does not read or interpret a separate mapping mode from the dictionary
 
 In practice, this utility is best suited to direct-map style interfaces such as
 the conformal `flag`/`interface` pair in `foilInWind`.
+
+If multiple interface face pairs connect the same two owner cells, the duplicate
+cell-cell graph edges are collapsed before decomposition.
 
 ## Command-line options
 
