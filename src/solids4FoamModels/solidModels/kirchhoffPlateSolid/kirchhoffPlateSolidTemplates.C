@@ -21,6 +21,7 @@ License
 
 #include "kirchhoffPlateSolid.H"
 #include "GeometricFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -39,11 +40,7 @@ mapAreaFieldToSingleLayerVolumeField
     const label areaPatchID = areaPatch().index();
     const label pMeshNFaces = pMesh.nFaces();
     const Field<Type> afI = af.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
-    FieldField<fvPatchField, Type>& bf = vf.boundaryFieldRef();
-#else
-    FieldField<fvPatchField, Type>& bf = vf.boundaryField();
-#endif
+    FieldField<fvPatchField, Type>& bf = boundaryFieldRef(vf);
 
     // Check that bf area patch is not of type empty
     if (bf[areaPatchID].type() == "empty")
@@ -86,13 +83,8 @@ mapAreaFieldToSingleLayerVolumeField
 
     {
         const unallocLabelList& faceCells = areaShadowPatch().faceCells();
-#ifdef OPENFOAM_NOT_EXTEND
         Field<Type>& patchField =
-            vf.boundaryFieldRef()[areaShadowPatch().index()];
-#else
-        Field<Type>& patchField =
-            vf.boundaryField()[areaShadowPatch().index()];
-#endif
+            boundaryFieldRef(vf)[areaShadowPatch().index()];
 
         forAll(faceCells, faceI)
         {

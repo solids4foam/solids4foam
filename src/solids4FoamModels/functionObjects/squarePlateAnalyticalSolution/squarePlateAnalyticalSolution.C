@@ -24,6 +24,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "squarePlateStressDisplacement.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -134,11 +135,7 @@ bool Foam::squarePlateAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAM_NOT_EXTEND
-                scalarField& aDP = analyticalD.boundaryFieldRef()[patchI];
-#else
-                scalarField& aDP = analyticalD.boundaryField()[patchI];
-#endif
+                scalarField& aDP = boundaryFieldRef(analyticalD)[patchI];
                 const vectorField& CP = C.boundaryField()[patchI];
 
                 forAll(aDP, faceI)
