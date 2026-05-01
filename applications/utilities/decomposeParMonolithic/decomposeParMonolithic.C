@@ -20,9 +20,11 @@ Application
 
 Description
     Decomposes multiple volume regions as one coupled graph for monolithic
-    FSI solvers.  By default it also runs the standard decomposePar utility
+    FSI cases. By default it also runs the standard decomposePar utility
     internally (via method manual) so that a single command produces the
-    full processor directory tree for every region.
+    full processor directory tree for every region. The generated
+    per-region decomposition can be used by other multi-region solvers that
+    support processor ranks with zero cells in some regions.
 
     This avoids the inefficiency of independent per-region decomposition
     when one region is much smaller than the other. With a coupled
@@ -56,7 +58,6 @@ Usage
 \*---------------------------------------------------------------------------*/
 
 #include "argList.H"
-#include "Time.H"
 #include "fvMesh.H"
 #include "IOdictionary.H"
 #include "labelIOList.H"
@@ -69,6 +70,57 @@ Usage
 using namespace Foam;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+static bool optionFound(const argList& args, const word& opt)
+{
+#ifdef OPENFOAM_COM
+    return args.found(opt);
+#else
+    return args.optionFound(opt);
+#endif
+}
+
+
+static bool optionReadIfPresent
+(
+    const argList& args,
+    const word& opt,
+    fileName& value
+)
+{
+#ifdef OPENFOAM_COM
+    return args.readIfPresent(opt, value);
+#else
+    return args.optionReadIfPresent(opt, value);
+#endif
+}
+
+
+static label regionIndex(const wordList& names, const word& name)
+{
+#ifdef OPENFOAM_COM
+    return names.find(name);
+#else
+    return findIndex(names, name);
+#endif
+}
+
+
+static bool appendIfAbsent(labelList& labels, const label value)
+{
+    forAll(labels, i)
+    {
+        if (labels[i] == value)
+        {
+            return false;
+        }
+    }
+
+    labels.append(value);
+
+    return true;
+}
+
 
 // Build face-centre matching between two conformal patches.
 // Returns list of (ownerCellA, ownerCellB) pairs.
@@ -135,8 +187,9 @@ List<labelPair> matchConformalInterface
 
     List<labelPair> pairs(cfA.size());
 
-    // For each face in patchA, find the matching face in patchB
-    // by nearest face centre. For conformal meshes this should be exact.
+    // For each face in patchA, find the matching face in patchB by nearest
+    // face centre. For conformal meshes this should be exact. This is an
+    // O(n^2) search and can be revisited if it becomes a bottleneck.
     labelList usedB(cfB.size(), -1);
 
     forAll(cfA, faceI)
@@ -230,11 +283,11 @@ int main(int argc, char *argv[])
     #include "setRootCase.H"
     #include "createTime.H"
 
-    const bool writeCellDist = args.found("cellDist");
-    const bool decomposeOnly = args.found("decompose-only");
-    const bool forceOverwrite = args.found("force");
-    const bool copyZero = args.found("copy-zero");
-    const bool noFields = args.found("no-fields");
+    const bool writeCellDist = optionFound(args, "cellDist");
+    const bool decomposeOnly = optionFound(args, "decompose-only");
+    const bool forceOverwrite = optionFound(args, "force");
+    const bool copyZero = optionFound(args, "copy-zero");
+    const bool noFields = optionFound(args, "no-fields");
 
     // -----------------------------------------------------------------------
     // Read dictionary
@@ -243,38 +296,44 @@ int main(int argc, char *argv[])
     fileName decompDictFile;
     if
     (
-        args.readIfPresent("decomposeParDict", decompDictFile)
+        optionReadIfPresent(args, "decomposeParDict", decompDictFile)
      && !decompDictFile.empty() && !decompDictFile.isAbsolute()
     )
     {
-        decompDictFile = runTime.globalPath()/decompDictFile;
+        decompDictFile = runTime.path()/decompDictFile;
     }
 
     // Find the dictionary
     IOdictionary decompDict
     (
-        IOobject::selectIO
+        decompDictFile.empty()
+      ? IOobject
         (
-            IOobject
-            (
-                "decomposeParDict",
-                runTime.system(),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                IOobject::NO_REGISTER
-            ),
-            decompDictFile
+            "decomposeParDict",
+            runTime.system(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
+      : IOobject
+        (
+            decompDictFile,
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
         )
     );
 
-    const label nDomains = decompDict.get<label>("numberOfSubdomains");
+    const label nDomains =
+        readLabel(decompDict.lookup("numberOfSubdomains"));
 
     Info<< "Number of subdomains: " << nDomains << nl << endl;
 
     // Read monolithicCoeffs
     const dictionary& monoDict = decompDict.subDict("monolithicCoeffs");
-    const wordList regionNames(monoDict.get<wordList>("regions"));
+    const wordList regionNames(monoDict.lookup("regions"));
 
     if (regionNames.size() < 2)
     {
@@ -370,14 +429,14 @@ int main(int argc, char *argv[])
     {
         const dictionary& ifDict = interfaceDicts[ii];
 
-        const word regionAName = ifDict.get<word>("regionA");
-        const word patchAName = ifDict.get<word>("patchA");
-        const word regionBName = ifDict.get<word>("regionB");
-        const word patchBName = ifDict.get<word>("patchB");
+        const word regionAName(ifDict.lookup("regionA"));
+        const word patchAName(ifDict.lookup("patchA"));
+        const word regionBName(ifDict.lookup("regionB"));
+        const word patchBName(ifDict.lookup("patchB"));
 
         // Find region indices
-        const label riA = regionNames.find(regionAName);
-        const label riB = regionNames.find(regionBName);
+        const label riA = regionIndex(regionNames, regionAName);
+        const label riB = regionIndex(regionNames, regionBName);
 
         if (riA < 0)
         {
@@ -408,7 +467,10 @@ int main(int argc, char *argv[])
         const label offsetA = regionOffset[riA];
         const label offsetB = regionOffset[riB];
 
-        // Add bidirectional edges
+        label nDuplicateEdges = 0;
+
+        // Add bidirectional edges. Multiple matching boundary faces may
+        // connect the same cell pair, so collapse duplicates in the graph.
         forAll(pairs, pi)
         {
             const label globalA = pairs[pi].first() + offsetA;
@@ -416,11 +478,20 @@ int main(int argc, char *argv[])
 
             // Add B to A's neighbours
             labelList& nbrsA = globalCellCells[globalA];
-            nbrsA.append(globalB);
+            if (!appendIfAbsent(nbrsA, globalB))
+            {
+                nDuplicateEdges++;
+            }
 
             // Add A to B's neighbours
             labelList& nbrsB = globalCellCells[globalB];
-            nbrsB.append(globalA);
+            appendIfAbsent(nbrsB, globalA);
+        }
+
+        if (nDuplicateEdges > 0)
+        {
+            Info<< "  Collapsed " << nDuplicateEdges
+                << " duplicate interface graph edges" << endl;
         }
     }
 
@@ -493,7 +564,7 @@ int main(int argc, char *argv[])
                 mesh,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE,
-                IOobject::NO_REGISTER
+                false
             ),
             regionCellToProc
         );
@@ -501,7 +572,7 @@ int main(int argc, char *argv[])
         cellDecomposition.write();
 
         Info<< "  Region " << regionNames[ri] << ": wrote "
-            << cellDecomposition.objectRelPath() << endl;
+            << cellDecomposition.objectPath() << endl;
 
         // Optional: write as volScalarField
         if (writeCellDist)
@@ -515,7 +586,7 @@ int main(int argc, char *argv[])
                     mesh,
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE,
-                    IOobject::NO_REGISTER
+                    false
                 ),
                 mesh,
                 dimensionedScalar("cellDist", dimless, 0)
@@ -529,7 +600,7 @@ int main(int argc, char *argv[])
             cellDist.write();
 
             Info<< "  Region " << regionNames[ri] << ": wrote "
-                << cellDist.objectRelPath() << endl;
+                << cellDist.objectPath() << endl;
         }
     }
 

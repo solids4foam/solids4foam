@@ -17,4 +17,23 @@ EXE_LIBS = \
     -ldecompose \
     -lscotchDecomp \
     -L$(FOAM_LIBBIN)/dummy \
-    -lmetisDecomp -lkahipDecomp
+    -lmetisDecomp
+
+ifneq (,$(findstring -DOPENFOAM_COM, $(VERSION_SPECIFIC_INC)))
+    EXE_LIBS += -lkahipDecomp
+endif
+
+ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+    EXE_INC = \
+        $(VERSION_SPECIFIC_INC) \
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude \
+        -I$(LIB_SRC)/decompositionMethods/decompositionMethods/lnInclude \
+        -I$(LIB_SRC)/decompositionMethods/decomposeReconstruct/lnInclude
+
+    EXE_LIBS = \
+        -lfiniteVolume \
+        -lmeshTools \
+        -ldecompositionMethods \
+        -ldecomposeReconstruct
+endif
