@@ -799,8 +799,7 @@ foamPetscSnesHelper::foamPetscSnesHelper
     ),
     neiProcGlobalIDs_(),
     neiProcVolumes_(),
-    snesHasRun_(false),
-    snesOptionsApplied_(false)
+    snesHasRun_(false)
 {
     if (initialise)
     {
@@ -839,7 +838,6 @@ void foamPetscSnesHelper::resetSnes()
     x_.reset();
     A_.reset();
     snesUserPtr_.clear();
-    snesOptionsApplied_ = false;
 
     if (initialiseSnes() != 0)
     {
@@ -892,7 +890,6 @@ void foamPetscSnesHelper::resetSnesSolverState()
         AssertPETSc(KSPSetReusePreconditioner(ksp, PETSC_FALSE));
     }
 
-    snesOptionsApplied_ = false;
     forceSnesSolverStateRebuild_ = true;
     diverged_ = false;
 }
@@ -2226,11 +2223,7 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
     // Load the correct options database
     AssertPETSc(PetscOptionsPush(options_));
 
-    if (!snesOptionsApplied_)
-    {
-        AssertPETSc(SNESSetFromOptions(snes_.s));
-        snesOptionsApplied_ = true;
-    }
+    AssertPETSc(SNESSetFromOptions(snes_.s));
 
     // Allow derived classes to adjust PC, KSP, etc.
     this->customiseSolver();

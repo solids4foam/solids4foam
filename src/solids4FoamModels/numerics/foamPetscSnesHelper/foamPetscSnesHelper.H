@@ -190,10 +190,6 @@ private:
         //- A flag indicating if the solve function has been called
         bool snesHasRun_;
 
-        //- A flag indicating if SNESSetFromOptions has been applied
-        bool snesOptionsApplied_;
-
-
     // Private Member Functions
 
         //- Make the neighbour processor patch fields for the given mesh
