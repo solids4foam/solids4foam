@@ -20,6 +20,7 @@ License
 #include "solidSubMeshes.H"
 #include "processorFvsPatchField.H"
 #include "processorPointPatchFields.H"
+#include "compatibilityFunctions.H"
 #ifdef FOAMEXTEND
     #include "componentMixedPointPatchFields.H"
 #endif
@@ -61,13 +62,8 @@ void Foam::solidSubMeshes::mapSubMeshVolFields
 
             if (patchMap[patchI] != -1)
             {
-#ifdef OPENFOAM_NOT_EXTEND
                 fvPatchField<Type>& baseMeshFieldP =
-                    baseMeshField.boundaryFieldRef()[patchMap[patchI]];
-#else
-                fvPatchField<Type>& baseMeshFieldP =
-                    baseMeshField.boundaryField()[patchMap[patchI]];
-#endif
+                    boundaryFieldRef(baseMeshField)[patchMap[patchI]];
 
                 if (!baseMeshFieldP.coupled())
                 {
@@ -134,13 +130,8 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             if (patchMap[patchI] != -1)
             {
-#ifdef OPENFOAM_NOT_EXTEND
                 fvsPatchField<Type>& baseMeshFieldP =
-                    baseMeshField.boundaryFieldRef()[patchMap[patchI]];
-#else
-                fvsPatchField<Type>& baseMeshFieldP =
-                    baseMeshField.boundaryField()[patchMap[patchI]];
-#endif
+                    boundaryFieldRef(baseMeshField)[patchMap[patchI]];
 
                 // Note: unlike volFields, we do map on the coupled patches for
                 // surface fields
@@ -180,15 +171,10 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
                             globalGlobalMeshFace
                             - baseMesh().boundaryMesh()[curPatch].start();
 
-#ifdef OPENFOAM_NOT_EXTEND
-                        baseMeshField.boundaryFieldRef()
+                        boundaryFieldRef(baseMeshField)
                         [
                             curPatch
                         ][curPatchFace] = subMeshFieldP[faceI];
-#else
-                        baseMeshField.boundaryField()[curPatch][curPatchFace] =
-                            subMeshFieldP[faceI];
-#endif
                     }
                 }
             }
@@ -229,13 +215,8 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
     forAll(baseMeshField.boundaryField(), patchI)
     {
-#ifdef OPENFOAM_NOT_EXTEND
         fvsPatchField<Type>& baseMeshFieldP =
-            baseMeshField.boundaryFieldRef()[patchI];
-#else
-        fvsPatchField<Type>& baseMeshFieldP =
-            baseMeshField.boundaryField()[patchI];
-#endif
+            boundaryFieldRef(baseMeshField)[patchI];
 
         if (baseMeshFieldP.type() == processorFvsPatchField<Type>::typeName)
         {

@@ -47,6 +47,9 @@ void Foam::diffusionElastic::updateD() const
     df_ = min(maxFactor_*avDf, max(minFactor_*avDf, df_));
     df_ /= avDf;
     d_ = fvc::average(df_);
+
+    // Enforce zero gradient boundaries
+    d_.correctBoundaryConditions();
 }
 
 
@@ -64,11 +67,23 @@ Foam::diffusionElastic::diffusionElastic
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     mu_(dict.lookup("mu")),
     kappa_(dict.lookup("kappa")),
-    maxFactor_(dict.lookupOrDefault<scalar>("maxFactor", 10)),
+    maxFactor_(dict.lookupOrDefault<scalar>("maxFactor", 100)),
     minFactor_(dict.lookupOrDefault<scalar>("minFactor", 0.1)),
     motionDiffPtr_(motionDiffusivity::New(mesh, dict.lookup("diffusivity"))),
     df_("distf", motionDiffPtr_()()),
-    d_("dist", fvc::average(df_))
+    d_
+    (
+        IOobject
+        (
+            "stiffnessScaleFactor",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        fvc::average(df_),
+        "zeroGradient"
+    )
 {
     // Store old times
     epsilon().storeOldTime();
@@ -81,6 +96,11 @@ Foam::diffusionElastic::diffusionElastic
     }
 
     updateD();
+
+    if (Switch(dict.lookup("writeStiffScaleFactor")))
+    {
+        d_.writeOpt() = IOobject::AUTO_WRITE;
+    }
 }
 
 

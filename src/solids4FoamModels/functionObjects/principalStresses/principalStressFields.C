@@ -18,6 +18,7 @@ License
 \*----------------------------------------------------------------------------*/
 
 #include "principalStressFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * Functions * * * * * * * * * * * * * * //
 
@@ -240,23 +241,13 @@ void Foam::writePrincipalStressFields
 
     // References to internalFields for efficiency
     const symmTensorField& sigmaI = sigma.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
-    scalarField& sigmaMaxI = sigmaMax.primitiveFieldRef();
-    scalarField& sigmaMidI = sigmaMid.primitiveFieldRef();
-    scalarField& sigmaMinI = sigmaMin.primitiveFieldRef();
-    vectorField& sigmaMaxDirI = sigmaMaxDir.primitiveFieldRef();
-    vectorField& sigmaMidDirI = sigmaMidDir.primitiveFieldRef();
-    vectorField& sigmaMinDirI = sigmaMinDir.primitiveFieldRef();
-    scalarField& sigmaDiffI = sigmaDiff.primitiveFieldRef();
-#else
-    scalarField& sigmaMaxI = sigmaMax.internalField();
-    scalarField& sigmaMidI = sigmaMid.internalField();
-    scalarField& sigmaMinI = sigmaMin.internalField();
-    vectorField& sigmaMaxDirI = sigmaMaxDir.internalField();
-    vectorField& sigmaMidDirI = sigmaMidDir.internalField();
-    vectorField& sigmaMinDirI = sigmaMinDir.internalField();
-    scalarField& sigmaDiffI = sigmaDiff.internalField();
-#endif
+    scalarField& sigmaMaxI = primitiveFieldRef(sigmaMax);
+    scalarField& sigmaMidI = primitiveFieldRef(sigmaMid);
+    scalarField& sigmaMinI = primitiveFieldRef(sigmaMin);
+    vectorField& sigmaMaxDirI = primitiveFieldRef(sigmaMaxDir);
+    vectorField& sigmaMidDirI = primitiveFieldRef(sigmaMidDir);
+    vectorField& sigmaMinDirI = primitiveFieldRef(sigmaMinDir);
+    scalarField& sigmaDiffI = primitiveFieldRef(sigmaDiff);
 
     forAll (sigmaI, cellI)
     {
@@ -284,23 +275,13 @@ void Foam::writePrincipalStressFields
         )
         {
             const symmTensorField& pSigma = sigma.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
-            scalarField& pSigmaMax = sigmaMax.boundaryFieldRef()[patchI];
-            scalarField& pSigmaMid = sigmaMid.boundaryFieldRef()[patchI];
-            scalarField& pSigmaMin = sigmaMin.boundaryFieldRef()[patchI];
-            vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryFieldRef()[patchI];
-            vectorField& pSigmaMidDir = sigmaMidDir.boundaryFieldRef()[patchI];
-            vectorField& pSigmaMinDir = sigmaMinDir.boundaryFieldRef()[patchI];
-            scalarField& pSigmaDiff = sigmaDiff.boundaryFieldRef()[patchI];
-#else
-            scalarField& pSigmaMax = sigmaMax.boundaryField()[patchI];
-            scalarField& pSigmaMid = sigmaMid.boundaryField()[patchI];
-            scalarField& pSigmaMin = sigmaMin.boundaryField()[patchI];
-            vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryField()[patchI];
-            vectorField& pSigmaMidDir = sigmaMidDir.boundaryField()[patchI];
-            vectorField& pSigmaMinDir = sigmaMinDir.boundaryField()[patchI];
-            scalarField& pSigmaDiff = sigmaDiff.boundaryField()[patchI];
-#endif
+            scalarField& pSigmaMax = boundaryFieldRef(sigmaMax)[patchI];
+            scalarField& pSigmaMid = boundaryFieldRef(sigmaMid)[patchI];
+            scalarField& pSigmaMin = boundaryFieldRef(sigmaMin)[patchI];
+            vectorField& pSigmaMaxDir = boundaryFieldRef(sigmaMaxDir)[patchI];
+            vectorField& pSigmaMidDir = boundaryFieldRef(sigmaMidDir)[patchI];
+            vectorField& pSigmaMinDir = boundaryFieldRef(sigmaMinDir)[patchI];
+            scalarField& pSigmaDiff = boundaryFieldRef(sigmaDiff)[patchI];
 
             forAll(pSigmaMax, faceI)
             {

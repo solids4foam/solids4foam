@@ -27,6 +27,7 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,6 +68,11 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
     const vectorField& faceDisp
 )
 {
+    if (!enforcePointPatchField_)
+    {
+        return;
+    }
+
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
     if
@@ -102,14 +108,10 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
             fixedValuePointPatchVectorField& patchPointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-                    const_cast<pointVectorField&>
+                    boundaryFieldRef
                     (
-                        pointD
-#ifdef OPENFOAM_NOT_EXTEND
-                    ).boundaryFieldRef()[patch().index()]
-#else
-                    ).boundaryField()[patch().index()]
-#endif
+                        const_cast<pointVectorField&>(pointD)
+                    )[patch().index()]
                 );
 
             // Interpolate face values to the points
@@ -131,6 +133,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     nonOrthogonalCorrections_(true),
     totalDisp_(p.size(), vector::zero),
     dispSeries_(),
+    enforcePointPatchField_(true),
     interpPtr_()
 {}
 
@@ -151,6 +154,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     totalDisp_(pvf.totalDisp_, mapper),
 #endif
     dispSeries_(pvf.dispSeries_),
+    enforcePointPatchField_(true),
     interpPtr_()
 {}
 
@@ -169,6 +173,10 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     ),
     totalDisp_(*this),
     dispSeries_(),
+    enforcePointPatchField_
+    (
+        dict.lookupOrDefault<Switch>("enforcePointPatchField", true)
+    ),
     interpPtr_()
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
@@ -197,6 +205,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
     totalDisp_(pvf.totalDisp_),
     dispSeries_(pvf.dispSeries_),
+    enforcePointPatchField_(pvf.enforcePointPatchField_),
     interpPtr_()
 {}
 #endif
@@ -211,6 +220,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
     totalDisp_(pvf.totalDisp_),
     dispSeries_(pvf.dispSeries_),
+    enforcePointPatchField_(pvf.enforcePointPatchField_),
     interpPtr_()
 {}
 

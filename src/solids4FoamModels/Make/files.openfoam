@@ -55,6 +55,7 @@ $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 
 linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
+$(linGeomLaws)/diffusionElastic/diffusionElastic.C
 $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
@@ -188,6 +189,7 @@ functionObjects/solidPointDisplacementAlongLine/solidPointDisplacementAlongLine.
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
+functionObjects/solidPressureMinMax/solidPressureMinMax.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
