@@ -1842,6 +1842,15 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         updateCoupled();
     }
 
+    if (!coupled())
+    {
+        motionSolid().D().correctBoundaryConditions();
+        motionSolid().pointD().correctBoundaryConditions();
+        motionSolid().U().correctBoundaryConditions();
+
+        return fluid().evolve();
+    }
+
     // Preliminaries
     Time& time = physicsModel::runTime();
     volVectorField& UFluid = fluid().U();
