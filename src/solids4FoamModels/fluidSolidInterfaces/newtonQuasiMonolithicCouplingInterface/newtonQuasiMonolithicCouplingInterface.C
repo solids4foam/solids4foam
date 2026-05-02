@@ -2176,14 +2176,18 @@ label newtonQuasiMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     //  - Ass: solid equations (momentum)
 
     // Aff
-    foamPetscSnesHelper::initialiseJacobian
+    // Use the region helper: globalCells() and processor-neighbour caches are
+    // mesh-specific.
+    refCast<foamPetscSnesHelper>(fluid()).initialiseJacobian
     (
         subMats[0][0], fluid().mesh(), fluidBlockSize, false
     );
     PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
 
     // Ass
-    foamPetscSnesHelper::initialiseJacobian
+    // Use the region helper: globalCells() and processor-neighbour caches are
+    // mesh-specific.
+    refCast<foamPetscSnesHelper>(solid()).initialiseJacobian
     (
         subMats[1][1], solid().mesh(), solidBlockSize, false
     );
