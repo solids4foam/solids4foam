@@ -310,9 +310,15 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
         // Update p field, which we use
     }
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), gradD(), pointD());
+    // Update future-time displacement from the converged velocity
+    DFutureTime_ =
+        D() + 0.5*runTime().deltaT()*(3*U() - U().oldTime());
+    mechanical().grad(DFutureTime_, gradD());
+
+    // Interpolate future-time cell displacements to vertices for FSI coupling
+    mechanical().interpolate(DFutureTime_, gradD(), pointD());
     pointD().correctBoundaryConditions();
+    pointDD() = pointD() - pointD().oldTime();
 
     // Acceleration
     A_ = fvc::ddt(U());
@@ -647,13 +653,21 @@ bool nonLinGeomTotalLagVelocitySolid::evolve()
     }
     else
     {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
-            << "Unrecognised solution algorithm. Available options are "
+        FatalErrorIn("bool nonLinGeomTotalLagVelocitySolid::evolve()")
+            << "The " << type() << " solid model only supports the "
             << solidModel::solutionAlgorithmNames_
                [
                    solidModel::solutionAlgorithm::PETSC_SNES
                ]
-            << endl;
+            << " solution algorithm; the selected algorithm is "
+            << solidModel::solutionAlgorithmNames_[solutionAlg()] << nl
+            << "Add 'solutionAlgorithm "
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::PETSC_SNES
+               ]
+            << ";' to the " << type() << "Coeffs dictionary."
+            << abort(FatalError);
     }
 
     // Keep compiler happy
