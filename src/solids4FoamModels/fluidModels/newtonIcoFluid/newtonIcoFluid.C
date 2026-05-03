@@ -650,12 +650,19 @@ bool newtonIcoFluid::evolve()
             );
         }
 
-        // Update the mesh
+        // Update the mesh, unless the FSI interface already moved it.
+        if (fluidModel::fsiMeshUpdate())
+        {
+            fluidModel::fsiMeshUpdateChanged();
+        }
+        else
+        {
 #ifdef OPENFOAM_COM
-        mesh.controlledUpdate();
+            mesh.controlledUpdate();
 #else
-        mesh.update();
+            mesh.update();
 #endif
+        }
 
         const bool meshMoved = mesh.changing();
 
