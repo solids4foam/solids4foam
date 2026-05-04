@@ -47,7 +47,7 @@ Description
     - the origin is at the centre of plate
 
 Author
-    Ivan Batistic & Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic & Philip Cardiff, UCD.
 
 SourceFiles
     squarePlateStressDisplacement.C

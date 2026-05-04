@@ -38,7 +38,7 @@ Description
     It is assumed that the inner and outer beam surfaces are traction-free.
 
 Author
-    Ivan Batistic & Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic & Philip Cardiff, UCD.
 
 SourceFiles
     curvedCantileverAnalyticalSolution.C

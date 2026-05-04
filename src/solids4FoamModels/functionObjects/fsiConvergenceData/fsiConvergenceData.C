@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved
+    Zeljko Tukovic, FSB Zagreb.
 
 \*----------------------------------------------------------------------------*/
 

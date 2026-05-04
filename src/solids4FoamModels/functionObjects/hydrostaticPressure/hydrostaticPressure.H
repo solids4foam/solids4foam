@@ -44,7 +44,7 @@ Description
     @endverbatim
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     hydrostaticPressure.C

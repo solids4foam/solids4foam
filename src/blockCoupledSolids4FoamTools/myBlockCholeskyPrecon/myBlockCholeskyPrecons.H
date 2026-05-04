@@ -22,7 +22,7 @@ Description
     Typedefs for Incomplete Cholesky preconditioning with no fill-in.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 SourceFiles
     myBlockCholeskyPrecons.C

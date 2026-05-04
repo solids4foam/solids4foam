@@ -23,7 +23,7 @@ Description
     interpolation functions.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     amiZoneInterpolation.C

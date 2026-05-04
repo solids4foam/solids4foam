@@ -31,7 +31,7 @@ Description
         - nu : Poisson's ratio
 
 Author
-    Ivan Batistic & Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic & Philip Cardiff, UCD.
 
 SourceFiles
     contactPatchTestAnalyticalSolution.C

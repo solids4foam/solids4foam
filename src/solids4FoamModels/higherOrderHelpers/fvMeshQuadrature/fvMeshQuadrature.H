@@ -45,7 +45,7 @@ Description
 
 Author
     Ivan Batistic, UCD.
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     fvMeshQuadrature.C

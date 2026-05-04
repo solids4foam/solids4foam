@@ -22,7 +22,7 @@ Description
     Mode-I Dugdale-type cohesive zone model.
 
 Author
-    Philip Cardif, UCD/UT. All rights reserved.
+    Philip Cardif, UCD/UT.
 
 SourceFiles
     modeICohesiveZoneModel.C

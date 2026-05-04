@@ -25,7 +25,7 @@ Description
 
 Author
     Iago Lessa de Oliveira, FEIS/UNESP/UCD.
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     sonicLiquidFluid.foundation.C

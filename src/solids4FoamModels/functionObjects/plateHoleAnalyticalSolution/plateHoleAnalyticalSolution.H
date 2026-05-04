@@ -31,7 +31,7 @@ Description
         - nu : Poisson's ratio
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     plateHoleAnalyticalSolution.C

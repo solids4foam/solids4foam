@@ -23,7 +23,7 @@ Description
     min X, min Y, min Z, max X, max Y, max Z, average.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidDisplacements.C

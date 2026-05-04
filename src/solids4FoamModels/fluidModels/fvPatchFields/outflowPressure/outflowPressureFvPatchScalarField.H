@@ -22,7 +22,7 @@ Description
     Foam::outflowPressureFvPatchScalarField
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     outflowPressureFvPatchScalarField.C

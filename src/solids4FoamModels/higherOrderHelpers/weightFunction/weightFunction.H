@@ -35,8 +35,8 @@ SourceFile
     weightFunction.C
 
 Author
-    Ivan Batistic, UCD. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic, UCD.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

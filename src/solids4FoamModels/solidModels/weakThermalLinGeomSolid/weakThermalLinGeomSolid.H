@@ -25,7 +25,7 @@ Description
     The stress is calculated by the run-time selectable mechanical law.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     weakThermalLinGeomSolid.C

@@ -25,7 +25,7 @@ Description
     be specified.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidPotentialEnergy.C
