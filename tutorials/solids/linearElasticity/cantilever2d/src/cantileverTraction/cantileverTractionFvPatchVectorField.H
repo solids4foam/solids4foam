@@ -145,6 +145,13 @@ public:
 
     // Member functions
 
+#ifndef FOAMEXTEND
+            //- Return face quadrature values
+            //  Used for high order solvers
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
+#endif
+
         // Mapping functions
 
             //- Map (and resize as needed) from self given a mapping object
