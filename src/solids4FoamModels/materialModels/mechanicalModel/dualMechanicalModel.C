@@ -21,7 +21,7 @@ License
 #include "fvc.H"
 #include "fvcGradf.H"
 #include "gaussGrad.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
 #ifdef OPENFOAM_NOT_EXTEND

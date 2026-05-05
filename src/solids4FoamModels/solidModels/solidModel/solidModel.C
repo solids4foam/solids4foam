@@ -21,7 +21,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"

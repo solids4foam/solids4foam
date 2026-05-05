@@ -50,7 +50,7 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif

@@ -50,7 +50,7 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
@@ -291,7 +291,7 @@ private:
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
         //- TwoD point corrector object
-        twoDPointCorrector twoDCorrector_;
+        twoDPointCorrectorS4f twoDCorrector_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -815,7 +815,7 @@ public:
             virtual volVectorField& solutionD() = 0;
 
             //- Const-reference to the twoD point corrector object
-            const twoDPointCorrector& twoDCorrector() const
+            const twoDPointCorrectorS4f& twoDCorrector() const
             {
                 return twoDCorrector_;
             }

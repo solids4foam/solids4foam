@@ -257,6 +257,7 @@ numerics/stabilisationModels/multipleStabilisationModels/multipleStabilisationMo
 numerics/stabilisationModels/volStrainRateStab/volStrainRateStab.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
+numerics/twoDPointCorrectorS4f/twoDPointCorrectorS4f.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 

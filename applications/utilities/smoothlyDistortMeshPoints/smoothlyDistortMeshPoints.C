@@ -44,7 +44,7 @@ Author
 
 #include "fvCFD.H"
 #include "argList.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "unitConversion.H"
 
 
@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
     }
 
     // Correct points for 2-D
-    twoDPointCorrector twoD(mesh);
+    twoDPointCorrectorS4f twoD(mesh);
     twoD.correctPoints(newPoints);
 
     // Move the mesh

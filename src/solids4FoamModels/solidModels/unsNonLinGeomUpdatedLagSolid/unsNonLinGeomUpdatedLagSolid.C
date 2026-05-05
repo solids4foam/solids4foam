@@ -24,7 +24,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "bound.H"
 #include "symmetryPolyPatch.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 
