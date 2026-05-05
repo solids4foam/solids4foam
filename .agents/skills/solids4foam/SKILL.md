@@ -35,7 +35,68 @@ This document defines how automated coding changes should be made in this reposi
   as local code.
 - Keep lines and expressions readable; avoid clever/condensed code.
 - Prefer explicit, local, maintainable changes over abstraction-heavy rewrites.
-- Add comments only when behavior is non-obvious; do not add redundant comments.
+- Add explanatory comments only when behavior is non-obvious; do not add
+  redundant explanatory comments. This restriction does not apply to mandatory
+  OpenFOAM structural comments and `//-` API documentation comments, which must
+  be preserved and reproduced.
+
+### OpenFOAM structural comments
+
+- Preserve and reproduce the standard OpenFOAM/solids4foam structural comment
+  layout when creating or editing C++ classes in both `.H` and `.C` files.
+- These comments are mandatory style, not optional explanatory comments.
+- Do not remove existing OpenFOAM section separators, class declaration banners,
+  namespace separators, end-of-file banners, or `//-` API documentation comments
+  when editing a class unless the user explicitly asks for style cleanup.
+- When creating a new `.H`/`.C` class pair, copy the structural comment pattern
+  from the closest existing class in the same directory or model family.
+
+Header files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+                        Class myClass Declaration
+\*---------------------------------------------------------------------------*/
+
+// class declaration here
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //
+```
+
+Source files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+// ************************************************************************* //
+```
+
+- Header declarations should use OpenFOAM `//-` documentation comments for
+  private data, constructors, runtime type information, and public member
+  functions, following nearby classes.
+- Do not add empty section banners for sections that do not exist, but do add
+  the normal banner whenever a section exists.
 
 ### File/header conventions
 
