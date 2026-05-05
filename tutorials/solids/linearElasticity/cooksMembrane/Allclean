@@ -12,3 +12,9 @@ cleanCase
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
+
+# Link files back to default solid model settings
+for file in $(find ./0 ./constant ./system -name '*.segregated')
+do
+    ln -vnsf ${file##*/} ${file%.*}
+done
