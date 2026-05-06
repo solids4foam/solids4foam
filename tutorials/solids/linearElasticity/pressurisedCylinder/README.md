@@ -73,7 +73,7 @@ functions
     pressurisedCylinderAnalytical
     {
        type    pressurisedCylinderAnalyticalSolution;
-      
+
        // Inside radius
        Ri      7;
        // Outside radius
@@ -84,7 +84,7 @@ functions
        E       1e10;
        // Poisson's ratio
        nu      0.3;
-      
+
        cellDisplacement yes;
        pointDisplacement no;
        cellStress yes;

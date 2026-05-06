@@ -32,6 +32,10 @@ Description
 SourceFiles
     pressurisedCylinderAnalyticalSolution.C
 
+Author
+    Ivan Batistic, UCD.
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef pressurisedCylinderAnalyticalSolution_H
