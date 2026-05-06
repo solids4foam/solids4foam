@@ -14,6 +14,7 @@ Prepared by Iago Lessa de Oliveira, Ivan Batistić and Philip Cardiff
 
 - Demonstrate the solver accuracy for a compressible linear elastic test case;
 - Examine the solver performance when approaching the incompressibility limit.
+- Demonstrate how to set up a high-order cell-centred discretisation.
 
 ---
 
@@ -59,6 +60,38 @@ u_r =
 \dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}
 \left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\right].
 $$
+
+The `pressurisedCylinderAnalyticalSolution` function object in
+`system/controlDict` is used to generate analytical cylindrical displacement and
+stress fields and compute the corresponding difference fields:
+`cylAnalyticalD`, `cylAnalyticalCellStress`, `cylDDifference`, and
+`cylCellStressDifference`.
+
+```c++
+functions
+{
+    pressurisedCylinderAnalytical
+    {
+       type    pressurisedCylinderAnalyticalSolution;
+      
+       // Inside radius
+       Ri      7;
+       // Outside radius
+       Ro      18.625;
+       // Internal pressure
+       p       10e6;
+       // Young modulus
+       E       1e10;
+       // Poisson's ratio
+       nu      0.3;
+      
+       cellDisplacement yes;
+       pointDisplacement no;
+       cellStress yes;
+       pointStress no;
+    }
+}
+```
 
 Results presented in Figures 2 and 3 show numerical and analytical calculations
 of radial displacement $$u_r$$, circumferential $$\sigma_{\theta}$$ and radial
@@ -117,13 +150,25 @@ thickness
 
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/pressurisedCylinder`. The case
-can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case,
-the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`)
-followed by running the `solids4foam` solver (`> ./solids4Foam`) and
-`> ./sample` utility. Optionally, if `gnuplot` is installed, the radial and
-circumferential stress distribution together with the profile of radial
-displacement are plotted in the `sigmaR.png`, `sigmaTheta.png` and `dispR.png`
-files.
+can be run using the included `Allrun` script. The `Allrun` script optionally
+takes an argument which specifies the solution approach:
+
+```bash
+./Allrun             # Defaults to the segregated approach
+./Allrun segregated  # Segregated second-order approach
+./Allrun petscSnes   # PETSc SNES second-order approach [4]
+./Allrun highOrder   # PETSc SNES high-order approach [5]
+```
+
+The `Allrun` script starts by updating the files in the case to match the
+selected approach; the following files are updated:
+`constant/solidProperties`, `system/fvSchemes`, and `system/fvSolution`.
+Subsequently, the mesh is created with `blockMesh`, followed by running the
+solver `solids4Foam` and sampling the stress along the specified lines.
+
+Optionally, if `gnuplot` is installed, the radial and circumferential stress
+distribution together with the profile of radial displacement are plotted in the
+`sigmaR.png`, `sigmaTheta.png` and `dispR.png` files.
 
 ```note
 The same case is solved with Mooney-Rivlin hyperelastic material and can be
@@ -148,3 +193,13 @@ engineering, vol. 195, no. 44-47, pp. 6378–6390,
 [Bijelonja, I., I. Demirdžić, and S. Muzaferija. "A finite volume method for
 large strain analysis of incompressible hyperelastic materials." _International
 journal for numerical methods in engineering_ 64.12 (2005):1594-1609.](https://www.researchgate.net/publication/230308043_A_finite_volume_method_for_large_strain_analysis_of_incompressible_hyperelastic_materials)
+
+[4] [P. Cardiff, D. Armfield, Ž. Tuković, I. Batistić, A Jacobian-free Newton–Krylov
+ method for cell-centred finite volume solid mechanics. _International Journal for
+ Numerical Methods in Engineering_, 127, e70268, 2026,
+ 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
+
+[5] [I. Batistić, P. Castrillo, P. Cardiff, A Jacobian-free Newton-Krylov method
+ for high-order cell-centred finite volume solid mechanics. _arXiv preprint
+ arXiv:2601.18417_,
+ 2026.](https://arxiv.org/abs/2601.18417)

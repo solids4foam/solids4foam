@@ -12,70 +12,33 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "system";
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-libs            ("libpressurisedCylinderAnalytical.so");
-
-application     solids4Foam;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          1;
-
-writeControl    runTime;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
+solvers
 {
-    pressurisedCylinderAnalytical
+    D
     {
-       type    pressurisedCylinderAnalyticalSolution;
-       Ri      7;
-       Ro      18.625;
-       p       10e6;
-       E       1e10;
-       nu      0.3;
-       cellDisplacement yes;
-       pointDisplacement no;
-       cellStress yes;
-       pointStress no;
-    }
+        solver          petsc;
 
-    disp
-    {
-       type    solidPointDisplacement;
-       point   (7.0 0 0);
-    }
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
 
-    transformStressToCylindrical
-    {
-        type        transformStressToCylindrical;
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
 
-        origin      (0 0 0);
-        axis        (0 0 1);
+            pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
     }
 }
 
