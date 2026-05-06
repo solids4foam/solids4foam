@@ -22,7 +22,7 @@ Description
     polyBoundaryMesh for the solidPolyMesh class.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidPolyBoundaryMesh.C

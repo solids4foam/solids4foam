@@ -36,7 +36,7 @@ Description
     It is assumed that the inner and outer pipe surfaces are traction-free.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     hotCylinderAnalyticalSolution.C

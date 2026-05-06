@@ -28,7 +28,7 @@ SourceFiles
     fixedDisplacementFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
+    Philip Cardiff, UCD/UT.
 
 \*---------------------------------------------------------------------------*/
 
@@ -64,6 +64,9 @@ class fixedDisplacementFvPatchVectorField
 
         //- Displacement time series
         interpolationTable<vector> dispSeries_;
+
+        //- Optionally, set point patch displacement field if it exists
+        const Switch enforcePointPatchField_;
 
         //- Patch interpolator to interpolate face values to the points
         mutable autoPtr<primitivePatchInterpolation> interpPtr_;

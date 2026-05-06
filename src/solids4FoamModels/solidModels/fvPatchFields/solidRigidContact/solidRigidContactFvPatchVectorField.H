@@ -50,7 +50,7 @@ SourceFiles
     solidRigidContactFvPatchVectorFieldCalcContact.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
     Rewrite by Hrvoje Jasak.
 
 \*---------------------------------------------------------------------------*/

@@ -22,7 +22,7 @@ Description
     Template specialisation for tensor block Cholesky preconditioning
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 SourceFiles
     tensorBlockCholeskyPrecon.C

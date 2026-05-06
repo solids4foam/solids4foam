@@ -22,7 +22,7 @@ Description
     Splits up a patch by putting faces in the given bounding box in a new patch
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

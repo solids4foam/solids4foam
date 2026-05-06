@@ -30,8 +30,8 @@ Description
     as an option.
 
 Author
-    Zeljko Tukovic, FSB Zagreb. All rights reserved.
-    Re-organised by Philip Cardif, UCD/UT. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Re-organised by Philip Cardif, UCD/UT.
 
 SourceFiles
     fixedMixedModeCohesiveZoneModel.C

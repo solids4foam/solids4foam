@@ -23,6 +23,7 @@ License
 #include "wedgePolyPatch.H"
 #include "ZoneIDs.H"
 #include "demandDrivenData.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -170,11 +171,7 @@ void Foam::solidSubMeshes::checkCellZones() const
         baseMesh(),
         dimensionedScalar("zero", dimless, 0.0)
     );
-#ifdef OPENFOAM_NOT_EXTEND
-    scalarField& nCellZonesI = nCellZones.ref();
-#else
-    scalarField& nCellZonesI = nCellZones.internalField();
-#endif
+    scalarField& nCellZonesI = primitiveFieldRef(nCellZones);
 
     forAll(cellZoneNames_, matI)
     {
@@ -1967,11 +1964,7 @@ void Foam::solidSubMeshes::correctBoundarySnGrad
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
             const vectorField n(subMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
-            tensorField& patchGradD = subMeshGradD.boundaryFieldRef()[patchI];
-#else
-            tensorField& patchGradD = subMeshGradD.boundaryField()[patchI];
-#endif
+            tensorField& patchGradD = boundaryFieldRef(subMeshGradD)[patchI];
 
             const tensorField patchGradDif
             (
@@ -2056,13 +2049,8 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
             const vectorField n(subMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
             tensorField& patchGradDf =
-                subMeshGradDf.boundaryFieldRef()[patchI];
-#else
-            tensorField& patchGradDf =
-                subMeshGradDf.boundaryField()[patchI];
-#endif
+                boundaryFieldRef(subMeshGradDf)[patchI];
 
             const tensorField patchGradDif
             (

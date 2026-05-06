@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "fluidSolidInterface.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -390,11 +391,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
         rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
-    flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
-#else
-    flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();
-#endif
+    boundaryFieldRef(flux)[patch().index()] = rAU*snGrad()*patch().magSf();
 }
 
 

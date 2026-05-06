@@ -30,7 +30,7 @@ SourceFiles
     JamesonSchmidtTurkelStabTemplates.H
 
 Author
-    Philip Cardiff, UCD. All rights reserved
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -117,6 +117,28 @@ public:
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
+            ) const;
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvScalarMatrix& scalarJacobian
+            (
+                const volScalarField& field,
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
+            ) const;
+
+            //- Provide an implicit approximation of the stabilisation
+            //  This is an approximate Jacobian of the stabilisation term
+            //  Provide the primary variable field and optionally a surface
+            //  diffusivity field can be optionally provided
+            virtual const fvVectorMatrix& vectorJacobian
+            (
+                const volVectorField& field,
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 };
 

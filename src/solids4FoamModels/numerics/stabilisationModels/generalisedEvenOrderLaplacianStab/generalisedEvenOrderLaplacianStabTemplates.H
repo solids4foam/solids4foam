@@ -41,21 +41,18 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     fv::orthogonalSnGrad<Type> op(mesh);
 
     // -----------------------------------------------------
-    // Special case m = 0  ->  Oosterlee h^2 * Laplacian
+    // Special case m = 0 -> recover the basic Laplacian model
     // -----------------------------------------------------
     if (m == 0)
     {
-        const GeoField L0
-        (
-            fvc::div(op.snGrad(field) * mesh.magSf())
-        );
-
         const surfaceScalarField h2f
         (
             1.0/sqr(mesh.deltaCoeffs())
         );
 
-        faceFlux = scaleFactor*h2f*op.snGrad(L0);
+        const dimensionedScalar one("one", dimless/sqr(dimLength), 1.0);
+
+        faceFlux = scaleFactor*one*h2f*op.snGrad(field);
 
         return;
     }

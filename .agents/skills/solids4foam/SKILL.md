@@ -19,16 +19,84 @@ This document defines how automated coding changes should be made in this reposi
 - Prefer consistency with nearby code over introducing new style variants.
 - Avoid broad refactors unless explicitly requested.
 - Keep compatibility across supported OpenFOAM variants in mind.
+- State assumptions before implementation when behavior, target OpenFOAM
+  variant, or expected numerical result is unclear.
+- If multiple interpretations are plausible, ask or present the tradeoff instead
+  of silently choosing.
+- Push back on requests that would cause unnecessary redesign, broad
+  compatibility risk, or speculative behavior.
 
 ## 2) Coding Style Rules
 
 ### C++ style
 
 - Follow existing OpenFOAM/solids4foam style in surrounding files.
-- Use the same indentation, brace style, comment style, and naming conventions as local code.
+- Use the same indentation, brace style, comment style, and naming conventions
+  as local code.
 - Keep lines and expressions readable; avoid clever/condensed code.
 - Prefer explicit, local, maintainable changes over abstraction-heavy rewrites.
-- Add comments only when behavior is non-obvious; do not add redundant comments.
+- Add explanatory comments only when behavior is non-obvious; do not add
+  redundant explanatory comments. This restriction does not apply to mandatory
+  OpenFOAM structural comments and `//-` API documentation comments, which must
+  be preserved and reproduced.
+
+### OpenFOAM structural comments
+
+- Preserve and reproduce the standard OpenFOAM/solids4foam structural comment
+  layout when creating or editing C++ classes in both `.H` and `.C` files.
+- These comments are mandatory style, not optional explanatory comments.
+- Do not remove existing OpenFOAM section separators, class declaration banners,
+  namespace separators, end-of-file banners, or `//-` API documentation comments
+  when editing a class unless the user explicitly asks for style cleanup.
+- When creating a new `.H`/`.C` class pair, copy the structural comment pattern
+  from the closest existing class in the same directory or model family.
+
+Header files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+                        Class myClass Declaration
+\*---------------------------------------------------------------------------*/
+
+// class declaration here
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //
+```
+
+Source files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+// ************************************************************************* //
+```
+
+- Header declarations should use OpenFOAM `//-` documentation comments for
+  private data, constructors, runtime type information, and public member
+  functions, following nearby classes.
+- Do not add empty section banners for sections that do not exist, but do add
+  the normal banner whenever a section exists.
 
 ### File/header conventions
 
@@ -94,6 +162,12 @@ Rules when adding new runtime-selectable classes:
 - Do not rename symbols/files unless required.
 - Do not alter behavior outside requested scope.
 - Prefer targeted edits over cleanup passes.
+- Every changed line should trace directly to the user's request, a required
+  build fix, or a test/documentation update needed to verify the change.
+- If unrelated dead code or cleanup is noticed, mention it separately; do not
+  remove it unless asked.
+- Remove only unused code, imports, includes, or variables introduced by the
+  current change.
 
 Before finalizing, verify:
 
@@ -101,27 +175,30 @@ Before finalizing, verify:
 - No unrelated files changed.
 - No compatibility regressions introduced by style-only edits.
 
-## 6) Change Delivery Format (Mandatory)
+## 6) Change Delivery Format
 
-All code changes must be returned as **git patches**.
-
-- Provide changes in patch form (`git diff`/unified diff) suitable for application.
+- Keep changes patch-oriented and reviewable.
+- When asked for a patch, provide unified diff output suitable for application.
+- When editing directly in the workspace, summarize changed files and
+  verification performed.
 - Keep patches focused and reviewable.
 - If multiple concerns are required, split into logical commits/patches.
-- Do not provide only prose summaries when code edits were requested.
 
 ## 7) Practical Workflow for Codex
 
-1. Read nearby code and follow local patterns.
-2. Implement minimal patch.
-3. Update runtime registration/build lists if adding a new class.
-4. Run or describe relevant checks/tests.
-5. Return changes as patch-oriented output.
+1. Define the concrete success criteria for the request.
+2. Read nearby code and follow local patterns.
+3. Implement the minimal patch.
+4. Update runtime registration/build lists if adding a new class.
+5. Verify with the narrowest relevant build/test/check.
+6. Report what was verified and what was not.
 
 ## 8) What to Avoid
 
 - Large-scale refactors without explicit request.
 - API redesigns when a local fix is sufficient.
+- New dictionary options, runtime switches, fallback behavior, or
+  configurability unless requested or required by existing repository patterns.
 - Introducing new style conventions inconsistent with repository norms.
 - Silent behavioral changes not documented in the patch summary.
 

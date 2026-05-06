@@ -22,7 +22,7 @@ Description
     interfaceToInterfaceMapping wrapper for GGI interpolation
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     ggiInterfaceToInterfaceMapping.C

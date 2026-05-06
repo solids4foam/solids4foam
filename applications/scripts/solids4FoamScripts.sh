@@ -577,7 +577,7 @@ function solids4Foam::regressionCaseSkipped()
         return 1
     fi
 
-    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently working with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
     then
         return 0
     fi
