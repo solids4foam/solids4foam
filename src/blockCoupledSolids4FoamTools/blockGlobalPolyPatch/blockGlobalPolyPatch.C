@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 Contributor
     Martin Beaudoin, Hydro-Quebec, (2008)

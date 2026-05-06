@@ -42,9 +42,9 @@ SourceFile
     triQuadrature.C
 
 Author
-    Ivan Batistic, UCD. All rights reserved.
-    Pablo Castrillo, UCD. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic, UCD.
+    Pablo Castrillo, UCD.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

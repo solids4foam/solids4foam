@@ -23,8 +23,8 @@ Description
     cohesiveZoneModel is run-time selectable.
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
-    Zeljko Tukovic, FSB Zaregb. All rights reserved.
+    Philip Cardiff, UCD/UT.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     solidCohesiveFvPatchVectorField.C

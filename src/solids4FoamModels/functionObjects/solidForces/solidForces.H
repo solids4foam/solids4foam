@@ -22,7 +22,7 @@ Description
     FunctionObject reports forces on the patch of a solid.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidForces.C

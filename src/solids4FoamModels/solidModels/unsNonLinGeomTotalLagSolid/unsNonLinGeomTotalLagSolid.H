@@ -28,8 +28,8 @@ Description
     the face tangential gradient are calculated using a face-Gauss approach.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD.  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     unsNonLinGeomTotalLagSolid.C

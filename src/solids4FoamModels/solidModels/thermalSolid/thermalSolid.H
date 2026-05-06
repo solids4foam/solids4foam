@@ -30,8 +30,8 @@ Description
     Added functions required for CHT explicit coupling
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
-    Tukovic Zeljko, FSB.  All rights reserved.
+    Philip Cardiff, UCD.
+    Tukovic Zeljko, FSB.
 
 SourceFiles
     thermalSolid.C

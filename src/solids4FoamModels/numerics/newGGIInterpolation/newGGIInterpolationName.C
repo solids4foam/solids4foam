@@ -19,7 +19,7 @@ Description
     Shared template name for GGI interpolation
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 Contributor:
     Martin Beaudoin, Hydro-Quebec, (2008)
