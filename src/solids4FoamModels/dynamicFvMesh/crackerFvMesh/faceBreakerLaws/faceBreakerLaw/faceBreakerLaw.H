@@ -22,7 +22,7 @@ Description
     Law that selects which internal faces should be cracked/broken.
 
 Authors
-    Philip Cardif, UCD. All rights reserved.
+    Philip Cardif, UCD.
 
 SourceFiles
     faceBreakerLaw.C

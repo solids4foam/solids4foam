@@ -30,7 +30,7 @@ Description
     doi=10.1002/nme.5345.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     nonLinGeomTotalLagTotalDispSolid.C

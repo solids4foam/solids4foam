@@ -22,7 +22,7 @@ Description
     Typedefs for block matrices
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 \*---------------------------------------------------------------------------*/
 

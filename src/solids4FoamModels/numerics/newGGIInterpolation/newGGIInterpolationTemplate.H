@@ -38,7 +38,7 @@ Description
     globalData to false.  HJ, 27/Apr/2016
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 Contributor:
     Martin Beaudoin, Hydro-Quebec, (2008)

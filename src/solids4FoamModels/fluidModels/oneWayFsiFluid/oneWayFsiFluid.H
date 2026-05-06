@@ -24,7 +24,7 @@ Description
     interaction simulation.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     oneWayFsiFluid.C

@@ -29,7 +29,7 @@ SourceFile
     pointFieldFunctions.C
 
 Author
-    Federico Mazzanti, UCD. All rights reserved.
+    Federico Mazzanti, UCD.
 
 \*---------------------------------------------------------------------------*/
 

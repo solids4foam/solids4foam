@@ -22,8 +22,8 @@ Description
     Constant thermal properties
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
-    Philip Cardiff, UCD.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
+    Philip Cardiff, UCD.
 
 SourceFiles
     constantThermal.C

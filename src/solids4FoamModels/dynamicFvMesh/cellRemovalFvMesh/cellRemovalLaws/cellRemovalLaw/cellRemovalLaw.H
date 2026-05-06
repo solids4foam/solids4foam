@@ -22,7 +22,7 @@ Description
     Law that selects which cells should be removed
 
 Authors
-    Philip Cardif, UCD. All rights reserved.
+    Philip Cardif, UCD.
 
 SourceFiles
     cellRemovalLaw.C

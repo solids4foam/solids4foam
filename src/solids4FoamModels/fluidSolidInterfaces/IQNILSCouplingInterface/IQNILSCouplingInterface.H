@@ -27,8 +27,8 @@ Description
     procedure in fluid-solid interaction. Computers & Solids
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     IQNILSCouplingInterface.C

@@ -48,7 +48,7 @@ Description
     concentration factor at the edge of the cavity.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     sphericalCavityAnalyticalSolution.C

@@ -49,7 +49,6 @@ SourceFiles
 Author
     Iago Oliveira, based on code by Philip Cardiff, UCD.
     Ported by Philip Cardiff, UCD.
-    All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 

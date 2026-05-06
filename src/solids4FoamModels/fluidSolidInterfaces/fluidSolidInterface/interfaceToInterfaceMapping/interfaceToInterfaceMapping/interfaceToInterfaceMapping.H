@@ -22,7 +22,7 @@ Description
     Virtual base class for mapping/interpolating between two interfaces
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     interfaceToInterfaceMapping.C

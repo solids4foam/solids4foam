@@ -35,7 +35,7 @@ Description
        approximation of the Jacobian, e.g. fvm::laplacian.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     foamPetscSnesHelper.C

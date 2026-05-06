@@ -24,7 +24,7 @@ Description
     displacement components.
 
 Author
-    Philip Cardif, UCD/UT. All rights reserved.
+    Philip Cardif, UCD/UT.
 
 SourceFiles
     variableMixedModeCohesiveZoneModel.C

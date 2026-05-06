@@ -22,9 +22,9 @@ Description
     Virtual base class for fluid solvers.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     fluidModel.C

@@ -33,7 +33,7 @@ SourceFiles
     diffusionHyperElastic.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

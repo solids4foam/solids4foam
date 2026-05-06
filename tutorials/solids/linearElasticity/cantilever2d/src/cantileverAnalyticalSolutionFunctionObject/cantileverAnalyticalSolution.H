@@ -32,7 +32,7 @@ Description
     The beam is L long and D deep (thick).
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     cantileverAnalyticalSolution.C

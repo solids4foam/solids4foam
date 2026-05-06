@@ -31,7 +31,7 @@ Description
     Take care as entries will be -1 if the map does not exist for the entity.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     dualMeshToMeshMap.C

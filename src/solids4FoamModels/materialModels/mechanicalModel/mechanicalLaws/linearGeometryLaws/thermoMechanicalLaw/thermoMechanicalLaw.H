@@ -31,7 +31,7 @@ SourceFiles
     thermoMechanicalLaw.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
     Inspired by Denis Maier, BAW, code design suggestions.
 
 \*---------------------------------------------------------------------------*/

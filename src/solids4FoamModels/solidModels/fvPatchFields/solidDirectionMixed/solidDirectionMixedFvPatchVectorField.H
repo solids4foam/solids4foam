@@ -22,8 +22,8 @@ Description
     directionMixed with non-orthogonal correction for the diffusion term
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
-    Zeljko Tukovic, FSB Zagreb. All rights reserved.
+    Philip Cardiff, UCD.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     solidDirectionMixedFvPatchVectorField.C

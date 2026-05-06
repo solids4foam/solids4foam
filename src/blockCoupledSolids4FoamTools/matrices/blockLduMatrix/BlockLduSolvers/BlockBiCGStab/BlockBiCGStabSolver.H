@@ -22,7 +22,7 @@ Description
     Preconditioned Bi-Conjugate Gradient stabilised solver.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 SourceFiles
     BlockBiCGStabSolver.C
