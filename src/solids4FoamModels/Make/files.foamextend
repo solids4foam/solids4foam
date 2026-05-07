@@ -9,9 +9,11 @@ solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSo
 solidModels/kirchhoffPlateSolid/kirchhoffPlateSolid.C
 solidModels/kirchhoffPlateSolid/clampedMoment/clampedMomentFaPatchScalarField.C
 solidModels/kirchhoffPlateSolid/freeEdgeDisplacement/freeEdgeDisplacementFaPatchScalarField.C
+solidModels/linGeomVelocitySolid/linGeomVelocitySolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
+solidModels/nonLinGeomTotalLagVelocitySolid/nonLinGeomTotalLagVelocitySolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
@@ -35,6 +37,7 @@ fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
+fluidSolidInterfaces/newtonQuasiMonolithicCouplingInterface/newtonQuasiMonolithicCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C
@@ -55,6 +58,7 @@ $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 
 linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
+$(linGeomLaws)/diffusionElastic/diffusionElastic.C
 $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
@@ -247,6 +251,8 @@ numerics/stabilisationModels/generalisedEvenOrderLaplacianStab/generalisedEvenOr
 numerics/stabilisationModels/gradDivStab/gradDivStab.C
 numerics/stabilisationModels/JamesonSchmidtTurkelStab/JamesonSchmidtTurkelStab.C
 numerics/stabilisationModels/laplacianStab/laplacianStab.C
+numerics/stabilisationModels/multipleStabilisationModels/multipleStabilisationModels.C
+numerics/stabilisationModels/volStrainRateStab/volStrainRateStab.C
 /*numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C

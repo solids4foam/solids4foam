@@ -41,6 +41,7 @@ SourceFiles
 #include "CompactListList.H"
 #include "Switch.H"
 #include "interpolationTable.H"
+#include "fieldWithHistory.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,8 +67,11 @@ class solidTractionFvPatchVectorField
         //  responsibility of the solid model to lookup and use this
         const Switch useUndeformedArea_;
 
-        //- Traction
-        mutable vectorField traction_;
+        //- Traction field and, optionally, old-time traction fields
+        mutable fieldWithHistory traction_;
+
+        //- Optional: traction-rate field and old-time traction rate fields
+        mutable autoPtr<fieldWithHistory> tractionRatePtr_;
 
         //- Pressure
         mutable scalarField pressure_;
@@ -187,6 +191,42 @@ public:
             virtual vectorField& traction()
             {
                 return traction_;
+            }
+
+            virtual const fieldWithHistory& tractionHistory() const
+            {
+                return traction_;
+            }
+
+            virtual fieldWithHistory& tractionHistory()
+            {
+                return traction_;
+            }
+
+            virtual const fieldWithHistory& tractionRateHistory() const
+            {
+                if (!tractionRatePtr_.valid())
+                {
+                    tractionRatePtr_.reset
+                    (
+                        new fieldWithHistory(traction_.size())
+                    );
+                }
+
+                return tractionRatePtr_();
+            }
+
+            virtual fieldWithHistory& tractionRateHistory()
+            {
+                if (!tractionRatePtr_.valid())
+                {
+                    tractionRatePtr_.reset
+                    (
+                        new fieldWithHistory(traction_.size())
+                    );
+                }
+
+                return tractionRatePtr_();
             }
 
             virtual const scalarField& pressure() const

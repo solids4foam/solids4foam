@@ -36,12 +36,6 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
             type        diffStencilLaplacian;
             scaleFactor 0.5;
         }
-
-        pressure
-        {
-            type        diffStencilLaplacian;
-            scaleFactor 0.5;
-        }
     }
 }
 

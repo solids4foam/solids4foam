@@ -18,7 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidSubMeshes.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "processorPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "ZoneIDs.H"
@@ -2124,7 +2124,7 @@ void Foam::solidSubMeshes::moveSubMeshes()
             Info<< "    Moving subMesh " << subMeshes()[matI].subMesh().name()
                 << endl;
 
-            twoDPointCorrector twoDCorrector(subMeshes()[matI].subMesh());
+            twoDPointCorrectorS4f twoDCorrector(subMeshes()[matI].subMesh());
             pointField newPoints
             (
                 subMeshes()[matI].subMesh().points() + subMeshPointD()[matI]

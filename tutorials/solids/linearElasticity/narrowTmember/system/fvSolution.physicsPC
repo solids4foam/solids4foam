@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    D
+    {
+        solver          petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            // fgmres is required because the physics PC is variable
+            ksp_type fgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type physics;
+            pc_physics_type model;
+        }
+    }
+
+    // Inner solver for the physics preconditioner correction field.
+    // One cheap application (1 GAMG V-cycle) is sufficient; with
+    // nPCCorrectors 2 (default) this gives the best wall-clock time.
+    dD
+    {
+        solver          GAMG;
+        tolerance       0;
+        relTol          0;
+        minIter         1;
+        maxIter         1;
+        smoother        symGaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     1;
+        nFinestSweeps   1;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+}
+
+// ************************************************************************* //

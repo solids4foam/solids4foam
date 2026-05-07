@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# PETSc is required for this case
+if [[ -z "${PETSC_DIR:-}" ]]
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
+    exit 0
+fi
+
+# Example usage:
+# ./Allrun                     -> partitioned (IQNILS), serial
+# ./Allrun aitken              -> partitioned (Aitken), serial
+# ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
+# ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
+# ./Allrun aitken parallel     -> partitioned (Aitken), parallel
+
+coupling=iqnils
+runMode=serial
+fvSolutionSuffix=""
+SOLVER="partitioned"
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            SOLVER="partitioned"
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            SOLVER="partitioned"
+            ;;
+        monolithic)
+            SOLVER="monolithic"
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Restore 0 directory
+restore0Dir
+
+if [[ "$SOLVER" == "monolithic" ]]; then
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    echo "Using the monolithic Newton/PETSc approach"
+    solids4Foam::convertCaseFormat .
+    for file in $(find ./0 ./constant ./system -name '*.monolithic')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+else
+    # Dirichlet-Neumann partitioned approach
+    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+        fvSolutionSuffix=".foamextend"
+    elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+        fvSolutionSuffix=".openfoamorg"
+    fi
+
+    echo "Using ${coupling} coupling setup"
+
+    # Remove monolithic-only files that may have been copied in from a dirty
+    # case tree after a previous monolithic run.
+    rm -f \
+        0/fluid/D \
+        0/fluid/pointD \
+        0/fluid/pointDisplacement \
+        0/solid/U \
+        constant/fluid/mechanicalProperties \
+        constant/fluid/solidProperties
+
+    # Create all .partitioned symlinks
+    for file in $(find ./0 ./constant ./system -name '*.partitioned')
+    do
+        ln -vnsf "${file##*/}" "${file%.partitioned}"
+    done
+
+    # Override fvSolution to use coupling-specific version (iqnils or aitken)
+    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+    ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+
+    solids4Foam::convertCaseFormat .
+fi
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Refine fluid mesh
+solids4Foam::runApplication setSet -batch setSet.batch -region fluid
+solids4Foam::runApplication refineMesh -region fluid -overwrite
+
+# Run potentialFoam
+solids4Foam::runApplication potentialFoam -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    if [[ "$SOLVER" == "monolithic" ]]; then
+        # Monolithic: coupled decomposition across fluid+solid
+        solids4Foam::runApplication decomposeParMonolithic -force
+    else
+        # Partitioned: independent decomposition per region
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    fi
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

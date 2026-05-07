@@ -82,8 +82,8 @@ using the default settings in the tutorial case.
 
 ![Figure 2: Snapshot of the pressure field in the fluid and the equivalent (von Mises) stress field in the solid](./images/HronTurekFsi3-results.png)
 
-**Figure 2: Snapshot of the pressure field in the fluid and the equivalent (von
-Mises) stress field in the solid**
+**Figure 2: Snapshot of the pressure field in the fluid and the equivalent
+(von Mises) stress field in the solid**
 
 {% include youtube.html id="GCwZ3tC-Iig" %}
 
@@ -93,25 +93,23 @@ displacement magnitude field in the solid.**
 ![Figure 3: Displacement of the plate tip point A for the elastic plat\
 e behind a rigid cylinder case](./images/HronTurekFsi3-displacement.pdf")
 
-**Figure 3: Displacement of the plate tip point A for the elastic plate behind a
-rigid cylinder case**
+**Figure 3: Displacement of the plate tip point A for the elastic plate behind
+a rigid cylinder case**
 
 ![Figure 4: Force on the plate and the cylinder for the elastic plate behind a
 rigid cylinder case](./images/HronTurekFsi3-force.pdf")
 
-**Figure 4: Force on the plate and the cylinder for the elastic plate behind a
-rigid cylinder case**
+**Figure 4: Force on the plate and the cylinder for the elastic plate behind
+a rigid cylinder case**
 
-**Table 2: Displacement on point A and the force on the elastic plate. The
-values are given in the same format as in the benchmark paper [1] (mean ±
-amplitude [frequency]).**
+### Table 2: Displacement at point A and force values on the elastic plate
 
-|           Parameter           |    solids4foam [2]     |    Benchmark [1]     |
-| :---------------------------: | :--------------------: | :------------------: |
-| $$u_x \times 10^{−3}$$ (in m) |  −2.72 ± 2.58 [11.07]  | −2.69 ± 2.53 [10.9]  |
-| $$u_y \times 10^{−3}$$ (in m) |  1.67 ± 33.84 [5.53]   |  1.48 ± 34.38 [5.3]  |
-|        $$F_x$$ (in N)         | 459.18 ± 24.86 [11.07] | 457.3 ± 22.66 [10.9] |
-|        $$F_x$$ (in N)         |  1.59 ± 155.9 [5.53]   | 2.22 ± 149.78 [5.3]  |
+| Parameter | solids4foam [2] | Benchmark [1] |
+| --------- | --------------- | ------------- |
+| $$u_x \\times 10^{-3}$$ (m) | -2.72 ± 2.58 [11.07] | -2.69 ± 2.53 [10.9] |
+| $$u_y \\times 10^{-3}$$ (m) | 1.67 ± 33.84 [5.53] | 1.48 ± 34.38 [5.3] |
+| $$F_x$$ (N) | 459.18 ± 24.86 [11.07] | 457.3 ± 22.66 [10.9] |
+| $$F_y$$ (N) | 1.59 ± 155.9 [5.53] | 2.22 ± 149.78 [5.3] |
 
 ---
 

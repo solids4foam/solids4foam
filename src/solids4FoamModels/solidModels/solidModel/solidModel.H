@@ -50,7 +50,7 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
@@ -246,7 +246,7 @@ private:
         Switch enforceLinear_;
 
         //- Under-relaxation method
-        //  It can be 'fixed' or 'Aitken'
+        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
         const word relaxationMethod_;
 
         //- Aitken's under-relaxation factor field
@@ -254,6 +254,24 @@ private:
 
         //- Aitken's residual field
         volVectorField aitkenResidual_;
+
+        //- Restart frequency for the Quasi-Newton method
+        const int QuasiNewtonRestartFreq_;
+
+        //- Quasi-Newton method input vector field
+        DynamicList<vectorField> QuasiNewtonV_;
+
+        //- Quasi-Newton method output vector field
+        DynamicList<vectorField> QuasiNewtonW_;
+
+        //- Quasi-Newton method time indices for the input-ouput fields
+        DynamicList<scalar> QuasiNewtonT_;
+
+        //- Reference D field used for Quasi-Newton method
+        volVectorField DRef_;
+
+        //- Reference D (without relaxation) field used for Quasi-Newton method
+        volVectorField unrelaxedDRef_;
 
         //- Ptr list of global poly patches
         //  This is a copy of a patch which is reconstructed in full on each
@@ -273,7 +291,7 @@ private:
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
         //- TwoD point corrector object
-        twoDPointCorrector twoDCorrector_;
+        twoDPointCorrectorS4f twoDCorrector_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -797,7 +815,7 @@ public:
             virtual volVectorField& solutionD() = 0;
 
             //- Const-reference to the twoD point corrector object
-            const twoDPointCorrector& twoDCorrector() const
+            const twoDPointCorrectorS4f& twoDCorrector() const
             {
                 return twoDCorrector_;
             }

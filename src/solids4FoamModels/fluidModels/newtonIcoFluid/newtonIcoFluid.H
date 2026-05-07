@@ -100,6 +100,11 @@ class newtonIcoFluid
         //- Pressure stabilisation model
         autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
+        //- Scale factor applied to the pressure-equation residual and
+        //  Jacobian rows relative to the momentum equations
+        const scalar pressureScaleFactor_;
+
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -121,6 +126,13 @@ class newtonIcoFluid
 
         //- Correct phi function
         void correctPhi();
+
+        //- Restore the flow fields and mesh after a failed PETSc solve
+        void restoreOldTimeState
+        (
+            const pointField& oldPoints,
+            const bool meshMoved
+        );
 
         //- Solve pressure equation
         void solvePEqn
@@ -214,6 +226,13 @@ public:
                 return pressureStabilisationPtr_();
             }
 
+            //- Return the pressure-equation scaling factor
+            scalar pressureScaleFactor() const
+            {
+                return pressureScaleFactor_;
+            }
+
+
 
         // Edit
 
@@ -242,16 +261,18 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            );
+            )
+            {
+                return formResidual(f, x, false);
+            }
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
-            //  array) vector, given a reference configuration (solid model
-            //  representing the fluid domain motion)
+            //  array) vector, with optional flux extrapolation
             virtual label formResidual
             (
                 Vec f,         // Residual
-                const Vec x,    // Solution
-                const solidModel& motion
+                const Vec x,   // Solution
+                const bool extrapolatedFlux
             );
 
             //- Form the Jacobian of the governing equation
@@ -259,7 +280,30 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
+            )
+            {
+                return formJacobian(jac, x, false);
+            }
+
+            //- Form the Jacobian of the governing equation, with optional
+            //  flux extrapolation
+            virtual label formJacobian
+            (
+                Mat jac,                    // Jacobian
+                const Vec x,                // Solution
+                const bool extrapolatedFlux
             );
+
+            //- Apply a SIMPLE-type segregated preconditioner
+            //  Approximately solves y = M^{-1} x using one SIMPLE iteration
+            //  when PETSc uses the `physics` preconditioner
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            );
+
+
 #endif // USE_PETSC
 };
 

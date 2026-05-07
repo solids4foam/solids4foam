@@ -375,15 +375,13 @@ newtonIcoFluidCoeffs
     pRefPoint (0.5 0.5 0);
     pRefValue 0.0;
 
-    // PETSc options file used by PETSc SNES
-    optionsFile petscOptions.lu;
 }
 ```
 
-The `petscOptions.lu` file currently specifies a Jacobian-free Newton-Krylov
- solution approach, where the approximate Jacobian is inverted using a direct LU
- solver and L-GMRES is used as the iterative linear solver. Key settings from
- `petscOptions.lu` are shown below:
+The `system/fvSolution` file currently specifies a Jacobian-free
+Newton-Krylov solution approach, where the approximate Jacobian is inverted
+using a direct LU solver and L-GMRES is used as the iterative linear solver.
+Key settings are shown below:
 
 ```bash
 -snes_type newtonls

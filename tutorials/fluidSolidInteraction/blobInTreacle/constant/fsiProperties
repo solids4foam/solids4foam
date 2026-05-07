@@ -1,0 +1,34 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+fluidSolidInterface NewtonQuasiMonolithic;
+
+NewtonQuasiMonolithicCoeffs
+{
+    solidPatch      interface;
+    fluidPatch      cylinder;
+    fluidSystemScaleFactor 1e+08;
+    coupled         yes;
+    interfaceTransferMethod directMap;
+    writeResidualsToFile yes;
+    passViscousStress yes;
+    // PETSc SNES options for the monolithic UpU system are defined in
+    // system/fvSolution. Alternatively, an optionsFile can be specified here.
+    //optionsFile petscOptions.lu;
+    //optionsFile petscOptions.mf_fieldsplit;
+}
+
+// ************************************************************************* //

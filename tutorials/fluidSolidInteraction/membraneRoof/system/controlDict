@@ -1,0 +1,86 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs
+(
+    "libmembraneRoofVelocityFvPatchVectorField.so"
+);
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         12;
+
+deltaT          0.02;
+
+writeControl    runTime;
+
+writeInterval   0.5;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+functions
+{
+    forces
+    {
+        type                forces;
+        region              fluid;
+        libs                ( "libforces.so" );
+        outputControl       timeStep;
+        outputInterval      1;
+        patches             (membrane-fluid);
+        "pName|p"           p;
+        "UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 true;
+        rhoInf              1.25;
+        CofR                (50 5 0);
+    }
+    pointDisp
+    {
+        type                solidPointDisplacement;
+        point               (50 5 0);
+    }
+    fsiConvData
+    {
+        type                fsiConvergenceData;
+        region              fluid;
+    }
+}
+
+// ************************************************************************* //

@@ -22,7 +22,80 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "findRefCell.H"
+#include "fixedValueFvPatchFields.H"
 #include "compatibilityFunctions.H"
+
+
+namespace
+{
+
+void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
+{
+    matrix.diag() *= scale;
+
+    if (matrix.hasUpper())
+    {
+        matrix.upper() *= scale;
+    }
+
+    if (matrix.hasLower())
+    {
+        matrix.lower() *= scale;
+    }
+
+    Foam::FieldField<Foam::Field, Foam::scalar>& internalCoeffs =
+        matrix.internalCoeffs();
+    Foam::FieldField<Foam::Field, Foam::scalar>& boundaryCoeffs =
+        matrix.boundaryCoeffs();
+
+    forAll(internalCoeffs, patchI)
+    {
+        internalCoeffs[patchI] *= scale;
+        boundaryCoeffs[patchI] *= scale;
+    }
+}
+
+
+const Foam::dictionary& solverControls
+(
+    const Foam::fvMesh& mesh,
+    const Foam::word& fieldName
+)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    return mesh.solverDict(fieldName);
+#else
+    return mesh.solutionDict().solver(fieldName);
+#endif
+}
+
+
+class retryTimeStateBuilder
+:
+    public Foam::TimeState
+{
+public:
+
+    static Foam::TimeState rollbackState(const Foam::Time& runTime)
+    {
+        retryTimeStateBuilder state;
+
+        static_cast<Foam::TimeState&>(state) =
+            static_cast<const Foam::TimeState&>(runTime);
+
+        // Restore the previous successful time-step length as the "saved"
+        // value so the retry does not treat the failed step as the last
+        // accepted one when operator++() updates deltaT0.
+        state.deltaTSave_ = runTime.deltaT0Value();
+#ifdef OPENFOAM_NOT_EXTEND
+        state.writeTime_ = false;
+#endif
+
+        return state;
+    }
+};
+
+}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -89,6 +162,37 @@ surfaceScalarField& newtonIcoFluid::rAUf()
     return autoPtrRef(rAUfPtr_);
 }
 
+
+void newtonIcoFluid::restoreOldTimeState
+(
+    const pointField& oldPoints,
+    const bool meshMoved
+)
+{
+    dynamicFvMesh& mesh = this->mesh();
+    volVectorField& U = this->U();
+    volScalarField& p = this->p();
+    surfaceScalarField& phi = this->phi();
+
+    U = U.oldTime();
+    U.correctBoundaryConditions();
+
+    p = p.oldTime();
+    p.correctBoundaryConditions();
+
+    if (meshMoved)
+    {
+        mesh.movePoints(oldPoints);
+    }
+
+    phi = fvc::interpolate(U) & mesh.Sf();
+
+    if (meshMoved)
+    {
+        fvc::makeRelative(phi, U);
+    }
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 newtonIcoFluid::newtonIcoFluid
@@ -132,6 +236,10 @@ newtonIcoFluid::newtonIcoFluid
     rho_(laminarTransport_.lookup("rho")),
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
+    pressureScaleFactor_
+    (
+        fluidProperties().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    ),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -286,6 +394,11 @@ newtonIcoFluid::newtonIcoFluid
     const fvMesh& mesh = this->mesh();
     const surfaceScalarField& phi = this->phi();
     #include "CourantNo.H"
+
+    if (mag(pressureScaleFactor_ - 1.0) > SMALL)
+    {
+        Info<< "pressureScaleFactor = " << pressureScaleFactor_ << endl;
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -472,6 +585,7 @@ bool newtonIcoFluid::evolve()
 
     // Take references
     // const Time& runTime = fluidModel::runTime();
+    Time& time = physicsModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
     volVectorField& U = this->U();
     volScalarField& p = this->p();
@@ -482,72 +596,170 @@ bool newtonIcoFluid::evolve()
     //const bool checkMeshCourantNo = checkMeshCourantNo_;
     //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
-    // Update U boundary conditions
-    U.correctBoundaryConditions();
-
-    {
-        const Time& runTime = mesh.time();
-        #include "CourantNo.H"
-    }
-
     // Solution predictor
     const Switch predictor
     (
         fluidProperties().lookupOrDefault<Switch>("predictor", false)
     );
 
-    if (predictor && runTime().timeIndex() > 1) // && newTimeStep())
+    const Switch adjustTimeStep
+    (
+        time.controlDict().lookupOrDefault("adjustTimeStep", false)
+    );
+
+    const label maxTimeStepRetries
+    (
+        fluidProperties().lookupOrDefault<label>("maxTimeStepRetries", 10)
+    );
+
+    label timeStepRetry = 0;
+    bool retriedCurrentDeltaT = false;
+
+    while (true)
     {
-        Info<< "Applying a linear predictor to velocity" << endl;
-        //predict();
-        // Applying a linear predictor to velocity
-        U = 2.0*U.oldTime() - U.oldTime().oldTime();
-        Info<< "Applying a linear predictor to velocity: done" << endl;
+        // Update U boundary conditions
+        U.correctBoundaryConditions();
 
-        // We could optionally apply a correction to this velocity field to
-        // ensure it is divergence free, i.e. solve for potential and apply
-        //  the correction
+        {
+            const Time& runTime = mesh.time();
+            #include "CourantNo.H"
+        }
 
-        // Access the raw solution data
-        // const PetscScalar *xx;
-        // VecGetArray(foamPetscSnesHelper::solution(), &xx);
+        const scalar failedTimeValue = time.value();
+        const scalar failedDeltaT = time.deltaTValue();
+        const label oldTimeIndex = time.timeIndex() - 1;
+        const scalar oldTimeValue = failedTimeValue - failedDeltaT;
+        const pointField oldPoints(mesh.points());
+        const TimeState retryTimeState =
+            retryTimeStateBuilder::rollbackState(time);
 
-        // Map the U field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
+        if (predictor && time.timeIndex() > 1) // && newTimeStep())
+        {
+            Info<< "Applying a linear predictor to velocity" << endl;
+            U = 2.0*U.oldTime() - U.oldTime().oldTime();
+            Info<< "Applying a linear predictor to velocity: done" << endl;
+
+            foamPetscSnesHelper::InsertFieldComponents<vector>
+            (
+                U,
+                foamPetscSnesHelper::solution(),
+                blockSize_,
+                fluidModel::twoD()
+              ? makeList<label>({0,1})
+              : makeList<label>({0,1,2})
+            );
+        }
+
+        // Update the mesh, unless the FSI interface already moved it.
+        if (fluidModel::fsiMeshUpdate())
+        {
+            fluidModel::fsiMeshUpdateChanged();
+        }
+        else
+        {
+#ifdef OPENFOAM_COM
+            mesh.controlledUpdate();
+#else
+            mesh.update();
+#endif
+        }
+
+        const bool meshMoved = mesh.changing();
+
+        // Update the flux
+        phi = fvc::interpolate(U) & mesh.Sf();
+
+        // If the mesh moved, update the flux and make it relative to the mesh
+        // motion
+        if (meshMoved)
+        {
+            // Make the flux relative to the mesh motion
+            fvc::makeRelative(phi, U);
+        }
+
+        // Keep the pre-solve state so a failed SNES solve can be retried.
+        foamPetscSnesHelper::storeSolutionBackup();
+
+        // Solve the nonlinear system and check the convergence
+        Info<< "Solving the fluid for U and p" << endl;
+        const int solveStatus = foamPetscSnesHelper::solve(true);
+
+        if (solveStatus >= 0)
+        {
+            break;
+        }
+
+        VecCopy
         (
-            U,
-            foamPetscSnesHelper::solution(),
-            blockSize_,
-            fluidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
+            foamPetscSnesHelper::solutionBackup(),
+            foamPetscSnesHelper::solution()
         );
 
-        // Restore the solution vector
-        // VecRestoreArray(foamPetscSnesHelper::solution(), &xx);
+        restoreOldTimeState(oldPoints, meshMoved);
+
+        static_cast<TimeState&>(time) = retryTimeState;
+        time.setTime(oldTimeValue, oldTimeIndex);
+
+        if (!retriedCurrentDeltaT)
+        {
+            retriedCurrentDeltaT = true;
+
+            foamPetscSnesHelper::resetSnesSolverState();
+
+            ++time;
+
+            Info<< "Retrying the failed PETSc time step at unchanged deltaT = "
+                << time.deltaTValue() << " after resetting PETSc solver state"
+                << " at Time = " << time.timeName() << nl << endl;
+
+            continue;
+        }
+
+        if (!adjustTimeStep)
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge and the previous time-step "
+                << "state has been restored, and a same-deltaT PETSc reset "
+                << "retry has already been attempted, but `adjustTimeStep` is "
+                << "disabled."
+                << nl << "Enable `adjustTimeStep` to retry the failed time "
+                << "step with a reduced deltaT."
+                << abort(FatalError);
+        }
+
+        ++timeStepRetry;
+
+        if (timeStepRetry > maxTimeStepRetries)
+        {
+            FatalErrorInFunction
+                << "Exceeded the maximum number of failed PETSc retries ("
+                << maxTimeStepRetries << ") at time " << failedTimeValue
+                << " with deltaT = " << failedDeltaT << nl
+                << "Set a larger `maxTimeStepRetries` if you would like more "
+                << "recovery attempts."
+                << abort(FatalError);
+        }
+
+        setDeltaT(time);
+
+        if (time.deltaTValue() >= failedDeltaT*(1.0 - SMALL))
+        {
+            FatalErrorInFunction
+                << "PETSc SNES failed to converge at the minimum allowed time "
+                << "step. The old-time state has been restored, but deltaT "
+                << "could not be reduced below " << failedDeltaT
+                << " for a retry."
+                << abort(FatalError);
+        }
+
+        foamPetscSnesHelper::resetSnesSolverState();
+
+        ++time;
+
+        Info<< "Retrying the failed PETSc time step with deltaT = "
+            << time.deltaTValue() << " at Time = "
+            << time.timeName() << nl << endl;
     }
-
-    // Update the mesh
-#ifdef OPENFOAM_COM
-    mesh.controlledUpdate();
-#else
-    mesh.update();
-#endif
-
-    // Update the flux
-    phi = fvc::interpolate(U) & mesh.Sf();
-
-    // If the mesh moved, update the flux and make it relative to the mesh
-    // motion
-    if (mesh.changing())
-    {
-        // Make the flux relative to the mesh motion
-        fvc::makeRelative(phi, U);
-    }
-
-    // Solve the nonlinear system and check the convergence
-    Info<< "Solving the fluid for U and p" << endl;
-    foamPetscSnesHelper::solve();
 
     // Access the raw solution data
     const PetscScalar *xx;
@@ -615,7 +827,7 @@ bool newtonIcoFluid::evolve()
 
 #endif
 
-    return 0;
+    return true;
 }
 
 
@@ -644,7 +856,8 @@ label newtonIcoFluid::initialiseSolution(Vec& x)
 label newtonIcoFluid::formResidual
 (
     Vec f,         // Residual
-    const Vec x    // Solution
+    const Vec x,   // Solution
+    const bool extrapolatedFlux
 )
 {
     if (debug)
@@ -654,7 +867,6 @@ label newtonIcoFluid::formResidual
     }
 
     // Take references
-    //const Time& runTime = fluidModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
@@ -666,34 +878,64 @@ label newtonIcoFluid::formResidual
     (
         x,
         UI,
-        0, // Location of first UI component
+        0,
         fluidModel::twoD()
       ? makeList<label>({0,1})
       : makeList<label>({0,1,2})
     );
 
-    // Enforce the boundary conditions
     U.correctBoundaryConditions();
-
-    // Update gradU
     gradU() = fvc::grad(U);
 
-    // Update the flux
-    phi = fvc::interpolate(U) & mesh.Sf();
+    // Lookup the forceImplicitFlux flag
+    const Switch forceImplicitFlux =
+        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
+
+    if (forceImplicitFlux || !extrapolatedFlux)
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+    else
+    {
+        if
+        (
+            Switch
+            (
+                fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+            )
+        )
+        {
+            // Equation 6.10
+            phi = fvc::interpolate
+                  (
+                      2.0*U.oldTime() - U.oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
+        else
+        {
+            // Equation 6.30
+            phi = fvc::interpolate
+                  (
+                      2.25*U.oldTime()
+                    - 1.5*U.oldTime().oldTime()
+                    + 0.25*U.oldTime().oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
+    }
+
+    // Absolute flux
+    const surfaceScalarField phiAbs("phiAbs", phi);
 
     if (mesh.changing())
     {
-        // Make the flux relative to the mesh motion
         fvc::makeRelative(phi, U);
-    }
 
-    // Set the flux to zero on walls, including FSI interfaces
-    // makeRelative should do this but may not work as expected
-    forAll(U.boundaryField(), patchI)
-    {
-        if (mesh.boundaryMesh()[patchI].type() == "wall")
+        forAll(U.boundaryField(), patchI)
         {
-            boundaryFieldRef(phi)[patchI] = 0.0;
+            if (mesh.boundaryMesh()[patchI].type() == "wall")
+            {
+                boundaryFieldRef(phi)[patchI] = 0.0;
+            }
         }
     }
 
@@ -704,295 +946,44 @@ label newtonIcoFluid::formResidual
         x, pI, blockSize_ - 1
     );
 
-    // Enforce the boundary conditions
     p.correctBoundaryConditions();
-
-    // Update the pressure BCs to ensure flux consistency
-    // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
-    // CHECK
-    //constrainPressure(p, U, phiHbyA, rAtU());
-
-    // Update gradp
     gradp() = fvc::grad(p);
-    gradU() = fvc::grad(U);
 
-    // Correct the transport and turbulence models
-    //laminarTransport_.correct();
-    //turbulence_->correct();
+    // Interpolated effective viscosity for momentum stabilisation
+    const surfaceScalarField nuEfff(fvc::interpolate(turbulence_->nuEff()));
 
-    // const surfaceScalarField nuEfff(fvc::interpolate(turbulence_->nuEff()));
-    // momentumStabilisation().updateVector(U, &gradU());
+    // Update momentum stabilisation
+    momentumStabilisation().updateVector(U, &gradU());
 
-    // The residual vector is defined as
-    // F = div(sigma) - ddt(U) - div(phi*U)
-    //   = div(dev(sigma)) - grad(p) - ddt(U) - div(phi*U)
-    //   = div(2*nuEff*symm(gradU)) - grad(p) - ddt(U) - div(phi*U)
-    //   = laplacian(nuEff,U) + div(nuEff*gradU.T())
-    //     - grad(p) - ddt(U) - div(phi*U)
-    //
-    // Check: do we want to include div(gradU.T).. it makes the stencil
-    // larger and should be zero anyway, although it may increase accuracy
+    // The residual vector
     vectorField residual
     (
         fvc::laplacian(turbulence_->nuEff(), U)
-        //+ fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
       - gradp()
       - fvc::ddt(U)
-      - fvc::div(phi, U)
-    );
-
-    // Make residual extensive as fvc operators are intensive (per unit volume)
-    residual *= mesh.V();
-
-    // Copy the residual into the f field
-    foamPetscSnesHelper::InsertFieldComponents<vector>
-    (
-        residual,
-        f,
-        0, // Location of first component
-        fluidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
-
-    // Calculate pressure equation residual
-    // Fp = stabilisation - div(U)
-    //    = stabilisation - tr(grad(U))
-    // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
-    scalarField pressureResidual
-    (
-      - fvc::div(U)
-    );
-
-    fvVectorMatrix pressureStabUEqn
-    (
-        fvm::laplacian(turbulence_->nuEff(), U)
-      - fvm::ddt(U)
-      - fvm::div(phi, U)
-    );
-
-    rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
-
-    pressureStabilisation().updateScalar(p, &gradp());
-    pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
-
-    // Make residual extensive
-    pressureResidual *= mesh.V();
-
-    // If required, set pressure reference value
-    if (pRefCell_ != -1)
-    {
-        // Set the residual to zero for the pressure equation in the pRefCell
-        // cell
-        pressureResidual[pRefCell_] = pRefValue_;
-
-        // Set p in the pRefCell
-        p[pRefCell_] = pRefValue_;
-    }
-
-    // Copy the pressureResidual into the f field as the final equation
-    foamPetscSnesHelper::InsertFieldComponents<scalar>
-    (
-        pressureResidual, f, blockSize_ - 1
-    );
-
-    return 0;
-}
-
-
-label newtonIcoFluid::formResidual
-(
-    Vec f,         // Residual
-    const Vec x,    // Solution
-    const solidModel& motion
-)
-{
-    if (debug)
-    {
-        InfoInFunction
-            << "start" << endl;
-    }
-
-    // Take references
-    //const Time& runTime = fluidModel::runTime();
-    dynamicFvMesh& mesh = this->mesh();
-    volVectorField& U = const_cast<volVectorField&>(this->U());
-    volScalarField& p = const_cast<volScalarField&>(this->p());
-    surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
-
-    // Lookup the motion gradD and calculate the deformation gradient and its
-    // determinant
-    const volTensorField Fm(I + motion.gradD().T());
-    const volScalarField Jm(det(Fm));
-    const volTensorField invFm(inv(Fm));
-    const surfaceTensorField Fmf(fvc::interpolate(Fm));
-    const surfaceScalarField Jmf(det(Fmf));
-    const surfaceTensorField invFmf(inv(Fmf));
-
-    // Copy x into the U field
-    vectorField& UI = U;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        UI,
-        0, // Location of first UI component
-        fluidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
-
-    // Enforce the boundary conditions
-    U.correctBoundaryConditions();
-
-    // Update the velocity gradient
-    gradU() = fvc::grad(U);
-    const surfaceTensorField gradUf(fvc::interpolate(gradU()));
-
-    // Calculate the deformed area vectors
-    const surfaceVectorField deformedSf(Jmf*invFmf.T() & mesh.Sf());
-
-    // Calculate the relative flux
-    //phi = fvc::interpolate(U) & mesh.Sf();
-    phi = deformedSf & (fvc::interpolate(U - motion.U()));
-
-    // See comment below
-    // if (mesh.changing())
-    // {
-    //     // Make the flux relative to the mesh motion
-    //     fvc::makeRelative(phi, U);
-    // }
-
-    const volScalarField nuEff(turbulence_->nuEff());
-    const surfaceScalarField nuEfff(fvc::interpolate(nuEff));
-
-    // WIP
-    // Set the flux to zero on walls, including FSI interfaces
-    // makeRelative should do this but mat not work as expected
-    // But this solution may not be right for non-FSI cases, where the mesh is
-    // moved at the start of the time step
-    // Wait, this is not needed since U == motion.U() at FSI interfaces
-    // forAll(U.boundaryField(), patchI)
-    // {
-    //     if (mesh.boundaryMesh()[patchI].type() == "wall")
-    //     {
-    //         Info<< "Setting the flux to 0 on patch "
-    //             << mesh.boundaryMesh()[patchI].name() << endl;
-    //         phi.boundaryFieldRef()[patchI] = 0.0;
-    //     }
-    // }
-
-    // Copy x into the p field
-    scalarField& pI = p;
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        x, pI, blockSize_ - 1
-    );
-
-    // Enforce the boundary conditions
-    p.correctBoundaryConditions();
-
-    // Update gradp
-    gradp() = fvc::grad(p);
-
-    // Update the pressure BCs to ensure flux consistency
-    // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
-    // CHECK
-    //constrainPressure(p, U, phiHbyA, rAtU());
-
-    // Correct Uf if the mesh is moving
-    //fvc::correctUf(Uf, U, phi);
-
-    // Make the fluxes relative to the mesh motion
-    //fvc::makeRelative(phi, U);
-
-    // Correct the transport and turbulence models
-    // NOTE: these assume the fluid mesh is in the deformed configuration and may
-    // not be correct in the reference configuration
-    // DISABLED for now
-    // laminarTransport_.correct();
-    // turbulence_->correct();
-
-    // Deformed configuration
-    // The residual vector is defined as
-    // F = div(sigma) - ddt(U) - div(phi*U)
-    //   = div(dev(sigma)) - grad(p) - ddt(U) - div(phi*U)
-    //   = div(2*nuEff*symm(gradU)) - grad(p) - ddt(U) - div(phi*U)
-    //   = laplacian(nuEff,U) + div(nuEff*gradU.T())
-    //     - grad(p) - ddt(U) - div(phi*U)
-    //
-    // Check: do we want to include div(gradU.T).. it makes the stencil
-    // larger and should be zero anyway, although it may increase accuracy
-    // To be checked ...
-    // ... ignored below
-    //
-    // Reference configuration
-    // The residual vector is defined as
-    // F = div((Jmf*invFmf.T() & Sf) & (nuEff*invFmf.T() & gradUf))
-    //     - (Jm*invFm.T() & grad(p))
-    //     - Jm*ddt(U)
-    //     - div(phi*U)
-    //     + Du
-    //
-    // where phi is calculated in terms of the reference configuration
-    // quantities
-    // Check: div(phi,U) will use the reference mesh weights but we need the
-    // deformed configuration
-    // Du is the stabilisation term, where
-    // Du = alphaU*laplacian(nuEff,U) - alphaU*div(nuEff*gradU)
-    //
-
-    momentumStabilisation().updateVector(U, &gradU());
-
-    // Calculate the residual over the reference configuration
-    vectorField residual
-    (
-        fvc::div(deformedSf & (nuEfff*invFmf.T() & gradUf))
-      - (Jm*invFm.T() & gradp())
-      - Jm*fvc::ddt(U)
       - fvc::div(phi, U)
       + momentumStabilisation().cellVector(&nuEfff, true)
     );
 
-    // Make residual extensive as fvc operators are intensive (per unit volume)
+    if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
+    {
+        residual -= 0.5*fvc::div(phiAbs)*U;
+    }
+
     residual *= mesh.V();
 
-    // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
     (
         residual,
         f,
-        0, // Location of first component
+        0,
         fluidModel::twoD()
       ? makeList<label>({0,1})
       : makeList<label>({0,1,2})
     );
 
-    // Deformed configuration
-    // Calculate pressure equation residual
-    // Fp = Dp - div(U) // or Dp - tr(grad(U))
-    // where the stabilisation Dp = laplacian(pD, p) - div(pD*grad(p))
-    //
-    // Reference configuration
-    // Fp = Dp - div((Jmf*invFmf.T() & Sf) & Uf)
-    //
-
-    // Update rAUf
-    // {
-    //     const scalar pressureSmoothingCoeff
-    //     (
-    //         readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
-    //     );
-    //     rAUf() = pressureSmoothingCoeff*mesh.magSf()/nuEfff;
-    // }
-
-    // const surfaceVectorField n(mesh.Sf()/mesh.magSf());
-    // const surfaceVectorField gradpf(fvc::interpolate(fvc::grad(p)));
-    // const surfaceScalarField snGradp(fvc::snGrad(p));
-
-    scalarField pressureResidual
-    (
-      - fvc::div(U)
-    );
+    // Pressure residual
+    scalarField pressureResidual(- fvc::div(U));
 
     fvVectorMatrix pressureStabUEqn
     (
@@ -1006,21 +997,18 @@ label newtonIcoFluid::formResidual
     pressureStabilisation().updateScalar(p, &gradp());
     pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
 
-    // Make residual extensive
     pressureResidual *= mesh.V();
 
-    // If required, set pressure reference value
     if (pRefCell_ != -1)
     {
-        // Set the residual to zero for the pressure equation in the pRefCell
-        // cell
-        pressureResidual[pRefCell_] = pRefValue_;
-
-        // Set p in the pRefCell
-        p[pRefCell_] = pRefValue_;
+        pressureResidual[pRefCell_] = pRefValue_ - p[pRefCell_];
     }
 
-    // Copy the pressureResidual into the f field as the final equation
+    if (pressureScaleFactor_ != 1.0)
+    {
+        pressureResidual *= pressureScaleFactor_;
+    }
+
     foamPetscSnesHelper::InsertFieldComponents<scalar>
     (
         pressureResidual, f, blockSize_ - 1
@@ -1032,8 +1020,9 @@ label newtonIcoFluid::formResidual
 
 label newtonIcoFluid::formJacobian
 (
-    Mat jac,       // Jacobian
-    const Vec x    // Solution
+    Mat jac,
+    const Vec x,
+    const bool extrapolatedFlux
 )
 {
     if (debug)
@@ -1044,32 +1033,68 @@ label newtonIcoFluid::formJacobian
 
     const fvMesh& mesh = this->mesh();
 
-    // Copy x into the U field
     volVectorField& U = const_cast<volVectorField&>(this->U());
     vectorField& UI = U;
     foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
         x,
         UI,
-        0, // Location of first component
+        0,
         fluidModel::twoD()
       ? makeList<label>({0,1})
       : makeList<label>({0,1,2})
     );
 
-    // Enforce the boundary conditions
     U.correctBoundaryConditions();
 
-    // Update the flux
-    phi() = fvc::interpolate(U) & mesh.Sf();
+    surfaceScalarField& phi = this->phi();
+    const Switch forceImplicitFlux =
+        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
+
+    if (forceImplicitFlux || !extrapolatedFlux)
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+    else if
+    (
+        Switch
+        (
+            fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+        )
+    )
+    {
+        phi =
+            fvc::interpolate
+            (
+                2.0*U.oldTime() - U.oldTime().oldTime()
+            ) & mesh.Sf();
+    }
+    else
+    {
+        phi =
+            fvc::interpolate
+            (
+                2.25*U.oldTime()
+              - 1.5*U.oldTime().oldTime()
+              + 0.25*U.oldTime().oldTime().oldTime()
+            ) & mesh.Sf();
+    }
+
+    const surfaceScalarField phiAbs("phiAbs", phi);
 
     if (mesh.changing())
     {
-        // Make the flux relative to the mesh motion
-        fvc::makeRelative(phi(), U);
+        fvc::makeRelative(phi, U);
+
+        forAll(U.boundaryField(), patchI)
+        {
+            if (mesh.boundaryMesh()[patchI].type() == "wall")
+            {
+                boundaryFieldRef(phi)[patchI] = 0.0;
+            }
+        }
     }
 
-    // Copy x into the p field
     volScalarField& p = const_cast<volScalarField&>(this->p());
     scalarField& pI = p;
     foamPetscSnesHelper::ExtractFieldComponents<scalar>
@@ -1077,21 +1102,10 @@ label newtonIcoFluid::formJacobian
         x, pI, blockSize_ - 1
     );
 
-    // Enforce the boundary conditions
     p.correctBoundaryConditions();
 
-    // Debug
-    // Info<< nl << "Correcting the turbulence model" << endl;
-    // turbulence_->correct();
-    // Info<< "Correcting the turbulence model: DONE" << endl;
-
-    // Correct the transport and turbulence models - do not call here
-    //laminarTransport_.correct();
-    //turbulence_->correct();
-
-    // Calculate the segregated approximatoion of momentum equation Jacobian
-    // Note: the nonlinear convection term is added separately below
-    //const surfaceScalarField nuEfff(fvc::interpolate(turbulence_->nuEff()));
+    laminarTransport_.correct();
+    turbulence_->correct();
 
     fvVectorMatrix UEqn
     (
@@ -1101,87 +1115,331 @@ label newtonIcoFluid::formJacobian
 
     UEqn.relax();
 
-    if (debug)
+    if (extrapolatedFlux && !forceImplicitFlux)
     {
-        Info<< "Inserting U equation in Afluid" << endl;
+        UEqn -= fvm::div(phi, U, "jacobian-div(phi,U)");
+
+        if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
+        {
+            UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), U);
+        }
+    }
+    else
+    {
+        foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
+        (
+            U,
+            phi,
+            jac,
+            0,
+            0,
+            fluidModel::twoD() ? 2 : 3
+        );
     }
 
-    // Convert fvMatrix matrix to PETSc matrix
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     (
         UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
     );
 
-    // Insert linearisation of convection term
-    // The linearisation assumes an upwind discretisation
-    foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
-    (
-        U,
-        phi(),
-        jac,
-        0,                         // row offset
-        0,                         // column offset
-        fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
-    );
-
     // Add advection term to UEqn to allow the correct central coefficient to
     // be calculated for pressure stabilisation
-    UEqn -= fvm::div(phi(), U);
+    if (!extrapolatedFlux || forceImplicitFlux)
+    {
+        UEqn -= fvm::div(phi, U);
+    }
 
     // Record the reciprocal of the central coefficient
     rAUf() = -fvc::interpolate(1.0/UEqn.A());
 
-    // Calculate pressure equation matrix
     fvScalarMatrix pEqn
     (
         pressureStabilisation().scalarJacobian(p, &rAUf(), true)
     );
 
-    if (debug)
-    {
-        Info<< "Inserting p equation in Afluid" << endl;
-    }
-
-    // If required, set pressure reference value
     if (pRefCell_ != -1)
     {
-        // Set the off-diagonal to zero for cell pRefCell
 #ifdef OPENFOAM_COM
         pEqn.setValues(labelList(1, pRefCell_), 0.0);
 #else
         pEqn.setValues(labelList(1, pRefCell_), scalarField(1, 0.0));
 #endif
-
-        // Set the diagonal to unity for cell pRefCell
         pEqn.diag()[pRefCell_] = -1.0;
     }
 
-    // Insert the pressure equation
+    if (pressureScaleFactor_ != 1.0)
+    {
+        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+    }
+
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
     (
         pEqn, jac, blockSize_ - 1, blockSize_ - 1, 1
     );
 
-    // Calculate U-in-p equation coeffs coming from tr(grad(U)) == div(U)
+    const word pressureStabType(pressureStabilisation().type());
+    if
+    (
+        pressureStabType == "RhieChow"
+     || pressureStabType == "diffStencilLaplacian"
+    )
+    {
+        foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
+        (
+            p,
+            rAUf(),
+            jac,
+            blockSize_ - 1,
+            blockSize_ - 1,
+           -pressureScaleFactor_*pressureStabilisation().scaleFactorJacobian()
+        );
+    }
+
     foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     (
         p,
         U,
         jac,
-        blockSize_ - 1,            // row offset
-        0,                         // column offset
-        fluidModel::twoD() ? 2 : 3 // number of scalar components of U
+        blockSize_ - 1,
+        0,
+        fluidModel::twoD() ? 2 : 3,
+        pressureScaleFactor_
     );
 
-    // Insert p-in-U term
-    // Insert "-grad(p)" (equivalent to "-div(p*I)") into the U equation
     foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     (
         p,
         jac,
-        0,                         // row offset
-        blockSize_ - 1,            // column offset
-        fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        0,
+        blockSize_ - 1,
+        fluidModel::twoD() ? 2 : 3
+    );
+
+    if (debug)
+    {
+        Info<< "End" << endl;
+    }
+
+    return 0;
+}
+
+
+label newtonIcoFluid::precondition
+(
+    Vec y,
+    const Vec x
+)
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const fvMesh& mesh = this->mesh();
+    const volVectorField& U = this->U();
+    const volScalarField& p = this->p();
+    const surfaceScalarField& phi = this->phi();
+
+    // Build safe BC types for the correction fields.  Using
+    // U.boundaryField().types() directly would propagate codedFixedValue
+    // entries, which require a codeDict file that only exists inside the
+    // original field specification.  For the correction fields, Dirichlet
+    // boundaries are simply fixedValue (zero) and Neumann boundaries are
+    // zeroGradient.
+    wordList dUBCTypes(U.boundaryField().size());
+    forAll(dUBCTypes, patchI)
+    {
+        if (U.boundaryField()[patchI].fixesValue())
+        {
+            dUBCTypes[patchI] = fixedValueFvPatchVectorField::typeName;
+        }
+        else
+        {
+            dUBCTypes[patchI] = U.boundaryField().types()[patchI];
+        }
+    }
+
+    wordList dpBCTypes(p.boundaryField().size());
+    forAll(dpBCTypes, patchI)
+    {
+        if (p.boundaryField()[patchI].fixesValue())
+        {
+            dpBCTypes[patchI] = fixedValueFvPatchScalarField::typeName;
+        }
+        else
+        {
+            dpBCTypes[patchI] = p.boundaryField().types()[patchI];
+        }
+    }
+
+    volVectorField dU
+    (
+        IOobject
+        (
+            "dU",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("zero", dimVelocity, vector::zero),
+        dUBCTypes
+    );
+
+    volScalarField dp
+    (
+        IOobject
+        (
+            "dp",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", p.dimensions(), 0.0),
+        dpBCTypes
+    );
+
+    vectorField momentumRhs(Foam::primitiveFieldRef(dU).size(), vector::zero);
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        momentumRhs,
+        0,
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    scalarField pressureRhs(Foam::primitiveFieldRef(dp).size(), 0.0);
+    foamPetscSnesHelper::ExtractFieldComponents<scalar>
+    (
+        x, pressureRhs, blockSize_ - 1
+    );
+
+    // Use the same approximate momentum block as the assembled Jacobian's
+    // segregated part.  The extra forceImplicitFlux tensor terms are left to
+    // the assembled PETSc matrix path; this preconditioner stays deliberately
+    // cheap and local.
+    fvVectorMatrix UEqn
+    (
+        fvm::laplacian(turbulence_->nuEff(), dU)
+      - fvm::ddt(dU)
+      - fvm::div(phi, dU, "jacobian-div(phi,U)")
+    );
+
+    UEqn.relax();
+
+    if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
+    {
+        surfaceScalarField phiAbs("phiAbs", phi);
+
+        if (mesh.changing())
+        {
+            fvc::makeAbsolute(phiAbs, U);
+        }
+
+        UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), dU);
+    }
+
+    UEqn.source() = momentumRhs;
+    Foam::primitiveFieldRef(dU) = vector::zero;
+    dU.correctBoundaryConditions();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const int oldVectorSolverDebug = SolverPerformance<vector>::debug;
+    const int oldScalarSolverDebug = SolverPerformance<scalar>::debug;
+    SolverPerformance<vector>::debug = 0;
+    SolverPerformance<scalar>::debug = 0;
+#else
+    const int oldBlockLduDebug = blockLduMatrix::debug();
+    blockLduMatrix::debug = 0;
+#endif
+
+    UEqn.solve(solverControls(mesh, "dU"));
+
+    volScalarField rAU("rAU", 1.0/UEqn.A());
+
+    // Match the pressure-block sign convention in formJacobian().
+    rAUf() = -fvc::interpolate(rAU);
+
+    surfaceScalarField phiHbyA
+    (
+        "phiHbyA",
+        fvc::interpolate(dU) & mesh.Sf()
+    );
+
+    fvScalarMatrix pEqn
+    (
+        pressureStabilisation().scalarJacobian(dp, &rAUf(), true)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const scalarField divPhiHbyAV
+    (
+        fvc::div(phiHbyA)().primitiveField()*mesh.V()
+    );
+#else
+    const scalarField divPhiHbyAV
+    (
+        fvc::div(phiHbyA)().internalField()*mesh.V()
+    );
+#endif
+
+    scalarField pSource
+    (
+        pressureRhs
+      + pressureScaleFactor_*divPhiHbyAV
+    );
+
+    if (pRefCell_ != -1)
+    {
+#ifdef OPENFOAM_COM
+        pEqn.setValues(labelList(1, pRefCell_), 0.0);
+#else
+        pEqn.setValues(labelList(1, pRefCell_), scalarField(1, 0.0));
+#endif
+        pEqn.diag()[pRefCell_] = -1.0;
+        pSource[pRefCell_] = pressureRhs[pRefCell_];
+    }
+
+    if (pressureScaleFactor_ != 1.0)
+    {
+        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+    }
+
+    pEqn.source() = pSource;
+    Foam::primitiveFieldRef(dp) = 0.0;
+    dp.correctBoundaryConditions();
+
+    pEqn.solve(solverControls(mesh, "dp"));
+
+    dU += rAU*fvc::grad(dp);
+    dU.correctBoundaryConditions();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector>::debug = oldVectorSolverDebug;
+    SolverPerformance<scalar>::debug = oldScalarSolverDebug;
+#else
+    blockLduMatrix::debug = oldBlockLduDebug;
+#endif
+
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        Foam::primitiveFieldRef(dU),
+        y,
+        0,
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    foamPetscSnesHelper::InsertFieldComponents<scalar>
+    (
+        Foam::primitiveFieldRef(dp), y, blockSize_ - 1
     );
 
     if (debug)

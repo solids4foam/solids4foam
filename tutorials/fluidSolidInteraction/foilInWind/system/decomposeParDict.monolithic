@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+numberOfSubdomains 4;
+
+method          scotch;
+
+monolithicCoeffs
+{
+    regions (fluid solid);
+
+    // Optional per-region cell weights
+    // DOF-based: fluid has 4 DOFs/cell (p,Ux,Uy,Uz), solid has 3 (Dx,Dy,Dz)
+    regionWeights
+    {
+        fluid   4;
+        solid   3;
+    }
+
+    interfaces
+    (
+        {
+            regionA     fluid;
+            patchA      flag;
+            regionB     solid;
+            patchB      interface;
+        }
+    );
+}
+
+// ************************************************************************* //

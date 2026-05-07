@@ -1,0 +1,87 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    UpU
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-6";
+            snes_stol "1e-6";
+            snes_monitor;
+            snes_converged_reason;
+            snes_max_linear_solve_fail "100";
+
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "200";
+            ksp_rtol "1e-4";
+            ksp_converged_reason;
+            ksp_max_it "1000";
+
+            // Top-level: fluid/solid multiplicative split
+            pc_type fieldsplit;
+            pc_fieldsplit_type multiplicative;
+
+            // Solid: gather to 1 rank, exact LU (parallel-safe)
+            fieldsplit_solid_ksp_type preonly;
+            fieldsplit_solid_pc_type redundant;
+            fieldsplit_solid_redundant_pc_type lu;
+
+            // Fluid: nested velocity/pressure Schur (2-D: block_size 3)
+            fieldsplit_fluid_ksp_type preonly;
+            fieldsplit_fluid_pc_type fieldsplit;
+            fieldsplit_fluid_pc_fieldsplit_type schur;
+            fieldsplit_fluid_pc_fieldsplit_schur_fact_type upper;
+            fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp;
+            fieldsplit_fluid_pc_fieldsplit_block_size "3";
+            fieldsplit_fluid_pc_fieldsplit_0_fields "0,1";
+            fieldsplit_fluid_pc_fieldsplit_1_fields "2";
+
+            // Velocity sub-block: bjacobi + ILU(0)
+            fieldsplit_fluid_fieldsplit_0_ksp_type preonly;
+            fieldsplit_fluid_fieldsplit_0_pc_type bjacobi;
+            fieldsplit_fluid_fieldsplit_0_sub_pc_type ilu;
+            fieldsplit_fluid_fieldsplit_0_sub_pc_factor_levels "0";
+
+            // Pressure Schur complement: HYPRE BoomerAMG
+            fieldsplit_fluid_fieldsplit_1_ksp_type preonly;
+            fieldsplit_fluid_fieldsplit_1_pc_type hypre;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_fluid_fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
+        }
+    }
+}
+
+// ************************************************************************* //

@@ -41,7 +41,7 @@ are solved:
 | `implicitSegregated` | Default segregated solve | Recommended |
 | `PETScSNES` | Nonlinear solve via PETSc SNES | Requires PETSc |
 | `explicit` | Explicit time integration | Time-step limited by stability |
-| `implicitCoupled` | Not implemented for this model | Do not select this value |
+| `implicitCoupled` | Not implemented for this model | Do not use |
 
 The runtime type name for this class is `linearGeometryTotalDisplacement`.
 
@@ -296,11 +296,96 @@ stored in `impK_` and `impKf_`.
 
 The PETSc path uses a compact approximate Jacobian consistent with the
 segregated discretisation, and `precondition()` is available for a physics-based
-preconditioner.
+preconditioner (see below).
 
 The pressure-coupled branch adds one scalar unknown per cell, so the block size
 is `2/3` for displacement only and `3/4` when pressure is included, depending on
 the dimensionality.
+
+#### Physics preconditioner
+
+`precondition(y, x)` implements the custom model-side path used by
+`pc_type physics` with `pc_physics_type model`:
+
+1. Create a temporary correction field `dD`.
+2. Extract the momentum components of the incoming PETSc vector into an
+   OpenFOAM source field.
+3. Assemble and solve an approximate momentum correction equation for `dD`
+   using `mesh.solverDict("dD")`. The equation includes the Laplacian
+   (`impKf`), transient (`d2dt2`), and optional damping terms, matching
+   the diagonal block assembled in `formJacobian`.
+4. When `solvePressure` is enabled, extract the pressure RHS, assemble and
+   solve the pressure correction equation for `dp` using
+   `mesh.solverDict("dp")`, and correct `dD` with `rAD*grad(dp)`.
+5. Insert `dD` (and `dp`) back into the PETSc output vector.
+
+The preconditioner intentionally stays cheap; it is designed to be a useful
+physics-based approximation rather than a full exact inverse. The inner
+solver uses a single GAMG V-cycle (1 iteration, zero tolerance).
+
+Because the correction field `dD` uses `zeroGradient` boundary conditions
+(solid-specific BCs like `solidTraction` cannot be reused as they look up
+cached gradient fields), the preconditioner is not an exact inverse of the
+assembled Jacobian even when fully converged. This is consistent with the
+assembled Jacobian itself being only an approximation to the matrix-free
+operator.
+
+If `gradSchemes` uses `default none`, an explicit `grad(dD)` entry is
+required (e.g. `Gauss linear`). Cases with a permissive default (e.g.
+`default leastSquaresS4f`) do not need an extra entry.
+
+Example PETSc options (`fvSolution`):
+
+```c++
+solvers
+{
+    D
+    {
+        solver          petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type fgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type physics;
+            pc_physics_type model;
+        }
+    }
+
+    dD
+    {
+        solver          GAMG;
+        tolerance       0;
+        relTol          0;
+        minIter         1;
+        maxIter         1;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     1;
+        nFinestSweeps   1;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+}
+```
+
+`fgmres` (flexible GMRES) is required because the physics PC is variable
+(the inner solves are approximate). A single GAMG V-cycle for `dD` provides
+a good balance between cost and effectiveness. The `laplacianSchemes` entry
+must cover `laplacian(DD,D)` for the correction field — typically satisfied
+by the existing `default`.
 
 #### Explicit path
 

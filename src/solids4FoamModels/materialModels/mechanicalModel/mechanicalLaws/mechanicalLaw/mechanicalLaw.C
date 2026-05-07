@@ -338,7 +338,7 @@ void Foam::mechanicalLaw::makeF()
         (
             IOobject
             (
-                "F_",
+                "F_" + typeName,
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,

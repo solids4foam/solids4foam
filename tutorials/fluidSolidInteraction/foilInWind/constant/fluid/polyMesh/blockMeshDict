@@ -1,0 +1,404 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// X locations
+x0 0;
+x1 5;
+x2 6;
+x3 10;
+x4 20;
+
+// Y locations
+y0 0;
+y1 5;
+y2 5.47;
+y3 5.53;
+y4 6;
+y5 11;
+
+// Z locations (4 planes)
+z0 0;
+z1 4;
+z2 7;
+z3 11;
+
+// Mesh parameters
+// Number of cells
+nx1 10;
+nx2 4; // block
+nx3 16; // tail
+nx4 20;
+
+ny1 10;
+ny2 4;
+ny3 3;
+ny4 4;
+ny5 10;
+
+nz1 8;
+nz2 12;
+nz3 8;
+
+// Block grading
+gx0 0.2;
+gx3 5;
+gy0 0.2;
+gy4 5;
+gz0 0.2;
+gz2 5;
+
+// All dimensions are in cm
+scale 0.01;
+
+vertices
+(
+    // -------- z0 --------
+    ($x0 $y0 $z0) ($x1 $y0 $z0) ($x2 $y0 $z0) ($x3 $y0 $z0) ($x4 $y0 $z0)
+    ($x0 $y1 $z0) ($x1 $y1 $z0) ($x2 $y1 $z0) ($x3 $y1 $z0) ($x4 $y1 $z0)
+    ($x0 $y2 $z0) ($x1 $y2 $z0) ($x2 $y2 $z0) ($x3 $y2 $z0) ($x4 $y2 $z0)
+    ($x0 $y3 $z0) ($x1 $y3 $z0) ($x2 $y3 $z0) ($x3 $y3 $z0) ($x4 $y3 $z0)
+    ($x0 $y4 $z0) ($x1 $y4 $z0) ($x2 $y4 $z0) ($x3 $y4 $z0) ($x4 $y4 $z0)
+    ($x0 $y5 $z0) ($x1 $y5 $z0) ($x2 $y5 $z0) ($x3 $y5 $z0) ($x4 $y5 $z0)
+
+    // -------- z1 --------
+    ($x0 $y0 $z1) ($x1 $y0 $z1) ($x2 $y0 $z1) ($x3 $y0 $z1) ($x4 $y0 $z1)
+    ($x0 $y1 $z1) ($x1 $y1 $z1) ($x2 $y1 $z1) ($x3 $y1 $z1) ($x4 $y1 $z1)
+    ($x0 $y2 $z1) ($x1 $y2 $z1) ($x2 $y2 $z1) ($x3 $y2 $z1) ($x4 $y2 $z1)
+    ($x0 $y3 $z1) ($x1 $y3 $z1) ($x2 $y3 $z1) ($x3 $y3 $z1) ($x4 $y3 $z1)
+    ($x0 $y4 $z1) ($x1 $y4 $z1) ($x2 $y4 $z1) ($x3 $y4 $z1) ($x4 $y4 $z1)
+    ($x0 $y5 $z1) ($x1 $y5 $z1) ($x2 $y5 $z1) ($x3 $y5 $z1) ($x4 $y5 $z1)
+
+    // -------- z2 --------
+    ($x0 $y0 $z2) ($x1 $y0 $z2) ($x2 $y0 $z2) ($x3 $y0 $z2) ($x4 $y0 $z2)
+    ($x0 $y1 $z2) ($x1 $y1 $z2) ($x2 $y1 $z2) ($x3 $y1 $z2) ($x4 $y1 $z2)
+    ($x0 $y2 $z2) ($x1 $y2 $z2) ($x2 $y2 $z2) ($x3 $y2 $z2) ($x4 $y2 $z2)
+    ($x0 $y3 $z2) ($x1 $y3 $z2) ($x2 $y3 $z2) ($x3 $y3 $z2) ($x4 $y3 $z2)
+    ($x0 $y4 $z2) ($x1 $y4 $z2) ($x2 $y4 $z2) ($x3 $y4 $z2) ($x4 $y4 $z2)
+    ($x0 $y5 $z2) ($x1 $y5 $z2) ($x2 $y5 $z2) ($x3 $y5 $z2) ($x4 $y5 $z2)
+
+    // -------- z3 --------
+    ($x0 $y0 $z3) ($x1 $y0 $z3) ($x2 $y0 $z3) ($x3 $y0 $z3) ($x4 $y0 $z3)
+    ($x0 $y1 $z3) ($x1 $y1 $z3) ($x2 $y1 $z3) ($x3 $y1 $z3) ($x4 $y1 $z3)
+    ($x0 $y2 $z3) ($x1 $y2 $z3) ($x2 $y2 $z3) ($x3 $y2 $z3) ($x4 $y2 $z3)
+    ($x0 $y3 $z3) ($x1 $y3 $z3) ($x2 $y3 $z3) ($x3 $y3 $z3) ($x4 $y3 $z3)
+    ($x0 $y4 $z3) ($x1 $y4 $z3) ($x2 $y4 $z3) ($x3 $y4 $z3) ($x4 $y4 $z3)
+    ($x0 $y5 $z3) ($x1 $y5 $z3) ($x2 $y5 $z3) ($x3 $y5 $z3) ($x4 $y5 $z3)
+);
+
+blocks
+(
+    // =========================
+    // k = 0 → 1
+    // =========================
+
+    // j = 0
+    hex (0 1 6 5   30 31 36 35) ($nx1 $ny1 $nz1) simpleGrading ($gx0 $gy0 $gz0)
+    hex (1 2 7 6   31 32 37 36) ($nx2 $ny1 $nz1) simpleGrading (1 $gy0 $gz0)
+    hex (2 3 8 7   32 33 38 37) ($nx3 $ny1 $nz1) simpleGrading (1 $gy0 $gz0)
+    hex (3 4 9 8   33 34 39 38) ($nx4 $ny1 $nz1) simpleGrading ($gx3 $gy0 $gz0)
+
+    // j = 1
+    hex (5 6 11 10   35 36 41 40) ($nx1 $ny2 $nz1) simpleGrading ($gx0 1 $gz0)
+    hex (6 7 12 11   36 37 42 41) ($nx2 $ny2 $nz1) simpleGrading (1 1 $gz0)
+    hex (7 8 13 12   37 38 43 42) ($nx3 $ny2 $nz1) simpleGrading (1 1 $gz0)
+    hex (8 9 14 13   38 39 44 43) ($nx4 $ny2 $nz1) simpleGrading ($gx3 1 $gz0)
+
+    // j = 2 (hole at i=1)
+    hex (10 11 16 15   40 41 46 45) ($nx1 $ny3 $nz1) simpleGrading ($gx0 1 $gz0)
+    hex (11 12 17 16   41 42 47 46) ($nx2 $ny3 $nz1) simpleGrading (1 1 $gz0)
+    hex (12 13 18 17   42 43 48 47) ($nx3 $ny3 $nz1) simpleGrading (1 1 $gz0)
+    hex (13 14 19 18   43 44 49 48) ($nx4 $ny3 $nz1) simpleGrading ($gx3 1 $gz0)
+
+    // j = 3
+    hex (15 16 21 20   45 46 51 50) ($nx1 $ny4 $nz1) simpleGrading ($gx0 1 $gz0)
+    hex (16 17 22 21   46 47 52 51) ($nx2 $ny4 $nz1) simpleGrading (1 1 $gz0)
+    hex (17 18 23 22   47 48 53 52) ($nx3 $ny4 $nz1) simpleGrading (1 1 $gz0)
+    hex (18 19 24 23   48 49 54 53) ($nx4 $ny4 $nz1) simpleGrading ($gx3 1 $gz0)
+
+    // j = 4
+    hex (20 21 26 25   50 51 56 55) ($nx1 $ny5 $nz1) simpleGrading ($gx0 $gy4 $gz0)
+    hex (21 22 27 26   51 52 57 56) ($nx2 $ny5 $nz1) simpleGrading (1 $gy4 $gz0)
+    hex (22 23 28 27   52 53 58 57) ($nx3 $ny5 $nz1) simpleGrading (1 $gy4 $gz0)
+    hex (23 24 29 28   53 54 59 58) ($nx4 $ny5 $nz1) simpleGrading ($gx3 $gy4 $gz0)
+
+    // =========================
+    // k = 1 → 2
+    // =========================
+
+    // j = 0
+    hex (30 31 36 35   60 61 66 65) ($nx1 $ny1 $nz2) simpleGrading ($gx0 $gy0 1)
+    hex (31 32 37 36   61 62 67 66) ($nx2 $ny1 $nz2) simpleGrading (1 $gy0 1)
+    hex (32 33 38 37   62 63 68 67) ($nx3 $ny1 $nz2) simpleGrading (1 $gy0 1)
+    hex (33 34 39 38   63 64 69 68) ($nx4 $ny1 $nz2) simpleGrading ($gx3 $gy0 1)
+
+    // j = 1
+    hex (35 36 41 40   65 66 71 70) ($nx1 $ny2 $nz2) simpleGrading ($gx0 1 1)
+    //hex (36 37 42 41   66 67 72 71) ($nx2 $ny2 $nz2) simpleGrading (1 1 1)
+    hex (37 38 43 42   67 68 73 72) ($nx3 $ny2 $nz2) simpleGrading (1 1 1)
+    hex (38 39 44 43   68 69 74 73) ($nx4 $ny2 $nz2) simpleGrading ($gx3 1 1)
+
+    // j = 2  (previously had hole — now INCLUDED)
+    hex (40 41 46 45   70 71 76 75) ($nx1 $ny3 $nz2) simpleGrading ($gx0 1 1)
+    //hex (41 42 47 46   71 72 77 76) ($nx2 $ny3 $nz2) simpleGrading (1 1 1)
+    //hex (42 43 48 47   72 73 78 77) ($nx3 $ny3 $nz2) simpleGrading (1 1 1)
+    hex (43 44 49 48   73 74 79 78) ($nx4 $ny3 $nz2) simpleGrading ($gx3 1 1)
+
+    // j = 3
+    hex (45 46 51 50   75 76 81 80) ($nx1 $ny4 $nz2) simpleGrading ($gx0 1 1)
+    //hex (46 47 52 51   76 77 82 81) ($nx2 $ny4 $nz2) simpleGrading (1 1 1)
+    hex (47 48 53 52   77 78 83 82) ($nx3 $ny4 $nz2) simpleGrading (1 1 1)
+    hex (48 49 54 53   78 79 84 83) ($nx4 $ny4 $nz2) simpleGrading ($gx3 1 1)
+
+    // j = 4
+    hex (50 51 56 55   80 81 86 85) ($nx1 $ny5 $nz2) simpleGrading ($gx0 $gy4 1)
+    hex (51 52 57 56   81 82 87 86) ($nx2 $ny5 $nz2) simpleGrading (1 $gy4 1)
+    hex (52 53 58 57   82 83 88 87) ($nx3 $ny5 $nz2) simpleGrading (1 $gy4 1)
+    hex (53 54 59 58   83 84 89 88) ($nx4 $ny5 $nz2) simpleGrading ($gx3 $gy4 1)
+
+    // =========================
+    // k = 2 → 3
+    // =========================
+
+    // j = 0
+    hex (60 61 66 65   90 91 96 95) ($nx1 $ny1 $nz3) simpleGrading ($gx0 $gy0 $gz2)
+    hex (61 62 67 66   91 92 97 96) ($nx2 $ny1 $nz3) simpleGrading (1 $gy0 $gz2)
+    hex (62 63 68 67   92 93 98 97) ($nx3 $ny1 $nz3) simpleGrading (1 $gy0 $gz2)
+    hex (63 64 69 68   93 94 99 98) ($nx4 $ny1 $nz3) simpleGrading ($gx3 $gy0 $gz2)
+
+    // j = 1
+    hex (65 66 71 70   95 96 101 100) ($nx1 $ny2 $nz3) simpleGrading ($gx0 1 $gz2)
+    hex (66 67 72 71   96 97 102 101) ($nx2 $ny2 $nz3) simpleGrading (1 1 $gz2)
+    hex (67 68 73 72   97 98 103 102) ($nx3 $ny2 $nz3) simpleGrading (1 1 $gz2)
+    hex (68 69 74 73   98 99 104 103) ($nx4 $ny2 $nz3) simpleGrading ($gx3 1 $gz2)
+
+    // j = 2  (included)
+    hex (70 71 76 75   100 101 106 105) ($nx1 $ny3 $nz3) simpleGrading ($gx0 1 $gz2)
+    hex (71 72 77 76   101 102 107 106) ($nx2 $ny3 $nz3) simpleGrading (1 1 $gz2)
+    hex (72 73 78 77   102 103 108 107) ($nx3 $ny3 $nz3) simpleGrading (1 1 $gz2)
+    hex (73 74 79 78   103 104 109 108) ($nx4 $ny3 $nz3) simpleGrading ($gx3 1 $gz2)
+
+    // j = 3
+    hex (75 76 81 80   105 106 111 110) ($nx1 $ny4 $nz3) simpleGrading ($gx0 1 $gz2)
+    hex (76 77 82 81   106 107 112 111) ($nx2 $ny4 $nz3) simpleGrading (1 1 $gz2)
+    hex (77 78 83 82   107 108 113 112) ($nx3 $ny4 $nz3) simpleGrading (1 1 $gz2)
+    hex (78 79 84 83   108 109 114 113) ($nx4 $ny4 $nz3) simpleGrading ($gx3 1 $gz2)
+
+    // j = 4
+    hex (80 81 86 85   110 111 116 115) ($nx1 $ny5 $nz3) simpleGrading ($gx0 $gy4 $gz2)
+    hex (81 82 87 86   111 112 117 116) ($nx2 $ny5 $nz3) simpleGrading (1 $gy4 $gz2)
+    hex (82 83 88 87   112 113 118 117) ($nx3 $ny5 $nz3) simpleGrading (1 $gy4 $gz2)
+    hex (83 84 89 88   113 114 119 118) ($nx4 $ny5 $nz3) simpleGrading ($gx3 $gy4 $gz2)
+);
+
+edges
+(
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+            (
+                // ===== k = 0 → 1 =====
+                (0 5 35 30)
+                (5 10 40 35)
+                (10 15 45 40)
+                (15 20 50 45)
+                (20 25 55 50)
+
+                // ===== k = 1 → 2 =====
+                (30 35 65 60)
+                (35 40 70 65)
+                (40 45 75 70)
+                (45 50 80 75)
+                (50 55 85 80)
+
+                // ===== k = 2 → 3 =====
+                (60 65 95 90)
+                (65 70 100 95)
+                (70 75 105 100)
+                (75 80 110 105)
+                (80 85 115 110)
+            );
+    }
+
+    outlet
+    {
+        type patch;
+        faces
+            (
+                // ===== k = 0 → 1 =====
+                (4 34 39 9)
+                (9 39 44 14)
+                (14 44 49 19)
+                (19 49 54 24)
+                (24 54 59 29)
+
+                // ===== k = 1 → 2 =====
+                (34 64 69 39)
+                (39 69 74 44)
+                (44 74 79 49)
+                (49 79 84 54)
+                (54 84 89 59)
+
+                // ===== k = 2 → 3 =====
+                (64 94 99 69)
+                (69 99 104 74)
+                (74 104 109 79)
+                (79 109 114 84)
+                (84 114 119 89)
+            );
+    }
+
+    walls
+    {
+        type wall;
+        faces
+            (
+                // ===== bottom (y = y0) =====
+                // k = 0 → 1
+                (0 30 31 1)
+                (1 31 32 2)
+                (2 32 33 3)
+                (3 33 34 4)
+
+                // k = 1 → 2
+                (30 60 61 31)
+                (31 61 62 32)
+                (32 62 63 33)
+                (33 63 64 34)
+
+                // k = 2 → 3
+                (60 90 91 61)
+                (61 91 92 62)
+                (62 92 93 63)
+                (63 93 94 64)
+
+                // ===== top (y = y5) =====
+                // k = 0 → 1
+                (25 26 56 55)
+                (26 27 57 56)
+                (27 28 58 57)
+                (28 29 59 58)
+
+                // k = 1 → 2
+                (55 56 86 85)
+                (56 57 87 86)
+                (57 58 88 87)
+                (58 59 89 88)
+
+                // k = 2 → 3
+                (85 86 116 115)
+                (86 87 117 116)
+                (87 88 118 117)
+                (88 89 119 118)
+
+                // ===== front (z = z0) =====
+                // j = 0..4
+                (0 1 6 5)
+                (1 2 7 6)
+                (2 3 8 7)
+                (3 4 9 8)
+
+                (5 6 11 10)
+                (6 7 12 11)
+                (7 8 13 12)
+                (8 9 14 13)
+
+                (10 11 16 15)
+                (11 12 17 16)
+                (12 13 18 17)
+                (13 14 19 18)
+
+                (15 16 21 20)
+                (16 17 22 21)
+                (17 18 23 22)
+                (18 19 24 23)
+
+                (20 21 26 25)
+                (21 22 27 26)
+                (22 23 28 27)
+                (23 24 29 28)
+
+                // ===== back (z = z3) =====
+                // j = 0..4
+
+                (90 95 96 91)
+                (91 96 97 92)
+                (92 97 98 93)
+                (93 98 99 94)
+
+                (95 100 101 96)
+                (96 101 102 97)
+                (97 102 103 98)
+                (98 103 104 99)
+
+                (100 105 106 101)
+                (101 106 107 102)
+                (102 107 108 103)
+                (103 108 109 104)
+
+                (105 110 111 106)
+                (106 111 112 107)
+                (107 112 113 108)
+                (108 113 114 109)
+
+                (110 115 116 111)
+                (111 116 117 112)
+                (112 117 118 113)
+                (113 118 119 114)
+            );
+    }
+
+    flag
+    {
+        type wall;
+        faces
+        (
+            // +x face
+            (43 73 78 48)
+
+            // -y face
+            (42 72 73 43)
+
+            // +y face
+            (47 48 78 77)
+
+            // -z face
+            (42 43 48 47)
+
+            // +z face
+            (72 77 78 73)
+        );
+    }
+);
+
+// Set the remaining boundary faces to be the block object
+defaultPatch
+{
+    name block;
+    type wall;
+}
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

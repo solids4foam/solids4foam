@@ -24,10 +24,12 @@ function usage()
     while [ "$#" -ge 1 ]; do echo "$1"; shift; done
     cat<<USAGE
 
-usage: ${0##*/} [OPTION]
+usage: ${0##*/} [-j [N]] [OPTION]
 
 options:
   -help         Print the usage
+  -j [N]        Limit the number of parallel jobs. If N is omitted, use all
+                available cores.
 
 Quickly tests the tutorials and writes out the scheme/solver information.
 
@@ -52,6 +54,9 @@ function die()
 # Extracts useful info from log file.
 function logReport()
 {
+    # Return if a directory is provided
+    [ -f "$1" ] || return
+
     case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
     app=`echo $1 | sed s/"\(.*\)\."/""/g`
     if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
@@ -86,41 +91,212 @@ function logReport()
     fi
 }
 
-# Run cases (similar to foamRunTutorials)
-function runCases()
+function get_num_cores()
 {
-    thisScript=$0
-    if [ "/${thisScript#/}" != "$thisScript" ]
+    # Linux: physical cores
+    if command -v lscpu > /dev/null 2>&1
     then
-        thisScript="$PWD/$thisScript"
+        cores=$(lscpu | awk '/^Core\(s\) per socket:/ {c=$4} /^Socket\(s\):/ {s=$2} END {if (c && s) print c*s}')
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
     fi
 
-    # If an argument is supplied do not execute ./Allrun to avoid recursion
-    if [ $# = 0 -a -f "./Allrun" ]
+    # macOS / BSD: physical cores
+    if command -v sysctl > /dev/null 2>&1
     then
-        echo; echo "execute Allrun"
-        # Specialised script.
-        ./Allrun
+        cores=$(sysctl -n hw.physicalcpu 2>/dev/null)
+        if [ -n "$cores" ]; then
+            echo "$cores"
+            return
+        fi
+    fi
+
+    # Fallback: logical CPUs
+    if command -v nproc > /dev/null 2>&1
+    then
+        nproc
+    elif command -v getconf > /dev/null 2>&1
+    then
+        getconf _NPROCESSORS_ONLN
     else
-        # Loop over sub-directories and compile any applications
-        for case in *
+        sysctl -n hw.ncpu
+    fi
+}
+
+function compileApplications()
+{
+    find . -type d -name Make | while read -r makeDir
+    do
+        caseDir=$(dirname "$makeDir")
+        parentDir=$(dirname "$caseDir")
+        caseName=$(basename "$caseDir")
+
+        if shouldSkipCaseDueToRuntimeSelection "$parentDir"
+        then
+            echo "Skipping compile for ${parentDir#./}: case is not intended to run under ${WM_PROJECT} ${WM_PROJECT_VERSION}"
+            continue
+        fi
+
+        echo "compileApplication ${caseDir#./}"
+        (
+            cd "$parentDir" || exit 1
+            compileApplication "$caseName"
+        )
+    done
+}
+
+function shouldSkipCaseDueToRuntimeSelection()
+{
+    local dir="$1"
+    local allrunDir=""
+
+    while [[ "$dir" != "." && "$dir" != "/" && -n "$dir" ]]
+    do
+        if [[ -f "$dir/Allrun" ]]
+        then
+            allrunDir="$dir"
+            break
+        fi
+        dir=$(dirname "$dir")
+    done
+
+    if [[ -z "$allrunDir" ]]
+    then
+        return 1
+    fi
+
+    local allrunFile="${allrunDir}/Allrun"
+    local project="${WM_PROJECT:-}"
+    local version="${WM_PROJECT_VERSION:-}"
+
+    if [[ -z "$project" || -z "$version" ]]
+    then
+        return 1
+    fi
+
+    if grep -qF "solids4Foam::caseDoesNotRunWithOpenFOAMOrg" "$allrunFile"
+    then
+    if [[ "$project" == "OpenFOAM" && "$version" != v* ]]
+    then
+        return 0
+    fi
+    fi
+
+    if grep -qF "solids4Foam::caseDoesNotRunWithFoamExtend" "$allrunFile"
+    then
+        if [[ "$project" == "foam" ]]
+        then
+            return 0
+        fi
+    fi
+
+    if grep -qF "solids4Foam::caseOnlyRunsWithFoamExtend" "$allrunFile"
+    then
+        if [[ "$project" != "foam" ]]
+        then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+function runCase()
+{
+    caseDir="$1"
+
+    echo "Running ${caseDir#./}"
+    (
+        cd "$caseDir" || exit 1
+        ./Allrun > log.Allrun 2>&1
+    )
+}
+
+function waitForAvailableSlot()
+{
+    while [ "$ACTIVE_JOBS" -ge "$MAX_JOBS" ]
+    do
+        livePids=""
+
+        for pid in $PIDS
         do
-            if [ -d $case -a -d "$case/Make" ]
+            if kill -0 "$pid" 2> /dev/null
             then
-                (compileApplication $case)
+                livePids="${livePids} ${pid}"
+            else
+                ACTIVE_JOBS=$((ACTIVE_JOBS - 1))
             fi
         done
 
-        # Recurse to subdirectories
-        for case in *
-        do
-            if [ -d $case ]
-            then
-                echo "cd $case and runCases"
-                (cd $case && runCases)
-            fi
-        done
+        PIDS="${livePids# }"
+
+        if [ "$ACTIVE_JOBS" -ge "$MAX_JOBS" ]
+        then
+            sleep 1
+        fi
+    done
+}
+
+function runCasesInParallel()
+{
+    ACTIVE_JOBS=0
+    PIDS=""
+
+    while read -r allrunFile
+    do
+        caseDir=$(dirname "$allrunFile")
+
+        if [[ "$SKIP_PRECICE_CASES" -eq 1 && "$caseDir" == ./*fluidSolidInteraction-preCICE* ]]
+        then
+            echo "Skipping preCICE case: ${caseDir#./}"
+            continue
+        fi
+
+        waitForAvailableSlot
+
+        runCase "$caseDir" &
+        pid=$!
+        ACTIVE_JOBS=$((ACTIVE_JOBS + 1))
+
+        if [ -n "$PIDS" ]
+        then
+            PIDS="${PIDS} ${pid}"
+        else
+            PIDS="${pid}"
+        fi
+    done < <(find . -type f -name Allrun | sort)
+
+    if [ -n "$PIDS" ]
+    then
+        wait $PIDS
     fi
+}
+
+function cleanCopiedCaseArtifacts()
+{
+    local dir="$1"
+
+    find "$dir" -type f -name "log.*" -delete
+    find "$dir" -type d \( -name postProcessing -o -name dynamicCode -o -name "processor*" \) -prune -exec rm -rf {} +
+}
+
+function preciceAdapterAvailable()
+{
+    local libDirs=()
+    [[ -n "${FOAM_USER_LIBBIN}" ]] && libDirs+=("${FOAM_USER_LIBBIN}")
+    [[ -n "${FOAM_LIBBIN}" ]] && libDirs+=("${FOAM_LIBBIN}")
+
+    for libDir in "${libDirs[@]}"
+    do
+        if [[ -f "${libDir}/libpreciceAdapterFunctionObject.so" ]] || \
+           [[ -f "${libDir}/libpreciceAdapterFunctionObject.dylib" ]]
+        then
+            return 0
+        fi
+    done
+    return 1
 }
 
 
@@ -129,11 +305,25 @@ function runCases()
 #
 
 rootDir="./"
+MAX_JOBS=""
+SKIP_PRECICE_CASES=0
 
 # Parse options
 while [ "$#" -gt 0 ]
 do
     case "$1" in
+    -j)
+        if [ "$#" -gt 1 ] && [ "${2#-}" = "$2" ]
+        then
+            MAX_JOBS="$2"
+            shift
+        else
+            MAX_JOBS="auto"
+        fi
+        ;;
+    -j*)
+        MAX_JOBS="${1#-j}"
+        ;;
     -h | -help)
         usage
         ;;
@@ -150,6 +340,29 @@ done
 # Set test directory
 TEST_RUN_DIR=../tutorialsTest
 
+if [ -z "$MAX_JOBS" ] || [ "$MAX_JOBS" = "auto" ]
+then
+    MAX_JOBS=$(get_num_cores)
+    echo "MAX_JOBS = $MAX_JOBS"
+fi
+
+case "$MAX_JOBS" in
+    ''|*[!0-9]*)
+        die "Invalid job limit: '$MAX_JOBS'"
+        ;;
+esac
+
+if [ "$MAX_JOBS" -lt 1 ]
+then
+    die "Invalid job limit: '$MAX_JOBS'"
+fi
+
+if ! preciceAdapterAvailable
+then
+    echo "preCICE adapter not detected; skipping fluidSolidInteraction-preCICE tutorials."
+    SKIP_PRECICE_CASES=1
+fi
+
 
 #
 # MAIN
@@ -163,10 +376,14 @@ then
 fi
 
 # Copy tutorials
+echo "Copying $rootDir to $TEST_RUN_DIR"
 cp -a "$rootDir" "$TEST_RUN_DIR"
 
 # Enter test directory
 cd "$TEST_RUN_DIR" || exit
+
+echo "Removing copied logs and generated case output"
+cleanCopiedCaseArtifacts .
 
 # Modify controlDicts
 echo "Modifying the case controlDicts to run only one time step"
@@ -244,9 +461,13 @@ done
 # Remove high-level Allrun
 rm Allrun*
 
-# Run cases recursively
-echo "Running cases "; echo "    $PWD"; echo
-runCases
+# Compile any tutorial applications before running the cases
+echo "Compiling tutorial applications "; echo "    $PWD"; echo
+compileApplications
+
+# Run cases in parallel
+echo "Running cases with up to ${MAX_JOBS} parallel job(s)"; echo "    $PWD"; echo
+runCasesInParallel
 
 # Prepare summary files
 echo; echo "Preparing testLoopReport"

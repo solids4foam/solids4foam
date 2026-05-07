@@ -40,7 +40,18 @@ $$
 + \boldsymbol{f_b}
 $$
 
-We will use the PIMPLE pressure-velocity coupling algorithm:
+The tutorial supports three solver configurations through `Allrun`:
+
+- `./Allrun`: `pimpleFluid` with PIMPLE `residualControl` of `1e-4` for both
+  `U` and `p`.
+- `./Allrun newtonIcoFluid`: `newtonIcoFluid` with a PETSc Schur `fieldsplit`
+  preconditioner, hypre BoomerAMG on the pressure block, and SNES stopping
+  tolerances of `1e-4`.
+- `./Allrun newtonIcoFluidPhysicsPC`: `newtonIcoFluid` with an opt-in
+  SIMPLE-type physics preconditioner using one fixed momentum correction and
+  one fixed pressure correction per preconditioner application.
+
+The default option uses the PIMPLE pressure-velocity coupling algorithm:
 
 ```pseudocode
 for all time-steps
@@ -50,6 +61,12 @@ for all time-steps
     while not converged
 end
 ```
+
+The `newtonIcoFluid` options solve the coupled velocity-pressure system with
+PETSc SNES. The Schur `fieldsplit` configuration is the default coupled setup
+for this tutorial. The SIMPLE-type physics preconditioner is included as an
+experimental benchmark configuration: it can reduce Krylov iterations, but the
+extra OpenFOAM `GAMG` pressure-correction work can dominate in parallel runs.
 
 ---
 
@@ -67,8 +84,18 @@ Peric (2002)**
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e.
-`> ./Allrun`. In this case, the `Allrun` script is
+The tutorial case can be run using the included `Allrun` script:
+
+- `./Allrun` runs the residual-controlled `pimpleFluid` setup.
+- `./Allrun newtonIcoFluid` runs the coupled `newtonIcoFluid` setup with
+  hypre BoomerAMG pressure-block preconditioning in the tuned PETSc options.
+- `./Allrun newtonIcoFluidPhysicsPC` runs the coupled `newtonIcoFluid` setup
+  with the opt-in SIMPLE-type physics preconditioner.
+
+The physics-PC variant also accepts the dictionary-style alias
+`./Allrun newtonIcoFluid.physicsPC`.
+
+The current `Allrun` script is
 
 ```bash
 #!/bin/bash
@@ -76,11 +103,39 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Example usage:
+# ./Allrun                         -> pimpleFluid + residualControl 1e-4
+# ./Allrun newtonIcoFluid          -> newtonIcoFluid + PETSc Schur fieldsplit
+#                                   + hypre pressure block
+# ./Allrun newtonIcoFluidPhysicsPC -> newtonIcoFluid + SIMPLE-type physics PC
+
+# Parse arguments
+SOLVER="pimpleFluid"
+FV_SOLUTION="pimpleFluid"
+SOLVER_DESCRIPTION="residualControl 1e-4"
+for arg in "$@"; do
+    if [[ "$arg" == "newtonIcoFluid" ]]; then
+        SOLVER="newtonIcoFluid"
+        FV_SOLUTION="newtonIcoFluid"
+        SOLVER_DESCRIPTION="PETSc Schur fieldsplit preconditioning"
+    elif [[ "$arg" == "newtonIcoFluidPhysicsPC" \
+        || "$arg" == "newtonIcoFluid.physicsPC" ]]; then
+        SOLVER="newtonIcoFluid"
+        FV_SOLUTION="newtonIcoFluid.physicsPC"
+        SOLVER_DESCRIPTION="PETSc SIMPLE-type physics preconditioning"
+    fi
+done
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+# Select the fluid solver and fvSolution
+cp -f "constant/fluidProperties.${SOLVER}" constant/fluidProperties
+cp -f "system/fvSolution.${FV_SOLUTION}" system/fvSolution
+echo "Using ${SOLVER} with ${SOLVER_DESCRIPTION}"
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
@@ -92,11 +147,8 @@ solids4Foam::runApplication solids4Foam
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    if [[ -f "./postProcessing/forces/0/forces.dat" ]]
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.of9.gnuplot &> /dev/null
-    else
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null
     fi
@@ -107,13 +159,15 @@ fi
 
 where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
 case to make it compatible with your version of OpenFOAM/foam-extend. As can be
-seen, the mesh in the fluent format is converted to the OpenFOAM format before
-running the `solids4Foam` solver. After the solver has finished, a `force.pdf`
-plot is generated if the `gnuplot` program is installed.
+seen, the script first selects either the `pimpleFluid` or
+`newtonIcoFluid` dictionaries, then converts the mesh in the fluent format to
+the OpenFOAM format before running `solids4Foam`. After the solver has
+finished, a `force.pdf` plot is generated if the `gnuplot` program is
+installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
- `Allrun` script, i.e. `./Allclean`.
+`Allclean` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -162,7 +216,10 @@ cylinderInChannel
     ├── changeDictionaryDict
     ├── controlDict
     ├── fvSchemes
-    └── fvSolution
+    ├── fvSolution
+    ├── fvSolution.newtonIcoFluid
+    ├── fvSolution.newtonIcoFluid.physicsPC
+    └── fvSolution.pimpleFluid
 ```
 
 The only difference with a `pimpleFoam` case is that a
@@ -188,8 +245,14 @@ pimpleFluidCoeffs
 
 ```note
 The `pimpleFluid` fluid model does not require any settings to be specified.
- Parameters related to the PIMPLE algorithm as instead specified in
- `system/fvSolution`, just like for the `pimpleFoam` solver.
+Parameters related to the PIMPLE algorithm are instead specified in
+`system/fvSolution`, just like for the `pimpleFoam` solver. In this tutorial,
+`system/fvSolution.pimpleFluid` stores the residual-controlled PIMPLE setup,
+while `system/fvSolution.newtonIcoFluid` stores the tuned PETSc options for the
+coupled Newton solve, including hypre BoomerAMG pressure-block preconditioning.
+The opt-in `system/fvSolution.newtonIcoFluid.physicsPC` variant uses a
+SIMPLE-type physics preconditioner with one fixed `dU` correction and one fixed
+`dp` correction per preconditioner application.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`
@@ -203,8 +266,8 @@ terms of `transportProperties`, `RASProperties`, `dynamicMeshDict`, `U`, `p`,
 
 For the `cylinderInChannel` test case, we have selected a “fluid” analysis in
 the `physicsProperties` dictionary: this means a `fluidModel` class will be
-selected; then, we specify the actual `solidModel` class to be the `pimpleFluid`
-class.
+selected; then, we specify the actual `fluidModel` class in the
+`fluidProperties` dictionary.
 
 The code for the pimpleFluid class is located at:
 
@@ -213,4 +276,14 @@ solids4foam/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.C
 ```
 
 and this code directly ports the `pimpleFoam` solver code; in particular, see
-the `evolve()` function with `pimpleFluid.C`.
+the `evolve()` function in `pimpleFluid.C`.
+
+The coupled Newton option uses the `newtonIcoFluid` class:
+
+```bash
+solids4foam/src/solids4FoamModels/fluidModels/newtonIcoFluid/newtonIcoFluid.C
+```
+
+The `system/fvSolution.newtonIcoFluid.physicsPC` variant exercises the
+`newtonIcoFluid::precondition(...)` path through PETSc's `physics`
+preconditioner.

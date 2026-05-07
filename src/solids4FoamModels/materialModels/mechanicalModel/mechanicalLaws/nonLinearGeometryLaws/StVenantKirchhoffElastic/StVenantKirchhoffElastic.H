@@ -110,6 +110,12 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Return the bulk modulus field
+        virtual tmp<volScalarField> bulkModulus() const;
+
+        //- Return the shear modulus field
+        virtual tmp<volScalarField> shearModulus() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 

@@ -13,5 +13,8 @@ cleanCase
 \rm -rf VTK case.foam postProcessing constant/polyMesh/boundary
 \rm -rf system/cellsToSmoothSubset
 
+# Re-link the default fvSolutions
+(cd system && rm -f fvSolution && ln -s fvSolution.petscSnes fvSolution)
+
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

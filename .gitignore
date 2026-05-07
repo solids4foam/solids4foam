@@ -1,6 +1,9 @@
 # git-ls-files --others --exclude-from=.git/info/exclude
 # Lines that start with '#' are comments.
 
+# PETSc state file
+.petsc_state
+
 notes.txt
 todo*
 tutorialsTest*

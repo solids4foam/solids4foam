@@ -11,45 +11,13 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "system";
-    object      fvSchemes;
+    class       uniformDimensionedVectorField;
+    location    "constant";
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default                 backward;
-}
-
-ddtSchemes
-{
-    default                 backward;
-}
-
-gradSchemes
-{
-    default                 leastSquaresS4f;
-}
-
-divSchemes
-{
-    default                 Gauss linear;
-}
-
-laplacianSchemes
-{
-    default                 Gauss linear corrected;
-}
-
-snGradSchemes
-{
-    default                 corrected;
-}
-
-interpolationSchemes
-{
-    default                 linear;
-}
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 0 0 );
 
 // ************************************************************************* //

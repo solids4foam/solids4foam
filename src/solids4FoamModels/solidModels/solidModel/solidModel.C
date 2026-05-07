@@ -21,7 +21,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
@@ -1135,6 +1135,39 @@ Foam::solidModel::solidModel
         *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
+    QuasiNewtonRestartFreq_
+    (
+        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
+    ),
+    QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
+    QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
+    QuasiNewtonT_(QuasiNewtonRestartFreq_ + 2),
+    DRef_
+    (
+        IOobject
+        (
+            "DRef",
+            runTime.constant(),
+            *meshPtr_,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        *meshPtr_,
+        dimensionedVector("zero", dimLength, vector::zero)
+    ),
+    unrelaxedDRef_
+    (
+        IOobject
+        (
+            "unrelaxedDRef",
+            runTime.constant(),
+            *meshPtr_,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        *meshPtr_,
+        dimensionedVector("zero", dimLength, vector::zero)
+    ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
     restart_
@@ -1261,6 +1294,10 @@ Foam::solidModel::solidModel
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
+    if (relaxationMethod_ == "QuasiNewton")
+    {
+        Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
+    }
 
     // If requested, create the residual file
     if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))
@@ -1314,23 +1351,6 @@ Foam::solidModel::solidModel
         stabDict.add("pressure", defaultStabSubDict);
     }
 
-    // Only alpha stabilisation is allowed with high-order residual calculation
-    if (stabDict.found("momentum"))
-    {
-        const dictionary& momentumDict = stabDict.subDict("momentum");
-
-        const word stabType =
-            momentumDict.lookupOrDefault<word>("type", "default");
-
-        if (stabType != "alpha" && highOrderResidual())
-        {
-            FatalErrorInFunction
-                << "Only alpha stabilisation is supported with high-order "
-                << "residual calculation"
-                << abort(FatalError);
-        }
-    }
-
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1339,6 +1359,18 @@ Foam::solidModel::solidModel
             dimless
         );
 
+    // Only stabilisation models that support high-order residual calculation
+    // are allowed when highOrderResidual is enabled
+    if (highOrderResidual() && !momentumStabilisation().supportsHighOrderResidual())
+    {
+        FatalErrorInFunction
+            << "Only stabilisation models that support high-order residual "
+            << "calculation can be used with highOrderResidual = true. "
+            << "Model type " << momentumStabilisation().type()
+            << " does not support it."
+            << abort(FatalError);
+    }
+
     pressureStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1346,6 +1378,13 @@ Foam::solidModel::solidModel
             stabDict.subDict("pressure"),
             dimPressure/dimLength
         );
+
+#ifdef OPENFOAM_COM
+    if (!fvOptions_.optionList::size())
+    {
+        Info<< "No finite volume options present" << endl;
+    }
+#endif
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())

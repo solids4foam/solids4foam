@@ -184,9 +184,6 @@ linearGeometryTotalDisplacementCoeffs
     //solutionAlgorithm implicitSegregated;
     solutionAlgorithm PETScSNES;
     //solutionAlgorithm explicit;
-
-    // PETSc options file used by PETScSNES
-    optionsFile petscOptions.snes;
 }
 ```
 
@@ -197,8 +194,8 @@ Here, the `linearGeometryTotalDisplacement` solid solver can adopt one of three
    displacement component equation is solved separately.
 - `PETScSNES`: using the PETSc SNES nonlinear solver, which is provided with
    the a compact stencil, approcimate Jacobian. Various solution procedures can
-   be specified through the `optionsFile petscOptions.snes;` file included in
-   the case. The Jacobian-free Newton-Krylov approach is typically faster than
+   be specified through the `system/fvSolution` file included in the case. The
+   Jacobian-free Newton-Krylov approach is typically faster than
    the segregated approach, as examined in Cardiff et al. (2025) [3].
 - `explicit`: fully-explicit (matrix-free) approach, where the time step size is
    limited by the stand CFL criterion.

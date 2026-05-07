@@ -21,7 +21,7 @@ License
 #include "volFields.H"
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #ifndef OPENFOAM_NOT_EXTEND
     #include "tetPointFields.H"
     #include "fixedValueTetPolyPatchFields.H"
@@ -995,7 +995,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                   - fluidPatchesPointsDisplsPrev[interfaceI][pointI];
             }
 
-            twoDPointCorrector twoDCorrector(fluidMesh());
+            twoDPointCorrectorS4f twoDCorrector(fluidMesh());
             twoDCorrector.correctPoints(newPoints);
 
             fluidMesh().movePoints(newPoints);
@@ -1242,7 +1242,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //               - fluidZonePointsDisplPrev()[pointI];
     //         }
     //     }
-    //     twoDPointCorrector twoDCorrector(fluidMesh());
+    //     twoDPointCorrectorS4f twoDCorrector(fluidMesh());
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }

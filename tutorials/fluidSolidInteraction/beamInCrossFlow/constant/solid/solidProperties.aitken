@@ -16,7 +16,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel     linearGeometryTotalDisplacement;
 solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
 "linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
@@ -31,12 +30,6 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
     stabilisation
     {
         momentum
-        {
-            type        diffStencilLaplacian;
-            scaleFactor 0.5;
-        }
-
-        pressure
         {
             type        diffStencilLaplacian;
             scaleFactor 0.5;

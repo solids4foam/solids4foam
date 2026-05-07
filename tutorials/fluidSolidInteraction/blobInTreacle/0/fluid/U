@@ -1,0 +1,96 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    left
+    {
+        type            codedFixedValue;
+        value           uniform 0;
+
+        name            smoothRampedParabolicFixedValue;
+
+        code
+        #{
+            // y coordinate
+            const scalarField y
+            (
+                patch().Cf().component(vector::Y)
+            );
+
+            // Velocity magnitude after transition period
+            scalarField UMag((1.0 + 2.0*y)*(1.0 - y));
+
+            // g(t) function
+            // Smoothly ramp the velocity magnitude
+            const scalar t = this->db().time().value();
+            const scalar rampPeriod = 2;
+            if (t < rampPeriod)
+            {
+                UMag *= (1.0 - cos(M_PI*t/rampPeriod))/2.0;
+            }
+
+            // Apply UMag in the x direction
+            operator==(UMag*vector(1, 0, 0));
+        #};
+
+        value             uniform (0 0 0);
+    }
+
+    up
+    {
+        type              fixedValue;
+        // type              fixedValueCorrected;
+        value             uniform (0 0 0);
+    }
+
+    right
+    {
+        type              zeroGradient;
+        //type              fixedGradientCorrected;
+        //gradient          uniform (0 0 0);;
+    }
+
+    cylinder
+    {
+        type              fixedValue;
+        // type            fixedValueCorrected;
+        value           uniform (0 0 0);
+    }
+
+    down
+    {
+        type            symmetryPlane;
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+
+    defaultFaces
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

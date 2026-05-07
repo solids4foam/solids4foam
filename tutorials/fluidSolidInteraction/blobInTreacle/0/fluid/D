@@ -1,0 +1,71 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    left
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+
+    up
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+
+    right
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+
+    cylinder
+    {
+        type           fixedDisplacement;
+
+        // Do not update pointD from D, as the pointD interface field has
+        // already be set from the solid side
+        enforcePointPatchField no;
+        value           uniform (0 0 0);
+    }
+
+    down
+    {
+        type            fixedValue; //symmetryPlane;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+
+    defaultFaces
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

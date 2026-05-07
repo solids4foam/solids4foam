@@ -57,11 +57,20 @@ The $$σ_{xx}$$ and $$σ_{yy}$$ are the Cauchy stress components along
 the _x_ and _y_ directions, respectively, while $$u_x$$ and
 $$u_y$$ are the total displacements along the x and y directions.
 
-**Table 1: Comparison of Cauchy stress and the wall displacement in the x and y
-directions.**
+### Table 1: Cauchy stress and wall displacement in x and y
 
-| Source | $$σ_{xx}$$ (MPa) | $$σ_{yy}$$ (MPa) | $$u_{x}$$ (m) | $$u_{y}$$ (m) |
-| ----------- | ---------- | ---------- | -------------- | -------------  |
-| solids4foam | -49.99        | 100.0         | -0.1636      | 0.4010     |
-| Reference   | -49.00        | 100.0         | -0.1676      | 0.4022     |
-| Analytical  | -50.00        | 100.0         | -0.1675      | 0.4025     |
+- **solids4foam**
+  - $$σ_{xx}$$ (MPa): -49.99
+  - $$σ_{yy}$$ (MPa): 100.0
+  - $$u_{x}$$ (m): -0.1636
+  - $$u_{y}$$ (m): 0.4010
+- **Reference**
+  - $$σ_{xx}$$ (MPa): -49.00
+  - $$σ_{yy}$$ (MPa): 100.0
+  - $$u_{x}$$ (m): -0.1676
+  - $$u_{y}$$ (m): 0.4022
+- **Analytical**
+  - $$σ_{xx}$$ (MPa): -50.00
+  - $$σ_{yy}$$ (MPa): 100.0
+  - $$u_{x}$$ (m): -0.1675
+  - $$u_{y}$$ (m): 0.4025

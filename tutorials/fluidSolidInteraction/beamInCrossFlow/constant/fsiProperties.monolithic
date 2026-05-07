@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface NewtonQuasiMonolithic;
+
+NewtonQuasiMonolithicCoeffs
+{
+    // Solid and fluid interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Enable coupling
+    coupled         yes;
+
+    // Mapping data across the solid-fluid interface
+    interfaceTransferMethod directMap;
+
+    // PETSc SNES options for the monolithic UpU system are defined in
+    // system/fvSolution. Alternatively, an optionsFile can be specified here
+    // instead.
+    //optionsFile     petscOptions.mf_fieldsplit;
+    //optionsFile     petscOptions.lu;
+    //optionsFile     petscOptions.mf_bjacobi_lu;
+
+    // Pass viscous forces from fluid-to-solid interface (in addition to pressure
+    // forces)
+    passViscousStress yes;
+
+    // Scaling for fluid system to improve the condition number
+    fluidSystemScaleFactor 1e+08;
+
+    // Scale solid equations to balance their contribution to the SNES norm.
+    // Default (~0.014 at dt=0.02) leaves the solid 7e9× weaker than the
+    // fluid in the residual norm, so Newton converges the fluid only.
+    //solidSystemScaleFactor 1e+08;
+}
+
+// ************************************************************************* //
