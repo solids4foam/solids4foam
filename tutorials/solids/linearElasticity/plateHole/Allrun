@@ -1,10 +1,139 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   segregated (default), petscSnes, highOrder
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach] [parallel]
+
+Where [approach] is one of:
+  segregated        (default)
+  petscSnes
+  highOrder
+
+Examples:
+  ./Allrun
+  ./Allrun petscSnes
+  ./Allrun highOrder
+
+Any approach can be run in parallel by adding parallel as the second argument.
+
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
+
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-segregated}"
+RUN_MODE="${2:-serial}"
+
+if [[ "$APPROACH" == "parallel" ]]; then
+    APPROACH="segregated"
+    RUN_MODE="parallel"
+fi
+
+case "$APPROACH" in
+    segregated|petscSnes|highOrder) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+case "$RUN_MODE" in
+    serial|parallel) ;;
+    *)
+        echo "Error: Unknown run mode '$RUN_MODE'"
+        usage
+        exit 1
+        ;;
+esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    # $1 = suffix (e.g. petscSnes)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    case "$APPROACH" in
+        petscSnes|highOrder)
+            if [[ -z "${PETSC_DIR:-}" ]]
+            then
+                echo; echo "Skipping this case as PETSc is not installed"
+                echo "Please set the PETSC_DIR variable"; echo
+                exit 0
+            fi
+            ;;
+    esac
+}
+
+select_approach() {
+    case "$APPROACH" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        petscSnes)
+            echo "Using the petscSnes approach"
+            link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+require_petsc_or_exit_silently
+
+select_approach
+
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -13,13 +142,11 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication blockMesh
 
 # Run solver
-if [[ "$1" == "parallel" ]]
+if [[ "$RUN_MODE" == "parallel" ]]
 then
-    # Number of cores passed as an argument
     solids4Foam::runApplication decomposePar
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication reconstructPar
 else
-    # Case runs in serial if no argument is passed or if the argument is 1
     solids4Foam::runApplication solids4Foam
 fi

@@ -12,64 +12,47 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "system";
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-libs            ("libplateHoleAnalytical.so");
-
-application     solids4Foam;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          1;
-
-writeControl    timeStep;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
+d2dt2Schemes
 {
-    forceDisp1
-    {
-        type          solidForcesDisplacements;
-        historyPatch  right;
-    }
+    default                 steadyState;
+}
 
-    pointDisp
-    {
-        type          solidPointDisplacement;
-        point         (0 0.5 0);
-    }
+ddtSchemes
+{
+    default                 steadyState;
+}
 
-    plateHoleAnalyticalSolution1
-    {
-        type          plateHoleAnalyticalSolution;
-        farFieldTractionX 1e6;
-        holeRadius    0.5;
-        E             200e+9;
-        nu            0.3;
-    }
+gradSchemes
+{
+    default                 none;
+    grad(D)                 leastSquaresS4f;
+}
+
+divSchemes
+{
+    default                 none;
+    div(sigma)              Gauss linear;
+    div((impK*grad(D)))     Gauss linear;
+}
+
+laplacianSchemes
+{
+    default                 Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default                 corrected;
+}
+
+interpolationSchemes
+{
+    default                 linear;
 }
 
 // ************************************************************************* //
