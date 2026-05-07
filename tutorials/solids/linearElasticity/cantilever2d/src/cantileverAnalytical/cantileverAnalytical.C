@@ -100,6 +100,12 @@ Foam::tmp<Foam::vectorField> Foam::cantileverAnalytical::displacement
     const vectorField& locations
 ) const
 {
+    if (E_ < SMALL || L_ < SMALL || D_ < SMALL || I_ < SMALL)
+    {
+        FatalErrorInFunction
+            << "E, L, D and I must be greater than 0!" << exit(FatalError);
+    }
+
     // Prepare the result field
     tmp<vectorField> tresult(new vectorField(locations.size(), vector::zero));
     vectorField& result = tmpRef(tresult);
