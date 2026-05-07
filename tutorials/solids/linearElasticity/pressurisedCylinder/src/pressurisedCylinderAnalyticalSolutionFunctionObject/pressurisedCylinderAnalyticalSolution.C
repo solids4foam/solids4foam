@@ -517,9 +517,10 @@ bool Foam::pressurisedCylinderAnalyticalSolution::read(const dictionary& dict)
     return true;
 }
 
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::pressurisedCylinderAnalyticalSolution::write()
 {
     return false;
 }
-
+#endif
 // ************************************************************************* //
