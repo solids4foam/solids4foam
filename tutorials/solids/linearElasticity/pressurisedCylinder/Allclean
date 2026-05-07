@@ -8,7 +8,9 @@ source solids4FoamScripts.sh
 
 wclean lib src
 
+[ -f constant/polyMesh/blockMeshDict ] && cp constant/polyMesh/blockMeshDict system/
 cleanCase
+[ -f system/blockMeshDict ] && mkdir -p constant/polyMesh && cp system/blockMeshDict constant/polyMesh/
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam postProcessing *.png
 \rm -rf system/*Subset
