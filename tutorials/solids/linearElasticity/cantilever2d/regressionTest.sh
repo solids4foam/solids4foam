@@ -14,8 +14,8 @@ fi
 
 # ============================================================
 # cantilever2d regression test
-# Uses the fast default PETSc-SNES path and checks the final
-# solver extrema against the analytical benchmark output.
+# Checks selected solution approaches against the analytical
+# benchmark output.
 # ============================================================
 
 EPS_MIN=3.5e-4
@@ -25,6 +25,11 @@ SIGMA_MAX=1.05e8
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+
+APPROACHES=(
+    petscSnes
+    highOrder
+)
 
 echo "============================================================"
 echo "cantilever2d regression test"
@@ -74,14 +79,8 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
-
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the tutorial skipped in this environment"
-    exit 0
 fi
 
 extract_max_epsilon() {
@@ -96,28 +95,67 @@ extract_max_sigma() {
         | awk '{print $NF}' || true
 }
 
-epsilon=$(extract_max_epsilon)
-sigma=$(extract_max_sigma)
+check_solver_extrema() {
+    local approach="$1"
+    local epsilon
+    local sigma
+    local failures=0
 
-if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
-    echo "FAIL: Could not extract one or more regression quantities"
-    exit 1
-fi
+    epsilon=$(extract_max_epsilon)
+    sigma=$(extract_max_sigma)
+
+    if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
+        echo "FAIL: Could not extract one or more regression quantities for ${approach}"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
+        printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
+    else
+        printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"; then
+        printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+    else
+        printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
+}
 
 failures=0
 
-if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
-    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
-else
-    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
-    failures=$((failures + 1))
-fi
+if [ "$CHECK_ONLY" = false ]; then
+    for approach in "${APPROACHES[@]}"; do
+        echo
+        echo "------------------------------------------------------------"
+        echo "Testing approach: ${approach}"
+        echo "------------------------------------------------------------"
 
-if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"; then
-    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+
+        if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+            echo "Skipping ${approach} because it is unavailable in this environment"
+            continue
+        fi
+
+        if ! check_solver_extrema "${approach}"; then
+            failures=$((failures + 1))
+        fi
+    done
 else
-    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
-    failures=$((failures + 1))
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping regression checks because the tutorial skipped in this environment"
+        exit 0
+    fi
+
+    if ! check_solver_extrema "check-only"; then
+        failures=$((failures + 1))
+    fi
 fi
 
 if [ "$CHECK_ONLY" = false ]; then
