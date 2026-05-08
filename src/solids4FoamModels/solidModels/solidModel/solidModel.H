@@ -1035,6 +1035,17 @@ public:
             //- End of the program
             virtual void end();
 
+        // Coupling
+
+            //- Return a coupling field by name.
+            //  Used by electro-mechanical coupling to extract fields such as
+            //  the deformation gradient from the solid model.
+            //  Default implementation triggers a FatalError.
+            virtual tmp<volTensorField> couplingField
+            (
+                const word& fieldName
+            ) const;
+
             //- Write function must be defined for regIOobjects
             virtual bool writeData(Ostream&) const
             {
