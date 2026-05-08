@@ -12,70 +12,48 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-libs            ("libpressurisedCylinderAnalytical.so");
+solidModel     linearGeometryTotalDisplacement;
 
-application     solids4Foam;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          1;
-
-writeControl    runTime;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
+linearGeometryTotalDisplacementCoeffs
 {
-    pressurisedCylinderAnalytical
+    // Solution algorithm
+    solutionAlgorithm    PETScSNES;
+
+    highOrderCoeffs
     {
-       type    pressurisedCylinderAnalyticalSolution;
-       Ri      7;
-       Ro      18.625;
-       p       10e6;
-       E       1e10;
-       nu      0.3;
-       cellDisplacement yes;
-       pointDisplacement no;
-       cellStress yes;
-       pointStress no;
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        displacement
+        {
+            // Polynomial order of displacement field
+            polynomialOrder 2;
+
+            // Extra cells in minimum size stencil
+            faceStencilExtraCells 15;
+
+            // Weight function for least square systems
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
     }
 
-    disp
+    stabilisation
     {
-       type    solidPointDisplacement;
-       point   (7.0 0 0);
-    }
-
-    transformStressToCylindrical
-    {
-        type        transformStressToCylindrical;
-
-        origin      (0 0 0);
-        axis        (0 0 1);
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
     }
 }
 
