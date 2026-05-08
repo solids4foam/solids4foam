@@ -1,21 +1,120 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   petscSnes (default), segregated, highOrder
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  petscSnes         (default)
+  segregated
+  highOrder
+
+Examples:
+  ./Allrun
+  ./Allrun petscSnes
+  ./Allrun highOrder
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
-# PETSc is required for this case
-if [[ -z "${PETSC_DIR:-}" ]]
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
     exit 0
 fi
 
+APPROACH="${1:-petscSnes}"
+
+case "$APPROACH" in
+    segregated|petscSnes|highOrder) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    # $1 = suffix (e.g. petscSnes)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    case "$APPROACH" in
+        petscSnes|highOrder)
+            if [[ -z "${PETSC_DIR:-}" ]]
+            then
+                echo; echo "Skipping this case as PETSc is not installed"
+                echo "Please set the PETSC_DIR variable"; echo
+                exit 0
+            fi
+            ;;
+    esac
+}
+
+select_approach() {
+    case "$APPROACH" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        petscSnes)
+            echo "Using the petscSnes approach"
+            link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+require_petsc_or_exit_silently
+
+select_approach
 
 echo
 echo "Compiling libraries..."
@@ -24,7 +123,7 @@ echo "Compiling libraries..."
 # Create the mesh
 if command -v gmsh &> /dev/null
 then
-    # Remporarily rename 0 to avoid issues
+    # Temporarily rename 0 to avoid issues
     mv 0 0.tmp
 
     # Create mesh with gmsh

@@ -157,11 +157,21 @@ The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
 
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/sphericalCavity`. The case can
-be run using the included `Allrun` script, i.e. `./Allrun`. In this case, the
-`Allrun` script compiles the tutorial-local library in the `src` directory and
-creates the unstructured tetrahedral mesh using the Gmsh meshing utility,
-followed by conversion to its dual polyhedral representations using the
-OpenFOAM `polyDualMesh` utility:
+be run using the included `Allrun` script. The `Allrun` script optionally takes
+an argument that specifies the solution approach:
+
+```bash
+./Allrun             # Defaults to the PETSc SNES second-order approach [3]
+./Allrun segregated  # Segregated second-order approach
+./Allrun highOrder   # PETSc SNES high-order approach [4]
+```
+
+The `Allrun` script starts by updating the files in the case to match the
+selected approach; the following files are updated: `constant/solidProperties`,
+`system/fvSchemes`, and `system/fvSolution`. Subsequently, the tutorial-local
+library in the `src` directory is compiled, and the unstructured tetrahedral
+mesh is created using the Gmsh meshing utility, followed by conversion to its
+dual polyhedral representation using the OpenFOAM `polyDualMesh` utility:
 
 ```bash
    # Create mesh with gmsh
@@ -176,37 +186,17 @@ OpenFOAM `polyDualMesh` utility:
 The case is currently only works with the COM version of OpenFOAM!
 ```
 
-The case is setup to use the small strain (linear geometry) cell-centred finite
- volume solid solver based on the PETSc SNES nonlinear solver, as defined in
- `constant/solidProperties`:
-
-```c++
-solidModel     linearGeometryTotalDisplacement;
-
-linearGeometryTotalDisplacementCoeffs
-{
-    // Solution algorithm
-    //solutionAlgorithm implicitSegregated;
-    solutionAlgorithm PETScSNES;
-    //solutionAlgorithm explicit;
-
-    // PETSc options file used by PETScSNES
-    optionsFile petscOptions.snes;
-}
-```
-
 Here, the `linearGeometryTotalDisplacement` solid solver can adopt one of three
- solution algorithms:
+solution approaches:
 
-- `implicitSegregated`: the standard segregated solution procedure, where each
-   displacement component equation is solved separately.
-- `PETScSNES`: using the PETSc SNES nonlinear solver, which is provided with
-   the a compact stencil, approcimate Jacobian. Various solution procedures can
-   be specified through the `optionsFile petscOptions.snes;` file included in
-   the case. The Jacobian-free Newton-Krylov approach is typically faster than
-   the segregated approach, as examined in Cardiff et al. (2025) [3].
-- `explicit`: fully-explicit (matrix-free) approach, where the time step size is
-   limited by the stand CFL criterion.
+- `segregated`: the standard segregated solution procedure, where each
+  displacement component equation is solved separately using second-order
+  spatial discretisation.
+- `petscSnes`: the PETSc SNES nonlinear solver, using the same second-order
+  spatial discretisation. The Jacobian-free Newton-Krylov approach is typically
+  faster than the segregated approach, as examined in Cardiff et al. (2026) [3].
+- `highOrder`: the PETSc SNES nonlinear solver using high-order spatial
+  discretisation for the residual.
 
 ---
 
@@ -220,6 +210,11 @@ Here, the `linearGeometryTotalDisplacement` solid solver can adopt one of three
 [2] [Goodier, J.N.: Concentration of stress around spherical and cylindrical
  inclusions and flaws. Journal of Applied Mechanics 1(2), 39–44 (1933)](https://asmedigitalcollection.asme.org/appliedmechanics/article-abstract/1/2/39/1112122/Concentration-of-Stress-Around-Spherical-and?redirectedFrom=fulltext)
 
-[3] [Cardiff, P., Armfield, D., Tukovic, Z., Batistic, I.: Assessing the
- potential of Jacobian-free Newton-Krylov methods for cell-centred finite
- volume solid mechanics. Preprint, arXiv](https://arxiv.org/abs/2502.17217)
+[3] [P. Cardiff, D. Armfield, Ž. Tuković, I. Batistić, A Jacobian-free
+Newton-Krylov method for cell-centred finite volume solid mechanics.
+_International Journal for Numerical Methods in Engineering_, 127, e70268,
+2026, 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
+
+[4] [I. Batistić, P. Castrillo, P. Cardiff, A Jacobian-free Newton-Krylov method
+for high-order cell-centred finite volume solid mechanics. _arXiv preprint
+arXiv:2601.18417_, 2026.](https://arxiv.org/abs/2601.18417)
