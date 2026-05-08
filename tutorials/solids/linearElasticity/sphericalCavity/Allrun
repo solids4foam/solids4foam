@@ -17,6 +17,10 @@ fi
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
 # Create the mesh
 if command -v gmsh &> /dev/null
 then

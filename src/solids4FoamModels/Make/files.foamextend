@@ -86,7 +86,6 @@ $(thermalLaws)/thermalLaw/thermalLaw.C
 $(thermalLaws)/constantThermal/constantThermal.C
 
 solidFvPatchFields = solidModels/fvPatchFields
-$(solidFvPatchFields)/analyticalSphericalCavityTraction/analyticalSphericalCavityTractionFvPatchVectorField.C
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
@@ -168,12 +167,7 @@ $(fluidFvPatchFields)/flowRateOutletPressure/flowRateOutletPressureFvPatchScalar
 
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
-functionObjects/curvedCantileverAnalyticalSolution/curvedCantileverAnalyticalSolution.C
-functionObjects/contactPatchTestAnalyticalSolution/contactPatchTestAnalyticalSolution.C
-functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
-functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityAnalyticalSolution.C
-functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityStressDisplacement.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
@@ -190,8 +184,6 @@ functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
-functionObjects/squarePlateAnalyticalSolution/squarePlateAnalyticalSolution.C
-functionObjects/squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
 functionObjects/transformStressToCylindrical/transformStressToCylindrical.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C

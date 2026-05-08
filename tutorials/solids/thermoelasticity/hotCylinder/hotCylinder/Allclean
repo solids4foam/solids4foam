@@ -6,6 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+wclean lib src
+
 cleanCase
 rm -rf constant/polyMesh/boundary VTK case.foam postProcessing 0/analytical* *.png
 

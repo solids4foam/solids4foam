@@ -118,11 +118,11 @@ $$
 and $\mu$ is the shear modulus.
 
 The analytical solution is generated alongside solution fields using the
- function object `sphericalCavityAnalyticalSolution` located in the
- `system/controlDict`, where one needs to input geometry, laoding and material
- data:
+function object `sphericalCavityAnalyticalSolution` located in the
+`system/controlDict`, where one needs to input geometry, loading and material
+data:
 
-```plaintext
+```c++
 functions
 {
     cavityAnalytical
@@ -138,8 +138,11 @@ functions
         pointStress no;
     }
 }
-
 ```
+
+The function object writes the analytical displacement and stress fields
+`analyticalD` and `analyticalCellStress`, and the difference fields
+`DDifference` and `cellStressDifference`, in the time directories.
 
 The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
  Figure 2.
@@ -152,11 +155,13 @@ The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/sphericalCavity`.
- The case can be run using the included `Allrun` script, i.e. `./Allrun`. In this
- case, the `Allrun` creates the unstructured tetrahedral mesh using the Gmsh
- meshing utility, followed by conversion to its dual polyhedral representations
- using the OpenFOAM `polyDualMesh` utility:
+The tutorial case is located at
+`solids4foam/tutorials/solids/linearElasticity/sphericalCavity`. The case can
+be run using the included `Allrun` script, i.e. `./Allrun`. In this case, the
+`Allrun` script compiles the tutorial-local library in the `src` directory and
+creates the unstructured tetrahedral mesh using the Gmsh meshing utility,
+followed by conversion to its dual polyhedral representations using the
+OpenFOAM `polyDualMesh` utility:
 
 ```bash
    # Create mesh with gmsh
