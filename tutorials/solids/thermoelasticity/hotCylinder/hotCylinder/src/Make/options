@@ -1,4 +1,4 @@
-SOLIDS4FOAM_ROOT := ../../../../../..
+SOLIDS4FOAM_ROOT := $(shell d="$(CURDIR)"; while [ "$$d" != "/" ]; do if [ -f "$$d/etc/wmake-options" ] && [ -d "$$d/src/solids4FoamModels" ]; then echo "$$d"; exit 0; fi; d="$$(dirname "$$d")"; done)
 
 sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
