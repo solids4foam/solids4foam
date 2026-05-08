@@ -86,7 +86,6 @@ $(thermalLaws)/thermalLaw/thermalLaw.C
 $(thermalLaws)/constantThermal/constantThermal.C
 
 solidFvPatchFields = solidModels/fvPatchFields
-$(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
 $(solidFvPatchFields)/analyticalSphericalCavityTraction/analyticalSphericalCavityTractionFvPatchVectorField.C
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
@@ -173,7 +172,6 @@ functionObjects/curvedCantileverAnalyticalSolution/curvedCantileverAnalyticalSol
 functionObjects/contactPatchTestAnalyticalSolution/contactPatchTestAnalyticalSolution.C
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
-functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
 functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityAnalyticalSolution.C
 functionObjects/sphericalCavityAnalyticalSolution/sphericalCavityStressDisplacement.C
 functionObjects/principalStresses/principalStresses.C

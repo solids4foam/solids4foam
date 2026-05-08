@@ -12,63 +12,48 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-libs            ("libplateHoleAnalytical.so");
+solidModel     linearGeometryTotalDisplacement;
 
-application     solids4Foam;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          1;
-
-writeControl    timeStep;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
+linearGeometryTotalDisplacementCoeffs
 {
-    forceDisp1
+    // Solution algorithm
+    solutionAlgorithm    PETScSNES;
+
+    highOrderCoeffs
     {
-        type          solidForcesDisplacements;
-        historyPatch  right;
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        displacement
+        {
+            // Polynomial order of displacement field
+            polynomialOrder 2;
+
+            // Extra cells in minimum size stencil
+            faceStencilExtraCells 15;
+
+            // Weight function for least square systems
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
     }
 
-    pointDisp
+    stabilisation
     {
-        type          solidPointDisplacement;
-        point         (0 0.5 0);
-    }
-
-    plateHoleAnalyticalSolution1
-    {
-        type          plateHoleAnalyticalSolution;
-        farFieldTractionX 1e6;
-        holeRadius    0.5;
-        E             200e+9;
-        nu            0.3;
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
     }
 }
 

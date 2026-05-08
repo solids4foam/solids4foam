@@ -1,0 +1,4 @@
+analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
+plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libplateHoleAnalytical
