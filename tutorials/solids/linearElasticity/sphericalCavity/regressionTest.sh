@@ -87,6 +87,11 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
+    if ! command -v gmsh > /dev/null 2>&1; then
+        echo "Skipping regression checks because Gmsh is not installed"
+        exit 0
+    fi
+
     prepare_case
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
