@@ -16,6 +16,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libcurvedCantileverAnalytical.so");
+
 application     solids4Foam;
 
 startFrom       startTime;

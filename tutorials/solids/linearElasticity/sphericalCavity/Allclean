@@ -6,6 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+wclean lib src
+
 cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones* sphericalCavity.msh
 \rm -rf VTK case.foam postProcessing constant/polyMesh/boundary* *.obj

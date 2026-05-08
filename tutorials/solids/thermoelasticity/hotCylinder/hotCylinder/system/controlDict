@@ -17,6 +17,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libhotCylinderAnalytical.so");
+
 application     solids4Foam;
 
 startFrom       startTime;
