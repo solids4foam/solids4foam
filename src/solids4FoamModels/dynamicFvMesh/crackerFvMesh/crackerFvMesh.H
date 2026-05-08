@@ -27,9 +27,9 @@ SourceFiles
     crackerFvMeshTemplates.C
 
 Author
-    Hrvoje Jasak, Wikki Ltd. All rights reserved
-    Zeljko Tukovic, FSB Zagreb. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

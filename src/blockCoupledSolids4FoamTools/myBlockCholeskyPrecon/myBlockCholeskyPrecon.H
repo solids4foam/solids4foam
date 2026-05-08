@@ -22,7 +22,7 @@ Description
     Incomplete Cholesky preconditioning with no fill-in.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 SourceFiles
     myBlockCholeskyPrecon.C

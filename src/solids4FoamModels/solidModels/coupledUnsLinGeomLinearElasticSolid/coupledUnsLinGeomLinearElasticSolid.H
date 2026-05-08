@@ -32,7 +32,7 @@ Description
     and Structures, 2016, 10.1016/j.compstruc.2016.07.004.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     coupledUnsLinGeomLinearElasticSolid.C

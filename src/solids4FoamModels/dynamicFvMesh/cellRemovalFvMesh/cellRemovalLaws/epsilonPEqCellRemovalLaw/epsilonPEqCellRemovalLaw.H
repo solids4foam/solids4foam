@@ -23,7 +23,7 @@ Description
     greater than the specified critical equivalent value.
 
 Author
-    Philip Cardif, UCD/UT. All rights reserved.
+    Philip Cardif, UCD/UT.
 
 SourceFiles
     epsilonPEqCellRemovalLaw.C

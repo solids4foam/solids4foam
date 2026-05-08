@@ -22,7 +22,7 @@ Description
     FunctionObject reports force vs displacement for specified patch.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidForcesDisplacements.C

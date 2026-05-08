@@ -30,7 +30,7 @@ Description
       files.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved
+    Philip Cardiff, UCD.
 
 SourceFiles
     BlockEigenSolver.C

@@ -29,7 +29,7 @@ Description
     The plate dimensions are a x b, thickness of the plate is h.
 
 Author
-    Ivan Batistic & Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic & Philip Cardiff, UCD.
 
 SourceFiles
     squarePlateAnalyticalSolution.C

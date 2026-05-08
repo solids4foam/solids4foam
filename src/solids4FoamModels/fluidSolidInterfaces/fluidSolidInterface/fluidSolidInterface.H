@@ -22,8 +22,8 @@ Description
     Virtual base class for fluid-solid interface coupling.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
     Extended to multiple interfaces by Danial Khazaei
 
 SourceFiles

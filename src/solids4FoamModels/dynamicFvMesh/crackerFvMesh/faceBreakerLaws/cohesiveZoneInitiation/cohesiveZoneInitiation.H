@@ -28,7 +28,7 @@ Description
     cohesiveZoneModel class what faces it would like to break.
 
 Author
-    Philip Cardif, UCD/UT. All rights reserved.
+    Philip Cardif, UCD/UT.
 
 SourceFiles
     cohesiveZoneInitiation.C

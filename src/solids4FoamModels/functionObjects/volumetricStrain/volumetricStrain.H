@@ -40,7 +40,7 @@ Description
     @endverbatim
 
 Author
-    Scott Levie, Philip Cardiff, UCD. All rights reserved.
+    Scott Levie, Philip Cardiff, UCD.
 
 SourceFiles
     volumetricStrain.C

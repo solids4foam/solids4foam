@@ -22,7 +22,7 @@ Description
     standAlonePatch is a primiteve patch that holds its point and face list.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 \*---------------------------------------------------------------------------*/
 

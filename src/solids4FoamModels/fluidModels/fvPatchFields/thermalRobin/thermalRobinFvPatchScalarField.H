@@ -24,7 +24,7 @@ Description
     "dirichlet_ = true" and "neumann_ = false".
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     thermalRobinFvPatchScalarField.C

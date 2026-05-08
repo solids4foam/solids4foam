@@ -63,7 +63,6 @@ SourceFiles
 Author
     Iago Oliveira, based on code of Philip Cardiff, UCD.
     Ported by Philip Cardiff, UCD.
-    All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
