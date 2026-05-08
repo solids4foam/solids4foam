@@ -6,6 +6,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+SOLIDS4FOAM_ROOT_ABS=$(cd "${SCRIPT_DIR}/../../../../" && pwd)
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
@@ -13,21 +14,27 @@ fi
 
 # ============================================================
 # sphericalCavity regression test
-# Uses the analytical-solution tutorial output as a sanity check.
+# Checks selected solution approaches against the expected solution bounds
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-EPS_MIN=1.0e-6
-EPS_MAX=1.0e-3
-SIGMA_MIN=1.0e6
-SIGMA_MAX=3.0e7
+EPS_MIN=7.0e-6
+EPS_MAX=9.0e-6
+SIGMA_MIN=1.8e6
+SIGMA_MAX=2.0e6
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+
+APPROACHES=(
+    segregated
+    petscSnes
+    highOrder
+)
 
 echo "============================================================"
 echo "sphericalCavity regression test"
@@ -47,6 +54,20 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    # The regression copy lives deeper than the source tutorial, so the
+    # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
+    # the repository root.
+    sed -i.bak \
+        "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
+        "${CASE_DIR}/src/Make/options"
+
+    if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
+        && [[ ! -f "${CASE_DIR}/constant/polyMesh/blockMeshDict" ]]; then
+        mkdir -p "${CASE_DIR}/constant/polyMesh"
+        cp -a "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" \
+            "${CASE_DIR}/constant/polyMesh/blockMeshDict"
+    fi
 }
 
 # ------------------------------------------------------------
@@ -67,15 +88,8 @@ done
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
-
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the tutorial skipped in this environment"
-    exit 0
 fi
 
 # ------------------------------------------------------------
@@ -94,17 +108,36 @@ extract_max_sigma() {
         | awk '{print $NF}' || true
 }
 
-# ------------------------------------------------------------
-# Extract values
-# ------------------------------------------------------------
+check_solver_extrema() {
+    local approach="$1"
+    local epsilon
+    local sigma
+    local failures=0
 
-epsilon=$(extract_max_epsilon)
-sigma=$(extract_max_sigma)
+    epsilon=$(extract_max_epsilon)
+    sigma=$(extract_max_sigma)
 
-if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
-fi
+    if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
+        echo "FAIL: Could not extract one or more regression quantities for ${approach}"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
+        printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
+    else
+        printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"; then
+        printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+    else
+        printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
+}
 
 # ------------------------------------------------------------
 # Checks
@@ -112,18 +145,34 @@ fi
 
 failures=0
 
-if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
-    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
-else
-    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
-    failures=$((failures + 1))
-fi
+if [ "$CHECK_ONLY" = false ]; then
+    for approach in "${APPROACHES[@]}"; do
+        echo
+        echo "------------------------------------------------------------"
+        echo "Testing approach: ${approach}"
+        echo "------------------------------------------------------------"
 
-if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"; then
-    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+
+        if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+            echo "Skipping ${approach} because it is unavailable in this environment"
+            continue
+        fi
+
+        if ! check_solver_extrema "${approach}"; then
+            failures=$((failures + 1))
+        fi
+    done
 else
-    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
-    failures=$((failures + 1))
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping regression checks because the tutorial skipped in this environment"
+        exit 0
+    fi
+
+    if ! check_solver_extrema "check-only"; then
+        failures=$((failures + 1))
+    fi
 fi
 
 # Clean case again
