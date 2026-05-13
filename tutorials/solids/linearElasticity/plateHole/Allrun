@@ -5,7 +5,7 @@ IFS=$'\n\t'
 # -------------------------------------------------------------------------
 # solids4Foam Allrun script
 # Allows selection of solution approach:
-#   displacement (default)
+#   segregated (default), petscSnes, highOrder
 #   pressureDisplacementCompressible [coarse|medium]
 #   pressureDisplacementIncompressible [coarse|medium|poly]
 # -------------------------------------------------------------------------
@@ -13,22 +13,30 @@ IFS=$'\n\t'
 usage() {
 cat <<'EOF'
 Usage:
-  ./Allrun [approach] [mesh]
+  ./Allrun [approach] [arg]
 
 Where [approach] is one of:
-  displacement                         (default)
+  segregated                           (default)
+  petscSnes
+  highOrder
   pressureDisplacementCompressible
   pressureDisplacementIncompressible
 
-The optional [mesh] is used for pressure-displacement approaches:
+For segregated|petscSnes|highOrder, the second argument is the run mode:
+  serial                               (default)
+  parallel
+
+For pressureDisplacement* approaches (foam-extend only), the second argument
+selects the mesh:
   coarse                               (default)
   medium
   poly                                 (incompressible only)
 
 Examples:
   ./Allrun
-  ./Allrun displacement
-  ./Allrun parallel
+  ./Allrun segregated
+  ./Allrun petscSnes parallel
+  ./Allrun highOrder
   ./Allrun pressureDisplacementCompressible medium
   ./Allrun pressureDisplacementIncompressible poly
 EOF
@@ -38,9 +46,9 @@ EOF
 # Environment setup
 # -------------------------------------------------------------------------
 
-: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 : "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
@@ -53,23 +61,29 @@ if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
     exit 0
 fi
 
-APPROACH="${1:-displacement}"
-MESH="${2:-coarse}"
-RUN_PARALLEL=false
+APPROACH="${1:-segregated}"
+ARG2="${2:-}"
 
 if [[ "${APPROACH}" == "parallel" ]]; then
-    APPROACH="displacement"
-    RUN_PARALLEL=true
-elif [[ "${APPROACH}" == "displacement" && "${MESH}" == "parallel" ]]; then
-    MESH="coarse"
-    RUN_PARALLEL=true
+    APPROACH="segregated"
+    ARG2="parallel"
 fi
 
 case "${APPROACH}" in
-    displacement)
+    segregated|petscSnes|highOrder)
+        RUN_MODE="${ARG2:-serial}"
+        case "${RUN_MODE}" in
+            serial|parallel) ;;
+            *)
+                echo "Error: Unknown run mode '${RUN_MODE}'"
+                usage
+                exit 1
+                ;;
+        esac
         ;;
     pressureDisplacementCompressible)
         solids4Foam::caseOnlyRunsWithFoamExtend
+        MESH="${ARG2:-coarse}"
         case "${MESH}" in
             coarse|medium) ;;
             *)
@@ -81,6 +95,7 @@ case "${APPROACH}" in
         ;;
     pressureDisplacementIncompressible)
         solids4Foam::caseOnlyRunsWithFoamExtend
+        MESH="${ARG2:-coarse}"
         case "${MESH}" in
             coarse|medium|poly) ;;
             *)
@@ -96,6 +111,37 @@ case "${APPROACH}" in
         exit 1
         ;;
 esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    case "${APPROACH}" in
+        petscSnes|highOrder)
+            if [[ -z "${PETSC_DIR:-}" ]]
+            then
+                echo; echo "Skipping this case as PETSc is not installed"
+                echo "Please set the PETSC_DIR variable"; echo
+                exit 0
+            fi
+            ;;
+    esac
+}
 
 copy_contents() {
     local src="$1"
@@ -127,16 +173,6 @@ reset_active_case() {
     rm -f postProcessing.gplt
 }
 
-select_displacement_case() {
-    echo "Using displacement approach"
-
-    reset_active_case
-
-    copy_contents caseOptions/displacement/0 0
-    copy_contents caseOptions/displacement/constant constant
-    copy_contents caseOptions/displacement/system system
-}
-
 select_pressure_displacement_case() {
     local material="$1"
 
@@ -160,36 +196,68 @@ select_pressure_displacement_case() {
     fi
 }
 
+select_approach() {
+    case "${APPROACH}" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        petscSnes)
+            echo "Using the petscSnes approach"
+            link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            ;;
+        pressureDisplacementCompressible)
+            select_pressure_displacement_case compressible
+            ;;
+        pressureDisplacementIncompressible)
+            select_pressure_displacement_case incompressible
+            ;;
+    esac
+}
+
 # -------------------------------------------------------------------------
 # Main workflow
 # -------------------------------------------------------------------------
 
+require_petsc_or_exit_silently
+
+select_approach
+
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
+solids4Foam::convertCaseFormat .
+
 case "${APPROACH}" in
-    displacement)
-        select_displacement_case
-        ;;
-    pressureDisplacementCompressible)
-        select_pressure_displacement_case compressible
-        ;;
     pressureDisplacementIncompressible)
-        select_pressure_displacement_case incompressible
+        if [[ "${MESH}" != "poly" ]]; then
+            echo
+            solids4Foam::runApplication blockMesh
+        fi
+        ;;
+    *)
+        echo
+        solids4Foam::runApplication blockMesh
         ;;
 esac
 
-echo
-solids4Foam::convertCaseFormat .
-
-if [[ "${APPROACH}" == "displacement" || "${MESH}" != "poly" ]]; then
-    echo
-    solids4Foam::runApplication blockMesh
-fi
-
-if [[ "${APPROACH}" == "displacement" && "${RUN_PARALLEL}" == true ]]; then
-    echo
-    solids4Foam::runApplication decomposePar
-    solids4Foam::runParallel solids4Foam
-    solids4Foam::runApplication reconstructPar
-else
-    echo
-    solids4Foam::runApplication solids4Foam
-fi
+case "${APPROACH}" in
+    segregated|petscSnes|highOrder)
+        if [[ "${RUN_MODE}" == "parallel" ]]; then
+            solids4Foam::runApplication decomposePar
+            solids4Foam::runParallel solids4Foam
+            solids4Foam::runApplication reconstructPar
+        else
+            solids4Foam::runApplication solids4Foam
+        fi
+        ;;
+    *)
+        solids4Foam::runApplication solids4Foam
+        ;;
+esac

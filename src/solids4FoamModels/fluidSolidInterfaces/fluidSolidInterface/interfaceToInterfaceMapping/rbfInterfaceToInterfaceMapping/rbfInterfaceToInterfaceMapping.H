@@ -22,7 +22,7 @@ Description
     interfaceToInterfaceMapping wrapper using radial basis functions
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
     This class is a wrapper for the code from David Blom
 
 SourceFiles

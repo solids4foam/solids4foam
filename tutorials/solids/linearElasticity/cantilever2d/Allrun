@@ -18,12 +18,14 @@ Where [approach] is one of:
   vertexCentred
   segregated
   unsCoupled
+  highOrder
 
 Examples:
   ./Allrun
   ./Allrun vertexCentred
   ./Allrun segregated
   ./Allrun unsCoupled
+  ./Allrun highOrder
 EOF
 }
 
@@ -50,7 +52,7 @@ APPROACH="${1:-petscSnes}"
 
 # Validate approach name
 case "$APPROACH" in
-    petscSnes|vertexCentred|segregated|unsCoupled) ;;
+    petscSnes|vertexCentred|segregated|unsCoupled|highOrder) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -68,6 +70,7 @@ link_files_for_suffix() {
     local found=0
     while IFS= read -r -d '' f; do
         found=1
+        rm -f "${f%.*}"
         ln -vnsf "$(basename "$f")" "${f%.*}"
     done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
 
@@ -78,7 +81,7 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "$APPROACH" in
-        petscSnes|vertexCentred)
+        petscSnes|vertexCentred|highOrder)
             if [[ -z "${PETSC_DIR:-}" ]]
             then
                 echo; echo "Skipping this case as PETSc is not installed"
@@ -104,9 +107,14 @@ select_approach() {
             solids4Foam::caseOnlyRunsWithFoamExtend
             link_files_for_suffix "unsCoupled"
             ;;
-        petscSnes|*)
+        petscSnes)
             echo "Using the petscSnes approach"
             link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
             ;;
     esac
 }

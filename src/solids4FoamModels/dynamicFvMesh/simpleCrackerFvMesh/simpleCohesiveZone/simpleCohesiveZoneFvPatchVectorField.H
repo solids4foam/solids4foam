@@ -32,8 +32,8 @@ SourceFiles
     simpleCohesiveZoneFvPatchVectorField.C
 
 Author
-    Zeljko Tukovic. FSB Zaregb. All rights reserved.
-    Philip Cardiff. UCD. All rights reserved.
+    Zeljko Tukovic. FSB Zagreb.
+    Philip Cardiff. UCD.
 
 \*---------------------------------------------------------------------------*/
 

@@ -17,6 +17,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libsphericalCavityAnalytical.so");
+
 application     solids4Foam;
 
 startFrom       startTime;

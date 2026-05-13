@@ -31,8 +31,8 @@ Description
     An implicit Newton-Raphson algorithm is employed.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
-    Federico Mazzanti, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
+    Federico Mazzanti, UCD.
 
 SourceFiles
     vertexCentredLinGeomSolid.C

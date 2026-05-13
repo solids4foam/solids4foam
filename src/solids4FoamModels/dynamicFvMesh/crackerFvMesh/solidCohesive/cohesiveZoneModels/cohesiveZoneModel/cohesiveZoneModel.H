@@ -29,7 +29,7 @@ Description
     (2) updateEnergies
         Calculate the current dissipated fracture energies;
 Authors
-    Philip Cardif, UCD/UT. All rights reserved.
+    Philip Cardif, UCD/UT.
 
 SourceFiles
     cohesiveZoneModel.C

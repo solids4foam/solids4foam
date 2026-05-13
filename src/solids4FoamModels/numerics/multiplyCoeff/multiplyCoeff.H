@@ -26,8 +26,8 @@ SourceFile
     multiplyCoeff.C
 
 Author
-    Federico Mazzanti, UCD. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Federico Mazzanti, UCD.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

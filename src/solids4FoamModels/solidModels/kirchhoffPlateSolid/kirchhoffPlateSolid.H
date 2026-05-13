@@ -24,7 +24,7 @@ Description
     Based on "rotation-free formulation" of Torlak (2006).
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     kirchhoffPlateSolid.C

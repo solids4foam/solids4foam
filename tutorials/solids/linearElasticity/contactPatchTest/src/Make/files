@@ -1,0 +1,3 @@
+contactPatchTestAnalyticalSolution/contactPatchTestAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libcontactPatchTestAnalytical

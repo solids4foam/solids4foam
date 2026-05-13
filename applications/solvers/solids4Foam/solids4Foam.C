@@ -23,8 +23,8 @@ Description
     fluid-solid) is chosen at run-time.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Philip Cardiff, UCD.
+    Zeljko Tukovic, FSB Zagreb.
 
 \*---------------------------------------------------------------------------*/
 

@@ -23,7 +23,7 @@ Description
     coordinate system.
 
 Author
-    Ivan Batistic, FSB. All rights reserved.
+    Ivan Batistic, FSB.
 
 SourceFiles
     transformStressToCylindrical.C

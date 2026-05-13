@@ -1,0 +1,4 @@
+squarePlateAnalyticalSolution/squarePlateAnalyticalSolution.C
+squarePlateAnalyticalSolution/squarePlateStressDisplacement.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libsquarePlateAnalytical

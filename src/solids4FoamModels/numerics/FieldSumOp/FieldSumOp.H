@@ -24,7 +24,7 @@ Description
     This is required for clang, where reduce operations on lists are ambiguous.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

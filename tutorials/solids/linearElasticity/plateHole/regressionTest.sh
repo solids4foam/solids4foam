@@ -5,6 +5,7 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+SOLIDS4FOAM_ROOT_ABS=$(cd "${SCRIPT_DIR}/../../../../" && pwd)
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
@@ -13,8 +14,13 @@ fi
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# and pressure-displacement solution options.
+# (segregated/petscSnes/highOrder) and pressure-displacement
+# solution options.
 # ============================================================
+
+# ------------------------------------------------------------
+# Regression tolerances
+# ------------------------------------------------------------
 
 DISP_TOL=1e-7
 POINT_DISP_TOL=1e-7
@@ -27,6 +33,12 @@ PD_P_TOL=9.0e4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+
+APPROACHES=(
+    segregated
+    petscSnes
+    highOrder
+)
 
 PRESSURE_DISPLACEMENT_CASES=(
     "pressureDisplacementCompressible coarse"
@@ -62,6 +74,22 @@ prepare_case() {
         fi
         cp -a "${item}" "${case_dir}/"
     done
+
+    # The regression copy lives deeper than the source tutorial, so the
+    # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
+    # the repository root.
+    if [[ -f "${case_dir}/src/Make/options" ]]; then
+        sed -i.bak \
+            "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
+            "${case_dir}/src/Make/options"
+    fi
+
+    if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
+        && [[ ! -f "${case_dir}/constant/polyMesh/blockMeshDict" ]]; then
+        mkdir -p "${case_dir}/constant/polyMesh"
+        cp -a "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" \
+            "${case_dir}/constant/polyMesh/blockMeshDict"
+    fi
 }
 
 run_case() {
@@ -93,7 +121,9 @@ if [ "$CHECK_ONLY" = false ]; then
     rm -rf "${REGRESSION_ROOT}"
     mkdir -p "${REGRESSION_ROOT}"
 
-    displacement_case_dir=$(run_case "displacement")
+    for approach in "${APPROACHES[@]}"; do
+        run_case "${approach}" "${approach}" > /dev/null
+    done
 
     for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
         IFS=' ' read -r approach mesh <<< "${case_args}"
@@ -101,7 +131,6 @@ if [ "$CHECK_ONLY" = false ]; then
     done
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
-    displacement_case_dir="${REGRESSION_ROOT}/displacement"
 fi
 
 extract_disp_linf() {
@@ -156,24 +185,25 @@ check_less_than() {
 
 failures=0
 
-if solids4Foam::regressionCaseSkipped \
-    "${displacement_case_dir}/${ALLRUN_LOGFILE}"
-then
-    echo "SKIP: displacement"
-else
+for approach in "${APPROACHES[@]}"; do
+    case_dir="${REGRESSION_ROOT}/${approach}"
+    if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: ${approach}"
+        continue
+    fi
     check_less_than \
-        "displacement" "DDifference LInf" \
-        "$(extract_disp_linf "${displacement_case_dir}" "DDifference")" \
+        "${approach}" "DDifference LInf" \
+        "$(extract_disp_linf "${case_dir}" "DDifference")" \
         "${DISP_TOL}"
     check_less_than \
-        "displacement" "pointDDifference LInf" \
-        "$(extract_disp_linf "${displacement_case_dir}" "pointDDifference")" \
+        "${approach}" "pointDDifference LInf" \
+        "$(extract_disp_linf "${case_dir}" "pointDDifference")" \
         "${POINT_DISP_TOL}"
     check_less_than \
-        "displacement" "stress component-0 LInf" \
-        "$(extract_stress_linf_comp0 "${displacement_case_dir}")" \
+        "${approach}" "stress component-0 LInf" \
+        "$(extract_stress_linf_comp0 "${case_dir}")" \
         "${STRESS_TOL}"
-fi
+done
 
 for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
     IFS=' ' read -r approach mesh <<< "${case_args}"

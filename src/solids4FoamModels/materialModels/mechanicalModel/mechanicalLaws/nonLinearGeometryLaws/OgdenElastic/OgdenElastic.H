@@ -51,7 +51,6 @@ SourceFiles
 Author
     Joszef Nagy, Eulerian Solutions.
     Philip Cardiff, UCD.
-    All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 

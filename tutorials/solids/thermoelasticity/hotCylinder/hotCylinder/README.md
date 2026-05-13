@@ -71,7 +71,7 @@ used to generate analytical solution fields (`analyticalT`,
 ```c++
 analyticalHotCylinder
 {
- type    hotCylinderAnalyticalSolution;
+    type    hotCylinderAnalyticalSolution;
 
     // Inner pipe radius
     rInner  0.5;
@@ -79,7 +79,7 @@ analyticalHotCylinder
     // Outer pipe radius
     rOuter  0.7;
 
- // Inner pipe temperature
+    // Inner pipe temperature
     TInner  100;
 
     // Outer pipe temperature
@@ -160,12 +160,13 @@ Figure 3: Temperature profile
 The tutorial case is located at
 `solids4foam/tutorials/solids/thermoelasticity/hotCylinder/hotCylinder`. The
 case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this
-case, the `Allrun` creates the mesh using `blockMesh` (`> blockMesh`), followed
-by running the case with the `solids4Foam` solver (`> solids4Foam`). As the last
-step, the `sample` utility is used to extract data along $$\theta=45^{\circ}$$
-line. Optionally, if `gnuplot` is installed, the temperature profile and the
-profile of the radial and circumferential stresses are plotted in the `T.png`,
-`sigmaR.png` and `sigmaTheta.png` files.
+case, the `Allrun` script compiles the tutorial-local library in the `src`
+directory, creates the mesh using `blockMesh` (`> blockMesh`), and runs the case
+with the `solids4Foam` solver (`> solids4Foam`). As the last step, the `sample`
+utility is used to extract data along $$\theta=45^{\circ}$$ line. Optionally, if
+`gnuplot` is installed, the temperature profile and the profile of the radial
+and circumferential stresses are plotted in the `T.png`, `sigmaR.png` and
+`sigmaTheta.png` files.
 
 ---
 

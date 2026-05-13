@@ -19,7 +19,7 @@ Class
     newGgiInterpolation
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 Description
     Mass-conservative face interpolation: typedefs for polyPatch and faceZone

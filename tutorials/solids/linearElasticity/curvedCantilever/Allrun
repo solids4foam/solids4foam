@@ -11,6 +11,10 @@ solids4Foam::convertCaseFormat .
 
 solids4Foam::caseOnlyRunsWithFoamExtend
 
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
 # Create mesh
 solids4Foam::runApplication blockMesh
 
@@ -27,4 +31,3 @@ then
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
-

@@ -32,7 +32,7 @@ Description
     The new mesh overwrites the previous mesh.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

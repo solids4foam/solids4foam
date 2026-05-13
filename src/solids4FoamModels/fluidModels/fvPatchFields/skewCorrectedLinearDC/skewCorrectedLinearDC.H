@@ -25,7 +25,7 @@ Description
     Correction is calculated using difference between linear and upwind interp.
 
 Author
-    Zeljko Tukovic, FSB Zagreb  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb
 
 SourceFiles
     skewCorrectedLinearDC.C

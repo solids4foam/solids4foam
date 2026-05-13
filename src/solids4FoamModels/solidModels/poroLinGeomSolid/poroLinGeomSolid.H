@@ -43,8 +43,8 @@ Description
 
 
 Author
-    Tian Tang, DTU.  All rights reserved.
-    Philip Cardiff, UCD.  All rights reserved.
+    Tian Tang, DTU.
+    Philip Cardiff, UCD.
 
 SourceFiles
     poroLinGeomSolid.C
