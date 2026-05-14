@@ -15,10 +15,6 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
-Description
-    Specialisation of gaussGrad for scalars. Needed for implicit fvmGrad
-    operator for block coupled systems.
-
 \*---------------------------------------------------------------------------*/
 
 #include "updatedLagGaussGrad.H"
