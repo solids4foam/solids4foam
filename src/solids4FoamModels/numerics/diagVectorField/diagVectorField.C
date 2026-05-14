@@ -30,7 +30,7 @@ Author
 namespace Foam
 {
 
-    tmp<diagTensorField> diag(const vectorField& vf)
+tmp<diagTensorField> diag(const vectorField& vf)
 {
     // Prepare the result field
     tmp<diagTensorField> tresult
