@@ -21,11 +21,14 @@ mechanical
 (
     rubber
     {
+        // Although this law is named neoHookeanElastic, the
+        // coupledPressureDisplacementSolid solidProperties set nonLinear false,
+        // so this case follows the linear-geometry linear-elastic formulation.
         type neoHookeanElastic;
         pressureDisplacement yes;
         E    E      [ 1 -1 -2 0 0 0 0 ] 1e9;
         rho  rho    [ 1 -3  0 0 0 0 0 ] 1;
-        nu   nu     [ 0 0 0 0 0 0 0 ]   0.5;
+        nu   nu     [ 0 0 0 0 0 0 0 ]   0.3;
     }
 );
 

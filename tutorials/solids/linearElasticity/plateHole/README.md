@@ -198,6 +198,23 @@ for example:
 ./Allrun highOrder parallel
 ```
 
+The script also supports pressure-displacement solution options (foam-extend
+only):
+
+```bash
+./Allrun pressureDisplacementCompressible coarse
+./Allrun pressureDisplacementCompressible medium
+./Allrun pressureDisplacementIncompressible coarse
+./Allrun pressureDisplacementIncompressible medium
+./Allrun pressureDisplacementIncompressible poly
+```
+
+These pressure-displacement options use `coupledPressureDisplacementSolid` with
+`nonLinear false` in `constant/solidProperties`. The material law is selected as
+`neoHookeanElastic` because that law provides the pressure-displacement stress
+form, but with `nonLinear false` the case remains a linear-geometry
+linear-elastic plate-hole benchmark.
+
 ---
 
 ### References

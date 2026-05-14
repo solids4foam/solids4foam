@@ -52,6 +52,9 @@ coupledPressureDisplacementSolidCoeffs
         }
     }
 
+    // Use the coupled pressure-displacement formulation with linear geometry.
+    // With this switch set to false, the neoHookeanElastic law selected in
+    // mechanicalProperties is evaluated as a linear-elastic formulation.
     nonLinear           false;
     debug               false;
 
