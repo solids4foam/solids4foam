@@ -32,6 +32,7 @@ License
 #include "wedgePolyPatch.H"
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -1716,6 +1717,23 @@ void Foam::solidModel::end()
 }
 
 
+Foam::tmp<Foam::volTensorField> Foam::solidModel::couplingField
+(
+    const word& fieldName
+) const
+{
+    FatalErrorInFunction
+        << "Coupling field \"" << fieldName
+        << "\" requested from solidModel type " << type() << nl
+        << "This solidModel does not support coupling fields." << nl
+        << "Override couplingField() in the derived class to enable coupling."
+        << abort(FatalError);
+
+    // Keep compiler happy
+    return tmp<volTensorField>(nullptr);
+}
+
+
 Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 (
     Time& runTime,
@@ -1855,11 +1873,7 @@ void Foam::solidModel::setTraction
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
-#else
-    setTraction(solutionD().boundaryField()[patchID], patchTraction);
-#endif
+    setTraction(boundaryFieldRef(solutionD())[patchID], patchTraction);
 }
 
 
@@ -1923,11 +1937,7 @@ void Foam::solidModel::setPressure
         globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
-    setPressure(solutionD().boundaryFieldRef()[patchID], patchPressure);
-#else
-    setPressure(solutionD().boundaryField()[patchID], patchPressure);
-#endif
+    setPressure(boundaryFieldRef(solutionD())[patchID], patchPressure);
 }
 
 

@@ -1,0 +1,29 @@
+SOLIDS4FOAM_ROOT := $(shell d="$(CURDIR)"; while [ "$$d" != "/" ]; do if [ -f "$$d/etc/wmake-options" ] && [ -d "$$d/src/solids4FoamModels" ]; then echo "$$d"; exit 0; fi; d="$$(dirname "$$d")"; done)
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/numerics/compatibilityFunctions \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/finiteArea/lnInclude \
+    -I$(LIB_SRC)/lagrangian/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
+    -I$(LIB_SRC)/sampling/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/postProcessing/foamCalcFunctions/lnInclude \
+    -I$(LIB_SRC)/postProcessing/functionObjects/forces/lnInclude \
+    -I$(LIB_SRC)/errorEstimation/lnInclude \
+    -I$(LIB_SRC)/mesh/cfMesh/lnInclude
+
+LIB_INC = $(EXE_INC)
+
+LIB_LIBS = \
+    -lfiniteVolume

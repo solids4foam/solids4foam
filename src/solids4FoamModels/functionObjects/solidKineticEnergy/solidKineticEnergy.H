@@ -22,7 +22,7 @@ Description
     FunctionObject reports the kinetic energy of a solid.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidKineticEnergy.C

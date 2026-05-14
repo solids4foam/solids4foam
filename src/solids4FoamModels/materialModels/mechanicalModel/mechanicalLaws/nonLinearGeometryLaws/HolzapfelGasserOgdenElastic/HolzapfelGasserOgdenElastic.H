@@ -47,7 +47,7 @@ SourceFiles
     HolzapfelGasserOgdenElastic.C
 
 Author
-    Zeljko Tukovic, FSB Zagreb. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
 
 \*---------------------------------------------------------------------------*/
 

@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    right
+    {
+        type            cantileverTraction;
+        P               0.1e6;
+        E               200e9;
+        nu              0.3;
+        L               2.0;
+        D               0.1;
+        value           uniform (0 0 0);
+    }
+
+    top
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    bottom
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    left
+    {
+        type            cantileverDisplacement;
+        P               0.1e6;
+        E               200e9;
+        nu              0.3;
+        L               2.0;
+        D               0.1;
+        value           uniform (0 0 0);
+    }
+
+    back
+    {
+         type            empty;
+    }
+
+    front
+    {
+         type            empty;
+    }
+}
+
+// ************************************************************************* //

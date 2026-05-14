@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "eig3Field.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -30,13 +31,8 @@ void eig3Field
 )
 {
     const tensorField& AI = A.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
-    tensorField& VI = V.primitiveFieldRef();
-    vectorField& dI = d.primitiveFieldRef();
-#else
-    tensorField& VI = V.internalField();
-    vectorField& dI = d.internalField();
-#endif
+    tensorField& VI = primitiveFieldRef(V);
+    vectorField& dI = primitiveFieldRef(d);
 
     forAll(AI, cellI)
     {
@@ -48,13 +44,8 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const tensorField& AB = A.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
-            tensorField& VB = V.boundaryFieldRef()[patchI];
-            vectorField& dB = d.boundaryFieldRef()[patchI];
-#else
-            tensorField& VB = V.boundaryField()[patchI];
-            vectorField& dB = d.boundaryField()[patchI];
-#endif
+            tensorField& VB = boundaryFieldRef(V)[patchI];
+            vectorField& dB = boundaryFieldRef(d)[patchI];
 
             forAll(AB, faceI)
             {
@@ -71,13 +62,8 @@ void eig3Field
 )
 {
     const symmTensorField& AI = A.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
-    tensorField& VI = V.primitiveFieldRef();
-    vectorField& dI = d.primitiveFieldRef();
-#else
-    tensorField& VI = V.internalField();
-    vectorField& dI = d.internalField();
-#endif
+    tensorField& VI = primitiveFieldRef(V);
+    vectorField& dI = primitiveFieldRef(d);
 
     forAll(AI, cellI)
     {
@@ -89,13 +75,8 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
-            tensorField& VB = V.boundaryFieldRef()[patchI];
-            vectorField& dB = d.boundaryFieldRef()[patchI];
-#else
-            tensorField& VB = V.boundaryField()[patchI];
-            vectorField& dB = d.boundaryField()[patchI];
-#endif
+            tensorField& VB = boundaryFieldRef(V)[patchI];
+            vectorField& dB = boundaryFieldRef(d)[patchI];
 
             forAll(AB, faceI)
             {

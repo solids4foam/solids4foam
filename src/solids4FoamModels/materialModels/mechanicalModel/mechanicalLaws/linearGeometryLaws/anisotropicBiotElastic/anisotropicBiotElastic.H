@@ -40,8 +40,8 @@ SourceFiles
     anisotropicBiotElastic.C
 
 Author
-    Original author: Tian Tang, DTU. All rights reserved.
-    Ported to solids4foam by: Philip Cardiff, UCD. All rights reserved.
+    Original author: Tian Tang, DTU.
+    Ported to solids4foam by: Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

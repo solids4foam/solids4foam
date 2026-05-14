@@ -23,8 +23,8 @@ Description
     on all processors.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
-    Modifications/additions by Philip Cardiff, UCD.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
+    Modifications/additions by Philip Cardiff, UCD.
 
 SourceFiles
     globalPolyPatch.C

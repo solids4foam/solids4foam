@@ -49,10 +49,13 @@ Figure 1 - Problem geometry (dimensions in m) [4]
 - Under plane strain conditions, the analytical solution to the problem is
 
 [[1]](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0207%2820000530%2948%3A3%3C435%3A%3AAID-NME891%3E3.0.CO%3B2-V):
-  $$
-    \sigma_{x} = \tau_{xy}=0\qquad \sigma_{y} = \dfrac{E}{1-\nu^2}\Delta \qquad
+$$
+\sigma_{x} = \tau_{xy}=0\qquad \sigma_{y} = \dfrac{E}{1-\nu^2}\Delta \qquad
 \sigma_z = \nu \sigma_y.
-  $$
+$$
+
+where $$E$$ is Young's modulus, $$\nu$$ Poisson's ratio and $$\Delta$$
+prescribed displacement of upper block top surface.
 
 For the considered case with $$\nu=0$$, there are no $$\sigma_x$$ and
 $$\sigma_z$$ stresses. If one wants to set $$\nu > 0$$ the above equation can be
@@ -61,9 +64,10 @@ in the tangential direction. Here the bottom surface of the lower block is held
 fixed as there is no displacement in the $$x$$ direction.
 
 The analytical solution is generated alongside solution fields using the
-function object compiled when running `>./Allrun` script. Function object inputs
-are located in `controlDict` where one needs to upper block top surface
-vertical displacement and material data:
+`contactPatchTestAnalyticalSolution` function object compiled when running the
+`> ./Allrun` script. Function object inputs are located in `controlDict` where
+one needs to specify the upper block top surface vertical displacement and
+material data:
 
 ```c++
 functions
@@ -83,6 +87,9 @@ functions
     }
 }
 ```
+
+The function object writes the analytical stress tensor field `analyticalStress`
+and the scalar relative error field `relativeError` in the time directories.
 
 Figure 2 shows the distribution of the relative error field $$e$$. The relative
 error (in percentages) is defined as:
@@ -111,8 +118,9 @@ Figure 2 - Distribution of the relative error
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/contactPatchTest`. The case can
 be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
-Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed
-by running the `solids4foam` solver (`> solids4Foam`).
+`Allrun` script compiles the tutorial-local library in the `src` directory,
+creates the mesh using `blockMesh` (`> blockMesh`), and runs the `solids4foam`
+solver (`> solids4Foam`).
 
 ---
 

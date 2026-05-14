@@ -19,7 +19,7 @@ Description
      Block matrix member static data members
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
 
 \*---------------------------------------------------------------------------*/
 

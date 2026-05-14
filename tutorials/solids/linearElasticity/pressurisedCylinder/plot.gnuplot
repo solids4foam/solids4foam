@@ -15,33 +15,37 @@ Ri = 7        # Inner cylinder radius
 Ro = 18.625   # Outer cylinder radius
 E = 1e10      # Young modulus
 p = 10e6      # Internal pressure
-nu = 0.3     # Poissons ratio
+nu = 0.3      # Poissons ratio
 
 sigmaR(x) = (p*Ri**2 / (Ro**2-Ri**2))*(1-Ro**2/x**2)/p
 sigmatheta(x) = (p*Ri**2 / (Ro**2-Ri**2))*(1+Ro**2/x**2)/p
 dispR(x) = ((p/E) * (Ri**2/(Ro**2-Ri**2)))*((1-nu)*x+(1+nu)*(Ro**2/x))
 
 # Path to postProcessing files
-pathSigma="postProcessing/sets/10/line_sigma\:Transformed.xy"
-pathD="postProcessing/sets/10/line_D.xy"
+pathSigma="postProcessing/sets/1/line_sigma\:Transformed.xy"
+pathD="postProcessing/sets/1/line_D.xy"
+pathSigmaD="postProcessing/sets/1/line_D_sigma\:Transformed.xy"
 
 # Radial stress
 set output 'sigmaR.png'
 set ylabel "{/Symbol s}_{r} / p [-]"
 set key r b
 plot sigmaR(x) w l ls 1 title"Analytical",\
-     pathSigma using 1:($2/p) w lp ls 2 title"solids4foam"
+     pathSigma using 1:($2/p) w lp ls 2 title"solids4foam",\
+     pathSigmaD using 1:($5/p) w lp ls 2 title"solids4foam"
 
 # Hoop stress
 set output 'sigmaTheta.png'
 set key r t
 set ylabel "{/Symbol s}_{{/Symbol q}} / p [-]"
 plot sigmatheta(x) w l ls 1 title"Analytical",\
-     pathSigma using 1:($5/p) w lp ls 2 title"solids4foam"
+     pathSigma using 1:($5/p) w lp ls 2 title"solids4foam",\
+     pathSigmaD using 1:($8/p) w lp ls 2 title"solids4foam"
 
 # Radial displacement
 set output 'dispR.png'
 set key r t
 set ylabel "u_r  [m]"
 plot dispR(x) w l ls 1 title"Analytical",\
-     pathD using 1:(sqrt($2**2+$3**2)) w lp ls 2 title"solids4foam"
+     pathD using 1:(sqrt($2**2+$3**2)) w lp ls 2 title"solids4foam",\
+     pathSigmaD using 1:(sqrt($2**2+$3**2)) w lp ls 2 title"solids4foam"

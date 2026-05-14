@@ -89,9 +89,21 @@ specified `point` and writes the displacement of this vertex to
 
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be
-run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
-Allrun consists of creating the mesh using `blockMesh` (`> ./blockMesh`)
-followed by running the `solids4foam` solver (`> ./solids4Foam`).
+run using the included `Allrun` script. The `Allrun` script optionally takes an
+argument which specifies the solution approach:
+
+```bash
+./Allrun             # Defaults to the segregated approach
+./Allrun segregated  # Segregated second-order approach
+./Allrun petscSnes   # PETSc SNES second-order approach
+./Allrun highOrder   # PETSc SNES high-order approach
+```
+
+The `Allrun` script starts by updating the files in the case to match the
+selected approach; the following files are updated:
+`constant/solidProperties`, `system/fvSchemes`, and `system/fvSolution`.
+Subsequently, the mesh is created with `blockMesh`, followed by running the
+solver `solids4Foam`.
 
 ---
 

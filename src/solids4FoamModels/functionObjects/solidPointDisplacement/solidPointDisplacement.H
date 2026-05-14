@@ -26,7 +26,7 @@ Description
     least squares vol-to-point interpolator.
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidPointDisplacement.C

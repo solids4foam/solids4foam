@@ -17,6 +17,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libsquarePlateAnalytical.so");
+
 application     solids4Foam;
 
 startFrom       startTime;

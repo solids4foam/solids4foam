@@ -37,7 +37,7 @@ Description
     endverbatim
 
 Author
-    Philip Cardif, UCD.  All rights reserved.
+    Philip Cardif, UCD.
 
 SourceFiles
     boundingBoxLimiter.C

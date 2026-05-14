@@ -27,7 +27,7 @@ SourceFiles
     transitionalParabolicVelocityFvPatchVectorField.C
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 \*---------------------------------------------------------------------------*/
 

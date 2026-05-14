@@ -1,0 +1,4 @@
+pressurisedCylinderAnalytical/pressurisedCylinderAnalytical.C
+pressurisedCylinderAnalyticalSolutionFunctionObject/pressurisedCylinderAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libpressurisedCylinderAnalytical

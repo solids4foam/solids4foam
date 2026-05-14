@@ -26,7 +26,7 @@ Description
     in a coupled system and is currently available for foam-extend builds.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     coupledPressureDisplacementSolid.C

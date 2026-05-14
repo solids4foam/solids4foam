@@ -28,11 +28,12 @@ Description
     Design, 44, 2008, 595–601, 10.1016/j.finel.2008.01.010.
 
     It is assumed that the origin is at the centre of the fixed patch.
+    Empty direction is z-axis.
 
     The beam is L long and D deep (thick).
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     cantileverAnalyticalSolution.C

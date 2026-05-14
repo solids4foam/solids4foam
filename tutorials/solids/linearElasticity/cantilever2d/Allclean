@@ -8,7 +8,9 @@ source solids4FoamScripts.sh
 
 wclean lib src
 
+[ -f constant/polyMesh/blockMeshDict ] && cp constant/polyMesh/blockMeshDict system/
 cleanCase
+[ -f system/blockMeshDict ] && mkdir -p constant/polyMesh && cp system/blockMeshDict constant/polyMesh/
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
