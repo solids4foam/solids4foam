@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      f0;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions [0 0 0 0 0 0 0];
+
+internalField uniform (0 0 1); //za ventricle 001
+
+boundaryField
+{
+    fixed
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    inside
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    outside
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+}
+
+
+// ************************************************************************* //

@@ -1,5 +1,4 @@
 #!/bin/bash
-set -Eeuo pipefail
 IFS=$'\n\t'
 
 # Source tutorial clean functions
