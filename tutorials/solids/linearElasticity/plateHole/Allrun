@@ -7,7 +7,7 @@ IFS=$'\n\t'
 # Allows selection of solution approach:
 #   segregated (default), petscSnes, highOrder
 #   pressureDisplacementCompressible [coarse|medium]
-#   pressureDisplacementIncompressible [coarse|medium|poly]
+#   pressureDisplacementIncompressible [coarse|medium]
 # -------------------------------------------------------------------------
 
 usage() {
@@ -30,7 +30,6 @@ For pressureDisplacement* approaches (foam-extend only), the second argument
 selects the mesh:
   coarse                               (default)
   medium
-  poly                                 (incompressible only)
 
 Examples:
   ./Allrun
@@ -38,7 +37,7 @@ Examples:
   ./Allrun petscSnes parallel
   ./Allrun highOrder
   ./Allrun pressureDisplacementCompressible medium
-  ./Allrun pressureDisplacementIncompressible poly
+  ./Allrun pressureDisplacementIncompressible medium
 EOF
 }
 
@@ -97,7 +96,7 @@ case "${APPROACH}" in
         solids4Foam::caseOnlyRunsWithFoamExtend
         MESH="${ARG2:-coarse}"
         case "${MESH}" in
-            coarse|medium|poly) ;;
+            coarse|medium) ;;
             *)
                 echo "Error: Unknown mesh '${MESH}' for ${APPROACH}"
                 usage
@@ -185,15 +184,10 @@ select_pressure_displacement_case() {
     copy_contents caseOptions/pressureDisplacement/common/system system
     copy_contents "caseOptions/pressureDisplacement/${material}/constant" constant
 
-    if [[ "${MESH}" == "poly" ]]; then
-        copy_contents caseOptions/pressureDisplacement/poly/constant constant
-        copy_contents caseOptions/pressureDisplacement/poly/system system
-    else
-        copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
-        copy_contents caseOptions/pressureDisplacement/hex/common/system system
-        copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
-        cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
-    fi
+    copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
+    copy_contents caseOptions/pressureDisplacement/hex/common/system system
+    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
+    cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
 }
 
 select_approach() {
@@ -234,18 +228,8 @@ echo "Compiling libraries..."
 
 solids4Foam::convertCaseFormat .
 
-case "${APPROACH}" in
-    pressureDisplacementIncompressible)
-        if [[ "${MESH}" != "poly" ]]; then
-            echo
-            solids4Foam::runApplication blockMesh
-        fi
-        ;;
-    *)
-        echo
-        solids4Foam::runApplication blockMesh
-        ;;
-esac
+echo
+solids4Foam::runApplication blockMesh
 
 case "${APPROACH}" in
     segregated|petscSnes|highOrder)

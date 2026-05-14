@@ -45,7 +45,6 @@ PRESSURE_DISPLACEMENT_CASES=(
     "pressureDisplacementCompressible medium"
     "pressureDisplacementIncompressible coarse"
     "pressureDisplacementIncompressible medium"
-    "pressureDisplacementIncompressible poly"
 )
 
 echo "============================================================"

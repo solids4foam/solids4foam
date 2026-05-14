@@ -206,7 +206,6 @@ only):
 ./Allrun pressureDisplacementCompressible medium
 ./Allrun pressureDisplacementIncompressible coarse
 ./Allrun pressureDisplacementIncompressible medium
-./Allrun pressureDisplacementIncompressible poly
 ```
 
 These pressure-displacement options use `coupledPressureDisplacementSolid` with
