@@ -112,7 +112,6 @@ $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
-$(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
 $(pointPatchFields)/pointLinearSpatialDisplacement/linearSpatialDisplacementPointPatchVectorField.C
 $(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorField.C
 $(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorFieldCalcContact.C
