@@ -12,33 +12,35 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
 fi
 
 # ============================================================
-# Plate-with-hole regression tests
-# Checks numerical vs analytical solution for the displacement
-# (segregated/petscSnes/highOrder) solution options.
+# Hyperelastic plate-with-hole pressure-displacement regression tests
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_TOL=1e-7
-POINT_DISP_TOL=1e-7
-STRESS_TOL=2e5
+PD_DISP_TOL=3.0e-4
+PD_POINT_DISP_TOL=3.0e-4
+PD_SIGMA_TOL=2.0e5
+PD_P_TOL=9.0e4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
-APPROACHES=(
-    segregated
-    petscSnes
-    highOrder
+PRESSURE_DISPLACEMENT_CASES=(
+    "pressureDisplacementCompressible coarse"
+    "pressureDisplacementCompressible medium"
+    "pressureDisplacementIncompressible coarse"
+    "pressureDisplacementIncompressible medium"
+    "pressureDisplacementIncompressible poly"
 )
 
 echo "============================================================"
-echo "Plate-with-hole regression tests"
-echo "DDifference LInf        < ${DISP_TOL}"
-echo "pointDDifference LInf   < ${POINT_DISP_TOL}"
-echo "Stress component-0 LInf < ${STRESS_TOL}"
+echo "Hyperelastic plate-with-hole regression tests"
+echo "Pressure-displacement DError max      < ${PD_DISP_TOL}"
+echo "Pressure-displacement pointDError max < ${PD_POINT_DISP_TOL}"
+echo "Pressure-displacement sigma*Err max   < ${PD_SIGMA_TOL}"
+echo "Pressure-displacement pErr max        < ${PD_P_TOL}"
 echo "============================================================"
 echo
 
@@ -103,34 +105,21 @@ if [ "$CHECK_ONLY" = false ]; then
     rm -rf "${REGRESSION_ROOT}"
     mkdir -p "${REGRESSION_ROOT}"
 
-    for approach in "${APPROACHES[@]}"; do
-        run_case "${approach}" "${approach}" > /dev/null
+    for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
+        IFS=' ' read -r approach mesh <<< "${case_args}"
+        run_case "${approach}-${mesh}" "${approach}" "${mesh}" > /dev/null
     done
-
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
-extract_disp_linf() {
+extract_log_value() {
     local case_dir="$1"
-    local field="$2"
+    local label="$2"
 
-    grep -A2 "Writing ${field} field" "${case_dir}/${SOLVER_LOGFILE}" \
-        | grep "Norms:" -A1 \
+    grep "${label}" "${case_dir}/${SOLVER_LOGFILE}" 2>/dev/null \
         | tail -n 1 \
-        | awk '{print $3}' \
-        || true
-}
-
-extract_stress_linf_comp0() {
-    local case_dir="$1"
-
-    grep -A6 "Writing cellStressDifference field" \
-        "${case_dir}/${SOLVER_LOGFILE}" \
-        | tail -6 \
-        | awk '
-            /Component:[[:space:]]*0/ {getline; getline; print $3}
-        ' \
+        | awk '{print $NF}' \
         || true
 }
 
@@ -153,24 +142,38 @@ check_less_than() {
 
 failures=0
 
-for approach in "${APPROACHES[@]}"; do
-    case_dir="${REGRESSION_ROOT}/${approach}"
+for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
+    IFS=' ' read -r approach mesh <<< "${case_args}"
+    case_name="${approach}-${mesh}"
+    case_dir="${REGRESSION_ROOT}/${case_name}"
+
     if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
-        echo "SKIP: ${approach}"
+        echo "SKIP: ${case_name}"
         continue
     fi
+
     check_less_than \
-        "${approach}" "DDifference LInf" \
-        "$(extract_disp_linf "${case_dir}" "DDifference")" \
-        "${DISP_TOL}"
+        "${case_name}" "DError, max" \
+        "$(extract_log_value "${case_dir}" "DError, max")" "${PD_DISP_TOL}"
     check_less_than \
-        "${approach}" "pointDDifference LInf" \
-        "$(extract_disp_linf "${case_dir}" "pointDDifference")" \
-        "${POINT_DISP_TOL}"
+        "${case_name}" "pointDError, max" \
+        "$(extract_log_value "${case_dir}" "pointDError, max")" \
+        "${PD_POINT_DISP_TOL}"
     check_less_than \
-        "${approach}" "stress component-0 LInf" \
-        "$(extract_stress_linf_comp0 "${case_dir}")" \
-        "${STRESS_TOL}"
+        "${case_name}" "sigmaXXErr, max" \
+        "$(extract_log_value "${case_dir}" "sigmaXXErr, max")" \
+        "${PD_SIGMA_TOL}"
+    check_less_than \
+        "${case_name}" "sigmaXYErr, max" \
+        "$(extract_log_value "${case_dir}" "sigmaXYErr, max")" \
+        "${PD_SIGMA_TOL}"
+    check_less_than \
+        "${case_name}" "sigmaYYErr, max" \
+        "$(extract_log_value "${case_dir}" "sigmaYYErr, max")" \
+        "${PD_SIGMA_TOL}"
+    check_less_than \
+        "${case_name}" "pErr, max" \
+        "$(extract_log_value "${case_dir}" "pErr, max")" "${PD_P_TOL}"
 done
 
 if [ "$CHECK_ONLY" = false ]; then

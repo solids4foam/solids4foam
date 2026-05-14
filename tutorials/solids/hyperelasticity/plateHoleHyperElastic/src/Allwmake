@@ -1,0 +1,10 @@
+#!/bin/bash
+cd "${0%/*}" || exit  # Run from this directory
+
+if [[ -n "${S4F_NO_USE_EIGEN:-}" ]]; then
+    echo "Eigen is required to compile this local library"
+    echo "Unset S4F_NO_USE_EIGEN and rebuild solids4foam"
+    exit 1
+fi
+
+wmake $* libso

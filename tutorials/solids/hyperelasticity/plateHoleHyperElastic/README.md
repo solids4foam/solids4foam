@@ -2,7 +2,7 @@
 sort: x
 ---
 
-# Hole in a Infinite Plate Subjected to Remote Stress: `plateHole`
+# Hyperelastic Plate with a Hole Subjected to Remote Stress: `plateHoleHyperElastic`
 
 ---
 
@@ -171,32 +171,25 @@ overall number of computational nodes, i.e. cells.
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/linearElasticity/plateHole`. The case can be run
-using the included `Allrun` script. The `Allrun` script optionally takes an
-argument which specifies the solution approach:
+`solids4foam/tutorials/solids/hyperelasticity/plateHoleHyperElastic`. The case
+can be run using the included `Allrun` script. The `Allrun` script optionally
+takes arguments which specify the pressure-displacement material option and
+mesh:
 
 ```bash
-./Allrun             # Defaults to the segregated approach
-./Allrun segregated  # Segregated second-order approach
-./Allrun petscSnes   # PETSc SNES second-order approach [4]
-./Allrun highOrder   # PETSc SNES high-order approach [5]
+./Allrun                                           # Incompressible, coarse mesh
+./Allrun pressureDisplacementCompressible coarse
+./Allrun pressureDisplacementCompressible medium
+./Allrun pressureDisplacementIncompressible coarse
+./Allrun pressureDisplacementIncompressible medium
+./Allrun pressureDisplacementIncompressible poly
 ```
 
-The `Allrun` script starts by updating the files in the case to match the
-selected approach; the following files are updated:
-`constant/solidProperties`, `system/fvSchemes`, and `system/fvSolution`.
+The pressure-displacement formulation is foam-extend-only. The `Allrun` script
+starts by updating the files in the case to match the selected option.
 Subsequently, the tutorial-local library in the `src` directory is compiled,
-the mesh is created with `blockMesh`, followed by running the solver
-`solids4Foam`.
-
-Any approach can be run in parallel by adding `parallel` as the second argument,
-for example:
-
-```bash
-./Allrun segregated parallel
-./Allrun petscSnes parallel
-./Allrun highOrder parallel
-```
+the mesh is created with `blockMesh` for the hexahedral mesh options, followed
+by running the solver `solids4Foam`.
 
 ---
 
