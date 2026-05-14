@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress no;
+
+mechanical
+(
+    rubber
+    {
+        type GuccioneElastic;
+        pressureDisplacement yes;
+
+        k k [ 1 -1 -2 0 0 0 0 ] 2000;
+        cf 8;
+        ct 2;
+        cfs 4;
+
+        // mu = 14000 Pa
+
+        impKcoeff 2;
+
+        calculateStressInLocalCoordinateSystem true; //ventricle mora s false
+
+        rho  rho    [ 1 -3  0 0 0 0 0 ] 1000;
+        nu   nu     [ 0 0 0 0 0 0 0 ]   0.5;
+    }
+
+    // rubber
+    // {
+    //     type incompressibleNeoHookeanElastic;
+    //     E    E      [ 1 -1 -2 0 0 0 0 ] 30000; // Abaqus tip disp  Dz = 1.965
+    //     rho  rho    [ 1 -3  0 0 0 0 0 ] 1000;
+    //     nu   nu     [ 0 0 0 0 0 0 0 ]   0.5;
+    //     impKcoeff 1;
+    // }
+);
+
+// neoHookean true;
+
+// ************************************************************************* //

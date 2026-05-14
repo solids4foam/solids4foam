@@ -1,0 +1,73 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel coupledPressureDisplacementSolid;
+
+coupledPressureDisplacementSolidCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors             1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-08;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-08;
+
+    // Material law solution tolerance
+    materialTolerance       1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency           1;
+
+    stabilisation
+    {
+        momentum
+        {
+            // Momentum stabilisation seems to contribute to sigmaHyd oscillations
+            type laplacian;
+            scaleFactor 0;
+            scaleFactorJacobian 0;
+        }
+
+        pressure
+        {
+            type laplacian;
+            scaleFactor 0;
+            scaleFactorJacobian 0;
+        }
+    }
+
+    // Use the coupled pressure-displacement formulation with linear geometry.
+    // With this switch set to false, the neoHookeanElastic law selected in
+    // mechanicalProperties is evaluated as a linear-elastic formulation.
+    nonLinear           false;
+    debug               false;
+
+    consistentRhieChow  false;
+    composite false;
+
+    skewCorr true;
+    stdDispGrad true;
+
+    writeConvergenceData true;
+
+    // K K [0 0 -1 0 0 0 0] 100;
+}
+
+
+// ************************************************************************* //

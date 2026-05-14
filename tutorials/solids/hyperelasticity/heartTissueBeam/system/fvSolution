@@ -1,0 +1,123 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    DDDp__
+    {
+        solver CG;
+        // preconditioner	Cholesky;
+
+        minIter			1;
+        maxIter			500;
+
+        tolerance		1e-16;
+        relTol			1e-2;
+    }
+
+    DDDp
+    {
+        solver BiCGStab;
+
+        // preconditioner Cholesky;
+
+        preconditioner
+        {
+            preconditioner Cholesky;
+
+            // cycle V-cycle;
+            // nPreSweeps 2;
+            // nPostSweeps 2;
+            // nMaxLevels 100;
+            // scale on;
+            // coarseningType SAMG;
+            // groupSize 2;
+            // minCoarseEqns 4;
+            // norm componentNorm;
+            // normComponent 3;
+            // smoother ILU;
+        }
+
+
+        // preconditioner //ILUCp; //Cholesky BlockAMG GaussSeidel ILUC0 ILUCp;
+        // {
+        //     preconditioner ILUC0;
+        //     fillInLevel 1;
+        // }
+
+        minIter			1;
+        maxIter			500;
+
+        tolerance		1e-30;
+        relTol			1e-5;
+    }
+
+    DDDp_
+    {
+        solver          AMG;
+        cycle           V-cycle; // W-cycle;
+        coarseningType  AAMG; //AAMG SAMG;
+        norm            componentNorm; //componentNorm maxNorm twoNorm
+        normComponent   3;
+
+        minGroupSize    2; // 2
+        maxGroupSize    4;
+
+        nPreSweeps      2;
+        nPostSweeps     2;
+
+        groupSize       2; // 2
+        minCoarseEqns   4;
+        nMaxLevels      100; // 100
+        scale           on; //on;
+
+        // smoother        ILU; //ILUC0;
+
+
+        smoother
+        {
+            smoother    ILU;
+            fillInLevel 1;
+        }
+
+        minIter         1;
+        maxIter         300;
+        tolerance       1e-13;
+        relTol          1e-2;
+    }
+}
+
+relaxationFactors
+{
+    fields
+    {
+        Dp 1;
+        DD 1;
+        ".*Final" 1;
+
+        nonLinForceCorrection 1;
+    }
+
+    equations
+    {
+        DD 0.999;
+        DDFinal 0.999;
+        // ".*Final" 0.99;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,202 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    system;
+    object      sampleDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Set output format : choice of
+//      xmgr
+//      jplot
+//      gnuplot
+//      raw
+setFormat raw;
+
+// Surface output format. Choice of
+//      null        : suppress output
+//      foamFile    : separate points, faces and values file
+//      dx          : DX scalar or vector format
+//      vtk         : VTK ascii format
+//      raw         : x y z value format for use with e.g. gnuplot 'splot'.
+//
+// Note:
+// other formats such as obj, stl, etc can also be written (by proxy)
+// but without any values!
+surfaceFormat raw;
+
+// interpolationScheme. choice of
+//      cell          : use cell-centre value only; constant over cells (default)
+//      cellPoint     : use cell-centre and vertex values
+//      cellPointFace : use cell-centre, vertex and face values.
+// 1] vertex values determined from neighbouring cell-centre values
+// 2] face values determined using the current face interpolation scheme
+//    for the field (linear, gamma, etc.)
+interpolationScheme cellPointFace;
+
+// Fields to sample.
+fields
+(
+    D
+    p
+    //sigmaRR
+
+);
+
+
+// Set sampling definition: choice of
+//      uniform             evenly distributed points on line
+//      face                one point per face intersection
+//      midPoint            one point per cell, inbetween two face intersections
+//      midPointAndFace     combination of face and midPoint
+//
+//      curve               specified points, not nessecary on line, uses
+//                          tracking
+//      cloud               specified points, uses findCell
+//
+// axis: how to write point coordinate. Choice of
+// - x/y/z: x/y/z coordinate only
+// - xyz: three columns
+//  (probably does not make sense for anything but raw)
+// - distance: distance from start of sampling line (if uses line) or
+//             distance from first specified sampling point
+//
+// type specific:
+//      uniform, face, midPoint, midPointAndFace : start and end coordinate
+//      uniform: extra number of sampling points
+//      curve, cloud: list of coordinates
+sets
+(
+
+        x
+    {
+        axis        xyz;
+        type        cloud;
+        points (
+(	-0.000391811	0	-0.0184803	)
+(	-0.000782789	0	-0.0184214	)
+(	-0.0011721	0	-0.0183233	)
+(	-0.00155893	0	-0.0181862	)
+(	-0.00194243	0	-0.0180105	)
+(	-0.00232181	0	-0.0177964	)
+(	-0.00269625	0	-0.0175446	)
+(	-0.00306496	0	-0.0172554	)
+(	-0.00342716	0	-0.0169296	)
+(	-0.00378207	0	-0.0165678	)
+(	-0.00412894	0	-0.0161707	)
+(	-0.00446703	0	-0.0157393	)
+(	-0.00479562	0	-0.0152744	)
+(	-0.00511402	0	-0.0147771	)
+(	-0.00542155	0	-0.0142483	)
+(	-0.00571755	0	-0.0136892	)
+(	-0.00600139	0	-0.0131011	)
+(	-0.00627248	0	-0.012485	)
+(	-0.00653024	0	-0.0118425	)
+(	-0.00677411	0	-0.0111747	)
+(	-0.00700358	0	-0.0104833	)
+(	-0.00721816	0	-0.00976948	)
+(	-0.00741739	0	-0.00903493	)
+(	-0.00760086	0	-0.00828117	)
+(	-0.00776816	0	-0.00750981	)
+(	-0.00791896	0	-0.00672249	)
+(	-0.00805291	0	-0.00592087	)
+(	-0.00816975	0	-0.00510666	)
+(	-0.00826922	0	-0.0042816	)
+(	-0.00835111	0	-0.00344744	)
+(	-0.00841525	0	-0.00260595	)
+(	-0.00846149	0	-0.00175891	)
+(	-0.00848975	0	-0.000908143	)
+(	-0.00849996	0	-5.54402E-05	)
+(	-0.0084921	0	0.00079738	)
+(	-0.00846619	0	0.00164851	)
+(	-0.00842227	0	0.00249613	)
+(	-0.00836046	0	0.00333844	)
+(	-0.00828086	0	0.00417366	)
+(	-0.00818367	0	0.005	)
+
+
+            );
+
+
+    }
+
+
+    inside
+    {
+        axis        xyz;
+        type        cloud;
+        points (
+
+(	-0.000327013	0	-0.0169814	)
+(	-0.000653313	0	-0.0169258	)
+(	-0.000978186	0	-0.0168332	)
+(	-0.00130092	0	-0.0167038	)
+(	-0.00162082	0	-0.016538	)
+(	-0.00193718	0	-0.0163361	)
+(	-0.0022493	0	-0.0160985	)
+(	-0.00255652	0	-0.0158257	)
+(	-0.00285815	0	-0.0155184	)
+(	-0.00315354	0	-0.0151771	)
+(	-0.00344205	0	-0.0148028	)
+(	-0.00372304	0	-0.0143961	)
+(	-0.0039959	0	-0.013958	)
+(	-0.00426003	0	-0.0134894	)
+(	-0.00451487	0	-0.0129914	)
+(	-0.00475984	0	-0.012465	)
+(	-0.00499442	0	-0.0119113	)
+(	-0.00521809	0	-0.0113317	)
+(	-0.00543038	0	-0.0107273	)
+(	-0.0056308	0	-0.0100995	)
+(	-0.00581892	0	-0.00944964	)
+(	-0.00599435	0	-0.00877915	)
+(	-0.00615668	0	-0.00808948	)
+(	-0.00630557	0	-0.00738215	)
+(	-0.00644069	0	-0.0066587	)
+(	-0.00656174	0	-0.00592072	)
+(	-0.00666847	0	-0.0051698	)
+(	-0.00676063	0	-0.00440759	)
+(	-0.00683804	0	-0.00363576	)
+(	-0.00690051	0	-0.00285599	)
+(	-0.00694791	0	-0.00206998	)
+(	-0.00698015	0	-0.00127946	)
+(	-0.00699714	0	-0.000486139	)
+(	-0.00699885	0	0.000308243	)
+(	-0.00698528	0	0.00110195	)
+(	-0.00695645	0	0.00189325	)
+(	-0.00691244	0	0.00268042	)
+(	-0.00685333	0	0.00346174	)
+(	-0.00677926	0	0.00423549	)
+(	-0.00669038	0	0.005	)
+
+
+            );
+
+
+    }
+
+
+
+    );
+// Surface sampling definition: choice of
+//      plane : values on plane defined by point, normal.
+//      patch : values on patch.
+//
+// 1] patches are not triangulated by default
+// 2] planes are always triangulated
+// 3] iso-surfaces are always triangulated
+surfaces
+(
+);
+
+
+// *********************************************************************** //

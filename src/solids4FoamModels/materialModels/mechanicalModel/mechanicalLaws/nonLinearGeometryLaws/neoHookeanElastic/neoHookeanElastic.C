@@ -49,6 +49,16 @@ Foam::neoHookeanElastic::neoHookeanElastic
     alternatePressureDefinition_
     (
         dict.lookupOrDefault<Switch>("alternatePressureDefinition", false)
+    ),
+    pressureDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("pressureDisplacement", false)
+    ),
+    pressureDisplacementCoeff_
+    (
+        "pressureDisplacementCoeff",
+        dimless,
+        dict.lookupOrDefault<scalar>("pressureDisplacementCoeff", -1.0)
     )
 {
     // Read mechanical properties
@@ -66,6 +76,10 @@ Foam::neoHookeanElastic::neoHookeanElastic
         if (planeStress())
         {
             K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
+        }
+        else if (pressureDisplacement_ && nu.value() > 0.5 - SMALL)
+        {
+            K_.value() = GREAT;
         }
         else
         {
@@ -88,6 +102,20 @@ Foam::neoHookeanElastic::neoHookeanElastic
             << abort(FatalError);
     }
 
+    if (pressureDisplacement_ && pressureDisplacementCoeff_.value() < 0.0)
+    {
+        dimensionedScalar nu("nu", dimless, 0.5);
+
+        if (K_.value() < GREAT - SMALL)
+        {
+            nu =
+                (3.0*K_ - 2.0*mu_)
+               /(2.0*(3.0*K_ + mu_));
+        }
+
+        pressureDisplacementCoeff_ = 3.0*nu/(1.0 + nu);
+    }
+
     // Store old F
     F().storeOldTime();
     Ff().storeOldTime();
@@ -104,6 +132,26 @@ Foam::neoHookeanElastic::~neoHookeanElastic()
 
 Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 {
+    if (pressureDisplacement_)
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                mu_
+            )
+        );
+    }
+
     return tmp<volScalarField>
     (
         new volScalarField
@@ -280,12 +328,12 @@ void Foam::neoHookeanElastic::materialTangentField(List<mat66>& matTan) const
                     // Zero the tangent
                     curMatTan.clear();
 
-                    curMatTan(XX, cmptI) = tangCmptI[fI][XX];
-                    curMatTan(YY, cmptI) = tangCmptI[fI][YY];
-                    curMatTan(ZZ, cmptI) = tangCmptI[fI][ZZ];
-                    curMatTan(XY, cmptI) = tangCmptI[fI][XY];
-                    curMatTan(YZ, cmptI) = tangCmptI[fI][YZ];
-                    curMatTan(XZ, cmptI) = tangCmptI[fI][XZ];
+                    curMatTan(XX, cmptI) = tangCmptP[fI][XX];
+                    curMatTan(YY, cmptI) = tangCmptP[fI][YY];
+                    curMatTan(ZZ, cmptI) = tangCmptP[fI][ZZ];
+                    curMatTan(XY, cmptI) = tangCmptP[fI][XY];
+                    curMatTan(YZ, cmptI) = tangCmptP[fI][YZ];
+                    curMatTan(XZ, cmptI) = tangCmptP[fI][XZ];
                 }
             }
         }
@@ -312,11 +360,28 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
 
+    // Calculate the left Cauchy Green strain
+    const volSymmTensorField b(symm(F & FT));
+
     // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
+    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*b);
 
     // Calculate the deviatoric stress
-    const volSymmTensorField s(mu_*dev(bEbar));
+    const volSymmTensorField s
+    (
+        pressureDisplacement_
+      ? mu_*(b - I)/J
+      : mu_*dev(bEbar)
+    );
+
+    if (pressureDisplacement_)
+    {
+        const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+
+        sigma = -pressureDisplacementCoeff_*p*I + s;
+
+        return;
+    }
 
     // Update the hydrostatic stress
     if (alternatePressureDefinition_)
@@ -384,11 +449,29 @@ void Foam::neoHookeanElastic::correctF
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
 
+    // Calculate left Cauchy Green strain tensor
+    const surfaceSymmTensorField b(symm(F & FT));
+
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & FT));
+    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*b);
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s(mu_*dev(bEbar));
+    const surfaceSymmTensorField s
+    (
+        pressureDisplacement_
+      ? mu_*(b - I)/J
+      : mu_*dev(bEbar)
+    );
+
+    if (pressureDisplacement_)
+    {
+        const surfaceScalarField& pf =
+            mesh().lookupObject<surfaceScalarField>("pf");
+
+        sigma = -pressureDisplacementCoeff_*pf*I + s;
+
+        return;
+    }
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);

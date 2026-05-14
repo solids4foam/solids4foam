@@ -83,6 +83,14 @@ class neoHookeanElastic
         //  alternate: -0.5*K*(J - 1.0)
         const Switch alternatePressureDefinition_;
 
+        //- Use pressure fields p/pf as the hydrostatic stress contribution
+        //  for coupledPressureDisplacementSolid
+        const Switch pressureDisplacement_;
+
+        //- Pressure multiplier for coupledPressureDisplacementSolid
+        //  Defaults to 3*nu/(1+nu), where nu is derived from mu and K
+        dimensionedScalar pressureDisplacementCoeff_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct

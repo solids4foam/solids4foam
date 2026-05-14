@@ -1,0 +1,31 @@
+#
+# Radius diagram
+#
+
+reset
+set output 'innerRadius.eps'
+set term postscript color
+
+set size 0.8,0.8
+
+set style line 1 linecolor rgb 'blue' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'red' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'p (kPa)'
+set ylabel 'Inner radius (mm)'
+set key left top
+
+#set xrange [8:16]
+#set yrange [0.04:0.17]
+#set ytics 0.04
+#set xtics 2
+#set samples 800, 800
+
+path_to_directory = "./postProcessing/0/"
+path_to_file = path_to_directory . "solidPointDisplacement_pointHistory.dat"
+
+plo path_to_file u ($1*25):($2*1000+0.3) with lines ls 2 title 'HGO', \
+"sun-inner_radius" u 1:($2) with points ls 3 title "Sun"
+
+set output

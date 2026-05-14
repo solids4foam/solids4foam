@@ -40,8 +40,8 @@ right
 Symmetry boundary conditions are applied on
 boundaries AB and DE, while zero traction is specified on the hole boundary.
 The material properties are defined by a Young’s modulus of $$E = 200 GPa$$
- and a Poisson’s ratio of $$\nu = 0.3$$. Gravitational and inertial effects are neglected,
-and the case is solved using one loading increment.
+and a Poisson’s ratio of $$\nu = 0.3$$. Gravitational and inertial effects are
+neglected, and the case is solved using one loading increment.
 
 ![Geometry](./images/plateHole-geometry.png)
 
@@ -197,6 +197,22 @@ for example:
 ./Allrun petscSnes parallel
 ./Allrun highOrder parallel
 ```
+
+The script also supports pressure-displacement solution options (foam-extend
+only):
+
+```bash
+./Allrun pressureDisplacementCompressible coarse
+./Allrun pressureDisplacementCompressible medium
+./Allrun pressureDisplacementIncompressible coarse
+./Allrun pressureDisplacementIncompressible medium
+```
+
+These pressure-displacement options use `coupledPressureDisplacementSolid` with
+`nonLinear false` in `constant/solidProperties`. The material law is selected as
+`neoHookeanElastic` because that law provides the pressure-displacement stress
+form, but with `nonLinear false` the case remains a linear-geometry
+linear-elastic plate-hole benchmark.
 
 ---
 

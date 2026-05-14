@@ -45,6 +45,7 @@ SourceFiles
 #include "dictionary.H"
 #include "fvMesh.H"
 #include "OFstream.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,6 +68,9 @@ class plateHoleAnalyticalSolution
         //- Reference to main object registry
         const Time& time_;
 
+        //- Region name
+        const word regionName_;
+
         //- Far field traction
         //  It is assumed that it acts in the positive X direction
         const scalar T_;
@@ -80,6 +84,9 @@ class plateHoleAnalyticalSolution
         //- Poisson's ratio
         const scalar nu_;
 
+        //- Derive elastic constants from the active solid model
+        const Switch deriveMaterialProperties_;
+
         //- Calculate cell displacement fields
         const Switch cellDisplacement_;
 
@@ -92,17 +99,36 @@ class plateHoleAnalyticalSolution
         //- Calculate point stress fields
         const Switch pointStress_;
 
+        //- Calculate pressure-displacement validation fields
+        const Switch pressureDisplacement_;
+
 
     // Private Member Functions
 
+        //- Lookup the active mesh
+        const fvMesh& mesh() const;
+
+        //- Check if this is plane stress simulation
+        bool planeStress(const fvMesh& mesh) const;
+
         //- Analytical stress solution
-        symmTensor plateHoleStress(const vector& C);
+        symmTensor plateHoleStress(const vector& C) const;
 
         //- Analytical displacement solution
-        vector plateHoleDisplacement(const vector& C, const symmTensor& sigma);
+        vector plateHoleDisplacement(const vector& C, const fvMesh& mesh) const;
+
+        //- Analytical hydrostatic pressure solution
+        scalar plateHoleHydPressure(const vector& C, const fvMesh& mesh) const;
 
         //- Write data
         bool writeData();
+
+        //- Write pressure-displacement validation data
+        void writePressureDisplacementData
+        (
+            const fvMesh& mesh,
+            const pointMesh& pMesh
+        ) const;
 
         //- Disallow default bitwise copy construct
         plateHoleAnalyticalSolution

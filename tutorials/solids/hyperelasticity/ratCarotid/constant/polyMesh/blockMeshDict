@@ -1,0 +1,137 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// M4
+
+
+
+
+
+
+
+// GEOMETRY
+// Inner radius
+
+// thickness
+
+// lenght
+
+
+// MESH
+// Abaqus mesh
+//m4_define(BLOCKSIZE, 40 54 1)
+//m4_define(BLOCKSIZE, 20 51 1) // from paper
+
+
+
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+    //Plane A:
+    (0.0003 0 0) // Vertex A0 = 0
+    (0.0004 0 0) // Vertex A1 = 1
+    (0 0.0004 0) // Vertex A2 = 2
+    (0 0.0003 0) // Vertex A3 = 3
+
+    //Plane B:
+    (0.0003 0 0.00005) // Vertex B0 = 4
+    (0.0004 0 0.00005) // Vertex B1 = 5
+    (0 0.0004 0.00005) // Vertex B2 = 6
+    (0 0.0003 0.00005) // Vertex B3 = 7
+);
+
+blocks
+(
+    hex ( 0 1 2 3 4 5 6 7 ) (6 30 6) simpleGrading (1 1 1)
+);
+
+edges
+(
+    // Plane A
+    arc  0 3  (0.000212132034355964 0.000212132034355964 0)
+    arc  1 2  (0.000282842712474619 0.000282842712474619 0)
+    // Plane B
+    arc  4 7  (0.000212132034355964 0.000212132034355964 0.00005)
+    arc  5 6  (0.000282842712474619 0.000282842712474619 0.00005)
+);
+
+boundary
+(
+    inside
+    {
+        type patch;
+        faces
+        (
+            (3 7 4 0)
+        );
+    }
+
+    outside
+    {
+        type patch;
+        faces
+        (
+            (1 5 6 2)
+        );
+    }
+    symm1
+    {
+       type symmetryPlane;
+        faces
+        (
+            (0 1 2 3)
+        );
+    }
+    symm2
+    {
+        type symmetryPlane;
+        faces
+        (
+            (5 6 7 4)
+        );
+    }
+    symm3
+    {
+        type symmetryPlane;
+        faces
+        (
+            (2 6 7 3)
+        );
+    }
+
+    symm4
+    {
+        type symmetryPlane;
+        faces
+        (
+            (5 1 0 4)
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

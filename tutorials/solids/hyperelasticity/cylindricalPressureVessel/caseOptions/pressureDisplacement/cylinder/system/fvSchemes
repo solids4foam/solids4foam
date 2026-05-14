@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default         steadyState;
+}
+
+d2dt2Schemes
+{
+    default         none; //steadyState;
+}
+
+gradSchemes
+{
+    default         none;
+
+    grad(Dp) updatedLagGauss linear;
+    grad(DD) stabLeastSquares;
+}
+
+divSchemes
+{
+    default none;
+    div(DD) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default none;
+
+    laplacian(DD,D)  Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
+
+    laplacian(rAD,p) Gauss linear corrected;
+
+ //   laplacian((1|A(U)),p) Gauss linear corrected newSkewCorrected 1.0;
+}
+
+snGradSchemes
+{
+    default         none;
+    snGrad(D)       corrected;
+    snGrad(DD)       corrected;
+
+    // snGrad(DD)ho corrected; //fourthPade;
+
+    // snGrad(reconD)  uncorrected;
+    // snGrad(p)       uncorrected;
+    // snGrad(p_0)     uncorrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+
+
+// ************************************************************************* //

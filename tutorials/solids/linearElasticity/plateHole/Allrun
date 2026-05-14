@@ -6,25 +6,38 @@ IFS=$'\n\t'
 # solids4Foam Allrun script
 # Allows selection of solution approach:
 #   segregated (default), petscSnes, highOrder
+#   pressureDisplacementCompressible [coarse|medium]
+#   pressureDisplacementIncompressible [coarse|medium]
 # -------------------------------------------------------------------------
 
 usage() {
 cat <<'EOF'
 Usage:
-  ./Allrun [approach] [parallel]
+  ./Allrun [approach] [arg]
 
 Where [approach] is one of:
-  segregated        (default)
+  segregated                           (default)
   petscSnes
   highOrder
+  pressureDisplacementCompressible
+  pressureDisplacementIncompressible
+
+For segregated|petscSnes|highOrder, the second argument is the run mode:
+  serial                               (default)
+  parallel
+
+For pressureDisplacement* approaches (foam-extend only), the second argument
+selects the mesh:
+  coarse                               (default)
+  medium
 
 Examples:
   ./Allrun
-  ./Allrun petscSnes
+  ./Allrun segregated
+  ./Allrun petscSnes parallel
   ./Allrun highOrder
-
-Any approach can be run in parallel by adding parallel as the second argument.
-
+  ./Allrun pressureDisplacementCompressible medium
+  ./Allrun pressureDisplacementIncompressible medium
 EOF
 }
 
@@ -48,26 +61,51 @@ if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
 fi
 
 APPROACH="${1:-segregated}"
-RUN_MODE="${2:-serial}"
+ARG2="${2:-}"
 
-if [[ "$APPROACH" == "parallel" ]]; then
+if [[ "${APPROACH}" == "parallel" ]]; then
     APPROACH="segregated"
-    RUN_MODE="parallel"
+    ARG2="parallel"
 fi
 
-case "$APPROACH" in
-    segregated|petscSnes|highOrder) ;;
-    *)
-        echo "Error: Unknown approach '$APPROACH'"
-        usage
-        exit 1
+case "${APPROACH}" in
+    segregated|petscSnes|highOrder)
+        RUN_MODE="${ARG2:-serial}"
+        case "${RUN_MODE}" in
+            serial|parallel) ;;
+            *)
+                echo "Error: Unknown run mode '${RUN_MODE}'"
+                usage
+                exit 1
+                ;;
+        esac
         ;;
-esac
-
-case "$RUN_MODE" in
-    serial|parallel) ;;
+    pressureDisplacementCompressible)
+        solids4Foam::caseOnlyRunsWithFoamExtend
+        MESH="${ARG2:-coarse}"
+        case "${MESH}" in
+            coarse|medium) ;;
+            *)
+                echo "Error: Unknown mesh '${MESH}' for ${APPROACH}"
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
+    pressureDisplacementIncompressible)
+        solids4Foam::caseOnlyRunsWithFoamExtend
+        MESH="${ARG2:-coarse}"
+        case "${MESH}" in
+            coarse|medium) ;;
+            *)
+                echo "Error: Unknown mesh '${MESH}' for ${APPROACH}"
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
     *)
-        echo "Error: Unknown run mode '$RUN_MODE'"
+        echo "Error: Unknown approach '${APPROACH}'"
         usage
         exit 1
         ;;
@@ -78,7 +116,6 @@ esac
 # -------------------------------------------------------------------------
 
 link_files_for_suffix() {
-    # $1 = suffix (e.g. petscSnes)
     local suffix="$1"
     local found=0
     while IFS= read -r -d '' f; do
@@ -93,7 +130,7 @@ link_files_for_suffix() {
 }
 
 require_petsc_or_exit_silently() {
-    case "$APPROACH" in
+    case "${APPROACH}" in
         petscSnes|highOrder)
             if [[ -z "${PETSC_DIR:-}" ]]
             then
@@ -105,8 +142,56 @@ require_petsc_or_exit_silently() {
     esac
 }
 
+copy_contents() {
+    local src="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}"
+    cp -a "${src}/." "${dst}/"
+}
+
+reset_active_case() {
+    rm -rf 0
+    rm -rf constant/polyMesh
+
+    rm -f constant/dynamicMeshDict
+    rm -f constant/g
+    rm -f constant/mechanicalProperties
+    rm -f constant/physicsProperties
+    rm -f constant/solidProperties
+    rm -f constant/timeVsPressure
+    rm -f constant/timeVsTraction
+
+    rm -f system/controlDict
+    rm -f system/createPatchDict
+    rm -f system/decomposeParDict
+    rm -f system/fvSchemes
+    rm -f system/fvSolution
+    rm -f system/sampleDict
+
+    rm -f postProcessing.gplt
+}
+
+select_pressure_displacement_case() {
+    local material="$1"
+
+    echo "Using ${APPROACH} approach with ${MESH} mesh"
+
+    reset_active_case
+
+    copy_contents caseOptions/pressureDisplacement/common/0 0
+    copy_contents caseOptions/pressureDisplacement/common/constant constant
+    copy_contents caseOptions/pressureDisplacement/common/system system
+    copy_contents "caseOptions/pressureDisplacement/${material}/constant" constant
+
+    copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
+    copy_contents caseOptions/pressureDisplacement/hex/common/system system
+    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
+    cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
+}
+
 select_approach() {
-    case "$APPROACH" in
+    case "${APPROACH}" in
         segregated)
             echo "Using the segregated approach"
             link_files_for_suffix "segregated"
@@ -119,6 +204,12 @@ select_approach() {
             echo "Using the highOrder approach"
             solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "highOrder"
+            ;;
+        pressureDisplacementCompressible)
+            select_pressure_displacement_case compressible
+            ;;
+        pressureDisplacementIncompressible)
+            select_pressure_displacement_case incompressible
             ;;
     esac
 }
@@ -135,18 +226,22 @@ echo
 echo "Compiling libraries..."
 (cd src && bash ./Allwmake -s)
 
-# Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Create mesh
+echo
 solids4Foam::runApplication blockMesh
 
-# Run solver
-if [[ "$RUN_MODE" == "parallel" ]]
-then
-    solids4Foam::runApplication decomposePar
-    solids4Foam::runParallel solids4Foam
-    solids4Foam::runApplication reconstructPar
-else
-    solids4Foam::runApplication solids4Foam
-fi
+case "${APPROACH}" in
+    segregated|petscSnes|highOrder)
+        if [[ "${RUN_MODE}" == "parallel" ]]; then
+            solids4Foam::runApplication decomposePar
+            solids4Foam::runParallel solids4Foam
+            solids4Foam::runApplication reconstructPar
+        else
+            solids4Foam::runApplication solids4Foam
+        fi
+        ;;
+    *)
+        solids4Foam::runApplication solids4Foam
+        ;;
+esac

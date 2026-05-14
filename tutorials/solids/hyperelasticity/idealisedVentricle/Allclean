@@ -1,0 +1,46 @@
+#!/bin/bash
+IFS=$'\n\t'
+
+# Source tutorial clean functions
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+cleanCase
+
+rm -rf 0
+rm -rf constant/polyMesh
+rm -rf processor* postProcessing
+rm -f case.foam
+rm -f log.* *.log
+
+rm -f constant/dynamicMeshDict
+rm -f constant/g
+rm -f constant/mechanicalProperties
+rm -f constant/physicsProperties
+rm -f constant/solidProperties
+rm -f constant/timeVsPressure
+
+rm -f system/blockMeshDict
+rm -f system/controlDict
+rm -f system/createPatchDict
+rm -f system/decomposeParDict
+rm -f system/extrudeMeshDict
+rm -f system/fvSchemes
+rm -f system/fvSolution
+rm -f system/sampleDict
+
+rm -f petscOptions.*
+rm -f ventricle_ideal_*.msh ventricle_ideal_*.msh.gz
+rm -f epicard_apex.txt
+rm -f tipPointDisplacement*.gplt
+
+# Restore default petsc files (so the case is browseable after Allclean)
+mkdir -p 0 constant system
+cp -a caseOptions/petsc/0/. 0/
+cp -a caseOptions/petsc/constant/. constant/
+cp -a caseOptions/petsc/system/. system/
+cp -a caseOptions/petsc/petscOptions.* .

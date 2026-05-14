@@ -1,0 +1,25 @@
+#!/bin/sh
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+set -e
+
+# reset
+rm -rf 0
+cp -rf 0.orig 0
+
+# paraview file
+touch case.foam
+
+# mesh
+runApplication blockMesh
+
+# Decompose case
+runApplication decomposePar
+
+# Run solver
+#mpirun -np 8 --use-hwthread-cpus solids4Foam -parallel > log.solids4Foam &
+runParallel solids4Foam 4
+
+# run
+#runApplication solids4Foam
