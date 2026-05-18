@@ -1024,11 +1024,7 @@ void linGeomTotalDispSolid::packSolution(Vec x)
     if (solvePressure())
     {
         // Insert the scaled pressure unknown pHat = p/pressureUnknownScale_
-#ifdef OPENFOAM_NOT_EXTEND
-        scalarField pHat(p().primitiveField());
-#else
-        scalarField pHat(p().internalField());
-#endif
+        scalarField pHat(primitiveField(p()));
         pHat /= pressureUnknownScale_;
         foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
