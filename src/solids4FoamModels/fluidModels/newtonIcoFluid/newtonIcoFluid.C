@@ -240,6 +240,22 @@ newtonIcoFluid::newtonIcoFluid
     (
         fluidProperties().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
     ),
+    scaleMixedPetScFields_
+    (
+        fluidProperties().lookupOrDefault<Switch>
+        (
+            "scaleMixedPetScFields", false
+        )
+    ),
+    pressureUnknownScaleType_
+    (
+        fluidProperties().lookupOrDefault<word>
+        (
+            "pressureUnknownScale", "none"
+        )
+    ),
+    pressureUnknownScale_(1.0),
+    pressureEqnScale_(pressureScaleFactor_),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -398,6 +414,53 @@ newtonIcoFluid::newtonIcoFluid
     if (mag(pressureScaleFactor_ - 1.0) > SMALL)
     {
         Info<< "pressureScaleFactor = " << pressureScaleFactor_ << endl;
+    }
+
+    // Resolve the PETSc pressure unknown scale.
+    // Default ("none") leaves pressureUnknownScale_ = 1, which is a
+    // no-op everywhere pack/unpackSolution is used
+    pressureUnknownScale_ = 1.0;
+    if (scaleMixedPetScFields_)
+    {
+        if (pressureUnknownScaleType_ == "none")
+        {
+            pressureUnknownScale_ = 1.0;
+        }
+        else if
+        (
+            pressureUnknownScaleType_ == "user"
+         || pressureUnknownScaleType_ == "scalar"
+        )
+        {
+            pressureUnknownScale_ =
+                readScalar
+                (
+                    fluidProperties().lookup("pressureUnknownScaleValue")
+                );
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Unknown pressureUnknownScale "
+                << pressureUnknownScaleType_ << nl
+                << "Valid options are user, scalar, none"
+                << abort(FatalError);
+        }
+
+        if (pressureUnknownScale_ <= VSMALL)
+        {
+            FatalErrorInFunction
+                << "pressureUnknownScale must be positive, found "
+                << pressureUnknownScale_ << abort(FatalError);
+        }
+    }
+
+    if (mag(pressureUnknownScale_ - 1.0) > SMALL)
+    {
+        Info<< "PETSc pressure unknown scale = " << pressureUnknownScale_
+            << " (scaleMixedPetScFields = " << scaleMixedPetScFields_
+            << ", pressureUnknownScale = " << pressureUnknownScaleType_
+            << ")" << endl;
     }
 }
 
@@ -588,7 +651,6 @@ bool newtonIcoFluid::evolve()
     Time& time = physicsModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
     volVectorField& U = this->U();
-    volScalarField& p = this->p();
     surfaceScalarField& phi = this->phi();
     // autoPtr<surfaceVectorField>& Uf = Uf_;
     //scalar& cumulativeContErr = cumulativeContErr_;
@@ -761,42 +823,13 @@ bool newtonIcoFluid::evolve()
             << time.timeName() << nl << endl;
     }
 
-    // Access the raw solution data
-    const PetscScalar *xx;
-    VecGetArrayRead(foamPetscSnesHelper::solution(), &xx);
-
-    // Retrieve the solution
-    // Map the PETSc solution to the U field
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        xx,
-        U,
-        0, // Location of U
-        blockSize_,
-        fluidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
-
-    U.correctBoundaryConditions();
-
-    // Map the PETSc solution to the p field
-    // p is located in the final component
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        xx,
-        p,
-        blockSize_ - 1, // Location of p component
-        blockSize_
-    );
-
-    p.correctBoundaryConditions();
+    // Retrieve the solution: map the PETSc Vec back into the U field
+    // and the p field. Pressure unknown scaling (pHat -> p) and the
+    // boundary-condition corrections are applied by unpackSolution
+    unpackSolution(foamPetscSnesHelper::solution());
 
     // Correct Uf if the mesh is moving
     //fvc::correctUf(Uf, U, phi);
-
-    // Restore the solution vector
-    VecRestoreArrayRead(foamPetscSnesHelper::solution(), &xx);
 
     // Update the flux
     //phi = mesh.Sf() & Uf();
@@ -839,6 +872,81 @@ void newtonIcoFluid::clearRAUf()
 
 #ifdef USE_PETSC
 
+void newtonIcoFluid::unpackSolution(const Vec x)
+{
+    volVectorField& U = const_cast<volVectorField&>(this->U());
+    volScalarField& p = const_cast<volScalarField&>(this->p());
+
+    // Copy x into the U field
+    vectorField& UI = U;
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        UI,
+        0, // Location of U
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+    U.correctBoundaryConditions();
+
+    // Copy the scaled pressure unknown pHat from x into the physical
+    // p field via p = pressureUnknownScale_ * pHat. When the scale is
+    // 1 (default) this reduces to a direct extract
+    scalarField& pI = p;
+    if (mag(pressureUnknownScale_ - 1.0) > SMALL)
+    {
+        scalarField pHat(pI.size(), 0.0);
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pHat, blockSize_ - 1
+        );
+        pI = pressureUnknownScale_*pHat;
+    }
+    else
+    {
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pI, blockSize_ - 1
+        );
+    }
+    p.correctBoundaryConditions();
+}
+
+
+void newtonIcoFluid::packSolution(Vec x)
+{
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        U(),
+        x,
+        0, // Location of U
+        fluidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Insert the scaled pressure unknown pHat = p/pressureUnknownScale_.
+    // When the scale is 1 (default) this reduces to a direct insert
+    if (mag(pressureUnknownScale_ - 1.0) > SMALL)
+    {
+        scalarField pHat(p());
+        pHat /= pressureUnknownScale_;
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pHat, x, blockSize_ - 1
+        );
+    }
+    else
+    {
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            p(), x, blockSize_ - 1
+        );
+    }
+}
+
+
 label newtonIcoFluid::initialiseJacobian(Mat& jac)
 {
     // Initialise based on compact stencil fvMesh
@@ -868,23 +976,16 @@ label newtonIcoFluid::formResidual
 
     // Take references
     dynamicFvMesh& mesh = this->mesh();
+
+    // Copy x into the U and p fields (pHat -> p when scale != 1).
+    // unpackSolution also corrects the boundary conditions on both
+    // fields, so the rest of this routine can use them directly
+    unpackSolution(x);
+
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
 
-    // Copy x into the U field
-    vectorField& UI = U;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        UI,
-        0,
-        fluidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
-
-    U.correctBoundaryConditions();
     gradU() = fvc::grad(U);
 
     // Lookup the forceImplicitFlux flag
@@ -939,14 +1040,8 @@ label newtonIcoFluid::formResidual
         }
     }
 
-    // Copy x into the p field
-    scalarField& pI = p;
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        x, pI, blockSize_ - 1
-    );
-
-    p.correctBoundaryConditions();
+    // Pressure has already been unpacked from x (and BCs corrected)
+    // by unpackSolution() above
     gradp() = fvc::grad(p);
 
     // Interpolated effective viscosity for momentum stabilisation
@@ -1033,19 +1128,12 @@ label newtonIcoFluid::formJacobian
 
     const fvMesh& mesh = this->mesh();
 
-    volVectorField& U = const_cast<volVectorField&>(this->U());
-    vectorField& UI = U;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        UI,
-        0,
-        fluidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
+    // Copy x into the U and p fields (pHat -> p when scale != 1).
+    // unpackSolution also corrects the boundary conditions on both
+    // fields, so the rest of this routine can use them directly
+    unpackSolution(x);
 
-    U.correctBoundaryConditions();
+    volVectorField& U = const_cast<volVectorField&>(this->U());
 
     surfaceScalarField& phi = this->phi();
     const Switch forceImplicitFlux =
@@ -1095,14 +1183,9 @@ label newtonIcoFluid::formJacobian
         }
     }
 
+    // Pressure has already been unpacked from x (and BCs corrected)
+    // by unpackSolution() above
     volScalarField& p = const_cast<volScalarField&>(this->p());
-    scalarField& pI = p;
-    foamPetscSnesHelper::ExtractFieldComponents<scalar>
-    (
-        x, pI, blockSize_ - 1
-    );
-
-    p.correctBoundaryConditions();
 
     laminarTransport_.correct();
     turbulence_->correct();

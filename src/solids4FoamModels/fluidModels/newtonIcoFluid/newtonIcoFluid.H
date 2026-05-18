@@ -104,6 +104,26 @@ class newtonIcoFluid
         //  Jacobian rows relative to the momentum equations
         const scalar pressureScaleFactor_;
 
+        //- Store pressure in the PETSc solution vector as p/pScale.
+        //  When disabled (default) the PETSc Vec stores physical
+        //  pressure unchanged
+        const Switch scaleMixedPetScFields_;
+
+        //- Scale type used for the PETSc pressure unknown.
+        //  Valid options: "none", "user"/"scalar"
+        const word pressureUnknownScaleType_;
+
+        //- Pressure scale used for pHat = p/pressureUnknownScale_.
+        //  Defaults to 1 (no-op); intended to give matrix-free SNES
+        //  (-snes_mf_operator) comparable velocity and pressure
+        //  magnitudes in the PETSc Vec
+        scalar pressureUnknownScale_;
+
+        //- Effective scale applied to the pressure-equation residual
+        //  and the pressure-row Jacobian entries.
+        //  Equals pressureScaleFactor_ today; introduced for symmetry
+        //  with the solid-side scaling pattern
+        scalar pressureEqnScale_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -141,6 +161,20 @@ class newtonIcoFluid
             const fvVectorMatrix& ddtUEqn,
             const fvVectorMatrix& HUEqn
         );
+
+#ifdef USE_PETSC
+        //- Copy the PETSc solution vector x into the U and p fields,
+        //  applying the pressure unknown scale
+        //  (p = pressureUnknownScale_ * pHat) and correcting boundary
+        //  conditions. Vec is a pointer type, so it is taken by value
+        void unpackSolution(const Vec x);
+
+        //- Copy the current U and p fields into the PETSc solution
+        //  vector x, applying the inverse pressure unknown scale
+        //  (pHat = p/pressureUnknownScale_).
+        //  Vec is a pointer type, so it is taken by value
+        void packSolution(Vec x);
+#endif
 
         //- Disallow default bitwise copy construct
         newtonIcoFluid(const newtonIcoFluid&);
