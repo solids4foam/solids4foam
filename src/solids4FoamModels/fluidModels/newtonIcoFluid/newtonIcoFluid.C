@@ -732,17 +732,17 @@ bool newtonIcoFluid::evolve()
             Info<< "Applying a linear predictor to velocity" << endl;
             U = 2.0*U.oldTime() - U.oldTime().oldTime();
             Info<< "Applying a linear predictor to velocity: done" << endl;
-
-            foamPetscSnesHelper::InsertFieldComponents<vector>
-            (
-                U,
-                foamPetscSnesHelper::solution(),
-                blockSize_,
-                fluidModel::twoD()
-              ? makeList<label>({0,1})
-              : makeList<label>({0,1,2})
-            );
         }
+
+        // Seed the PETSc Vec from the current U and p fields on every
+        // timestep, including the first one. Otherwise the very first
+        // formResidual reads an unset (zero) PETSc Vec, overwrites the
+        // user-supplied initial U and p, and SNES starts from an
+        // internal-vs-boundary-inconsistent state. This is especially
+        // damaging when a fixedValue pressure boundary differs from
+        // zero, because grad(p) then sees a huge boundary step that
+        // produces a spurious momentum residual on the first iteration
+        packSolution(foamPetscSnesHelper::solution());
 
         // Update the mesh, unless the FSI interface already moved it.
         if (fluidModel::fsiMeshUpdate())
@@ -1112,11 +1112,23 @@ label newtonIcoFluid::formResidual
     // Pressure residual
     scalarField pressureResidual(- fvc::div(U));
 
+    // Approximate momentum operator used only to derive the rAUf
+    // coefficient field. Use the same first-order upwind named scheme
+    // as the assembled Jacobian's div term ("jacobian-div(phi,U)" in
+    // fvSchemes) so that A.A() has a predictable sign structure: the
+    // upwind div diagonal is the sum of outflow fluxes (>= 0), so
+    // pressureStabUEqn.A() = laplacian.A() - V/dt - upwind_div.A()
+    // stays consistently negative in the ddt/advection-dominated
+    // regime regardless of how non-physical a Newton or MFFD trial U
+    // is. This is what keeps rAUf = -1/A from flipping sign under
+    // Newton/MFFD perturbations and tripping the RhieChow check.
+    // The actual momentum residual (above) still uses the user-chosen
+    // div scheme, so physical accuracy is unchanged
     fvVectorMatrix pressureStabUEqn
     (
         fvm::laplacian(turbulence_->nuEff(), U)
       - fvm::ddt(U)
-      - fvm::div(phi, U)
+      - fvm::div(phi, U, "jacobian-div(phi,U)")
     );
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
