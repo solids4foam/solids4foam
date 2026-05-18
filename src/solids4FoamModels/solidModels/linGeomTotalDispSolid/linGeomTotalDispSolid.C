@@ -64,6 +64,80 @@ void linGeomTotalDispSolid::predict()
 }
 
 
+const surfaceVectorField& linGeomTotalDispSolid::nf() const
+{
+    const label tIdx = mesh().time().timeIndex();
+
+    if (!nfPtr_.valid())
+    {
+        nfPtr_.set
+        (
+            new surfaceVectorField
+            (
+                IOobject
+                (
+                    "nf",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh().Sf()/mesh().magSf()
+            )
+        );
+    }
+    else if (mesh().moving() && nfTimeIndex_ != tIdx)
+    {
+        // The mesh has moved since the cache was built: refresh values
+        // in-place
+        nfPtr_() = mesh().Sf()/mesh().magSf();
+    }
+
+    nfTimeIndex_ = tIdx;
+    return nfPtr_();
+}
+
+
+void linGeomTotalDispSolid::updateRAUfIfStale()
+{
+    if (!solvePressure())
+    {
+        // rAUf is unused unless we are solving the mixed system
+        return;
+    }
+
+    const label tIdx = runTime().timeIndex();
+    const scalar dt = runTime().deltaT().value();
+
+    // rAUf depends on (impKf_, rho, mesh, deltaT) only. It is fresh
+    // when both the timeIndex and deltaT match what we cached
+    if
+    (
+        rAUfTimeIndex_ >= 0
+     && rAUfTimeIndex_ == tIdx
+     && mag(dt - rAUfDeltaT_) <= SMALL*max(mag(dt), SMALL)
+    )
+    {
+        return;
+    }
+
+    // Build the approximate momentum diagonal. fvm::laplacian and
+    // fvm::d2dt2 read only the BC structure of D, not its values, so
+    // the resulting diagonal is independent of the current Newton
+    // iterate and any MFFD perturbation
+    fvVectorMatrix approxMomJ
+    (
+        fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+      - rho()*fvm::d2dt2(D())
+    );
+    approxMomJ.relax();
+    rAUf() = -1.0/fvc::interpolate(approxMomJ.A());
+
+    rAUfTimeIndex_ = tIdx;
+    rAUfDeltaT_ = dt;
+}
+
+
 void linGeomTotalDispSolid::enforceTractionBoundaries
 (
     surfaceVectorField& traction,
@@ -359,68 +433,15 @@ bool linGeomTotalDispSolid::evolveSnes()
     {
         predict();
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
-        (
-#ifdef OPENFOAM_NOT_EXTEND
-            D().primitiveFieldRef(),
-#else
-            D().internalField(),
-#endif
-            foamPetscSnesHelper::solution(),
-            0, // Location of first component
-            solidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
-        );
-
-        if (solvePressure())
-        {
-            scalarField pHat(p().primitiveField());
-            pHat /= pressureUnknownScale_;
-            foamPetscSnesHelper::InsertFieldComponents<scalar>
-            (
-                pHat,
-                foamPetscSnesHelper::solution(),
-                blockSize_ - 1
-            );
-        }
+        // Seed the PETSc solution vector from the predicted fields
+        packSolution(foamPetscSnesHelper::solution());
     }
 
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
 
-    // Retrieve the solution
-    // Map the PETSc solution to the D field
-    vectorField& DI = D();
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        foamPetscSnesHelper::solution(),
-        DI,
-        0, // Location of first component
-        solidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
-
-    D().correctBoundaryConditions();
-
-    if (solvePressure())
-    {
-        // Map the PETSc solution to the p field
-        // p is located in the 4th component
-        scalarField& pI = p();
-        scalarField pHat(pI.size(), 0.0);
-        foamPetscSnesHelper::ExtractFieldComponents<scalar>
-        (
-            foamPetscSnesHelper::solution(),
-            pHat,
-            blockSize_ - 1 // Location of p component
-        );
-        pI = pressureUnknownScale_*pHat;
-
-        p().correctBoundaryConditions();
-    }
+    // Map the PETSc solution back into the D field (and p when active)
+    unpackSolution(foamPetscSnesHelper::solution());
 
     // Update gradient of displacement
     if (highOrderResidual())
@@ -605,6 +626,10 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    nfPtr_(),
+    nfTimeIndex_(-1),
+    rAUfTimeIndex_(-1),
+    rAUfDeltaT_(0),
     scaleMixedPetScFields_
     (
         solidModelDict().lookupOrDefault<Switch>
@@ -627,15 +652,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     ),
     twoMuRef_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
-    debugBlockNorms_
-    (
-        solidModelDict().lookupOrDefault<Switch>("debugBlockNorms", false)
-    ),
-    debugBlockNormsFreq_
-    (
-        solidModelDict().lookupOrDefault<label>("debugBlockNormsFreq", 1000)
-    ),
-    debugBlockNormsCount_(0),
     blockSize_
     (
         solvePressure()
@@ -952,6 +968,74 @@ bool linGeomTotalDispSolid::evolve()
 
 #ifdef USE_PETSC
 
+void linGeomTotalDispSolid::unpackSolution(const Vec x)
+{
+    // Copy x into the D field
+    volVectorField& D = const_cast<volVectorField&>(this->D());
+    vectorField& DI = D;
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        DI,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Enforce the boundary conditions on D
+    D.correctBoundaryConditions();
+
+    if (solvePressure())
+    {
+        // Copy the scaled pressure unknown pHat from x into the
+        // physical p field via p = pressureUnknownScale_ * pHat
+        volScalarField& p = const_cast<volScalarField&>(this->p());
+        scalarField& pI = p;
+        scalarField pHat(pI.size(), 0.0);
+        foamPetscSnesHelper::ExtractFieldComponents<scalar>
+        (
+            x, pHat, blockSize_ - 1
+        );
+        pI = pressureUnknownScale_*pHat;
+
+        // Enforce the boundary conditions on p
+        p.correctBoundaryConditions();
+    }
+}
+
+
+void linGeomTotalDispSolid::packSolution(Vec x)
+{
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        D().primitiveField(),
+#else
+        D().internalField(),
+#endif
+        x,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        // Insert the scaled pressure unknown pHat = p/pressureUnknownScale_
+        scalarField pHat(p().primitiveField());
+        pHat /= pressureUnknownScale_;
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pHat,
+            x,
+            blockSize_ - 1
+        );
+    }
+}
+
+
 label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
 #ifndef FOAMEXTEND
@@ -988,21 +1072,11 @@ label linGeomTotalDispSolid::formResidual
 {
     const fvMesh& mesh = this->mesh();
 
-    // Copy x into the D field
-    volVectorField& D = const_cast<volVectorField&>(this->D());
-    vectorField& DI = D;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        DI,
-        0, // Location of first component
-        solidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
+    // Copy x into the D field (and p when solvePressure() is active)
+    unpackSolution(x);
 
-    // Enforce the boundary conditions
-    D.correctBoundaryConditions();
+    // Take a non-const reference to D for local use below
+    volVectorField& D = const_cast<volVectorField&>(this->D());
 
     if (solvePressure() && highOrderResidual())
     {
@@ -1012,8 +1086,9 @@ label linGeomTotalDispSolid::formResidual
                 << abort(FatalError);
     }
 
-    // Unit normal vectors at the faces
-    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    // Unit normal vectors at the faces (cached: pure geometry, rebuilt
+    // only when the mesh has moved)
+    const surfaceVectorField& n = nf();
 
     // Traction vectors at the faces
     surfaceVectorField traction
@@ -1030,9 +1105,9 @@ label linGeomTotalDispSolid::formResidual
         dimensionedVector("0", dimPressure, vector::zero)
     );
 
+#ifndef FOAMEXTEND
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
         // Consider switching to mechanical().grad() interface
         gradD() = displacementMLS().grad(D);
@@ -1045,16 +1120,12 @@ label linGeomTotalDispSolid::formResidual
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
-#endif
     }
     else
+#endif
     {
         // Update gradient of displacement
         mechanical().grad(D, gradD());
-
-        // Enforce the boundary conditions again for any conditions that
-        // use gradD
-        //D.correctBoundaryConditions();
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
@@ -1065,18 +1136,9 @@ label linGeomTotalDispSolid::formResidual
 
     if (solvePressure())
     {
-        // Copy scaled pressure unknown from x into the physical p field
+        // Pressure has already been unpacked from x by unpackSolution(x)
+        // above and its BCs corrected; take a reference for local use
         volScalarField& p = const_cast<volScalarField&>(this->p());
-        scalarField& pI = p;
-        scalarField pHat(pI.size(), 0.0);
-        foamPetscSnesHelper::ExtractFieldComponents<scalar>
-        (
-            x, pHat, blockSize_ - 1
-        );
-        pI = pressureUnknownScale_*pHat;
-
-        // Enforce the boundary conditions
-        p.correctBoundaryConditions();
 
         // We can either add p to the residual as div(p*I) or grad(p)
         sigma() = dev(sigma()) - p*I;
@@ -1087,18 +1149,13 @@ label linGeomTotalDispSolid::formResidual
         // Re-calculate the pressure stabilisation parameter
         pressureStabilisation().updateScalar(p, &gradp);
 
-        // Compute the positive face-interpolated reciprocal of the approximate
-        // momentum equation diagonal. This is the solid analogue of rAUf in
-        // pressure-velocity coupling and has units of [Pa].
-        {
-            fvVectorMatrix approxMomJ
-            (
-                fvm::laplacian(impKf_, D, "laplacian(DD,D)")
-              - rho()*fvm::d2dt2(D)
-            );
-            approxMomJ.relax();
-            rAUf() = -1.0/fvc::interpolate(approxMomJ.A());
-        }
+        // Refresh rAUf (the positive face-interpolated reciprocal of
+        // the approximate momentum equation diagonal -- the solid
+        // analogue of rAUf in pressure-velocity coupling, units [m^2/Pa])
+        // only when the mesh or deltaT have changed. The diagonal is
+        // value-independent of D and p, so this is safe under PETSc
+        // matrix-free finite-difference perturbations
+        updateRAUfIfStale();
 
         // Calculate pressure equation residual using a Gauss-style
         // divergence of D for consistency with the Gauss-style J_pD
@@ -1158,13 +1215,13 @@ label linGeomTotalDispSolid::formResidual
         )
     );
 
+#ifndef FOAMEXTEND
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         residual -= rho()*hofvc::d2dt2(D);
-#endif
     }
     else
+#endif
     {
         residual -= rho()*fvc::d2dt2(D);
     }
@@ -1189,36 +1246,6 @@ label linGeomTotalDispSolid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    if
-    (
-        debugBlockNorms_
-     && (debugBlockNormsCount_++ % max(1, debugBlockNormsFreq_) == 0)
-    )
-    {
-        const scalar rDNorm = Foam::sqrt(gSum(magSqr(residual)));
-
-        // Re-read the pressure block of f to report it consistently with
-        // what PETSc actually sees (post-scaling).
-        if (solvePressure())
-        {
-            scalarField pBlock(mesh.nCells(), 0.0);
-            foamPetscSnesHelper::ExtractFieldComponents<scalar>
-            (
-                f, pBlock, blockSize_ - 1
-            );
-            const scalar rPNorm = Foam::sqrt(gSum(magSqr(pBlock)));
-
-            Info<< "    block-norms: ||r_D|| = " << rDNorm
-                << "   ||r_p|| = " << rPNorm
-                << "   ratio = " << (rPNorm > SMALL ? rDNorm/rPNorm : GREAT)
-                << endl;
-        }
-        else
-        {
-            Info<< "    block-norms: ||r_D|| = " << rDNorm << endl;
-        }
-    }
-
     return 0;
 }
 
@@ -1229,49 +1256,23 @@ label linGeomTotalDispSolid::formJacobian
     const Vec x
 )
 {
-    // Copy x into the D field
-    volVectorField& D = const_cast<volVectorField&>(this->D());
-    vectorField& DI = D;
-    foamPetscSnesHelper::ExtractFieldComponents<vector>
-    (
-        x,
-        DI,
-        0, // Location of first component
-        solidModel::twoD()
-      ? makeList<label>({0,1})
-      : makeList<label>({0,1,2})
-    );
+    // Copy x into the D field (and p when solvePressure() is active)
+    unpackSolution(x);
 
-    // Enforce the boundary conditions
-    D.correctBoundaryConditions();
+    // Take a non-const reference to D for local use below
+    volVectorField& D = const_cast<volVectorField&>(this->D());
 
     if (solvePressure())
     {
-        // Copy scaled pressure unknown from x into the physical p field
+        // Pressure has already been unpacked from x by unpackSolution(x)
+        // above and its BCs corrected; take a reference for local use
         volScalarField& p = const_cast<volScalarField&>(this->p());
-        scalarField& pI = p;
-        scalarField pHat(pI.size(), 0.0);
-        foamPetscSnesHelper::ExtractFieldComponents<scalar>
-        (
-            x, pHat, blockSize_ - 1
-        );
-        pI = pressureUnknownScale_*pHat;
-
-        // Enforce the boundary conditions
-        p.correctBoundaryConditions();
 
         {
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
-            {
-                fvVectorMatrix approxMomJ
-                (
-                    fvm::laplacian(impKf_, D, "laplacian(DD,D)")
-                  - rho()*fvm::d2dt2(D)
-                );
-                approxMomJ.relax();
-                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A()));
-            }
+            // Refresh rAUf only when the mesh or deltaT have changed
+            // (the diagonal of the approximate momentum Jacobian is
+            // independent of D and p values)
+            updateRAUfIfStale();
 
             fvScalarMatrix approxPressureJ
             (
@@ -1320,9 +1321,9 @@ label linGeomTotalDispSolid::formJacobian
         );
     }
 
+#ifndef FOAMEXTEND
     if (highOrderJacobian())
     {
-#ifndef FOAMEXTEND
         // Note: unlike the fallback fvVectorMatrix approxJ path below, we do
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
@@ -1379,9 +1380,9 @@ label linGeomTotalDispSolid::formJacobian
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
         );
-#endif
     }
     else
+#endif
     {
         // Calculate a segregated approximation of the Jacobian
         fvVectorMatrix approxJ

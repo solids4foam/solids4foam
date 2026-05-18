@@ -90,6 +90,25 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Cached face unit-normal vectors (= mesh.Sf()/mesh.magSf()).
+        //  Purely geometric: independent of D and p. Rebuilt only when
+        //  the mesh has moved between timesteps
+        mutable autoPtr<surfaceVectorField> nfPtr_;
+
+        //- Time index when nfPtr_ was last refreshed (-1 = never built).
+        //  Used to detect mesh motion between timesteps
+        mutable label nfTimeIndex_;
+
+        //- Time index when solidModel::rAUf() was last computed
+        //  (-1 = never built)
+        mutable label rAUfTimeIndex_;
+
+        //- deltaT for which solidModel::rAUf() was last computed.
+        //  rAUf depends only on impKf_, rho, mesh and deltaT (not on
+        //  the values of D or p), so it is safe to reuse across PETSc
+        //  matrix-free residual evaluations within a Newton solve
+        mutable scalar rAUfDeltaT_;
+
         //- Store pressure in the PETSc solution vector as p/pScale
         const Switch scaleMixedPetScFields_;
 
@@ -119,18 +138,6 @@ class linGeomTotalDispSolid
         //                       * (pressureScaleByTwoMu_ ? twoMuRef_ : 1)
         scalar pressureEqnScale_;
 
-        //- Print the per-block (momentum / pressure) residual norms
-        //  while SNES is solving. The print is throttled to
-        //  every `debugBlockNormsFreq_` residual evaluations so the
-        //  log stays readable under matrix-free SNES
-        const Switch debugBlockNorms_;
-
-        //- Throttle factor for `debugBlockNorms_`
-        const label debugBlockNormsFreq_;
-
-        //- Counter for `debugBlockNorms_` throttling
-        mutable label debugBlockNormsCount_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -142,6 +149,36 @@ class linGeomTotalDispSolid
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Return the cached face unit-normal field (Sf()/magSf()).
+        //  Built lazily and refreshed only when the mesh has moved
+        //  between timesteps. Independent of D and p, so safe under
+        //  PETSc matrix-free perturbation
+        const surfaceVectorField& nf() const;
+
+        //- Update solidModel::rAUf() if the mesh or deltaT changed
+        //  since it was last computed. The result depends only on
+        //  impKf_, rho, mesh and deltaT (not on the values of D or p),
+        //  so it can safely be reused across MFFD residual evaluations
+        //  within a single Newton solve. Does nothing when
+        //  solvePressure() is disabled
+        void updateRAUfIfStale();
+
+#ifdef USE_PETSC
+        //- Copy the PETSc solution vector x into the D field (and p
+        //  when solvePressure() is active), applying the pressure
+        //  unknown scale (p = pressureUnknownScale_ * pHat) and
+        //  correcting boundary conditions. Centralises the mapping
+        //  used by formResidual, formJacobian and evolveSnes.
+        //  Vec is a pointer type, so it is taken by value
+        void unpackSolution(const Vec x);
+
+        //- Copy the current D field (and, when solvePressure() is
+        //  active, p) into the PETSc solution vector x, applying the
+        //  inverse pressure unknown scale (pHat = p/pressureUnknownScale_).
+        //  Vec is a pointer type, so it is taken by value
+        void packSolution(Vec x);
+#endif
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
