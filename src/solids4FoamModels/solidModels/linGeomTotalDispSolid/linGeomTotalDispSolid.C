@@ -1001,12 +1001,8 @@ label linGeomTotalDispSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Keep only the deviatoric part of the stress here. The
-        // pressure contribution to the momentum equation (-V*grad(p))
-        // is added separately below as a Gauss-style face flux, so
-        // div(sigma_dev) and grad(p) use the SAME (Gauss) stencil
-        // as the J_DD = impK*Laplacian preconditioner.
-        sigma() = dev(sigma());
+        // We can either add p to the residual as div(p*I) or grad(p)
+        sigma() = dev(sigma()) - p*I;
 
         // Calculate the pressure gradient (we should store this!)
         const volVectorField gradp(fvc::grad(p));
@@ -1098,18 +1094,6 @@ label linGeomTotalDispSolid::formResidual
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
-
-    if (solvePressure())
-    {
-        // Add the pressure contribution -V*grad(p) using the same
-        // leastSquaresS4f gradient stencil that InsertFvmGradIntoPETScMatrix
-        // assembles, so the residual matches the assembled Jacobian
-        // structurally. (The deviatoric stress contribution already in
-        // `residual` does NOT include -p*I, see the dev() call above.)
-        const volScalarField& pField = this->p();
-        const volVectorField gradPField(fvc::grad(pField));
-        residual -= gradPField.primitiveField()*mesh.V();
-    }
 
 #ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
