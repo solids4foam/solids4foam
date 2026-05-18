@@ -1013,10 +1013,18 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
         fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
     );
 
-    // Pressure coupling coefficients: solidSf * rho (local to solid, OK)
+    // Pressure coupling coefficients: solidSf * rho * pressureUnknownScale.
+    // The pHat-column factor pressureUnknownScale_ implements the chain
+    // rule for the scaled pressure unknown
+    //   ∂(solid traction residual)/∂pHat
+    //     = pressureUnknownScale_ * ∂(solid traction residual)/∂p
+    // It equals 1 (no-op) when scaleMixedPetScFields is disabled
+    const scalar pressureUnknownScale = newtonFluid.pressureUnknownScale();
     const vectorField pressureCoeffs
     (
-        solidPatch.Sf()*newtonFluid.rho().value()
+        solidPatch.Sf()
+       *newtonFluid.rho().value()
+       *pressureUnknownScale
     );
 
     // Viscous coupling coefficients (only when passViscousStress is enabled)
@@ -1536,7 +1544,9 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     );
     UFluid.correctBoundaryConditions();
 
-    // Retrieve the fluid pressure
+    // Retrieve the fluid pressure. The PETSc Vec stores pHat = p/scale
+    // when newtonIcoFluid's pressure unknown scaling is active, so undo
+    // it here to recover the physical pressure field
     foamPetscSnesHelper::ExtractFieldComponents
     (
         xx,
@@ -1544,6 +1554,13 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
         fluidBlockSize - 1, // Location of p component
         fluidBlockSize
     );
+    const scalar pressureUnknownScale =
+        refCast<const fluidModels::newtonIcoFluid>(fluid())
+       .pressureUnknownScale();
+    if (mag(pressureUnknownScale - 1.0) > SMALL)
+    {
+        primitiveFieldRef(p) *= pressureUnknownScale;
+    }
     p.correctBoundaryConditions();
 
     // Retrieve the solid velocity

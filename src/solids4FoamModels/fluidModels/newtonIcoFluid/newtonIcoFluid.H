@@ -266,6 +266,14 @@ public:
                 return pressureScaleFactor_;
             }
 
+            //- Return the PETSc pressure unknown scale, i.e. the scale s
+            //  in pHat = p / s used to store pressure in the SNES vector.
+            //  Equals 1 (no-op) unless scaleMixedPetScFields is enabled
+            scalar pressureUnknownScale() const
+            {
+                return pressureUnknownScale_;
+            }
+
 
 
         // Edit
