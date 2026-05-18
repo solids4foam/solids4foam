@@ -1580,6 +1580,76 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::seedSolution
+(
+    Vec solution,
+    const volVectorField& UFluid,
+    const volScalarField& p,
+    const volVectorField& USolid,
+    const label fluidBlockSize,
+    const label solidBlockSize,
+    const bool twoD
+) const
+{
+    // Access the raw solution data
+    PetscScalar *xx;
+    VecGetArray(solution, &xx);
+
+    // Insert the fluid velocity. The vol*Field implicitly slices to
+    // Field<Type>& (its internal field) for the const-ref argument
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        UFluid,
+        xx,
+        0, // Location of U
+        fluidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Insert the fluid pressure as the scaled unknown
+    // pHat = p / pressureUnknownScale (no-op when scale == 1)
+    const scalar pressureUnknownScale =
+        refCast<const fluidModels::newtonIcoFluid>(fluid())
+       .pressureUnknownScale();
+    if (mag(pressureUnknownScale - 1.0) > SMALL)
+    {
+        scalarField pHat(p);
+        pHat /= pressureUnknownScale;
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            pHat,
+            xx,
+            fluidBlockSize - 1, // Location of p component
+            fluidBlockSize
+        );
+    }
+    else
+    {
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            p,
+            xx,
+            fluidBlockSize - 1, // Location of p component
+            fluidBlockSize
+        );
+    }
+
+    // Insert the solid velocity at the per-process solid offset
+    const label solidFirstEqnID = UFluid.size()*fluidBlockSize;
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        USolid,
+        &xx[solidFirstEqnID],
+        0, // Location of first component
+        solidBlockSize,
+        twoD ? labelList({0,1}) : labelList({0,1,2})
+    );
+
+    // Restore the x vector
+    VecRestoreArray(solution, &xx);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
@@ -2043,6 +2113,21 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
         // Keep the pre-solve state so a failed SNES solve can be retried.
         foamPetscSnesHelper::storeSolutionBackup();
+
+        // Seed the global PETSc Vec from the current fluid U, fluid p
+        // and solid U fields. Without this, the first SNES residual
+        // evaluation overwrites the OF fields with the contents of an
+        // uninitialised Vec, wiping out the user-supplied initial
+        // conditions and producing a spurious boundary/internal
+        // pressure mismatch on iteration 0 whenever any fixedValue
+        // pressure boundary differs from zero
+        seedSolution
+        (
+            foamPetscSnesHelper::solution(),
+            UFluid, p, USolid,
+            fluidBlockSize, solidBlockSize,
+            twoD
+        );
 
         // We will call PETSc SNES to form and solve the coupled monolithic
         // system. Note that this will call formResidual, formJacobian,

@@ -354,24 +354,44 @@ bool linGeomTotalDispSolid::evolveSnes()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
-    // Solution predictor
+    // Solution predictor (when enabled)
     if (predictor_ && newTimeStep())
     {
         predict();
+    }
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
+    // Seed the PETSc Vec from the current D field on every timestep
+    // (and from the current p field when solving the mixed system).
+    // Without this, the first solve sees a zero-initialised PETSc Vec,
+    // which formResidual then unpacks back into D and p -- wiping out
+    // the user-supplied initial conditions and producing a spurious
+    // boundary/internal mismatch on iteration 0 whenever a
+    // fixedValue boundary differs from zero
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        D().primitiveFieldRef(),
+#else
+        D().internalField(),
+#endif
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
 #ifdef OPENFOAM_NOT_EXTEND
-            D().primitiveFieldRef(),
+            p().primitiveFieldRef(),
 #else
-            D().internalField(),
+            p().internalField(),
 #endif
             foamPetscSnesHelper::solution(),
-            0, // Location of first component
-            solidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
+            blockSize_ - 1 // Location of p component
         );
     }
 

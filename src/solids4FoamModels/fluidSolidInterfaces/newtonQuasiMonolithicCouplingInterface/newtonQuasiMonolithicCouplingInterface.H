@@ -301,6 +301,21 @@ class newtonQuasiMonolithicCouplingInterface
             const bool twoD
         ) const;
 
+        //- Seed the PETSc solution vector from the current UFluid, p
+        //  and USolid fields. Applies the inverse fluid pressure
+        //  unknown scale (pHat = p/pressureUnknownScale) so the Vec
+        //  stores the SNES-side unknowns consistently
+        void seedSolution
+        (
+            Vec solution,
+            const volVectorField& UFluid,
+            const volScalarField& p,
+            const volVectorField& USolid,
+            const label fluidBlockSize,
+            const label solidBlockSize,
+            const bool twoD
+        ) const;
+
         //- Disallow default bitwise copy construct
         newtonQuasiMonolithicCouplingInterface
         (
