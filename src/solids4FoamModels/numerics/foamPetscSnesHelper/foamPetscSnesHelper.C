@@ -2092,7 +2092,6 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = p.mesh();
-    //const scalar sign = flipSign ? -1 : 1;
     const scalar sign = scale;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
@@ -2111,8 +2110,19 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
         scalarField& upper = divUCoeffs.upper();
         scalarField& lower = divUCoeffs.lower();
 
-        lower = w*Sf.component(cmptI);
-        upper = lower - Sf.component(cmptI);
+        // Interior face coefficients (scaled by sign so the whole row
+        // is scaled consistently). Note: these are the negation of
+        // OpenFOAM's `fvm::div(phi, U)` coefficient convention, so the
+        // assembled matrix for sign=+1 represents -V*div(U) per the
+        // operator action at interior cells but with a self-consistent
+        // boundary treatment that pairs with the gradient helper. In
+        // practice the empirically self-consistent sign for the
+        // displacement-pressure Newton system on this discretisation
+        // requires the caller to pass scale = -alpha when assembling
+        // J_pD = -alpha*V*div(D); see the call site in
+        // linGeomTotalDispSolid::formJacobian for details.
+        lower = sign*w*Sf.component(cmptI);
+        upper = lower - sign*Sf.component(cmptI);
 
         divUCoeffs.negSumDiag();
 
@@ -2130,25 +2140,19 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
             {
                 if (patch.type() == "processor")
                 {
-                    // Set the fvMatrix coupled boundary coefficients so that
-                    // InsertFvMatrixIntoPETScMatrix handles the diagonal and
-                    // off-diagonal entries for processor patches.
-                    //
                     // Convention: InsertFvMatrixIntoPETScMatrix inserts
                     //   +internalCoeffs to the diagonal
                     //   -boundaryCoeffs to the off-diagonal
                     //
-                    // Internal face convention:
-                    //   lower[f] = w*Sf_cmpt
-                    //   upper[f] = (w-1)*Sf_cmpt
-                    //   negSumDiag: Diag[own] -= lower = -w*Sf_cmpt
-                    //
-                    // To match, the processor boundary needs:
-                    //   internalCoeffs = -w*Sf_cmpt (so +intCoeffs
-                    //     matches negSumDiag's -lower)
-                    //   boundaryCoeffs = (1-w)*Sf_cmpt (so -bndCoeffs
-                    //     = -(1-w)*Sf = (w-1)*Sf matches upper)
-
+                    // Interior face convention (lower = +sign*w*Sf,
+                    // upper = sign*(w-1)*Sf, negSumDiag adds
+                    // -sign*w*Sf to the owner diagonal per face).
+                    // Reproduce the same stencil across processor
+                    // boundaries by setting:
+                    //   internalCoeffs[f] = -sign*w*Sf
+                    //     (matches negSumDiag's contribution).
+                    //   boundaryCoeffs[f] = sign*(1-w)*Sf
+                    //     so -boundaryCoeffs = sign*(w-1)*Sf = upper[f].
                     scalarField& patchIntCoeffs =
                         divUCoeffs.internalCoeffs()[patchI];
                     scalarField& patchBndCoeffs =
@@ -2157,28 +2161,42 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
                     forAll(pU, faceI)
                     {
                         patchIntCoeffs[faceI] =
-                            -pw[faceI]*Sf[faceI][cmptI];
+                            -sign*pw[faceI]*Sf[faceI][cmptI];
                         patchBndCoeffs[faceI] =
-                            (1.0 - pw[faceI])*Sf[faceI][cmptI];
+                            sign*(1.0 - pw[faceI])*Sf[faceI][cmptI];
                     }
                 }
                 else
                 {
                     FatalErrorInFunction
                         << "Coupled boundary type " << patch.type()
-                        << " not yet supported in InsertFvmDivUIntoPETScMatrix"
+                        << " not yet supported in "
+                        << "InsertFvmDivUIntoPETScMatrix"
                         << abort(FatalError);
                 }
             }
             else
             {
-                // Non-coupled boundary: add diagonal contribution
-                const vectorField internalCoeffs(pU.valueInternalCoeffs(pw));
+                // Non-coupled boundary contribution.
+                // With the fvm::div-style interior coefficients above,
+                // negSumDiag already yields the correct V*div diagonal
+                // at Dirichlet boundary cells (where the BC's
+                // valueInternalCoeffs is zero). For BCs where the face
+                // value depends on the interior cell value
+                // (e.g. zeroGradient, where valueInternalCoeffs = 1),
+                // an additional `-sign*intCoeffs*Sf` correction per
+                // face is required to recover the true V*div diagonal.
+                const vectorField internalCoeffs
+                (
+                    pU.valueInternalCoeffs(pw)
+                );
 
                 forAll(pU, faceI)
                 {
                     diag[fc[faceI]] -=
-                        sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
+                        sign
+                       *internalCoeffs[faceI][cmptI]
+                       *Sf[faceI][cmptI];
                 }
             }
         }
@@ -2188,6 +2206,123 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
         (
             divUCoeffs, jac, rowOffset, colOffset + cmptI, 1
+        );
+    }
+
+    return 0;
+}
+
+
+label foamPetscSnesHelper::InsertFvmGradPGaussIntoPETScMatrix
+(
+    const volScalarField& p,
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const label nScalarEqns,
+    const scalar scale
+) const
+{
+    // Gauss-style discrete gradient of p, inserted as the J_Dp block.
+    // Interior face contribution to V*grad(p)|_own_i :
+    //   = Sf_i * (w * p[own] + (1-w) * p[nei])
+    // The scalar matrix is built identically to InsertFvmDivUIntoPETScMatrix
+    // (same upper/lower/negSumDiag coefficients per face). The difference
+    // is the destination block position: this helper inserts at
+    //   (rowOffset + cmptI, colOffset)
+    // i.e. cmptI varies the displacement-equation ROW (D_x, D_y, D_z),
+    // while InsertFvmDivU varies the displacement-field COLUMN. Together
+    // they produce the structurally consistent J_pD/J_Dp pair for the
+    // Gauss discretisation of (-V*div D) in the pressure equation and
+    // (-V*grad p) in the momentum equation.
+    const fvMesh& mesh = p.mesh();
+    const scalar sign = scale;
+
+    for (label cmptI = 0; cmptI < 3; ++cmptI)
+    {
+        if (nScalarEqns == 2 && cmptI == 2)
+        {
+            break;
+        }
+
+        fvScalarMatrix gradPCoeffs(p, dimArea*dimPressure);
+
+        const vectorField& Sf = mesh.Sf();
+        const surfaceScalarField& weights = mesh.weights();
+        const scalarField& w = weights;
+
+        scalarField& upper = gradPCoeffs.upper();
+        scalarField& lower = gradPCoeffs.lower();
+
+        // Interior coefficients (mirror InsertFvmDivU)
+        lower = sign*w*Sf.component(cmptI);
+        upper = lower - sign*Sf.component(cmptI);
+
+        gradPCoeffs.negSumDiag();
+
+        // Boundary contributions: use p's BC (not U's)
+        scalarField& diag = gradPCoeffs.diag();
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatchScalarField& pP = p.boundaryField()[patchI];
+            const fvPatch& patch = pP.patch();
+            const vectorField& Sfp = patch.Sf();
+            const fvsPatchScalarField& pw = weights.boundaryField()[patchI];
+            const labelUList& fc = patch.faceCells();
+
+            if (patch.coupled())
+            {
+                if (patch.type() == "processor")
+                {
+                    scalarField& patchIntCoeffs =
+                        gradPCoeffs.internalCoeffs()[patchI];
+                    scalarField& patchBndCoeffs =
+                        gradPCoeffs.boundaryCoeffs()[patchI];
+
+                    forAll(pP, faceI)
+                    {
+                        patchIntCoeffs[faceI] =
+                            -sign*pw[faceI]*Sfp[faceI][cmptI];
+                        patchBndCoeffs[faceI] =
+                            sign*(1.0 - pw[faceI])*Sfp[faceI][cmptI];
+                    }
+                }
+                else
+                {
+                    FatalErrorInFunction
+                        << "Coupled boundary type " << patch.type()
+                        << " not yet supported in "
+                        << "InsertFvmGradPGaussIntoPETScMatrix"
+                        << abort(FatalError);
+                }
+            }
+            else
+            {
+                // Non-coupled boundary: use p's BC valueInternalCoeffs.
+                // For zeroGradient p, valueInternalCoeffs = 1 → adds
+                //   -sign*Sf[cmpt] to diag per boundary face.
+                // For fixedValue p, valueInternalCoeffs = 0 → no
+                //   additional correction (and the diag stays as set
+                //   by negSumDiag, which is the correct V*grad value
+                //   for that BC because the face value of p doesn't
+                //   depend on the interior).
+                const scalarField internalCoeffs
+                (
+                    pP.valueInternalCoeffs(pw)
+                );
+
+                forAll(pP, faceI)
+                {
+                    diag[fc[faceI]] -=
+                        sign*internalCoeffs[faceI]*Sfp[faceI][cmptI];
+                }
+            }
+        }
+
+        // Insert at (rowOffset + cmptI, colOffset)
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+        (
+            gradPCoeffs, jac, rowOffset + cmptI, colOffset, 1
         );
     }
 

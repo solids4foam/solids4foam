@@ -515,13 +515,36 @@ public:
                 const scalar scale = -1.0
             ) const;
 
-            //- Insert div(U) into the scalar p equation of a a PETSc matrix
-            //  If "flipSign" is true, -div(U) is inserted rather than
-            //  div(U)
+            //- Insert div(U) into the scalar p equation of a PETSc matrix.
+            //  The inserted matrix is `scale * V * div(U)`. Callers
+            //  needing `-V * div(U)` should pass `scale = -1.0`, or
+            //  `-alpha` if they additionally want to row-scale by `alpha`
+            //  (e.g. for a non-dimensionalised pressure residual).
+            //  Includes proper processor-patch coupling and a Dirichlet
+            //  boundary correction that undoes the implicit zeroGradient
+            //  assumption baked into negSumDiag at boundary cells.
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
                 const volVectorField& U,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const scalar scale = 1.0
+            ) const;
+
+            //- Insert the Gauss-style grad(p) into the vector D equation
+            //  of a PETSc matrix. The inserted matrix is
+            //  `scale * V * grad(p)`. Callers needing `-V*grad(p)`
+            //  should pass `scale = -1.0`. This is the structural
+            //  transpose of `InsertFvmDivUIntoPETScMatrix` (same per-face
+            //  coefficient pattern, inserted at block position
+            //  (rowOffset + cmptI, colOffset) instead of
+            //  (rowOffset, colOffset + cmptI)).
+            label InsertFvmGradPGaussIntoPETScMatrix
+            (
+                const volScalarField& p,
                 Mat jac,
                 const label rowOffset,
                 const label colOffset,

@@ -114,6 +114,20 @@ namespace Foam
 #endif
     }
 
+    // Const field → const primitiveField&
+    template<class Type, template<class> class PatchField, class GeoMesh>
+    inline const Foam::Field<Type>& primitiveField
+    (
+        const Foam::GeometricField<Type, PatchField, GeoMesh>& fld
+    )
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        return fld.primitiveField();
+#else
+        return fld.internalField();
+#endif
+    }
+
     // Non-const field → modifiable Boundary&
     template<class Type, template<class> class PatchField, class GeoMesh>
 #ifdef FOAMEXTEND
