@@ -110,7 +110,7 @@ class newtonIcoFluid
         const Switch scaleMixedPetScFields_;
 
         //- Scale type used for the PETSc pressure unknown.
-        //  Valid options: "none", "user"/"scalar"
+        //  Valid options: "none", "user"/"scalar", "dynamicHead"
         const word pressureUnknownScaleType_;
 
         //- Pressure scale used for pHat = p/pressureUnknownScale_.

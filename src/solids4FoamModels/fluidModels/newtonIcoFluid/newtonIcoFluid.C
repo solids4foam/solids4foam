@@ -438,12 +438,44 @@ newtonIcoFluid::newtonIcoFluid
                     fluidProperties().lookup("pressureUnknownScaleValue")
                 );
         }
+        else if (pressureUnknownScaleType_ == "dynamicHead")
+        {
+            // 0.5*max(|U|)^2 evaluated over the initial U field. This is
+            // the natural magnitude of kinematic pressure (p/rho) in
+            // regions of significant pressure gradient for an
+            // incompressible flow. It is fixed at construction so that
+            // MFFD perturbations within a Newton solve see a stable
+            // scale
+            scalar Umax2 = 0;
+            forAll(U(), cellI)
+            {
+                Umax2 = max(Umax2, magSqr(U()[cellI]));
+            }
+            reduce(Umax2, maxOp<scalar>());
+
+            if (Umax2 <= VSMALL)
+            {
+                WarningInFunction
+                    << "pressureUnknownScale = dynamicHead requested but "
+                    << "the initial U field is zero everywhere. Falling "
+                    << "back to pressureUnknownScale_ = 1. Set "
+                    << "pressureUnknownScale to 'user' with an explicit "
+                    << "pressureUnknownScaleValue if the case starts "
+                    << "from rest."
+                    << endl;
+                pressureUnknownScale_ = 1.0;
+            }
+            else
+            {
+                pressureUnknownScale_ = 0.5*Umax2;
+            }
+        }
         else
         {
             FatalErrorInFunction
                 << "Unknown pressureUnknownScale "
                 << pressureUnknownScaleType_ << nl
-                << "Valid options are user, scalar, none"
+                << "Valid options are user, scalar, dynamicHead, none"
                 << abort(FatalError);
         }
 
