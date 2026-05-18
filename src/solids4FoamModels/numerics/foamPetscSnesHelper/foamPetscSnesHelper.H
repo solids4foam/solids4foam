@@ -426,31 +426,6 @@ public:
                 const scalar scale = -1.0
             ) const;
 
-            //- Insert the linearisation of `V*tr(grad(U))` into a PETSc
-            //  matrix at block position (rowOffset, colOffset).
-            //  Uses the same least-squares-S4f gradient stencil as
-            //  `mechanical().grad(D, gradD())` so the assembled Jacobian
-            //  block exactly matches the residual term
-            //  `r_p = ... - V*tr(grad(D))`.
-            //  The inserted matrix is `scale * V * tr(grad(U))`. Callers
-            //  needing `-V*tr(grad(U))` (the J_pD block of the mixed
-            //  displacement-pressure solid model) should pass
-            //  `scale = -1.0`, or `-alpha` to additionally row-scale.
-            //  This is the analogue of InsertFvmGradIntoPETScMatrix but
-            //  with row/column block-positions swapped so it inserts a
-            //  (scalar_row, vector_col) block instead of
-            //  (vector_row, scalar_col).
-            label InsertFvmTrGradIntoPETScMatrix
-            (
-                const volScalarField& p,
-                const volVectorField& U,
-                Mat jac,
-                const label rowOffset,
-                const label colOffset,
-                const label nScalarEqns,
-                const scalar scale = -1.0
-            ) const;
-
             //- Insert linearisation of div(phi,U) into a PETSc matrix
             //  where phi = Sf & Uf
             //  An upwind discretisation is assumed
