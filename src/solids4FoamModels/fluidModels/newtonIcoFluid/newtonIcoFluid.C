@@ -1099,9 +1099,13 @@ label newtonIcoFluid::formResidual
         pressureResidual[pRefCell_] = pRefValue_ - p[pRefCell_];
     }
 
-    if (pressureScaleFactor_ != 1.0)
+    // Row-scale the pressure residual.
+    // pressureEqnScale_ == pressureScaleFactor_ today; the symbol is
+    // used here so that any future twoMu-style augmentation lives in
+    // one place
+    if (mag(pressureEqnScale_ - 1.0) > SMALL)
     {
-        pressureResidual *= pressureScaleFactor_;
+        pressureResidual *= pressureEqnScale_;
     }
 
     foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1250,9 +1254,13 @@ label newtonIcoFluid::formJacobian
         pEqn.diag()[pRefCell_] = -1.0;
     }
 
-    if (pressureScaleFactor_ != 1.0)
+    // J_pp block: row is the pressure equation (row-scaled by
+    // pressureEqnScale_) AND column is the pressure unknown pHat
+    // (column-scaled by pressureUnknownScale_). Both factors apply
+    const scalar ppScale = pressureEqnScale_*pressureUnknownScale_;
+    if (mag(ppScale - 1.0) > SMALL)
     {
-        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+        scaleFvScalarMatrix(pEqn, ppScale);
     }
 
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
@@ -1267,6 +1275,8 @@ label newtonIcoFluid::formJacobian
      || pressureStabType == "diffStencilLaplacian"
     )
     {
+        // Same J_pp block: row-scale by pressureEqnScale_ and
+        // column-scale by pressureUnknownScale_
         foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
         (
             p,
@@ -1274,10 +1284,11 @@ label newtonIcoFluid::formJacobian
             jac,
             blockSize_ - 1,
             blockSize_ - 1,
-           -pressureScaleFactor_*pressureStabilisation().scaleFactorJacobian()
+           -ppScale*pressureStabilisation().scaleFactorJacobian()
         );
     }
 
+    // J_pU block: pressure row, U column. Only row-scaling applies
     foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     (
         p,
@@ -1286,16 +1297,20 @@ label newtonIcoFluid::formJacobian
         blockSize_ - 1,
         0,
         fluidModel::twoD() ? 2 : 3,
-        pressureScaleFactor_
+        pressureEqnScale_
     );
 
+    // J_Up block: U row, pressure (pHat) column. Only column-scaling
+    // applies. Helper defaults to scale = -1.0 (inserts -V*grad(p));
+    // multiply by pressureUnknownScale_ for the pHat column
     foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     (
         p,
         jac,
         0,
         blockSize_ - 1,
-        fluidModel::twoD() ? 2 : 3
+        fluidModel::twoD() ? 2 : 3,
+        -pressureUnknownScale_
     );
 
     if (debug)
@@ -1472,10 +1487,16 @@ label newtonIcoFluid::precondition
     );
 #endif
 
+    // Both pressureRhs and divPhiHbyAV are mapped onto the same
+    // row-scaled space the assembled pEqn lives in. pressureEqnScale_
+    // is used here so the rename stays symmetric with formJacobian.
+    // No pressureUnknownScale_ here: we deliberately solve for the
+    // physical pressure correction dp and convert dp -> dpHat at the
+    // end (see the dp /= pressureUnknownScale_ step below)
     scalarField pSource
     (
         pressureRhs
-      + pressureScaleFactor_*divPhiHbyAV
+      + pressureEqnScale_*divPhiHbyAV
     );
 
     if (pRefCell_ != -1)
@@ -1489,9 +1510,9 @@ label newtonIcoFluid::precondition
         pSource[pRefCell_] = pressureRhs[pRefCell_];
     }
 
-    if (pressureScaleFactor_ != 1.0)
+    if (mag(pressureEqnScale_ - 1.0) > SMALL)
     {
-        scaleFvScalarMatrix(pEqn, pressureScaleFactor_);
+        scaleFvScalarMatrix(pEqn, pressureEqnScale_);
     }
 
     pEqn.source() = pSource;
@@ -1520,10 +1541,26 @@ label newtonIcoFluid::precondition
       : makeList<label>({0,1,2})
     );
 
-    foamPetscSnesHelper::InsertFieldComponents<scalar>
-    (
-        Foam::primitiveFieldRef(dp), y, blockSize_ - 1
-    );
+    // Convert the physical pressure correction dp produced by the
+    // SIMPLE solve into the scaled correction dpHat = dp /
+    // pressureUnknownScale_ before writing it into the output vector,
+    // because PETSc consumes y in (U, pHat) coordinates
+    if (mag(pressureUnknownScale_ - 1.0) > SMALL)
+    {
+        scalarField dpHat(Foam::primitiveFieldRef(dp));
+        dpHat /= pressureUnknownScale_;
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            dpHat, y, blockSize_ - 1
+        );
+    }
+    else
+    {
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        (
+            Foam::primitiveFieldRef(dp), y, blockSize_ - 1
+        );
+    }
 
     if (debug)
     {
