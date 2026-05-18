@@ -90,6 +90,38 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- User-facing dimensionless scale factor applied to the
+        //  pressure-equation residual and Jacobian rows relative to
+        //  the momentum equations
+        const scalar pressureScaleFactor_;
+
+        //- If true, multiply pressureScaleFactor_ by a representative
+        //  2*mu so that the pressure-equation residual has units
+        //  comparable to the momentum equation
+        const Switch pressureScaleByTwoMu_;
+
+        //- Representative value of 2*mu used as the physical scale of
+        //  the pressure equation. Computed once at construction
+        scalar twoMuRef_;
+
+        //- Effective scale applied to the pressure residual and the
+        //  pressure-row Jacobian entries.
+        //  pressureEqnScale_ = pressureScaleFactor_
+        //                       * (pressureScaleByTwoMu_ ? twoMuRef_ : 1)
+        scalar pressureEqnScale_;
+
+        //- Print the per-block (momentum / pressure) residual norms
+        //  while SNES is solving. The print is throttled to
+        //  every `debugBlockNormsFreq_` residual evaluations so the
+        //  log stays readable under matrix-free SNES
+        const Switch debugBlockNorms_;
+
+        //- Throttle factor for `debugBlockNorms_`
+        const label debugBlockNormsFreq_;
+
+        //- Counter for `debugBlockNorms_` throttling
+        mutable label debugBlockNormsCount_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 

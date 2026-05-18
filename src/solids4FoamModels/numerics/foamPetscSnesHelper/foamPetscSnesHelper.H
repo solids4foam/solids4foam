@@ -412,9 +412,10 @@ public:
             ) const;
 
             //- Inserts least squares gradient into a PETSc matrix at location
-            //  (rowOffset, colOffset) within the block
-            //  Only implemented for the gradient of a scalar, e.g. grad(p)
-            //  If "flipSign" is true, -grad(p) is inserted rather than grad(p)
+            //  (rowOffset, colOffset) within the block. Only implemented
+            //  for the gradient of a scalar, e.g. grad(p). The inserted
+            //  matrix is scaled by `scale`; the default `-1.0` reproduces
+            //  the old `flipSign=true` behaviour (insertion of -V*grad(p))
             label InsertFvmGradIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -422,7 +423,32 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const scalar scale = -1.0
+            ) const;
+
+            //- Insert the linearisation of `V*tr(grad(U))` into a PETSc
+            //  matrix at block position (rowOffset, colOffset).
+            //  Uses the same least-squares-S4f gradient stencil as
+            //  `mechanical().grad(D, gradD())` so the assembled Jacobian
+            //  block exactly matches the residual term
+            //  `r_p = ... - V*tr(grad(D))`.
+            //  The inserted matrix is `scale * V * tr(grad(U))`. Callers
+            //  needing `-V*tr(grad(U))` (the J_pD block of the mixed
+            //  displacement-pressure solid model) should pass
+            //  `scale = -1.0`, or `-alpha` to additionally row-scale.
+            //  This is the analogue of InsertFvmGradIntoPETScMatrix but
+            //  with row/column block-positions swapped so it inserts a
+            //  (scalar_row, vector_col) block instead of
+            //  (vector_row, scalar_col).
+            label InsertFvmTrGradIntoPETScMatrix
+            (
+                const volScalarField& p,
+                const volVectorField& U,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const scalar scale = -1.0
             ) const;
 
             //- Insert linearisation of div(phi,U) into a PETSc matrix
@@ -441,9 +467,14 @@ public:
                 const bool flipSign = true
             ) const;
 
-            //- Insert div(U) into the scalar p equation of a a PETSc matrix
-            //  If "flipSign" is true, -div(phi,U) is inserted rather than
-            //  div(phi,U)
+            //- Insert div(U) into the scalar p equation of a PETSc matrix.
+            //  The inserted matrix is `scale * V * div(U)`. Callers
+            //  needing `-V * div(U)` should pass `scale = -1.0`, or
+            //  `-alpha` if they additionally want to row-scale by `alpha`
+            //  (e.g. for a non-dimensionalised pressure residual).
+            //  Includes proper processor-patch coupling and a Dirichlet
+            //  boundary correction that undoes the implicit zeroGradient
+            //  assumption baked into negSumDiag at boundary cells.
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -452,7 +483,25 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = false
+                const scalar scale = 1.0
+            ) const;
+
+            //- Insert the Gauss-style grad(p) into the vector D equation
+            //  of a PETSc matrix. The inserted matrix is
+            //  `scale * V * grad(p)`. Callers needing `-V*grad(p)`
+            //  should pass `scale = -1.0`. This is the structural
+            //  transpose of `InsertFvmDivUIntoPETScMatrix` (same per-face
+            //  coefficient pattern, inserted at block position
+            //  (rowOffset + cmptI, colOffset) instead of
+            //  (rowOffset, colOffset + cmptI)).
+            label InsertFvmGradPGaussIntoPETScMatrix
+            (
+                const volScalarField& p,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const scalar scale = 1.0
             ) const;
 
             //- Extract a subset of components a raw scalar array 'x' into the

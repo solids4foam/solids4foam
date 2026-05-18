@@ -123,7 +123,7 @@ void Foam::solidModel::makeRAUf() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            dimensionedScalar("0", dimPressure, 0.0)
+            dimensionedScalar("0", dimArea/dimPressure, 0.0)
         )
     );
 }

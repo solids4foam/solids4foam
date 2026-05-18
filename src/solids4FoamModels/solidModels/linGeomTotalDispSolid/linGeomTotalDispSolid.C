@@ -591,6 +591,25 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    pressureScaleFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    ),
+    pressureScaleByTwoMu_
+    (
+        solidModelDict().lookupOrDefault<Switch>("pressureScaleByTwoMu", true)
+    ),
+    twoMuRef_(1.0),
+    pressureEqnScale_(pressureScaleFactor_),
+    debugBlockNorms_
+    (
+        solidModelDict().lookupOrDefault<Switch>("debugBlockNorms", false)
+    ),
+    debugBlockNormsFreq_
+    (
+        solidModelDict().lookupOrDefault<label>("debugBlockNormsFreq", 1000)
+    ),
+    debugBlockNormsCount_(0),
     blockSize_
     (
         solvePressure()
@@ -721,6 +740,32 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 tracPatch.extrapolateValue() = true;
             }
         }
+    }
+
+    if (solvePressure())
+    {
+        // Use a volume-weighted average of 2*mu (== impK_ when solving
+        // for pressure) as the physical scale of the pressure equation.
+        // The pressure-row residual and Jacobian are then multiplied by
+        // pressureEqnScale_ = pressureScaleFactor_ * twoMuRef_ so that
+        // their natural magnitude is comparable to the momentum block.
+        scalar twoMuV = 0;
+        scalar Vtot = 0;
+        forAll(impK_, cellI)
+        {
+            const scalar Vc = mesh().V()[cellI];
+            twoMuV += impK_[cellI]*Vc;
+            Vtot += Vc;
+        }
+        reduce(twoMuV, sumOp<scalar>());
+        reduce(Vtot, sumOp<scalar>());
+        twoMuRef_ = twoMuV/Vtot;
+        pressureEqnScale_ =
+            pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1.0);
+
+        Info<< "pressureEqnScale = " << pressureEqnScale_
+            << ", where pressureScaleFactor = " << pressureScaleFactor_
+            << " and 2*mu = " << twoMuRef_ << endl;
     }
 }
 
@@ -956,20 +1001,18 @@ label linGeomTotalDispSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        // Keep only the deviatoric part of the stress here. The
+        // pressure contribution to the momentum equation (-V*grad(p))
+        // is added separately below as a Gauss-style face flux, so
+        // div(sigma_dev) and grad(p) use the SAME (Gauss) stencil
+        // as the J_DD = impK*Laplacian preconditioner.
+        sigma() = dev(sigma());
 
         // Calculate the pressure gradient (we should store this!)
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
         pressureStabilisation().updateScalar(p, &gradp);
-
-        // Dimensional consistency factor
-        const dimensionedScalar one
-        (
-            "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
-        );
 
         // Compute the positive face-interpolated reciprocal of the approximate
         // momentum equation diagonal. This is the solid analogue of rAUf in
@@ -981,19 +1024,29 @@ label linGeomTotalDispSolid::formResidual
               - rho()*fvm::d2dt2(D)
             );
             approxMomJ.relax();
-            rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+            rAUf() = -1.0/fvc::interpolate(approxMomJ.A());
         }
 
-        // Calculate pressure equation residual
+        // Calculate pressure equation residual using a Gauss-style
+        // divergence of D for consistency with the Gauss-style J_pD
+        // (InsertFvmDivUIntoPETScMatrix) and the Gauss J_DD.
         scalarField pressureResidual
         (
           - p*rKappa_
-          + pressureStabilisation().cellScalar(&rAUf(), true)*one
-          - tr(gradD())
+          + pressureStabilisation().cellScalar(&rAUf(), true)
+          - fvc::div(D)
         );
 
         // Make residual extensive
         pressureResidual *= mesh.V();
+
+        // Apply the physical row scaling. pressureEqnScale_ already
+        // bakes in both the user-facing pressureScaleFactor and the
+        // 2*mu physical scale.
+        if (pressureEqnScale_ != 1.0)
+        {
+            pressureResidual *= pressureEqnScale_;
+        }
 
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1046,6 +1099,18 @@ label linGeomTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
+    if (solvePressure())
+    {
+        // Add the pressure contribution -V*grad(p) using the same
+        // leastSquaresS4f gradient stencil that InsertFvmGradIntoPETScMatrix
+        // assembles, so the residual matches the assembled Jacobian
+        // structurally. (The deviatoric stress contribution already in
+        // `residual` does NOT include -p*I, see the dev() call above.)
+        const volScalarField& pField = this->p();
+        const volVectorField gradPField(fvc::grad(pField));
+        residual -= gradPField.primitiveField()*mesh.V();
+    }
+
 #ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
@@ -1062,6 +1127,36 @@ label linGeomTotalDispSolid::formResidual
       ? makeList<label>({0,1})
       : makeList<label>({0,1,2})
     );
+
+    if
+    (
+        debugBlockNorms_
+     && (debugBlockNormsCount_++ % max(1, debugBlockNormsFreq_) == 0)
+    )
+    {
+        const scalar rDNorm = Foam::sqrt(gSum(magSqr(residual)));
+
+        // Re-read the pressure block of f to report it consistently with
+        // what PETSc actually sees (post-scaling).
+        if (solvePressure())
+        {
+            scalarField pBlock(mesh.nCells(), 0.0);
+            foamPetscSnesHelper::ExtractFieldComponents<scalar>
+            (
+                f, pBlock, blockSize_ - 1
+            );
+            const scalar rPNorm = Foam::sqrt(gSum(magSqr(pBlock)));
+
+            Info<< "    block-norms: ||r_D|| = " << rDNorm
+                << "   ||r_p|| = " << rPNorm
+                << "   ratio = " << (rPNorm > SMALL ? rDNorm/rPNorm : GREAT)
+                << endl;
+        }
+        else
+        {
+            Info<< "    block-norms: ||r_D|| = " << rDNorm << endl;
+        }
+    }
 
     return 0;
 }
@@ -1103,12 +1198,6 @@ label linGeomTotalDispSolid::formJacobian
         p.correctBoundaryConditions();
 
         {
-            // Dimensional consistency factor
-            const dimensionedScalar one
-            (
-                "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
-            );
-
             // Compute the positive face-interpolated reciprocal of the approximate
             // momentum equation diagonal (solid analogue of rAUf), [Pa]
             {
@@ -1118,13 +1207,14 @@ label linGeomTotalDispSolid::formJacobian
                   - rho()*fvm::d2dt2(D)
                 );
                 approxMomJ.relax();
-                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+                rAUf() = -1.0/(fvc::interpolate(approxMomJ.A()));
             }
 
             fvScalarMatrix approxPressureJ
             (
-              - fvm::Sp(rKappa_, p)
-              + one*pressureStabilisation().scalarJacobian(p, &rAUf())
+              - pressureEqnScale_*fvm::Sp(rKappa_, p)
+              + pressureEqnScale_
+               *pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation
@@ -1134,26 +1224,36 @@ label linGeomTotalDispSolid::formJacobian
             );
         }
 
-        // Insert D-in-p equation coeffs coming from tr(grad(D)) == div(D)
+        // Insert D-in-p equation coefficients matching the residual
+        // term -V*div(D) = J_pD. The residual uses fvc::div(D) with
+        // the fvSchemes `div(D) Gauss linear` entry, so we use the
+        // Gauss-style InsertFvmDivU helper here.
+        //
+        // InsertFvmDivU's sign convention: scale=+1 assembles
+        // `-V*div(U)` (see header comment). So we pass
+        // `+pressureEqnScale_` to get J_pD = -alpha*V*div(D).
         foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
         (
             p,
             D,
             jac,
-            blockSize_ - 1,            // row offset
-            0,                         // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar components of D
+            blockSize_ - 1,             // row offset (p row)
+            0,                          // column offset (D columns)
+            solidModel::twoD() ? 2 : 3, // number of D components
+            pressureEqnScale_           // scale (helper returns -V*div with +1)
         );
 
-        // Insert p-in-D term
-        // Insert "-grad(p)" (equivalent to "-div(p*I)") into the D equation
-        foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
+        // Insert p-in-D term: -V*grad(p) into the displacement equation
+        // using the Gauss-style helper. Same sign convention as
+        // InsertFvmDivU: scale=+1 assembles -V*grad(p).
+        foamPetscSnesHelper::InsertFvmGradPGaussIntoPETScMatrix
         (
             p,
             jac,
-            0,                         // row offset
-            blockSize_ - 1,            // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+            0,                          // row offset
+            blockSize_ - 1,             // column offset
+            solidModel::twoD() ? 2 : 3, // number of D components
+            1.0                         // scale (helper returns -V*grad with +1)
         );
     }
 
