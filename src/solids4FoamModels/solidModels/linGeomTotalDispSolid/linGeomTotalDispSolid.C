@@ -373,6 +373,18 @@ bool linGeomTotalDispSolid::evolveSnes()
           ? makeList<label>({0,1})
           : makeList<label>({0,1,2})
         );
+
+        if (solvePressure())
+        {
+            scalarField pHat(p().primitiveField());
+            pHat /= pressureUnknownScale_;
+            foamPetscSnesHelper::InsertFieldComponents<scalar>
+            (
+                pHat,
+                foamPetscSnesHelper::solution(),
+                blockSize_ - 1
+            );
+        }
     }
 
     // Solve the nonlinear system and check the convergence
@@ -398,12 +410,14 @@ bool linGeomTotalDispSolid::evolveSnes()
         // Map the PETSc solution to the p field
         // p is located in the 4th component
         scalarField& pI = p();
+        scalarField pHat(pI.size(), 0.0);
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
             foamPetscSnesHelper::solution(),
-            pI,
+            pHat,
             blockSize_ - 1 // Location of p component
         );
+        pI = pressureUnknownScale_*pHat;
 
         p().correctBoundaryConditions();
     }
@@ -591,6 +605,18 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    scaleMixedPetScFields_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "scaleMixedPetScFields", true
+        )
+    ),
+    pressureUnknownScaleType_
+    (
+        solidModelDict().lookupOrDefault<word>("pressureUnknownScale", "twoMu")
+    ),
+    pressureUnknownScale_(1.0),
     pressureScaleFactor_
     (
         solidModelDict().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
@@ -763,9 +789,58 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         pressureEqnScale_ =
             pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1.0);
 
+        pressureUnknownScale_ = 1.0;
+        if (scaleMixedPetScFields_)
+        {
+            if
+            (
+                pressureUnknownScaleType_ == "twoMu"
+             || pressureUnknownScaleType_ == "2mu"
+            )
+            {
+                pressureUnknownScale_ = twoMuRef_;
+            }
+            else if
+            (
+                pressureUnknownScaleType_ == "user"
+             || pressureUnknownScaleType_ == "scalar"
+            )
+            {
+                pressureUnknownScale_ =
+                    readScalar
+                    (
+                        solidModelDict().lookup("pressureUnknownScaleValue")
+                    );
+            }
+            else if (pressureUnknownScaleType_ == "none")
+            {
+                pressureUnknownScale_ = 1.0;
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "Unknown pressureUnknownScale "
+                    << pressureUnknownScaleType_ << nl
+                    << "Valid options are twoMu, user, scalar, none"
+                    << abort(FatalError);
+            }
+
+            if (pressureUnknownScale_ <= VSMALL)
+            {
+                FatalErrorInFunction
+                    << "pressureUnknownScale must be positive, found "
+                    << pressureUnknownScale_ << abort(FatalError);
+            }
+        }
+
         Info<< "pressureEqnScale = " << pressureEqnScale_
             << ", where pressureScaleFactor = " << pressureScaleFactor_
             << " and 2*mu = " << twoMuRef_ << endl;
+
+        Info<< "PETSc pressure unknown scale = " << pressureUnknownScale_
+            << " (scaleMixedPetScFields = " << scaleMixedPetScFields_
+            << ", pressureUnknownScale = " << pressureUnknownScaleType_
+            << ")" << endl;
     }
 }
 
@@ -990,13 +1065,15 @@ label linGeomTotalDispSolid::formResidual
 
     if (solvePressure())
     {
-        // Copy x into the p field
+        // Copy scaled pressure unknown from x into the physical p field
         volScalarField& p = const_cast<volScalarField&>(this->p());
         scalarField& pI = p;
+        scalarField pHat(pI.size(), 0.0);
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1
+            x, pHat, blockSize_ - 1
         );
+        pI = pressureUnknownScale_*pHat;
 
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
@@ -1170,13 +1247,15 @@ label linGeomTotalDispSolid::formJacobian
 
     if (solvePressure())
     {
-        // Copy x into the p field
+        // Copy scaled pressure unknown from x into the physical p field
         volScalarField& p = const_cast<volScalarField&>(this->p());
         scalarField& pI = p;
+        scalarField pHat(pI.size(), 0.0);
         foamPetscSnesHelper::ExtractFieldComponents<scalar>
         (
-            x, pI, blockSize_ - 1
+            x, pHat, blockSize_ - 1
         );
+        pI = pressureUnknownScale_*pHat;
 
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
@@ -1196,8 +1275,8 @@ label linGeomTotalDispSolid::formJacobian
 
             fvScalarMatrix approxPressureJ
             (
-              - pressureEqnScale_*fvm::Sp(rKappa_, p)
-              + pressureEqnScale_
+              - pressureEqnScale_*pressureUnknownScale_*fvm::Sp(rKappa_, p)
+              + pressureEqnScale_*pressureUnknownScale_
                *pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
@@ -1237,7 +1316,7 @@ label linGeomTotalDispSolid::formJacobian
             0,                          // row offset
             blockSize_ - 1,             // column offset
             solidModel::twoD() ? 2 : 3, // number of D components
-            1.0                         // scale (helper returns -V*grad with +1)
+            pressureUnknownScale_       // scale (helper returns -V*grad with +1)
         );
     }
 

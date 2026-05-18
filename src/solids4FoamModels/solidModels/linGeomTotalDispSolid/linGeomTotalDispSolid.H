@@ -90,6 +90,15 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Store pressure in the PETSc solution vector as p/pScale
+        const Switch scaleMixedPetScFields_;
+
+        //- Scale type used for the PETSc pressure unknown
+        const word pressureUnknownScaleType_;
+
+        //- Pressure scale used for pHat = p/pressureUnknownScale_
+        scalar pressureUnknownScale_;
+
         //- User-facing dimensionless scale factor applied to the
         //  pressure-equation residual and Jacobian rows relative to
         //  the momentum equations
