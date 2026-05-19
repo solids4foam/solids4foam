@@ -31,7 +31,7 @@ modelled using the `solidContact` boundary condition with a Coulomb friction
 coefficient of $$0.5$$. Taylor [1] showed that this high friction coefficient
 approximates the rough surface condition.
 
-The case is represented as a 2-D axisymmetric model, see Figure 2. The default 
+The case is represented as a 2-D axisymmetric model, see Figure 2. The default
 tutorial mesh consists of 168 cells. The updated Lagrangian solid model is
 selected in `constant/solidProperties` using
 `nonLinearGeometryUpdatedLagrangian`.

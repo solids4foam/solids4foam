@@ -61,9 +61,9 @@ Table 1 - Mechanical properties
 ## Expected Results
 
 Figure 3 compares the predicted $$y$$-displacement at point A on the upper rim
-of the hole with Abaqus finite-element results. The mesh-refinement study
- shows that the finite-volume predictions become mesh independent and 
-agree well with the finite-element reference solution [1].
+of the hole with Abaqus finite-element results. The mesh-refinement study shows
+that the finite-volume predictions become mesh independent and agree well with
+the finite-element reference solution [1].
 
 Figure 3 also shows the residual $$\sigma_{xx}$$ stress component along the
 path A-B after unloading at $$t = 20$$ s. Material near the hole yields during

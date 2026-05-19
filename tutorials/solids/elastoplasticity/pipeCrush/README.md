@@ -84,7 +84,7 @@ force calculation on faces in partial contact.
 Figure 3 - Force-displacement response for different mesh densities [1]
 
 Figure 4 shows the deformed pipe geometry at four stages of compression. The
-hydrostatic pressure distribution is also compared with the Abaqus prediction. 
+hydrostatic pressure distribution is also compared with the Abaqus prediction.
 More information is available in Cardiff et al. [1].
 
 ![Figure 4: Deformed geometry and hydrostatic pressure
