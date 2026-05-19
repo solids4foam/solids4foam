@@ -97,6 +97,45 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- Time index when solidModel::rAUf() was last computed
+        //  (-1 = never built)
+        mutable label rAUfTimeIndex_;
+
+        //- deltaT for which solidModel::rAUf() was last computed.
+        //  rAUf depends only on impKf_, rho, mesh and deltaT (not on
+        //  the values of D or p), so it is safe to reuse across PETSc
+        //  matrix-free residual evaluations within a Newton solve
+        mutable scalar rAUfDeltaT_;
+
+        //- Store pressure in the PETSc solution vector as p/pScale
+        const Switch scaleMixedPetScFields_;
+
+        //- Scale type used for the PETSc pressure unknown
+        const word pressureUnknownScaleType_;
+
+        //- Pressure scale used for pHat = p/pressureUnknownScale_
+        scalar pressureUnknownScale_;
+
+        //- User-facing dimensionless scale factor applied to the
+        //  pressure-equation residual and Jacobian rows relative to
+        //  the momentum equations
+        const scalar pressureScaleFactor_;
+
+        //- If true, multiply pressureScaleFactor_ by a representative
+        //  2*mu so that the pressure-equation residual has units
+        //  comparable to the momentum equation
+        const Switch pressureScaleByTwoMu_;
+
+        //- Representative value of 2*mu used as the physical scale of
+        //  the pressure equation. Computed once at construction
+        scalar twoMuRef_;
+
+        //- Effective scale applied to the pressure residual and the
+        //  pressure-row Jacobian entries.
+        //  pressureEqnScale_ = pressureScaleFactor_
+        //                       * (pressureScaleByTwoMu_ ? twoMuRef_ : 1)
+        scalar pressureEqnScale_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
@@ -115,6 +154,31 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
+
+        //- Update solidModel::rAUf() if the mesh or deltaT changed
+        //  since it was last computed. The result depends only on
+        //  impKf_, rho, mesh and deltaT (not on the values of D or p),
+        //  so it can safely be reused across MFFD residual evaluations
+        //  within a single Newton solve. Does nothing when
+        //  solvePressure() is disabled
+        void updateRAUfIfStale();
+
+#ifdef USE_PETSC
+        //- Copy the PETSc solution vector x into the D field (and p
+        //  when solvePressure() is active), refresh the dependent
+        //  kinematic fields (gradD, DD, gradDD, F, Finv, J, sigma) and
+        //  correct boundary conditions. Applies the pressure unknown
+        //  scale (p = pressureUnknownScale_ * pHat). Centralises the
+        //  mapping used by formResidual, formJacobian and evolveSnes.
+        //  Vec is a pointer type, so it is taken by value
+        void unpackSolution(const Vec x);
+
+        //- Copy the current D field (and, when solvePressure() is
+        //  active, p) into the PETSc solution vector x, applying the
+        //  inverse pressure unknown scale (pHat = p/pressureUnknownScale_).
+        //  Vec is a pointer type, so it is taken by value
+        void packSolution(Vec x);
+#endif
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
