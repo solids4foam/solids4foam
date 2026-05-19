@@ -97,6 +97,10 @@ The `solidForcesDisplacements` function object is added in
 `pipeContact` patch, which can be used to plot the force-displacement response
 shown in Figure 3.
 
+{% include youtube.html id="_eDJPoWeHZE" %}
+
+Video 1 - Pipe crushing animation
+
 ---
 
 ## Running the Case
