@@ -46,12 +46,12 @@ hardening curve is given in Table 2. The hardening data is the same as in the
 
 Table 1 - Mechanical properties
 
-| Parameter            | Symbol       | Value           |
-| -------------------- | ------------ | --------------- |
-| Young's modulus      | $$E$$        | $$186$$ GPa     |
-| Poisson's ratio      | $$\nu$$      | $$0.3$$         |
-| Initial yield stress | $$\sigma_Y$$ | $$241.32$$ MPa  |
-| Initial density      | $$\rho$$     | $$7800$$ kg/m^3 |
+| Parameter            | Symbol       | Value               |
+| -------------------- | ------------ | ------------------- |
+| Young's modulus      | $$E$$        | $$186$$ GPa         |
+| Poisson's ratio      | $$\nu$$      | $$0.3$$             |
+| Initial yield stress | $$\sigma_Y$$ | $$241.32$$ MPa      |
+| Initial density      | $$\rho$$     | $$7800$$ kg/m$$^3$$ |
 
 Table 2 - Hardening behaviour
 
@@ -71,7 +71,7 @@ Table 2 - Hardening behaviour
 ## Expected Results
 
 Figure 2 shows the initial mesh and the deformed mesh coloured by the von Mises
-stress field at an intermediate loading step and at the final loading step. 
+stress field at an intermediate loading step and at the final loading step.
 
 ![Figure 2: Initial and deformed meshes coloured by von Mises
 stress](./images/cylinderCrush-results.jpeg)
