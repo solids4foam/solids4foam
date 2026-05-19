@@ -798,13 +798,6 @@ void nonLinGeomTotalLagTotalDispSolid::updateRAUfIfStale()
         return;
     }
 
-    // Dimensional consistency factor: rAUf is the solid analogue of
-    // 1/A in pressure-velocity coupling, with units [m^2/Pa]
-    const dimensionedScalar one
-    (
-        "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
-    );
-
     // Build the approximate momentum diagonal. fvm::laplacian and
     // fvm::d2dt2 read only the BC structure of D, not its values, so
     // the resulting diagonal is independent of the current Newton
@@ -815,7 +808,7 @@ void nonLinGeomTotalLagTotalDispSolid::updateRAUfIfStale()
       - rho()*fvm::d2dt2(D())
     );
     approxMomJ.relax();
-    rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
+    rAUf() = -1.0/(fvc::interpolate(approxMomJ.A()));
 
     rAUfTimeIndex_ = tIdx;
     rAUfDeltaT_ = dt;
@@ -1010,12 +1003,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Re-calculate the pressure stabilisation parameter
         pressureStabilisation().updateScalar(p, &gradp);
 
-        // Dimensional consistency factor
-        const dimensionedScalar one
-        (
-            "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
-        );
-
         // Refresh rAUf (the positive face-interpolated reciprocal of
         // the approximate momentum equation diagonal -- the solid
         // analogue of rAUf in pressure-velocity coupling, units [m^2/Pa])
@@ -1032,7 +1019,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         scalarField pressureResidual
         (
           - p*rKappa()
-          + pressureStabilisation().cellScalar(&rAUf(), true)*one
+          + pressureStabilisation().cellScalar(&rAUf(), true)
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
@@ -1138,12 +1125,6 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         volScalarField& p = const_cast<volScalarField&>(this->p());
 
         {
-            // Dimensional consistency factor
-            const dimensionedScalar one
-            (
-                "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
-            );
-
             // Refresh rAUf only when the mesh or deltaT have changed
             // (the diagonal of the approximate momentum Jacobian is
             // independent of D and p values)
@@ -1153,7 +1134,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             (
               - pressureEqnScale_*pressureUnknownScale_*fvm::Sp(rKappa(), p)
               + pressureEqnScale_*pressureUnknownScale_
-               *one*pressureStabilisation().scalarJacobian(p, &rAUf())
+               *pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
             // Insert the pressure equation
