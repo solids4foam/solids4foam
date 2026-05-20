@@ -1164,7 +1164,7 @@ label linGeomTotalDispSolid::formResidual
         (
           - p*rKappa_
           + pressureStabilisation().cellScalar(&rAUf(), true)
-          - fvc::div(D)
+          - tr(gradD())
         );
 
         // Make residual extensive
