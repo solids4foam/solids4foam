@@ -295,6 +295,14 @@ void Foam::twoDPointCorrectorS4f::correctPoints(pointField& p) const
 {
     if (!required_) return;
 
+    // Prime polyMesh::geometricD() collectively across all ranks. After mesh
+    // motion polyMesh resets geometricD_ to Zero, so the next access lazily
+    // invokes polyMesh::calcDirections(), which contains world-collective
+    // reductions. If only the ranks with normal edges entered the per-edge
+    // loop below they would call it on their own and deadlock against ranks
+    // with no normal edges (e.g. processors with zero solid cells).
+    (void) mesh_.geometricD();
+
     // Algorithm:
     // Loop through all edges. Calculate the average point position A for
     // the front and the back. Correct the position of point P (in two planes)
@@ -338,6 +346,10 @@ void Foam::twoDPointCorrectorS4f::correctDisplacement
 ) const
 {
     if (!required_) return;
+
+    // See note in correctPoints: prime polyMesh::geometricD() collectively so
+    // ranks with no normal edges still participate in calcDirections().
+    (void) mesh_.geometricD();
 
     // Algorithm:
     // Loop through all edges. Calculate the average point position A for
