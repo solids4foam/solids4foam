@@ -54,7 +54,7 @@ boundaryField
             penaltyScale     0.5;
             relaxationFactor 0.02;
         }
-        frictionContactModel standardPenalty;
+        frictionContactModel frictionless;//standardPenalty;
         standardPenaltyFrictionModelDict
         {
             penaltyScale     1;

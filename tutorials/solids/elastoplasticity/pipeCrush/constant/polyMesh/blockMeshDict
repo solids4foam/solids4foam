@@ -64,35 +64,35 @@ patches
 
     empty back
     (
-     (3 2 1 0)
-     (11 10 9 8)
+        (3 2 1 0)
+        (11 10 9 8)
     )
     empty front
     (
-     (4 5 6 7)
-     (12 13 14 15)
-     )
+        (4 5 6 7)
+        (12 13 14 15)
+    )
 
     symmetryPlane left
     (
-     (4 7 3 0)
-     (8 12 15 11)
-     )
+        (4 7 3 0)
+        (8 12 15 11)
+    )
 
     symmetryPlane bottom
     (
-     (1 2 6 5)
-     )
+        (1 2 6 5)
+    )
 
     patch inside
     (
-     (0 1 5 4)
-     )
+        (0 1 5 4)
+    )
 
     patch pipeContact
     (
-     (7 6 2 3)
-     )
+        (7 6 2 3)
+    )
 
     patch anvilLoading
     (
