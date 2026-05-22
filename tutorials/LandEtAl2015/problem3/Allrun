@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# If you want to run the solver in parallel, pass the argument "parallel" to
+# this script, e.g. > ./Allrun parallel
+# You may want to change `numberOfSubdomains` in system/decomposeParDict
+
+# You can set the mesh number with the MESH_NUMBER variable, which defaults to
+# 1, e.g. > MESH_NUMBER=2 ./Allrun parallel
+
+# Mesh number: 1 is coarsest, 6 is finest
+MESH_NUMBER="${MESH_NUMBER:-1}"
+echo "Using MESH_NUMBER=$MESH_NUMBER"
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Restore 0 directory frm 0.orig
+restore0Dir
+
+# Create mesh in steps:
+#     1. Create slice of a circle
+#     2. Rotationally extrude the slice
+#     3. Remove empty patches
+runApplication blockMesh -dict system/blockMeshDict.$MESH_NUMBER
+runApplication extrudeMesh -dict system/extrudeMeshDict.$MESH_NUMBER
+runApplication createPatch -overwrite
+
+# Set the fibre field
+runApplication setFibreField
+
+# Run the solver
+if [[ "$1" == "parallel" ]]
+then
+    # Decompose the mesh
+    runApplication decomposePar
+
+    # Run the solver in parallel
+    runParallel solids4Foam
+
+    # Reconstruct the results
+    runApplication reconstructPar
+else
+    # Run the solver in serial
+    runApplication solids4Foam
+fi

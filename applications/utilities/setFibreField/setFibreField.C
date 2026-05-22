@@ -88,10 +88,10 @@ int main(int argc, char *argv[])
 
 
     // alpha at the endocardium: SHOULD BE INPUT PARAMETER
-    const scalar alphaEndo = degToRad(60.0);
+    const scalar alphaEndo = degToRad(90.0);
 
     // alpha at the epicardium: SHOULD BE INPUT PARAMETER
-    const scalar alphaEpi = degToRad(-60.0);
+    const scalar alphaEpi = degToRad(-90.0);
 
     // Calculate alphaRadians
     const volScalarField alphaRadians
