@@ -1063,15 +1063,6 @@ label newtonIcoFluid::formResidual
     {
         fvc::makeRelative(phi, U);
 
-        // Zero relative phi on wall-type patches. Analytically, the
-        // matched coefficients in the extrapolation of phi above
-        // (2.25, -1.5, 0.25 -- Jaiman & Joshi Eq. 6.30) and OpenFOAM's
-        // BDF2 mesh flux mesh.phi() (their Eq. 6.31, with positions
-        // updated by the same explicit BDF2 displacement predictor)
-        // give (v_check^f - w^n)|_Gamma = 0 at the moving FSI interface,
-        // so the convection flux through it must be zero. This loop
-        // makes that identity exact in the discrete sense and is also
-        // a no-op on stationary walls (U = 0, mesh.phi() = 0).
         forAll(U.boundaryField(), patchI)
         {
             if (mesh.boundaryMesh()[patchI].type() == "wall")
@@ -1118,19 +1109,7 @@ label newtonIcoFluid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    // Pressure residual: discrete continuity ``div(v^{f,n}) = 0`` on the
-    // (already-moved) t^n mesh, with v^{f,n}|_Gamma = v^{s,n} imposed via the
-    // fluid interface fixedValue BC (set by the FSI coupler from the current
-    // solid iterate -- Jaiman & Joshi Eq. 6.32). This is the GCL-reduced ALE
-    // form: after subtracting the geometric conservation law from the moving
-    // control volume mass balance, the constraint becomes ``∮ n.v dGamma = 0``
-    // in absolute v. Per-cell discrete continuity is exact after SNES
-    // convergence; the global ``Sf.U_solid[n]`` vs ``mesh.phi()`` mismatch on
-    // the FSI interface is the O(deltaT^2) consistency error of the
-    // quasi-monolithic scheme (J/J Sect. 6.5), reduced to O(deltaT) only at
-    // the very first time step from rest unless the cold-start corrector in
-    // newtonQuasiMonolithicCouplingInterface::evolve() is enabled. See the
-    // PDF excerpt at the repo root: jaimann-Joshi-excerpt-fsi.pdf.
+    // Pressure residual
     scalarField pressureResidual(- fvc::div(U));
 
     // Approximate momentum operator used only to derive the rAUf
@@ -1243,7 +1222,6 @@ label newtonIcoFluid::formJacobian
     {
         fvc::makeRelative(phi, U);
 
-        // See the matching comment in formResidual()
         forAll(U.boundaryField(), patchI)
         {
             if (mesh.boundaryMesh()[patchI].type() == "wall")

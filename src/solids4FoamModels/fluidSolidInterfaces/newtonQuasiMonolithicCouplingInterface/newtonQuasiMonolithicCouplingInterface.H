@@ -92,17 +92,14 @@ class newtonQuasiMonolithicCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
-        //- Apply a cold-start corrector at the very first time step.
-        //  Starting from rest, both U_solid.oldTime() and
-        //  U_solid.oldTime().oldTime() are zero, so the explicit BDF2
-        //  displacement predictor leaves the fluid mesh stationary at
-        //  step 1 even though the just-converged U_solid[1] is non-zero.
-        //  The corrector reruns the displacement update as a BDF1
-        //  implicit step using the converged U_solid[1], re-moves the
-        //  fluid mesh, and re-runs the SNES from the warm-started state
-        //  so the GCL identity Sf.U_solid[1] == mesh.phi() holds at step
-        //  1 to machine precision. Defaults to yes.
-        const Switch coldStartCorrection_;
+        //- Use the Liu (2014) Eq.31 interface velocity condition
+        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
+        //  This condition is from Liu et al., JCP 270, 2014, Section 4.
+        //  Note: in the FVM-ALE context, this condition creates a mismatch
+        //  between the mesh velocity (U_solid) and the fluid BC (Liu combo),
+        //  violating the GCL for interface-adjacent cells. This causes
+        //  pressure oscillations in practice. Defaults to no.
+        const Switch liuInterfaceCondition_;
 
         //- Number of sub-regions: 2 == fluid + solid
         const label nRegions_;
@@ -276,12 +273,14 @@ class newtonQuasiMonolithicCouplingInterface
             const bool twoD
         );
 
-        //- Copy the (current) solid interface velocity onto the fluid
-        //  interface patch. Enforces the implicit kinematic identity
-        //  v^{f,n}|_Gamma = v^{s,n}|_Gamma (Jaiman & Joshi Eq. 6.32) once
-        //  per SNES iteration. The fluid interface patch must be of type
-        //  fixedValue (or derived).
+        //- Map the velocity from the mesh motion to the fluid interface
         void mapInterfaceMotionUToFluidU();
+
+        //- Set the fluid interface velocity using Liu (2014) Eq.31
+        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
+        //  This replaces mapInterfaceMotionUToFluidU() when
+        //  liuInterfaceCondition_ is enabled
+        void setLiuInterfaceVelocity();
 
         //- Map the displacement and velocity from the solid to the mesh motion
         //  interface. Three fields are mapped: D, U and pointD
