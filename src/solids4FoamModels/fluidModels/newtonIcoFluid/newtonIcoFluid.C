@@ -1235,8 +1235,8 @@ label newtonIcoFluid::formJacobian
     // by unpackSolution() above
     volScalarField& p = const_cast<volScalarField&>(this->p());
 
-    laminarTransport_.correct();
-    turbulence_->correct();
+    // laminarTransport_.correct();
+    // turbulence_->correct();
 
     fvVectorMatrix UEqn
     (
