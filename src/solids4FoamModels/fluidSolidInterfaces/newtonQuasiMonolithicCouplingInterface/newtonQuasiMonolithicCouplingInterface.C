@@ -1187,98 +1187,23 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
     // The mesh motion patch is the same as the fluid patch
     const label motionPatchID = fluidPatchID;
 
-    // Map the motion interface velocity to the fluid interface
+    // Map the motion interface velocity to the fluid interface.
+    // motionSolid().U() carries the current solid interface velocity at the
+    // mesh-motion patch (mapped from the solid in mapInterfaceSolidToMeshMotion),
+    // so writing it to the fluid patch enforces the implicit kinematic
+    // identity v^{f,n}|_Gamma = v^{s,n}|_Gamma (Jaiman & Joshi Eq. 6.32) at
+    // every SNES iteration. This is the implicit coupling that makes the
+    // monolithic Newton scheme converge; the residual O(deltaT^2) mismatch
+    // between Sf.U_solid[n] and mesh.phi() on the interface is the
+    // fundamental consistency error of the quasi-monolithic scheme (see the
+    // comment in newtonIcoFluid::formResidual just above the continuity
+    // residual).
     const fvPatchVectorField& motionPatchU =
         motionSolid().U().boundaryField()[motionPatchID];
 
     forAll(fluidPatchU, fluidFaceI)
     {
         fluidPatchU[fluidFaceI] = motionPatchU[fluidFaceI];
-    }
-}
-
-
-void newtonQuasiMonolithicCouplingInterface::setLiuInterfaceVelocity()
-{
-    // Set the fluid interface velocity using Liu (2014) Eq.31:
-    //   U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //
-    // This is required for energy-stable temporal coupling. The (3/4, 1/2,
-    // -1/4) coefficients arise from the compatibility between the BDF2
-    // temporal discretisation and the trapezoidal stress averaging in the
-    // solid equations. See Liu et al., JCP 270, 2014, Eq. 31 and Section 4.
-
-    // Lookup interface mapping
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
-
-    // Global patches for parallel face data transfer
-    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
-    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
-
-    // Solid interface patch
-    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const labelList& solidFaceCells =
-        solidMesh().boundary()[solidPatchID].faceCells();
-
-    // Access solid velocity at current, old, and old-old time levels
-    const vectorField& solidUI = solid().U();
-    const vectorField& solidUOld = solid().U().oldTime();
-    const vectorField& solidUOldOld = solid().U().oldTime().oldTime();
-
-    // Build local solid interface velocities at each time level using
-    // adjacent cell-centre values
-    const label nSolidFaces = solidMesh().boundary()[solidPatchID].size();
-    vectorField localSolidU(nSolidFaces);
-    vectorField localSolidUOld(nSolidFaces);
-    vectorField localSolidUOldOld(nSolidFaces);
-
-    forAll(localSolidU, faceI)
-    {
-        const label cellI = solidFaceCells[faceI];
-        localSolidU[faceI] = solidUI[cellI];
-        localSolidUOld[faceI] = solidUOld[cellI];
-        localSolidUOldOld[faceI] = solidUOldOld[cellI];
-    }
-
-    // Broadcast to zone level for parallel access
-    const vectorField zoneSolidU
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidU)
-    );
-    const vectorField zoneSolidUOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOld)
-    );
-    const vectorField zoneSolidUOldOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOldOld)
-    );
-
-    // Set the fluid interface velocity with Liu Eq.31 coefficients
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    fvPatchVectorField& fluidPatchU =
-        boundaryFieldRef(fluid().U())[fluidPatchID];
-
-    forAll(fluidPatchU, fluidFaceI)
-    {
-        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-
-        fluidPatchU[fluidFaceI] =
-            0.75*zoneSolidU[solidZoneFaceI]
-          + 0.50*zoneSolidUOld[solidZoneFaceI]
-          - 0.25*zoneSolidUOldOld[solidZoneFaceI];
     }
 }
 
@@ -1710,13 +1635,9 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         )
     ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
-    liuInterfaceCondition_
+    coldStartCorrection_
     (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "liuInterfaceCondition",
-            false
-        )
+        fsiProperties().lookupOrDefault<Switch>("coldStartCorrection", true)
     ),
     nRegions_(2),
     subMatsPtr_(nullptr),
@@ -1770,7 +1691,7 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
 
     Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
         << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << nl
-        << "liuInterfaceCondition = " << liuInterfaceCondition_ << endl;
+        << "coldStartCorrection = " << coldStartCorrection_ << endl;
 
     // Store old time values
     fluid().U().storeOldTime();
@@ -2224,6 +2145,138 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         twoD
     );
 
+    // Cold-start corrector for the very first time step.
+    //
+    // Starting from rest, USolid.oldTime() == USolid.oldTime().oldTime() == 0,
+    // so the explicit BDF2 displacement predictor in step (a) above gave
+    // D[1] = D[0]: the fluid mesh did not move at all during the SNES
+    // solve, while the just-converged USolid[1] is non-zero. The
+    // associated Sf.U_solid[1] vs mesh.phi() (== 0) mismatch on the FSI
+    // interface is then O(deltaT) rather than the O(deltaT^2) consistency
+    // the rest of the scheme delivers (Jaiman & Joshi Sect. 6.5,
+    // Eqs. 6.29-6.32).
+    //
+    // Redo the displacement update as an implicit BDF1 step using the
+    // converged USolid[1], re-move the fluid mesh, and rerun a warm-started
+    // SNES so that mesh.phi() on the interface becomes Sf.U_solid[1] to
+    // machine precision (BDF1 GCL identity at n = 1). For step n >= 2 the
+    // standard explicit BDF2 predictor in step (a) is already O(deltaT^2)
+    // consistent and the corrector is skipped.
+    if (coldStartCorrection_ && time.timeIndex() == 1)
+    {
+        Info<< nl
+            << "Cold-start corrector: redoing the step-1 mesh motion as"
+            << " D[1] = D[0] + deltaT*U_solid[1] (BDF1 implicit) and "
+            << "re-running the SNES from the warm-started state" << nl
+            << endl;
+
+        const dimensionedScalar& deltaT = time.deltaT();
+
+        // Implicit BDF1 displacement update at n = 1 using converged USolid
+        D = D.oldTime() + deltaT*USolid;
+
+        // Refresh gradient and point-interpolated displacement so that
+        // mapInterfaceSolidToMeshMotion sees a consistent solid state
+        solid().mechanical().grad(D, solid().gradD());
+        solid().mechanical().interpolate
+        (
+            D, solid().gradD(), solid().pointD()
+        );
+        solid().pointD().correctBoundaryConditions();
+
+        // Push the corrected solid displacement and velocity onto the
+        // mesh-motion patch, then move the fluid mesh
+        mapInterfaceSolidToMeshMotion();
+        fluidMesh().update();
+
+        // Print updated mesh and fluid Courant numbers
+        {
+            const scalarField sumMeshPhi
+            (
+                fvc::surfaceSum(mag(fluidMesh().phi()))().primitiveField()
+            );
+
+            const scalar meshCoNum =
+                0.5*gMax(sumMeshPhi/fluidMesh().V().field())*deltaT.value();
+
+            const scalar meanMeshCoNum =
+                0.5
+               *(gSum(sumMeshPhi)/gSum(fluidMesh().V().field()))*deltaT.value();
+
+            Info<< "Cold-start mesh Courant number mean: " << meanMeshCoNum
+                << " max: " << meshCoNum << endl;
+        }
+
+        // Re-extrapolate phi on the corrected mesh, matching step (d) above
+        if
+        (
+            Switch
+            (
+                fluid().fluidProperties().lookup
+                (
+                    "fluidFluxExtrapolationAlgorithm1"
+                )
+            )
+        )
+        {
+            phi = fvc::interpolate
+                  (
+                      2.0*UFluid.oldTime() - UFluid.oldTime().oldTime()
+                  ) & fluidMesh().Sf();
+        }
+        else
+        {
+            phi = fvc::interpolate
+                  (
+                      2.25*UFluid.oldTime()
+                    - 1.5*UFluid.oldTime().oldTime()
+                    + 0.25*UFluid.oldTime().oldTime().oldTime()
+                  ) & fluidMesh().Sf();
+        }
+
+        // Warm-start PETSc Vec from the (just-converged) fields. The mesh
+        // geometry changed but the cell-centred unknowns are unchanged, so
+        // SNES should converge in 1-2 iterations
+        foamPetscSnesHelper::storeSolutionBackup();
+        seedSolution
+        (
+            foamPetscSnesHelper::solution(),
+            UFluid, p, USolid,
+            fluidBlockSize, solidBlockSize,
+            twoD
+        );
+
+        Info<< "Re-solving the monolithic momentum-continuity system on "
+            << "the corrected mesh using PETSc SNES" << endl;
+        const int correctorStatus = foamPetscSnesHelper::solve(true);
+
+        if (correctorStatus < 0)
+        {
+            // Fall back to the pre-corrector state and continue. The
+            // step-1 GCL inconsistency persists in that case but the
+            // simulation does not abort.
+            WarningInFunction
+                << "Cold-start SNES failed to converge; restoring the "
+                << "pre-corrector solution and continuing. The step-1 "
+                << "Sf.U_solid[1] vs mesh.phi() consistency will remain "
+                << "O(deltaT) rather than O(deltaT^2)." << endl;
+
+            VecCopy
+            (
+                foamPetscSnesHelper::solutionBackup(),
+                foamPetscSnesHelper::solution()
+            );
+        }
+
+        retrieveSolution
+        (
+            foamPetscSnesHelper::solution(),
+            UFluid, p, USolid,
+            fluidBlockSize, solidBlockSize,
+            twoD
+        );
+    }
+
     return true;
 }
 
@@ -2463,15 +2516,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     if (passViscousStress_)
     {
         mapInterfaceSolidToMeshMotion();
-
-        if (liuInterfaceCondition_)
-        {
-            setLiuInterfaceVelocity();
-        }
-        else
-        {
-            mapInterfaceMotionUToFluidU();
-        }
+        mapInterfaceMotionUToFluidU();
     }
 
     // 2. Map the fluid interface traction to the solid interface
@@ -2599,22 +2644,10 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     }
 
 
-    // 4. Map the solid interface velocity to the fluid interface
-    //    When liuInterfaceCondition is enabled, the fluid interface velocity
-    //    uses the temporally consistent condition from Liu (2014) Eq.31:
-    //      U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //    This is O(dt^2) accurate and ensures energy stability at the FSI
-    //    interface for the BDF2/trapezoidal temporal discretisation.
+    // 4. Map the (current) solid interface velocity to the fluid interface,
+    //    enforcing v^{f,n}|_Gamma = v^{s,n}|_Gamma (Jaiman & Joshi Eq. 6.32).
     mapInterfaceSolidToMeshMotion();
-
-    if (liuInterfaceCondition_)
-    {
-        setLiuInterfaceVelocity();
-    }
-    else
-    {
-        mapInterfaceMotionUToFluidU();
-    }
+    mapInterfaceMotionUToFluidU();
 
 
     // 5. Update the fluid residual, which now has the correct interface
