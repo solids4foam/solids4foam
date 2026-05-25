@@ -1115,10 +1115,11 @@ label nonLinGeomUpdatedLagSolid::formJacobian
             pressureEqnScale_           // scale (helper returns -V*div with +1)
         );
 
-        // Insert p-in-DD term. InsertFvmGradIntoPETScMatrix uses the
-        // least-squares gradient convention where scale=-1 assembles
-        // `-V*grad(p)`. Apply the pressure-unknown scale so the column
-        // corresponds to the scaled unknown pHat = p/pressureUnknownScale_.
+        // Insert p-in-DD term. InsertFvmGrad's updated sign
+        // convention: scale=+1 assembles `-V*grad(p)` (matching the
+        // momentum equation contribution of -grad(p)). Apply the
+        // pressure-unknown scale so the column corresponds to the
+        // scaled unknown pHat = p/pressureUnknownScale_.
         foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         (
             p,
@@ -1126,7 +1127,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
             0,                          // row offset
             blockSize_ - 1,             // column offset
             solidModel::twoD() ? 2 : 3, // number of DD components
-            -pressureUnknownScale_      // scale for -V*grad(pHat)
+            pressureUnknownScale_       // scale (helper returns -V*grad with +1)
         );
     }
 
