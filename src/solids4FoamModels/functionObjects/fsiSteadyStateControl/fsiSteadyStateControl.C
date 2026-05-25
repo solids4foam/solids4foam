@@ -268,26 +268,52 @@ bool Foam::fsiSteadyStateControl::checkSteadyState()
 
     bool steady = false;
 
+    // Number of samples in each half of the comparison window
+    const label halfN = max(label(1), nSamples_/2);
+
     if
     (
         time_.timeOutputValue() >= minTime_
-     && displacementHistory_.size() > nSamples_
+     && displacementHistory_.size() >= 2*halfN
     )
     {
-        const label oldI = displacementHistory_.size() - nSamples_ - 1;
+        // Compare the mean of the most recent halfN samples to the mean of
+        // the preceding halfN samples. This detects steady state when the
+        // mean has stopped evolving, even if a residual symmetric
+        // oscillation about that mean persists.
+        const label size = displacementHistory_.size();
+        const label midI = size - halfN;          // first index of new half
+        const label startI = size - 2*halfN;      // first index of old half
 
-        displacementAbsChange =
-            mag(displacement - displacementHistory_[oldI]);
+        scalar dispOldSum = 0;
+        scalar dispNewSum = 0;
+        scalar forceOldSum = 0;
+        scalar forceNewSum = 0;
+        for (label i = 0; i < halfN; ++i)
+        {
+            dispOldSum  += displacementHistory_[startI + i];
+            dispNewSum  += displacementHistory_[midI   + i];
+            forceOldSum += forceHistory_[startI + i];
+            forceNewSum += forceHistory_[midI   + i];
+        }
 
-        forceAbsChange =
-            mag(force - forceHistory_[oldI]);
+        const scalar dispOldMean  = dispOldSum  / halfN;
+        const scalar dispNewMean  = dispNewSum  / halfN;
+        const scalar forceOldMean = forceOldSum / halfN;
+        const scalar forceNewMean = forceNewSum / halfN;
+
+        const scalar dispRefMean  = 0.5*(dispOldMean  + dispNewMean);
+        const scalar forceRefMean = 0.5*(forceOldMean + forceNewMean);
+
+        displacementAbsChange = mag(dispNewMean  - dispOldMean);
+        forceAbsChange        = mag(forceNewMean - forceOldMean);
 
         displacementRelChange =
             displacementAbsChange
-           /max(mag(displacementHistory_[oldI]), displacementRefMin_);
+           /max(mag(dispRefMean), displacementRefMin_);
 
         forceRelChange =
-            forceAbsChange/max(mag(forceHistory_[oldI]), forceRefMin_);
+            forceAbsChange/max(mag(forceRefMean), forceRefMin_);
 
         steady =
         (
@@ -324,8 +350,10 @@ bool Foam::fsiSteadyStateControl::checkSteadyState()
     {
         Info<< type() << " " << name_ << ": displacement = "
             << displacement << ", force = " << force
-            << ", displacementRelChange = " << displacementRelChange
-            << ", forceRelChange = " << forceRelChange
+            << ", displacementMeanShift = " << displacementAbsChange
+            << ", displacementRelMeanShift = " << displacementRelChange
+            << ", forceMeanShift = " << forceAbsChange
+            << ", forceRelMeanShift = " << forceRelChange
             << ", consecutive = " << consecutive_ << endl;
     }
 
