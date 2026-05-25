@@ -2631,7 +2631,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         VecSetBlockSize(fFluid, fluidBlockSize);
         refCast<fluidModels::newtonIcoFluid>(fluid()).formResidual
         (
-            fFluid, xFluid, true // extrapolaed flux
+            fFluid, xFluid, true // extrapolated flux
         );
         VecRestoreSubVector(x, isFluid(), &xFluid);
         VecRestoreSubVector(f, isFluid(), &fFluid);
