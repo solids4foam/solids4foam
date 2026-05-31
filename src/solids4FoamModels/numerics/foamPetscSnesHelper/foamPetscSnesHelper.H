@@ -499,11 +499,10 @@ public:
                 const scalar scale = 1.0
             ) const;
 
-            //- Insert linearisation of div(phi,U) into a PETSc matrix
-            //  where phi = Sf & Uf
-            //  An upwind discretisation is assumed
-            //  If "flipSign" is true, -div(phi,U) is inserted rather than
-            //  div(phi,U)
+            //- Insert the missing tensor part of the linearisation of
+            //  div(phi,U) into a PETSc matrix, where phi = Sf & Uf.
+            //  The caller must insert the segregated fvm::div(phi,U)
+            //  contribution separately. An upwind discretisation is assumed.
             label InsertFvmDivPhiUIntoPETScMatrix
             (
                 const volVectorField& U,

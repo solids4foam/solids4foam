@@ -101,6 +101,24 @@ class newtonQuasiMonolithicCouplingInterface
         //  pressure oscillations in practice. Defaults to no.
         const Switch liuInterfaceCondition_;
 
+        //- Interface normal flux treatment for the fluid pressure equation
+        const word quasiMonolithicInterfaceFluxMode_;
+
+        //- Report interface normal flux defect diagnostics
+        const Switch interfaceFluxDiagnostics_;
+
+        //- Suppress pressure-stabilisation boundary flux on the FSI interface
+        const Switch zeroPressureStabilisationFluxOnFsiInterface_;
+
+        //- Old geometric interface mesh flux on the local fluid patch faces
+        autoPtr<scalarField> interfaceMeshPhiOldPtr_;
+
+        //- Old-old geometric interface mesh flux on local fluid patch faces
+        autoPtr<scalarField> interfaceMeshPhiOldOldPtr_;
+
+        //- Accumulated signed leakage from interface flux defect
+        scalar accumulatedInterfaceFluxLeakage_;
+
         //- Number of sub-regions: 2 == fluid + solid
         const label nRegions_;
 
@@ -281,6 +299,30 @@ class newtonQuasiMonolithicCouplingInterface
         //  This replaces mapInterfaceMotionUToFluidU() when
         //  liuInterfaceCondition_ is enabled
         void setLiuInterfaceVelocity();
+
+        //- Return true if the selected interface flux mode is recognised
+        bool validInterfaceFluxMode(const word& mode) const;
+
+        //- Return d(Phi_Gamma)/d(U_solid.Sf) coefficient
+        scalar interfaceFluxImplicitScale() const;
+
+        //- Return current geometric interface mesh flux
+        scalarField currentInterfaceMeshPhi() const;
+
+        //- Return current fluid-boundary normal velocity flux
+        scalarField currentInterfaceVelocityPhi() const;
+
+        //- Ensure geometric interface mesh-flux history is allocated
+        void initialiseInterfaceMeshPhiHistory(const scalarField& meshPhi);
+
+        //- Return selected interface pressure flux
+        scalarField interfacePressurePhi();
+
+        //- Report interface pressure flux defect diagnostics
+        void reportInterfaceFluxDiagnostics();
+
+        //- Shift geometric interface mesh-flux history after accepted step
+        void updateInterfaceMeshPhiHistory();
 
         //- Map the displacement and velocity from the solid to the mesh motion
         //  interface. Three fields are mapped: D, U and pointD

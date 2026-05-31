@@ -1750,22 +1750,6 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const scalar sign = scale;
     tensor coeff = tensor::zero;
 
-    // Add segregated component of convection term
-    {
-        fvVectorMatrix UEqn
-        (
-          - fvm::div(phi, U, "jacobian-div(phi,U)")
-        );
-
-        UEqn.relax();
-
-        // Convert fvMatrix matrix to PETSc matrix
-        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-        (
-            UEqn, jac, 0, 0, nScalarEqns
-        );
-    }
-
     // The first-order upwind discretisation for cell P is
     //     div(phi,U)_P = \sum phi*Uf
     // where
@@ -1792,8 +1776,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     //     (d/dUp)(phi*Un) = w*Un*Sf                => diagonal
     //     (d/dUn)(phi*Un) = phi*I + (1 - w)*Un*Sf  => off-diagonal
     //
-    // The w*Sf*Up term is missing from fvm::div(phi(), U) as it requires a
-    // coupled solver. So we will add the w*Sf*Up term here
+    // The w*Sf*Up term is missing from fvm::div(phi, U) as it requires a
+    // coupled solver. The caller inserts the segregated fvm::div(phi,U)
+    // matrix; this routine adds only the missing tensor terms.
     // From the neighbours perspective, the coefficient is (1 - w)*Sf*Un
 
     // Get the blockSize
