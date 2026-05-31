@@ -125,6 +125,13 @@ class newtonIcoFluid
         //  with the solid-side scaling pattern
         scalar pressureEqnScale_;
 
+        //- Optional pressure stabilisation gamma with selected patch fluxes
+        //  zeroed
+        autoPtr<surfaceScalarField> pressureStabilisationGammaPtr_;
+
+        //- Patch IDs where pressure-stabilisation boundary flux is suppressed
+        labelList zeroPressureStabilisationFluxPatchIDs_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -162,6 +169,10 @@ class newtonIcoFluid
             const fvVectorMatrix& HUEqn
         );
 
+        //- Return pressure-stabilisation gamma with selected patch fluxes
+        //  zeroed
+        const surfaceScalarField& pressureStabilisationGamma();
+
 #ifdef USE_PETSC
         //- Copy the PETSc solution vector x into the U and p fields,
         //  applying the pressure unknown scale
@@ -174,6 +185,10 @@ class newtonIcoFluid
         //  (pHat = p/pressureUnknownScale_).
         //  Vec is a pointer type, so it is taken by value
         void packSolution(Vec x);
+
+        //- Apply equation under-relaxation to the velocity equation
+        //  using an implicit diagonal source term
+        void relaxVelocityEqn(fvVectorMatrix& UEqn) const;
 #endif
 
         //- Disallow default bitwise copy construct
@@ -273,6 +288,9 @@ public:
             {
                 return pressureUnknownScale_;
             }
+
+            //- Suppress pressure-stabilisation boundary flux on a patch
+            void addZeroPressureStabilisationFluxPatch(const label patchID);
 
 
 

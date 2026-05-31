@@ -56,6 +56,20 @@ void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
 }
 
 
+bool containsLabel(const Foam::labelList& labels, const Foam::label value)
+{
+    forAll(labels, i)
+    {
+        if (labels[i] == value)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 const Foam::dictionary& solverControls
 (
     const Foam::fvMesh& mesh,
@@ -193,6 +207,7 @@ void newtonIcoFluid::restoreOldTimeState
     }
 }
 
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 newtonIcoFluid::newtonIcoFluid
@@ -256,6 +271,8 @@ newtonIcoFluid::newtonIcoFluid
     ),
     pressureUnknownScale_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
+    pressureStabilisationGammaPtr_(),
+    zeroPressureStabilisationFluxPatchIDs_(),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -690,6 +707,10 @@ bool newtonIcoFluid::evolve()
     //const bool checkMeshCourantNo = checkMeshCourantNo_;
     //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
 
+    // Store U and p fields to allow under-relaxation
+    U.storePrevIter();
+    p().storePrevIter();
+
     // Solution predictor
     const Switch predictor
     (
@@ -706,8 +727,20 @@ bool newtonIcoFluid::evolve()
         fluidProperties().lookupOrDefault<label>("maxTimeStepRetries", 10)
     );
 
+    // When enabled, SNES outcomes that hit the iteration cap or the line
+    // search limit are accepted as usable iterates and time is advanced.
+    // Intended for Picard-style runs that do a small fixed number of
+    // sweeps per step. Genuine numerical failures (NaN, function domain,
+    // KSP divergence, dtol) are still treated as failures.
+    const Switch tolerateSnesNonConvergence
+    (
+        fluidProperties().lookupOrDefault<Switch>
+        (
+            "tolerateSnesNonConvergence", false
+        )
+    );
+
     label timeStepRetry = 0;
-    bool retriedCurrentDeltaT = false;
 
     while (true)
     {
@@ -778,7 +811,17 @@ bool newtonIcoFluid::evolve()
         Info<< "Solving the fluid for U and p" << endl;
         const int solveStatus = foamPetscSnesHelper::solve(true);
 
-        if (solveStatus >= 0)
+        const bool acceptable =
+            (solveStatus >= 0)
+         || (
+                tolerateSnesNonConvergence
+             && (
+                    solveStatus == SNES_DIVERGED_MAX_IT
+                 || solveStatus == SNES_DIVERGED_LINE_SEARCH
+                )
+            );
+
+        if (acceptable)
         {
             break;
         }
@@ -794,27 +837,11 @@ bool newtonIcoFluid::evolve()
         static_cast<TimeState&>(time) = retryTimeState;
         time.setTime(oldTimeValue, oldTimeIndex);
 
-        if (!retriedCurrentDeltaT)
-        {
-            retriedCurrentDeltaT = true;
-
-            foamPetscSnesHelper::resetSnesSolverState();
-
-            ++time;
-
-            Info<< "Retrying the failed PETSc time step at unchanged deltaT = "
-                << time.deltaTValue() << " after resetting PETSc solver state"
-                << " at Time = " << time.timeName() << nl << endl;
-
-            continue;
-        }
-
         if (!adjustTimeStep)
         {
             FatalErrorInFunction
                 << "PETSc SNES failed to converge and the previous time-step "
-                << "state has been restored, and a same-deltaT PETSc reset "
-                << "retry has already been attempted, but `adjustTimeStep` is "
+                << "state has been restored, but `adjustTimeStep` is "
                 << "disabled."
                 << nl << "Enable `adjustTimeStep` to retry the failed time "
                 << "step with a reduced deltaT."
@@ -876,12 +903,26 @@ bool newtonIcoFluid::evolve()
         fvc::makeRelative(phi, U);
     }
 
+    // Optionally relax p and U
+    U.relax();
+    p().relax();
+
+    // Keep the face flux consistent with the velocity used by transport and
+    // turbulence corrections after optional field relaxation.
+    phi = mesh.Sf() & fvc::interpolate(U);
+
+    if (mesh.changing())
+    {
+        fvc::makeRelative(phi, U);
+    }
+
     // Correct transport and turbulence models once per call to evolve
     Info<< nl << "Correcting the transport model" << endl;
     laminarTransport_.correct();
 
-    Info<< nl << "Correcting the turbulence model" << endl;
+    Info<< nl << "Correcting the turbulence model" << nl << endl;
     turbulence_->correct();
+    Info<< endl;
 
 #else
 
@@ -899,6 +940,65 @@ bool newtonIcoFluid::evolve()
 void newtonIcoFluid::clearRAUf()
 {
     rAUfPtr_.clear();
+    pressureStabilisationGammaPtr_.clear();
+}
+
+
+const surfaceScalarField& newtonIcoFluid::pressureStabilisationGamma()
+{
+    if (zeroPressureStabilisationFluxPatchIDs_.empty())
+    {
+        return rAUf();
+    }
+
+    if (pressureStabilisationGammaPtr_.empty())
+    {
+        pressureStabilisationGammaPtr_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "pressureStabilisationGamma",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                rAUf()
+            )
+        );
+    }
+    else
+    {
+        pressureStabilisationGammaPtr_() = rAUf();
+    }
+
+    forAll(zeroPressureStabilisationFluxPatchIDs_, i)
+    {
+        const label patchID = zeroPressureStabilisationFluxPatchIDs_[i];
+        boundaryFieldRef(pressureStabilisationGammaPtr_())[patchID] = 0.0;
+    }
+
+    return pressureStabilisationGammaPtr_();
+}
+
+
+void newtonIcoFluid::addZeroPressureStabilisationFluxPatch(const label patchID)
+{
+    if (patchID < 0 || patchID >= mesh().boundary().size())
+    {
+        FatalErrorInFunction
+            << "Invalid patch ID " << patchID << " for mesh "
+            << mesh().name() << abort(FatalError);
+    }
+
+    if (!containsLabel(zeroPressureStabilisationFluxPatchIDs_, patchID))
+    {
+        const label oldSize = zeroPressureStabilisationFluxPatchIDs_.size();
+        zeroPressureStabilisationFluxPatchIDs_.setSize(oldSize + 1);
+        zeroPressureStabilisationFluxPatchIDs_[oldSize] = patchID;
+    }
 }
 
 
@@ -976,6 +1076,22 @@ void newtonIcoFluid::packSolution(Vec x)
             p(), x, blockSize_ - 1
         );
     }
+}
+
+
+void newtonIcoFluid::relaxVelocityEqn(fvVectorMatrix& UEqn) const
+{
+    scalar alpha = 0.0;
+    if (!mesh().relaxEquation("U", alpha))
+    {
+        return;
+    }
+    if (alpha <= 0.0 || alpha >= 1.0 - SMALL)
+    {
+        return;
+    }
+
+    UEqn += (1.0/alpha - 1.0)*fvm::Sp(UEqn.A(), U());
 }
 
 
@@ -1132,9 +1248,10 @@ label newtonIcoFluid::formResidual
     );
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
+    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
 
     pressureStabilisation().updateScalar(p, &gradp());
-    pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
+    pressureResidual += pressureStabilisation().cellScalar(&pStabGamma, true);
 
     pressureResidual *= mesh.V();
 
@@ -1244,19 +1361,32 @@ label newtonIcoFluid::formJacobian
       - fvm::ddt(U)
     );
 
-    UEqn.relax();
+    UEqn -= fvm::div(phi, U, "jacobian-div(phi,U)");
 
-    if (extrapolatedFlux && !forceImplicitFlux)
+    // Record the reciprocal of the central coefficient before adding
+    // diagonal damping terms that are not part of the upwind pressure
+    // stabilisation operator and may not preserve the sign of UEqn.A().
+    rAUf() = -fvc::interpolate(1.0/UEqn.A());
+    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+
+    if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
     {
-        UEqn -= fvm::div(phi, U, "jacobian-div(phi,U)");
-
-        if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
-        {
-            UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), U);
-        }
+        UEqn -= 0.5*fvm::SuSp(fvc::div(phiAbs), U);
     }
-    else
+
+    //if (!extrapolatedFlux || forceImplicitFlux)
+    if
+    (
+        Switch
+        (
+            fluidProperties().lookupOrDefault<Switch>("addNewtonDivPhiU", false)
+        )
+    )
     {
+        // Add the tensor part of the Newton linearisation of div(phi,U).
+        // The segregated fvm::div(phi,U) contribution is already in UEqn
+        // above so that its diagonal is included in equation relaxation
+        // and pressure-stabilisation rAUf.
         foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
         (
             U,
@@ -1268,24 +1398,16 @@ label newtonIcoFluid::formJacobian
         );
     }
 
+    relaxVelocityEqn(UEqn);
+
     foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
     (
         UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
     );
 
-    // Add advection term to UEqn to allow the correct central coefficient to
-    // be calculated for pressure stabilisation
-    if (!extrapolatedFlux || forceImplicitFlux)
-    {
-        UEqn -= fvm::div(phi, U);
-    }
-
-    // Record the reciprocal of the central coefficient
-    rAUf() = -fvc::interpolate(1.0/UEqn.A());
-
     fvScalarMatrix pEqn
     (
-        pressureStabilisation().scalarJacobian(p, &rAUf(), true)
+        pressureStabilisation().scalarJacobian(p, &pStabGamma, true)
     );
 
     if (pRefCell_ != -1)
@@ -1324,7 +1446,7 @@ label newtonIcoFluid::formJacobian
         foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
         (
             p,
-            rAUf(),
+            pStabGamma,
             jac,
             blockSize_ - 1,
             blockSize_ - 1,
@@ -1473,8 +1595,6 @@ label newtonIcoFluid::precondition
       - fvm::div(phi, dU, "jacobian-div(phi,U)")
     );
 
-    UEqn.relax();
-
     if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
     {
         surfaceScalarField phiAbs("phiAbs", phi);
@@ -1484,7 +1604,7 @@ label newtonIcoFluid::precondition
             fvc::makeAbsolute(phiAbs, U);
         }
 
-        UEqn -= 0.5*fvm::Sp(fvc::div(phiAbs), dU);
+        UEqn -= 0.5*fvm::SuSp(fvc::div(phiAbs), dU);
     }
 
     UEqn.source() = momentumRhs;
@@ -1507,6 +1627,7 @@ label newtonIcoFluid::precondition
 
     // Match the pressure-block sign convention in formJacobian().
     rAUf() = -fvc::interpolate(rAU);
+    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
 
     surfaceScalarField phiHbyA
     (
@@ -1516,7 +1637,7 @@ label newtonIcoFluid::precondition
 
     fvScalarMatrix pEqn
     (
-        pressureStabilisation().scalarJacobian(dp, &rAUf(), true)
+        pressureStabilisation().scalarJacobian(dp, &pStabGamma, true)
     );
 
 #ifdef OPENFOAM_NOT_EXTEND

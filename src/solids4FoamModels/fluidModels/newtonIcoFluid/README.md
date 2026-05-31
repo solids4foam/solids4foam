@@ -237,15 +237,42 @@ The following entries are read from `newtonIcoFluidCoeffs`:
   inside the residual and Jacobian paths.
 - `fluidFluxExtrapolationAlgorithm1`: selects one of the explicit old-time flux
   extrapolation formulae when `forceImplicitFlux` is disabled.
-- `addDivPhiUDamping`: adds a diagonal damping term based on `div(phiAbs)`.
+- `addDivPhiUDamping`: adds a semi-implicit damping term based on
+  `div(phiAbs)`. The matrix uses `fvm::SuSp` so only the part that preserves
+  the negative-diagonal momentum-block sign is added implicitly.
 - `pressureScaleFactor`: scales the pressure-continuity residual and pressure
   Jacobian rows relative to the momentum rows.
 - `maxTimeStepRetries`: maximum failed-PETSc-solve retry count when
   `adjustTimeStep` is enabled.
 - `stopOnPetscError`: passed to `foamPetscSnesHelper` to control whether PETSc
   errors abort immediately.
+- `tolerateSnesNonConvergence`: if `yes`, accept SNES outcomes of
+  `SNES_DIVERGED_MAX_IT` and `SNES_DIVERGED_LINE_SEARCH` as usable iterates
+  and advance time. Intended for Picard-style runs that perform a small
+  fixed number of nonlinear sweeps per step. Genuine numerical failures
+  (NaN, function-domain, KSP divergence, dtol) still trigger the
+  time-step-reduction retry path. Defaults to `no`.
 - `optionsFile`: optional PETSc options file name, defaulting to
   `petscOptions`.
+
+`newtonIcoFluid` honours `relaxationFactors.equations.U` from
+`system/fvSolution` by adding an implicit diagonal source to the
+velocity `fvMatrix` before PETSc insertion:
+`(1/alpha - 1)*fvm::Sp(UEqn.A(), U)`. This scales the segregated
+velocity-equation diagonal from `D` to `D/alpha` without calling
+`fvMatrix::relax()`, whose diagonal-dominance logic assumes a positive
+diagonal and is not valid for this negative-diagonal Jacobian. For
+implicit-flux Jacobians, the extra tensor terms from the Newton
+linearisation of `div(phi,U)` are still inserted directly into PETSc
+and are not modified by the scalar diagonal relaxation. The pressure
+stabilisation `rAUf` is still constructed from the upwind
+laplacian-ddt-div approximation before optional `addDivPhiUDamping`
+terms are added, since the damping term does not guarantee the same
+diagonal sign.
+
+`relaxationFactors.equations.p` is not honoured. For step-level
+damping (analogous to a global relaxation factor) use
+`snes_linesearch_damping` in the PETSc options.
 
 Time-step adaptation uses controls in `system/controlDict`:
 
@@ -288,10 +315,11 @@ The constructor:
 4. Move the mesh and rebuild `phi`, including relative flux correction for
    moving meshes.
 5. Call `foamPetscSnesHelper::solve(true)`.
-6. On PETSc failure, restore the solution and time state, retry once at the
-   same `deltaT` after resetting PETSc, then optionally reduce `deltaT` if
+6. Accept a converged solve, or a tolerated max-iteration/line-search outcome
+   when `tolerateSnesNonConvergence` is enabled. On other PETSc failures,
+   restore the solution and time state, then reduce `deltaT` if
    `adjustTimeStep` is enabled.
-7. Extract the converged PETSc solution vector back into `U` and `p`.
+7. Extract the accepted PETSc solution vector back into `U` and `p`.
 8. Rebuild `phi` and correct transport and turbulence models.
 
 `setDeltaT()` implements the SNES-iteration-based time-step adjustment. It uses
