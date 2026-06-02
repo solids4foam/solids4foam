@@ -316,7 +316,7 @@ class newtonQuasiMonolithicCouplingInterface
         void initialiseInterfaceMeshPhiHistory(const scalarField& meshPhi);
 
         //- Return selected interface pressure flux
-        scalarField interfacePressurePhi();
+        tmp<scalarField> interfacePressurePhi();
 
         //- Report interface pressure flux defect diagnostics
         void reportInterfaceFluxDiagnostics();

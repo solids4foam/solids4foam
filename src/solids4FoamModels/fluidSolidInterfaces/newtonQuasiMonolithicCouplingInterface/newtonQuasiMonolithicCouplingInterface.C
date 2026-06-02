@@ -1371,18 +1371,19 @@ void newtonQuasiMonolithicCouplingInterface::initialiseInterfaceMeshPhiHistory
 }
 
 
-scalarField newtonQuasiMonolithicCouplingInterface::interfacePressurePhi()
+Foam::tmp<Foam::scalarField>
+newtonQuasiMonolithicCouplingInterface::interfacePressurePhi()
 {
     const scalarField phiG(currentInterfaceMeshPhi());
     initialiseInterfaceMeshPhiHistory(phiG);
 
     if (quasiMonolithicInterfaceFluxMode_ == "oldVelocityHistory")
     {
-        return currentInterfaceVelocityPhi();
+        return tmp<scalarField>(new scalarField(currentInterfaceVelocityPhi()));
     }
     else if (quasiMonolithicInterfaceFluxMode_ == "geometricOnly")
     {
-        return phiG;
+        return tmp<scalarField>(new scalarField(phiG));
     }
 
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
