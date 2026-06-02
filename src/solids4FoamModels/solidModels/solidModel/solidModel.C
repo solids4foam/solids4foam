@@ -448,6 +448,49 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
     return hoDict.subDict("pressure");
 }
 
+
+Foam::dictionary& Foam::solidModel::stabilisationDict()
+{
+    dictionary defaultStabSubDict;
+    defaultStabSubDict.add("type", "diffStencilLaplacian");
+    defaultStabSubDict.add("scaleFactor", 0.1);
+
+    if (!solidModelDict().found("stabilisation"))
+    {
+        // If the stabilisation sub-dict is not found, we will add it with
+        // default settings
+        dictionary stabDict;
+        stabDict.add("momentum", defaultStabSubDict);
+        stabDict.add("pressure", defaultStabSubDict);
+
+        // Add stabilisation dict
+        solidModelDict().add("stabilisation", stabDict);
+    }
+
+    dictionary& stabDict = solidModelDict().subDict("stabilisation");
+
+    // Check for previous stabilisation definition
+    if (stabDict.found("type") || stabDict.found("scaleFactor"))
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
+    }
+
+    if (!stabDict.found("momentum"))
+    {
+        stabDict.add("momentum", defaultStabSubDict);
+    }
+
+    if (!stabDict.found("pressure"))
+    {
+        stabDict.add("pressure", defaultStabSubDict);
+    }
+
+    return stabDict;
+}
+
 #ifndef FOAMEXTEND
 void Foam::solidModel::makeDisplacementMLS() const
 {
@@ -609,6 +652,47 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::stabilisationModel> Foam::solidModel::createStabilisation
+(
+    const word& name,
+    const dimensionSet& dims
+)
+{
+    dictionary& stabDict = stabilisationDict();
+
+    return stabilisationModel::New
+    (
+        mesh(),
+        stabDict.subDict(name),
+        dims
+    );
+}
+
+
+void Foam::solidModel::resetMomentumStabilisation(const dimensionSet& dims)
+{
+    momentumStabilisationPtr_ = createStabilisation("momentum", dims);
+
+    // Only stabilisation models that support high-order residual calculation
+    // are allowed when highOrderResidual is enabled
+    if (highOrderResidual() && !momentumStabilisation().supportsHighOrderResidual())
+    {
+        FatalErrorInFunction
+            << "Only stabilisation models that support high-order residual "
+            << "calculation can be used with highOrderResidual = true. "
+            << "Model type " << momentumStabilisation().type()
+            << " does not support it."
+            << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::resetPressureStabilisation(const dimensionSet& dims)
+{
+    pressureStabilisationPtr_ = createStabilisation("pressure", dims);
+}
+
 
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
@@ -1312,72 +1396,8 @@ Foam::solidModel::solidModel
         }
     }
 
-    // Create momentum stabilisation
-
-    dictionary defaultStabSubDict;
-    defaultStabSubDict.add("type", "diffStencilLaplacian");
-    defaultStabSubDict.add("scaleFactor", 0.1);
-
-    if (!solidModelDict().found("stabilisation"))
-    {
-        // If the stabilisation sub-dict is not found, we will add it with
-        // default settings
-        dictionary stabDict;
-        stabDict.add("momentum", defaultStabSubDict);
-        stabDict.add("pressure", defaultStabSubDict);
-
-        // Add stabilisation dict
-        solidModelDict().add("stabilisation", stabDict);
-    }
-
-    dictionary& stabDict = solidModelDict().subDict("stabilisation");
-
-    // Check for previous stabilisation definition
-    if (stabDict.found("type") || stabDict.found("scaleFactor"))
-    {
-        FatalErrorInFunction
-            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
-            << "solidProperties: this is the old format. Instead, define a "
-            << "stabilisation/momentum sub-dict" << exit(FatalError);
-    }
-
-    if (!stabDict.found("momentum"))
-    {
-        stabDict.add("momentum", defaultStabSubDict);
-    }
-
-    if (!stabDict.found("pressure"))
-    {
-        stabDict.add("pressure", defaultStabSubDict);
-    }
-
-    momentumStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("momentum"),
-            dimless
-        );
-
-    // Only stabilisation models that support high-order residual calculation
-    // are allowed when highOrderResidual is enabled
-    if (highOrderResidual() && !momentumStabilisation().supportsHighOrderResidual())
-    {
-        FatalErrorInFunction
-            << "Only stabilisation models that support high-order residual "
-            << "calculation can be used with highOrderResidual = true. "
-            << "Model type " << momentumStabilisation().type()
-            << " does not support it."
-            << abort(FatalError);
-    }
-
-    pressureStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("pressure"),
-            dimPressure/dimLength
-        );
+    resetMomentumStabilisation(dimless);
+    resetPressureStabilisation(dimPressure/dimLength);
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())

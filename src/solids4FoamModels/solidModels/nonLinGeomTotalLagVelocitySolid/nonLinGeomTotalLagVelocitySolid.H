@@ -94,8 +94,15 @@ class nonLinGeomTotalLagVelocitySolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Use velocity-based momentum stabilisation instead of displacement
+        //  based stabilisation
+        const Switch velocityBasedMomentumStabilisation_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
+
+        //- Coefficient for velocity-based momentum stabilisation
+        autoPtr<surfaceScalarField> velocityMomentumStabilisationCoeffPtr_;
 
         //- Displacement at the future time (extrapolated)
         volVectorField DFutureTime_;
@@ -123,6 +130,12 @@ class nonLinGeomTotalLagVelocitySolid
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Make coefficient for velocity-based momentum stabilisation
+        void makeVelocityMomentumStabilisationCoeff();
+
+        //- Return coefficient for velocity-based momentum stabilisation
+        const surfaceScalarField& velocityMomentumStabilisationCoeff();
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries

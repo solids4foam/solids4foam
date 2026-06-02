@@ -358,6 +358,9 @@ private:
         //- Return high-order coefficients for pressure
         const dictionary& pressureHighOrderCoeffs() const;
 
+        //- Return stabilisation dictionary, creating default entries if needed
+        dictionary& stabilisationDict();
+
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
         //  field. For moving mesh approach (updated Lagrangian) we need the
@@ -382,6 +385,19 @@ private:
 protected:
 
     // Protected member functions
+
+        //- Create a stabilisation model
+        autoPtr<stabilisationModel> createStabilisation
+        (
+            const word& name,
+            const dimensionSet& dims
+        );
+
+        //- Reset the momentum stabilisation model
+        void resetMomentumStabilisation(const dimensionSet& dims);
+
+        //- Reset the pressure stabilisation model
+        void resetPressureStabilisation(const dimensionSet& dims);
 
         //- Make the dual mesh from the mesh
         void makeDualMesh() const;

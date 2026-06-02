@@ -89,6 +89,48 @@ void nonLinGeomTotalLagVelocitySolid::predict()
 }
 
 
+void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
+{
+    if (!velocityMomentumStabilisationCoeffPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    surfaceScalarField cSqrtRho(sqrt(impKf_*fvc::interpolate(rho())));
+    cSqrtRho.setOriented(false);
+
+    velocityMomentumStabilisationCoeffPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "velocityMomentumStabilisationCoeff",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            cSqrtRho/mesh().deltaCoeffs()
+        )
+    );
+    velocityMomentumStabilisationCoeffPtr_().setOriented(false);
+}
+
+
+const surfaceScalarField&
+nonLinGeomTotalLagVelocitySolid::velocityMomentumStabilisationCoeff()
+{
+    if (velocityMomentumStabilisationCoeffPtr_.empty())
+    {
+        makeVelocityMomentumStabilisationCoeff();
+    }
+
+    return velocityMomentumStabilisationCoeffPtr_();
+}
+
+
 void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
 (
     surfaceVectorField& force,
@@ -439,12 +481,21 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     dpdtPtr_(),
     linearGeometryFormulation_(linearGeometryFormulation),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    velocityBasedMomentumStabilisation_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "velocityBasedMomentumStabilisation",
+            false
+        )
+    ),
     blockSize_
     (
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
     ),
+    velocityMomentumStabilisationCoeffPtr_(),
     DFutureTime_
     (
         IOobject
@@ -496,9 +547,22 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 {
     Info<< "linearGeometryFormulation = " << linearGeometryFormulation_ << nl
         << "predictor = " << predictor_ << nl
+        << "velocityBasedMomentumStabilisation = "
+        << velocityBasedMomentumStabilisation_ << nl
         << "extrapolateTractionBoundaries = "
         << extrapolateTractionBoundaries_ << nl
         << "solvePressure = " << solvePressure() << endl;
+
+    // The momentum stabilisation model dimensions depend on which field is
+    // used to update it: DFutureTime_ has dimensions [L], while U has [L/T].
+    if (velocityBasedMomentumStabilisation_)
+    {
+        resetMomentumStabilisation(dimless/dimTime);
+    }
+    else
+    {
+        resetMomentumStabilisation(dimless);
+    }
 
     DisRequired();
 
@@ -805,8 +869,19 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
         // is set to zero on traction boundaries
-        momentumStabilisation().updateVector(DFutureTime_, &gradD());
-        traction += impKf_*momentumStabilisation().faceVector();
+        if (velocityBasedMomentumStabilisation_)
+        {
+            const volTensorField gradU("gradU", fvc::grad(U));
+            momentumStabilisation().updateVector(U, &gradU);
+            traction +=
+                velocityMomentumStabilisationCoeff()
+               *momentumStabilisation().faceVector();
+        }
+        else
+        {
+            momentumStabilisation().updateVector(DFutureTime_, &gradD());
+            traction += impKf_*momentumStabilisation().faceVector();
+        }
 
         // Update the future-time force at the faces
         forceFutureTime_ = mesh.magSf()*traction;
@@ -842,8 +917,19 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
         // the traction in the reference configuration)
         // CAREFUL: D may not have corrected BCs with non-ortho corrections; maybe
         // formulate in terms of alpha scheme instead
-        momentumStabilisation().updateVector(DFutureTime_, &gradD());
-        tractionNew += impKf_*momentumStabilisation().faceVector();
+        if (velocityBasedMomentumStabilisation_)
+        {
+            const volTensorField gradU("gradU", fvc::grad(U));
+            momentumStabilisation().updateVector(U, &gradU);
+            tractionNew +=
+                velocityMomentumStabilisationCoeff()
+               *momentumStabilisation().faceVector();
+        }
+        else
+        {
+            momentumStabilisation().updateVector(DFutureTime_, &gradD());
+            tractionNew += impKf_*momentumStabilisation().faceVector();
+        }
 
         // Update the future-time force at the faces
         forceFutureTime_ = magSfNew*tractionNew;
