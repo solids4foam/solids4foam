@@ -44,6 +44,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "mat66.H"
 #include "CompactListList.H"
+#include "boolIOList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -125,6 +126,10 @@ class mechanicalLaw
 
         // Hydrostatic stress (negative of hydrostatic pressure) volField
         autoPtr<volScalarField> sigmaHydPtr_;
+
+        //- Boundary flag field used by the leastSquaresS4f gradient scheme
+        //  for the sigmaHyd field
+        autoPtr<boolIOList> useBoundaryFaceValuesSigmaHydPtr_;
 
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
