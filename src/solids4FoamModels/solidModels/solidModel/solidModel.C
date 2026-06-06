@@ -1029,6 +1029,18 @@ Foam::solidModel::solidModel
         ),
         boolList(mesh().boundary().size(), false)
     ),
+    useBoundaryFaceValuesDD_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_DD",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     useBoundaryFaceValuesp_
     (
         IOobject
@@ -1294,6 +1306,27 @@ Foam::solidModel::solidModel
         else
         {
             useBoundaryFaceValuesD_[patchI] = true;
+        }
+    }
+    forAll(useBoundaryFaceValuesDD_, patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+        )
+        {
+            useBoundaryFaceValuesDD_[patchI] = false;
+        }
+        else
+        {
+            useBoundaryFaceValuesDD_[patchI] = true;
         }
     }
     if (pPtr_.valid())
