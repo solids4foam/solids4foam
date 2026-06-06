@@ -23,6 +23,7 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -1159,7 +1160,17 @@ Foam::solidModel::solidModel
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
     {
-        if (isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+         || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+        )
         {
             useBoundaryFaceValuesD_[patchI] = false;
         }
