@@ -356,11 +356,11 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
-    // Update gradient of total displacement
-    gradD() = fvc::grad(D().oldTime() + DD());
-
     // Total displacement
     D() = D().oldTime() + DD();
+
+    // Update gradient of total displacement
+    gradD() = fvc::grad(D());
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();

@@ -292,12 +292,12 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         ) && ++iCorr < nCorr()
     );
 
-    // Update gradient of total displacement
-    // Do we need this?
-    gradD() = fvc::grad(D().oldTime() + DD());
-
     // Total displacement
     D() = D().oldTime() + DD();
+
+    // Update gradient of total displacement
+    // Do we need this?
+    gradD() = fvc::grad(D());
 
     // Interpolate cell displacement increments to vertices
     mechanical().interpolate(DD(), gradDD(), pointDD());
