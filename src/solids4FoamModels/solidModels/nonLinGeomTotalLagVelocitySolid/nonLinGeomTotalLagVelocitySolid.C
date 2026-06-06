@@ -23,6 +23,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
@@ -509,6 +510,30 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         mesh(),
         dimensionedVector("0", dimLength, vector::zero)
     ),
+    useBoundaryFaceValuesDFutureTime_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_DFutureTime",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
+    useBoundaryFaceValuesU_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_U",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     forceCurrentTime_
     (
         IOobject
@@ -568,6 +593,22 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     // Ensure U is created (and possibly read)
     U();
+
+    // Use boundary face values only on fixed-displacement patches
+    forAll(useBoundaryFaceValuesDFutureTime_, patchI)
+    {
+        if
+        (
+            isA<fixedDisplacementFvPatchVectorField>
+            (
+                D().boundaryField()[patchI]
+            )
+        )
+        {
+            useBoundaryFaceValuesDFutureTime_[patchI] = true;
+            useBoundaryFaceValuesU_[patchI] = true;
+        }
+    }
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
