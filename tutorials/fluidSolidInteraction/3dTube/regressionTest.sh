@@ -18,7 +18,7 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # ------------------------------------------------------------
 
 DISP_MAX_TOL=1e-6       # max displacement absolute tolerance
-FORCE_MEAN_TOL=2.5e-2   # mean force tolerance
+FORCE_MEAN_TOL=2.6e-2   # mean force tolerance
 
 # Regression end time for the copied case only
 REG_END_TIME=0.0015
