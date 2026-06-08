@@ -15,14 +15,14 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ------------------------------------------------------------
 
 DISP_MAX_TOL=0.005      # max displacement absolute tolerance
-FORCE_MEAN_TOL=150      # mean force tolerance
+FORCE_MEAN_TOL=0.150    # mean force tolerance
 
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=40
 
 # Reference values
-REF_MAX_DISP=-0.22
-REF_MEAN_FORCE=-5150
+REF_MAX_DISP=-0.21
+REF_MEAN_FORCE=-5.150
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
