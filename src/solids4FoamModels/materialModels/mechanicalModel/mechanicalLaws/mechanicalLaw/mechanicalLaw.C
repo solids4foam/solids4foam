@@ -441,7 +441,12 @@ void Foam::mechanicalLaw::makeRelFf()
 
 void Foam::mechanicalLaw::makeSigmaHyd()
 {
-    if (sigmaHydPtr_.valid() || gradSigmaHydPtr_.valid())
+    if
+    (
+        sigmaHydPtr_.valid()
+     || useBoundaryFaceValuesSigmaHydPtr_.valid()
+     || gradSigmaHydPtr_.valid()
+    )
     {
         FatalErrorIn("void " + type() + "::makeSigmaHyd()")
             << "pointer already set" << abort(FatalError);
@@ -462,6 +467,22 @@ void Foam::mechanicalLaw::makeSigmaHyd()
             mesh(),
             dimensionedScalar("zero", dimPressure, 0.0),
             zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    useBoundaryFaceValuesSigmaHydPtr_.set
+    (
+        new boolIOList
+        (
+            IOobject
+            (
+                "useBoundaryFaceValues_sigmaHyd",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            boolList(mesh().boundary().size(), false)
         )
     );
 
@@ -1535,6 +1556,7 @@ Foam::mechanicalLaw::mechanicalLaw
         dict_.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
+    useBoundaryFaceValuesSigmaHydPtr_(),
     gradSigmaHydPtr_(),
     curTimeIndex_(-1),
     warnAboutEnforceLinear_(true)

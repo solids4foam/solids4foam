@@ -306,17 +306,17 @@ check_case() {
 }
 
 if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=0.040466
-    REF_FINAL_DISP=0.039857
-    REF_FINAL_FORCE=6.60812
+    REF_MAX_DISP=0.0395292
+    REF_FINAL_DISP=0.0387511
+    REF_FINAL_FORCE=6.63982
 elif [[ "${variant}" == "openfoamorg" ]]; then
-    REF_MAX_DISP=0.039909
-    REF_FINAL_DISP=0.039232
-    REF_FINAL_FORCE=6.54692
+    REF_MAX_DISP=0.0389623
+    REF_FINAL_DISP=0.0381231
+    REF_FINAL_FORCE=6.57859
 else
-    REF_MAX_DISP=0.039834
-    REF_FINAL_DISP=0.039150
-    REF_FINAL_FORCE=6.54017
+    REF_MAX_DISP=0.0389009
+    REF_FINAL_DISP=0.0380463
+    REF_FINAL_FORCE=6.57095
 fi
 
 aitken_case=$(prepare_case aitken)

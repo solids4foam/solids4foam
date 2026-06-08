@@ -19,8 +19,8 @@ APEX_DISP_TOL=1e-4
 FSI_RES_TOL=1e-6
 
 # Reference values at REG_END_TIME
-REF_APEX_DY=-0.534826
-REF_FSI_RES=5.35591e-06
+REF_APEX_DY=-0.532789
+REF_FSI_RES=5.939e-06
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_disp.dat"

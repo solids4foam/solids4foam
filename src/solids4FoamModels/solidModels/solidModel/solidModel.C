@@ -23,6 +23,7 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -944,6 +945,18 @@ Foam::solidModel::solidModel
         ),
         boolList(mesh().boundary().size(), false)
     ),
+    useBoundaryFaceValuesDD_
+    (
+        IOobject
+        (
+            "useBoundaryFaceValues_DD",
+            runTime.constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        boolList(mesh().boundary().size(), false)
+    ),
     useBoundaryFaceValuesp_
     (
         IOobject
@@ -1159,13 +1172,44 @@ Foam::solidModel::solidModel
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
     {
-        if (isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+         || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+        )
         {
             useBoundaryFaceValuesD_[patchI] = false;
         }
         else
         {
             useBoundaryFaceValuesD_[patchI] = true;
+        }
+    }
+    forAll(useBoundaryFaceValuesDD_, patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+        )
+        {
+            useBoundaryFaceValuesDD_[patchI] = false;
+        }
+        else
+        {
+            useBoundaryFaceValuesDD_[patchI] = true;
         }
     }
     if (pPtr_.valid())
