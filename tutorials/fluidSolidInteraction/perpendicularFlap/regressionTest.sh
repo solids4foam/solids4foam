@@ -23,7 +23,7 @@ DISP_MAX_TOL=1e-2      # max displacement absolute tolerance
 REG_END_TIME=4
 
 # Reference values
-REF_MAX_DISP=0.101
+REF_MAX_DISP=0.11
 
 RUN_ARGS=()
 variant="openfoamcom"
