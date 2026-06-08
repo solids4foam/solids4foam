@@ -107,6 +107,14 @@ class nonLinGeomTotalLagVelocitySolid
         //- Displacement at the future time (extrapolated)
         volVectorField DFutureTime_;
 
+        //- Boundary flag field used by the leastSquaresS4f gradient scheme
+        //  for the DFutureTime field
+        boolIOList useBoundaryFaceValuesDFutureTime_;
+
+        //- Boundary flag field used by the leastSquaresS4f gradient scheme
+        //  for the U field
+        boolIOList useBoundaryFaceValuesU_;
+
         //- Force at the current time
         surfaceVectorField forceCurrentTime_;
 

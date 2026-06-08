@@ -142,6 +142,10 @@ private:
         boolIOList useBoundaryFaceValuesD_;
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  DD field
+        boolIOList useBoundaryFaceValuesDD_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  p field
         boolIOList useBoundaryFaceValuesp_;
 

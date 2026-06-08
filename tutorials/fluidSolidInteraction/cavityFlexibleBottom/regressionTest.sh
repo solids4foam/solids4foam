@@ -28,7 +28,7 @@ FORCE_MEAN_TOL=0.150    # mean force tolerance
 FORCE_AVG_SAMPLES=40
 
 # Reference values
-REF_MAX_DISP=-0.22
+REF_MAX_DISP=-0.21
 REF_MEAN_FORCE=-5.150
 
 # Log files

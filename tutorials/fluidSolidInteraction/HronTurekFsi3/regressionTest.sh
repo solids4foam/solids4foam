@@ -21,9 +21,9 @@ FX_TOL=1e-4
 FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
-REF_TIP_UY=-0.00062628
-REF_FX=-0.02236218
-REF_FY=-0.08408091
+REF_TIP_UY=-0.0006538
+REF_FX=-0.0222979
+REF_FY=-0.0832844
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
