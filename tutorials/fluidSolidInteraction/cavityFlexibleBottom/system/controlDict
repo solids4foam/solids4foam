@@ -62,7 +62,7 @@ functions
         "pName|p"           p;
         "UName|U"           U;
         "rhoName|rho"       rhoInf;
-        log                 false;
+        log                 true;
         rhoInf              1;
         CofR                (0.45 0.15 -0.15);
     }
