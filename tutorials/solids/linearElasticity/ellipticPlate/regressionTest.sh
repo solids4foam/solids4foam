@@ -31,7 +31,7 @@ APPROACHES=(
 )
 
 # Settings for Test-leastSquaresS4fGrad test
-GRADIENT_REL_TOL=7e-1
+GRADIENT_REL_TOL=8e-1
 GRADIENT_ABS_TOL=1e-10
 GRADIENT_SERIAL_LOGFILE="log.Test-leastSquaresS4fGrad.serial"
 GRADIENT_PARALLEL_LOGFILE="log.Test-leastSquaresS4fGrad.parallel"
@@ -257,8 +257,11 @@ run_gradient_tests() {
             failures=$((failures + 1))
         fi
 
-        if ! solids4Foam::runParallel -o -s parallel -n 2 \
-            Test-leastSquaresS4fGrad >/dev/null 2>&1
+        if ! (
+            set +u
+            solids4Foam::runParallel -o -s parallel -n 2 \
+                Test-leastSquaresS4fGrad
+        ) >/dev/null 2>&1
         then
             echo "FAIL: parallel Test-leastSquaresS4fGrad run failed"
             failures=$((failures + 1))

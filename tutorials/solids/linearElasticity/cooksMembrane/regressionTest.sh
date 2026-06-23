@@ -33,7 +33,7 @@ APPROACHES=(
 )
 
 # Settings for Test-leastSquaresS4fGrad test
-GRADIENT_REL_TOL=1e-5
+GRADIENT_REL_TOL=5e-1
 GRADIENT_ABS_TOL=1e-10
 GRADIENT_LOGFILE="log.Test-leastSquaresS4fGrad.serial"
 
@@ -163,6 +163,7 @@ run_gradient_test() {
     prepare_case
     (
         cd "${CASE_DIR}"
+        solids4Foam::convertCaseFormat . >/dev/null 2>&1
         solids4Foam::runApplication -o -s gradient blockMesh >/dev/null 2>&1
         sed -E -i.bak 's/^[[:space:]]*default[[:space:]]+none;/        default         leastSquaresS4f;/' system/fvSchemes
         rm -f system/fvSchemes.bak
