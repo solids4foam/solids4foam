@@ -35,6 +35,9 @@ Author
 #include "fixedValueFvPatchFields.H"
 #include "IOmanip.H"
 #include "processorFvPatch.H"
+#include "compatibilityFunctions.H"
+
+#include <string>
 
 using namespace Foam;
 
@@ -65,6 +68,29 @@ scalar mathematicalPi()
 #else
     return mathematicalConstant::pi;
 #endif
+}
+
+
+bool optionFound(const argList& args, const word& opt)
+{
+#ifdef OPENFOAM_COM
+    return args.found(opt);
+#else
+    return args.optionFound(opt);
+#endif
+}
+
+
+string paddingString(const label width)
+{
+    return string
+    (
+        std::string
+        (
+            static_cast<std::string::size_type>(max(width, label(0))),
+            ' '
+        )
+    );
 }
 
 
@@ -238,7 +264,7 @@ volScalarField makeField
         patchTypes
     );
 
-    scalarField& fieldI = field.primitiveFieldRef();
+    scalarField& fieldI = primitiveFieldRef(field);
     const volVectorField& C = mesh.C();
 
     forAll(fieldI, cellI)
@@ -248,7 +274,7 @@ volScalarField makeField
 
     forAll(field.boundaryField(), patchI)
     {
-        fvPatchScalarField& patchField = field.boundaryFieldRef()[patchI];
+        fvPatchScalarField& patchField = boundaryFieldRef(field)[patchI];
 
         if
         (
@@ -297,7 +323,7 @@ volVectorField makeExactGradField
         dimensionedVector("zero", dimless/dimLength, vector::zero)
     );
 
-    vectorField& exactGradI = exactGrad.primitiveFieldRef();
+    vectorField& exactGradI = primitiveFieldRef(exactGrad);
     const volVectorField& C = mesh.C();
     const Vector<label> geometricD(mesh.geometricD());
 
@@ -309,7 +335,7 @@ volVectorField makeExactGradField
     forAll(exactGrad.boundaryField(), patchI)
     {
         fvPatchVectorField& patchField =
-            exactGrad.boundaryFieldRef()[patchI];
+            boundaryFieldRef(exactGrad)[patchI];
 
         if
         (
@@ -389,7 +415,11 @@ errorStats calcErrorStats
     scalar boundarySumSqrError = 0.0;
     label nBoundaryCells = 0;
 
+#ifdef OPENFOAM_NOT_EXTEND
     const scalarField& errorI = error.primitiveField();
+#else
+    const scalarField& errorI = error.internalField();
+#endif
 
     forAll(errorI, cellI)
     {
@@ -503,7 +533,7 @@ int main(int argc, char *argv[])
     );
     #include "setRootCase.H"
 
-    const bool writeFields = args.found("writeFields");
+    const bool writeFields = optionFound(args, "writeFields");
 
     #include "createTime.H"
     #include "createMesh.H"
@@ -534,7 +564,7 @@ int main(int argc, char *argv[])
     const label nTests = 5;
     const label fieldWidth = 24;
     const label valueWidth = 16;
-    const string headerPadding(fieldWidth - 5, ' ');
+    const string headerPadding(paddingString(fieldWidth - 5));
 
     Info<< nl
         << "Testing fvc::grad for scalar analytical fields" << nl
@@ -563,8 +593,7 @@ int main(int argc, char *argv[])
         const word& fieldName = tests[testI].name;
         const string fieldPadding
         (
-            max(fieldWidth - label(fieldName.size()), label(1)),
-            ' '
+            paddingString(max(fieldWidth - label(fieldName.size()), label(1)))
         );
 
         Info<< fieldName
