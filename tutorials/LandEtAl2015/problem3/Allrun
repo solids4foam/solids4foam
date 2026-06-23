@@ -4,6 +4,11 @@
 # this script, e.g. > ./Allrun parallel
 # You may want to change `numberOfSubdomains` in system/decomposeParDict
 
+# By default the displacement-based solid model is used. To instead use the
+# mixed displacement-pressure formulation, pass the argument "pressure",
+# e.g. > ./Allrun pressure
+# The "pressure" and "parallel" arguments can be combined in any order.
+
 # You can set the mesh number with the MESH_NUMBER variable, which defaults to
 # 1, e.g. > MESH_NUMBER=2 ./Allrun parallel
 
@@ -13,6 +18,24 @@ echo "Using MESH_NUMBER=$MESH_NUMBER"
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Select the solid formulation: "displacement" (default) or "pressure".
+# The selected fvSolution and solidProperties variants are activated by
+# symbolically linking the corresponding "*.<formulation>" files into place.
+APPROACH="displacement"
+for arg in "$@"
+do
+    if [[ "$arg" == "pressure" ]]
+    then
+        APPROACH="pressure"
+    fi
+done
+echo "Using the $APPROACH formulation"
+
+for file in $(find ./system ./constant -name "*.$APPROACH")
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
 
 # Restore 0 directory frm 0.orig
 restore0Dir
@@ -29,7 +52,7 @@ runApplication createPatch -overwrite
 runApplication setFibreField
 
 # Run the solver
-if [[ "$1" == "parallel" ]]
+if [[ " $* " == *" parallel "* ]]
 then
     # Decompose the mesh
     runApplication decomposePar
