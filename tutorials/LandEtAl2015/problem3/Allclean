@@ -4,3 +4,6 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase0
+
+# Remove the formulation symlinks created by Allrun (displacement/pressure)
+rm -f system/fvSolution constant/solidProperties
