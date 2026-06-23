@@ -126,6 +126,7 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/slidingFrictionBall"
     "solids/linearElasticity/sphericalCavity"
     "solids/linearElasticity/punch"
+    "solids/linearElasticity/wobblyNewton"
     "solids/multiMaterial/layeredPipe"
     "solids/poroelasticity/rodAndSeabed"
     "solids/thermoelasticity/hotSphere"
