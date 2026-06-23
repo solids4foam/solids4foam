@@ -21,6 +21,9 @@ Application
 Description
     Tests scalar-field gradients against analytical fields on the case mesh.
 
+    Note: Underlying fields are not symmetric, i.e. this means that this
+          utility can't be used with cases with symmetry boundary conditions.
+
 Author
     Ivan Batistic, UCD
     Philip Cardiff, UCD.
