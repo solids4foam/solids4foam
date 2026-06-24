@@ -18,6 +18,8 @@ fi
 
 # Settings for Test-leastSquaresS4fGrad test
 GRADIENT_MAX_ERROR=1e-12
+# Keep this at two ranks for CI runners with two available MPI slots.
+GRADIENT_N_PROCS=2
 GRADIENT_SERIAL_LOGFILE="log.Test-leastSquaresS4fGrad.serial"
 GRADIENT_PARALLEL_LOGFILE="log.Test-leastSquaresS4fGrad.parallel"
 
@@ -53,6 +55,7 @@ fi
 echo "============================================================"
 echo "wobblyNewton regression test"
 echo "Gradient maximum error: ${GRADIENT_MAX_ERROR}"
+echo "Gradient parallel subdomains: ${GRADIENT_N_PROCS}"
 echo "============================================================"
 echo
 
@@ -141,17 +144,7 @@ check_gradient_logs() {
     return "${failures}"
 }
 
-number_of_subdomains() {
-    awk '/^[[:space:]]*numberOfSubdomains[[:space:]]+/ {
-        gsub(";", "", $2)
-        print $2
-        exit
-    }' "${CASE_DIR}/system/decomposeParDict"
-}
-
 run_gradient_tests() {
-    local n_procs
-
     prepare_case
     rm -f "${CASE_DIR}/${GRADIENT_SERIAL_LOGFILE}" \
         "${CASE_DIR}/${GRADIENT_PARALLEL_LOGFILE}"
@@ -204,6 +197,15 @@ run_gradient_tests() {
         fi
         rm -f system/fvSchemes.bak
 
+        if ! sed -E -i.bak \
+            "s/^[[:space:]]*numberOfSubdomains[[:space:]]+[0-9]+;/numberOfSubdomains ${GRADIENT_N_PROCS};/" \
+            system/decomposeParDict
+        then
+            echo "FAIL: Could not set gradient test subdomain count"
+            failures=$((failures + 1))
+        fi
+        rm -f system/decomposeParDict.bak
+
         if ! solids4Foam::runApplication -o -s serial \
             Test-leastSquaresS4fGrad >/dev/null 2>&1
         then
@@ -218,13 +220,9 @@ run_gradient_tests() {
             failures=$((failures + 1))
         fi
 
-        n_procs=$(number_of_subdomains)
-        if [[ -z "${n_procs}" ]]; then
-            echo "FAIL: Could not read numberOfSubdomains"
-            failures=$((failures + 1))
-        elif ! (
+        if ! (
             set +u
-            solids4Foam::runParallel -o -s parallel -n "${n_procs}" \
+            solids4Foam::runParallel -o -s parallel -n "${GRADIENT_N_PROCS}" \
                 Test-leastSquaresS4fGrad
         ) >/dev/null 2>&1
         then
