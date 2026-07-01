@@ -32,9 +32,15 @@ APPROACHES=(
     highOrder
 )
 
+# Settings for Test-leastSquaresS4fGrad test
+GRADIENT_REL_TOL=5e-1
+GRADIENT_ABS_TOL=1e-10
+GRADIENT_LOGFILE="log.Test-leastSquaresS4fGrad.serial"
+
 echo "============================================================"
 echo "cooksMembrane regression test"
 echo "Top-right displacement in [${TOP_RIGHT_MIN}, ${TOP_RIGHT_MAX}] m"
+echo "Gradient relative tolerance: ${GRADIENT_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -74,6 +80,97 @@ extract_top_right_disp() {
     awk 'END {print $3}' "${value_file}"
 }
 
+check_gradient_log() {
+    local failures=0
+
+    check_gradient_reference_field phi_x 0 0 0 0 \
+        || failures=$((failures + 1))
+    check_gradient_reference_field phi_linear 0 0 0 0 \
+        || failures=$((failures + 1))
+    check_gradient_reference_field \
+        phi_quadratic 0.000721848 0.00377471 0.00165316 0.00377471 \
+        || failures=$((failures + 1))
+    check_gradient_reference_field \
+        phi_quadratic_cross 0.00034808 0.00216383 0.000796681 0.00216383 \
+        || failures=$((failures + 1))
+    check_gradient_reference_field \
+        phi_trigonometric 0.0150774 0.095765 0.0345717 0.095765 \
+        || failures=$((failures + 1))
+
+    return "${failures}"
+}
+
+extract_gradient_row() {
+    local field="$1"
+
+    awk -v field="${field}" \
+        '$1 == field && NF >= 5 {print $2, $3, $4, $5; exit}' \
+        "${CASE_DIR}/${GRADIENT_LOGFILE}" 2>/dev/null || true
+}
+
+check_gradient_reference_field() {
+    local field="$1"
+    local ref_l2="$2"
+    local ref_linf="$3"
+    local ref_boundary_l2="$4"
+    local ref_boundary_linf="$5"
+    local row
+    local l2 linf boundary_l2 boundary_linf
+
+    row=$(extract_gradient_row "${field}")
+    if [[ -z "${row}" ]]; then
+        echo "FAIL: Could not extract gradient norms for ${field}"
+        return 1
+    fi
+
+    IFS=' ' read -r l2 linf boundary_l2 boundary_linf <<< "${row}"
+    if awk -v l2="${l2}" -v linf="${linf}" \
+        -v boundary_l2="${boundary_l2}" \
+        -v boundary_linf="${boundary_linf}" \
+        -v ref_l2="${ref_l2}" -v ref_linf="${ref_linf}" \
+        -v ref_boundary_l2="${ref_boundary_l2}" \
+        -v ref_boundary_linf="${ref_boundary_linf}" \
+        -v rel_tol="${GRADIENT_REL_TOL}" \
+        -v abs_tol="${GRADIENT_ABS_TOL}" '
+        function mag(value) {return value < 0 ? -value : value}
+        function is_close(value, reference) {
+            return mag(value - reference) <= abs_tol + rel_tol*mag(reference)
+        }
+        BEGIN {
+            exit !(is_close(l2, ref_l2) && is_close(linf, ref_linf) &&
+                is_close(boundary_l2, ref_boundary_l2) &&
+                is_close(boundary_linf, ref_boundary_linf))
+        }'
+    then
+        printf "PASS: serial %s: [%s] expected [%.8g %.8g %.8g %.8g]\n" \
+            "${field}" "${row}" \
+            "${ref_l2}" "${ref_linf}" "${ref_boundary_l2}" "${ref_boundary_linf}"
+        return 0
+    fi
+
+    printf "FAIL: serial %s: [%s] expected [%.8g %.8g %.8g %.8g]\n" \
+        "${field}" "${row}" \
+        "${ref_l2}" "${ref_linf}" "${ref_boundary_l2}" "${ref_boundary_linf}"
+    return 1
+}
+
+run_gradient_test() {
+    if ! command -v Test-leastSquaresS4fGrad >/dev/null 2>&1; then
+        echo "FAIL: Test-leastSquaresS4fGrad is not available"
+        return 1
+    fi
+
+    prepare_case
+    (
+        cd "${CASE_DIR}"
+        solids4Foam::convertCaseFormat . >/dev/null 2>&1
+        solids4Foam::runApplication -o -s gradient blockMesh >/dev/null 2>&1
+        sed -E -i.bak 's/^[[:space:]]*default[[:space:]]+none;/        default         leastSquaresS4f;/' system/fvSchemes
+        rm -f system/fvSchemes.bak
+        solids4Foam::runApplication -o -s serial Test-leastSquaresS4fGrad >/dev/null 2>&1
+    )
+}
+
 check_top_right_disp() {
     local approach="$1"
     local top_right_disp
@@ -97,6 +194,7 @@ failures=0
 
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
+    rm -f "${CASE_DIR}/${GRADIENT_LOGFILE}"
     for approach in "${APPROACHES[@]}"; do
         echo
         echo "------------------------------------------------------------"
@@ -115,6 +213,16 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
     done
+
+    echo
+    echo "Testing leastSquaresS4f gradient calculation"
+    if run_gradient_test; then
+        if ! check_gradient_log; then
+            failures=$((failures + 1))
+        fi
+    else
+        failures=$((failures + 1))
+    fi
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
@@ -123,6 +231,9 @@ else
     fi
 
     if ! check_top_right_disp "check-only"; then
+        failures=$((failures + 1))
+    fi
+    if ! check_gradient_log; then
         failures=$((failures + 1))
     fi
 fi
