@@ -3,11 +3,51 @@
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Example usage
+# ./Allrun
+# ./Allrun newtonIcoFluid
+# ./Allrun pimpleFluid
+
+fluidModel=pimpleFluid
+
+print_usage()
+{
+    cat <<'EOF'
+Usage:
+  ./Allrun                    # default: pimpleFluid
+  ./Allrun pimpleFluid        # run with pimpleFluid
+  ./Allrun newtonIcoFluid     # run with newtonIcoFluid
+EOF
+}
+
+for arg in "$@"
+do
+    case "$arg" in
+        pimpleFluid|newtonIcoFluid)
+            fluidModel=$arg
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${fluidModel} fluid model"
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+# Set the requested fluid model before running the solver
+sed -i "s/^fluidModel .*/fluidModel ${fluidModel};/" constant/fluidProperties
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh

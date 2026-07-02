@@ -18,6 +18,45 @@ FoamFile
 
 solvers
 {
+    // Coupled Up block used by newtonIcoFluid; ignored by pimpleFluid
+    Up
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-6";
+            snes_stol "1e-6";
+            snes_max_it "10";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf_operator;
+
+            snes_max_linear_solve_fail "10000000";
+            snes_max_funcs "100000000";
+
+            snes_lag_preconditioner "-2";
+            snes_lag_preconditioner_persists;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "30";
+            ksp_converged_reason;
+            ksp_rtol "1e-5";
+            ksp_max_it "100";
+
+            // Direct preconditioner: exact LU factorisation, lagged across
+            // Newton iterations within a timestep (snes_lag_preconditioner).
+            // For this small mesh (~5500 cells) this beats the fieldsplit/
+            // AMG split preconditioner, since the split's iterative Schur
+            // solve needs many more matrix-free residual evaluations than
+            // a direct solve costs to factorise.
+            pc_type bjacobi;
+            sub_pc_type lu;
+        }
+    }
+
     "p|pFinal"
     {
         solver          GAMG;
@@ -69,9 +108,18 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    2;
+    nOuterCorrectors    20;
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
+
+    residualControl
+    {
+        "U|p"
+        {
+            tolerance    1e-6;
+            relTol       0.01;
+        }
+    }
 }
 
 // ************************************************************************* //
