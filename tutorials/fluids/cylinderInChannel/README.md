@@ -40,7 +40,9 @@ $$
 + \boldsymbol{f_b}
 $$
 
-We will use the PIMPLE pressure-velocity coupling algorithm:
+Two pressure-velocity coupling algorithms are available in this tutorial:
+
+**PIMPLE** (default, `pimpleFluid`): a segregated predictor-corrector loop:
 
 ```pseudocode
 for all time-steps
@@ -48,6 +50,15 @@ for all time-steps
         solve momentum equation for U (terms depending on p are calculated explicitly)
         solve pressure equation for p (terms depending on U are calculated explicitly)
     while not converged
+end
+```
+
+**Newton** (`newtonIcoFluid`): a monolithic Newton–Krylov approach that solves U
+and p simultaneously using PETSc SNES:
+
+```pseudocode
+for all time-steps
+    solve coupled (U, p) system with Newton–Krylov (SNES)
 end
 ```
 
@@ -67,49 +78,19 @@ Peric (2002)**
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e.
-`> ./Allrun`. In this case, the `Allrun` script is
+The tutorial case can be run using the included `Allrun` script. Two fluid
+models are available:
 
 ```bash
-#!/bin/bash
-
-# Source tutorial clean functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
-
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
-
-# Check case version is correct
-solids4Foam::convertCaseFormat .
-
-# Create the mesh
-solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
-solids4Foam::runApplication changeDictionary
-
-# Run the solver
-solids4Foam::runApplication solids4Foam
-
-# Create plots
-if command -v gnuplot &> /dev/null
-then
-    if [[ -f "./postProcessing/forces/0/forces.dat" ]]
-    then
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.of9.gnuplot &> /dev/null
-    else
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.gnuplot &> /dev/null
-    fi
-else
-    echo "Please install gnuplot if you would like to generate the plots"
-fi
+./Allrun                 # default: pimpleFluid (segregated PIMPLE)
+./Allrun newtonIcoFluid  # monolithic Newton–Krylov solver (requires PETSc)
+./Allrun pimpleFluid     # explicit selection of pimpleFluid
 ```
 
-where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
-case to make it compatible with your version of OpenFOAM/foam-extend. As can be
-seen, the mesh in the fluent format is converted to the OpenFOAM format before
-running the `solids4Foam` solver. After the solver has finished, a `force.pdf`
-plot is generated if the `gnuplot` program is installed.
+The `Allrun` script patches `constant/fluidProperties` to select the requested
+fluid model before running, and restores the default (`pimpleFluid`) on exit.
+The mesh in Fluent format is converted to OpenFOAM format first, and a
+`force.pdf` plot is generated afterwards if `gnuplot` is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
@@ -176,20 +157,24 @@ type     fluid;
 ```
 
 In addition, as this is a "fluid" analysis, a `constant/fluidProperties`
-dictionary must also be present, where the PIMPLE algorithm for an
-incompressible isothermal fluid is specified:
+dictionary must also be present. This tutorial supports two fluid models; both
+coefficient sub-dictionaries are included so that either model can be selected
+via `Allrun` without editing the file manually:
 
 ```c++
-fluidModel pimpleFluid;
+fluidModel pimpleFluid;   // switched to newtonIcoFluid by Allrun if requested
 
 pimpleFluidCoeffs
+{}
+
+newtonIcoFluidCoeffs
 {}
 ```
 
 ```note
-The `pimpleFluid` fluid model does not require any settings to be specified.
- Parameters related to the PIMPLE algorithm as instead specified in
- `system/fvSolution`, just like for the `pimpleFoam` solver.
+`pimpleFluid` requires no settings here — PIMPLE parameters are specified in
+`system/fvSolution` as for `pimpleFoam`. `newtonIcoFluid` uses PETSc SNES
+options defined in the `Up` solver block of `system/fvSolution`.
 ```
 
 Apart from specifying the `physicsProperties` and `fluidProperties`
@@ -203,8 +188,8 @@ terms of `transportProperties`, `RASProperties`, `dynamicMeshDict`, `U`, `p`,
 
 For the `cylinderInChannel` test case, we have selected a “fluid” analysis in
 the `physicsProperties` dictionary: this means a `fluidModel` class will be
-selected; then, we specify the actual `solidModel` class to be the `pimpleFluid`
-class.
+selected; then, we specify the actual `fluidModel` class to be `pimpleFluid`
+(default) or `newtonIcoFluid`.
 
 The code for the pimpleFluid class is located at:
 

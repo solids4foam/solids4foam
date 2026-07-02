@@ -32,6 +32,8 @@ divSchemes
     div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
+    div(U) Gauss linear;
+    jacobian-div(phi,U) Gauss upwind;
 }
 
 laplacianSchemes
@@ -40,8 +42,10 @@ laplacianSchemes
     laplacian(nuEff,U) Gauss linear corrected;
     laplacian((1|A(U)),p) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
-
     laplacian(rAU,p) Gauss linear corrected;
+    laplacian(nuEff,dU) Gauss linear corrected;
+    laplacian(rAUf,p) Gauss linear corrected;
+    laplacian(rAUf,dp) Gauss linear corrected;
 }
 
 interpolationSchemes

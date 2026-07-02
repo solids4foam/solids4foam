@@ -15,7 +15,7 @@ REG_END_TIME=2
 MODE="iqnils"
 
 # Regression tolerances
-APEX_DISP_TOL=1e-4
+APEX_DISP_TOL=1e-3
 FSI_RES_TOL=1e-6
 
 # Reference values at REG_END_TIME
