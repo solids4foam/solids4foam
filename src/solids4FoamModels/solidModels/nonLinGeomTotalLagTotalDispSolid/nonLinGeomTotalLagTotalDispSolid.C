@@ -245,10 +245,10 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(force)
           + rho()*g()
+#ifdef OPENFOAM_COM
+          + fvOptions()(ds_, D())
+#endif
         );
-
-        // Add optional fvOptions body force (e.g. MMS)
-        DEqn.source() += fvOptions()(D())().source();
 
         // Add damping
         if (dampingCoeff().value() > SMALL)
@@ -614,6 +614,19 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
+    ),
+    ds_
+    (
+        IOobject
+        (
+            "ds",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     )
 {
     DisRequired();
@@ -932,8 +945,11 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
-    // Add optional fvOptions body force (e.g. MMS)
-    residual += fvOptions()(const_cast<volVectorField&>(D))().source();
+#ifdef OPENFOAM_COM
+    // Add optional fvOptions, e.g. MMS body force
+    // Note that "source()" is already multiplied by the volumes
+    residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
