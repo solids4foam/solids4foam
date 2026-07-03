@@ -56,11 +56,17 @@ class electroMechanicalLaw
         //- Run-time selectable passive mechanical law
         autoPtr<mechanicalLaw> passiveMechLawPtr_;
 
-        //- Constant active tension
-        const dimensionedScalar Ta_;
+        //- Fibre direction field (read from 0/solid/f0)
+        volVectorField f0_;
 
-        //- Ramp time over which Ta is increased from zero to its maximum value
-        const scalar rampTime_;
+        //- Fibre direction outer product f0 x f0
+        volSymmTensorField f0f0_;
+
+        //- Surface fibre direction field (read from 0/solid/f0f)
+        surfaceVectorField f0f_;
+
+        //- Surface fibre direction outer product
+        surfaceSymmTensorField f0f0f_;
 
     // Private Member Functions
 

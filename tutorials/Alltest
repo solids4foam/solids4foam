@@ -14,6 +14,16 @@
 #------------------------------------------------------------------------------
 cd "${0%/*}" || exit  # Run from this directory
 
+_gsed_candidate=$(command -v gsed 2>/dev/null || echo /opt/homebrew/bin/gsed)
+if sed --version 2>/dev/null | grep -q "GNU sed"; then
+    _SED=sed
+elif [ -x "$_gsed_candidate" ] && "$_gsed_candidate" --version 2>/dev/null | grep -q "GNU sed"; then
+    _SED="$_gsed_candidate"
+else
+    echo "Warning: GNU sed not found. Some substitutions may fail on macOS."
+    _SED=sed
+fi
+
 #
 # FUNCTION DEFINITIONS
 #
@@ -173,7 +183,7 @@ echo "Modifying the case controlDicts to run only one time step"
 for CD in $(find . -name "controlDict*" -type f)
 do
     cp -f "${CD}" "${CD}.orig"
-    sed \
+    "${_SED}" \
         -e 's/\(stopAt[ \t]*\)\([a-zA-Z]*\);/\1 nextWrite;/g' \
         -e 's/\(writeControl[ \t]*\)\([a-zA-Z]*\);/\1 timeStep;/g' \
         -e 's/\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);/\1 1;/g' \
@@ -186,8 +196,8 @@ echo "Modifying the fvSolution to run only one iteration"
 for FVS in $(find . -name "fvSolution")
 do
     mv ${FVS} ${FVS}.org
-    sed -e "s|maxIter.*;|maxIter 1;|g" ${FVS}.org > ${FVS}
-    sed -i "s|nOuterCorrectors.*;|nOuterCorrectors 1;|g" ${FVS}
+    "${_SED}" -e "s|maxIter.*;|maxIter 1;|g" ${FVS}.org > ${FVS}
+    "${_SED}" -i "s|nOuterCorrectors.*;|nOuterCorrectors 1;|g" ${FVS}
 done
 
 # Modify solidProperties
@@ -208,13 +218,13 @@ do
       }
     ' "${SP}.org" > "${SP}"
 
-    sed \
+    "${_SED}" \
     -i \
     -e "s|//nCorrectors.*;|nCorrectors 1;|g" \
     -e "s|nCorrectors.*;|nCorrectors 1;|g" \
     ${SP}
 
-    sed -i -e "s|stopOnError.*;|stopOnError no;|g" ${SP}
+    "${_SED}" -i -e "s|stopOnError.*;|stopOnError no;|g" ${SP}
 done
 
 # Modify fsiProperties
@@ -229,7 +239,7 @@ do
     fi
 
     # Edit the target in-place, preserving symlink
-    sed -i.bak \
+    "${_SED}" -i.bak \
       -e 's|//nOuterCorr.*;|nOuterCorr 1;|g' \
       -e 's|nOuterCorr.*;|nOuterCorr 1;|g' \
       "$FP"

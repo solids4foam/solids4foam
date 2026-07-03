@@ -51,6 +51,12 @@ function solids4Foam::convertCaseFormat()
     if sed --version 2>/dev/null | grep -q "GNU sed"
     then
         echo "GNU sed detected"
+        local _SED=sed
+    elif { _gsed=$(command -v gsed 2>/dev/null || echo /opt/homebrew/bin/gsed); } \
+         && [ -x "$_gsed" ] && "$_gsed" --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed (gsed) detected"
+        local _SED="$_gsed"
     else
         echo "Error: This script requires GNU sed. Please install it (e.g.,"
         echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
@@ -62,19 +68,19 @@ function solids4Foam::convertCaseFormat()
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
     then
         echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict* | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name blockMeshDict* | xargs "${_SED}" -i 's\symmetryPlane\symmetry\g'
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
         echo "Changing symmetryPlane to symmetry in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name boundary | xargs "${_SED}" -i 's\symmetryPlane\symmetry\g'
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
     then
         echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name createPatchDict | xargs "${_SED}" -i 's\symmetryPlane\symmetry\g'
     fi
 
     # Check all files in the 0 directory
@@ -85,7 +91,7 @@ function solids4Foam::convertCaseFormat()
             if grep -q "symmetryPlane;" "${FILE}"
             then
                 echo "Changing symmetryPlane to symmetry in ${FILE}"; echo
-                sed -i 's\symmetryPlane;\symmetry;\g' "${FILE}"
+                "${_SED}" -i 's\symmetryPlane;\symmetry;\g' "${FILE}"
             fi
         fi
     done
@@ -129,7 +135,7 @@ function solids4Foam::convertCaseFormat()
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RASModel to RAS in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
+        find "${CASE_DIR}" -name turbulenceProperties | xargs "${_SED}" -i "s/RASModel;/RAS;/g"
     fi
 
     # 4. Check for boundaryData
@@ -148,10 +154,10 @@ function solids4Foam::convertCaseFormat()
         if [[ -f "${CASE_DIR}"/system/sample ]]
         then
            echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
-           sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+           "${_SED}" -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
 
            echo "OpenFOAM.org specific: replacing 'face' with 'lineFace' in system/sample"
-           sed -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
+           "${_SED}" -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 
@@ -160,9 +166,9 @@ function solids4Foam::convertCaseFormat()
     then
         echo "Changing timeVaryingUniformFixedValue to uniformValue in p"
         find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
+            xargs "${_SED}" -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
         find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
+            xargs "${_SED}" -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
     fi
 
     # 7. Check for changeDictionaryDict.openfoam
@@ -191,11 +197,11 @@ function solids4Foam::convertCaseFormat()
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
             echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
-            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+            "${_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
         elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
         then
             echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
-            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+            "${_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
 
@@ -205,7 +211,7 @@ function solids4Foam::convertCaseFormat()
         if [[ $WM_PROJECT_VERSION == *"v"* ]]
         then
             echo "Modifying force.gnuplot in consistent with ESI version"
-            sed -i "s|forces.dat|force.dat|g" force.gnuplot
+            "${_SED}" -i "s|forces.dat|force.dat|g" force.gnuplot
         fi
     fi
 
@@ -213,14 +219,14 @@ function solids4Foam::convertCaseFormat()
     if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
     then
         echo "Updating plot.gnuplot"
-        sed -i "s@postProcessing/sets/@postProcessing/sample/@g" plot.gnuplot
+        "${_SED}" -i "s@postProcessing/sets/@postProcessing/sample/@g" plot.gnuplot
     fi
 
     # 12. Resolve sampleDict post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
     then
         echo "Updating plot.gnuplot"
-        sed -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
+        "${_SED}" -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
     fi
 
     # 13. Replace mirrorMeshDict differences
@@ -228,14 +234,14 @@ function solids4Foam::convertCaseFormat()
     then
         echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
         echo "system/mirrorMeshDict with with 'point' and 'normal'"
-        sed -i -E 's/\bbasePoint\b/point/' system/mirrorMeshDict
-        sed -i -E 's/\bnormalVector\b/normal/' system/mirrorMeshDict
+        "${_SED}" -i -E 's/\bbasePoint\b/point/' system/mirrorMeshDict
+        "${_SED}" -i -E 's/\bnormalVector\b/normal/' system/mirrorMeshDict
     elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
     then
         echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
         echo "system/solid/mirrorMeshDict with with 'point' and 'normal'"
-        sed -i -E 's/\bbasePoint\b/point/' system/solid/mirrorMeshDict
-        sed -i -E 's/\bnormalVector\b/normal/' system/solid/mirrorMeshDict
+        "${_SED}" -i -E 's/\bbasePoint\b/point/' system/solid/mirrorMeshDict
+        "${_SED}" -i -E 's/\bnormalVector\b/normal/' system/solid/mirrorMeshDict
     fi
 
     echo
@@ -272,6 +278,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if sed --version 2>/dev/null | grep -q "GNU sed"
     then
         echo "GNU sed detected"
+        local _SED=sed
+    elif { _gsed=$(command -v gsed 2>/dev/null || echo /opt/homebrew/bin/gsed); } \
+         && [ -x "$_gsed" ] && "$_gsed" --version 2>/dev/null | grep -q "GNU sed"
+    then
+        echo "GNU sed (gsed) detected"
+        local _SED="$_gsed"
     else
         echo "Error: This script requires GNU sed. Please install it (e.g.,"
         echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
@@ -285,19 +297,19 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
         echo "Changing symmetry to symmetryPlane in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetry \symmetryPlane \g'
+        find "${CASE_DIR}" -name blockMeshDict | xargs "${_SED}" -i 's\symmetry \symmetryPlane \g'
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
     echo "Changing symmetry to symmetryPlane in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+        find "${CASE_DIR}" -name boundary | xargs "${_SED}" -i 's\symmetry;\symmetryPlane;\g'
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
     then
     echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+        find "${CASE_DIR}" -name createPatchDict | xargs "${_SED}" -i 's\symmetry;\symmetryPlane;\g'
     fi
 
     for FILE in $(find "${CASE_DIR}/0" -type f)
@@ -307,7 +319,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
             if grep -q "symmetry;" "${FILE}"
             then
                 echo "Changing symmetry to symmetryPlane in ${FILE}"; echo
-                sed -i 's\symmetry;\symmetryPlane;\g' "${FILE}"
+                "${_SED}" -i 's\symmetry;\symmetryPlane;\g' "${FILE}"
             fi
         fi
     done
@@ -351,7 +363,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
+        find "${CASE_DIR}" -name turbulenceProperties | xargs "${_SED}" -i "s/RAS;/RASModel;/g"
     fi
 
     # 4. Check for boundaryData
@@ -370,10 +382,10 @@ function solids4Foam::convertCaseFormatFoamExtend()
         if [[ -f "${CASE_DIR}"/system/sample ]]
         then
            echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
-           sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+           "${_SED}" -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
 
            echo "OpenFOAM.org specific: replacing 'lineFace' with 'face' in system/sample"
-           sed -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
+           "${_SED}" -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 
@@ -382,12 +394,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Changing uniformValue to timeVaryingUniformFixedValue in p"
         find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
+            xargs "${_SED}" -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
         find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
+            xargs "${_SED}" -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
 
         # Remove any //// that were introdued
-        find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
+        find "${CASE_DIR}" -name p | xargs "${_SED}" -i "s|////|//|g"
     fi
 
     # 7. Check for changeDictionaryDict.openfoam
@@ -416,11 +428,11 @@ function solids4Foam::convertCaseFormatFoamExtend()
         if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
         then
             echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
-            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+            "${_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
         elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
         then
             echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
-            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+            "${_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
 
@@ -430,7 +442,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
         if [[ $WM_PROJECT_VERSION == *"v"* ]]
         then
             echo "Reverting force.gnuplot from ESI version to foam-extend or .org "
-            sed -i "s|force.dat|forces.dat|g" force.gnuplot
+            "${_SED}" -i "s|force.dat|forces.dat|g" force.gnuplot
         fi
     fi
 
@@ -438,14 +450,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
     then
         echo "Updating plot.gnuplot"
-        sed -i "s@postProcessing/sample/@postProcessing/sets/@g" plot.gnuplot
+        "${_SED}" -i "s@postProcessing/sample/@postProcessing/sets/@g" plot.gnuplot
     fi
 
     # 12. Resolve sampleDict post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
     then
         echo "Updating plot.gnuplot"
-        sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
+        "${_SED}" -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
     fi
 
     # 13. Replace mirrorMeshDict differences
@@ -453,14 +465,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "OpenFOAM specific: replacing 'point' and 'normal' in "
         echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
-        sed -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
-        sed -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
+        "${_SED}" -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
+        "${_SED}" -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
     elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
     then
         echo "OpenFOAM specific: replacing 'point' and 'normal' in "
         echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
-        sed -i -E 's/\bpoint\b/basePoint/' system/solid/mirrorMeshDict
-        sed -i -E 's/\b(normal)\b/\1Vector/' system/solid/mirrorMeshDict
+        "${_SED}" -i -E 's/\bpoint\b/basePoint/' system/solid/mirrorMeshDict
+        "${_SED}" -i -E 's/\b(normal)\b/\1Vector/' system/solid/mirrorMeshDict
     fi
 
     echo
@@ -819,13 +831,13 @@ function solids4Foam::runSolidModel()
         if [ "${DISP}" = "D" ] && [ -f "${CASE_DIR}/0/DD" ]; then
             echo "Renaming ${CASE_DIR}/0/DD to ${CASE_DIR}/0/D"
             \mv "${CASE_DIR}/0/DD" "${CASE_DIR}/0/D"
-            sed -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
+            "${_SED}" -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
         fi
 
         if [ "${DISP}" = "DD" ] && [ -f "${CASE_DIR}/0/D" ]; then
             echo "Renaming ${CASE_DIR}/0/D to ${CASE_DIR}/0/DD"
             \mv "${CASE_DIR}/0/D" "${CASE_DIR}/0/DD"
-            sed -i "s/object.*D;/object DD;/g" "${CASE_DIR}/0/DD"
+            "${_SED}" -i "s/object.*D;/object DD;/g" "${CASE_DIR}/0/DD"
         fi
 
         if [ "${DISP}" != "D" ] && [ "${DISP}" != "DD" ]; then
