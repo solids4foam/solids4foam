@@ -149,6 +149,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //  previous time-steps
         void predict();
 
+        //- Apply the mixed pressure-displacement stress split
+        void applyMixedPressureStressSplit();
+
         //- Allocate the reciprocal of the bulk modulus
         void makeRKappa() const;
 

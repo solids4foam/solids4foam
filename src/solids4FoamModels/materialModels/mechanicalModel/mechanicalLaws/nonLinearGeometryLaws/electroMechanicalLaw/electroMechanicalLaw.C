@@ -34,6 +34,42 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void Foam::electroMechanicalLaw::checkFieldTa() const
+{
+    if (!fieldTaChecked_)
+    {
+        fieldTaChecked_ = true;
+        useFieldTa_ = mesh().foundObject<volScalarField>("Ta");
+
+        if (useFieldTa_)
+        {
+            Info<< "    electroMechanicalLaw: using field-based active tension"
+                << " (Ta volScalarField from objectRegistry)" << endl;
+        }
+        else if (mag(Ta_.value()) > SMALL)
+        {
+            Info<< "    electroMechanicalLaw: using constant active tension"
+                << " Ta = " << Ta_.value()
+                << " with rampTime = " << rampTime_ << endl;
+        }
+    }
+}
+
+
+Foam::dimensionedScalar Foam::electroMechanicalLaw::activeTension() const
+{
+    dimensionedScalar currentTa = Ta_;
+    if (mesh().time().value() < rampTime_)
+    {
+        currentTa = (mesh().time().value()/rampTime_)*Ta_;
+    }
+
+    return currentTa;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -126,32 +162,30 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
 }
 
 
-void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
+bool Foam::electroMechanicalLaw::hasActiveStress() const
 {
-    // Lazy check for field-based active tension
-    if (!fieldTaChecked_)
-    {
-        fieldTaChecked_ = true;
-        useFieldTa_ = mesh().foundObject<volScalarField>("Ta");
+    checkFieldTa();
 
-        if (useFieldTa_)
-        {
-            Info<< "    electroMechanicalLaw: using field-based active tension"
-                << " (Ta volScalarField from objectRegistry)" << endl;
-        }
-        else
-        {
-            Info<< "    electroMechanicalLaw: using constant active tension"
-                << " Ta = " << Ta_.value()
-                << " with rampTime = " << rampTime_ << endl;
-        }
+    if (useFieldTa_)
+    {
+        const volScalarField& Ta =
+            mesh().lookupObject<volScalarField>("Ta");
+
+        return max(mag(Ta)).value() > SMALL;
     }
 
-    // Calculate passive stress
-    passiveMechLawPtr_->correct(sigma);
+    return mag(activeTension().value()) > SMALL;
+}
+
+
+Foam::tmp<Foam::volSymmTensorField>
+Foam::electroMechanicalLaw::activeCauchyStress() const
+{
+    checkFieldTa();
 
     // Take a reference to the deformation gradient
-    const volTensorField& F = this->F();
+    const volTensorField& F =
+        const_cast<electroMechanicalLaw&>(*this).F();
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
@@ -162,49 +196,54 @@ void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
         const volScalarField& Ta =
             mesh().lookupObject<volScalarField>("Ta");
 
-        // Add active stress: convert 2nd Piola-Kirchhoff to Cauchy
-        sigma += symm(F & (Ta*f0f0_) & F.T())/J;
+        // Convert active 2nd Piola-Kirchhoff stress to Cauchy stress
+        return tmp<volSymmTensorField>
+        (
+            new volSymmTensorField
+            (
+                IOobject
+                (
+                    "sigmaActive",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                symm(F & (Ta*f0f0_) & F.T())/J
+            )
+        );
     }
-    else
-    {
-        // Constant active tension with optional ramp
-        dimensionedScalar currentTa = Ta_;
-        if (mesh().time().value() < rampTime_)
-        {
-            currentTa = (mesh().time().value()/rampTime_)*Ta_;
-        }
 
-        sigma += symm(F & (currentTa*f0f0_) & F.T())/J;
-    }
+    // Constant active tension with optional ramp
+    const dimensionedScalar currentTa = activeTension();
+
+    // Convert active 2nd Piola-Kirchhoff stress to Cauchy stress
+    return tmp<volSymmTensorField>
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "sigmaActive",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            symm(F & (currentTa*f0f0_) & F.T())/J
+        )
+    );
 }
 
 
-void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
+Foam::tmp<Foam::surfaceSymmTensorField>
+Foam::electroMechanicalLaw::activeCauchyStressf() const
 {
-    // Lazy check for field-based active tension (same as vol variant)
-    if (!fieldTaChecked_)
-    {
-        fieldTaChecked_ = true;
-        useFieldTa_ = mesh().foundObject<volScalarField>("Ta");
-
-        if (useFieldTa_)
-        {
-            Info<< "    electroMechanicalLaw: using field-based active tension"
-                << " (Ta volScalarField from objectRegistry)" << endl;
-        }
-        else
-        {
-            Info<< "    electroMechanicalLaw: using constant active tension"
-                << " Ta = " << Ta_.value()
-                << " with rampTime = " << rampTime_ << endl;
-        }
-    }
-
-    // Calculate passive stress
-    passiveMechLawPtr_->correct(sigma);
+    checkFieldTa();
 
     // Take a reference to the deformation gradient
-    const surfaceTensorField& F = this->Ff();
+    const surfaceTensorField& F =
+        const_cast<electroMechanicalLaw&>(*this).Ff();
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
@@ -217,19 +256,68 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
 
         const surfaceScalarField Taf(fvc::interpolate(Ta));
 
-        // Add active stress: convert 2nd Piola-Kirchhoff to Cauchy
-        sigma += J*symm(F & (Taf*f0f0f_) & F.T());
+        // Convert active 2nd Piola-Kirchhoff stress to Cauchy stress
+        return tmp<surfaceSymmTensorField>
+        (
+            new surfaceSymmTensorField
+            (
+                IOobject
+                (
+                    "sigmaActivef",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                (1.0/J)*symm(F & (Taf*f0f0f_) & F.T())
+            )
+        );
     }
-    else
-    {
-        // Constant active tension with optional ramp
-        dimensionedScalar currentTa = Ta_;
-        if (mesh().time().value() < rampTime_)
-        {
-            currentTa = (mesh().time().value()/rampTime_)*Ta_;
-        }
 
-        sigma += J*symm(F & (currentTa*f0f0f_) & F.T());
+    // Constant active tension with optional ramp
+    const dimensionedScalar currentTa = activeTension();
+
+    // Convert active 2nd Piola-Kirchhoff stress to Cauchy stress
+    return tmp<surfaceSymmTensorField>
+    (
+        new surfaceSymmTensorField
+        (
+            IOobject
+            (
+                "sigmaActivef",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            (1.0/J)*symm(F & (currentTa*f0f0f_) & F.T())
+        )
+    );
+}
+
+
+void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
+{
+    // Calculate passive stress
+    passiveMechLawPtr_->correct(sigma);
+
+    if (hasActiveStress())
+    {
+        const tmp<volSymmTensorField> tSigmaActive = activeCauchyStress();
+        sigma += tSigmaActive();
+    }
+}
+
+
+void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
+{
+    // Calculate passive stress
+    passiveMechLawPtr_->correct(sigma);
+
+    if (hasActiveStress())
+    {
+        const tmp<surfaceSymmTensorField> tSigmaActive = activeCauchyStressf();
+        sigma += tSigmaActive();
     }
 }
 

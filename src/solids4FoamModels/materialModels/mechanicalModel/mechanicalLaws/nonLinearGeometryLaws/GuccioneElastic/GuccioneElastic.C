@@ -831,7 +831,8 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
 
         // Convert the second Piola-Kirchhoff stress to the deviatoric Cauchy
         // stress
-        const volSymmTensorField s("s", dev(symm(F & S_ & FT)));
+        const volScalarField J("J", det(F));
+        const volSymmTensorField s("s", dev(symm(F & S_ & FT)/J));
 
         // Lookup pressure field
         const volScalarField& p =
@@ -1125,7 +1126,8 @@ void Foam::GuccioneElastic::correct(surfaceSymmTensorField& sigma)
 
         // Convert the second Piola-Kirchhoff stress to the deviatoric Cauchy
         // stress
-        const surfaceSymmTensorField sf("sf", dev(symm(Ff & Sf_ & FfT)));
+        const surfaceScalarField Jf("Jf", det(Ff));
+        const surfaceSymmTensorField sf("sf", dev(symm(Ff & Sf_ & FfT)/Jf));
 
         // Lookup pressure field
         const surfaceScalarField& pf =

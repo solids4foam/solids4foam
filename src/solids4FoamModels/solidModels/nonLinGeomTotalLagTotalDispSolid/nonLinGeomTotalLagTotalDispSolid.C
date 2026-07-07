@@ -27,6 +27,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
+#include "electroMechanicalLaw.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -49,6 +50,146 @@ addToRunTimeSelectionTable
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+void nonLinGeomTotalLagTotalDispSolid::applyMixedPressureStressSplit()
+{
+    static bool printedActiveStressPreservingSplit = false;
+
+    const PtrList<mechanicalLaw>& laws = mechanical();
+
+    if (laws.size() == 1)
+    {
+        if (isA<electroMechanicalLaw>(laws[0]))
+        {
+            const electroMechanicalLaw& activeLaw =
+                refCast<const electroMechanicalLaw>(laws[0]);
+
+            if (activeLaw.hasActiveStress())
+            {
+                if (!printedActiveStressPreservingSplit)
+                {
+                    Info<< "Using active-stress-preserving mixed pressure split"
+                        << endl;
+                    printedActiveStressPreservingSplit = true;
+                }
+
+                const tmp<volSymmTensorField> tSigmaActive =
+                    activeLaw.activeCauchyStress();
+                const volSymmTensorField& sigmaActive = tSigmaActive();
+
+                sigma() =
+                    dev(sigma() - sigmaActive) + sigmaActive - p()*I;
+                return;
+            }
+        }
+
+        sigma() = dev(sigma());
+        sigma() = sigma() - p()*I;
+        return;
+    }
+
+    bool hasActiveStress = false;
+    forAll(laws, lawI)
+    {
+        if (isA<electroMechanicalLaw>(laws[lawI]))
+        {
+            const electroMechanicalLaw& activeLaw =
+                refCast<const electroMechanicalLaw>(laws[lawI]);
+
+            if (activeLaw.hasActiveStress())
+            {
+                hasActiveStress = true;
+                break;
+            }
+        }
+    }
+
+    if (!hasActiveStress)
+    {
+        sigma() = dev(sigma());
+        sigma() = sigma() - p()*I;
+        return;
+    }
+
+    if (!printedActiveStressPreservingSplit)
+    {
+        Info<< "Using active-stress-preserving mixed pressure split" << endl;
+        printedActiveStressPreservingSplit = true;
+    }
+
+    PtrList<volSymmTensorField> subMeshSigmaActive(laws.size());
+
+    forAll(laws, lawI)
+    {
+        const fvMesh& lawMesh =
+            mechanical().solSubMeshes().subMeshes()[lawI].subMesh();
+
+        if (isA<electroMechanicalLaw>(laws[lawI]))
+        {
+            const electroMechanicalLaw& activeLaw =
+                refCast<const electroMechanicalLaw>(laws[lawI]);
+
+            if (activeLaw.hasActiveStress())
+            {
+                const tmp<volSymmTensorField> tSigmaActive =
+                    activeLaw.activeCauchyStress();
+
+                subMeshSigmaActive.set
+                (
+                    lawI,
+                    new volSymmTensorField(tSigmaActive())
+                );
+                continue;
+            }
+        }
+
+        subMeshSigmaActive.set
+        (
+            lawI,
+            new volSymmTensorField
+            (
+                IOobject
+                (
+                    "sigmaActive",
+                    lawMesh.time().timeName(),
+                    lawMesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                lawMesh,
+                dimensionedSymmTensor
+                (
+                    "zero",
+                    dimPressure,
+                    symmTensor::zero
+                )
+            )
+        );
+    }
+
+    volSymmTensorField sigmaActive
+    (
+        IOobject
+        (
+            "sigmaActive",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    );
+
+    mechanical().solSubMeshes().mapSubMeshVolFields<symmTensor>
+    (
+        subMeshSigmaActive,
+        sigmaActive
+    );
+
+    sigma() = dev(sigma() - sigmaActive) + sigmaActive - p()*I;
+}
 
 
 void nonLinGeomTotalLagTotalDispSolid::predict()
@@ -84,7 +225,7 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
         // p() = p().oldTime() + dpdt*runTime().deltaT()
         //     + 0.5*sqr(runTime().deltaT())*d2pdt2;
 
-        sigma() = dev(sigma()) - p()*I;
+        applyMixedPressureStressSplit();
     }
 }
 
@@ -876,7 +1017,7 @@ void nonLinGeomTotalLagTotalDispSolid::unpackSolution(const Vec x)
         p.correctBoundaryConditions();
 
         // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        applyMixedPressureStressSplit();
     }
 }
 
