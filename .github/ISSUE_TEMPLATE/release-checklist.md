@@ -19,6 +19,7 @@ assignees: ""
 - [ ] Merge `development` into `master`
 - [ ] Tag release on `master` (`vX.Y`) and push tag
 - [ ] Create GitHub Release from tag with release notes (**not a draft** — publish directly to avoid the Zenodo draft-release breakage from a past release)
+- [ ] [Optional] Create/update `CHANGELOG.md` in `master` branch with a summary of the main changes since the last release, where this file should ideally provide the full history, one section per version, newest first, back to v1.0
 - [ ] Confirm Zenodo archive was created correctly from the GitHub Release (check the Zenodo record renders, metadata/DOI match `CITATION.cff`)
 
 ## Docker images
