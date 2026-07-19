@@ -15,13 +15,13 @@ solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 if [[ $WM_PROJECT_VERSION = *"v"* ]] # OpenFOAM.com
 then
     echo "OpenFOAM.com specific change"
-    echo "0/fluid/U: change timeVaryingUniformFixedValue to scaledFixedValue"
+    echo "0/fluid/U: change timeVaryingUniformFixedValue to uniformFixedValue"
 
     # Comment timeVaryingUniformFixedValue
     sed -i '/timeVaryingUniformFixedValue/s/^/\/\//g' 0/fluid/U
 
     # Uncomment
-    sed -i '/scaledFixedValue/s/^\/\///g' 0/fluid/U
+    sed -i '/uniformFixedValue/s/^\/\///g' 0/fluid/U
 fi
 
 # Create the mesh

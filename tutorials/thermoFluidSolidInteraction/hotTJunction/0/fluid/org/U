@@ -32,22 +32,20 @@ boundaryField
     inlet2
     {
         // OpenFOAM
-//        type            scaledFixedValue;
+        // Note: scaledFixedValue was previously used here, but it is broken in
+        // OpenFOAM-v2606: scaledFixedValueFvPatchField's copy constructor calls
+        // the no-argument clone(), which v2606 made NotImplemented, so any copy
+        // of a field with this patch type throws. uniformFixedValue with the
+        // table below is equivalent. Revert if/when the upstream bug is fixed.
+//        type            uniformFixedValue;
 
-        // Time vs scale factor
-        scale table
+        // Time vs velocity
+        uniformValue    table
         (
-            (0.0 0.0)
-            (0.1 1.0)
-            (0.2 0.0)
+            (0.0 (0 0 0))
+            (0.1 (0 -1 0))
+            (0.2 (0 0 0))
         );
-
-        // The true velocity is the reference value times the scale factor
-        refValue
-        {
-            type            fixedValue;
-            value           uniform (0 -1 0);
-        }
 
         // foam extend
         type            timeVaryingUniformFixedValue;
