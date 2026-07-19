@@ -152,7 +152,7 @@ elasticSlipWallVelocityFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && (OPENFOAM < 2606)
 elasticSlipWallVelocityFvPatchVectorField::
 elasticSlipWallVelocityFvPatchVectorField
 (

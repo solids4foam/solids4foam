@@ -75,6 +75,7 @@ clampedMomentFaPatchScalarField
 {}
 
 
+#if (OPENFOAM < 2606)
 Foam::clampedMomentFaPatchScalarField::
 clampedMomentFaPatchScalarField
 (
@@ -84,6 +85,7 @@ clampedMomentFaPatchScalarField
     fixedValueFaPatchField<scalar>(ptf),
     relaxFac_(ptf.relaxFac_)
 {}
+#endif
 
 
 Foam::clampedMomentFaPatchScalarField::
