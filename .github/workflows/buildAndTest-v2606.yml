@@ -1,0 +1,88 @@
+# Build and test solids4foam with OpenFOAM-v2606
+#
+# This workflow is manual (workflow_dispatch) only and is deliberately kept
+# out of the main build matrix in buildAndTest.yml.
+#
+# OpenFOAM-v2606 is not yet available as a Docker image with build tools
+# (opencfd/openfoam-run:2606 contains no source code or build tools, and
+# opencfd/openfoam-default has no 2606 tag), so OpenFOAM is installed here
+# from the OpenFOAM.com apt repository instead of using a container.
+#
+# Note that dl.openfoam.com may still be serving a release candidate of
+# v2606. Results from this workflow should be treated accordingly until the
+# final release is available.
+name: Build and test (OpenFOAM-v2606, manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-regression-tests:
+        description: "Also run Alltest-regression (slower)"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-and-test-v2606:
+    name: Build and test on OpenFOAM-v2606
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenFOAM-v2606
+        shell: bash {0}
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg
+          curl -fsSL https://dl.openfoam.com/pubkey.gpg \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/openfoam.gpg
+          echo "deb [arch=amd64] https://dl.openfoam.com/repos/deb jammy main" \
+            | sudo tee /etc/apt/sources.list.d/openfoam.list
+          sudo apt-get update
+          sudo apt-get install -y openfoam2606-default
+          dpkg -l | grep openfoam2606
+
+      - name: Allwmake
+        shell: bash -l {0}
+        run: |
+          source /usr/lib/openfoam/openfoam2606/etc/bashrc
+          export S4F_NO_FILE_FIXES=1; ./Allwmake -j
+
+      - name: Alltest
+        shell: bash -l {0}
+        run: |
+          source /usr/lib/openfoam/openfoam2606/etc/bashrc
+          cd tutorials
+          export OMP_NUM_THREADS=1; export OPENBLAS_NUM_THREADS=1; export MKL_NUM_THREADS=1; ./Alltest
+
+      - name: Upload test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs.OpenFOAM-v2606
+          path: tutorialsTest/logs
+          retention-days: 10
+
+      - name: Alltest-regression
+        if: ${{ inputs.run-regression-tests }}
+        shell: bash -l {0}
+        run: |
+          source /usr/lib/openfoam/openfoam2606/etc/bashrc
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./tutorials/Alltest-regression -j
+
+      - name: Upload regression logs
+        if: ${{ failure() && inputs.run-regression-tests }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-logs.OpenFOAM-v2606
+          path: tutorialsTest-regression
+          retention-days: 10
+
+      - name: Set job status
+        if: ${{ failure() }}
+        run: echo "::error::OpenFOAM-v2606 build/test failed, marking job as failed"

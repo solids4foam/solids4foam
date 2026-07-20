@@ -15,7 +15,19 @@ REG_END_TIME=2
 MODE="iqnils"
 
 # Regression tolerances
-APEX_DISP_TOL=1e-4
+#
+# APEX_DISP_TOL was widened from 1e-4 to 1e-3 for OpenFOAM-v2606. In v2606,
+# inverseDistanceDiffusivity::correct() builds the wall-distance field as a
+# zeroGradient field and calls correctBoundaryConditions() before interpolating
+# it, which changes the mesh motion diffusivity near boundaries and shifts the
+# final apex dy by ~3.3e-4 relative to the reference below. The tolerance is
+# widened rather than the reference moved, so the case still passes on the
+# versions the reference was generated with.
+#
+# 1e-3 retains useful discriminating power: interpolating the wall distance
+# with the wrong scheme (e.g. midPoint instead of linear) shifts apex dy by
+# ~2.0e-3 from the reference, which still fails this check.
+APEX_DISP_TOL=1e-3
 FSI_RES_TOL=1e-6
 
 # Reference values at REG_END_TIME

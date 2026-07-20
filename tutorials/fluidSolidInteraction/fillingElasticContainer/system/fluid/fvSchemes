@@ -49,6 +49,7 @@ interpolationSchemes
 {
     default         none; //linear;
     interpolate(yPatch) linear;
+    interpolate(y) linear;
     interpolate(U) skewCorrected linear;
     interpolate(nHat) linear;
     interpolate(rho) linear;
