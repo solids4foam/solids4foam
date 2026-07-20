@@ -44,6 +44,7 @@ SourceFiles
 #include "DynamicList.H"
 #include "PackedBoolList.H"
 #include "boolList.H"
+#include "labelList.H"
 #include "typeInfo.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
