@@ -22,6 +22,7 @@ EPS_MIN=3.5e-4
 EPS_MAX=5.0e-4
 SIGMA_MIN=8.5e7
 SIGMA_MAX=1.05e8
+HIGH_ORDER_DISP_TOL=1e-11
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -35,6 +36,7 @@ echo "============================================================"
 echo "cantilever2d regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
+echo "High-order DDifference LInf < ${HIGH_ORDER_DISP_TOL}"
 echo "============================================================"
 echo
 
@@ -95,6 +97,14 @@ extract_max_sigma() {
         | awk '{print $NF}' || true
 }
 
+extract_disp_linf() {
+    grep -A2 "Writing DDifference field" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | grep "Norms:" -A1 \
+        | tail -n 1 \
+        | awk '{print $3}' \
+        || true
+}
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -126,6 +136,27 @@ check_solver_extrema() {
     return "${failures}"
 }
 
+check_high_order_errors() {
+    local displacement
+    local failures=0
+
+    displacement=$(extract_disp_linf)
+
+    if [[ -z "${displacement}" ]]; then
+        echo "FAIL: Could not extract high-order DDifference LInf"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${displacement} < ${HIGH_ORDER_DISP_TOL})}"; then
+        printf "PASS: High-order DDifference LInf = %.6g\n" "${displacement}"
+    else
+        printf "FAIL: High-order DDifference LInf = %.6g\n" "${displacement}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
+}
+
 failures=0
 
 if [ "$CHECK_ONLY" = false ]; then
@@ -146,6 +177,10 @@ if [ "$CHECK_ONLY" = false ]; then
         if ! check_solver_extrema "${approach}"; then
             failures=$((failures + 1))
         fi
+
+        if [[ "${approach}" == "highOrder" ]] && ! check_high_order_errors; then
+            failures=$((failures + 1))
+        fi
     done
 else
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
@@ -154,6 +189,11 @@ else
     fi
 
     if ! check_solver_extrema "check-only"; then
+        failures=$((failures + 1))
+    fi
+
+    if grep -q "highOrderResidual true" "${CASE_DIR}/constant/solidProperties" \
+        && ! check_high_order_errors; then
         failures=$((failures + 1))
     fi
 fi
