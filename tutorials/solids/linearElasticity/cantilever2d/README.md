@@ -25,9 +25,9 @@ The test case geometry consists of a rectangular beam $$L \times D$$ m, where
  Poisson’s ratio ($$\nu$$) of 0.3. A uniform quadrilateral mesh with $$5\,120$$
  cells is employed. The beam is fixed on the left boundary and a load of
  $$100$$ kN is applied to the right. There are no body forces. The problem is
- solved as static, using one loading increment. From Timoshenko beam theory [1],
- the analytical solution for the $$x$$ and $$y$$ components of the displacement
- field are given as:
+ solved as static with a plane-stress assumption, using one loading increment.
+ From Timoshenko beam theory [1], the analytical solution for the $$x$$ and
+ $$y$$ components of the displacement field are given as:
 
 $$
 u_x = -\frac{P y}{6 E I}
