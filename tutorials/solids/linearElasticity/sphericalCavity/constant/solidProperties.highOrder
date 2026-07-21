@@ -32,7 +32,7 @@ linearGeometryTotalDisplacementCoeffs
         displacement
         {
             // Polynomial order of displacement field
-            polynomialOrder 2;
+            polynomialOrder 3;
 
             // Extra cells in minimum size stencil
             faceStencilExtraCells 60;
