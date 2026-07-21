@@ -29,18 +29,22 @@ release. For complete commit-level details and contributor information, see the
   gradient cases.
 
 ## [v2.3] - 2026-02-04
-
 ### Added in v2.3
-
+- Added a Newton-Krylov solid solver, offering improved robustness and
+  efficiency compared to traditional segregated solvers.
 - Added high-order finite-volume capabilities for solid mechanics.
 - Added a PETSc SNES interface for nonlinear solution procedures.
-- Added Robin coupling support for the `interFluid` fluid model.
+- Added Robin-Neumann coupling support for two-phase flows via the
+  `interFluid` fluid model.
 - Added the `cavityFlexibleBottom` fluid-solid interaction tutorial and new
   regression coverage for major FSI cases.
+- Added the option to install solids4foam via the OpenFOAM package manager
+  styro.
+- Added README.md files across the tutorials and expanded website
+  documentation.
 
 ### Changed in v2.3
-
-- Added compatibility with OpenFOAM-v2506 and OpenFOAM-v2512.
+- Extended compatibility to OpenFOAM-v2312 through OpenFOAM-v2512.
 - Improved nonlinear vertex-centred solvers and several FSI tutorials.
 - Made optional OpenFOAM source-file fixes opt-in by default.
 
