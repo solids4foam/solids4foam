@@ -42,6 +42,8 @@ namespace Foam
 
 typedef SymmTensor3rdOrder<scalar> symmTensor3rdOrder;
 
+#ifdef OPENFOAM_COM
+
 //- Data are contiguous if component type is contiguous
 template<class Cmpt>
 struct is_contiguous<SymmTensor3rdOrder<Cmpt>> : is_contiguous<Cmpt> {};
@@ -57,6 +59,14 @@ template<class Cmpt>
 struct is_contiguous_scalar<SymmTensor3rdOrder<Cmpt>> :
     is_contiguous_scalar<Cmpt>
 {};
+
+#else
+
+//- Data associated with symmTensor3rdOrder type are contiguous
+template<>
+inline bool contiguous<symmTensor3rdOrder>() {return true;}
+
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
