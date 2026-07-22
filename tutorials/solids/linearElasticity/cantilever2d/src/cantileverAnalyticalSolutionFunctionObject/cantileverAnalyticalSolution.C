@@ -348,6 +348,11 @@ bool Foam::cantileverAnalyticalSolution::execute(const bool forceWrite)
 bool Foam::cantileverAnalyticalSolution::execute()
 #endif
 {
+    if (time_.timeIndex() == time_.startTimeIndex())
+    {
+        return true;
+    }
+
     return writeData();
 }
 
