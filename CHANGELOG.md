@@ -16,6 +16,7 @@ release. For complete commit-level details and contributor information, see the
 - Added adaptive time stepping to `newtonIcoFluid`.
 - Added the `solidPressureMinMax` function object and utilities for detecting
   PETSc build state and summarising solver logs.
+-Added new tutorial cases and per-tutorial README.md files, plus expanded website documentation.
 
 ### Changed in v2.4
 
