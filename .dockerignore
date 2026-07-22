@@ -15,6 +15,10 @@ tutorialsTest
 **/*.orig[0-9][0-9]
 **/\#*\#
 
+# Keep OpenFOAM initial-condition folders
+!tutorials/**/0.orig/
+!tutorials/**/0.orig/**
+
 **/*.[oa]
 **/*.la
 **/*.so
