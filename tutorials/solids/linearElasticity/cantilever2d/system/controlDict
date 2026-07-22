@@ -17,7 +17,11 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-libs            ("libcantileverAnalytical.so");
+libs
+(
+    "libsolids4FoamModels.so"
+    "libcantileverAnalytical.so"
+);
 
 application     solids4Foam;
 

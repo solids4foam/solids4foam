@@ -35,7 +35,7 @@ linearGeometryTotalDisplacementCoeffs
             polynomialOrder 2;
 
             // Extra cells in minimum size stencil
-            faceStencilExtraCells 15;
+            faceStencilExtraCells 20;
 
             // Weight function for least square systems
             weightFunctionCoeffs
