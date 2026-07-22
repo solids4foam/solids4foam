@@ -35,7 +35,9 @@ solvers
             ksp_gmres_restart "100";
             ksp_converged_reason;
 
-            pc_type lu;
+            //pc_type lu;
+            pc_type bjacobi;
+            sub_pc_type lu;
             snes_lag_preconditioner_persists true;
             snes_lag_preconditioner "-2";
         }
