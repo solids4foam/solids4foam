@@ -13,7 +13,8 @@ release. For complete commit-level details and contributor information, see the
   Jacobian support for JST and even-order schemes.
 - Added high-order finite-volume solid mechanics, with high-order
   configurations for `cantilever2d`, Cook's membrane, `pressurisedCylinder`,
-  `plateHole`, and `sphericalCavity`.
+  `plateHole`, and `sphericalCavity`
+  (<https://doi.org/10.1016/j.jcp.2026.115056>).
 - Added a block-coupled incompressible solid formulation.
 - Added `decomposeParMonolithic` for consistently decomposing coupled meshes.
 - Added adaptive time stepping to `newtonIcoFluid`.
