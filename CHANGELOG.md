@@ -21,6 +21,10 @@ release. For complete commit-level details and contributor information, see the
 - Added the `solidPressureMinMax` function object and utilities for detecting
   PETSc build state and summarising solver logs.
 -Added new tutorial cases and per-tutorial README.md files, plus expanded website documentation.
+- Introduced [`beamFoam`](https://github.com/solids4foam/beamFoam), a sister
+  repository released alongside the v2.4 update. `beamFoam` is developed and
+  maintained in a separate repository and is not part of solids4foam itself
+  (<https://doi.org/10.51560/ofj.v5.170>).
 
 ### Changed in v2.4
 
