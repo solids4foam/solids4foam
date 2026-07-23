@@ -17,9 +17,15 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel       coupledUnsLinearGeometryLinearElastic;
+solidModel       linearGeometryTotalDisplacement;
 
-coupledUnsLinearGeometryLinearElasticCoeffs
-{}
+linearGeometryTotalDisplacementCoeffs
+{
+    // Solution algorithm
+    solutionAlgorithm    PETScSNES;
+
+    // Maximum number of momentum correctors
+    nCorrectors          100000;
+}
 
 // ************************************************************************* //

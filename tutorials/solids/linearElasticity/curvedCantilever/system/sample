@@ -13,46 +13,32 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSchemes;
+    object      sample;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default     steadyState;
-}
+type sets;
+//libs ("libsampling.so");
 
-ddtSchemes
-{
-    default     steadyState;
-}
+interpolationScheme cellPoint;
 
-gradSchemes
-{
-     default                none;
-     grad(D)                leastSquaresS4f;
-}
+setFormat raw;
 
-divSchemes
-{
-    default                 none;
-    div(sigma)              Gauss linear;
-    div((impK*grad(D)))     Gauss linear;
-}
+sets
+(
+    line
+    {
+        type       midPoint;
+        axis       xyz;
+        start     (0.2333452378 -0.2333452378 0);
+        end       (0.2192031022 -0.2192031022 0);
+    }
+);
 
-laplacianSchemes
-{
-    default                 Gauss linear corrected;
-}
-
-snGradSchemes
-{
-    default                 corrected;
-}
-
-interpolationSchemes
-{
-    default                 linear;
-}
+fields
+(
+    sigma
+    analyticalStress
+);
 
 // ************************************************************************* //
