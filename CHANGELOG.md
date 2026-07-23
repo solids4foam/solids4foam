@@ -15,7 +15,7 @@ release. For complete commit-level details and contributor information, see the
   configurations for `cantilever2d`, Cook's membrane, `pressurisedCylinder`,
   `plateHole`, and `sphericalCavity`
   (<https://doi.org/10.1016/j.jcp.2026.115056>).
-- Added a block-coupled incompressible solid formulation.
+- Added a block-coupled incompressible solid formulation (<https://doi.org/10.3390/app152312660>).
 - Added `decomposeParMonolithic` for consistently decomposing coupled meshes.
 - Added adaptive time stepping to `newtonIcoFluid`.
 - Added the `solidPressureMinMax` function object and utilities for detecting
