@@ -11,6 +11,9 @@ release. For complete commit-level details and contributor information, see the
 - Added a configurable stabilisation framework, including combined
   stabilisation models, volumetric-strain-rate stabilisation, and PETSc SNES
   Jacobian support for JST and even-order schemes.
+- Added high-order finite-volume solid mechanics, with high-order
+  configurations for `cantilever2d`, Cook's membrane, `pressurisedCylinder`,
+  `plateHole`, and `sphericalCavity`.
 - Added a block-coupled incompressible solid formulation.
 - Added `decomposeParMonolithic` for consistently decomposing coupled meshes.
 - Added adaptive time stepping to `newtonIcoFluid`.
@@ -20,9 +23,6 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed in v2.4
 
-- Expanded high-order solid mechanics and provided high-order configurations
-  for `cantilever2d`, Cook's membrane, `pressurisedCylinder`, `plateHole`, and
-  `sphericalCavity`.
 - Improved IQN-ILS coupling and simplified FSI region selection.
 - Extended `electroMechanicalLaw` with field-based active tension and
   independent fibre tensors.
@@ -33,7 +33,6 @@ release. For complete commit-level details and contributor information, see the
 ### Added in v2.3
 - Added a Newton-Krylov solid solver, offering improved robustness and
   efficiency compared to traditional segregated solvers.
-- Added high-order finite-volume capabilities for solid mechanics.
 - Added a PETSc SNES interface for nonlinear solution procedures.
 - Added Robin-Neumann coupling support for two-phase flows via the
   `interFluid` fluid model.
@@ -142,6 +141,12 @@ release. For complete commit-level details and contributor information, see the
 - Supported foam-extend-4.0 and foam-extend-4.1, with initial support for
   OpenFOAM-7 and OpenFOAM-v1812.
 
+## [v0.1] - 2016-07-24
+
+- Added the initial solids4foam codebase (then developed on Bitbucket).
+- Introduced three working `solidFoam` solid-mechanics solvers.
+- Established the foundation for further solids4foam development.
+
 [v2.4]: https://github.com/solids4foam/solids4foam/compare/v2.3...development
 [v2.3]: https://github.com/solids4foam/solids4foam/releases/tag/v2.3
 [v2.2]: https://github.com/solids4foam/solids4foam/releases/tag/v2.2
@@ -150,3 +155,4 @@ release. For complete commit-level details and contributor information, see the
 [v2.0-alpha]: https://github.com/solids4foam/solids4foam/releases/tag/v2.0-alpha
 [v1.1]: https://github.com/solids4foam/solids4foam/releases/tag/v1.1
 [v1.0]: https://github.com/solids4foam/solids4foam/releases/tag/v1.0
+[v0.1]: https://github.com/solids4foam/solids4foam/commit/ccc2e752d6620c18f6cd42b38dddfe35c8a168b4
