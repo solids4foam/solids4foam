@@ -12,8 +12,6 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-require_petsc_or_exit_silently
-
 echo
 echo "Compiling libraries..."
 (cd src && bash ./Allwmake -s)
