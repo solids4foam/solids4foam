@@ -23,9 +23,6 @@ linearGeometryTotalDisplacementCoeffs
 {
     // Solution algorithm
     solutionAlgorithm    PETScSNES;
-
-    // Maximum number of momentum correctors
-    nCorrectors          100000;
 }
 
 // ************************************************************************* //
