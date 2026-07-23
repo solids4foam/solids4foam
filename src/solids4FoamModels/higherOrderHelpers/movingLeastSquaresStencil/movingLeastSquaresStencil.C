@@ -98,15 +98,16 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
         const label from = nbrs[i];
 
 #ifdef OPENFOAM_COM
-        if (pBufs.recvDataCount(from))
+        if (!pBufs.recvDataCount(from))
         {
-            UIPstream is(from, pBufs);
-
-            scalar lenN;
-            is >> lenN;
-            neighbourHaloDepth[from] = lenN;
+            continue;
         }
 #endif
+        UIPstream is(from, pBufs);
+
+        scalar lenN;
+        is >> lenN;
+        neighbourHaloDepth[from] = lenN;
     }
 
     // Return averaged first halo depth per processor

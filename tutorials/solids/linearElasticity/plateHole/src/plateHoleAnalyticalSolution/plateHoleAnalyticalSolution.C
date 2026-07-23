@@ -722,6 +722,11 @@ bool Foam::plateHoleAnalyticalSolution::start()
     bool Foam::plateHoleAnalyticalSolution::execute()
 #endif
 {
+    if (time_.timeIndex() == time_.startTimeIndex())
+    {
+        return true;
+    }
+
     return writeData();
 }
 

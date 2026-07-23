@@ -509,6 +509,11 @@ bool Foam::pressurisedCylinderAnalyticalSolution::execute(const bool forceWrite)
 bool Foam::pressurisedCylinderAnalyticalSolution::execute()
 #endif
 {
+    if (time_.timeIndex() == time_.startTimeIndex())
+    {
+        return true;
+    }
+
     return writeData();
 }
 
