@@ -11,17 +11,22 @@ IFS=$'\n\t'
 usage() {
 cat <<'EOF'
 Usage:
-  ./Allrun [approach]
+  ./Allrun [approach] [mesh]
 
 Where [approach] is one of:
   petscSnes         (default)
   segregated
   highOrder
 
+Where [mesh] is one of:
+  tet               (default) tetrahedral mesh from gmsh
+  poly              polyhedral mesh via polyDualMesh
+
 Examples:
   ./Allrun
   ./Allrun petscSnes
   ./Allrun highOrder
+  ./Allrun petscSnes poly
 EOF
 }
 
@@ -50,6 +55,17 @@ case "$APPROACH" in
     segregated|petscSnes|highOrder) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+MESH="${2:-tet}"
+
+case "$MESH" in
+    tet|poly) ;;
+    *)
+        echo "Error: Unknown mesh '$MESH'"
         usage
         exit 1
         ;;
@@ -129,8 +145,14 @@ then
     # Create mesh with gmsh
     solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
     solids4Foam::runApplication gmshToFoam sphericalCavity.msh
-    solids4Foam::runApplication polyDualMesh 30 -overwrite
-    solids4Foam::runApplication combinePatchFaces 45 -overwrite
+
+    if [[ "$MESH" == "poly" ]]
+    then
+        echo "Converting the tetrahedral mesh to a polyhedral mesh"
+        solids4Foam::runApplication polyDualMesh 30 -overwrite
+        solids4Foam::runApplication combinePatchFaces 45 -overwrite
+    fi
+
     solids4Foam::runApplication changeDictionary
 
     # Move 0 back

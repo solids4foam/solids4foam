@@ -9,8 +9,9 @@ Prepared by Philip Cardiff and Ivan Batistić
 ## Tutorial Aims
 
 - Demonstrate how to perform a 3D linear-static stress analysis in solids4foam
-- Demonstrate the process of meshing using the Gmsh meshing utility and
-  OpenFOAM `polyDualMesh` utility
+- Demonstrate the process of meshing using the Gmsh meshing utility, with
+  optional conversion to a polyhedral mesh using the OpenFOAM `polyDualMesh`
+  utility
 - Demonstrates using the solids4foam solid solver based on the PETSc SNES
   nonlinear solver
 
@@ -47,7 +48,8 @@ This classic 3-D problem consists of a spherical cavity with radius $a = 0.2$ m
 
 ![-](images/sphericalCavity-geometry.png)
 
-**Figure 1: Spherical cavity case geometry and mesh (4 555 cells).**
+**Figure 1: Spherical cavity case geometry and polyhedral mesh (4 555 cells),
+as produced by the optional `poly` mesh option.**
 
 ---
 
@@ -158,7 +160,7 @@ The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/sphericalCavity`. The case can
 be run using the included `Allrun` script. The `Allrun` script optionally takes
-an argument that specifies the solution approach:
+a first argument that specifies the solution approach:
 
 ```bash
 ./Allrun             # Defaults to the PETSc SNES second-order approach [3]
@@ -166,19 +168,32 @@ an argument that specifies the solution approach:
 ./Allrun highOrder   # PETSc SNES high-order approach [4]
 ```
 
+and an optional second argument that specifies the mesh type:
+
+```bash
+./Allrun petscSnes tet   # Defaults to the tetrahedral mesh
+./Allrun petscSnes poly  # Polyhedral (dual) mesh
+```
+
 The `Allrun` script starts by updating the files in the case to match the
 selected approach; the following files are updated: `constant/solidProperties`,
 `system/fvSchemes`, and `system/fvSolution`. Subsequently, the tutorial-local
 library in the `src` directory is compiled, and the unstructured tetrahedral
-mesh is created using the Gmsh meshing utility, followed by conversion to its
-dual polyhedral representation using the OpenFOAM `polyDualMesh` utility:
+mesh is created using the Gmsh meshing utility. If the `poly` mesh type is
+selected, the tetrahedral mesh is then converted to its dual polyhedral
+representation using the OpenFOAM `polyDualMesh` utility:
 
 ```bash
    # Create mesh with gmsh
     solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
     solids4Foam::runApplication gmshToFoam sphericalCavity.msh
-    solids4Foam::runApplication polyDualMesh 30 -overwrite
-    solids4Foam::runApplication combinePatchFaces 45 -overwrite
+
+    if [[ "$MESH" == "poly" ]]
+    then
+        solids4Foam::runApplication polyDualMesh 30 -overwrite
+        solids4Foam::runApplication combinePatchFaces 45 -overwrite
+    fi
+
     solids4Foam::runApplication changeDictionary
 ```
 
