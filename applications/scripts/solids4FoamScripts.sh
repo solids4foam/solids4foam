@@ -561,6 +561,29 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requirePetscOrExitSilently
+#     Exit cleanly (exit 0) if PETSc is not available, i.e. PETSC_DIR is unset.
+#     Used by tutorials whose (selected) solution approach requires PETSc. This
+#     function is intentionally unaware of case-specific approach names: the
+#     caller decides whether the current approach needs PETSc before calling it.
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requirePetscOrExitSilently()
+{
+    if [[ -z "${PETSC_DIR:-}" ]]
+    then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "If you would like to run this case, solids4foam should be rebuilt with PETSc"
+        echo "(set the PETSC_DIR variable and rebuild solids4foam)"
+        echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # regressionCaseSkipped
 #     Return success when an Allrun log contains a known case-skip message.
 #     Regression scripts use this to exit cleanly when a tutorial is not
