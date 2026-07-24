@@ -66,7 +66,7 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-sample_file=$(find "${CASE_DIR}/postProcessing" -name 'line_sigma_analyticalStress.xy' -print | tail -n 1)
+sample_file=$(find "${CASE_DIR}/postProcessing" -name 'line_analyticalStress_sigma.xy' -print | tail -n 1)
 if [[ -z "${sample_file}" ]]; then
     echo "FAIL: Could not find sampled stress output"
     exit 1
