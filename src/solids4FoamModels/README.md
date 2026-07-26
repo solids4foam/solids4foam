@@ -4,6 +4,83 @@ This directory holds the sources of `libsolids4FoamModels`, the main
 solids4foam library. It is built by the `Allwmake` script in this directory,
 which is called in turn by `src/Allwmake`.
 
+The `solids4Foam` application in `applications/solvers/solids4Foam` is a thin
+front end: it creates a physics model and advances it in time. Everything else
+lives in this library.
+
+---
+
+## Library overview
+
+### Physics models
+
+`physicsModel` is the virtual base class for the three families of solution
+procedure, each of which is selected at run time from its own dictionary:
+
+- **Solid**: base class `solidModel`, read from `constant/solidProperties`,
+  in `solidModels`;
+- **Fluid**: base class `fluidModel`, read from `constant/fluidProperties`,
+  in `fluidModels`;
+- **Fluid-solid**: base class `fluidSolidInterface`, read from
+  `constant/fsiProperties`, in `fluidSolidInterfaces`.
+
+Which family is used for a case is set by the `type` entry in
+`constant/physicsProperties`, i.e. `solid`, `fluid` or `fluidSolidInteraction`.
+
+A **solid model** solves the governing momentum equation in a solid domain.
+The available models differ in whether the geometry is linear or nonlinear,
+whether a total or updated Lagrangian formulation is used, whether the
+discretisation is cell-centred or vertex-centred, and whether the solution
+algorithm is segregated, coupled or explicit. They are described in
+[`solidModels/README.md`](solidModels/README.md).
+
+A **fluid model** solves the flow equations, using either a solver built on
+the standard OpenFOAM ones or a solver specific to solids4foam; see
+[`fluidModels/README.md`](fluidModels/README.md).
+
+A **fluid-solid interface** owns one fluid model and one solid model and
+implements the partitioned coupling algorithm between them, for example fixed
+relaxation, Aitken or IQN-ILS. See
+[`fluidSolidInterfaces/README.md`](fluidSolidInterfaces/README.md).
+
+### Material behaviour
+
+The constitutive behaviour of a solid is separate from the solid model that
+uses it, so the two can be varied independently:
+
+- `materialModels/mechanicalModel` reads `constant/mechanicalProperties` and
+  creates the mechanical laws. A `mechanicalLaw` returns the stress for a
+  given deformation; the laws are grouped into `linearGeometryLaws` and
+  `nonLinearGeometryLaws`. Multiple materials are supported, each region
+  taking its own law, with corrections at bi-material interfaces to keep the
+  stress continuous without oscillations.
+- `materialModels/thermalModel` does the same for thermal properties, reading
+  `constant/thermalProperties` and creating `thermalLaw` objects.
+
+### Supporting components
+
+- `physicsModel`: the base class of the three physics model families;
+- `solidModels/fvPatchFields` and `solidModels/pointPatchFields`: solid
+  boundary conditions, including tractions, contact, symmetry and prescribed
+  displacement and rotation;
+- `numerics`: discretisation and linear algebra support, including gradient
+  schemes, stabilisation models, interpolation, additional tensor types and
+  PETSc helpers;
+- `higherOrderHelpers`: higher-order finite volume support, including moving
+  least squares, quadrature and the associated operators;
+- `dynamicFvMesh`: meshes which change topology, such as `crackerFvMesh` for
+  crack propagation;
+- `functionObjects`: run-time post-processing, and the analytical solutions
+  used by the tutorials; see
+  [`functionObjects/README.md`](functionObjects/README.md).
+
+### Adding a class
+
+New classes follow the usual OpenFOAM run-time selection pattern: derive from
+the relevant base class, add the `TypeName` and `addToRunTimeSelectionTable`
+entries, and add the source to the canonical list described below. Please also
+see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+
 ---
 
 ## Source lists
