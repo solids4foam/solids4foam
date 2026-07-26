@@ -44,8 +44,8 @@ Journal for Numerical Methods in Engineering, vol. 64, pp. 1594–1609, Nov.
 2005](https://hrcak.srce.hr/206941),
 who modelled the cylinder material as purely incompressible. In this tutorial,
 the same material law employed by both studies was used: the Mooney-Rivlin law
-with $$c_{10} = 0.293$$ MPa, $$c_{01} = 0.177$$ MPa, and the bulk
-modulus $$1410$$ MPa. Note that this material is much less stiff than the
+with $c_{10} = 0.293$ MPa, $c_{01} = 0.177$ MPa, and the bulk
+modulus $1410$ MPa. Note that this material is much less stiff than the
 material assumed in the previous two tutorials.
 
 The domain used was only a quarter of the cylinder due to symmetry (hatched area

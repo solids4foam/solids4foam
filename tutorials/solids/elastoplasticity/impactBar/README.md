@@ -1,3 +1,7 @@
+---
+sort: 7
+---
+
 # Impact of cylinder against a rigid wall: `impactBar`
 
 Prepared by Philip Cardiff and Ivan Batistić
@@ -15,8 +19,8 @@ Prepared by Philip Cardiff and Ivan Batistić
 
 In this case, which has been analysed by Cardiff et al. [1], a cylindrical
 copper bar impacts a rigid wall. The bar has an initial radius of
-$$r_0 = 3.2$$ mm, an initial length of $$l_0 = 32.4$$ mm, and an initial
-velocity of $$v_0 = 227$$ m/s. A schematic of the problem geometry is
+$r_0 = 3.2$ mm, an initial length of $l_0 = 32.4$ mm, and an initial
+velocity of $v_0 = 227$ m/s. A schematic of the problem geometry is
 shown in Figure 1. The problem is modelled as axisymmetric.
 
 ![Geometry](./images/impactBar-geometry.png)
@@ -32,9 +36,9 @@ Table 1 - Mechanical properties
 
 | Parameter            | Symbol       | Value           |
 | -------------------- | ------------ | --------------- |
-| Young’s modulus      | $$E$$        | $$117$$ GPa     |
-| Poisson's ratio      | $$\nu$$      | $$0.35$$        |
-| Initial yield stress | $$\sigma_Y$$ | $$400$$ MPa     |
+| Young’s modulus      | $E$        | $117$ GPa     |
+| Poisson's ratio      | $\nu$      | $0.35$        |
+| Initial yield stress | $\sigma_Y$ | $400$ MPa     |
 | Initial density      | $\rho$       | $8930$ kg/m$^3$ |
 | Hardening modulus    | $\kappa$     | $100$ MPa       |
 
@@ -45,21 +49,21 @@ Table 1 - Mechanical properties
 The predicted deformed geometry is shown for four separate times in Figure 2. A
 comparison with the numerical results predicted by Aguirre et al. [2] is
 available in [1]. Table 2 compares the final end radius of the bar at
-$$80$$ $$\mu$$s, for the finer mesh consisting of 5760 cells, with numerical
+$80$ $\mu$s, for the finer mesh consisting of 5760 cells, with numerical
 results from other methodologies [2, 3]. Good agreement is found.
 
 ![Geometry](./images/impactBar-results.png)
 
 Figure 2 - Predicted deformed geometry [1]
 
-Table 2 - Predicted end radius at $$80$$ $$\mu$$s.
+Table 2 - Predicted end radius at $80$ $\mu$s.
 
 | Method                               | Predicted radius (in mm) |
 | ------------------------------------ | ------------------------ |
-| [2] FE method - tetrahedra           | $$5.55$$                 |
-| [2] FE method - hexahedra            | $$6.95$$                 |
-| [2] FE method average nodal pressure | $$6.99$$                 |
-| [1] FV method                        | $$6.98$$                 |
+| [2] FE method - tetrahedra           | $5.55$                 |
+| [2] FE method - hexahedra            | $6.95$                 |
+| [2] FE method average nodal pressure | $6.99$                 |
+| [1] FV method                        | $6.98$                 |
 | solids4Foam                          | $7.14$                   |
 
 {% include youtube.html id="4VDuINBV2DU" %}
