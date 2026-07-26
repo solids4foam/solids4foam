@@ -1,3 +1,7 @@
+---
+sort: 8
+---
+
 # Upsetting a Billet: `upsetBillet`
 
 Prepared by Philip Cardiff and Ivan Batistić

@@ -1,5 +1,5 @@
 ---
-sort: x
+sort: 6
 ---
 
 # Perforated Plate: `perforatedPlate`

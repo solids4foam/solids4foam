@@ -1,3 +1,7 @@
+---
+sort: 12
+---
+
 # Out-of-plane bending of an elliptic plate: `ellipticPlate`
 
 ---

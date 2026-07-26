@@ -1,5 +1,5 @@
 ---
-sort: x
+sort: 9
 ---
 
 # Crushing of a Pipe: `pipeCrush`

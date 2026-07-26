@@ -1,3 +1,7 @@
+---
+sort: 7
+---
+
 # Impact of cylinder against a rigid wall: `impactBar`
 
 Prepared by Philip Cardiff and Ivan Batistić
