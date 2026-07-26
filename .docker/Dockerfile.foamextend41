@@ -32,9 +32,11 @@ COPY --chown=dockeruser:dockeruser . /home/dockeruser/solids4foam
 USER dockeruser
 
 # Compile solids4Foam
+# The image is built from scratch and never incrementally, so the unity
+# build is used: see src/solids4FoamModels/README.md
 RUN source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc && \
     cd /home/dockeruser/solids4foam && \
-    ./Allwmake
+    S4F_UNITY_BUILD=1 ./Allwmake
 
 # Clean log files
 RUN cd /home/dockeruser/solids4foam && \
