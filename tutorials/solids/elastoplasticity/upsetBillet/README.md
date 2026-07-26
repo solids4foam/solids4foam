@@ -19,16 +19,16 @@ This case considers the upsetting of a cylindrical billet between two parallel
 rough dies. The benchmark has been used to assess numerical methods for metal
 forming simulations [1, 2, 3].
 
-The billet has an initial diameter of $$20$$ mm and an initial height of
-$$30$$ mm. It is upset by $$60\%$$, corresponding to a total die displacement
-of $$18$$ mm. Because of symmetry, only the upper half of the billet is
-modelled, so the rigid die in this half model is displaced by $$9$$ mm. The
+The billet has an initial diameter of $20$ mm and an initial height of
+$30$ mm. It is upset by $60\%$, corresponding to a total die displacement
+of $18$ mm. Because of symmetry, only the upper half of the billet is
+modelled, so the rigid die in this half model is displaced by $9$ mm. The
 problem geometry and loading are shown in Figure 1.
 
 Gravitational and transient effects are neglected. The loading is applied over
 2000 quasi-static time increments. Rough contact between the die and billet is
 modelled using the `solidContact` boundary condition with a Coulomb friction
-coefficient of $$0.5$$. Taylor [1] showed that this high friction coefficient
+coefficient of $0.5$. Taylor [1] showed that this high friction coefficient
 approximates the rough surface condition.
 
 The case is represented as a 2-D axisymmetric model, see Figure 2. The default
@@ -47,17 +47,17 @@ Figure 2 - Axisymmetric mesh [4]
 The billet is modelled using the `neoHookeanElasticMisesPlastic` mechanical
 law. The mechanical properties are given in Table 1. The tabulated hardening
 curve in `constant/plasticStrainVsYieldStress` corresponds to a hardening
-modulus of $$300$$ MPa.
+modulus of $300$ MPa.
 
 Table 1 - Mechanical properties
 
 | Parameter            | Symbol       | Value                 |
 | -------------------- | ------------ | --------------------- |
-| Young's modulus      | $$E$$        | $$200$$ GPa           |
-| Poisson's ratio      | $$\nu$$      | $$0.3$$               |
-| Initial yield stress | $$\sigma_Y$$ | $$700$$ MPa           |
-| Initial density      | $$\rho$$     | $$7833$$ kg/m$$^3$$   |
-| Hardening modulus    | $$\kappa$$   | $$300$$ MPa           |
+| Young's modulus      | $E$        | $200$ GPa           |
+| Poisson's ratio      | $\nu$      | $0.3$               |
+| Initial yield stress | $\sigma_Y$ | $700$ MPa           |
+| Initial density      | $\rho$     | $7833$ kg/m$^3$   |
+| Hardening modulus    | $\kappa$   | $300$ MPa           |
 
 ---
 
