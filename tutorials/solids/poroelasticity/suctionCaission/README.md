@@ -12,7 +12,8 @@ Prepared by Philip Cardiff and Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate the poro-elasto-plasticity soil model.
+- Demonstrate the poro-elasto-plasticity soil model
+- Demonstrate the vertical uplift capacity of suction caisson foundations
 
 ---
 
