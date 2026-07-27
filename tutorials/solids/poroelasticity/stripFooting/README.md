@@ -119,7 +119,7 @@ $$\omega = 14.3$$ [2]**
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/elastoplasticity/perforatedPlate`. The case can
+`solids4foam/tutorials/solids/elastoplasticity/stripFooting`. The case can
 be run using the included `Allrun` script, i.e. `> ./Allrun`.
 
 The `Allrun` script first creates the mesh using `blockMesh`

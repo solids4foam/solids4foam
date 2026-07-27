@@ -29,7 +29,7 @@ pullout capacity of the caisson.
 Figure 1 shows a cylindrical suction caisson with overall diameter $$d$$ and
 embedded length $$L$$. The caisson is subjected to an uplift displacement at the
 top.
-In the current `blockMeshDict`, the caisson wall spans radii $$1.0$$ m to
+In the current case, the caisson wall spans radii $$1.0$$ m to
 $$1.1$$ m, giving a wall thickness of $$0.1$$ m.
 
 ![Suction caisson geometry](./images/suctionCaission-geometry.png)
@@ -54,8 +54,7 @@ Table 1 - Geometry, soil, pore-fluid, and loading properties reported in [1,2]
 | Cohesion              | $$c$$        | $$1\cdot10^5$$ Pa        |
 
 The case uses `blockMesh` to discretize one quarter of the three-dimensional
-domain, with symmetry conditions on the `left` and `front` patches, as shown in
-Figure 2.
+domain, as shown in Figure 2.
 
 The reference pullout velocities range from $$2\cdot10^{-4}$$ to
 $$2\cdot10^{-1}$$ m/s.
