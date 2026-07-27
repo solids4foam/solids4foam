@@ -29,6 +29,8 @@ pullout capacity of the caisson.
 Figure 1 shows a cylindrical suction caisson with overall diameter $$d$$ and
 embedded length $$L$$. The caisson is subjected to an uplift displacement at the
 top.
+In the current `blockMeshDict`, the caisson wall spans radii $$1.0$$ m to
+$$1.1$$ m, giving a wall thickness of $$0.1$$ m.
 
 ![Suction caisson geometry](./images/suctionCaission-geometry.png)
 
