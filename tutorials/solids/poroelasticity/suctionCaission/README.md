@@ -59,16 +59,13 @@ $$2\cdot10^{-1}$$ m/s.
 
 ![Suction caisson mesh](./images/suctionCaission-mesh.png)**Figure 2 - Computational mesh for one quarter of the geometry**
 
-> Note: Tang et al. [2] also discuss an axisymmetric setup using a `wedge`
+> Note: Tang et al. [2] is using an axisymmetric setup with a `wedge`
 > boundary condition. The current tutorial uses a quarter-domain mesh with
 > symmetry conditions.
 
 The `soilStructureInterface` patch is prescribed an uplift displacement using
 `constant/timeVsDisp`. In the current case, the displacement increases from
 $$0$$ to $$0.2$$ m over $$5$$ s.
-
-> Note: the current case uses a water bulk modulus of $$2.0\cdot10^9$$ Pa,
-> slightly lower than the reference value in Table 1.
 
 ---
 
