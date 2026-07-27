@@ -59,6 +59,23 @@ if [[ -z "${version_major}" || -z "${version_minor}" || -z "${version_subminor}"
 fi
 
 petsc_version="${version_major}.${version_minor}.${version_subminor}"
+
+# Minimum supported PETSc version
+#
+# PETSc 3.14 and older do not define PETSC_ERR_GPU and PETSC_ERR_MPI, which are
+# used in numerics/foamPetscSnesHelper/petscErrorHandling.C, so they cannot
+# build solids4foam at all. PETSc 3.15 to 3.24 have been tested with the
+# wobblyNewton tutorial using both MUMPS and HYPRE
+minimum_version_major=3
+minimum_version_minor=15
+
+if (( version_major < minimum_version_major )) \
+    || (( version_major == minimum_version_major \
+          && version_minor < minimum_version_minor ))
+then
+    die "PETSc ${petsc_version} is too old: solids4foam requires PETSc ${minimum_version_major}.${minimum_version_minor} or newer"
+fi
+
 missing_packages=()
 
 for package in MUMPS HYPRE; do
