@@ -69,6 +69,9 @@ jobs:
           cd "${source_dir}"
 
           export PETSC_ARCH=arch-ci
+
+          # PETSc-3.23 and newer require CMake 3.26 to build HYPRE, whereas
+          # ubuntu-22.04 provides CMake 3.22, so let PETSc download its own
           ./configure \
             --prefix="${PETSC_PREFIX}" \
             --with-debugging=0 \
@@ -78,6 +81,7 @@ jobs:
             --with-fc=mpif90 \
             --with-mpi=1 \
             --with-openmp=0 \
+            --download-cmake \
             --download-fblaslapack \
             --download-scalapack \
             --download-mumps \
@@ -123,21 +127,6 @@ jobs:
           export S4F_NO_FILE_FIXES=1
           ./Allwmake -j
 
-      - name: Alltest
-        shell: bash -l {0}
-        run: |
-          source "${OPENFOAM_BASHRC}"
-          set -eo pipefail
-          export PETSC_DIR="${PETSC_PREFIX}"
-          unset PETSC_ARCH
-          export LD_LIBRARY_PATH="${PETSC_DIR}/lib:${LD_LIBRARY_PATH:-}"
-          export OMP_NUM_THREADS=1
-          export OPENBLAS_NUM_THREADS=1
-          export MKL_NUM_THREADS=1
-          mkdir -p petsc-version-test-logs
-          (cd tutorials && ./Alltest) \
-            2>&1 | tee petsc-version-test-logs/log.Alltest
-
       - name: Test MUMPS and HYPRE through solids4foam
         shell: bash -l {0}
         run: |
@@ -180,8 +169,27 @@ jobs:
               "${case_dir}/log.solids4Foam"
           }
 
-          run_targeted_case mumps
-          run_targeted_case hypre
+          # Run both packages even if the first fails, so a single broken
+          # package does not hide the state of the other
+          status=0
+          run_targeted_case mumps || { echo "MUMPS case FAILED"; status=1; }
+          run_targeted_case hypre || { echo "HYPRE case FAILED"; status=1; }
+          exit ${status}
+
+      - name: Alltest
+        shell: bash -l {0}
+        run: |
+          source "${OPENFOAM_BASHRC}"
+          set -eo pipefail
+          export PETSC_DIR="${PETSC_PREFIX}"
+          unset PETSC_ARCH
+          export LD_LIBRARY_PATH="${PETSC_DIR}/lib:${LD_LIBRARY_PATH:-}"
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          mkdir -p petsc-version-test-logs
+          (cd tutorials && ./Alltest) \
+            2>&1 | tee petsc-version-test-logs/log.Alltest
 
       - name: Alltest-regression
         if: ${{ inputs.run-regression-tests }}
