@@ -797,7 +797,14 @@ label foamPetscSnesHelper::initialiseJacobian
         MatCreate(PETSC_COMM_WORLD, &jac);
         MatSetFromOptions(jac);
         MatSetSizes(jac, n, n, N, N);
-        MatSetType(jac, MATMPIAIJ);
+
+        // Note: the matrix is created as block AIJ so that the block
+        // preallocation performed below, which counts non-zeros per block row,
+        // applies to it. MatMPIBAIJSetPreallocation silently does nothing for
+        // a MATMPIAIJ matrix, leaving the matrix un-preallocated: PETSc-3.19
+        // and newer then quietly call MatSetUp, whereas older versions give a
+        // "wrong state" error in debug builds and segfault in optimised builds
+        MatSetType(jac, MATMPIBAIJ);
     }
 
     // Set the block size
