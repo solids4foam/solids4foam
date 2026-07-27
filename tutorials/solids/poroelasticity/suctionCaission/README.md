@@ -22,7 +22,7 @@ This case demonstrates vertical uplift of a suction caisson foundation, a common
 problem in offshore geotechnical engineering. A suction caisson is open at the
 bottom and closed at the top. It penetrates the seabed under its own weight and
 by generating an internal under-pressure relative to the external water
-pressure. The passive suction that develops inside the soil plug increases the
+pressure [1]. The passive suction that develops inside the soil plug increases the
 pullout capacity of the caisson.
 
 Figure 1 shows a cylindrical suction caisson with overall diameter $$d$$ and
