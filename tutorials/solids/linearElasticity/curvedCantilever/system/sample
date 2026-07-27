@@ -13,36 +13,32 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      sampleDict;
+    object      sample;
 }
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-setFormat raw;
-surfaceFormat raw;
+type sets;
+//libs ("libsampling.so");
 
 interpolationScheme cellPoint;
 
-// Fields to sample.
+setFormat raw;
+
+sets
+(
+    line
+    {
+        type       midPoint;
+        axis       xyz;
+        start     (0.2333452378 -0.2333452378 0);
+        end       (0.2192031022 -0.2192031022 0);
+    }
+);
+
 fields
 (
     sigma
     analyticalStress
 );
 
-sets
-(
-    line
-    {
-        axis        xyz;
-        type        midPoint;
-        end       (0.2192031022 -0.2192031022 0);
-        start     (0.2333452378 -0.2333452378 0);
-    }
-);
-
-surfaces
-(
-);
-
-// *********************************************************************** //
-
+// ************************************************************************* //
