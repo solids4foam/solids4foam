@@ -21,20 +21,38 @@ dynamicFvMesh dynamicMotionSolverFvMesh;
 "solver|motionSolver" velocityLaplacian; // finite volume solver
 //"solver|motionSolver" laplace; // finite element solver
 //"solver|motionSolver" RBFMeshMotionSolver; // radial basis function solver
+// motionSolverLibs ("libRBFMeshMotionSolver.so");
 
 diffusivity quadratic inverseDistance (flap);
 
 // Settings for the RBF solver
-// staticPatches    (top bottom left);
-// movingPatches    (interface);
-// fixedPatches     (inlet outlet);
-// interpolation
+// RBFMeshMotionSolverCoeffs
 // {
-//     function     TPS;
+//     staticPatches    (upperWall lowerWall);
+//     movingPatches    (flap);
+//     fixedPatches     (inlet outlet);
+//
+//     interpolation
+//     {
+//         function     TPS;
+//         polynomial   no;
+//         cpu          no;
+//         fullCPU      no;
+//     }
+//
+//     coarsening
+//     {
+//         enabled                 yes;
+//         tol                     0.05;
+//         minPoints               20;
+//         maxPoints               200;
+//         livePointSelection      yes;
+//         tolLivePointSelection   0.05;
+//         exportSelectedPoints    no;
+//         twoPointSelection       no;
+//         surfaceCorrection       no;
+//     }
 // }
-// coarsening
-// {
-//     enabled      no;
-// }
+// Remove 0/fluid/pointMotionU when switching this case to RBFMeshMotionSolver.
 
 // ************************************************************************* //

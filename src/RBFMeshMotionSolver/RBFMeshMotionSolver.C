@@ -92,6 +92,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     nbPoints(0),
     faceCellCenters(true),
     cpu(false),
+    motionCentersSet_(false),
     corrector(false),
     k(0)
 {
@@ -364,6 +365,7 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
     }
 
     motionCenters = motion;
+    motionCentersSet_ = true;
 }
 
 void RBFMeshMotionSolver::updateMesh(const mapPolyMesh &)
@@ -375,16 +377,23 @@ void RBFMeshMotionSolver::solve()
 {
     assert(motionCenters.size() == mesh().boundaryMesh().size());
 
-    // Copy motionCentersField to motionCenters
-    forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
+    if (!motionCentersSet_)
     {
-        motionCenters[patchI] =
-            accumulatedMotionCentersField_.boundaryField()[patchI]
-          - accumulatedMotionCentersField_.prevIter().boundaryField()[patchI];
+        // Copy motionCentersField to motionCenters
+        forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
+        {
+            motionCenters[patchI] =
+                accumulatedMotionCentersField_.boundaryField()[patchI]
+              - accumulatedMotionCentersField_.prevIter().boundaryField()
+                [
+                    patchI
+                ];
+        }
     }
 
     // Update previous field
     accumulatedMotionCentersField_.storePrevIter();
+    motionCentersSet_ = false;
 
 
     /*
