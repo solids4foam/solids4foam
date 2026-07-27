@@ -23,7 +23,8 @@ DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
 REG_END_TIME=0.3
 
 # Reference values
-REF_MAX_DISP=1.93742e-05
+# Regenerated for the mesh-aligned water column, rho = 2500 and backward d2dt2
+REF_MAX_DISP=1.09559e-04
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -39,6 +40,7 @@ elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
 fi
 
 if [[ "${variant}" == "foamextend" ]]; then
+    # TODO: stale - regenerate on foam-extend after the case changes above
     REF_MAX_DISP=3.76032e-05
 fi
 

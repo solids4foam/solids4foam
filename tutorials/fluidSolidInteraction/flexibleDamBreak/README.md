@@ -56,7 +56,7 @@ solver, and the volume-of-fluid incompressible multiphase fluid model
 Upon starting the solution, the water column collapses due to gravity and will
 hit the flexible dam. Video 1 shows the time evolution of the volume-of-fluid
 field in the fluid domain and the displacement field in the solid domain. The
-`solids4foam` predictions for the deflection of the top-right corner of the dam
+`solids4foam` predictions for the deflection of the top-left corner of the dam
 are compared with numerical solutions from the literature in Figure 2, showing
 reasonable agreement. For better agreement, a mesh and time-step independence
 study should be performed.
@@ -81,7 +81,7 @@ run using the included `Allrun` script, i.e. `> ./Allrun`. The `Allrun` script
 first executes `blockMesh` for both `solid` and `fluid` domains
 (`> blockMesh -region fluid` and `> blockMesh -region solid` ), and the
 `solids4foam` solver is used to run the case (`> solids4Foam`). Optionally, if
-`gnuplot` is installed, the displacement history of the top-right edge of the
+`gnuplot` is installed, the displacement history of the top-left edge of the
 obstacle Optionally, to create post-processing plots, it is possible to use
 `solidPointDisplacement` functionObjects, which will keep track of the specified
 point during the solution.
