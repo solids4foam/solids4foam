@@ -442,9 +442,16 @@ function solids4Foam::undoFoamExtendTweaks()
         # a case may link its blockMeshDict to a variant file
         if [[ -f ${SRC} || -L ${SRC} ]]
         then
-            echo "Moving ${SRC} to ${DST}"
             mkdir -p "${DST}"
-            \mv "${SRC}" "${DST}"
+
+            if [[ -f "${DST}/blockMeshDict" || -L "${DST}/blockMeshDict" ]]
+            then
+                echo "Removing generated ${SRC}; ${DST}/blockMeshDict exists"
+                \rm "${SRC}"
+            else
+                echo "Moving ${SRC} to ${DST}"
+                \mv "${SRC}" "${DST}"
+            fi
 
             # Remove the polyMesh directory if the conversion created it
             rmdir "$(dirname "${SRC}")" 2>/dev/null || true
