@@ -33,7 +33,7 @@ boundaryField
 
 	"symm.*"
 	{
-		type		symmetryPlane;
+		type		symmetry;
 	}
 }
 

@@ -52,11 +52,11 @@ boundaryField
     }
     symmetry-x
     {
-        type                symmetryPlane;
+        type                symmetry;
     }
     symmetry-y
     {
-        type                symmetryPlane;
+        type                symmetry;
     }
 }
 

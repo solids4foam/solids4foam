@@ -38,7 +38,7 @@ boundaryField
         // copy of a field with this patch type throws. uniformFixedValue with
         // the table below is equivalent and works across all supported
         // versions, so there is no need to change back if that bug is fixed.
-//        type            uniformFixedValue;
+        type            uniformFixedValue;
 
         // Time vs velocity
         uniformValue    table
@@ -49,7 +49,7 @@ boundaryField
         );
 
         // foam extend
-        type            timeVaryingUniformFixedValue;
+//        type            timeVaryingUniformFixedValue;
         "file|fileName"   "$FOAM_CASE/constant/fluid/timeVsVelocity.fe41";
         outOfBounds       clamp;
     }

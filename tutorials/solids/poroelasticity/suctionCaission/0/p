@@ -25,12 +25,12 @@ boundaryField
 {
     left
     {
-        type            symmetryPlane;
+        type            symmetry;
     }
 
     front
     {
-        type            symmetryPlane;
+        type            symmetry;
     }
 
     sides

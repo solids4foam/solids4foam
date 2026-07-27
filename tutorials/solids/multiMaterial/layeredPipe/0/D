@@ -38,11 +38,11 @@ boundaryField
     }
     symmX
     {
-        type            symmetryPlane;
+        type            symmetry;
     }
     symmY
     {
-        type            symmetryPlane;
+        type            symmetry;
     }
     frontAndBack
     {

@@ -25,7 +25,7 @@ boundaryField
     down
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     right

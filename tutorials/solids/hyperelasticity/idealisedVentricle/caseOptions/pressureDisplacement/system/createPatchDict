@@ -117,7 +117,7 @@ patchInfo
         // Type of new patch
         dictionary
         {
-            type symmetryPlane;
+            type symmetry;
 
         }
 
@@ -137,7 +137,7 @@ patchInfo
         // Type of new patch
         dictionary
         {
-            type symmetryPlane;
+            type symmetry;
 
         }
 

@@ -1,5 +1,5 @@
 functions
-(
+{
     analyticalSolution
     {
         type    contactPatchTestAnalyticalSolution;
@@ -13,4 +13,4 @@ functions
         // Poisson's ratio
         nu      1e-15;
     }
-);
+}

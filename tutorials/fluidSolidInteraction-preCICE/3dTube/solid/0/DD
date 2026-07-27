@@ -25,13 +25,13 @@ boundaryField
     symmetry-x
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     symmetry-y
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     outlet

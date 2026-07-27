@@ -232,7 +232,7 @@ run_gradient_tests() {
         if [[ "${WM_PROJECT:-}" == "foam" ]]; then
             mkdir -p constant/polyMesh
             rm -f system/blockMeshDict constant/polyMesh/blockMeshDict
-            ln -nsf ../../system/blockMeshDict.foamExtend \
+            ln -nsf ../../system/blockMeshDict.foamextend \
                 constant/polyMesh/blockMeshDict
         fi
 

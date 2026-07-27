@@ -44,7 +44,7 @@ pointSync false;
         name symmx;
         "patchInfo|dictionary"
         {
-            type symmetryPlane;
+            type symmetry;
         }
         constructFrom patches;
         patches ("auto8" "auto3");
@@ -80,7 +80,7 @@ pointSync false;
         name symmy;
         "patchInfo|dictionary"
         {
-            type symmetryPlane;
+            type symmetry;
         }
         constructFrom patches;
         patches ("auto6" "auto7");

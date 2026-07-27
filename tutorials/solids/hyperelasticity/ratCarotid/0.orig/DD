@@ -47,9 +47,9 @@ boundaryField
     {
         // type            solidSymmetry;
         // type            blockSymmPlane;
-        // patchType       symmetryPlane;
+        // patchType       symmetry;
 
-        type            symmetryPlane;
+        type            symmetry;
         value           uniform (0 0 0);
     }
 

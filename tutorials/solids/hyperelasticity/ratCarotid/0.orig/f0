@@ -34,7 +34,7 @@ boundaryField
 
     "(symm.*)"
     {
-        type            symmetryPlane;
+        type            symmetry;
         value           uniform (0 0 0);
     }
 }

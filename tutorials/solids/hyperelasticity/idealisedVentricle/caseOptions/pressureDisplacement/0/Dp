@@ -40,13 +40,13 @@ boundaryField
 
     symmetry_1
     {
-        type		symmetryPlane;
+        type		symmetry;
         value		uniform 0;
     }
 
     symmetry_2
     {
-        type		symmetryPlane;
+        type		symmetry;
         value		uniform 0;
     }
 

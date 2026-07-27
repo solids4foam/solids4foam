@@ -154,7 +154,7 @@ PETSc SNES path using the same geometry and boundary conditions.
 ```note
 OpenFOAM v2412 does not support the foam-extend `ellipse` block edge type in
 `blockMeshDict`. The foam-extend mesh dictionary is kept in
-`system/blockMeshDict.foamExtend` and uses the original `ellipse` entries. The
+`system/blockMeshDict.foamextend` and uses the original `ellipse` entries. The
 OpenFOAM mesh dictionary is kept in `system/blockMeshDict.openfoam` and
 replaces those edges with `spline` edges sampled from the ellipses using the
 helper script located in `system/makeBlockMeshDict.py`. The `Allrun` script

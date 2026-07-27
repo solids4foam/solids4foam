@@ -12,7 +12,7 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "constant/polyMesh";
+    location    "system";
     object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -71,7 +71,7 @@ edges
 
 patches
 (
-    symmetryPlane symmPlane
+    symmetry symmPlane
     (
         (0 8 5 0)
     )
