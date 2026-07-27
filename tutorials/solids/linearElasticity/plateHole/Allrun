@@ -186,7 +186,7 @@ select_pressure_displacement_case() {
 
     copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
     copy_contents caseOptions/pressureDisplacement/hex/common/system system
-    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
+    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/system" system
     cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
 }
 
