@@ -273,7 +273,9 @@ function solids4Foam::applyFoamExtendTweaks()
             local DST="${CASE_DIR}/constant/${DIR}/polyMesh"
         fi
 
-        if [[ -f ${SRC} ]]
+        # Note: -f is false for a dangling symlink, so -L is also checked, as
+        # a case may link its blockMeshDict to a variant file
+        if [[ -f ${SRC} || -L ${SRC} ]]
         then
             echo "Moving ${SRC} to ${DST}"
             mkdir -p "${DST}"
@@ -436,11 +438,16 @@ function solids4Foam::undoFoamExtendTweaks()
             local DST="${CASE_DIR}/system/${DIR}"
         fi
 
-        if [[ -f ${SRC} ]]
+        # Note: -f is false for a dangling symlink, so -L is also checked, as
+        # a case may link its blockMeshDict to a variant file
+        if [[ -f ${SRC} || -L ${SRC} ]]
         then
             echo "Moving ${SRC} to ${DST}"
             mkdir -p "${DST}"
             \mv "${SRC}" "${DST}"
+
+            # Remove the polyMesh directory if the conversion created it
+            rmdir "$(dirname "${SRC}")" 2>/dev/null || true
         fi
     done
 

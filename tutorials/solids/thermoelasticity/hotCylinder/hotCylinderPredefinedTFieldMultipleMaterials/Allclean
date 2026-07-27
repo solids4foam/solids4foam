@@ -9,8 +9,8 @@ source solids4FoamScripts.sh
 cleanCase
 rm -rf constant/polyMesh/boundary VTK case.foam postProcessing system/*Subset
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
 
 # Fix for symmetry type: the temperature field time directories are not
 # restored by solids4Foam::restoreCaseFormat, which only checks the 0 directory

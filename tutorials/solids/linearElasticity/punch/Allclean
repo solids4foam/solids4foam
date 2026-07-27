@@ -14,5 +14,5 @@ cleanCase
 \rm -rf system/punch_bottomSubset system/punch_topSubset
 \rm -rf 0/D[x,y,z]
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .

@@ -24,8 +24,8 @@ fi
 \rm -rf case.foam
 \rm -rf residuals
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
 
 # Check fvSolution for foundation version
 

@@ -83,12 +83,6 @@ prepare_case() {
             "${case_dir}/src/Make/options"
     fi
 
-    if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
-        && [[ ! -f "${case_dir}/constant/polyMesh/blockMeshDict" ]]; then
-        mkdir -p "${case_dir}/constant/polyMesh"
-        cp -a "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" \
-            "${case_dir}/constant/polyMesh/blockMeshDict"
-    fi
 }
 
 run_case() {

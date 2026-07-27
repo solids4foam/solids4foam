@@ -13,9 +13,9 @@ solids4Foam::caseOnlyRunsWithFoamExtend
 #solids4Foam::convertCaseFormat .
 
 # Create the blockMeshDict
-mkdir -p constant/polyMesh
-m4 -P system/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
-#m4 -P system/blockMeshDict.m4 > system/blockMeshDict
+BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+mkdir -p "${BLOCK_MESH_DICT_DIR}"
+m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
 
 # Create mesh
 solids4Foam::runApplication blockMesh

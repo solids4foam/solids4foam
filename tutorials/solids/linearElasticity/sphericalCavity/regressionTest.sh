@@ -62,12 +62,6 @@ prepare_case() {
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
 
-    if [[ -f "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" ]] \
-        && [[ ! -f "${CASE_DIR}/constant/polyMesh/blockMeshDict" ]]; then
-        mkdir -p "${CASE_DIR}/constant/polyMesh"
-        cp -a "${SCRIPT_DIR}/constant/polyMesh/blockMeshDict" \
-            "${CASE_DIR}/constant/polyMesh/blockMeshDict"
-    fi
 }
 
 # ------------------------------------------------------------
