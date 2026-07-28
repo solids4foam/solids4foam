@@ -1,5 +1,5 @@
 ---
-sort: x
+sort: 5
 ---
 
 # Pressing a Long Cylinder: `cylinderCrush`

@@ -1,3 +1,7 @@
+---
+sort: 2
+---
+
 # Decaying Taylor-Green vortex flow: `decayingTaylorGreenVortex`
 
 ---

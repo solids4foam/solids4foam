@@ -1,5 +1,5 @@
 ---
-sort: x
+sort: 11
 ---
 
 # Hole in a Infinite Plate Subjected to Remote Stress: `plateHole`
