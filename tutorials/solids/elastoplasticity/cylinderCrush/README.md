@@ -23,10 +23,10 @@ A hyperelastic version of this tutorial is also available in solids4foam at
 ## Case Overview
 
 This case considers a long solid cylinder crushed between two rigid plates, as
-shown in Figure 1. The cylinder diameter is $0.4$ m, and the cylinder is
+shown in Figure 1. The cylinder diameter is $$0.4$$ m, and the cylinder is
 compressed by half of its diameter. Because the problem is symmetric, only one
 quarter of the cylinder is modelled. The rigid plate in the computational
-domain is displaced by $0.1$ m over 30 equal loading increments.
+domain is displaced by $$0.1$$ m over 30 equal loading increments.
 
 The plate-cylinder contact is modelled using the `solidContact` boundary
 condition with a frictionless contact law. Gravity and transient effects are
@@ -48,23 +48,23 @@ Table 1 - Mechanical properties
 
 | Parameter            | Symbol       | Value               |
 | -------------------- | ------------ | ------------------- |
-| Young's modulus      | $E$        | $186$ GPa         |
-| Poisson's ratio      | $\nu$      | $0.3$             |
-| Initial yield stress | $\sigma_Y$ | $241.32$ MPa      |
-| Initial density      | $\rho$     | $7800$ kg/m$^3$ |
+| Young's modulus      | $$E$$        | $$186$$ GPa         |
+| Poisson's ratio      | $$\nu$$      | $$0.3$$             |
+| Initial yield stress | $$\sigma_Y$$ | $$241.32$$ MPa      |
+| Initial density      | $$\rho$$     | $$7800$$ kg/m$$^3$$ |
 
 Table 2 - Hardening behaviour
 
 | Plastic strain | Yield stress (in MPa) |
 | -------------- | --------------------- |
-| $0.000$      | $241.32$            |
-| $0.0035$     | $275.79$            |
-| $0.0083$     | $301.65$            |
-| $0.0133$     | $318.88$            |
-| $0.0182$     | $344.74$            |
-| $0.0281$     | $361.98$            |
-| $0.0380$     | $379.21$            |
-| $1.000$      | $1482.37$           |
+| $$0.000$$      | $$241.32$$            |
+| $$0.0035$$     | $$275.79$$            |
+| $$0.0083$$     | $$301.65$$            |
+| $$0.0133$$     | $$318.88$$            |
+| $$0.0182$$     | $$344.74$$            |
+| $$0.0281$$     | $$361.98$$            |
+| $$0.0380$$     | $$379.21$$            |
+| $$1.000$$      | $$1482.37$$           |
 
 ---
 
