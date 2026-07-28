@@ -6,7 +6,7 @@ sort: 2
 
 ---
 
-Prepared by Philip Cardiff and Ivan Batistić
+Prepared by Philip Cardiff, Ivan Batistić, and Tian Tang
 
 ---
 
@@ -25,6 +25,9 @@ on a smooth rigid base. The problem also assumes that there is no horizontal
 force on any vertical section. The original geometry is sketched in Figure 1,
 and the soil and pore-fluid properties are given in Table 1. A plane strain
 condition is considered and gravity is neglected.
+
+The case was adapted, with modifications, from Tian Tang's `minigeotechfoam`
+cases [3].
 
 ![Strip footing geometry](./images/stripFooting-geometry.png)
 
@@ -136,3 +139,5 @@ consolidation of soil," International Journal of Solids and Structures,
 [2] [T. Tang, O. Hededal, and P. Cardiff, "On finite volume method
 implementation of poro-elasto-plasticity soil model," International Journal for
 Numerical and Analytical Methods in Geomechanics, 39:1410-1430, 2015](https://doi.org/10.1002/nag.2361)
+
+[3] [T. Tang, `minigeotechfoam`](https://bitbucket.org/tiantang/minigeotechfoam/src/master/)

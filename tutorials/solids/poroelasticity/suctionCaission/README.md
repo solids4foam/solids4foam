@@ -6,7 +6,7 @@ sort: 3
 
 ---
 
-Prepared by Philip Cardiff and Ivan Batistić
+Prepared by Philip Cardiff, Ivan Batistić, and Tian Tang
 
 ---
 
@@ -25,6 +25,9 @@ bottom and closed at the top. It penetrates the seabed under its own weight and
 by generating an internal under-pressure relative to the external water
 pressure [1]. The passive suction that develops inside the soil plug increases the
 pullout capacity of the caisson.
+
+The case was adapted, with modifications, from Tian Tang's `minigeotechfoam`
+cases [3].
 
 Figure 1 shows a cylindrical suction caisson with overall diameter $$d$$ and
 embedded length $$L$$. The caisson is subjected to an uplift displacement at the
@@ -110,3 +113,5 @@ Engineering, 12(2):89-97, 2002](https://www.researchgate.net/profile/John-Carter
 [2] [T. Tang, O. Hededal, and P. Cardiff, "On finite volume method
 implementation of poro-elasto-plasticity soil model," International Journal for
 Numerical and Analytical Methods in Geomechanics, 39:1410-1430, 2015](https://doi.org/10.1002/nag.2361)
+
+[3] [T. Tang, `minigeotechfoam`](https://bitbucket.org/tiantang/minigeotechfoam/src/master/)
