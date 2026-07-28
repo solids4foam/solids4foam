@@ -101,19 +101,17 @@ else
     fi
 fi
 
-# Detect if PETSC_DIR availability has changed since the last build.
-# When it changes, an incremental build leaves stale object files compiled
-# without USE_PETSC (e.g. newtonQuasiMonolithicCouplingInterface.o compiled
-# empty), so we wclean before rebuilding to avoid a silent mismatch.
+# Validate PETSc and detect if its configuration has changed since the last
+# build. Reusing objects compiled with different PETSc headers can cause a
+# silent ABI mismatch, so clean before rebuilding when the state changes.
 PETSC_STATE_FILE="Make/${WM_OPTIONS}/.petsc_state"
-if [[ -n "${PETSC_DIR}" ]]; then
-    CURRENT_PETSC_STATE="USE_PETSC"
-else
-    CURRENT_PETSC_STATE="NO_PETSC"
+if ! CURRENT_PETSC_STATE="$(../../etc/check-petsc.sh)"
+then
+    exit 1
 fi
 CACHED_PETSC_STATE="$(cat "${PETSC_STATE_FILE}" 2>/dev/null || true)"
 if [[ "${CURRENT_PETSC_STATE}" != "${CACHED_PETSC_STATE}" && -n "${CACHED_PETSC_STATE}" ]]; then
-    echo "PETSC_DIR availability changed (was ${CACHED_PETSC_STATE}, now ${CURRENT_PETSC_STATE})."
+    echo "PETSc configuration changed since the last build."
     echo "Cleaning build to avoid stale object files..."
     wclean
 fi
