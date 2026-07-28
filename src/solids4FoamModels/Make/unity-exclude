@@ -1,0 +1,9 @@
+# Sources which must not be merged into a unity build bucket
+#
+# Each entry is a path exactly as it appears in Make/files.openfoam or
+# Make/files.foamextend, with any $(var) references expanded. Listed sources are
+# compiled on their own, as they are in a conventional build.
+#
+# Use this as an escape hatch for a source which cannot share a translation
+# unit with its neighbours, for example because it defines a macro or a
+# file-scope name which clashes with another source.
