@@ -616,9 +616,15 @@ function solids4Foam::undoOpenFOAMOrgTweaks()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # useForcesDat, useForceDat
-#     Set the forces functionObject output file name expected by the gnuplot
-#     scripts: OpenFOAM.com writes force.dat, whereas foam extend and
-#     OpenFOAM.org write forces.dat
+#     Set the forces functionObject output expected by the gnuplot scripts.
+#
+#     OpenFOAM.com writes force.dat, with the total force in columns 2 to 4,
+#     followed by the pressure and viscous contributions, so the total force is
+#     plotted directly as ($2) and ($3).
+#
+#     foam extend and OpenFOAM.org write forces.dat, with only the pressure and
+#     viscous contributions, followed by the moments, so the total force is
+#     plotted as their sum, ($2+$5) and ($3+$6).
 # Arguments:
 #     1: CASE_DIR
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -631,6 +637,10 @@ function solids4Foam::useForcesDat()
     do
         echo "Changing force.dat to forces.dat in ${FILE}"
         sed -i "s|force\.dat|forces.dat|g" "${FILE}"
+
+        echo "Summing the pressure and viscous forces in ${FILE}"
+        sed -i 's|(\$2)|($2+$5)|g' "${FILE}"
+        sed -i 's|(\$3)|($3+$6)|g' "${FILE}"
     done
 }
 
@@ -643,6 +653,10 @@ function solids4Foam::useForceDat()
     do
         echo "Changing forces.dat to force.dat in ${FILE}"
         sed -i "s|forces\.dat|force.dat|g" "${FILE}"
+
+        echo "Using the total force in ${FILE}"
+        sed -i 's|(\$2+\$5)|($2)|g' "${FILE}"
+        sed -i 's|(\$3+\$6)|($3)|g' "${FILE}"
     done
 }
 
