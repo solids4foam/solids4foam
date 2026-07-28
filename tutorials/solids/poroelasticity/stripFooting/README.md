@@ -1,5 +1,5 @@
 ---
-sort: xx
+sort: 2
 ---
 
 # Bearing capacity of strip footing: `stripFooting`
