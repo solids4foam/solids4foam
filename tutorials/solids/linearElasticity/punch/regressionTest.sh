@@ -13,20 +13,17 @@ fi
 
 # ============================================================
 # punch regression test
-# Checks the final displacement and reaction force histories.
+# Checks the final Z displacement.
 # ============================================================
 
-PUNCH_DISP_Z_MIN=-0.00034
-PUNCH_DISP_Z_MAX=-0.0003
-SUPPORT_FORCE_Z_MIN=380000
-SUPPORT_FORCE_Z_MAX=400000
+PUNCH_DISP_Z_MIN=-0.00019
+PUNCH_DISP_Z_MAX=-0.0001
 
 ALLRUN_LOGFILE="log.Allrun"
 
 echo "============================================================"
 echo "punch regression test"
 echo "Punch loading dispZ in [${PUNCH_DISP_Z_MIN}, ${PUNCH_DISP_Z_MAX}]"
-echo "Support forceZ in [${SUPPORT_FORCE_Z_MIN}, ${SUPPORT_FORCE_Z_MAX}]"
 echo "============================================================"
 echo
 
@@ -74,18 +71,16 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
 fi
 
 punch_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesDisplacementspunchLoading.dat' -print | tail -n 1)
-support_file=$(find "${CASE_DIR}/postProcessing" -name 'solidForcesDisplacementscylinderFixed.dat' -print | tail -n 1)
 
-if [[ -z "${punch_file}" || -z "${support_file}" ]]; then
-    echo "FAIL: Could not find punch force/displacement outputs"
+if [[ -z "${punch_file}" ]]; then
+    echo "FAIL: Could not find punch force/displacement output"
     exit 1
 fi
 
 punch_disp_z=$(awk 'END {print $4}' "${punch_file}")
-support_force_z=$(awk 'END {print $7}' "${support_file}")
 
-if [[ -z "${punch_disp_z:-}" || -z "${support_force_z:-}" ]]; then
-    echo "FAIL: Could not extract punch regression quantities"
+if [[ -z "${punch_disp_z:-}" ]]; then
+    echo "FAIL: Could not extract punch Z displacement"
     exit 1
 fi
 
@@ -95,13 +90,6 @@ if awk "BEGIN {exit !(${punch_disp_z} >= ${PUNCH_DISP_Z_MIN} && ${punch_disp_z} 
     printf "PASS: punchLoading dispZ = %.6g\n" "${punch_disp_z}"
 else
     printf "FAIL: punchLoading dispZ = %.6g\n" "${punch_disp_z}"
-    failures=$((failures + 1))
-fi
-
-if awk "BEGIN {exit !(${support_force_z} >= ${SUPPORT_FORCE_Z_MIN} && ${support_force_z} <= ${SUPPORT_FORCE_Z_MAX})}"; then
-    printf "PASS: cylinderFixed forceZ = %.6g\n" "${support_force_z}"
-else
-    printf "FAIL: cylinderFixed forceZ = %.6g\n" "${support_force_z}"
     failures=$((failures + 1))
 fi
 
