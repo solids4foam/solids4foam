@@ -16,9 +16,11 @@ SHELL ["/bin/bash", "-c"]
 COPY . /usr/lib/solids4foam
 
 # Compile solids4Foam
+# The image is built from scratch and never incrementally, so the unity
+# build is used: see src/solids4FoamModels/README.md
 RUN source /usr/lib/openfoam/openfoam2412/etc/bashrc && \
     cd /usr/lib/solids4foam && \
-    ./Allwmake -j -s
+    S4F_UNITY_BUILD=1 ./Allwmake -j -s
 
 # Clean log files
 RUN cd /usr/lib/solids4foam && \

@@ -1,4 +1,17 @@
 #!/bin/bash
+#
+# Environment variables
+#     S4F_UNITY_BUILD     set to 1 to build the library as a "unity build",
+#                         where the sources are grouped into a small number of
+#                         buckets and each bucket is compiled as a single
+#                         translation unit. The OpenFOAM headers are then
+#                         parsed once per bucket rather than once per source,
+#                         which cuts the build time substantially. The library
+#                         produced is the same either way
+#     S4F_UNITY_NBUCKETS  number of buckets to use, overriding the default,
+#                         which is taken from the number of compilation
+#                         processes
+#
 cd "${0%/*}" || exit  # Run from this directory
 
 # Parse arguments for library compilation
@@ -9,25 +22,9 @@ fi
 
 if [ "$WM_PROJECT" = "foam" ]
 then
-    if [[ ! -f Make/files ]]
-    then
-        echo "Linking Make/files.foamextend to Make/files"
-        (cd Make && ln -s files.foamextend files)
-    elif [ "$(readlink Make/files)" != "files.foamextend" ]
-    then
-        echo "Updating Make/files link to Make/files.foamextend"
-        (cd Make && ln -sf files.foamextend files)
-    fi
+    FILES_LIST="files.foamextend"
 else
-    if [[ ! -f Make/files ]]
-    then
-        echo "Linking Make/files.openfoam to Make/files"
-        (cd Make && ln -sf files.openfoam files)
-    elif [ "$(readlink Make/files)" != "files.openfoam" ]
-    then
-        echo "Updating Make/files link to Make/files.openfoam"
-        (cd Make && ln -sf files.openfoam files)
-    fi
+    FILES_LIST="files.openfoam"
 
     # OpenFOAM.org does not allow C-style comments in Make files
     if [[ $WM_PROJECT_VERSION != v* ]]
@@ -45,19 +42,76 @@ else
     fi
 fi
 
-# Detect if PETSC_DIR availability has changed since the last build.
-# When it changes, an incremental build leaves stale object files compiled
-# without USE_PETSC (e.g. newtonQuasiMonolithicCouplingInterface.o compiled
-# empty), so we wclean before rebuilding to avoid a silent mismatch.
-PETSC_STATE_FILE="Make/${WM_OPTIONS}/.petsc_state"
-if [[ -n "${PETSC_DIR}" ]]; then
-    CURRENT_PETSC_STATE="USE_PETSC"
+# wmake caches the expanded source list in Make/$WM_OPTIONS/sourceFiles and
+# regenerates it only when Make/files is newer. Switching between a
+# conventional and a unity build changes the list without necessarily making
+# Make/files newer, e.g. when it becomes a link to the unchanged canonical
+# list, so the cache is dropped here. It costs a fraction of a second to
+# rebuild
+rm -f Make/*/sourceFiles
+
+if [[ "${S4F_UNITY_BUILD}" == "1" ]]
+then
+    # Unity build: the sources are grouped into buckets, where each bucket is
+    # compiled as a single translation unit, so the OpenFOAM headers are parsed
+    # once per bucket rather than once per source. See Make/makeUnityFiles.
+    if [[ -n "${S4F_UNITY_NBUCKETS}" ]]
+    then
+        N_BUCKETS="${S4F_UNITY_NBUCKETS}"
+    else
+        # wmake exports WM_NCOMPPROCS when it is given -j. Fall back to nproc,
+        # which, unlike the total core count, respects the CPU affinity of a
+        # Slurm allocation or a container
+        N_JOBS="${WM_NCOMPPROCS:-$(nproc 2>/dev/null || echo 4)}"
+        [[ "${N_JOBS}" -ge 1 ]] 2>/dev/null || N_JOBS=4
+
+        # Fewer buckets means less repeated header parsing, but larger
+        # translation units and so a higher peak memory use per compiler
+        # process. More buckets gives diminishing wall-clock returns beyond
+        # about 32, while the total compilation cost keeps growing
+        N_BUCKETS="${N_JOBS}"
+        [[ "${N_BUCKETS}" -lt 8 ]] && N_BUCKETS=8
+        [[ "${N_BUCKETS}" -gt 32 ]] && N_BUCKETS=32
+    fi
+
+    # Make/files is a link to the canonical list in a conventional build, and
+    # must not be written through
+    if [[ -L Make/files ]]
+    then
+        rm -f Make/files
+    fi
+
+    if ! ./Make/makeUnityFiles "Make/${FILES_LIST}" "${N_BUCKETS}" \
+        unityBuild Make/files
+    then
+        echo "** ERROR: failed to generate the unity build sources **"
+        exit 1
+    fi
 else
-    CURRENT_PETSC_STATE="NO_PETSC"
+    # Discard any sources and objects left by an earlier unity build: wmake
+    # includes every dependency file it finds under the object directory, so a
+    # stale unityBuild/unityNN.C.dep would ask for a source which no longer
+    # exists
+    rm -rf unityBuild Make/*/unityBuild
+
+    if [[ ! -L Make/files || "$(readlink Make/files)" != "${FILES_LIST}" ]]
+    then
+        echo "Updating Make/files link to Make/${FILES_LIST}"
+        (cd Make && ln -sf "${FILES_LIST}" files)
+    fi
+fi
+
+# Validate PETSc and detect if its configuration has changed since the last
+# build. Reusing objects compiled with different PETSc headers can cause a
+# silent ABI mismatch, so clean before rebuilding when the state changes.
+PETSC_STATE_FILE="Make/${WM_OPTIONS}/.petsc_state"
+if ! CURRENT_PETSC_STATE="$(../../etc/check-petsc.sh)"
+then
+    exit 1
 fi
 CACHED_PETSC_STATE="$(cat "${PETSC_STATE_FILE}" 2>/dev/null || true)"
 if [[ "${CURRENT_PETSC_STATE}" != "${CACHED_PETSC_STATE}" && -n "${CACHED_PETSC_STATE}" ]]; then
-    echo "PETSC_DIR availability changed (was ${CACHED_PETSC_STATE}, now ${CURRENT_PETSC_STATE})."
+    echo "PETSc configuration changed since the last build."
     echo "Cleaning build to avoid stale object files..."
     wclean
 fi
