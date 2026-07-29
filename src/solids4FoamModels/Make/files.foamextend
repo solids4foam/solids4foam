@@ -110,7 +110,6 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
-$(solidFvPatchFields)/analyticalPlateHolePressureDisplacementTraction/analyticalPlateHolePressureDisplacementTractionFvPatchVectorField.C
 $(solidFvPatchFields)/tractionPressureDisplacement/extrapolateDisplacement.C
 $(solidFvPatchFields)/tractionPressureDisplacement/tractionPressureDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/pressureTraction/pressureTractionFvPatchScalarField.C
