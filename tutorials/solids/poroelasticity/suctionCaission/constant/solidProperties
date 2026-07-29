@@ -41,7 +41,7 @@ poroLinearGeometryCoeffs
     porosity               porosity [0 0 0 0 0 0 0] 0.2;
     waterSpecificWeight    waterSpecificWeight [1 -2 -2 0 0 0 0] 1e+04;
     degreeOfSaturation     degreeOfSaturation [0 0 0 0 0 0 0] 0.98;
-    waterBulkModulus       waterBulkModulus [1 -1 -2 0 0 0 0] 2e+09;
+    waterBulkModulus       waterBulkModulus [1 -1 -2 0 0 0 0] 2.1e+09;
 }
 
 // ************************************************************************* //

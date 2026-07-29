@@ -7,4 +7,17 @@ if [[ -n "${S4F_NO_USE_EIGEN:-}" ]]; then
     exit 1
 fi
 
+if [ "$WM_PROJECT" = "foam" ]
+then
+    FILES_LIST="files.foamextend"
+else
+    FILES_LIST="files.openfoam"
+fi
+
+if [[ ! -L Make/files || "$(readlink Make/files)" != "${FILES_LIST}" ]]
+then
+    echo "Updating Make/files link to Make/${FILES_LIST}"
+    (cd Make && ln -sf "${FILES_LIST}" files)
+fi
+
 wmake $* libso

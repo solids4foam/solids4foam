@@ -91,13 +91,13 @@ Mises) stress field in the solid**
 displacement magnitude field in the solid.**
 
 ![Figure 3: Displacement of the plate tip point A for the elastic plat\
-e behind a rigid cylinder case](./images/HronTurekFsi3-displacement.pdf")
+e behind a rigid cylinder case](./images/HronTurekFsi3-displacement.pdf)
 
 **Figure 3: Displacement of the plate tip point A for the elastic plate behind a
 rigid cylinder case**
 
 ![Figure 4: Force on the plate and the cylinder for the elastic plate behind a
-rigid cylinder case](./images/HronTurekFsi3-force.pdf")
+rigid cylinder case](./images/HronTurekFsi3-force.pdf)
 
 **Figure 4: Force on the plate and the cylinder for the elastic plate behind a
 rigid cylinder case**
