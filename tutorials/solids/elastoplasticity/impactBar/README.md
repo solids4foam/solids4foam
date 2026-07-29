@@ -1,3 +1,7 @@
+---
+sort: 7
+---
+
 # Impact of cylinder against a rigid wall: `impactBar`
 
 Prepared by Philip Cardiff and Ivan Batistić
@@ -35,8 +39,8 @@ Table 1 - Mechanical properties
 | Young’s modulus      | $$E$$        | $$117$$ GPa     |
 | Poisson's ratio      | $$\nu$$      | $$0.35$$        |
 | Initial yield stress | $$\sigma_Y$$ | $$400$$ MPa     |
-| Initial density      | $\rho$       | $8930$ kg/m$^3$ |
-| Hardening modulus    | $\kappa$     | $100$ MPa       |
+| Initial density      | $$\rho$$       | $$8930$$ kg/m$$^3$$ |
+| Hardening modulus    | $$\kappa$$     | $$100$$ MPa       |
 
 ---
 
@@ -60,7 +64,7 @@ Table 2 - Predicted end radius at $$80$$ $$\mu$$s.
 | [2] FE method - hexahedra            | $$6.95$$                 |
 | [2] FE method average nodal pressure | $$6.99$$                 |
 | [1] FV method                        | $$6.98$$                 |
-| solids4Foam                          | $7.14$                   |
+| solids4Foam                          | $$7.14$$                   |
 
 {% include youtube.html id="4VDuINBV2DU" %}
 

@@ -1,0 +1,225 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# makeUnityFiles
+#
+# Generate a "unity build" (also called a "jumbo build") source list for
+# libsolids4FoamModels.
+#
+# Compiling each of the ~230 source files separately means the large OpenFOAM
+# header set is re-parsed once per file, which dominates the build time.  This
+# script groups the sources into a small number of buckets, where each bucket
+# is a single generated source file that #includes the sources assigned to it.
+# The headers are then parsed once per bucket rather than once per source.
+#
+# The canonical source list (Make/files.openfoam or Make/files.foamextend)
+# remains the single point of maintenance: new classes are added there exactly
+# as before and are picked up automatically.
+#
+# Usage:
+#     makeUnityFiles <sourceList> <nBuckets> <outputDir> <outputList>
+#
+# where
+#     <sourceList>  canonical wmake files list, e.g. Make/files.openfoam
+#     <nBuckets>    number of buckets to generate
+#     <outputDir>   directory for the generated bucket sources
+#     <outputList>  wmake files list to generate
+#
+# Sources listed in Make/unity-exclude are compiled on their own, i.e. they are
+# never merged into a bucket.
+#
+#------------------------------------------------------------------------------
+set -e
+
+usage()
+{
+    echo "Usage: ${0##*/} <sourceList> <nBuckets> <outputDir> <outputList>" 1>&2
+    exit 1
+}
+
+[ "$#" -eq 4 ] || usage
+
+sourceList="$1"
+nBuckets="$2"
+outputDir="$3"
+outputList="$4"
+excludeList="${0%/*}/unity-exclude"
+
+if [ ! -f "$sourceList" ]
+then
+    echo "${0##*/}: cannot read $sourceList" 1>&2
+    exit 1
+fi
+
+if ! [ "$nBuckets" -ge 1 ] 2>/dev/null
+then
+    echo "${0##*/}: nBuckets must be a positive integer, got '$nBuckets'" 1>&2
+    exit 1
+fi
+
+tmpDir="$(mktemp -d)"
+trap 'rm -rf "$tmpDir"' EXIT
+
+#------------------------------------------------------------------------------
+# Parse the canonical list
+#
+# Strips C-style comments (including multi-line ones), expands the $(var) path
+# variables, and separates the source files from the trailing directives such
+# as "LIB = ...", which are passed through untouched.
+#------------------------------------------------------------------------------
+
+awk -v srcOut="$tmpDir/sources" -v trailOut="$tmpDir/trailer" '
+    # Remove C-style comments, which may span multiple lines
+    {
+        line = $0; out = ""
+        while (length(line) > 0)
+        {
+            if (inComment)
+            {
+                p = index(line, "*/")
+                if (p == 0) { line = "" }
+                else { line = substr(line, p + 2); inComment = 0 }
+            }
+            else
+            {
+                p = index(line, "/*")
+                if (p == 0) { out = out line; line = "" }
+                else
+                {
+                    out = out substr(line, 1, p - 1)
+                    line = substr(line, p + 2); inComment = 1
+                }
+            }
+        }
+        $0 = out
+    }
+
+    # Strip surrounding white-space
+    { gsub(/^[ \t]+|[ \t]+$/, "") }
+
+    /^$/ { next }
+
+    # Directives such as "LIB = ..." are emitted verbatim: the make variables
+    # they contain must be left for wmake to expand
+    /^(LIB|EXE)[ \t]*=/ { print > trailOut; next }
+
+    # Path variables, e.g. "linGeomLaws = $(mechanicalLaws)/linearGeometryLaws"
+    /^[A-Za-z_][A-Za-z0-9_]*[ \t]*=/ {
+        name = $0; sub(/[ \t]*=.*$/, "", name)
+        value = $0; sub(/^[^=]*=[ \t]*/, "", value)
+        var[name] = value
+        next
+    }
+
+    # Everything else is a source file: expand any $(var) references
+    {
+        line = $0
+        for (i = 0; i < 10 && index(line, "$(") > 0; i++)
+        {
+            for (name in var)
+            {
+                gsub("[$][(]" name "[)]", var[name], line)
+            }
+        }
+        print line > srcOut
+    }
+' "$sourceList"
+
+[ -s "$tmpDir/sources" ] || {
+    echo "${0##*/}: no sources found in $sourceList" 1>&2
+    exit 1
+}
+
+#------------------------------------------------------------------------------
+# Split the sources into buckets
+#
+# The sources are chunked in the order they appear in the canonical list, which
+# keeps related classes together and so maximises header re-use within a bucket.
+#------------------------------------------------------------------------------
+
+if [ -f "$excludeList" ]
+then
+    grep -v '^[ \t]*\(#\|$\)' "$excludeList" > "$tmpDir/exclude" || true
+else
+    : > "$tmpDir/exclude"
+fi
+
+grep -x -F -f "$tmpDir/exclude" "$tmpDir/sources" > "$tmpDir/solo" || true
+grep -x -v -F -f "$tmpDir/exclude" "$tmpDir/sources" > "$tmpDir/bucketed" || true
+
+nSources="$(grep -c '' "$tmpDir/bucketed" || true)"
+nSolo="$(grep -c '' "$tmpDir/solo" || true)"
+
+mkdir -p "$tmpDir/new"
+
+if [ "$nSources" -gt 0 ]
+then
+    # Round up so that nBuckets is never exceeded
+    perBucket=$(( (nSources + nBuckets - 1) / nBuckets ))
+
+    awk -v perBucket="$perBucket" -v outDir="$tmpDir/new" '
+        {
+            if ((NR - 1) % perBucket == 0)
+            {
+                file = sprintf("%s/unity%02d.C", outDir, int((NR - 1)/perBucket))
+
+                # PETSc headers must be seen before any OpenFOAM header pulls
+                # in the "using namespace Foam" of fvCFD.H, otherwise calls
+                # such as pow(PetscScalar, PetscScalar) become ambiguous
+                print "#ifdef USE_PETSC" > file
+                print "    #include <petscsnes.h>" > file
+                print "#endif" > file
+                print "" > file
+            }
+            printf "#include \"%s\"\n", $0 > file
+        }
+    ' "$tmpDir/bucketed"
+fi
+
+#------------------------------------------------------------------------------
+# Install the generated files
+#
+# Unchanged files are left alone so that their time stamps do not advance and
+# trigger a needless rebuild.
+#------------------------------------------------------------------------------
+
+mkdir -p "$outputDir"
+
+for file in "$tmpDir"/new/*.C
+do
+    [ -f "$file" ] || continue
+    target="$outputDir/${file##*/}"
+    if ! cmp -s "$file" "$target"
+    then
+        cp "$file" "$target"
+    fi
+done
+
+# Remove buckets left over from a previous run with more buckets
+for file in "$outputDir"/unity[0-9][0-9].C
+do
+    [ -f "$file" ] || continue
+    [ -f "$tmpDir/new/${file##*/}" ] || rm -f "$file"
+done
+
+{
+    for file in "$tmpDir"/new/*.C
+    do
+        [ -f "$file" ] || continue
+        echo "$outputDir/${file##*/}"
+    done
+
+    cat "$tmpDir/solo"
+    echo
+    cat "$tmpDir/trailer"
+} > "$tmpDir/files"
+
+if ! cmp -s "$tmpDir/files" "$outputList"
+then
+    cp "$tmpDir/files" "$outputList"
+fi
+
+nGenerated="$(ls "$outputDir"/unity[0-9][0-9].C 2>/dev/null | wc -l)"
+echo "Unity build: $nSources sources in $nGenerated buckets" \
+     "($nSolo compiled separately)"
+
+#------------------------------------------------------------------------------

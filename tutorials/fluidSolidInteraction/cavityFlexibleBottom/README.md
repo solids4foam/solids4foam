@@ -1,3 +1,7 @@
+---
+sort: 7
+---
+
 # Channel flow over a cavity with a flexible bottom: `cavityFlexibleBottom`
 
 Prepared by Aaron Mullen-Hales, Philip Cardiff and Ivan Batistić
