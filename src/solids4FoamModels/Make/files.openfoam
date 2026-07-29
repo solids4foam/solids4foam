@@ -167,7 +167,6 @@ $(fluidFvPatchFields)/flowRateOutletPressure/flowRateOutletPressureFvPatchScalar
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
-functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalFields.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
