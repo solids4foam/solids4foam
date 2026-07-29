@@ -798,13 +798,7 @@ label foamPetscSnesHelper::initialiseJacobian
         MatSetFromOptions(jac);
         MatSetSizes(jac, n, n, N, N);
 
-        // Note: the matrix is created as block AIJ so that the block
-        // preallocation performed below, which counts non-zeros per block row,
-        // applies to it. MatMPIBAIJSetPreallocation silently does nothing for
-        // a MATMPIAIJ matrix, leaving the matrix un-preallocated: PETSc-3.19
-        // and newer then quietly call MatSetUp, whereas older versions give a
-        // "wrong state" error in debug builds and segfault in optimised builds
-        MatSetType(jac, MATMPIBAIJ);
+        MatSetType(jac, MATMPIAIJ);
     }
 
     // Set the block size
@@ -896,12 +890,19 @@ label foamPetscSnesHelper::initialiseJacobian
     }
 
     // Allocate parallel matrix
-    //AssertPETSc(MatMPIAIJSetPreallocation(jac, 0, d_nnz, 0, o_nnz));
-    // Allocate parallel matrix with the same conservative stencil per node
-    //AssertPETSc(MatMPIAIJSetPreallocation(jac, d_nz, NULL, 0, NULL));
-    AssertPETSc(MatMPIBAIJSetPreallocation
+    // Note: MatXAIJSetPreallocation is used rather than a type-specific
+    // routine, e.g. MatMPIBAIJSetPreallocation, because the type-specific
+    // routines dispatch through PetscTryMethod and so silently do nothing when
+    // the matrix is of another type, leaving the matrix un-preallocated:
+    // PETSc-3.19 and newer then quietly call MatSetUp, whereas older versions
+    // give a "wrong state" error in debug builds and segfault in optimised
+    // builds. MatXAIJSetPreallocation takes the same block-row counts and
+    // dispatches to whichever type the matrix actually has, so the matrix is
+    // preallocated whether it is AIJ, BAIJ or SBAIJ, e.g. if the user
+    // overrides the type with -mat_type
+    AssertPETSc(MatXAIJSetPreallocation
     (
-        jac, blockSize, 0, d_nnz.data(), 0, o_nnz.data())
+        jac, blockSize, d_nnz.data(), o_nnz.data(), NULL, NULL)
     );
 
     // Raise an error if mallocs are required during matrix assembly
