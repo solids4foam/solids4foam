@@ -17,14 +17,15 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
+DISP_MAX_TOL=2.5e-3      # max displacement absolute tolerance (~5% of reference)
 
 # Regression end time for the copied case only
 REG_END_TIME=0.3
 
 # Reference values
-# Regenerated for the mesh-aligned water column, rho = 2500 and backward d2dt2
-REF_MAX_DISP=1.09559e-04
+# Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3
+# Measured on OpenFOAM v2606; the peak occurs at t = 0.2325
+REF_MAX_DISP=0.0502752
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -40,8 +41,8 @@ elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
 fi
 
 if [[ "${variant}" == "foamextend" ]]; then
-    # TODO: stale - regenerate on foam-extend after the case changes above
-    REF_MAX_DISP=3.76032e-05
+    # Measured on foam-extend 4.1; the peak occurs at t = 0.222917
+    REF_MAX_DISP=0.0468941
 fi
 
 echo "============================================================"
@@ -99,7 +100,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $2}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {
