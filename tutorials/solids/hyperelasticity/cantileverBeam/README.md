@@ -65,5 +65,5 @@ be run using the included `Allrun` script:
 ./Allrun
 ```
 
-The `Allrun` script creates the mesh with `blockMesh`, and then 
+The `Allrun` script creates the mesh with `blockMesh`, and then
 runs the `solids4Foam` solver.
