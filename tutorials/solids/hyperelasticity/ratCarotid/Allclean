@@ -12,5 +12,5 @@ rm -r 0
 rm -r postProcessing history
 rm -r logs
 
-rm *.eps
+rm *.png
 rm *.dat

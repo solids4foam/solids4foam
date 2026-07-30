@@ -3,8 +3,8 @@
 #
 
 reset
-set output 'innerRadius.eps'
-set term postscript color
+set term pngcairo dashed size 1024,768 font "Arial,18"
+set output 'innerRadius.png'
 
 set size 0.8,0.8
 
@@ -14,7 +14,7 @@ set style line 2 linecolor rgb 'red' linetype 8 linewidth 2 ps 0.7
 set grid
 set xlabel 'p (kPa)'
 set ylabel 'Inner radius (mm)'
-set key left top
+set key r b
 
 #set xrange [8:16]
 #set yrange [0.04:0.17]

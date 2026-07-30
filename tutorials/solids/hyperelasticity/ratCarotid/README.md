@@ -67,9 +67,13 @@ arterial wall inflates smoothly under the applied internal pressure, with the
 largest displacement occurring at the inner surface.
 
 The `pointHystory.gplt` script plots the evolution of the inner radius as a
-function of internal pressure. The generated curve should follow the
+function of internal pressure. The generated curve follow the
 experimental data from [2] and the finite element results from [5], as reported
 for this benchmark in [1].
+
+![Geometry](./images/ratCarotid-results-innerR.png)
+
+**Figure 2 - The variation of the inner radius with respect to internal pressure**
 
 ---
 
@@ -83,12 +87,12 @@ can be run using the included `Allrun` script:
 ./Allrun
 ```
 
-The case is foam-extend-only. The `Allrun` script first compiles the
+ The `Allrun` script first compiles the
 case-local `calcLocCoordinates` utility from the `src` directory. It then
 generates `constant/polyMesh/blockMeshDict` from
 `constant/polyMesh/blockMeshDict.m4` using `m4`, creates the mesh with
 `blockMesh`, copies the required initial fields from `0.orig` to `0`,
-calculates the local coordinate systems, and then runs the `solids4Foam`
+calculates the local coordinate systems using `calcLocCoordinates` utility, and then runs the `solids4Foam`
 solver.
 
 The case can also be run in parallel using:
@@ -100,7 +104,7 @@ The case can also be run in parallel using:
 In parallel, the script decomposes the case according to
 `system/decomposeParDict`, runs `solids4Foam` in parallel, and reconstructs the
 decomposed fields. If `gnuplot` is installed, the script also runs
-`pointHystory.gplt` after the solver finishes and generates `innerRadius.eps`.
+`pointHystory.gplt` after the solver finishes and generates `innerRadius.png`.
 
 ---
 
