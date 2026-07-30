@@ -44,7 +44,7 @@ circumferential direction.
 The local tutorial setup follows the rat carotid artery inflation case
 described in [1]. The computational domain is a one-quarter cylindrical segment
 with inner radius $$r_i = 0.3$$ mm, outer radius $$r_o = 0.4$$ mm, and length
-$$0.05$$ mm. Symmetry boundary conditions are applied on the corresponding planes, 
+$$0.05$$ mm. Symmetry boundary conditions are applied on the corresponding planes,
 the outer wall is traction-free, and the inner pressure increases linearly from
 $$0$$ to $$25$$ kPa over the unit pseudo-time.
 
@@ -67,9 +67,11 @@ arterial wall inflates smoothly under the applied internal pressure, with the
 largest displacement occurring at the inner surface.
 
 The `pointHystory.gplt` script plots the evolution of the inner radius as a
-function of internal pressure. The generated curve should follow the
+function of internal pressure. The generated curve follow the
 experimental data from [2] and the finite element results from [5], as reported
 for this benchmark in [1].
+
+![Geometry](./images/ratCarotid-results-innerR.png)**Figure 2 - The variation of the inner radius with respect to internal pressure**
 
 ---
 
@@ -83,13 +85,13 @@ can be run using the included `Allrun` script:
 ./Allrun
 ```
 
-The case is foam-extend-only. The `Allrun` script first compiles the
+ The `Allrun` script first compiles the
 case-local `calcLocCoordinates` utility from the `src` directory. It then
 generates `constant/polyMesh/blockMeshDict` from
 `constant/polyMesh/blockMeshDict.m4` using `m4`, creates the mesh with
 `blockMesh`, copies the required initial fields from `0.orig` to `0`,
-calculates the local coordinate systems, and then runs the `solids4Foam`
-solver.
+calculates the local coordinate systems using `calcLocCoordinates` utility,
+and then runs the `solids4Foam` solver.
 
 The case can also be run in parallel using:
 
@@ -100,7 +102,7 @@ The case can also be run in parallel using:
 In parallel, the script decomposes the case according to
 `system/decomposeParDict`, runs `solids4Foam` in parallel, and reconstructs the
 decomposed fields. If `gnuplot` is installed, the script also runs
-`pointHystory.gplt` after the solver finishes and generates `innerRadius.eps`.
+`pointHystory.gplt` after the solver finishes and generates `innerRadius.png`.
 
 ---
 
@@ -110,14 +112,14 @@ decomposed fields. If `gnuplot` is installed, the script also runs
 [Horvat A., Milović P., Karšaj I., Tuković Ž., A Block-Coupled Finite Volume Method for Incompressible Hyperelastic Solids. *Applied Sciences*. 2025; 15(23):12660](https://doi.org/10.3390/app152312660)
 
 [2]
-[Fridez, P., Makino, A., Miyazaki, H., Meister, J., Hayashi, K., Stergiopulos, N., Short-Term biomechanical adaptation of the rat carotid to acute hypertension: Contribution of smooth muscle,  Ann. Biomed. Eng. 2001, 29, 26–34]()32
+[Fridez, P., Makino, A., Miyazaki, H., Meister, J., Hayashi, K., Stergiopulos, N., Short-Term biomechanical adaptation of the rat carotid to acute hypertension: Contribution of smooth muscle,  Ann. Biomed. Eng. 2001, 29, 26–34](https://doi.org/10.1114/1.1342054)
 
 [3]
-[Holzapfel, G.A., Gasser, T.C., Ogden, R.W., A new constitutive framework for arterial wall mechanics and a comparative study of material models, J. Elast. 2000, 61, 1–48]()15
+[Holzapfel, G.A., Gasser, T.C., Ogden, R.W., A new constitutive framework for arterial wall mechanics and a comparative study of material models, J. Elast. 2000, 61, 1–48](https://doi.org/10.1023/A:1010835316564)
 
 [4]
-[Zulliger, M.A., Fridez, P., Hayashi, K., Stergiopulos, N., A strain energy function for arteries accounting for wall composition and structure, J. Biomech. 2004, 37, 989–1000]()33
+[Zulliger, M.A., Fridez, P., Hayashi, K., Stergiopulos, N., A strain energy function for arteries accounting for wall composition and structure, J. Biomech. 2004, 37, 989–1000](https://doi.org/10.1016/j.jbiomech.2003.11.026)
 
 [5]
 [Sun, W.; Chaikof, E.L.; Levenston, M.E. Numerical Approximation of Tangent Moduli for Finite Element of
-Nonlinear Hyperelastic Material Models. J. Biomech. Eng. 2008, 130, 061003]()34
+Nonlinear Hyperelastic Material Models. J. Biomech. Eng. 2008, 130, 061003](https://doi.org/10.1115/1.2979872)
