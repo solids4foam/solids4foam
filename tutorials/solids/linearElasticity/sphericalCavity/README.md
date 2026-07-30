@@ -1,3 +1,7 @@
+---
+sort: 13
+---
+
 # Spherical cavity under uniaxial tensions: `sphericalCavity`
 
 ---

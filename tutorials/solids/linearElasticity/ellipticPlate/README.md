@@ -1,3 +1,7 @@
+---
+sort: 12
+---
+
 # Out-of-plane bending of an elliptic plate: `ellipticPlate`
 
 ---
@@ -31,6 +35,7 @@ Demirdžić et al. [2]. The assumed mechanical properties are Young’s modulus
 $$E = 210$$ GPa and Poisson’s ratio $$\nu = 0.3$$. Due to double symmetry,
 only a quarter of the plate is analysed. The thickness of the plate is
 $$0.6$$ m, and the inner and outer ellipses are given by:
+
 $$
 \left(\dfrac{x}{2}\right)^2 + y^2 = 1
 $$
@@ -50,7 +55,7 @@ consists of 12 cell layers through the thickness, 24 cells in the
 circumferential direction, and 16 cells in the radial direction, as shown in
 Figure 2. The mesh density corresponds to mesh 3 used in [3].
 
-```Note
+```note
 The target stress value given in the NAFEMS benchmark cannot be used directly
 for comparison, as the fixed displacement boundary conditions used in the
 current study mimic those used in Demirdžić et al. [2] and do not correspond
