@@ -66,26 +66,26 @@ function solids4Foam::convertCaseFormat()
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
-    if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
+    if [[ -n $(find "${CASE_DIR}" -name 'blockMeshDict*') ]]
     then
         echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict* | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name 'blockMeshDict*' -exec sed -i 's\symmetryPlane\symmetry\g' {} +
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
         echo "Changing symmetryPlane to symmetry in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name boundary -exec sed -i 's\symmetryPlane\symmetry\g' {} +
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
     then
         echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name createPatchDict -exec sed -i 's\symmetryPlane\symmetry\g' {} +
     fi
 
     # Check all files in the 0 directory
-    for FILE in $(find "${CASE_DIR}/0" -type f)
+    while IFS= read -r -d '' FILE
     do
         if [[ -f "${FILE}" ]]
         then
@@ -95,7 +95,7 @@ function solids4Foam::convertCaseFormat()
                 sed -i 's\symmetryPlane;\symmetry;\g' "${FILE}"
             fi
         fi
-    done
+    done < <(find "${CASE_DIR}/0" -type f -print0)
 
     # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/constant/polyMesh/blockMeshDict ]]
@@ -136,7 +136,7 @@ function solids4Foam::convertCaseFormat()
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RASModel to RAS in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
+        find "${CASE_DIR}" -name turbulenceProperties -exec sed -i "s/RASModel;/RAS;/g" {} +
     fi
 
     # 4. Check for boundaryData
@@ -166,10 +166,10 @@ function solids4Foam::convertCaseFormat()
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
     then
         echo "Changing timeVaryingUniformFixedValue to uniformValue in p"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
+        find "${CASE_DIR}" -name p \
+            -exec sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g" {} +
+        find "${CASE_DIR}" -name p \
+            -exec sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Check for changeDictionaryDict.openfoam
@@ -292,22 +292,22 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
         echo "Changing symmetry to symmetryPlane in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetry \symmetryPlane \g'
+        find "${CASE_DIR}" -name blockMeshDict -exec sed -i 's\symmetry \symmetryPlane \g' {} +
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
     echo "Changing symmetry to symmetryPlane in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+        find "${CASE_DIR}" -name boundary -exec sed -i 's\symmetry;\symmetryPlane;\g' {} +
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
     then
     echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+        find "${CASE_DIR}" -name createPatchDict -exec sed -i 's\symmetry;\symmetryPlane;\g' {} +
     fi
 
-    for FILE in $(find "${CASE_DIR}/0" -type f)
+    while IFS= read -r -d '' FILE
     do
         if [[ -f "${FILE}" ]]
         then
@@ -317,7 +317,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
                 sed -i 's\symmetry;\symmetryPlane;\g' "${FILE}"
             fi
         fi
-    done
+    done < <(find "${CASE_DIR}/0" -type f -print0)
 
     # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/system/blockMeshDict ]]
@@ -358,7 +358,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
+        find "${CASE_DIR}" -name turbulenceProperties -exec sed -i "s/RAS;/RASModel;/g" {} +
     fi
 
     # 4. Check for boundaryData
@@ -388,13 +388,13 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
     then
         echo "Changing uniformValue to timeVaryingUniformFixedValue in p"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
+        find "${CASE_DIR}" -name p \
+            -exec sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g" {} +
+        find "${CASE_DIR}" -name p \
+            -exec sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g" {} +
 
         # Remove any //// that were introdued
-        find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
+        find "${CASE_DIR}" -name p -exec sed -i "s|////|//|g" {} +
     fi
 
     # 7. Check for changeDictionaryDict.openfoam
@@ -556,6 +556,29 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
             echo; echo "This case currently does not run with OpenFOAM.org"; echo
             exit 0
         fi
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requirePetscOrExitSilently
+#     Exit cleanly (exit 0) if PETSc is not available, i.e. PETSC_DIR is unset.
+#     Used by tutorials whose (selected) solution approach requires PETSc. This
+#     function is intentionally unaware of case-specific approach names: the
+#     caller decides whether the current approach needs PETSc before calling it.
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requirePetscOrExitSilently()
+{
+    if [[ -z "${PETSC_DIR:-}" ]]
+    then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "If you would like to run this case, solids4foam should be rebuilt with PETSc"
+        echo "(set the PETSC_DIR variable and rebuild solids4foam)"
+        echo
+        exit 0
     fi
 }
 
