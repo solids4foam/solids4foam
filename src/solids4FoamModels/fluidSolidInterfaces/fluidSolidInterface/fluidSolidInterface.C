@@ -34,7 +34,10 @@ License
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "RBFMeshMotionSolver.H"
+#include "addToRunTimeSelectionTable.H"
+#ifndef S4F_NO_RBF
+    #include "RBFMeshMotionSolver.H"
+#endif
 #include "FieldSumOp.H"
 #ifdef OPENFOAM_COM
     #include "dynamicMotionSolverFvMesh.H"
@@ -1034,7 +1037,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         // Check for RBF motion solver
         RBFMeshMotionSolver* rbfMotionSolverPtr = nullptr;
 #ifdef OPENFOAM_COM
@@ -1185,7 +1188,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         else if (rbfMotionSolverPtr)
         {
             // Prepare list of patch motions

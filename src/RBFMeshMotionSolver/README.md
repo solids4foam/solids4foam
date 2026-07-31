@@ -5,6 +5,25 @@ interpolation from selected boundary control points. It is intended for cases
 where the moving boundary displacement is known, for example the fluid mesh in
 a fluid-solid interaction case.
 
+## Building
+
+The library is built by default as part of `Allwmake`. It has no solids4foam
+dependencies of its own, so it can be excluded from the build by setting
+
+```bash
+export S4F_NO_RBF=1
+```
+
+before building. `solids4FoamModels` is then compiled with `-DS4F_NO_RBF` and
+does not link against `libRBFMeshMotionSolver`, which also removes the
+`RBFMeshMotionSolver` mesh motion solver and the `rbf`
+`interfaceToInterfaceMapping` from the runtime selection tables. Cases relying
+on either of these will stop with an unknown-type error listing the available
+selections.
+
+Setting or unsetting the variable does not invalidate objects compiled with the
+previous setting, so run `./Allwclean` before rebuilding when changing it.
+
 ## Example: `perpendicularFlap`
 
 The `perpendicularFlap` tutorial has a small two-dimensional fluid mesh and is a
@@ -87,10 +106,18 @@ functions require a positive `radius` entry in the `interpolation` dictionary.
 system. This can improve rigid-body-like motion reproduction, but it increases
 the dense system size.
 
-`cpu` stores the factorisation of the control-point system and evaluates the
-point interpolation matrix at each interpolation. With `cpu no`, the solver
-stores the full point interpolation matrix. `fullCPU yes` requires `cpu yes` and
-keeps more of the interpolation work out of the precomputed matrix path.
+`cpu` selects the memory-lean formulation: the factorisation of the
+control-point system is stored, and the point interpolation matrix is evaluated
+at each interpolation. With `cpu no`, the solver instead stores the explicit
+(dense) point interpolation matrix, which is faster per motion update but uses
+considerably more memory for large meshes.
+
+`fullCPU` additionally discards the factorisation after every motion update, so
+the control point positions and the factorisation are rebuilt from the current
+(deformed) mesh each time. This is the slowest and leanest option, and is only
+needed when the control point positions themselves change during the run.
+`fullCPU yes` implies `cpu yes`: setting `cpu no; fullCPU yes;` enables `cpu`
+and issues a warning.
 
 ## Coarsening Options
 

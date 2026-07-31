@@ -26,30 +26,73 @@ dynamicFvMesh dynamicMotionSolverFvMesh;
 diffusivity quadratic inverseDistance (flap);
 
 // Settings for the RBF solver
+// See src/RBFMeshMotionSolver/README.md for further details
 // RBFMeshMotionSolverCoeffs
 // {
-//     staticPatches    (upperWall lowerWall);
+//     // Patches whose displacement drives the mesh motion, i.e. the fluid-side
+//     // FSI patch
 //     movingPatches    (flap);
+//
+//     // Patches included as zero-motion control points, which anchor the
+//     // interpolation
+//     staticPatches    (upperWall lowerWall);
+//
+//     // Patches reset to zero motion after the interpolation
 //     fixedPatches     (inlet outlet);
+//
+//     // A patch should appear in at most one of the three lists above; empty,
+//     // wedge and processor patches are omitted
 //
 //     interpolation
 //     {
+//         // Radial basis function: TPS, WendlandC0, WendlandC2, WendlandC4 or
+//         // WendlandC6; the Wendland functions also require a "radius" entry
 //         function     TPS;
+//
+//         // Add constant and linear polynomial terms to the interpolation;
+//         // improves rigid-body-like motion at the cost of a larger system
 //         polynomial   no;
+//
+//         // Store the factorisation of the control-point system rather than
+//         // the explicit interpolation matrix: slower, but much less memory
 //         cpu          no;
+//
+//         // Also rebuild the control point positions and the factorisation at
+//         // every motion update; implies "cpu"
 //         fullCPU      no;
 //     }
 //
 //     coarsening
 //     {
+//         // Select a subset of the boundary control points, rather than using
+//         // every moving and static face centre
 //         enabled                 yes;
+//
+//         // Relative error tolerance for the greedy point selection
 //         tol                     0.05;
+//
+//         // Bounds on the number of selected control points
 //         minPoints               20;
 //         maxPoints               200;
+//
+//         // Reselect the control points during the run from the accumulated
+//         // motion; usually preferable for FSI, as the interface deforms
 //         livePointSelection      yes;
+//
+//         // Reuse the current selection while it interpolates the accumulated
+//         // motion below this relative tolerance
 //         tolLivePointSelection   0.05;
+//
+//         // Write the selected point coordinates for inspection
 //         exportSelectedPoints    no;
+//
+//         // Add a second point in the opposite error direction at each greedy
+//         // selection step
 //         twoPointSelection       no;
+//
+//         // Apply a WendlandC2 correction based on the coarse interpolation
+//         // error at the boundary; "ratioRadiusError" (default 10.0) sets the
+//         // correction radius
 //         surfaceCorrection       no;
 //     }
 // }
