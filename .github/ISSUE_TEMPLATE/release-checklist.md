@@ -12,6 +12,9 @@ assignees: ""
 - [ ] `./Alltest` and `./Alltest-regression` pass locally on each supported OpenFOAM/foam-extend version
 - [ ] Update `CITATION.cff` (`version`, `date-released`, and DOI if a new one is minted)
 - [ ] Update `CONTRIBUTORS.md` if new contributors since last release
+- [ ] Update `solids4foamVersion` in
+      `applications/scripts/solids4FoamUpdateCaseFileHeader.sh` and run the
+      script across all tutorial cases
 - [ ] Tutorial/README docs reflect any new features or breaking changes
 
 ## Tag and publish
