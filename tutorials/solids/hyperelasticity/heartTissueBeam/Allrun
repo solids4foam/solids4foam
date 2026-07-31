@@ -2,17 +2,13 @@
 
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-if [[ $WM_PROJECT != "foam" ]]
-then
-    echo; echo "This case currently only runs in foam-extend"; echo
-    exit 0
-fi
-
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+
+solids4Foam::caseOnlyRunsWithFoamExtend
 
 set -e
 
@@ -27,6 +23,21 @@ touch case.foam
 # mesh
 runApplication blockMesh
 
-#before running the case, run blockMesh command in openfoam2206 or openfoam2306
-# run
-runApplication solids4Foam
+# Run solver
+if [[ "$1" == "parallel" ]]
+then
+    runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Plot tip displacement history
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating tipPointDisplacement.png using gnuplot"
+    gnuplot tipPointDisplacement.gplt &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
