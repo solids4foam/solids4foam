@@ -185,6 +185,14 @@ discretisation enabled via the `highOrderCoeffs` sub-dictionary. This requires
 PETSc and a mechanical law that provides the stress at face quadrature points,
 e.g. `StVenantKirchhoffElastic`.
 
+The equivalent updated Lagrangian approach is available as
+`> ./Allrun highOrderUpdatedLagrangian`, which enables the same
+`highOrderCoeffs` options on the `nonLinearGeometryUpdatedLagrangian` solid
+model. As this solid model moves the mesh, the moving least squares stencils,
+quadrature points and interpolation coefficients are re-calculated each time
+step, and the total deformation gradient at the quadrature points is
+accumulated across time steps.
+
 ---
 
 ## Regression Testing

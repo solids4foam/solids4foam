@@ -458,12 +458,15 @@ void Foam::solidModel::makeDisplacementMLS() const
             << "pointer already set!" << abort(FatalError);
     }
 
+    // Note: the mask is taken from the primary solution field: for incremental
+    // solid models this is DD, as it is that field which carries the boundary
+    // conditions
     displacementMLSPtr_.set
     (
         new movingLeastSquares
         (
             mesh(),
-            fixedValuePatchMask(D()),
+            fixedValuePatchMask(incremental() ? DD_ : D_),
             displacementHighOrderCoeffs()
         )
     );

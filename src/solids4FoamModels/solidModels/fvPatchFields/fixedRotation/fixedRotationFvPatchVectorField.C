@@ -402,13 +402,20 @@ gradientBoundaryCoeffs() const
 autoPtr<CompactListList<vector>>
 fixedRotationFvPatchVectorField::evaluateQuadrature() const
 {
-    if (internalField().name() == "DD")
+    // When the displacement increment is the primary unknown, the mesh has
+    // already been moved by the accumulated displacement, so the quadrature
+    // points lie in the configuration at the start of the time step and only
+    // the increment of the rigid rotation is applied below
+    const bool incremental = (internalField().name() == "DD");
+
+    if (incremental && (!angleSeries_.size() || originSeries_.size()))
     {
         notImplemented
         (
             type() + "::evaluateQuadrature()\n"
-            "Quadrature-point evaluation is only implemented when the "
-            "displacement increment is not the primary unknown"
+            "When the displacement increment is the primary unknown, "
+            "quadrature-point evaluation requires a 'rotationAngleSeries' and "
+            "a fixed 'rotationOrigin'"
         );
     }
 
@@ -435,9 +442,9 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     // Get a reference to the actual data for easier access
     CompactListList<vector>& quadPointsValue = tQuadPointsValue();
 
-    // Rotation tensor
+    // Rotation angle applied to the current quadrature point positions
     // Note: rotationAngle_ and rotationOrigin_ are updated by updateCoeffs
-    const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
+    scalar rotationAngle = rotationAngle_;
 
     // Optional superimposed translation
     vector translation = vector::zero;
@@ -445,6 +452,26 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     {
         translation = dispSeries_(this->db().time().timeOutputValue());
     }
+
+    if (incremental)
+    {
+        // Rotations about a common axis and origin commute, so the increment of
+        // displacement of a point p in the current configuration is given by
+        // the increment of rotation applied about the same origin
+        const scalar oldTimeValue =
+            this->db().time().timeOutputValue()
+          - this->db().time().deltaTValue();
+
+        rotationAngle -= angleSeries_(oldTimeValue);
+
+        if (dispSeries_.size())
+        {
+            translation -= dispSeries_(oldTimeValue);
+        }
+    }
+
+    // Rotation tensor
+    const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle);
 
     forAll(*this, faceI)
     {

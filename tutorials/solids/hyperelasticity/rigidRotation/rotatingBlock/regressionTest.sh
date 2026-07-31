@@ -31,6 +31,7 @@ SIGMA_TOL=50.0
 APPROACHES=(
     totalLagrangian
     highOrder
+    highOrderUpdatedLagrangian
 )
 
 failures=0
