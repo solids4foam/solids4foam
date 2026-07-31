@@ -132,12 +132,7 @@ link_files_for_suffix() {
 require_petsc_or_exit_silently() {
     case "${APPROACH}" in
         petscSnes|highOrder)
-            if [[ -z "${PETSC_DIR:-}" ]]
-            then
-                echo; echo "Skipping this case as PETSc is not installed"
-                echo "Please set the PETSC_DIR variable"; echo
-                exit 0
-            fi
+            solids4Foam::requirePetscOrExitSilently
             ;;
     esac
 }

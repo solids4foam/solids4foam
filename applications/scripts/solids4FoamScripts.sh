@@ -237,8 +237,7 @@ function solids4Foam::applyFoamExtendTweaks()
     #    Patches are given as "symmetry;" in field files, boundary files and
     #    createPatchDict, and as "symmetry <patchName>" in blockMeshDict
 
-    for FILE in $(find "${CASE_DIR}" -name 'blockMeshDict*' -o -name boundary \
-        -o -name createPatchDict)
+    while IFS= read -r -d '' FILE
     do
         if grep -qE "symmetry;|^[[:space:]]*symmetry[[:space:]]" "${FILE}"
         then
@@ -247,19 +246,20 @@ function solids4Foam::applyFoamExtendTweaks()
             sed -i -E 's|^([[:space:]]*)symmetry([[:space:]]+)|\1symmetryPlane\2|' \
                 "${FILE}"
         fi
-    done
+    done < <(find "${CASE_DIR}" \( -name 'blockMeshDict*' -o -name boundary \
+        -o -name createPatchDict \) -print0)
 
-    for DIR in $(solids4Foam::fieldDirs "${CASE_DIR}")
+    while IFS= read -r DIR
     do
-        for FILE in $(find "${DIR}" -type f)
+        while IFS= read -r -d '' FILE
         do
             if grep -q "symmetry;" "${FILE}"
             then
                 echo "Changing symmetry to symmetryPlane in ${FILE}"
                 sed -i 's|symmetry;|symmetryPlane;|g' "${FILE}"
             fi
-        done
-    done
+        done < <(find "${DIR}" -type f -print0)
+    done < <(solids4Foam::fieldDirs "${CASE_DIR}")
 
     # 2. foam extend reads the blockMeshDict from constant/polyMesh
     for DIR in "" solid fluid
@@ -298,7 +298,7 @@ function solids4Foam::applyFoamExtendTweaks()
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties \
-            | xargs sed -i "s/RAS;/RASModel;/g"
+            -exec sed -i "s/RAS;/RASModel;/g" {} +
     fi
 
     # 4. Use the foam extend boundaryData, if present
@@ -319,9 +319,9 @@ function solids4Foam::applyFoamExtendTweaks()
     then
         echo "Changing uniformFixedValue to timeVaryingUniformFixedValue in p"
         find "${CASE_DIR}" -name p \
-            | xargs sed -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g"
+            -exec sed -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            | xargs sed -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g"
+            -exec sed -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Use the foam extend changeDictionaryDict, if present
@@ -404,27 +404,27 @@ function solids4Foam::undoFoamExtendTweaks()
     local DIR
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-    for FILE in $(find "${CASE_DIR}" -name 'blockMeshDict*' -o -name boundary \
-        -o -name createPatchDict)
+    while IFS= read -r -d '' FILE
     do
         if grep -q "symmetryPlane" "${FILE}"
         then
             echo "Changing symmetryPlane to symmetry in ${FILE}"
             sed -i 's|symmetryPlane|symmetry|g' "${FILE}"
         fi
-    done
+    done < <(find "${CASE_DIR}" \( -name 'blockMeshDict*' -o -name boundary \
+        -o -name createPatchDict \) -print0)
 
-    for DIR in $(solids4Foam::fieldDirs "${CASE_DIR}")
+    while IFS= read -r DIR
     do
-        for FILE in $(find "${DIR}" -type f)
+        while IFS= read -r -d '' FILE
         do
             if grep -q "symmetryPlane;" "${FILE}"
             then
                 echo "Changing symmetryPlane to symmetry in ${FILE}"
                 sed -i 's|symmetryPlane;|symmetry;|g' "${FILE}"
             fi
-        done
-    done
+        done < <(find "${DIR}" -type f -print0)
+    done < <(solids4Foam::fieldDirs "${CASE_DIR}")
 
     # 2. OpenFOAM reads the blockMeshDict from system
     for DIR in "" solid fluid
@@ -471,7 +471,7 @@ function solids4Foam::undoFoamExtendTweaks()
     then
         echo "Changing RASModel to RAS in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties \
-            | xargs sed -i "s/RASModel;/RAS;/g"
+            -exec sed -i "s/RASModel;/RAS;/g" {} +
     fi
 
     # 4. Restore the OpenFOAM boundaryData, if it was replaced
@@ -492,9 +492,9 @@ function solids4Foam::undoFoamExtendTweaks()
     then
         echo "Changing timeVaryingUniformFixedValue to uniformFixedValue in p"
         find "${CASE_DIR}" -name p \
-            | xargs sed -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g"
+            -exec sed -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            | xargs sed -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g"
+            -exec sed -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Restore the OpenFOAM changeDictionaryDict, if it was replaced
@@ -739,6 +739,29 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
             echo; echo "This case currently does not run with OpenFOAM.org"; echo
             exit 0
         fi
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requirePetscOrExitSilently
+#     Exit cleanly (exit 0) if PETSc is not available, i.e. PETSC_DIR is unset.
+#     Used by tutorials whose (selected) solution approach requires PETSc. This
+#     function is intentionally unaware of case-specific approach names: the
+#     caller decides whether the current approach needs PETSc before calling it.
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requirePetscOrExitSilently()
+{
+    if [[ -z "${PETSC_DIR:-}" ]]
+    then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "If you would like to run this case, solids4foam should be rebuilt with PETSc"
+        echo "(set the PETSC_DIR variable and rebuild solids4foam)"
+        echo
+        exit 0
     fi
 }
 

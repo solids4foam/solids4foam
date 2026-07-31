@@ -83,6 +83,12 @@ class sonicLiquidFluid
         //- Fluid density
         volScalarField rho_;
 
+        //- Gravity related fields
+        uniformDimensionedScalarField hRef_;
+        dimensionedScalar ghRef_;
+        volScalarField gh_;
+        surfaceScalarField ghf_;
+
         //- Creates and initialises the momentum field rhoUf
         autoPtr<surfaceVectorField> rhoUf_;
 
