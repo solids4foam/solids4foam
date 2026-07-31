@@ -129,6 +129,28 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField>
+Foam::StVenantKirchhoffElastic::bulkModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "K",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_
+        )
+    );
+}
+
+
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field
@@ -199,6 +221,41 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
     // sigma = (1.0/J)*symm(Ff() & S & Ff().T());
     sigma = (1.0/J)*transform(F, S);
 }
+
+
+#ifndef FOAMEXTEND
+void Foam::StVenantKirchhoffElastic::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    // Get mu and lambda values
+    const scalar mu = mu_.value();
+    const scalar lambda = lambda_.value();
+
+    forAll(sigmaQuad, faceI)
+    {
+        UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            // Total deformation gradient
+            const tensor F(I + faceGradDQuad[qpI].T());
+
+            // Green strain tensor
+            const symmTensor E(0.5*(symm(F.T() & F) - I));
+
+            // 2nd Piola Kirchhoff stress
+            const symmTensor S(2.0*mu*E + lambda*tr(E)*I);
+
+            // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
+            faceSigmaQuad[qpI] = (1.0/det(F))*transform(F, S);
+        }
+    }
+}
+#endif
 
 
 void Foam::StVenantKirchhoffElastic::setRestart()

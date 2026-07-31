@@ -6,7 +6,7 @@ IFS=$'\n\t'
 # solids4Foam Allrun script
 # Allows selection of solution approach:
 #   totalLagrangian (default), updatedLagrangian, totalLagrangianPetscSnes,
-#   updatedLagrangianPetscSnes
+#   updatedLagrangianPetscSnes, highOrder
 # -------------------------------------------------------------------------
 
 usage() {
@@ -19,6 +19,7 @@ Where [approach] is one of:
   updatedLagrangian
   totalLagrangianPetscSnes
   updatedLagrangianPetscSnes
+  highOrder
 
 Examples:
   ./Allrun
@@ -26,6 +27,7 @@ Examples:
   ./Allrun updatedLagrangian
   ./Allrun totalLagrangianPetscSnes
   ./Allrun updatedLagrangianPetscSnes
+  ./Allrun highOrder
 EOF
 }
 
@@ -53,7 +55,7 @@ APPROACH="${1:-totalLagrangian}"
 
 # Validate approach name
 case "$APPROACH" in
-    totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes) ;;
+    totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes|highOrder) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -92,8 +94,8 @@ require_petsc_or_exit_silently() {
 select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
-        totalLagrangian|totalLagrangianPetscSnes)
-            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+        totalLagrangian|totalLagrangianPetscSnes|highOrder)
+            if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == "highOrder" ]]; then
                 require_petsc_or_exit_silently
             fi
             link_files_for_suffix "$APPROACH"

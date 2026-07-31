@@ -178,6 +178,13 @@ the cases in the Fluent `.msh` format, and the meshes are created with the
 `fluentMeshToFoam` utility. The `solids4foam` solver runs all three cases
 (`> solids4Foam`).
 
+The `rotatingBlock` case additionally accepts a `highOrder` approach
+(`> ./Allrun highOrder`), which uses the total Lagrangian solid model with the
+`PETScSNES` solution algorithm and the high-order, moving least squares
+discretisation enabled via the `highOrderCoeffs` sub-dictionary. This requires
+PETSc and a mechanical law that provides the stress at face quadrature points,
+e.g. `StVenantKirchhoffElastic`.
+
 ---
 
 ## Regression Testing

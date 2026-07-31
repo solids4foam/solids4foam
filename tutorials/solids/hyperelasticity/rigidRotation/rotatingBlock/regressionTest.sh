@@ -30,6 +30,7 @@ SIGMA_TOL=50.0
 # Solution approach to test
 APPROACHES=(
     totalLagrangian
+    highOrder
 )
 
 failures=0
@@ -59,6 +60,12 @@ for approach in "${APPROACHES[@]}"; do
     echo "------------------------------------------------------------"
     echo "Testing approach: ${approach}"
     echo "------------------------------------------------------------"
+
+    # Clean previous run
+    # The solver log is removed explicitly so that a failed run cannot be
+    # checked against the log of the previous approach
+    ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
+    rm -f "${CASE_DIR}/${SOLVER_LOGFILE}"
 
     # Run case
     ( cd "${CASE_DIR}" && ./Allrun "${approach}" ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1

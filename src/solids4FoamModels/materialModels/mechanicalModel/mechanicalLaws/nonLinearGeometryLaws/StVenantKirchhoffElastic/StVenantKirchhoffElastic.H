@@ -110,11 +110,24 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Return the bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+#ifndef FOAMEXTEND
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+#endif
 
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly

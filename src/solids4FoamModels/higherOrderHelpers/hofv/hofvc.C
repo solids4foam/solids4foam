@@ -127,6 +127,101 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 };
 
 
+tmp<surfaceVectorField> hofvc::surfaceIntegrate
+(
+    const CompactListList<symmTensor>& quadSigma,
+    const CompactListList<tensor>& quadGradD,
+    const fvMesh& mesh
+)
+{
+#ifndef FOAMEXTEND
+    tmp<surfaceVectorField> tsf
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "surfaceIntegrate(P)",
+                 mesh.time().timeName(),
+                 mesh,
+                 IOobject::NO_READ,
+                 IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector("0", dimPressure, vector::zero)
+        )
+    );
+
+    surfaceVectorField& tf = tsf.ref();
+
+    const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
+    const surfaceScalarField& magSf = mesh.magSf();
+    // Reference to integration weights
+    const solidModel& solMod = lookupSolidModel(mesh);
+    const CompactListList<scalar>& quadW =
+        solMod.displacementMLS().quadrature().faceQuadWeights();
+
+    // The transpose of the first Piola-Kirchhoff stress is
+    // P^T = J*(Finv & sigma), such that the nominal traction is (n0 & P^T),
+    // where n0 is the undeformed face unit normal
+
+    forAll(tf, faceI)
+    {
+        // Sigma and gradD at the quadrature points on the face
+        const UList<symmTensor>& faceQuadStress = quadSigma[faceI];
+        const UList<tensor>& faceQuadGradD = quadGradD[faceI];
+
+        const vector& faceNormal = normal[faceI];
+
+        forAll(faceQuadStress, pI)
+        {
+            const tensor F(I + faceQuadGradD[pI].T());
+            const tensor PT(det(F)*(inv(F) & faceQuadStress[pI]));
+
+            // Add nominal traction contribution of this quadrature point
+            tf[faceI] += (faceNormal & PT)*quadW[faceI][pI];
+        }
+        // We use physical weights so we need to divide with area to get
+        // traction
+        tf[faceI] *= (1.0/magSf[faceI]);
+    }
+
+    forAll(tf.boundaryField(), patchI)
+    {
+        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        forAll(tfPatch, faceI)
+        {
+            const label globalFaceID =
+                mesh.boundaryMesh()[patchI].start() + faceI;
+
+            // Sigma and gradD at the Gauss quadrature points on the face
+            const UList<symmTensor>& faceQuadStress = quadSigma[globalFaceID];
+            const UList<tensor>& faceQuadGradD = quadGradD[globalFaceID];
+
+            const vector& faceNormal = normal[globalFaceID];
+
+            forAll(faceQuadStress, pI)
+            {
+                const tensor F(I + faceQuadGradD[pI].T());
+                const tensor PT(det(F)*(inv(F) & faceQuadStress[pI]));
+
+                // Add nominal traction contribution of this quadrature point
+                tfPatch[faceI] +=
+                    (faceNormal & PT)*quadW[globalFaceID][pI];
+            }
+
+            tfPatch[faceI] *= (1.0/magSf.boundaryField()[patchI][faceI]);
+        }
+    }
+
+    return tsf;
+#else
+    notImplemented("Not implemented for foam extend");
+    return tmp<surfaceVectorField>();
+#endif
+};
+
+
 tmp<volVectorField> hofvc::d2dt2
 (
     const volVectorField& D

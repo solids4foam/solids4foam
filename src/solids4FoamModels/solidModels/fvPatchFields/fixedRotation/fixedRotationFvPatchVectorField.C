@@ -25,6 +25,7 @@ License
 #include "RodriguesRotation.H"
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
+#include "lookupSolidModel.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -395,6 +396,79 @@ gradientBoundaryCoeffs() const
         return (patch().deltaCoeffs()*(*this));
     }
 }
+
+
+#ifndef FOAMEXTEND
+autoPtr<CompactListList<vector>>
+fixedRotationFvPatchVectorField::evaluateQuadrature() const
+{
+    if (internalField().name() == "DD")
+    {
+        notImplemented
+        (
+            type() + "::evaluateQuadrature()\n"
+            "Quadrature-point evaluation is only implemented when the "
+            "displacement increment is not the primary unknown"
+        );
+    }
+
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is a list for the whole mesh
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementMLS().quadrature().faceQuadPoints();
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Rotation tensor
+    // Note: rotationAngle_ and rotationOrigin_ are updated by updateCoeffs
+    const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
+
+    // Optional superimposed translation
+    vector translation = vector::zero;
+    if (dispSeries_.size())
+    {
+        translation = dispSeries_(this->db().time().timeOutputValue());
+    }
+
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        const UList<point>& quadPoints = faceQuadPoints[globalFaceID];
+
+        // The displacement due to a rigid rotation varies linearly in space,
+        // so it is evaluated exactly at each quadrature point
+        forAll(quadPoints, pointI)
+        {
+            const point& p = quadPoints[pointI];
+
+            quadPointsValue[faceI][pointI] =
+                (rotMat & (p - rotationOrigin_))
+              + rotationOrigin_
+              - p
+              + translation;
+        }
+    }
+
+    return tQuadPointsValue;
+}
+#endif
 
 
 void fixedRotationFvPatchVectorField::write(Ostream& os) const

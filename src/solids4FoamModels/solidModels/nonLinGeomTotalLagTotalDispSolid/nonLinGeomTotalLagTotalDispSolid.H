@@ -42,6 +42,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
