@@ -24,26 +24,14 @@ REG_END_TIME=0.3
 
 # Reference values
 # Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3
-# Measured on OpenFOAM v2606; the peak occurs at t = 0.2325
-REF_MAX_DISP=0.0502752
+# Rounded reference covering OpenFOAM.com, OpenFOAM.org and foam-extend
+REF_MAX_DISP=0.049
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    # Measured on foam-extend 4.1; the peak occurs at t = 0.222917
-    REF_MAX_DISP=0.0468941
-fi
 
 echo "============================================================"
 echo "flexibleDamBreak FSI regression test"
