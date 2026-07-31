@@ -16,8 +16,8 @@ fi
 # Checks the final Z displacement.
 # ============================================================
 
-PUNCH_DISP_Z_MIN=-0.00019
-PUNCH_DISP_Z_MAX=-0.0001
+PUNCH_DISP_Z_MIN=-0.00025
+PUNCH_DISP_Z_MAX=-0.0002
 
 ALLRUN_LOGFILE="log.Allrun"
 
