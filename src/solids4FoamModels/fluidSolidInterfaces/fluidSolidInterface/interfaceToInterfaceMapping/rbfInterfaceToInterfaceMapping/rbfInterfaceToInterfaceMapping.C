@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef S4F_NO_RBF
+
 #include "rbfInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
 #include "TPSFunction.H"
@@ -282,5 +284,7 @@ void rbfInterfaceToInterfaceMapping::transferPointsZoneToZone
 } // End namespace interfaceToInterfaceMappings
 
 } // End namespace Foam
+
+#endif // end of #ifndef S4F_NO_RBF
 
 // ************************************************************************* //

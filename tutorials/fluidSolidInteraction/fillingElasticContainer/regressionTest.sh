@@ -143,9 +143,11 @@ apex_diff_abs=$(abs "$(awk "BEGIN {print ${apex_dy} - ${REF_APEX_DY}}")")
 failures=0
 
 if awk "BEGIN {exit !(${apex_diff_abs} < ${APEX_DISP_TOL})}"; then
-    printf "PASS: final apex dy = %.6g\n" "${apex_dy}"
+    printf "PASS: final apex dy = %.6g (diff = %.3g)\n" \
+        "${apex_dy}" "${apex_diff_abs}"
 else
-    printf "FAIL: final apex dy = %.6g\n" "${apex_dy}"
+    printf "FAIL: final apex dy = %.6g (diff = %.3g)\n" \
+        "${apex_dy}" "${apex_diff_abs}"
     failures=$((failures + 1))
 fi
 
