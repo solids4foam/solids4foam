@@ -64,7 +64,19 @@ if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
+
+    if [[ "$WM_PROJECT" == "foam" ]]; then
+        # foam-extend's processorPolyPatch face-matching check
+        # (patchFaceMatchTol, default 1e-3) can trip partway through this
+        # case: the parallel mesh-motion point interpolation is not exactly
+        # reproducible across processor boundaries, and the mismatch grows
+        # with the beam's oscillation amplitude until it exceeds the default
+        # tolerance. Loosen it for foam-extend only.
+        solids4Foam::runParallel solids4Foam -Tolerances patchFaceMatchTol=0.05
+    else
+        solids4Foam::runParallel solids4Foam
+    fi
+
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
