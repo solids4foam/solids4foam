@@ -83,6 +83,15 @@ link_files_for_suffix() {
     fi
 }
 
+link_default_control_dict() {
+    # link_files_for_suffix links system/controlDict.<approach> when the approach
+    # provides one; otherwise the controlDict symlink may still point at the
+    # variant used by a previous run, so reset it to the default here
+    if [[ ! -f "system/controlDict.${APPROACH}" ]]; then
+        ln -vnsf controlDict.default system/controlDict
+    fi
+}
+
 require_petsc_or_exit_silently() {
     if [[ -z "${PETSC_DIR:-}" ]]; then
         echo
@@ -111,6 +120,8 @@ select_approach() {
             (cd 0 && rm -f D* && ln -s org/DD .)
             ;;
     esac
+
+    link_default_control_dict
 }
 
 # -------------------------------------------------------------------------

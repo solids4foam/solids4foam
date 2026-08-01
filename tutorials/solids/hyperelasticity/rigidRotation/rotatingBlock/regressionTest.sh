@@ -30,6 +30,8 @@ SIGMA_TOL=50.0
 # Solution approach to test
 APPROACHES=(
     totalLagrangian
+    totalLagrangianPetscSnes
+    updatedLagrangianPetscSnes
     highOrder
     highOrderUpdatedLagrangian
 )

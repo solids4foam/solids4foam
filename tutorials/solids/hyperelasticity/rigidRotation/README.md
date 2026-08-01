@@ -193,6 +193,13 @@ quadrature points and interpolation coefficients are re-calculated each time
 step, and the total deformation gradient at the quadrature points is
 accumulated across time steps.
 
+The `rotatingBlock` case rotates by 100 degrees, with one exception: the
+`totalLagrangianPetscSnes` approach stops at 80 degrees, via its own
+`system/controlDict.totalLagrangianPetscSnes`. The PETSc SNES Jacobian used by
+that approach diverges at approximately 90 degrees of rotation, while the
+segregated, updated Lagrangian PETSc SNES and high-order approaches all complete
+the full rotation.
+
 ---
 
 ## Regression Testing

@@ -13,34 +13,38 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSolution;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solvers
-{
-    "D|DD"
-    {
-        solver          petsc;
-        options
-        {
-            snes_type newtonls;
-            snes_rtol "1e-12";
-            snes_stol "1e-12";
-            snes_monitor;
-            snes_converged_reason;
-            snes_mf;
-            snes_mf_operator;
+application     solids4Foam;
 
-            ksp_type lgmres;
-            ksp_gmres_restart "100";
-            ksp_converged_reason;
+startFrom       startTime;
 
-            pc_type lu;
-            snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
-        }
-    }
-}
+startTime       0;
+
+stopAt          endTime;
+
+endTime         10;
+
+deltaT          0.2;
+
+writeControl    runTime;
+
+writeInterval   1;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
 
 // ************************************************************************* //
