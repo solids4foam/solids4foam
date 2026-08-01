@@ -876,8 +876,12 @@ label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
     {
         // Note: the non-zero structure is preallocated from the moving least
         // squares stencils on the initial mesh. As this solid model moves the
-        // mesh, the stencils are re-calculated each time step and, if they
-        // change, PETSc will report a new non-zero allocation error
+        // mesh, the stencils are re-calculated each time step (see
+        // updateTotalFields) and, if they change, PETSc will report a new
+        // non-zero allocation error. This has been verified for rigid motion,
+        // where the stencils are unchanged by construction; a case with
+        // sufficient mesh deformation to re-order a stencil would require the
+        // Jacobian to be re-created after mesh motion
         return hofvm::initialiseJacobian
         (
             jac,
@@ -1436,8 +1440,28 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     if (highOrderResidual() || highOrderJacobian())
     {
         // The moving least squares stencils, quadrature points and
-        // interpolation coefficients are all geometric, so they must be
-        // re-calculated on the moved mesh
+        // interpolation coefficients are all geometric, so they are
+        // re-calculated here on the moved mesh
+        //
+        // This is the first solid model with a moving mesh to use the
+        // high-order approach, so it is the first to face the choice between:
+        //   1. building the stencils once on the initial mesh and re-using
+        //      them, which is cheaper and keeps the Jacobian sparsity pattern
+        //      fixed, but lets the stencils become progressively less
+        //      appropriate as the mesh deforms; and
+        //   2. re-calculating them after every mesh motion, as done here,
+        //      which keeps the stencils consistent with the current mesh at
+        //      the cost of rebuilding them each time step.
+        //
+        // Option 2 is used here because it is the conservative choice: the
+        // stencil always matches the mesh it is used on. Note that for a rigid
+        // motion the two options are equivalent, since the stencil is
+        // distance-sorted and a rigid motion preserves all distances.
+        //
+        // The distinction is expected to matter more when this approach is
+        // extended to fluids, where the mesh may deform far more than in a
+        // typical solid case
+        //
         // Note: FQuadOldPtr_ and gradDTotalQuadPtr_ are deliberately not
         // cleared, as the quadrature points move with the material
         clearMovingLeastSquaresData();
