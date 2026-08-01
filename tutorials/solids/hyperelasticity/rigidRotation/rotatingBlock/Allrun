@@ -109,12 +109,18 @@ select_approach() {
             if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == "highOrder" ]]; then
                 require_petsc_or_exit_silently
             fi
+            if [[ "$APPROACH" == highOrder* ]]; then
+                solids4Foam::caseDoesNotRunWithFoamExtend
+            fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/D .)
             ;;
         updatedLagrangian|updatedLagrangianPetscSnes|highOrderUpdatedLagrangian)
             if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == highOrder* ]]; then
                 require_petsc_or_exit_silently
+            fi
+            if [[ "$APPROACH" == highOrder* ]]; then
+                solids4Foam::caseDoesNotRunWithFoamExtend
             fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/DD .)
