@@ -633,6 +633,8 @@ function solids4Foam::useForcesDat()
     local CASE_DIR="$1"
     local FILE
 
+    # Convert the OpenFOAM.com filename and total-force columns to the
+    # foam-extend/OpenFOAM.org filename and pressure-plus-viscous columns
     for FILE in $(find "${CASE_DIR}" -name force.gnuplot)
     do
         echo "Changing force.dat to forces.dat in ${FILE}"
@@ -649,6 +651,8 @@ function solids4Foam::useForceDat()
     local CASE_DIR="$1"
     local FILE
 
+    # Reverse useForcesDat: restore the OpenFOAM.com filename and total-force
+    # columns from the foam-extend/OpenFOAM.org form
     for FILE in $(find "${CASE_DIR}" -name force.gnuplot)
     do
         echo "Changing forces.dat to force.dat in ${FILE}"

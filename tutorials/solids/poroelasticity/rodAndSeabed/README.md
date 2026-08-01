@@ -67,20 +67,16 @@ Table 2 - Boundary conditions for displacement and pressure
 
 The `seabed` pressure condition reads the mapped pressure values from
 `constant/boundaryData/seabed`. Since the solved field is named `p`, the active
-time directories contain files named `p`, for example:
+time directories contain files named `p` for the initial state and the single
+simulated time step:
 
 ```text
 constant/boundaryData/seabed/0/p
 constant/boundaryData/seabed/0.05/p
-constant/boundaryData/seabed/0.1/p
-constant/boundaryData/seabed/0.15/p
-constant/boundaryData/seabed/0.2/p
-constant/boundaryData/seabed/0.25/p
 ```
 
 The same directory also contains `points` and `faces`, which define the source
-patch geometry used for mapping. The `p_w` files are present as auxiliary data,
-but they are not referenced by the `p` boundary condition.
+patch geometry used for mapping.
 
 > Note: some current case settings differ from the values reported in [1].
 > The porosity is $$0.2$$, the degree of saturation is
