@@ -29,9 +29,9 @@ stopAt          endTime;
 // corresponds to 80 degrees of rigid rotation, rather than the 100 degrees used
 // by the other approaches.
 // The rotation is stopped short because the PETSc SNES Jacobian used by this
-// approach diverges at approximately 90 degrees: the segregated approach and
-// the high-order PETSc SNES approaches all complete the full 100 degrees. See
-// the test coverage tracking issue for details.
+// approach diverges at approximately 90 degrees: the segregated, updated
+// Lagrangian PETSc SNES and high-order approaches all complete the full 100
+// degrees. See issue #325 for details.
 endTime         8;
 
 deltaT          0.2;
