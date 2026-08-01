@@ -59,23 +59,23 @@ behaviour is linear elastic, and plane strain conditions are assumed.
 
 ### Table 1: Physical Parameters
 
-|               Parameter                |       Symbol       |    Value       |
-| :------------------------------------: | :----------------: | :------------: |
-| Solid Young's Modulus  | $$E$$        |     0.5 kPa                 |
-| Solid Density          |  $$ \rho$$   |     1 kg m$$^{-3}$$             |
-| Solid Poisson Ratio    | $$ \nu$$     |     0.3                   |
+| Parameter | Symbol | Value |
+| :---: | :---: | :---: |
+| Solid Young's Modulus | $$E$$ | 0.5 kPa |
+| Solid Density | $$ \rho$$ | 1 kg m$$^{-3}$$ |
+| Solid Poisson Ratio | $$ \nu$$ | 0.3 |
 | Solid Coefficient of Thermal Expansion | $$ \alpha$$ | $$10^{-5}$$ K$$^{-1}$$ |
-| Solid Thermal Conductivity       |       $$k$$ | $$0.04$$ W/(m K)   |
-| Solid Specific Heat Capacity      |      $$C_p$$   |  $$1010$$ J/(kg K)   |
-| Solid Reference Temperature |      $$T_0$$ |    $$0$$ K     |
-| Fluid Viscosity       |      $$\mu$$ | $$2.15\times10^{-5}$$ Pa s |
-| Fluid Density  |      $$\rho$$      |      1 kg m$$^{-3}$$       |
+| Solid Thermal Conductivity | $$k$$ | $$0.04$$ W/(m K) |
+| Solid Specific Heat Capacity | $$C_p$$ | $$1010$$ J/(kg K) |
+| Solid Reference Temperature | $$T_0$$ | $$0$$ K |
+| Fluid Viscosity | $$\mu$$ | $$2.15\times10^{-5}$$ Pa s |
+| Fluid Density | $$\rho$$ | 1 kg m$$^{-3}$$ |
 | Fluid Coefficient of Thermal Expansion | $$\beta$$ | $$0.00285$$ K$$^{-1}$$ |
-| Fluid Thermal Conductivity |    $$\lambda$$     |      $$0.03$$ W/(m K)      |
-| Fluid Specific Heat Capacity      |      $$ C_p$$ | $$1010$$ J/(kg K)      |
-| Fluid Reference Temperature |    $$T_{ref}$$     |   $$303$$ K    |
-| Fluid Turbulent Prandtl Number     | $$ \text{Pr}\_t $$ |      0.85      |
-| Gravity | $$g$$  | $$(0 \; $$-$$9.81 \; 0)$$ m $$s^{-2}$$ |
+| Fluid Thermal Conductivity | $$\lambda$$ | $$0.03$$ W/(m K) |
+| Fluid Specific Heat Capacity | $$ C_p$$ | $$1010$$ J/(kg K) |
+| Fluid Reference Temperature | $$T_{ref}$$ | $$303$$ K |
+| Fluid Turbulent Prandtl Number | $$ \text{Pr}_t $$ | 0.85 |
+| Gravity | $$g$$ | $$(0 \; $$-$$9.81 \; 0)$$ m $$s^{-2}$$ |
 
 A fixed under-relaxation factor of 1.0 is used for both the mechanical and
 thermal interface coupling. Dirichlet-Neumann coupling to used to enforce the

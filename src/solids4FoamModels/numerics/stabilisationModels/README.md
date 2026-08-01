@@ -191,7 +191,7 @@ faceVector_f = scaleFactor * C(mode) * [tr(gradD_f_future) - tr(gradD_f_old)] * 
 Four modes are available, selected via the `mode` entry:
 
 | mode | C(mode) | Vanishes as |
-|---|---|---|
+| --- | --- | --- |
 | `physicalDamping` | `tau/deltaT` | never — permanent physical damping |
 | `firstOrderTemporal` | `1` | O(deltaT) |
 | `secondOrderTemporal` | `deltaT` | O(deltaT^2) |
