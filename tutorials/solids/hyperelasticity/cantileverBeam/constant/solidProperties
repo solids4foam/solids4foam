@@ -22,13 +22,13 @@ solidModel     unsNonLinearGeometryUpdatedLagrangian;
 "unsNonLinearGeometryUpdatedLagrangianCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors             2000;
+    nCorrectors             5000;
 
     // Solution tolerance for displacement
-    solutionTolerance       1e-03;
+    solutionTolerance       1e-06;
 
     // Alternative solution tolerance for displacement
-    alternativeTolerance    1e-03;
+    alternativeTolerance    1e-07;
 
     // Material law solution tolerance
     materialTolerance       1e-05;

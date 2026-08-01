@@ -1491,6 +1491,19 @@ void Foam::solidModel::DDisRequired()
             << "This solidModel requires the 'DD' field to be specified!"
             << abort(FatalError);
     }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    if (incremental() && !restart() && Dheader_.typeHeaderOk<volVectorField>(true))
+#else
+    if (incremental() && !restart() && Dheader_.headerOk())
+#endif
+    {
+        FatalErrorIn(type() + "::DDisRequired()")
+            << "This solidModel solves for the displacement increment 'DD', "
+            << "but a 'D' field was found at the start time." << nl
+            << "Remove 'D' from the initial time directory, or set "
+            << "'restart true' for a consistent restart." << abort(FatalError);
+    }
 }
 
 
