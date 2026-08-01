@@ -17,30 +17,21 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
+DISP_MAX_TOL=2.5e-3      # max displacement absolute tolerance (~5% of reference)
 
 # Regression end time for the copied case only
 REG_END_TIME=0.3
 
 # Reference values
-REF_MAX_DISP=1.93742e-05
+# Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3
+# Rounded reference covering OpenFOAM.com, OpenFOAM.org and foam-extend
+REF_MAX_DISP=0.049
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
 
 echo "============================================================"
 echo "flexibleDamBreak FSI regression test"
@@ -97,7 +88,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $2}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {
