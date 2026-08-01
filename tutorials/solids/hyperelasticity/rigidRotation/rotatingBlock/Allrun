@@ -93,13 +93,7 @@ link_default_control_dict() {
 }
 
 require_petsc_or_exit_silently() {
-    if [[ -z "${PETSC_DIR:-}" ]]; then
-        echo
-        echo "Skipping this case as PETSc is not installed"
-        echo "Please set the PETSC_DIR variable"
-        echo
-        exit 0
-    fi
+    solids4Foam::requirePetscOrExitSilently
 }
 
 select_approach() {

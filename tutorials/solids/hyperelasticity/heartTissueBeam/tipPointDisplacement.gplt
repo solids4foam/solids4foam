@@ -3,8 +3,8 @@
 #
 
 reset
-set output 'tipPointDisplacement.eps'
-set term postscript color
+set term pngcairo dashed size 1024,768 font "Arial,18"
+set output 'tipPointDisplacement.png'
 
 set size 0.5,0.5
 

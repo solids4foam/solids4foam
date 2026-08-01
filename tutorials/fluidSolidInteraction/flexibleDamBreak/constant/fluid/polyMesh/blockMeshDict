@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -48,11 +48,16 @@ vertices
 
 blocks
 (
-    hex (0 1 5 4 12 13 17 16) (23 8 1) simpleGrading (1 1 1)
+    // The x and y divisions below are chosen so that the initial water column
+    // edges (x = 0.146 m, y = 0.292 m) lie on cell faces; otherwise setFields
+    // snaps the column to cell centres and adds ~6% spurious water volume.
+    // The 50 divisions above the dam also match the 8 divisions below it,
+    // giving a uniform cell height across y = 0.08 m.
+    hex (0 1 5 4 12 13 17 16) (24 8 1) simpleGrading (1 1 1)
     hex (2 3 7 6 14 15 19 18) (19 8 1) simpleGrading (1 1 1)
-    hex (4 5 9 8 16 17 21 20) (23 42 1) simpleGrading (1 1 1)
-    hex (5 6 10 9 17 18 22 21) (4 42 1) simpleGrading (1 1 1)
-    hex (6 7 11 10 18 19 23 22) (19 42 1) simpleGrading (1 1 1)
+    hex (4 5 9 8 16 17 21 20) (24 50 1) simpleGrading (1 1 1)
+    hex (5 6 10 9 17 18 22 21) (4 50 1) simpleGrading (1 1 1)
+    hex (6 7 11 10 18 19 23 22) (19 50 1) simpleGrading (1 1 1)
 );
 
 edges

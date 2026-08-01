@@ -61,13 +61,7 @@ case "${APPROACH}" in
     petsc)
         solids4Foam::caseDoesNotRunWithFoamExtend
         solids4Foam::caseDoesNotRunWithOpenFOAMOrg
-        if [[ -z "${PETSC_DIR:-}" ]]; then
-            echo
-            echo "Skipping this case as PETSc is not installed"
-            echo "Please set the PETSC_DIR variable and rebuild solids4foam"
-            echo
-            exit 0
-        fi
+        solids4Foam::requirePetscOrExitSilently
         ;;
     pressureDisplacement)
         solids4Foam::caseOnlyRunsWithFoamExtend
