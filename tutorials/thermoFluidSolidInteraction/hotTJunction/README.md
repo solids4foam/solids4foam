@@ -64,7 +64,7 @@ behaviour is linear elastic, and plane strain conditions are assumed.
 | Solid Young's Modulus | $$E$$ | 0.5 kPa |
 | Solid Density | $$ \rho$$ | 1 kg m$$^{-3}$$ |
 | Solid Poisson Ratio | $$ \nu$$ | 0.3 |
-| Solid Coefficient of Thermal Expansion | $$ \alpha$$ | $$10^{-5}$$ K$$^{-1}$$ |
+| Solid Coefficient of Thermal Expansion | $$\alpha$$ | $$10^{-5}$$ K$$^{-1}$$ |
 | Solid Thermal Conductivity | $$k$$ | $$0.04$$ W/(m K) |
 | Solid Specific Heat Capacity | $$C_p$$ | $$1010$$ J/(kg K) |
 | Solid Reference Temperature | $$T_0$$ | $$0$$ K |
