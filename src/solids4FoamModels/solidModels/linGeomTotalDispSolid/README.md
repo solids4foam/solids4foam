@@ -1,3 +1,7 @@
+---
+sort: 1
+---
+
 # linGeomTotalDispSolid
 
 This page documents the linear-geometry total-displacement solid model.

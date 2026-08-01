@@ -1,5 +1,5 @@
 ---
-sort: 2
+sort: 6
 ---
 
 # Fluid-solid coupling schemes: `fluidSolidInterfaces`
