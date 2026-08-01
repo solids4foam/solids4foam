@@ -19,6 +19,10 @@ FoamFile
 
 libs
 (
+    // fixedGradientCorrected is provided by solids4foam: it must be loaded
+    // here so that utilities, e.g. initialiseTaylorGreenVortex, can also
+    // construct the boundary condition
+    "libsolids4FoamModels.so"
     "libdecayingTaylorGreenVortexMeshMotion.so"
     "libdecayingTaylorGreenVortexFvPatchVectorField.so"
 );

@@ -426,15 +426,16 @@ Foam::GuccioneElastic::GuccioneElastic
 
     // Check for any vectors with zero magnitude; if found, then use the j
     // direction
+    const dimensionedScalar small("small", dimless, SMALL);
     {
         const volScalarField magS0(mag(s0_));
-        const volScalarField posMagS0(pos(magS0));
+        const volScalarField posMagS0(pos(magS0 - small));
         s0_ =
             posMagS0*s0_ + (1.0 - posMagS0)*((I - f0f0_) & vector(0, 1, 0));
     }
     {
         const surfaceScalarField magS0(mag(s0f_));
-        const surfaceScalarField posMagS0(pos(magS0));
+        const surfaceScalarField posMagS0(pos(magS0 - small));
         s0f_ =
             posMagS0*s0f_ + (1.0 - posMagS0)*((I - f0f0f_) & vector(0, 1, 0));
     }

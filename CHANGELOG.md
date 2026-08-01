@@ -8,6 +8,9 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added in v2.4
 
+- Added support for OpenFOAM-v2606, extending compatibility to OpenFOAM-v2312
+  through OpenFOAM-v2606, alongside the existing OpenFOAM-9 and
+  foam-extend-4.1 support.
 - Added a configurable stabilisation framework, including combined
   stabilisation models, volumetric-strain-rate stabilisation, and PETSc SNES
   Jacobian support for JST and even-order schemes.
@@ -15,27 +18,87 @@ release. For complete commit-level details and contributor information, see the
   configurations for `cantilever2d`, Cook's membrane, `pressurisedCylinder`,
   `plateHole`, and `sphericalCavity`
   (<https://doi.org/10.1016/j.jcp.2026.115056>).
-- Added a block-coupled incompressible solid formulation (<https://doi.org/10.3390/app152312660>).
+- Added a block-coupled incompressible solid formulation
+  (<https://doi.org/10.3390/app152312660>).
 - Added `decomposeParMonolithic` for consistently decomposing coupled meshes.
 - Added adaptive time stepping to `newtonIcoFluid`.
 - Added the `solidPressureMinMax` function object and utilities for detecting
   PETSc build state and summarising solver logs.
--Added new tutorial cases and per-tutorial README.md files, plus expanded website documentation.
-- Introduced [`beamFoam`](https://github.com/solids4foam/beamFoam), a sister
-  repository released alongside the v2.4 update. `beamFoam` is developed and
-  maintained in a separate repository and is not part of solids4foam itself
-  (<https://doi.org/10.51560/ofj.v5.170>).
+- Added an optional unity build for `libsolids4FoamModels`, reducing
+  compilation time.
+- Added validation of the PETSc configuration at build time, continuous
+  integration across supported OpenFOAM versions, and a v2512 Docker release
+  image.
+- Added further tutorial cases and per-tutorial README.md files, including the
+  poroelasticity, elastoplasticity, `ellipticPlate`, and one-way cavity cases,
+  plus expanded website documentation.
 
 ### Changed in v2.4
 
+- Tutorial cases are now stored in the OpenFOAM.com format and converted to
+  foam-extend or OpenFOAM.org at run time, rather than the reverse. All three
+  variants continue to work; see the upgrade notes below.
+- Incremental (updated Lagrangian) solid models now stop with a clear message
+  when an initial `D` field is present outside a restart; see the upgrade notes
+  below.
 - Improved IQN-ILS coupling and simplified FSI region selection.
 - Extended `electroMechanicalLaw` with field-based active tension and
   independent fibre tensors.
+- Made point-patch enforcement optional in the `fixedDisplacement` boundary
+  condition, and made the `fluidModel` fluid-property accessors public.
+- Unsupported foam-extend `cyclicGgi` patches now fail with a clear error
+  rather than segfaulting during volume-to-point interpolation.
 - Expanded regression coverage for solid, contact, FSI, and least-squares
-  gradient cases.
+  gradient cases, and added a `Test-leastSquaresS4fGrad` test application.
+
+### Fixed in v2.4
+
+- Fixed PETSc Jacobian preallocation by creating the Jacobian as a block AIJ
+  matrix, resolving segmentation faults with recent PETSc versions.
+- Fixed old-time deformation gradient storage in `StVenantKirchhoffElastic`.
+- Fixed least-squares gradient evaluation at boundary faces, and ported
+  `enhancedVolPointInterpolation` to OpenFOAM-9, correcting rigid-rotation
+  cases solved with the updated Lagrangian approach.
+- Fixed the sign convention in the even-order Laplacian for the `m == 0` case.
+- Fixed boundary condition enforcement in the `diffusionElastic` mechanical law
+  and the tabulated acceleration fields in `sonicLiquidFluid`.
+- Fixed the `RBFMeshMotionSolver` setup for fluid-solid interaction, and
+  documented a verified configuration.
+- Fixed `tmp<fvMatrix>` assembly on OpenFOAM.org.
+
+### Removed in v2.4
+
+- Removed tutorial-specific analytical solution function objects from
+  `src/solids4FoamModels`; these now live in case-local libraries within the
+  corresponding tutorials.
+
+### Upgrade notes for v2.4
+
+- **Tutorial case format**: tutorial cases are stored in the OpenFOAM.com
+  format. Cases copied from the repository run directly on OpenFOAM.com, and
+  the `Allrun` scripts convert them for foam-extend and OpenFOAM.org. Local
+  copies of older cases are unaffected, but any scripts that assumed the
+  foam-extend layout (for example `constant/polyMesh/blockMeshDict`) should be
+  updated.
+- **Initial `D` field with incremental solid models**: incremental updated
+  Lagrangian solid models solve for `DD`, and an initial `D` field alongside it
+  can make boundary conditions pick up an inconsistent displacement history.
+  Such cases now fail at startup unless the run is an explicit restart. Remove
+  `0/D` from affected cases.
+- **Tutorial analytical solutions**: if a case or user library referenced an
+  analytical solution function object from `libsolids4FoamModels`, link against
+  the case-local library in the corresponding tutorial instead.
+
+### Related to v2.4
+
+- [`beamFoam`](https://github.com/solids4foam/beamFoam) was released alongside
+  the v2.4 update (<https://doi.org/10.51560/ofj.v5.170>). It is developed and
+  maintained in a separate repository and is not part of solids4foam itself.
 
 ## [v2.3] - 2026-02-04
+
 ### Added in v2.3
+
 - Added a Newton-Krylov solid solver, offering improved robustness and
   efficiency compared to traditional segregated solvers.
 - Added a PETSc SNES interface for nonlinear solution procedures.
@@ -49,6 +112,7 @@ release. For complete commit-level details and contributor information, see the
   documentation.
 
 ### Changed in v2.3
+
 - Extended compatibility to OpenFOAM-v2312 through OpenFOAM-v2512.
 - Improved nonlinear vertex-centred solvers and several FSI tutorials.
 - Made optional OpenFOAM source-file fixes opt-in by default.
