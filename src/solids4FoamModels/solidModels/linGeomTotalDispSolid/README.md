@@ -37,15 +37,15 @@ can be treated as undeformed for the governing equations.
 
 ### Supported solution algorithms
 
-The `solutionAlgorithm` entry in `solidModelCoeffs` selects how the equations
-are solved:
+The `solutionAlgorithm` entry in the coefficients sub-dictionary selects how
+the equations are solved:
 
 | Value | Meaning | Notes |
 | --- | --- | --- |
 | `implicitSegregated` | Default segregated solve | Recommended |
 | `PETScSNES` | Nonlinear solve via PETSc SNES | Requires PETSc |
 | `explicit` | Explicit time integration | Time-step limited by stability |
-| `implicitCoupled` | Not implemented for this model | Do not select this value |
+| `implicitCoupled` | Not implemented here | Do not select this value |
 
 The runtime type name for this class is `linearGeometryTotalDisplacement`.
 
@@ -114,7 +114,7 @@ Minimal example for `constant/solidProperties`:
 ```text
 solidModel        linearGeometryTotalDisplacement;
 
-solidModelCoeffs
+linearGeometryTotalDisplacementCoeffs
 {
     solutionAlgorithm   implicitSegregated;
 
@@ -165,7 +165,7 @@ If `solvePressure` is enabled, add:
 
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
-you override that name in `solidModelCoeffs`.
+you override that name in the coefficients sub-dictionary.
 
 ### Required fields and boundary conditions
 

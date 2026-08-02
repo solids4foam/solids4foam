@@ -189,7 +189,9 @@ strain `tr(gradD)` rather than spatial oscillations.  The face stabilisation
 vector is:
 
 ```text
-faceVector_f = scaleFactor * C(mode) * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
+faceVector_f =
+    scaleFactor * C(mode)
+  * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
 ```
 
 Five modes are available, selected via the `mode` entry:

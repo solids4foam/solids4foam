@@ -40,8 +40,8 @@ is not valid.
 
 ### Supported solution algorithms
 
-The `solutionAlgorithm` entry in `solidModelCoeffs` selects how the equations
-are solved:
+The `solutionAlgorithm` entry in the coefficients sub-dictionary selects how
+the equations are solved:
 
 | Value | Meaning | Notes |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ Minimal example for `constant/solidProperties`:
 ```text
 solidModel        nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-solidModelCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    implicitSegregated;
 
@@ -148,7 +148,7 @@ If `solvePressure` is enabled, add:
 
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
-you override that name in `solidModelCoeffs`.
+you override that name in the coefficients sub-dictionary.
 
 ### Required fields and boundary conditions
 
