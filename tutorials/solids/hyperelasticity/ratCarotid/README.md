@@ -1,5 +1,5 @@
 ---
-sort: xx
+sort: 8
 ---
 
 # Inflation of a Rat Carotid Artery: `ratCarotid`

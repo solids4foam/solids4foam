@@ -1,5 +1,5 @@
 ---
-sort: xx
+sort: 6
 ---
 
 # Slender Cantilever in Bending: `cantileverBeam`
