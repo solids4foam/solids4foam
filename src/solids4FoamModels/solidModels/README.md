@@ -350,9 +350,9 @@ finite volume discretisation unless stated otherwise.
   - `thermalLinGeomSolid`: solves for the temperature $$T$$ (`T`) and total
     displacement $$\boldsymbol{d}$$ (`D`), where outer iterations ensure
     convergence of the temperature-displacement coupling in a segregated manner.
-  - `thermalSolid`: solves for the temperature $$T$$ (`T`) and total
-    displacement $$\boldsymbol{d}$$ (`D`) with strongly coupled momentum and
-    heat equations using a segregated approach.
+  - `thermalSolid`: solves the heat equation for the temperature $$T$$ (`T`)
+    only; no momentum equation is solved and the solid does not deform. It
+    provides the solid side of conjugate heat transfer.
   - `poroLinGeomSolid`: solves for the pore-pressure $$p$$ (`p`) and total
     displacement $$\boldsymbol{d}$$ (`D`), where outer iterations ensure
     convergence of the pressure-displacement coupling in a segregated manner,
@@ -370,8 +370,7 @@ finite volume discretisation unless stated otherwise.
     this solver currently works best with triangular and tetrahedral grids.
 
   - `kirchhoffPlateSolid`: this model solves the Kirchhoff plate equations using
-    a segregated finite area method; _currently only available with
-    foam-extend_.
+    a segregated finite area method; _requires OpenFOAM.com v2412 or newer_.
 
 - **Nonlinear geometry solid models**
 
@@ -389,5 +388,10 @@ finite volume discretisation unless stated otherwise.
     the increment of displacement $$\Delta \boldsymbol{d}$$ (`DD`).
   - `vertexCentredNonLinGeomTotalLagSolid`: a vertex-centred total Lagrangian
     nonlinear geometry approach which solves for the total displacement at the
-    mesh vertices/points (`pointD`); supports Newton-Raphson, segregated and
+    mesh vertices/points (`pointD`); supports Newton-Raphson (PETSc SNES) and
     explicit solution algorithms.
+  - `coupledPressureDisplacementSolid`: a block-coupled mixed formulation for
+    incompressible and nearly incompressible solids, solving the increments of
+    displacement $$\Delta \boldsymbol{d}$$ (`DD`) and hydrostatic pressure
+    $$\Delta p$$ (`Dp`) in a single system; _currently only available with
+    foam-extend_.
