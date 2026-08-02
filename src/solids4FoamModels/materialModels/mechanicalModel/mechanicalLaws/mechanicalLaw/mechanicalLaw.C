@@ -929,6 +929,12 @@ Foam::volTensorField& Foam::mechanicalLaw::F()
 }
 
 
+const Foam::volTensorField& Foam::mechanicalLaw::deformationGradient() const
+{
+    return const_cast<mechanicalLaw&>(*this).F();
+}
+
+
 Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 {
     if (FfPtr_.empty())
@@ -937,6 +943,13 @@ Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
     }
 
     return FfPtr_();
+}
+
+
+const Foam::surfaceTensorField&
+Foam::mechanicalLaw::faceDeformationGradient() const
+{
+    return const_cast<mechanicalLaw&>(*this).Ff();
 }
 
 

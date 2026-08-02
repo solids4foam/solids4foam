@@ -122,6 +122,12 @@ public:
 
     // Member Functions
 
+        //- Return the deformation gradient owned by the passive law
+        virtual const volTensorField& deformationGradient() const;
+
+        //- Return the face deformation gradient owned by the passive law
+        virtual const surfaceTensorField& faceDeformationGradient() const;
+
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
@@ -149,6 +155,12 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Forward accumulated-field updates to the passive law
+        virtual void updateTotalFields();
+
+        //- Forward restart setup to the passive law
+        virtual void setRestart();
 };
 
 

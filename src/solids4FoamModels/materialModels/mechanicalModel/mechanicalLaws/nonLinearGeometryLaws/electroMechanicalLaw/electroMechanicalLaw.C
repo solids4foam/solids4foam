@@ -162,6 +162,20 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
 }
 
 
+const Foam::volTensorField&
+Foam::electroMechanicalLaw::deformationGradient() const
+{
+    return passiveMechLawPtr_->deformationGradient();
+}
+
+
+const Foam::surfaceTensorField&
+Foam::electroMechanicalLaw::faceDeformationGradient() const
+{
+    return passiveMechLawPtr_->faceDeformationGradient();
+}
+
+
 bool Foam::electroMechanicalLaw::hasActiveStress() const
 {
     checkFieldTa();
@@ -184,8 +198,7 @@ Foam::electroMechanicalLaw::activeCauchyStress() const
     checkFieldTa();
 
     // Take a reference to the deformation gradient
-    const volTensorField& F =
-        const_cast<electroMechanicalLaw&>(*this).F();
+    const volTensorField& F = deformationGradient();
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
@@ -242,8 +255,7 @@ Foam::electroMechanicalLaw::activeCauchyStressf() const
     checkFieldTa();
 
     // Take a reference to the deformation gradient
-    const surfaceTensorField& F =
-        const_cast<electroMechanicalLaw&>(*this).Ff();
+    const surfaceTensorField& F = faceDeformationGradient();
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
@@ -319,6 +331,18 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
         const tmp<surfaceSymmTensorField> tSigmaActive = activeCauchyStressf();
         sigma += tSigmaActive();
     }
+}
+
+
+void Foam::electroMechanicalLaw::updateTotalFields()
+{
+    passiveMechLawPtr_->updateTotalFields();
+}
+
+
+void Foam::electroMechanicalLaw::setRestart()
+{
+    passiveMechLawPtr_->setRestart();
 }
 
 
