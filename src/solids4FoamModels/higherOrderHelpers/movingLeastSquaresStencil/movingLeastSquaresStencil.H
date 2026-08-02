@@ -143,7 +143,7 @@ class movingLeastSquaresStencil
         labelList checkProcessorOverlap
         (
             const List<treeBoundBox>& allOwnedCellsBox,
-            const treeBoundBox& ownedFacesBox
+            const List<treeBoundBox>& allOwnedFacesBox
         ) const;
 
         //- Get remote cells candidates for stencil construction
