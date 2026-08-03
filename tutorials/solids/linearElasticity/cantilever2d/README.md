@@ -188,6 +188,6 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
  methodology for linear elasticity and unstructured meshes. *Computers and Structures*,
  175, 2016, 100–122, 10.1016/j.compstruc.2016.07.004.](https://doi.org/10.1016/j.compstruc.2016.07.004)
 
-[5] [I. Batistić, P. Castrillo, P. Cardiff, A Jacobian-free Newton-Krylov
-method for high-order cell-centred finite volume solid mechanics.
-*arXiv preprint arXiv:2601.18417*, 2026.](https://arxiv.org/abs/2601.18417)
+[5] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)

@@ -239,6 +239,6 @@ complex domains." *International journal for numerical methods in engineering*
  10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
 
 [5]
-[I. Batistić, P. Castrillo and P. Cardiff. "A Jacobian-free Newton-Krylov
-method for high-order cell-centred finite volume solid mechanics."
-_arXiv preprint (2026)](https://arxiv.org/abs/2601.18417)
+[IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)
