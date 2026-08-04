@@ -600,7 +600,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         {
             FatalErrorIn(type() + "::" + type())
                 << "The `leastSquaresS4f` gradScheme should be used for "
-                << "`grad(D)` when using the "
+                << "`grad(DD)` when using the "
                 << solidModel::solutionAlgorithmNames_
                    [
                        solidModel::solutionAlgorithm::PETSC_SNES
@@ -620,7 +620,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             )
             {
                 Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << mesh().boundary()[patchI].name() << " patch of the DD "
                     << "field" << endl;
 
                 solidTractionFvPatchVectorField& tracPatch =
@@ -864,7 +864,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // where, here, we roll the stabilisationTerm into the div(sigma)
     vectorField residual
     (
-        fvc::div(magSfCurrent*traction)
+        fvc::div(force)
       + rho()
        *(
            g() - fvc::d2dt2(D()) - dampingCoeff()*fvc::ddt(D())

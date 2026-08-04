@@ -3,8 +3,8 @@
 | Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
-|              producer and distributor of the OpenFOAM software via          |
-|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              producer and distributor of OpenFOAM software via              |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
 |              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -12,34 +12,26 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "system";
-    object      fvSolution;
+    object      changeDictionaryDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solvers
+boundary
 {
-    D
+    xMin
     {
-        solver          petsc;
-
-        options
-        {
-            snes_type newtonls;
-            snes_monitor;
-            snes_converged_reason;
-            snes_mf;
-            snes_mf_operator;
-
-            ksp_type lgmres;
-            ksp_gmres_restart "100";
-            ksp_converged_reason;
-
-            pc_type bjacobi;
-            sub_pc_type lu;
-            snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
-        }
+        type            symmetry;
+        physicalType    symmetry;
+    }
+    yMin
+    {
+        type            symmetry;
+        physicalType    symmetry;
+    }
+    bottom
+    {
+        type            symmetry;
+        physicalType    symmetry;
     }
 }
 

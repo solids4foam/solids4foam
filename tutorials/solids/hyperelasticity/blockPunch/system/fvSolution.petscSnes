@@ -1,10 +1,10 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.4                                                           |
+| Version:     v2.3                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
-|              producer and distributor of the OpenFOAM software via          |
-|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              producer and distributor of OpenFOAM software via              |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
 |              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -19,7 +19,7 @@ FoamFile
 
 solvers
 {
-    D
+    "D|DD"
     {
         solver          petsc;
 
@@ -30,10 +30,12 @@ solvers
             snes_converged_reason;
             snes_mf;
             snes_mf_operator;
+            snes_max_it "100";
 
             ksp_type lgmres;
             ksp_gmres_restart "100";
             ksp_converged_reason;
+            ksp_rtol "1e-10";
 
             pc_type bjacobi;
             sub_pc_type lu;
