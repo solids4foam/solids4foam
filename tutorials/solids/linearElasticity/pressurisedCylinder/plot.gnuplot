@@ -22,9 +22,9 @@ sigmatheta(x) = (p*Ri**2 / (Ro**2-Ri**2))*(1+Ro**2/x**2)/p
 dispR(x) = ((p/E) * (Ri**2/(Ro**2-Ri**2)))*((1-nu)*x+(1+nu)*(Ro**2/x))
 
 # Path to postProcessing files
-pathSigma="postProcessing/sets/1/line_sigma\:Transformed.xy"
-pathD="postProcessing/sets/1/line_D.xy"
-pathSigmaD="postProcessing/sets/1/line_D_sigma\:Transformed.xy"
+pathSigma="postProcessing/sample/1/line_sigma\:Transformed.xy"
+pathD="postProcessing/sample/1/line_D.xy"
+pathSigmaD="postProcessing/sample/1/line_D_sigma\:Transformed.xy"
 
 # Radial stress
 set output 'sigmaR.png'

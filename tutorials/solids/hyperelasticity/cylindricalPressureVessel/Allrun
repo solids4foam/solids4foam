@@ -140,8 +140,10 @@ select_case
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-if [[ -f constant/polyMesh/blockMeshDict.m4 ]]; then
-    m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+if [[ -f system/blockMeshDict.m4 ]]; then
+    BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+    mkdir -p "${BLOCK_MESH_DICT_DIR}"
+    m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
 fi
 
 solids4Foam::runApplication blockMesh

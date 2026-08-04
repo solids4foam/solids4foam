@@ -25,13 +25,13 @@ boundaryField
     symmetry_1
     {
         type            blockSymmPlane;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     symmetry_2
     {
         type            blockSymmPlane;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
 
@@ -58,7 +58,7 @@ boundaryField
 
     top
     {
-        // type		symmetryPlane;
+        // type		symmetry;
         type		fixedDisplacement;
         value		uniform (0 0 0);
     }

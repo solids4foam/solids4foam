@@ -16,7 +16,7 @@ set xlabel "x [mm]" font "Arial Bold,20"
 set ylabel "Stress [Pa]" font "Arial Bold,20"
 set key r b
 
-data = "postProcessing/sets/1/line_analyticalStress_sigma.xy"
+data = "postProcessing/sample/1/line_analyticalStress_sigma.xy"
 
 plot \
 data u 1:10 w lp ls 1 title"{/Symbol s}_{xx}",\

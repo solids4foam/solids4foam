@@ -42,19 +42,19 @@ boundaryField
 
     left
     {
-        type    symmetryPlane;
+        type    symmetry;
         value uniform 0;
         // type fixedTemperatureGradient;
-        // patchType symmetryPlane;
+        // patchType symmetry;
         // gradient uniform 0;
     }
 
     down
     {
-        type    symmetryPlane;
+        type    symmetry;
         value uniform 0;
         // type fixedTemperatureGradient;
-        // patchType symmetryPlane;
+        // patchType symmetry;
         // gradient uniform 0;
     }
 
