@@ -154,7 +154,7 @@ selected with `./Allrun aitken`, and either option can be combined with
 
 For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
-[`fluidSolidInterfaces` README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md).
+[fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
 
 For the current settings, a fair comparison over the strongly-coupled transient
 window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,

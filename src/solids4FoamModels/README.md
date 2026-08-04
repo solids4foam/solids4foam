@@ -1,4 +1,8 @@
-# solids4FoamModels
+---
+sort: 9
+---
+
+# Under the hood: `solids4FoamModels`
 
 This directory holds the sources of `libsolids4FoamModels`, the main
 solids4foam library. It is built by the `Allwmake` script in this directory,
@@ -32,16 +36,16 @@ The available models differ in whether the geometry is linear or nonlinear,
 whether a total or updated Lagrangian formulation is used, whether the
 discretisation is cell-centred or vertex-centred, and whether the solution
 algorithm is segregated, coupled or explicit. They are described in
-[`solidModels/README.md`](solidModels/README.md).
+[solid models](https://www.solids4foam.com/documentation/solid-models/).
 
 A **fluid model** solves the flow equations, using either a solver built on
 the standard OpenFOAM ones or a solver specific to solids4foam; see
-[`fluidModels/README.md`](fluidModels/README.md).
+[fluid models](https://www.solids4foam.com/documentation/fluid-models/).
 
 A **fluid-solid interface** owns one fluid model and one solid model and
 implements the partitioned coupling algorithm between them, for example fixed
 relaxation, Aitken or IQN-ILS. See
-[`fluidSolidInterfaces/README.md`](fluidSolidInterfaces/README.md).
+[fluid-solid interfaces](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
 
 ### Material behaviour
 
@@ -72,14 +76,14 @@ uses it, so the two can be varied independently:
   crack propagation;
 - `functionObjects`: run-time post-processing, and the analytical solutions
   used by the tutorials; see
-  [`functionObjects/README.md`](functionObjects/README.md).
+  [function objects](https://www.solids4foam.com/documentation/function-objects/).
 
 ### Adding a class
 
 New classes follow the usual OpenFOAM run-time selection pattern: derive from
 the relevant base class, add the `TypeName` and `addToRunTimeSelectionTable`
 entries, and add the source to the canonical list described below. Please also
-see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+see [the contributing guide](https://www.solids4foam.com/documentation/under-the-hood/contributing.html).
 
 ---
 

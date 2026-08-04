@@ -1,5 +1,5 @@
 ---
-sort: xx
+sort: 7
 ---
 
 # Heart Tissue Beam: `heartTissueBeam`
