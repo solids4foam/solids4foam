@@ -760,7 +760,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         {
             FatalErrorIn(type() + "::" + type())
                 << "The `leastSquaresS4f` gradScheme should be used for "
-                << "`grad(D)` when using the "
+                << "`grad(DD)` when using the "
                 << solidModel::solutionAlgorithmNames_
                    [
                        solidModel::solutionAlgorithm::PETSC_SNES
@@ -780,7 +780,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             )
             {
                 Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << mesh().boundary()[patchI].name() << " patch of the DD "
                     << "field" << endl;
 
                 solidTractionFvPatchVectorField& tracPatch =

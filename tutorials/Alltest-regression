@@ -111,6 +111,7 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/rigidRotation/rotatingCylinder"
     "solids/hyperelasticity/cylindricalPressureVessel"
     "solids/hyperelasticity/cylinderCrush"
+    "solids/hyperelasticity/blockPunch"
     "solids/hyperelasticity/longWall"
     "solids/beamsPlatesShells/squarePlate"
     "solids/linearElasticity/cantilever2d"

@@ -1,3 +1,7 @@
+---
+sort: 2
+---
+
 # Contributing to solids4foam
 
 Thank you for considering contributing to **solids4foam**!
