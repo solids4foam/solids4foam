@@ -34,13 +34,13 @@ time increments.
 
 Table 1 - Mechanical properties
 
-| Parameter            | Symbol       | Value           |
-| -------------------- | ------------ | --------------- |
-| Young’s modulus      | $$E$$        | $$117$$ GPa     |
-| Poisson's ratio      | $$\nu$$      | $$0.35$$        |
-| Initial yield stress | $$\sigma_Y$$ | $$400$$ MPa     |
-| Initial density      | $$\rho$$       | $$8930$$ kg/m$$^3$$ |
-| Hardening modulus    | $$\kappa$$     | $$100$$ MPa       |
+| Parameter | Symbol | Value |
+| --- | --- | --- |
+| Young’s modulus | $$E$$ | $$117$$ GPa |
+| Poisson's ratio | $$\nu$$ | $$0.35$$ |
+| Initial yield stress | $$\sigma_Y$$ | $$400$$ MPa |
+| Initial density | $$\rho$$ | $$8930$$ kg/m$$^3$$ |
+| Hardening modulus | $$\kappa$$ | $$100$$ MPa |
 
 ---
 
@@ -58,13 +58,13 @@ Figure 2 - Predicted deformed geometry [1]
 
 Table 2 - Predicted end radius at $$80$$ $$\mu$$s.
 
-| Method                               | Predicted radius (in mm) |
-| ------------------------------------ | ------------------------ |
-| [2] FE method - tetrahedra           | $$5.55$$                 |
-| [2] FE method - hexahedra            | $$6.95$$                 |
-| [2] FE method average nodal pressure | $$6.99$$                 |
-| [1] FV method                        | $$6.98$$                 |
-| solids4Foam                          | $$7.14$$                   |
+| Method | Predicted radius (in mm) |
+| --- | --- |
+| [2] FE method - tetrahedra | $$5.55$$ |
+| [2] FE method - hexahedra | $$6.95$$ |
+| [2] FE method average nodal pressure | $$6.99$$ |
+| [1] FV method | $$6.98$$ |
+| solids4Foam | $$7.14$$ |
 
 {% include youtube.html id="4VDuINBV2DU" %}
 

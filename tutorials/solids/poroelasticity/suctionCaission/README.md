@@ -41,20 +41,20 @@ $$1.1$$ m, giving a wall thickness of $$0.1$$ m.
 
 Table 1 - Geometry, soil, pore-fluid, and loading properties reported in [1,2]
 
-| Parameter             | Symbol       | Value                    |
-| --------------------- | ------------ | ------------------------ |
-| Embedment depth       | $$L$$        | $$1$$ m                  |
-| Diameter              | $$d$$        | $$2$$ m                  |
-| Young's modulus       | $$E$$        | $$2\cdot10^7$$ Pa        |
-| Poisson's ratio       | $$\nu$$      | $$0.3$$                  |
-| Hydraulic conductivity | $$k$$       | $$0.001$$ m/s            |
-| Porosity              | $$n$$        | $$0.2$$                  |
+| Parameter | Symbol | Value |
+| --- | --- | --- |
+| Embedment depth | $$L$$ | $$1$$ m |
+| Diameter | $$d$$ | $$2$$ m |
+| Young's modulus | $$E$$ | $$2\cdot10^7$$ Pa |
+| Poisson's ratio | $$\nu$$ | $$0.3$$ |
+| Hydraulic conductivity | $$k$$ | $$0.001$$ m/s |
+| Porosity | $$n$$ | $$0.2$$ |
 | Water specific weight | $$\gamma_w$$ | $$1\cdot10^4$$ N/m$$^3$$ |
-| Water bulk modulus    | $$K_w$$      | $$2.1\cdot10^9$$ Pa      |
-| Degree of saturation  | $$S_r$$      | $$0.98$$                 |
-| Friction angle        | $$\phi$$     | $$30^\circ$$             |
-| Dilation angle        | $$\Psi$$     | $$0^\circ$$              |
-| Cohesion              | $$c$$        | $$1\cdot10^5$$ Pa        |
+| Water bulk modulus | $$K_w$$ | $$2.1\cdot10^9$$ Pa |
+| Degree of saturation | $$S_r$$ | $$0.98$$ |
+| Friction angle | $$\phi$$ | $$30^\circ$$ |
+| Dilation angle | $$\Psi$$ | $$0^\circ$$ |
+| Cohesion | $$c$$ | $$1\cdot10^5$$ Pa |
 
 The case uses `blockMesh` to discretize one quarter of the three-dimensional
 domain, as shown in Figure 2.

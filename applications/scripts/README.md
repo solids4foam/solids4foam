@@ -1,5 +1,5 @@
 ---
-sort: 5
+sort: 4
 ---
 
 # Bash functions: `solids4FoamScripts.sh`
@@ -265,7 +265,7 @@ is transformed into:
 ```
 
 **5.** If `sample` file is found in the `system/` directory and if the
-[OpenFOAM.org](OpenFOAM.org) version is used, `uniform` is replaced with
+[OpenFOAM.org](https://openfoam.org) version is used, `uniform` is replaced with
 `lineUniform`:
 
 ```c++
@@ -511,8 +511,8 @@ entry in the `system/` directory, here `sample`.
 ## `solids4foam::caseDoesNotRunWithFoamExtend()`
 
 - **Function purpose**
-  This function gives an error if the [OpenFOAM.com](OpenFOAM.com) or
-  [OpenFOAM.org](OpenFOAM.org) version is not sourced/loaded.
+  This function gives an error if the [OpenFOAM.com](https://www.openfoam.com) or
+  [OpenFOAM.org](https://openfoam.org) version is not sourced/loaded.
 
 - **Function arguments**
   None
