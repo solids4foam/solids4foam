@@ -71,7 +71,7 @@ predictions are seen to approach the reference finite element solution ("Abaqus
 FE").
 
 ![Radial stress](./images/viscoTube-radialStress.png)
-![Radial displacement]./images/viscoTube-radialDisplacement.png)
+![Radial displacement](./images/viscoTube-radialDisplacement.png)
 **Figure 2: Radial stress and radial displacement predictions across the wall
 thickness, showing the effect of loading step size [1]. Comparison is given with
 finite element results from Abaqus ("Abaqus FE")**
