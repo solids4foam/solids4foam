@@ -117,18 +117,26 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
 labelList movingLeastSquaresStencil::checkProcessorOverlap
 (
     const List<treeBoundBox>& allOwnedCellsBox,
-    const treeBoundBox& ownedFacesBox
+    const List<treeBoundBox>& allOwnedFacesBox
 ) const
 {
     DynamicList<label> overlappingProcessor;
+    const label myProcNo = Pstream::myProcNo();
+    const treeBoundBox& ownedCellsBox = allOwnedCellsBox[myProcNo];
+    const treeBoundBox& ownedFacesBox = allOwnedFacesBox[myProcNo];
 
     for (label proc = 0; proc < Pstream::nProcs(); ++proc)
     {
-        if (proc == Pstream::myProcNo())
+        if (proc == myProcNo)
         {
             continue;
         }
-        if (allOwnedCellsBox[proc].overlaps(ownedFacesBox))
+
+        if
+        (
+            allOwnedCellsBox[proc].overlaps(ownedFacesBox)
+         || allOwnedFacesBox[proc].overlaps(ownedCellsBox)
+        )
         {
             overlappingProcessor.append(proc);
         }
@@ -589,8 +597,10 @@ labelList movingLeastSquaresStencil::buildFacesStencil
 
     // Phase 3: Radius from position posR = ceil(searchExpansionFactor*N)
 
-    label posR = label(std::ceil(searchExpansionFactor * scalar(N_)));
-    posR = min(max(posR, 0), localDist.size()-1);
+    const label unboundedPosR =
+        label(std::ceil(searchExpansionFactor * scalar(N_)));
+
+    label posR = min(max(unboundedPosR, 0), localDist.size()-1);
 
     const scalar R2 = localDist[posR].second();
 
@@ -638,6 +648,56 @@ labelList movingLeastSquaresStencil::buildFacesStencil
             return A.second() < B.second();
         }
     );
+
+    // The local radius is under-estimated if the processor partition contains
+    // too few local cells; use all exchanged remote candidates before failing.
+    if (allDist.size() < N_ && unboundedPosR >= localDist.size())
+    {
+        allDist.clear();
+        allDist.reserve(localDist.size() + 100);
+
+        forAll(localDist, i)
+        {
+            const label cellID = localDist[i].first();
+            const label globalCellID = globalCells_.toGlobal(cellID);
+            allDist.append
+            (
+                Tuple2<label, scalar>(globalCellID, localDist[i].second())
+            );
+        }
+
+        forAll(remoteCells, p)
+        {
+            const labelList& procCells = remoteCells[p];
+            const vectorField& procCellCentres = remoteCellsCentres[p];
+
+            if (procCells.empty())
+            {
+                continue;
+            }
+
+            forAll(procCells, i)
+            {
+                allDist.append
+                (
+                    Tuple2<label, scalar>
+                    (
+                        procCells[i],
+                        magSqr(procCellCentres[i] - faceCentre)
+                    )
+                );
+            }
+        }
+
+        Foam::sort
+        (
+            allDist,
+            [](const Tuple2<label, scalar>& A, const Tuple2<label, scalar>& B)
+            {
+                return A.second() < B.second();
+            }
+        );
+    }
 
     // Check minimum stencil size
     if ( allDist.size() < N_ )
@@ -766,17 +826,23 @@ void movingLeastSquaresStencil::calcFacesStencil() const
     List<treeBoundBox> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
 
+    List<treeBoundBox> allOwnedFacesBox(Pstream::nProcs());
+    allOwnedFacesBox[Pstream::myProcNo()] = ownedFacesBox;
+
 #ifdef OPENFOAM_COM
     Pstream::allGatherList(allOwnedCellsBox);
+    Pstream::allGatherList(allOwnedFacesBox);
 #endif
 #ifdef OPENFOAM_ORG
     Pstream::gatherList(allOwnedCellsBox);
     Pstream::scatterList(allOwnedCellsBox);
+    Pstream::gatherList(allOwnedFacesBox);
+    Pstream::scatterList(allOwnedFacesBox);
 #endif
 
     // Get processors that may have stencil cells, detected using overlap test
     labelList procToQuery =
-       checkProcessorOverlap(allOwnedCellsBox, ownedFacesBox);
+       checkProcessorOverlap(allOwnedCellsBox, allOwnedFacesBox);
 
     // List of remote cells (per processor) written using global indexing
     List<labelList> remoteCells =
