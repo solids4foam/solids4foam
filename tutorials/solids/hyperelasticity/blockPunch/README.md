@@ -2,7 +2,7 @@
 sort: xx
 ---
 
-# Punch Problem: `punch`
+# Block Punch Problem: `blockPunch`
 
 ---
 
@@ -61,7 +61,7 @@ of point $$A$$ is $$0.47$$, i.e. $$47 \%$$ of the overall height.
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/hyperelasticity/punch`.
+`solids4foam/tutorials/solids/hyperelasticity/blockPunch`.
 
 The case can
 be run using the included `Allrun` script. The `Allrun` script optionally takes

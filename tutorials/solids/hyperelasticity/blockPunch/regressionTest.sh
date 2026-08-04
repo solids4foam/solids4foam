@@ -11,7 +11,7 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
 fi
 
 # ============================================================
-# punch regression test
+# blockPunch regression test
 # Checks the first load step with the segregated and PETSc SNES approaches.
 # ============================================================
 
@@ -28,7 +28,7 @@ APPROACHES=(
 )
 
 echo "============================================================"
-echo "punch regression test"
+echo "blockPunch regression test"
 echo "Final point-A disp_z in [${DISP_Z_MIN}, ${DISP_Z_MAX}]"
 echo "============================================================"
 echo
