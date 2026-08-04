@@ -162,20 +162,6 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
 }
 
 
-const Foam::volTensorField&
-Foam::electroMechanicalLaw::deformationGradient() const
-{
-    return passiveMechLawPtr_->deformationGradient();
-}
-
-
-const Foam::surfaceTensorField&
-Foam::electroMechanicalLaw::faceDeformationGradient() const
-{
-    return passiveMechLawPtr_->faceDeformationGradient();
-}
-
-
 bool Foam::electroMechanicalLaw::hasActiveStress() const
 {
     checkFieldTa();
@@ -197,8 +183,22 @@ Foam::electroMechanicalLaw::activeCauchyStress() const
 {
     checkFieldTa();
 
-    // Take a reference to the deformation gradient
-    const volTensorField& F = deformationGradient();
+    // Take a reference to the deformation gradient maintained by the passive
+    // law
+    // Note: the passive law calls updateF() in its correct() function, so its
+    // F is up-to-date by the time the active stress is calculated here. This
+    // law inherits its own F field from mechanicalLaw, but that field is
+    // never updated (mechanicalLaw::F() would lazily create it as the
+    // identity tensor), so it must not be used here: doing so silently
+    // evaluates the active stress at F = I.
+    // The passive law is bound as a const reference so that the public
+    // F() const accessor is selected; the non-const mechanicalLaw::F()
+    // overload is protected and so is not accessible through a base-class
+    // pointer.
+    // See https://github.com/solids4foam/solids4foam/pull/198 for the wider
+    // redesign of deformation-gradient ownership in the mechanical laws.
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const volTensorField& F = passiveLaw.F();
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
@@ -254,8 +254,11 @@ Foam::electroMechanicalLaw::activeCauchyStressf() const
 {
     checkFieldTa();
 
-    // Take a reference to the deformation gradient
-    const surfaceTensorField& F = faceDeformationGradient();
+    // Take a reference to the face deformation gradient maintained by the
+    // passive law
+    // See the note in activeCauchyStress()
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const surfaceTensorField& F = passiveLaw.Ff();
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));

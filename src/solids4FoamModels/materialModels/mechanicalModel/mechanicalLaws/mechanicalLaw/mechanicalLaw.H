@@ -292,9 +292,15 @@ protected:
         surfaceSymmTensorField& epsilonf();
 
         //- Return a reference to the F field
+        //  Note: this field is owned by this law alone and is lazily created
+        //  as the identity tensor; it is only meaningful if this law also
+        //  updates it, i.e. calls updateF(). A law that wraps another law
+        //  (e.g. electroMechanicalLaw) must not use this accessor: it should
+        //  read the wrapped law's F via the public F() const accessor
         volTensorField& F();
 
         //- Return a reference to the Ff field
+        //  See the note in F()
         surfaceTensorField& Ff();
 
         //- Return a reference to the relF field
@@ -479,11 +485,18 @@ public:
 
     // Member Functions
 
-        //- Return the total deformation gradient used by this law
-        virtual const volTensorField& deformationGradient() const;
+        //- Return a const reference to the total deformation gradient field
+        //  stored by this law
+        //  Note: this is only valid for laws that maintain F, i.e. laws that
+        //  call updateF(); calling it on a law that does not store F is a
+        //  fatal error rather than silently creating an identity field, as
+        //  the protected non-const F() accessor would do
+        const volTensorField& F() const;
 
-        //- Return the total face deformation gradient used by this law
-        virtual const surfaceTensorField& faceDeformationGradient() const;
+        //- Return a const reference to the total face deformation gradient
+        //  field stored by this law
+        //  See the note in F() const
+        const surfaceTensorField& Ff() const;
 
         //- Return name
         const word& name() const

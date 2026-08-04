@@ -929,9 +929,15 @@ Foam::volTensorField& Foam::mechanicalLaw::F()
 }
 
 
-const Foam::volTensorField& Foam::mechanicalLaw::deformationGradient() const
+const Foam::volTensorField& Foam::mechanicalLaw::F() const
 {
-    return const_cast<mechanicalLaw&>(*this).F();
+    if (FPtr_.empty())
+    {
+        FatalErrorIn("const volTensorField& " + type() + "::F() const")
+            << "F is not stored by this mechanical law" << abort(FatalError);
+    }
+
+    return FPtr_();
 }
 
 
@@ -946,10 +952,15 @@ Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 }
 
 
-const Foam::surfaceTensorField&
-Foam::mechanicalLaw::faceDeformationGradient() const
+const Foam::surfaceTensorField& Foam::mechanicalLaw::Ff() const
 {
-    return const_cast<mechanicalLaw&>(*this).Ff();
+    if (FfPtr_.empty())
+    {
+        FatalErrorIn("const surfaceTensorField& " + type() + "::Ff() const")
+            << "Ff is not stored by this mechanical law" << abort(FatalError);
+    }
+
+    return FfPtr_();
 }
 
 
