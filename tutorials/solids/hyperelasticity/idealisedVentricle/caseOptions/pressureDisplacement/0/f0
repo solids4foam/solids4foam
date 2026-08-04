@@ -42,13 +42,13 @@ boundaryField
 
     symmetry_1
     {
-        type		symmetryPlane;
+        type		symmetry;
         value		$internalField;
     }
 
     symmetry_2
     {
-        type		symmetryPlane;
+        type		symmetry;
         value		$internalField;
     }
 

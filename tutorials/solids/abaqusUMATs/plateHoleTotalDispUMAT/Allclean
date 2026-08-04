@@ -10,5 +10,5 @@ cleanCase
 \rm -rf constant/polyMesh/boundary case.foam postProcessing
 \rm -rf system/*Subset
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .

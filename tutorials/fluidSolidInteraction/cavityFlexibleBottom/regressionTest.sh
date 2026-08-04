@@ -101,16 +101,28 @@ extract_vertical_displacement() {
 }
 
 extract_mean_force_tail() {
+    # The forces functionObject writes a different set of columns depending on
+    # the OpenFOAM version: OpenFOAM.com writes the total force followed by the
+    # pressure and viscous contributions, whereas OpenFOAM.org and foam-extend
+    # write the pressure and viscous contributions followed by the moments. The
+    # number of columns is used to tell them apart, so that the total force is
+    # compared in both cases.
     tail -n "${FORCE_AVG_SAMPLES}" "${CASE_DIR}/${FORCE_FILE}" | \
     awk '
     {
         # Remove parentheses
         gsub(/[()]/, "", $0)
 
-        # After cleanup, fields are:
-        # $1 = time
-        # $3 = Fy (both formats)
-        sum += $3
+        if (NF >= 13)
+        {
+            # time, pressure, viscous, moments: sum the contributions
+            sum += $3 + $6
+        }
+        else
+        {
+            # time, total, pressure, viscous: use the total directly
+            sum += $3
+        }
         n++
     }
     END {

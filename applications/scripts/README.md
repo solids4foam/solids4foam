@@ -18,20 +18,38 @@ Prepared by Ivan Batistić
   `Allclean` scripts in `solids4foam` tutorial cases;
 - The primary purpose of these functions is to make a case compatible with the
   current version of `OpenFOAM`/`foam-extend`, e.g. convert the case from its
-  `foam-extend-4.1` format to its `OpenFOAM-v2012` format.
+  stored `OpenFOAM.com` format to the `foam-extend-4.1` format.
 
 ---
 
-## `solids4foam::convertCaseFormat()` and `solids4foam::convertCaseFormatFoamExtend()`
+## Stored case format
 
-`solids4foam::convertCaseFormat()` is used to convert a case from `foam-extend`
-format to `OpenFOAM` format, whereas
-`solids4foam::convertCaseFormatFoamExtend()` is used to convert any case version
-to the `foam-extend` format. No changes are applied if the case format matches
-the format of the current `OpenFOAM`/`foam-extend` version.
+Tutorial cases are stored in the `OpenFOAM.com` format, as this is the variant
+used by most users. A case is converted to the format required by the loaded
+`OpenFOAM`/`foam-extend` version when it is run, and converted back when it is
+cleaned, so that the stored files are left unchanged.
+
+Files that cannot be converted with a text substitution are stored twice. The
+unsuffixed name always holds the `OpenFOAM.com` version, and the `foam-extend`
+version is stored alongside it with a `.foamextend` suffix, e.g.
+`system/functions` and `system/functions.foamextend`. During conversion the
+unsuffixed file is backed up with a `.openfoam` suffix and the `foam-extend`
+file is copied into its place; restoring moves the backup back.
+
+---
+
+## `solids4foam::convertCaseFormat()` and `solids4foam::restoreCaseFormat()`
+
+`solids4foam::convertCaseFormat()` converts a case from the stored
+`OpenFOAM.com` format to the format required by the loaded version. No changes
+are made when `OpenFOAM.com` is loaded.
+`solids4foam::restoreCaseFormat()` converts a case back to the stored
+`OpenFOAM.com` format, regardless of which version is loaded. It is idempotent,
+so it is safe to run it more than once.
 
 - **Function purpose**
-  Converts a case from `foam-extend` format to `OpenFOAM` format and vice versa.
+  Converts a case between the stored `OpenFOAM.com` format and the format of
+  the loaded `OpenFOAM`/`foam-extend` version.
 
 - **Function arguments**
   Path to case directory (most often `.` is used, referring to the current
@@ -45,12 +63,18 @@ the format of the current `OpenFOAM`/`foam-extend` version.
   # Source solids4Foam scripts
   source solids4FoamScripts.sh
 
-  # Convert case format to OpenFOAM
+  # Convert the case to the format of the loaded version
   solids4Foam::convertCaseFormat .
 
-  # Convert case format back to foam-extend
-  solids4Foam::convertCaseFormatFoamExtend .
+  # Convert the case back to the stored OpenFOAM.com format
+  solids4Foam::restoreCaseFormat .
   ```
+
+```note
+`solids4foam::convertCaseFormatFoamExtend()` is retained as a deprecated alias
+for `solids4foam::restoreCaseFormat()`, so that existing user case scripts keep
+working. It should not be used in new cases.
+```
 
 Changes are performed in different ways:
 
@@ -62,20 +86,21 @@ Changes are performed in different ways:
   by renaming it (see points 4 or 7).
 
 ```note
-The following description refers to the function `solids4foam::convertCaseFormat()`.
-The description of `solids4foam::convertCaseFormatFoamExtend()` is not provided
-because it performs the same changes only in reverse order.
+The following description lists the differences between the formats. The
+`foam-extend` conversion applies them, and restoring a case applies them in
+reverse. Points 5 and 10 also apply to `OpenFOAM.org`, which differs from
+`OpenFOAM.com` in the sampled set type names and in the forces output file name.
 ```
 
-**1.** `symmetryPlane` in `foam-extend` becomes `symmetry` in `OpenFOAM`.
+**1.** `symmetry` in `OpenFOAM` becomes `symmetryPlane` in `foam-extend`.
 
-`blockMeshDict` is located, and every occurrence of `symmetryPlane` keyword is
+`blockMeshDict` is located, and every occurrence of the `symmetry` keyword is
 updated:
 
 ```c++
 patches
 (
-    symmetryPlane left
+    symmetry left
     (
         (8 9 20 19)
     )
@@ -87,7 +112,7 @@ is transformed into:
 ```c++
 patches
 (
-    symmetry left
+    symmetryPlane left
     (
         (8 9 20 19)
     )
@@ -118,27 +143,26 @@ left
 }
 ```
 
-**2.** If it is found, `blockMeshDict` is moved to the `system/` directory
+**2.** If it is found, `blockMeshDict` is moved to the `constant/polyMesh/`
+directory, as this is where `foam-extend` reads it from
 
-For solid and fluid simulations, `blockMeshDict` is found in
-`constant/polyMesh/`:
-
-```plaintext
-├── 0
-├── constant
-│   └── polyMesh
-│       └── blockMeshDict
-└── system
-```
-
-and it is moved to the `system` directory:
+For solid and fluid simulations, `blockMeshDict` is stored in `system/`:
 
 ```plaintext
 ├── 0
 ├── constant
-│   └── polyMesh
 └── system
  └── blockMeshDict
+```
+
+and it is moved to the `constant/polyMesh` directory:
+
+```plaintext
+├── 0
+├── constant
+│   └── polyMesh
+│       └── blockMeshDict
+└── system
 ```
 
 For fluid-solid interaction simulations, there may be two `blockMeshDict` files,
@@ -147,29 +171,25 @@ each located in the corresponding `solid/` and `fluid/` subdirectories:
 ```plaintext
 ├── 0
 ├── constant
-│   └── fluid
-│   │   └── polyMesh
-│   │       └── blockMeshDict
-│   └── solid
-│       └── polyMesh
-│           └── blockMeshDict
 └── system
+    └── fluid
+    │   └── blockMeshDict
+    └── solid
+        └── blockMeshDict
 ```
 
-These are also relocated to the `system` directory:
+These are also relocated to the `constant/` subdirectories:
 
 ```plaintext
 ├── 0
 ├── constant
-│   └── fluid
-│   │   └── polyMesh
-│   └── solid
-│       └── polyMesh
+│   └── fluid
+│   │   └── polyMesh
+│   │       └── blockMeshDict
+│   └── solid
+│       └── polyMesh
+│           └── blockMeshDict
 └── system
-    └── fluid
-    │   └── blockMeshDict
-    └── solid
-        └── blockMeshDict
 ```
 
 **2.1.** Rename the functions file
@@ -181,8 +201,8 @@ at the bottom of the `controlDict`:
 #include "./system/functions"
 ```
 
-In the `foam-extend` case structure, the `functions` file is renamed to
-`functions.foam-extend` whereas `functions.openfoam` is renamed to functions:
+The stored `functions` file is backed up as `functions.openfoam`, and the
+`foam-extend` version, `functions.foamextend`, is copied into its place:
 
 ```plaintext
 └── system
@@ -190,7 +210,7 @@ In the `foam-extend` case structure, the `functions` file is renamed to
     ├── fvSchemes
     ├── fvSolution
     ├── functions
-    └── functions.openfoam
+    └── functions.foamextend
 ```
 
 is transformed into:
@@ -200,21 +220,22 @@ is transformed into:
     ├── controlDict
     ├── fvSchemes
     ├── fvSolution
-    ├── functions.foam-extend
-    └── functions
+    ├── functions
+    ├── functions.foamextend
+    └── functions.openfoam
 ```
 
 **3.** Find the `turbulenceProperties` file and rename the value for the
 `simulationType` keyword:
 
 ```c++
-simulationType  RASModel;
+simulationType  RAS;
 ```
 
 is renamed to:
 
 ```c++
-simulationType  RAS;
+simulationType  RASModel;
 ```
 
 Note that in a fluid-solid interaction case, `turbulenceProperties` file is
@@ -316,7 +337,7 @@ inlet
 ├── constant
 └── system
     ├── changeDictionaryDict
-    ├── changeDictionaryDict.openfoam
+    ├── changeDictionaryDict.foamextend
     ├── controlDict
     ├── fvSchemes
     └── fvSolution
@@ -328,8 +349,8 @@ is transformed into:
 ├── 0
 ├── constant
 └── system
-    ├── changeDictionaryDict.foamextend
-    ├── changeDictionaryDict
+    ├── changeDictionaryDict
+    ├── changeDictionaryDict.openfoam
     ├── controlDict
     ├── fvSchemes
     └── fvSolution
@@ -342,7 +363,7 @@ is transformed into:
 ├── constant
 └── system
     ├── createPatchDict
-    ├── createPatchDict.openfoam
+    ├── createPatchDict.foamextend
     ├── controlDict
     ├── fvSchemes
     └── fvSolution
@@ -354,27 +375,17 @@ is transformed into:
 ├── 0
 ├── constant
 └── system
-    ├── createPatchDict.foamextend
-    ├── createPatchDict
+    ├── createPatchDict
+    ├── createPatchDict.openfoam
     ├── controlDict
     ├── fvSchemes
     └── fvSolution
 ```
 
-**9.** In case the [OpenFOAM.com](https://www.openfoam.com) version is used to
-solve solid mechanics or fluid-solid interaction problems, the `leastSquare`
-gradient method
-in `fvSchemes` file is replaced with `pointCellsLeastSquares` to account for
-boundary non-orthogonal corrections:
-
-```c++
-gradSchemes
-{
-    default            leastSquares;
-}
-```
-
-is transformed into:
+**9.** Solid cases are stored with the `pointCellsLeastSquares` gradient
+method, as `OpenFOAM` requires it to account for boundary non-orthogonal
+corrections. For `foam-extend`, it is replaced with `leastSquares`, which is
+the equivalent scheme there:
 
 ```c++
 gradSchemes
@@ -383,44 +394,95 @@ gradSchemes
 }
 ```
 
+is transformed into:
+
+```c++
+gradSchemes
+{
+    default            leastSquares;
+}
+```
+
 Note: In fluid-solid interaction cases, this change is performed only on
 `fvSchemes,` which refers to solid and is located in `system/solid/fvSchemes`.
 
-**10.** In case the `force.gnuplot` script is found, the path to the `force.dat`
-file is changed. `force.dat` is an output file generated by the `forces`
-function object. When `foam-extend` is used, it is located in the `forces/0/`
-directory; otherwise it is located in `postProcessing/fluid/forces/0/`:
-
-```bash
-plot [0.1:] "< sed s/[\\(\\)]//g forces/0/forces.dat" u 1:2 w l
-```
-
-is transformed into:
+**10.** In case the `force.gnuplot` script is found, the path to the forces
+output file is changed. This file is generated by the `forces` function object.
+`OpenFOAM.com` writes `force.dat` in `postProcessing/fluid/forces/0/`, whereas
+`foam-extend` writes `forces.dat` in `forces/0/`:
 
 ```bash
 plot [0.1:] "< sed s/[\\(\\)]//g ./postProcessing/fluid/forces/0/force.dat" \
     u 1:2 w l
 ```
 
-**11.** In case the `plot.gnuplot` script is found, the path to the
-`sigma_surface.raw` is changed. `sigma_surface.raw` is an output file generated
-after using `sample` utility for post-processing results. When `foam-extend` is
-used, it is located in the `"postProcessing/surfaces/1/` directory; otherwise,
-it is located in `postProcessing/sampleDict/1/`:
+is transformed into:
 
 ```bash
-path = "postProcessing/surfaces/1/sigma_surface.raw"
+plot [0.1:] "< sed s/[\\(\\)]//g forces/0/forces.dat" u 1:2 w l
+```
+
+Note that `OpenFOAM.org` also writes `forces.dat`, so this change is applied
+for `OpenFOAM.org` as well as for `foam-extend`.
+
+**11.** In case the `plot.gnuplot` script is found, the path to the
+`sigma_surface.raw` is changed. `sigma_surface.raw` is an output file generated
+after using the `sample` function object for post-processing results. In
+`OpenFOAM` it is located in `postProcessing/sample.surfaces/1/`, whereas in
+`foam-extend` it is located in `postProcessing/surfaces/1/`:
+
+```bash
+path = "postProcessing/sample.surfaces/1/sigma_surface.raw"
 ```
 
 is transformed into:
 
 ```bash
-path = "postProcessing/sampleDict.v2012/1/sigma_surface.raw"
+path = "postProcessing/surfaces/1/sigma_surface.raw"
 ```
 
-Note that the updated path has `sampleDict.v2012` in it, and this is because it
-has the same name in the `system/` directory where `sampleDict.v2012` is
-located.
+Note that the `OpenFOAM` path is derived from the name of the function object
+entry in the `system/` directory, here `sample`.
+
+---
+
+## `solids4foam::foamFlavour()`
+
+- **Function purpose**
+  Echoes the loaded variant: `foamextend`, `com` or `org`.
+
+- **Function arguments**
+  None
+
+- **Example of usage**
+
+  ```bash
+  if [[ $(solids4Foam::foamFlavour) == "foamextend" ]]
+  then
+      echo "foam-extend is loaded"
+  fi
+  ```
+
+---
+
+## `solids4foam::blockMeshDictDir()`
+
+- **Function purpose**
+  Echoes the directory `blockMesh` reads `blockMeshDict` from for the loaded
+  variant, i.e. `system` for `OpenFOAM` and `constant/polyMesh` for
+  `foam-extend`. It is intended for cases that generate their `blockMeshDict`,
+  for example with `m4`.
+
+- **Function arguments**
+  Optional region name, for multi-region cases
+
+- **Example of usage**
+
+  ```bash
+  BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+  mkdir -p "${BLOCK_MESH_DICT_DIR}"
+  m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
+  ```
 
 ---
 

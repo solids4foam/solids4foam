@@ -39,13 +39,13 @@ FoamFile
     }
     symm3
     {
-        type            symmetryPlane;
+        type            symmetry;
         nFaces          12;
         startFace       1262;
     }
     symm4
     {
-        type            symmetryPlane;
+        type            symmetry;
         nFaces          12;
         startFace       1274;
     }

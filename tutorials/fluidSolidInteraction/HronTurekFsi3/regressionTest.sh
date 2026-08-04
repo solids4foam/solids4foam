@@ -21,9 +21,12 @@ FX_TOL=1e-4
 FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
+# Note: the force references are the total force. They were previously the
+# total force plus the pressure force, as the extraction summed the OpenFOAM.com
+# total and pressure columns.
 REF_TIP_UY=-0.0006538
-REF_FX=-0.0222979
-REF_FY=-0.0832844
+REF_FX=-0.0391405
+REF_FY=-0.0416587
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
@@ -94,11 +97,26 @@ extract_final_tip_uy() {
 }
 
 extract_final_force_components() {
+    # The forces functionObject writes a different set of columns depending on
+    # the OpenFOAM version: OpenFOAM.com writes the total force followed by the
+    # pressure and viscous contributions, whereas OpenFOAM.org and foam-extend
+    # write the pressure and viscous contributions followed by the moments. The
+    # number of columns is used to tell them apart.
     awk '
     ($1 + 0) == $1 {
         gsub(/[()]/, "", $0)
-        fx = $2 + $5
-        fy = $3 + $6
+        if (NF >= 13)
+        {
+            # time, pressure, viscous, moments: sum the contributions
+            fx = $2 + $5
+            fy = $3 + $6
+        }
+        else
+        {
+            # time, total, pressure, viscous: use the total directly
+            fx = $2
+            fy = $3
+        }
     }
     END {
         if (fx != "" && fy != "") print fx, fy

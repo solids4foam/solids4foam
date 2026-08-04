@@ -80,7 +80,7 @@ select_block_mesh_dict() {
         echo "Using the foam-extend blockMeshDict"
         mkdir -p constant/polyMesh
         rm -f system/blockMeshDict
-        ln -vnsf ../../system/blockMeshDict.foamExtend constant/polyMesh/blockMeshDict
+        ln -vnsf ../../system/blockMeshDict.foamextend constant/polyMesh/blockMeshDict
     else
         echo "Using the OpenFOAM blockMeshDict"
         rm -f constant/polyMesh/blockMeshDict

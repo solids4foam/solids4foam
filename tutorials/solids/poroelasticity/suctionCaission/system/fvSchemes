@@ -30,7 +30,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            leastSquares;
+    default            pointCellsLeastSquares;
 }
 
 divSchemes

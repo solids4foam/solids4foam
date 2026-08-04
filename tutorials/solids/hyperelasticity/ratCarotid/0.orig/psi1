@@ -35,23 +35,23 @@ boundaryField
     symm1
     {
         type fixedValue;
-        patchType symmetryPlane;
+        patchType symmetry;
         value uniform 0;
     }
     symm2
     {
         type fixedValue;
-        patchType symmetryPlane;
+        patchType symmetry;
         value uniform 1;
     }
     symm3
     {
-        type symmetryPlane;
+        type symmetry;
         value uniform 0;
     }
     symm4
     {
-        type symmetryPlane;
+        type symmetry;
         value uniform 0;
     }
 }
