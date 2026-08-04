@@ -199,7 +199,6 @@ journal for numerical methods in engineering_ 64.12 (2005):1594-1609.](https://w
  Numerical Methods in Engineering_, 127, e70268, 2026,
  10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
 
-[5] [I. Batistić, P. Castrillo, P. Cardiff, A Jacobian-free Newton-Krylov method
- for high-order cell-centred finite volume solid mechanics. _arXiv preprint
- arXiv:2601.18417_,
- 2026.](https://arxiv.org/abs/2601.18417)
+[5] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)

@@ -95,8 +95,8 @@ argument which specifies the solution approach:
 ```bash
 ./Allrun             # Defaults to the segregated approach
 ./Allrun segregated  # Segregated second-order approach
-./Allrun petscSnes   # PETSc SNES second-order approach
-./Allrun highOrder   # PETSc SNES high-order approach
+./Allrun petscSnes   # PETSc SNES second-order approach [5]
+./Allrun highOrder   # PETSc SNES high-order approach [6]
 ```
 
 The `Allrun` script starts by updating the files in the case to match the
@@ -125,3 +125,13 @@ Applications. 2017 Aug 3;72(3):215-35.](https://www.tandfonline.com/doi/abs/10.1
 [Bijelonja I, Demirdžić I, Muzaferija S. A finite volume method for
 incompressible linear elasticity. Computer methods in applied mechanics and
 engineering. 2006 Sep 15;195(44-47):6378-90.](https://www.sciencedirect.com/science/article/abs/pii/S0045782506000387)
+
+[5] [P. Cardiff, D. Armfield, Ž. Tuković, I. Batistić, A Jacobian-free
+Newton-Krylov method for cell-centred finite volume solid mechanics.
+_International Journal for Numerical Methods in Engineering_, 127, e70268,
+2026, 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
+
+[6]
+[IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)

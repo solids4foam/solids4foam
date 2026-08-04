@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach] [mesh]
+
+Where [approach] is one of:
+  segregated        (default)
+  petscSnes
+
+Where [mesh] is one of:
+  hex               (default) structured hexahedral mesh
+  tet               structured tetrahedral mesh
+
+Examples:
+  ./Allrun
+  ./Allrun petscSnes
+  ./Allrun segregated hex
+  ./Allrun segregated tet
+EOF
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+APPROACH=segregated
+MESH=hex
+
+for arg in "$@"
+do
+    case "$arg" in
+        segregated|petscSnes)
+            APPROACH="$arg"
+            ;;
+        hex|tet)
+            MESH="$arg"
+            ;;
+        *)
+            echo "Error: Unknown argument '$arg'"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+
+    while IFS= read -r -d '' f
+    do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found ))
+    then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+case "$APPROACH" in
+    segregated)
+        echo "Using the segregated approach"
+        link_files_for_suffix segregated
+        ;;
+    petscSnes)
+        echo "Using the petscSnes approach"
+        solids4Foam::requirePetscOrExitSilently
+        link_files_for_suffix petscSnes
+        ;;
+esac
+
+case "$MESH" in
+    hex)
+        echo "Using the structured hexahedral mesh"
+        GMSH_FILE=structuredHex.geo
+        MESH_FILE=structuredHex.msh
+        ;;
+    tet)
+        echo "Using the structured tetrahedral mesh"
+        GMSH_FILE=structuredTet.geo
+        MESH_FILE=structuredTet.msh
+
+        # Unstructured tetrahedral mesh
+        # echo "Using the unstructured tetrahedral mesh"
+        # GMSH_FILE=unstructuredTet.geo
+        # MESH_FILE=unstructuredTet.msh
+        ;;
+esac
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh
+if command -v gmsh &> /dev/null
+then
+    # Temporarily rename 0 to avoid issues
+    if [[ -d 0.tmp ]]
+    then
+        echo; echo "Temporary 0.tmp directory already exists: please remove it before running"
+        exit 1
+    fi
+    mv 0 0.tmp
+
+    # Create mesh with gmsh
+    solids4Foam::runApplication gmsh -3 -format msh2 "$GMSH_FILE"
+    solids4Foam::runApplication gmshToFoam "$MESH_FILE"
+
+    solids4Foam::runApplication changeDictionary
+
+    # Move 0 back
+    rm -rf 0
+    mv 0.tmp 0
+else
+    # Fail silently
+    echo; echo "Gmsh is required to run this case: please install it"
+    exit 0
+fi
+
+# Run solver
+solids4Foam::runApplication solids4Foam
