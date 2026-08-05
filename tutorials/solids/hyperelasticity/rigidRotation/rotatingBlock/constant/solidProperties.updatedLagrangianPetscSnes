@@ -33,8 +33,11 @@ nonLinearGeometryUpdatedLagrangianCoeffs
     // Stabilisation term
     stabilisation
     {
-        type        RhieChow;
-        scaleFactor 1.0;
+        momentum
+        {
+            type        RhieChow;
+            scaleFactor 1.0;
+        }
     }
 }
 

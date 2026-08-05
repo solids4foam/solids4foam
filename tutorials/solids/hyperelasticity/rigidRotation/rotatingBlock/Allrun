@@ -6,7 +6,7 @@ IFS=$'\n\t'
 # solids4Foam Allrun script
 # Allows selection of solution approach:
 #   totalLagrangian (default), updatedLagrangian, totalLagrangianPetscSnes,
-#   updatedLagrangianPetscSnes
+#   updatedLagrangianPetscSnes, highOrder, highOrderUpdatedLagrangian
 # -------------------------------------------------------------------------
 
 usage() {
@@ -19,6 +19,8 @@ Where [approach] is one of:
   updatedLagrangian
   totalLagrangianPetscSnes
   updatedLagrangianPetscSnes
+  highOrder
+  highOrderUpdatedLagrangian
 
 Examples:
   ./Allrun
@@ -26,6 +28,8 @@ Examples:
   ./Allrun updatedLagrangian
   ./Allrun totalLagrangianPetscSnes
   ./Allrun updatedLagrangianPetscSnes
+  ./Allrun highOrder
+  ./Allrun highOrderUpdatedLagrangian
 EOF
 }
 
@@ -53,7 +57,7 @@ APPROACH="${1:-totalLagrangian}"
 
 # Validate approach name
 case "$APPROACH" in
-    totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes) ;;
+    totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes|highOrder|highOrderUpdatedLagrangian) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -79,6 +83,15 @@ link_files_for_suffix() {
     fi
 }
 
+link_default_control_dict() {
+    # link_files_for_suffix links system/controlDict.<approach> when the approach
+    # provides one; otherwise the controlDict symlink may still point at the
+    # variant used by a previous run, so reset it to the default here
+    if [[ ! -f "system/controlDict.${APPROACH}" ]]; then
+        ln -vnsf controlDict.default system/controlDict
+    fi
+}
+
 require_petsc_or_exit_silently() {
     solids4Foam::requirePetscOrExitSilently
 }
@@ -86,21 +99,29 @@ require_petsc_or_exit_silently() {
 select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
-        totalLagrangian|totalLagrangianPetscSnes)
-            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+        totalLagrangian|totalLagrangianPetscSnes|highOrder)
+            if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == "highOrder" ]]; then
                 require_petsc_or_exit_silently
+            fi
+            if [[ "$APPROACH" == highOrder* ]]; then
+                solids4Foam::caseDoesNotRunWithFoamExtend
             fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/D .)
             ;;
-        updatedLagrangian|updatedLagrangianPetscSnes)
-            if [[ "$APPROACH" == *"PetscSnes" ]]; then
+        updatedLagrangian|updatedLagrangianPetscSnes|highOrderUpdatedLagrangian)
+            if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == highOrder* ]]; then
                 require_petsc_or_exit_silently
+            fi
+            if [[ "$APPROACH" == highOrder* ]]; then
+                solids4Foam::caseDoesNotRunWithFoamExtend
             fi
             link_files_for_suffix "$APPROACH"
             (cd 0 && rm -f D* && ln -s org/DD .)
             ;;
     esac
+
+    link_default_control_dict
 }
 
 # -------------------------------------------------------------------------

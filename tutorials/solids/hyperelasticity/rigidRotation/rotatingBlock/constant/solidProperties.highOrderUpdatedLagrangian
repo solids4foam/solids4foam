@@ -17,9 +17,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+solidModel     nonLinearGeometryUpdatedLagrangian;
 
-nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+nonLinearGeometryUpdatedLagrangianCoeffs
 {
     // Solution algorithm: implicitSegregated (default), PETScSNES, ..
     solutionAlgorithm PETScSNES;
@@ -30,13 +30,36 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     // Alternative solution tolerance for displacement
     "alternativeTolerance|rTol"    1e-12;
 
+    highOrderCoeffs
+    {
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        displacement
+        {
+            // Polynomial order of displacement field
+            polynomialOrder 2;
+
+            // Extra cells in minimum size stencil
+            faceStencilExtraCells 15;
+
+            // Weight function for least square systems
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
     // Stabilisation term
     stabilisation
     {
         momentum
         {
-            type        RhieChow;
-            scaleFactor 1.0;
+            type        alpha;
+            scaleFactor 0.1;
         }
     }
 }

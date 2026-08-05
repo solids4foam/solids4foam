@@ -12,33 +12,46 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "constant";
-    object      solidProperties;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+application     solids4Foam;
 
-nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
-{
-    // Solution algorithm: implicitSegregated (default), PETScSNES, ..
-    solutionAlgorithm PETScSNES;
+startFrom       startTime;
 
-    // Solution tolerance for displacement
-    "solutionTolerance|sTol"       1e-12;
+startTime       0;
 
-    // Alternative solution tolerance for displacement
-    "alternativeTolerance|rTol"    1e-12;
+stopAt          endTime;
 
-    // Stabilisation term
-    stabilisation
-    {
-        momentum
-        {
-            type        RhieChow;
-            scaleFactor 1.0;
-        }
-    }
-}
+// The prescribed rotation rate is 10 degrees per second, so this end time
+// corresponds to 80 degrees of rigid rotation, rather than the 100 degrees used
+// by the other approaches.
+// The rotation is stopped short because the PETSc SNES Jacobian used by this
+// approach diverges at approximately 90 degrees: the segregated, updated
+// Lagrangian PETSc SNES and high-order approaches all complete the full 100
+// degrees. See issue #325 for details.
+endTime         8;
+
+deltaT          0.2;
+
+writeControl    runTime;
+
+writeInterval   1;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
 
 // ************************************************************************* //

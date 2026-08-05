@@ -12,31 +12,34 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "constant";
-    object      solidProperties;
+    location    "system";
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
-
-nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+solvers
 {
-    // Solution algorithm: implicitSegregated (default), PETScSNES, ..
-    solutionAlgorithm PETScSNES;
-
-    // Solution tolerance for displacement
-    "solutionTolerance|sTol"       1e-12;
-
-    // Alternative solution tolerance for displacement
-    "alternativeTolerance|rTol"    1e-12;
-
-    // Stabilisation term
-    stabilisation
+    D
     {
-        momentum
+        solver          petsc;
+
+        options
         {
-            type        RhieChow;
-            scaleFactor 1.0;
+            snes_type newtonls;
+            snes_rtol "1e-12";
+            snes_stol "1e-12";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
         }
     }
 }

@@ -28,6 +28,7 @@ License
 
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementFvPatchVectorField.H"
+#include "fixedRotationFvPatchVectorField.H"
 #include "fixedGradientFvPatchFields.H"
 
 
@@ -1183,19 +1184,29 @@ movingLeastSquares::patchFaceQuadValues
 
     // The problem is that evaluateQuadrature is not pure virtual function,
     // so we need to handle in this way
-    if (!isA<fixedDisplacementFvPatchVectorField>(pf))
+    if (isA<fixedDisplacementFvPatchVectorField>(pf))
     {
-        FatalErrorInFunction
-            << "Patch " << patchI << " fixes value, but quadrature-point "
-            << "evaluation is only implemented for "
-            << fixedDisplacementFvPatchVectorField::typeName
-            << abort(FatalError);
+        const fixedDisplacementFvPatchVectorField& patchField =
+            refCast<const fixedDisplacementFvPatchVectorField>(pf);
+
+        return patchField.evaluateQuadrature();
+    }
+    else if (isA<fixedRotationFvPatchVectorField>(pf))
+    {
+        const fixedRotationFvPatchVectorField& patchField =
+            refCast<const fixedRotationFvPatchVectorField>(pf);
+
+        return patchField.evaluateQuadrature();
     }
 
-    const fixedDisplacementFvPatchVectorField& patchField =
-        refCast<const fixedDisplacementFvPatchVectorField>(pf);
+    FatalErrorInFunction
+        << "Patch " << patchI << " fixes value, but quadrature-point "
+        << "evaluation is only implemented for "
+        << fixedDisplacementFvPatchVectorField::typeName << " and "
+        << fixedRotationFvPatchVectorField::typeName
+        << abort(FatalError);
 
-    return patchField.evaluateQuadrature();
+    return autoPtr<CompactListList<vector>>();
 }
 
 

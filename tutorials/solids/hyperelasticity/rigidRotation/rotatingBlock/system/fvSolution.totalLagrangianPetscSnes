@@ -21,12 +21,7 @@ solvers
 {
     "D|DD"
     {
-        solver          PCG;
-        preconditioner  FDIC;
-        tolerance       1e-15;
-        relTol          0.1;
-
-        //solver          petsc;
+        solver          petsc;
         options
         {
             snes_type newtonls;
