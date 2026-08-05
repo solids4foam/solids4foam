@@ -930,12 +930,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 #ifndef FOAMEXTEND
         // Calculate sigma at the face quadrature points
         mechanical().correct(gradDQuad(), sigmaQuad());
-
-        // Calculate the cell-centre stress using run-time selectable
-        // mechanical law
-        // The residual uses the quadrature point stress, but the cell-centre
-        // stress is still required by tractionBoundarySnGrad
-        mechanical().correct(sigma());
 #endif
     }
     else
