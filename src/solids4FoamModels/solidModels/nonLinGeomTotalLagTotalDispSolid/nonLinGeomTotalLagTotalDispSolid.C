@@ -54,6 +54,84 @@ addToRunTimeSelectionTable
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
+tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
+{
+    if (!highOrderResidual())
+    {
+        return fvc::interpolate(J_*Finv_.T()) & mesh().Sf();
+    }
+
+#ifndef FOAMEXTEND
+    const surfaceVectorField& Sf = mesh().Sf();
+
+    tmp<surfaceVectorField> tSfCurrent
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "SfCurrent",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("one", Sf.dimensions(), vector::one)
+        )
+    );
+    surfaceVectorField& SfCurrent = tSfCurrent.ref();
+
+    const vectorField normal(mesh().faceAreas()/mag(mesh().faceAreas()));
+    const CompactListList<scalar>& quadW =
+        displacementMLS().quadrature().faceQuadWeights();
+    const CompactListList<tensor>& quadGradD = gradDQuad();
+
+    // Only boundary values are required for enforcing traction conditions
+    forAll(SfCurrent.boundaryField(), patchI)
+    {
+        vectorField& SfCurrentPatch =
+            SfCurrent.boundaryFieldRef()[patchI];
+
+        forAll(SfCurrentPatch, faceI)
+        {
+            const label globalFaceID =
+                mesh().boundaryMesh()[patchI].start() + faceI;
+
+            if (!quadW[globalFaceID].size())
+            {
+                SfCurrentPatch[faceI] =
+                    Sf.boundaryField()[patchI][faceI];
+                continue;
+            }
+
+            SfCurrentPatch[faceI] = vector::zero;
+
+            forAll(quadW[globalFaceID], qpI)
+            {
+                const tensor F(I + quadGradD[globalFaceID][qpI].T());
+
+                // The quadrature weights include the reference area, so
+                // Nanson's relation is applied to the reference unit normal
+                SfCurrentPatch[faceI] +=
+                    quadW[globalFaceID][qpI]
+                   *det(F)
+                   *(inv(F).T() & normal[globalFaceID]);
+            }
+        }
+    }
+
+    return tSfCurrent;
+#else
+    notImplemented
+    (
+        type() + "::currentSf() with a high-order residual"
+    );
+    return tmp<surfaceVectorField>();
+#endif
+}
+
+
 void nonLinGeomTotalLagTotalDispSolid::predict()
 {
     Info<< "Linear predictor" << endl;
@@ -916,14 +994,17 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Update gradient of displacement increment
     gradDD() = gradD() - gradD().oldTime();
 
-    // Total deformation gradient
-    F_ = I + gradD().T();
+    if (!highOrderResidual())
+    {
+        // Total deformation gradient
+        F_ = I + gradD().T();
 
-    // Inverse of the deformation gradient
-    Finv_ = inv(F_);
+        // Inverse of the deformation gradient
+        Finv_ = inv(F_);
 
-    // Jacobian of the deformation gradient
-    J_ = det(F_);
+        // Jacobian of the deformation gradient
+        J_ = det(F_);
+    }
 
     if (highOrderResidual())
     {
@@ -999,10 +1080,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
-    const surfaceVectorField SfCurrent
-    (
-        fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
-    );
+    const tmp<surfaceVectorField> tSfCurrent(currentSf());
+    const surfaceVectorField& SfCurrent = tSfCurrent();
     const surfaceScalarField magSfCurrent(mag(SfCurrent));
     const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
 
