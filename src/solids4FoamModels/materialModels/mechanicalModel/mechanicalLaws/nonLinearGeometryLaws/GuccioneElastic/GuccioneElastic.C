@@ -1252,7 +1252,8 @@ void Foam::GuccioneElastic::calcDevCauchy
 
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
     // the deviatoric component
-    devSigma = dev(symm(F & S & FT));
+    const scalar J(det(F));
+    devSigma = dev(symm(F & S & FT)/J);
 }
 
 
