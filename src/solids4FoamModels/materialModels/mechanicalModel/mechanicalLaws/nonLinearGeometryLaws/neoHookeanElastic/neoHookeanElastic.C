@@ -478,6 +478,62 @@ void Foam::neoHookeanElastic::correctF
 }
 
 
+#ifndef FOAMEXTEND
+void Foam::neoHookeanElastic::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    if (pressureDisplacement_)
+    {
+        notImplemented
+        (
+            "void Foam::neoHookeanElastic::correct(...) not implemented "
+            "with pressureDisplacement"
+        );
+    }
+
+    // Get material properties
+    const scalar mu = mu_.value();
+    const scalar K = K_.value();
+
+    forAll(sigmaQuad, faceI)
+    {
+        UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+
+        forAll(faceSigmaQuad, qpI)
+        {
+            // Total deformation gradient
+            const tensor F(I + faceGradDQuad[qpI].T());
+
+            // Jacobian of the deformation gradient
+            const scalar J(det(F));
+
+            // Left Cauchy Green strain tensor
+            const symmTensor b(symm(F & F.T()));
+
+            // Left Cauchy Green strain tensor with volumetric term removed
+            const symmTensor bEbar(pow(J, -2.0/3.0)*b);
+
+            // Deviatoric stress
+            const symmTensor s(mu*dev(bEbar));
+
+            // Hydrostatic stress
+            const scalar sigmaHyd =
+                alternatePressureDefinition_
+              ? K*(J - 1.0)
+              : 0.5*K*(pow(J, 2.0) - 1.0);
+
+            // Cauchy stress
+            faceSigmaQuad[qpI] = (1.0/J)*(sigmaHyd*I + s);
+        }
+    }
+}
+#endif
+
+
 void Foam::neoHookeanElastic::setRestart()
 {
     F().writeOpt() = IOobject::AUTO_WRITE;

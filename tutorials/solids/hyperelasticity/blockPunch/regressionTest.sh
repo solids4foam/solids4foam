@@ -12,7 +12,8 @@ fi
 
 # ============================================================
 # blockPunch regression test
-# Checks the first load step with the segregated and PETSc SNES approaches.
+# Checks the first load step with the segregated, PETSc SNES, and high-order
+# approaches.
 # ============================================================
 
 DISP_Z_MIN=-0.052
@@ -25,6 +26,7 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 APPROACHES=(
     segregated
     petscSnes
+    highOrder
 )
 
 echo "============================================================"
