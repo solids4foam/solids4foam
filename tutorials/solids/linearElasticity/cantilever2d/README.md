@@ -106,7 +106,12 @@ In solids4foam, there are several solid models which can solve this problem;
    the solver uses the same second-order Laplacian as approach 1 as a physical
    preconditioner. Alternatively, `highOrderJacobian true;` can be used to
    assemble the high-order Jacobian; this affects the timing but not the
-   accuracy.
+   accuracy. Note that when `highOrderJacobian` is set to `true`, Jacobian-free
+   Newton-Krylov iterations should not be required. By setting `snes_type
+   ksponly;` in `system/fvSolution`, one should get the same answer as with the
+   JFNK approach. This mimics the discretisation in [6]. The assembled
+   high-order Jacobian does not include stabilisation, so direct solving is
+   acceptable only on regular meshes; see [5].
 
 ```note
 Approach 4 uses simplified uniform displacement (left) and uniform traction
@@ -191,3 +196,7 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
 [5] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
 finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
 Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)
+
+[6] [P. Castrillo, A. Canelas, E. Schillaci, J. Rigola, A. Oliva, High-order finite
+ volume method for linear elasticity on unstructured meshes. *Computers & Structures*,
+ 268, 106829, 2022, 10.1016/j.compstruc.2022.106829.](https://doi.org/10.1016/j.compstruc.2022.106829)

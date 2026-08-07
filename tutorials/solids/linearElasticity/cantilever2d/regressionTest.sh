@@ -30,6 +30,7 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     petscSnes
     highOrder
+    highOrder-JacobianTesting
 )
 
 echo "============================================================"
@@ -99,6 +100,69 @@ extract_disp_linf() {
         || true
 }
 
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+
+    while IFS= read -r -d '' f; do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+run_jacobian_testing() {
+    export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+    : "${FOAM_LD_LIBRARY_PATH:=}"
+    : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+    . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+    source solids4FoamScripts.sh
+
+    solids4Foam::requirePetscOrExitSilently
+
+    echo "Using the highOrder-JacobianTesting regression approach"
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    link_files_for_suffix "highOrder"
+
+    sed -i.bak \
+        -e 's|highOrderJacobian false;|highOrderJacobian true;|' \
+        -e 's|scaleFactor 0.1;|scaleFactor 0;|' \
+        constant/solidProperties
+
+    sed -i.bak \
+        -e 's|snes_type newtonls;|snes_type ksponly;|' \
+        system/fvSolution
+
+    rm -f constant/solidProperties.bak system/fvSolution.bak
+
+    echo
+    echo "Compiling libraries..."
+    (cd src && ./Allwmake -s)
+
+    echo
+    solids4Foam::convertCaseFormat .
+
+    echo
+    solids4Foam::runApplication blockMesh
+
+    echo
+    solids4Foam::runApplication solids4Foam
+}
+
+run_regression_approach() {
+    local approach="$1"
+
+    if [[ "${approach}" == "highOrder-JacobianTesting" ]]; then
+        run_jacobian_testing
+    else
+        ./Allrun "${approach}"
+    fi
+}
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -161,7 +225,7 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "------------------------------------------------------------"
 
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+        ( cd "${CASE_DIR}" && run_regression_approach "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
@@ -172,9 +236,10 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
 
-        if [[ "${approach}" == "highOrder" ]] && ! check_high_order_errors; then
+        if [[ "${approach}" == highOrder* ]] && ! check_high_order_errors; then
             failures=$((failures + 1))
         fi
+
     done
 else
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then

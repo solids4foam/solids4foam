@@ -49,7 +49,7 @@ namespace hofvm
     //- Laplacian coefficient
     tensor laplacianCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -58,7 +58,7 @@ namespace hofvm
     //- Laplacian transpose coefficient
     tensor laplacianTransposeCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -67,7 +67,7 @@ namespace hofvm
     //- Laplacian trace coefficient
     tensor laplacianTraceCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
