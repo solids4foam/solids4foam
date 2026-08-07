@@ -241,6 +241,14 @@ public:
         );
 
 #ifndef FOAMEXTEND
+        //- Return separate traction and pressure values at face quadrature
+        //  points, used for nonlinear high-order traction transformations
+        virtual void evaluateQuadrature
+        (
+            autoPtr<CompactListList<vector>>& tractionValues,
+            autoPtr<CompactListList<scalar>>& pressureValues
+        ) const;
+
         //- Return face quadrature values, used for high order solvers
         virtual autoPtr<CompactListList<vector>>
            evaluateQuadrature() const;

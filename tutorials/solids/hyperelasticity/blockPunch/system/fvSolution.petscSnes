@@ -35,7 +35,7 @@ solvers
             ksp_type lgmres;
             ksp_gmres_restart "100";
             ksp_converged_reason;
-            ksp_rtol "1e-10";
+            ksp_rtol "1e-5";
 
             pc_type bjacobi;
             sub_pc_type lu;

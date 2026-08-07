@@ -205,18 +205,30 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             if (highOrderResidual())
             {
 #ifndef FOAMEXTEND
-                // Face quadrature points weights
+                // Face quadrature weights include the reference face area
                 const CompactListList<scalar>& faceQuadWeights =
                     displacementMLS().quadrature().faceQuadWeights();
 
-                const surfaceScalarField& magSf = mesh().magSf();
+                const CompactListList<tensor>& faceGradD = gradDQuad();
 
-                // Get value at patch faces quadrature points
-                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
-                    tracPatch.evaluateQuadrature();
+                const vectorField nRef
+                (
+                    mesh().boundary()[patchI].Sf()
+                   /mesh().boundary()[patchI].magSf()
+                );
 
-                const CompactListList<vector>& quadratureValues =
-                    patchQuadraturePointsValue();
+                autoPtr<CompactListList<vector>> tractionValues;
+                autoPtr<CompactListList<scalar>> pressureValues;
+                tracPatch.evaluateQuadrature
+                (
+                    tractionValues,
+                    pressureValues
+                );
+
+                const CompactListList<vector>& tractionQuad = tractionValues();
+                const CompactListList<scalar>& pressureQuad = pressureValues();
+
+                forceP = vector::zero;
 
                 forAll(mesh().boundaryMesh()[patchI], faceI)
                 {
@@ -231,34 +243,57 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     // Loop over quadrature points and add their contribution
                     for (label pointI = 0; pointI < nPoints; ++pointI)
                     {
-                        tracP[faceI] +=
-                            quadratureValues[faceI][pointI]
-                           *faceQuadWeights[faceID][pointI];
+                        const scalar weight =
+                            faceQuadWeights[faceID][pointI];
+
+                        if (tracPatch.useUndeformedArea())
+                        {
+                            forceP[faceI] += weight*
+                            (
+                                tractionQuad[faceI][pointI]
+                              - pressureQuad[faceI][pointI]*nRef[faceI]
+                            );
+                        }
+                        else
+                        {
+                            const tensor F
+                            (
+                                I + faceGradD[faceID][pointI].T()
+                            );
+                            const vector areaMap
+                            (
+                                det(F)*(inv(F).T() & nRef[faceI])
+                            );
+
+                            forceP[faceI] += weight*
+                            (
+                                mag(areaMap)
+                               *tractionQuad[faceI][pointI]
+                              - pressureQuad[faceI][pointI]*areaMap
+                            );
+                        }
                     }
-                    // Divide with area because we use physical weights
-                    tracP[faceI] *=
-                        (1.0/(magSf.boundaryField()[patchI][faceI]));
                 }
 #endif
             }
             else
             {
                 tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
-            }
 
-            if (tracPatch.useUndeformedArea())
-            {
-                const scalarField& magSfPatch =
-                    D.mesh().boundary()[patchI].magSf();
+                if (tracPatch.useUndeformedArea())
+                {
+                    const scalarField& magSfPatch =
+                        D.mesh().boundary()[patchI].magSf();
 
-                forceP = tracP*magSfPatch;
-            }
-            else
-            {
-                const scalarField& magSfCurrentPatch =
-                    magSfCurrent.boundaryField()[patchI];
+                    forceP = tracP*magSfPatch;
+                }
+                else
+                {
+                    const scalarField& magSfCurrentPatch =
+                        magSfCurrent.boundaryField()[patchI];
 
-                forceP = tracP*magSfCurrentPatch;
+                    forceP = tracP*magSfCurrentPatch;
+                }
             }
         }
         else if
