@@ -492,11 +492,8 @@ void solidTractionFvPatchVectorField::evaluate
 }
 
 #ifndef FOAMEXTEND
-void solidTractionFvPatchVectorField::evaluateQuadrature
-(
-    autoPtr<CompactListList<vector>>& tractionValues,
-    autoPtr<CompactListList<scalar>>& pressureValues
-) const
+autoPtr<CompactListList<vector>>
+solidTractionFvPatchVectorField::evaluateTractionQuadrature() const
 {
     if (curTimeIndex_ != db().time().timeIndex())
     {
@@ -556,18 +553,13 @@ void solidTractionFvPatchVectorField::evaluateQuadrature
         nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
     }
 
-    tractionValues.reset
+    autoPtr<CompactListList<vector>> tractionValues
     (
         new CompactListList<vector>(nQpPerFace)
-    );
-    pressureValues.reset
-    (
-        new CompactListList<scalar>(nQpPerFace)
     );
 
     // Get a reference to the actual data for easier access
     CompactListList<vector>& tractionQuad = tractionValues();
-    CompactListList<scalar>& pressureQuad = pressureValues();
 
     forAll(*this, faceI)
     {
@@ -581,32 +573,29 @@ void solidTractionFvPatchVectorField::evaluateQuadrature
         for (label pointI = 0; pointI < nPoints; ++pointI)
         {
             tractionQuad[faceI][pointI] = traction_[faceI];
-            pressureQuad[faceI][pointI] = pressure_[faceI];
         }
     }
+
+    return tractionValues;
 }
 
 
 autoPtr<CompactListList<vector>>
 solidTractionFvPatchVectorField::evaluateQuadrature() const
 {
-    autoPtr<CompactListList<vector>> tractionValues;
-    autoPtr<CompactListList<scalar>> pressureValues;
-
-    evaluateQuadrature(tractionValues, pressureValues);
+    autoPtr<CompactListList<vector>> tractionValues =
+        evaluateTractionQuadrature();
 
     CompactListList<vector>& tractionQuad = tractionValues();
-    const CompactListList<scalar>& pressureQuad = pressureValues();
     const vectorField n(patch().nf());
 
     forAll(tractionQuad, faceI)
     {
         UList<vector> faceTraction = tractionQuad[faceI];
-        const UList<scalar> facePressure = pressureQuad[faceI];
 
         forAll(faceTraction, pointI)
         {
-            faceTraction[pointI] -= n[faceI]*facePressure[pointI];
+            faceTraction[pointI] -= n[faceI]*pressure_[faceI];
         }
     }
 

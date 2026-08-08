@@ -12,12 +12,14 @@ fi
 
 # ============================================================
 # blockPunch regression test
-# Checks the first load step with the segregated, PETSc SNES, and high-order
+# Checks four load steps with the segregated, PETSc SNES, and high-order
 # approaches.
 # ============================================================
 
-DISP_Z_MIN=-0.052
-DISP_Z_MAX=-0.050
+REGRESSION_END_TIME=0.4
+EXPECTED_TIME_STEPS=4
+DISP_Z_MIN=-0.16
+DISP_Z_MAX=-0.163
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
@@ -31,7 +33,9 @@ APPROACHES=(
 
 echo "============================================================"
 echo "blockPunch regression test"
-echo "Final point-A disp_z in [${DISP_Z_MIN}, ${DISP_Z_MAX}]"
+echo "Time steps: ${EXPECTED_TIME_STEPS}"
+echo "Final time: ${REGRESSION_END_TIME}"
+echo "Point-A disp_z between ${DISP_Z_MAX} and ${DISP_Z_MIN}"
 echo "============================================================"
 echo
 
@@ -51,7 +55,7 @@ prepare_case() {
     done
 
     sed -i.bak \
-        's/^endTime[[:space:]][[:space:]]*[^;][^;]*;/endTime         0.1;/' \
+        "s/^endTime[[:space:]][[:space:]]*[^;][^;]*;/endTime         ${REGRESSION_END_TIME};/" \
         "${case_dir}/system/controlDict"
     rm -f "${case_dir}/system/controlDict.bak"
 }
@@ -60,6 +64,30 @@ extract_final_disp_z() {
     local case_dir="$1"
 
     awk 'END {print $4}' "${case_dir}/${DISP_FILE}" 2>/dev/null || true
+}
+
+check_history() {
+    local case_dir="$1"
+    local approach="$2"
+    local n_steps
+    local final_time
+
+    n_steps=$(awk '!/^#/ && NF {count++} END {print count + 0}' \
+        "${case_dir}/${DISP_FILE}" 2>/dev/null || true)
+    final_time=$(awk '!/^#/ && NF {time=$1} END {print time}' \
+        "${case_dir}/${DISP_FILE}" 2>/dev/null || true)
+
+    if [[ "${n_steps}" != "${EXPECTED_TIME_STEPS}" ]]; then
+        echo "FAIL: ${approach} wrote ${n_steps} displacement entries; expected ${EXPECTED_TIME_STEPS}"
+        return 1
+    fi
+
+    if ! awk "BEGIN {exit !((${final_time} - ${REGRESSION_END_TIME})^2 < 1e-20)}"; then
+        echo "FAIL: ${approach} final time is ${final_time}; expected ${REGRESSION_END_TIME}"
+        return 1
+    fi
+
+    return 0
 }
 
 check_log() {
@@ -87,11 +115,13 @@ check_displacement() {
         return 1
     fi
 
-    if awk "BEGIN {exit !(${disp_z} >= ${DISP_Z_MIN} && ${disp_z} <= ${DISP_Z_MAX})}"; then
-        printf "PASS: %s final point-A disp_z = %.7g\n" "${approach}" "${disp_z}"
+    if awk "BEGIN {exit !(${disp_z} <= ${DISP_Z_MIN} && ${disp_z} >= ${DISP_Z_MAX})}"; then
+        printf "PASS: %s final point-A disp_z = %.7g\n" \
+            "${approach}" "${disp_z}"
         return 0
     else
-        printf "FAIL: %s final point-A disp_z = %.7g\n" "${approach}" "${disp_z}"
+        printf "FAIL: %s final point-A disp_z = %.7g; expected between %.7g and %.7g\n" \
+            "${approach}" "${disp_z}" "${DISP_Z_MAX}" "${DISP_Z_MIN}"
         return 1
     fi
 }
@@ -139,6 +169,11 @@ for approach in "${APPROACHES[@]}"; do
     fi
 
     if ! check_log "${CASE_DIR}" "${approach}"; then
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if ! check_history "${CASE_DIR}" "${approach}"; then
         failures=$((failures + 1))
         continue
     fi

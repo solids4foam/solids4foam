@@ -101,6 +101,6 @@ Newton-Krylov method for cell-centred finite volume solid mechanics.
 _International Journal for Numerical Methods in Engineering_, 127, e70268,
 2026, 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
 
-[3] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
-finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
-Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)
+[3] [I. Batistić, P. Castrillo, P. Cardiff, High-order cell-centred finite-volume
+solid mechanics using a Jacobian-free Newton-Krylov method,
+_Journal of Computational Physics_, 115056, 2026.](https://doi.org/10.1016/j.jcp.2026.115056)

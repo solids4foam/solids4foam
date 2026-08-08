@@ -3,8 +3,8 @@
 | Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
-|              producer and distributor of OpenFOAM software via              |
-|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
 |              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -13,36 +13,43 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSolution;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solvers
+d2dt2Schemes
 {
-    "D|DD"
-    {
-        solver          petsc;
+    default                 steadyState;
+}
 
-        options
-        {
-            snes_type newtonls;
-            snes_monitor;
-            snes_converged_reason;
-            snes_mf;
-            snes_mf_operator;
-            snes_max_it "100";
+ddtSchemes
+{
+    default                 steadyState;
+}
 
-            ksp_type lgmres;
-            ksp_gmres_restart "100";
-            ksp_converged_reason;
-            ksp_rtol "1e-5";
+gradSchemes
+{
+    default                 leastSquaresS4f;
+}
 
-            pc_type bjacobi;
-            sub_pc_type lu;
-            snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
-        }
-    }
+divSchemes
+{
+    default                 Gauss linear;
+}
+
+laplacianSchemes
+{
+    default                 Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default                 corrected;
+}
+
+interpolationSchemes
+{
+    default                 linear;
 }
 
 // ************************************************************************* //

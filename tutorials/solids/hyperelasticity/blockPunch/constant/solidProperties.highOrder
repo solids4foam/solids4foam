@@ -17,9 +17,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryUpdatedLagrangian;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-nonLinearGeometryUpdatedLagrangianCoeffs
+"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
 {
     // Solution algorithm
     solutionAlgorithm PETScSNES;

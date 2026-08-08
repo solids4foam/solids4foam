@@ -198,6 +198,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                 );
 
             const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+            const bool useUndeformedArea = tracPatch.useUndeformedArea();
 
             // Specified traction at the patch faces
             vectorField tracP(nPatch.size(), vector::zero);
@@ -217,16 +218,11 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                    /mesh().boundary()[patchI].magSf()
                 );
 
-                autoPtr<CompactListList<vector>> tractionValues;
-                autoPtr<CompactListList<scalar>> pressureValues;
-                tracPatch.evaluateQuadrature
-                (
-                    tractionValues,
-                    pressureValues
-                );
+                autoPtr<CompactListList<vector>> tractionValues =
+                    tracPatch.evaluateTractionQuadrature();
 
                 const CompactListList<vector>& tractionQuad = tractionValues();
-                const CompactListList<scalar>& pressureQuad = pressureValues();
+                const scalarField& pressure = tracPatch.pressure();
 
                 forceP = vector::zero;
 
@@ -240,19 +236,32 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     // Get the number of quadrature points for this face
                     const label nPoints = faceQuadWeights[faceID].size();
 
+                    // Pressure is constant per face and currentSf() already
+                    // contains its quadrature-integrated Nanson mapping
+                    if (useUndeformedArea)
+                    {
+                        forceP[faceI] =
+                           -pressure[faceI]
+                           *mesh().boundary()[patchI].Sf()[faceI];
+                    }
+                    else
+                    {
+                        forceP[faceI] =
+                           -pressure[faceI]
+                           *magSfCurrent.boundaryField()[patchI][faceI]
+                           *nPatch[faceI];
+                    }
+
                     // Loop over quadrature points and add their contribution
                     for (label pointI = 0; pointI < nPoints; ++pointI)
                     {
                         const scalar weight =
                             faceQuadWeights[faceID][pointI];
 
-                        if (tracPatch.useUndeformedArea())
+                        if (useUndeformedArea)
                         {
-                            forceP[faceI] += weight*
-                            (
-                                tractionQuad[faceI][pointI]
-                              - pressureQuad[faceI][pointI]*nRef[faceI]
-                            );
+                            forceP[faceI] +=
+                                weight*tractionQuad[faceI][pointI];
                         }
                         else
                         {
@@ -262,14 +271,13 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                             );
                             const vector areaMap
                             (
-                                det(F)*(inv(F).T() & nRef[faceI])
+                                cof(F) & nRef[faceI]
                             );
 
                             forceP[faceI] += weight*
                             (
                                 mag(areaMap)
                                *tractionQuad[faceI][pointI]
-                              - pressureQuad[faceI][pointI]*areaMap
                             );
                         }
                     }
@@ -280,7 +288,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             {
                 tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
 
-                if (tracPatch.useUndeformedArea())
+                if (useUndeformedArea)
                 {
                     const scalarField& magSfPatch =
                         D.mesh().boundary()[patchI].magSf();
