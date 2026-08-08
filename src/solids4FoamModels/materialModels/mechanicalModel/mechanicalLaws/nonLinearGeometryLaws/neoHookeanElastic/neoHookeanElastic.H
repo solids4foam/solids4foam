@@ -80,7 +80,7 @@ class neoHookeanElastic
 
         //- Alternative definition of the Kirchhoff pressure
         //  default: -0.5*K*(pow(J, 2.0) - 1.0)
-        //  alternate: -0.5*K*(J - 1.0)
+        //  alternate: -K*(J - 1.0)
         const Switch alternatePressureDefinition_;
 
         //- Use pressure fields p/pf as the hydrostatic stress contribution

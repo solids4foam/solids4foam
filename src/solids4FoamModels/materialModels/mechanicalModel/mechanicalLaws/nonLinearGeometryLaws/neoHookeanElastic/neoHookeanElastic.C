@@ -473,8 +473,16 @@ void Foam::neoHookeanElastic::correctF
         return;
     }
 
+    // Calculate the hydrostatic stress
+    const surfaceScalarField sigmaHyd
+    (
+        alternatePressureDefinition_
+      ? K_*(J - 1.0)
+      : 0.5*K_*(pow(J, 2.0) - 1.0)
+    );
+
     // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+    sigma = (1.0/J)*(sigmaHyd*I + s);
 }
 
 
