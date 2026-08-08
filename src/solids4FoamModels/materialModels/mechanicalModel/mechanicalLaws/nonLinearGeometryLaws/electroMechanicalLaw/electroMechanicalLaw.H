@@ -85,6 +85,12 @@ class electroMechanicalLaw
 
     // Private Member Functions
 
+        //- Check whether a field-based active tension should be used
+        void checkFieldTa() const;
+
+        //- Return the current ramped constant active tension
+        dimensionedScalar activeTension() const;
+
         //- Disallow default bitwise copy construct
         electroMechanicalLaw(const electroMechanicalLaw&);
 
@@ -129,11 +135,26 @@ public:
         //- Return the shear modulus field
         virtual tmp<volScalarField> shearModulus() const;
 
+        //- True if this law currently provides a non-zero active stress
+        bool hasActiveStress() const;
+
+        //- Return the active Cauchy stress
+        tmp<volSymmTensorField> activeCauchyStress() const;
+
+        //- Return the active Cauchy stress surface field
+        tmp<surfaceSymmTensorField> activeCauchyStressf() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Forward accumulated-field updates to the passive law
+        virtual void updateTotalFields();
+
+        //- Forward restart setup to the passive law
+        virtual void setRestart();
 };
 
 

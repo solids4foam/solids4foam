@@ -929,11 +929,35 @@ Foam::volTensorField& Foam::mechanicalLaw::F()
 }
 
 
+const Foam::volTensorField& Foam::mechanicalLaw::F() const
+{
+    if (FPtr_.empty())
+    {
+        FatalErrorIn("const volTensorField& " + type() + "::F() const")
+            << "F is not stored by this mechanical law" << abort(FatalError);
+    }
+
+    return FPtr_();
+}
+
+
 Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 {
     if (FfPtr_.empty())
     {
         makeFf();
+    }
+
+    return FfPtr_();
+}
+
+
+const Foam::surfaceTensorField& Foam::mechanicalLaw::Ff() const
+{
+    if (FfPtr_.empty())
+    {
+        FatalErrorIn("const surfaceTensorField& " + type() + "::Ff() const")
+            << "Ff is not stored by this mechanical law" << abort(FatalError);
     }
 
     return FfPtr_();
