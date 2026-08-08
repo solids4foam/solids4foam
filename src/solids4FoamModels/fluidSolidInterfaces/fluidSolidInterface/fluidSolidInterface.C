@@ -34,8 +34,14 @@ License
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "RBFMeshMotionSolver.H"
+#include "addToRunTimeSelectionTable.H"
+#ifndef S4F_NO_RBF
+    #include "RBFMeshMotionSolver.H"
+#endif
 #include "FieldSumOp.H"
+#ifdef OPENFOAM_COM
+    #include "dynamicMotionSolverFvMesh.H"
+#endif
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -1031,16 +1037,41 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         // Check for RBF motion solver
-        bool rbfMotionSolver = false;
+        RBFMeshMotionSolver* rbfMotionSolverPtr = nullptr;
+#ifdef OPENFOAM_COM
+        if (isA<dynamicMotionSolverFvMesh>(fluidMesh()))
+        {
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    refCast<const dynamicMotionSolverFvMesh>
+                    (
+                        fluidMesh()
+                    ).motion()
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
+        }
+#else
         if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
         {
-            rbfMotionSolver = isA<RBFMeshMotionSolver>
-            (
-                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
-            );
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
         }
+#endif
 #endif
 
         // Set motion on FSI interface
@@ -1157,8 +1188,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAM_ORG
-        else if (rbfMotionSolver)
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
+        else if (rbfMotionSolverPtr)
         {
             // Prepare list of patch motions
             Field<vectorField> motion(fluidMesh().boundaryMesh().size());
@@ -1195,10 +1226,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             // Set motion field in RBF motion solver
             // Note: take displacement as opposed to velocity
-            const_cast<RBFMeshMotionSolver&>
-            (
-                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
-            ).setMotion(motion);
+            rbfMotionSolverPtr->setMotion(motion);
         }
 #endif
         else

@@ -24,17 +24,17 @@ fi
 \rm -rf case.foam
 \rm -rf residuals
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
 
 # Check fvSolution for foundation version
 
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
 then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    if [[ -f system/fluid/fvSolution ]]
     then
         echo "OpenFOAM.org specific: replacing 'residualControl' with"
         echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/outerCorrectorResidualControl/residualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
+        sed -i "s/outerCorrectorResidualControl/residualControl/g" system/fluid/fvSolution
     fi
 fi

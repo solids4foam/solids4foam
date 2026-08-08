@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     4.1                                |
-|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -109,7 +111,6 @@ patchInfo
         set f0;
     }
 
-
        {
         // Name of new patch
         name symmetry_1;
@@ -117,7 +118,7 @@ patchInfo
         // Type of new patch
         dictionary
         {
-            type symmetryPlane;
+            type symmetry;
 
         }
 
@@ -137,7 +138,7 @@ patchInfo
         // Type of new patch
         dictionary
         {
-            type symmetryPlane;
+            type symmetry;
 
         }
 
@@ -151,11 +152,6 @@ patchInfo
         set f0;
     }
 
-
-
-
-
 );
-
 
 // ************************************************************************* //

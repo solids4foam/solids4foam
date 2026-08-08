@@ -28,11 +28,12 @@ MODE="iqnils"
 # with the wrong scheme (e.g. midPoint instead of linear) shifts apex dy by
 # ~2.0e-3 from the reference, which still fails this check.
 APEX_DISP_TOL=1e-3
-FSI_RES_TOL=1e-6
+# The FSI residual is a convergence measure, so lower values are better; check
+# an upper bound rather than closeness to a non-zero reference value.
+FSI_RES_MAX=1e-5
 
-# Reference values at REG_END_TIME
+# Reference value at REG_END_TIME
 REF_APEX_DY=-0.532789
-REF_FSI_RES=5.939e-06
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_disp.dat"
@@ -43,7 +44,7 @@ echo "fillingElasticContainer regression test"
 echo "Regression end time         = ${REG_END_TIME}"
 echo "Coupling mode               = ${MODE}"
 echo "Final apex dy tolerance     < ${APEX_DISP_TOL}"
-echo "Final FSI residual tolerance < ${FSI_RES_TOL}"
+echo "Final FSI residual           < ${FSI_RES_MAX}"
 echo "============================================================"
 echo
 
@@ -139,18 +140,18 @@ if [[ -z "${apex_dy}" || -z "${fsi_residual}" ]]; then
 fi
 
 apex_diff_abs=$(abs "$(awk "BEGIN {print ${apex_dy} - ${REF_APEX_DY}}")")
-fsi_res_diff_abs=$(abs "$(awk "BEGIN {print ${fsi_residual} - ${REF_FSI_RES}}")")
-
 failures=0
 
 if awk "BEGIN {exit !(${apex_diff_abs} < ${APEX_DISP_TOL})}"; then
-    printf "PASS: final apex dy = %.6g\n" "${apex_dy}"
+    printf "PASS: final apex dy = %.6g (diff = %.3g)\n" \
+        "${apex_dy}" "${apex_diff_abs}"
 else
-    printf "FAIL: final apex dy = %.6g\n" "${apex_dy}"
+    printf "FAIL: final apex dy = %.6g (diff = %.3g)\n" \
+        "${apex_dy}" "${apex_diff_abs}"
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {exit !(${fsi_res_diff_abs} < ${FSI_RES_TOL})}"; then
+if awk "BEGIN {exit !(${fsi_residual} < ${FSI_RES_MAX})}"; then
     printf "PASS: final FSI residual = %.6g\n" "${fsi_residual}"
 else
     printf "FAIL: final FSI residual = %.6g\n" "${fsi_residual}"

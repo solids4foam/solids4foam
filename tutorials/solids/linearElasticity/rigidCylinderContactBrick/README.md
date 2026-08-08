@@ -1,5 +1,5 @@
 ---
-sort: xx
+sort: 15
 ---
 
 # Rigid cylinder contact with block: `rigidCylinderContactBrick`

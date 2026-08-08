@@ -6,12 +6,10 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-[ -f constant/polyMesh/blockMeshDict ] && cp constant/polyMesh/blockMeshDict system/
 cleanCase
-[ -f system/blockMeshDict ] && mkdir -p constant/polyMesh && cp system/blockMeshDict constant/polyMesh/
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam postProcessing constant/polyMesh/boundary
 \rm -rf system/cellsToSmoothSubset
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .

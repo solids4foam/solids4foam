@@ -42,6 +42,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -108,12 +109,40 @@ class nonLinGeomUpdatedLagSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+#ifndef FOAMEXTEND
+        //- Total deformation gradient at the face quadrature points at the
+        //  start of the time step
+        //  Only used by the high-order approach: the updated Lagrangian
+        //  displacement gradient is relative to the start of the time step, so
+        //  the total deformation gradient must be accumulated
+        mutable autoPtr<CompactListList<tensor>> FQuadOldPtr_;
+
+        //- Total displacement gradient at the face quadrature points
+        //  Only used by the high-order approach: this is what the mechanical
+        //  law expects, as opposed to the relative gradient held in gradDQuad()
+        mutable autoPtr<CompactListList<tensor>> gradDTotalQuadPtr_;
+#endif
+
 
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+#ifndef FOAMEXTEND
+        //- Allocate the quadrature point deformation gradient fields
+        void makeQuadratureKinematics() const;
+
+        //- Update the total displacement gradient at the face quadrature points
+        //  from the relative gradient in gradDQuad(), i.e.
+        //  F = relF & F.oldTime() and gradDTotal = (F - I).T()
+        void updateQuadratureKinematics() const;
+
+        //- Store the current total deformation gradient at the face quadrature
+        //  points as the reference for the next time step
+        void storeQuadratureKinematicsOldTime() const;
+#endif
 
         //- Allocate the reciprocal of the bulk modulus
         void makeRKappa() const;

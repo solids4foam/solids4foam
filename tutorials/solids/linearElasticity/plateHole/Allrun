@@ -132,12 +132,7 @@ link_files_for_suffix() {
 require_petsc_or_exit_silently() {
     case "${APPROACH}" in
         petscSnes|highOrder)
-            if [[ -z "${PETSC_DIR:-}" ]]
-            then
-                echo; echo "Skipping this case as PETSc is not installed"
-                echo "Please set the PETSC_DIR variable"; echo
-                exit 0
-            fi
+            solids4Foam::requirePetscOrExitSilently
             ;;
     esac
 }
@@ -186,7 +181,7 @@ select_pressure_displacement_case() {
 
     copy_contents caseOptions/pressureDisplacement/hex/common/constant constant
     copy_contents caseOptions/pressureDisplacement/hex/common/system system
-    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/constant" constant
+    copy_contents "caseOptions/pressureDisplacement/hex/${MESH}/system" system
     cp -a caseOptions/pressureDisplacement/hex/common/postProcessing.gplt .
 }
 

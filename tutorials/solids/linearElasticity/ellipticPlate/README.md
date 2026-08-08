@@ -105,12 +105,12 @@ machine.
 
 **Table 1: Wall-clock time (in s) and maximum memory usage (in MB) [2].**
 
-| Mesh    | unsCoupled  | segregated  | Abaqus    |
-| ------- | ----------- | ----------- | --------- |
-| 500     | 0.08 s, 11 MB | 58 s, 20 MB | 3 s, 40 MB |
-| 4 500   | 0.5 s, 50 MB | 384 s, 27 MB | 4 s, 113 MB |
-| 12 500  | 1.4 s, 140 MB | 1 387 s, 43 MB | 5 s, 197 MB |
-| 50 000  | 6 s, 570 MB | 4 737 s, 112 MB | 16 s, 881 MB |
+| Mesh | unsCoupled | segregated | Abaqus |
+| --- | --- | --- | --- |
+| 500 | 0.08 s, 11 MB | 58 s, 20 MB | 3 s, 40 MB |
+| 4 500 | 0.5 s, 50 MB | 384 s, 27 MB | 4 s, 113 MB |
+| 12 500 | 1.4 s, 140 MB | 1 387 s, 43 MB | 5 s, 197 MB |
+| 50 000 | 6 s, 570 MB | 4 737 s, 112 MB | 16 s, 881 MB |
 | 200 000 | 36 s, 2 500 MB | -, - | 73 s, 1800 MB |
 
 ```warning
@@ -154,7 +154,7 @@ PETSc SNES path using the same geometry and boundary conditions.
 ```note
 OpenFOAM v2412 does not support the foam-extend `ellipse` block edge type in
 `blockMeshDict`. The foam-extend mesh dictionary is kept in
-`system/blockMeshDict.foamExtend` and uses the original `ellipse` entries. The
+`system/blockMeshDict.foamextend` and uses the original `ellipse` entries. The
 OpenFOAM mesh dictionary is kept in `system/blockMeshDict.openfoam` and
 replaces those edges with `spline` edges sampled from the ellipses using the
 helper script located in `system/makeBlockMeshDict.py`. The `Allrun` script

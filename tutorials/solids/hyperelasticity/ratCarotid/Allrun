@@ -11,14 +11,19 @@ solids4Foam::convertCaseFormat .
 
 solids4Foam::caseOnlyRunsWithFoamExtend
 
+# Compile case-local utilities
+(cd src && bash ./Allwmake -s) || exit 1
+
 if ! command -v calcLocCoordinates &> /dev/null
 then
-    echo; echo "Skipping this case as calcLocCoordinates is not installed"; echo
-    exit 0
+    echo; echo "calcLocCoordinates was not found after compiling src"; echo
+    exit 1
 fi
 
 # Create mesh
-m4 -P constant/polyMesh/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+mkdir -p "${BLOCK_MESH_DICT_DIR}"
+m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
 runApplication blockMesh
 
 # Create 0 folder
@@ -33,7 +38,23 @@ cp -r 0.orig/psi1 ./0
 runApplication calcLocCoordinates
 
 # Run solver
-runApplication solids4Foam
+if [[ "$1" == "parallel" ]]
+then
+    runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Plot inner radius history
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating innerRadius.png using gnuplot"
+    gnuplot pointHystory.gplt &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
 
 
 # ----------------------------------------------------------------- end-of-file

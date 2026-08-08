@@ -21,9 +21,9 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-mkdir -p constant/polyMesh
-m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
-m4 system/blockMeshDict.cylinder.m4 > system/blockMeshDict
+BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+mkdir -p "${BLOCK_MESH_DICT_DIR}"
+m4 system/blockMeshDict.cylinder.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
 solids4Foam::runApplication blockMesh
 
 if [[ $WM_PROJECT != "foam" ]]

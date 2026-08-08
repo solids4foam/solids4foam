@@ -39,48 +39,44 @@ direction, $$42.5$$ m in the $$y$$ direction, and $$10$$ m in depth.
 
 Table 1 - Poroelastic material properties used in the current case
 
-| Parameter              | Symbol       | Value                    |
-| ---------------------- | ------------ | ------------------------ |
-| Density                | $$\rho$$     | $$2650$$ kg/m$$^3$$      |
-| Young's modulus, x     | $$E_x$$      | $$1.2\cdot10^7$$ Pa      |
-| Young's modulus, y     | $$E_y$$      | $$1.2\cdot10^7$$ Pa      |
-| Young's modulus, z     | $$E_z$$      | $$2.0\cdot10^7$$ Pa      |
-| Poisson's ratio, xy    | $$\nu_{xy}$$ | $$0.2$$                  |
-| Poisson's ratio, yz    | $$\nu_{yz}$$ | $$0.24$$                 |
-| Poisson's ratio, zx    | $$\nu_{zx}$$ | $$0.4$$                  |
-| Shear modulus, xy      | $$G_{xy}$$   | $$0.5\cdot10^7$$ Pa      |
-| Shear modulus, yz      | $$G_{yz}$$   | $$1.2\cdot10^7$$ Pa      |
-| Shear modulus, zx      | $$G_{zx}$$   | $$1.2\cdot10^7$$ Pa      |
-| Hydraulic conductivity | $$k$$        | $$1.0\cdot10^{-3}$$ m/s  |
-| Porosity               | $$n$$        | $$0.2$$                  |
-| Water specific weight  | $$\gamma_w$$ | $$9.807\cdot10^3$$ N/m$$^3$$ |
-| Degree of saturation   | $$S_r$$      | $$0.9$$                  |
-| Water bulk modulus     | $$K_w$$      | $$2.15\cdot10^9$$ Pa     |
+| Parameter | Symbol | Value |
+| --- | --- | --- |
+| Density | $$\rho$$ | $$2650$$ kg/m$$^3$$ |
+| Young's modulus, x | $$E_x$$ | $$1.2\cdot10^7$$ Pa |
+| Young's modulus, y | $$E_y$$ | $$1.2\cdot10^7$$ Pa |
+| Young's modulus, z | $$E_z$$ | $$2.0\cdot10^7$$ Pa |
+| Poisson's ratio, xy | $$\nu_{xy}$$ | $$0.2$$ |
+| Poisson's ratio, yz | $$\nu_{yz}$$ | $$0.24$$ |
+| Poisson's ratio, zx | $$\nu_{zx}$$ | $$0.4$$ |
+| Shear modulus, xy | $$G_{xy}$$ | $$0.5\cdot10^7$$ Pa |
+| Shear modulus, yz | $$G_{yz}$$ | $$1.2\cdot10^7$$ Pa |
+| Shear modulus, zx | $$G_{zx}$$ | $$1.2\cdot10^7$$ Pa |
+| Hydraulic conductivity | $$k$$ | $$1.0\cdot10^{-3}$$ m/s |
+| Porosity | $$n$$ | $$0.2$$ |
+| Water specific weight | $$\gamma_w$$ | $$9.807\cdot10^3$$ N/m$$^3$$ |
+| Degree of saturation | $$S_r$$ | $$0.9$$ |
+| Water bulk modulus | $$K_w$$ | $$2.15\cdot10^9$$ Pa |
 
 Table 2 - Boundary conditions for displacement and pressure
 
-| Boundary | $$D$$           | $$p$$                         |
-| -------- | --------------- | ----------------------------- |
+| Boundary | $$D$$ | $$p$$ |
+| --- | --- | --- |
 | `seabed` | `solidTraction` | `timeVaryingMappedFixedValue` |
-| `sides`  | `slip`          | `zeroGradient`                |
-| `bottom` | `slip`          | `zeroGradient`                |
+| `sides` | `slip` | `zeroGradient` |
+| `bottom` | `slip` | `zeroGradient` |
 
 The `seabed` pressure condition reads the mapped pressure values from
 `constant/boundaryData/seabed`. Since the solved field is named `p`, the active
-time directories contain files named `p`, for example:
+time directories contain files named `p` for the initial state and the single
+simulated time step:
 
 ```text
 constant/boundaryData/seabed/0/p
 constant/boundaryData/seabed/0.05/p
-constant/boundaryData/seabed/0.1/p
-constant/boundaryData/seabed/0.15/p
-constant/boundaryData/seabed/0.2/p
-constant/boundaryData/seabed/0.25/p
 ```
 
 The same directory also contains `points` and `faces`, which define the source
-patch geometry used for mapping. The `p_w` files are present as auxiliary data,
-but they are not referenced by the `p` boundary condition.
+patch geometry used for mapping.
 
 > Note: some current case settings differ from the values reported in [1].
 > The porosity is $$0.2$$, the degree of saturation is

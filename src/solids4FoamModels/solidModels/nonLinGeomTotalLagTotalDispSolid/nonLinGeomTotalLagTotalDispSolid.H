@@ -42,6 +42,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -105,6 +106,9 @@ class nonLinGeomTotalLagTotalDispSolid
 
 
     // Private Member Functions
+
+        //- Calculate the current face-area vectors
+        tmp<surfaceVectorField> currentSf() const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps

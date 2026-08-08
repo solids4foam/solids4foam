@@ -3,18 +3,16 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Example usage
 # ./Allrun # default behaviour is Robin-Neumann coupling
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
 
 # This case requires PETSc to be installed
-if [ -z "${PETSC_DIR}" ];
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable"; echo
-    exit 0
-fi
+solids4Foam::requirePetscOrExitSilently
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -40,21 +38,18 @@ else
     done
 fi
 
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
-
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Check fvSolution for foundation version
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
 then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    if [[ -f system/fluid/fvSolution ]]
     then
         echo "OpenFOAM.org specific: replacing 'residualControl' with"
         echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
         sed -i "s/residualControl/outerCorrectorResidualControl/g" \
-            "${CASE_DIR}"/system/fluid/fvSolution
+            system/fluid/fvSolution
     fi
 fi
 
