@@ -218,8 +218,10 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                    /mesh().boundary()[patchI].magSf()
                 );
 
-                const CompactListList<vector>& tractionQuad =
-                    tracPatch.tractionQuadrature();
+                autoPtr<CompactListList<vector>> quadratureValues =
+                    tracPatch.evaluateQuadrature();
+                const CompactListList<vector>& tractionPressureQuad =
+                    quadratureValues();
                 const scalarField& pressure = tracPatch.pressure();
                 const scalarField& magSfRef =
                     mesh().boundary()[patchI].magSf();
@@ -252,11 +254,14 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     {
                         const scalar weight =
                             faceQuadWeights[faceID][pointI];
+                        const vector traction =
+                            tractionPressureQuad[faceI][pointI]
+                          + nRef[faceI]*pressure[faceI];
 
                         if (useUndeformedArea)
                         {
                             forceP[faceI] +=
-                                weight*tractionQuad[faceI][pointI];
+                                weight*traction;
                         }
                         else
                         {
@@ -272,7 +277,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                             forceP[faceI] += weight*
                             (
                                 mag(areaMap)
-                               *tractionQuad[faceI][pointI]
+                               *traction
                             );
                         }
                     }

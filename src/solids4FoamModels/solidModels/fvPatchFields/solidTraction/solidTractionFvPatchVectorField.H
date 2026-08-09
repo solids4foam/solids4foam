@@ -72,14 +72,6 @@ class solidTractionFvPatchVectorField
         //- Pressure
         mutable scalarField pressure_;
 
-        //- Traction at face quadrature points,
-        //  used only by high order discretisation
-        mutable CompactListList<vector> tractionQuad_;
-
-        //- Pressure at face quadrature points
-        //  used only by high order discretisation
-        mutable CompactListList<scalar> pressureQuad_;
-
         //- Traction time series
         interpolationTable<vector> tractionSeries_;
 
@@ -108,15 +100,6 @@ class solidTractionFvPatchVectorField
 
         //- Current time index
         mutable label curTimeIndex_;
-
-
-    // Private Member Functions
-
-#ifndef FOAMEXTEND
-        //- Initialise the face quadrature fields
-        void initialiseQuadratureFields() const;
-#endif
-
 
 public:
 
@@ -257,13 +240,7 @@ public:
         );
 
 #ifndef FOAMEXTEND
-        //- Return traction values at face quadrature points
-        virtual const CompactListList<vector>& tractionQuadrature() const;
-
-        //- Return pressure values at face quadrature points
-        virtual const CompactListList<scalar>& pressureQuadrature() const;
-
-        //- Return combined traction and pressure at face quadrature points
+        //- Return face quadrature values, used for high order solvers
         virtual autoPtr<CompactListList<vector>> evaluateQuadrature() const;
 #endif
 
