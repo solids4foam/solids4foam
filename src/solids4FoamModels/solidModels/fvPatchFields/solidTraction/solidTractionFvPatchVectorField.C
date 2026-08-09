@@ -42,6 +42,8 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(false),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
+    tractionQuad_(),
+    pressureQuad_(),
     tractionSeries_(),
     pressureSeries_(),
     tractionFieldPtr_(),
@@ -76,6 +78,8 @@ solidTractionFvPatchVectorField
     ),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
+    tractionQuad_(),
+    pressureQuad_(),
     tractionSeries_(),
     pressureSeries_(),
     tractionFieldPtr_(),
@@ -240,6 +244,8 @@ solidTractionFvPatchVectorField
     traction_(pvf.traction_, mapper),
     pressure_(pvf.pressure_, mapper),
 #endif
+    tractionQuad_(),
+    pressureQuad_(),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
@@ -263,6 +269,8 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
+    tractionQuad_(),
+    pressureQuad_(),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
@@ -287,6 +295,8 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
+    tractionQuad_(),
+    pressureQuad_(),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
@@ -315,6 +325,9 @@ void solidTractionFvPatchVectorField::autoMap
     traction_.autoMap(m);
     pressure_.autoMap(m);
 #endif
+
+    tractionQuad_.clear();
+    pressureQuad_.clear();
 }
 
 
@@ -332,6 +345,8 @@ void solidTractionFvPatchVectorField::rmap
 
     traction_.rmap(rpvf.traction_, addr);
     pressure_.rmap(rpvf.pressure_, addr);
+    tractionQuad_.clear();
+    pressureQuad_.clear();
 }
 
 
@@ -492,34 +507,42 @@ void solidTractionFvPatchVectorField::evaluate
 }
 
 #ifndef FOAMEXTEND
-autoPtr<CompactListList<vector>>
-solidTractionFvPatchVectorField::evaluateTractionQuadrature() const
+void solidTractionFvPatchVectorField::initialiseQuadratureFields() const
 {
-    if (curTimeIndex_ != db().time().timeIndex())
+    if (tractionQuad_.size() && pressureQuad_.size())
     {
-        curTimeIndex_ = db().time().timeIndex();
-
-        // Called once per time-step
-
-        if (pressureFieldPtr_.valid())
-        {
-            // Force the pressure field boundary conditions to update
-            const_cast<volScalarField&>
-            (
-                pressureFieldPtr_()
-            ).correctBoundaryConditions();
-        }
-
-        if (tractionFieldPtr_.valid())
-        {
-            // Force the traction field boundary conditions to update
-            const_cast<volVectorField&>
-            (
-                tractionFieldPtr_()
-            ).correctBoundaryConditions();
-        }
+        return;
     }
 
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementMLS().quadrature().faceQuadPoints();
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = patch().start();
+
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = faceQuadPoints[start + faceI].size();
+    }
+
+    if (!tractionQuad_.size())
+    {
+        tractionQuad_ = CompactListList<vector>(nQpPerFace);
+    }
+
+    if (!pressureQuad_.size())
+    {
+        pressureQuad_ = CompactListList<scalar>(nQpPerFace);
+    }
+}
+
+
+const CompactListList<vector>&
+solidTractionFvPatchVectorField::tractionQuadrature() const
+{
     if (tractionFieldPtr_.valid())
     {
         traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
@@ -529,6 +552,25 @@ solidTractionFvPatchVectorField::evaluateTractionQuadrature() const
         traction_ = tractionSeries_(this->db().time().timeOutputValue());
     }
 
+    initialiseQuadratureFields();
+
+    forAll(tractionQuad_, faceI)
+    {
+        // Assign the same values to all quadrature points on this face
+        // We assume constant distributions over each face
+        forAll(tractionQuad_[faceI], pointI)
+        {
+            tractionQuad_[faceI][pointI] = traction_[faceI];
+        }
+    }
+
+    return tractionQuad_;
+}
+
+
+const CompactListList<scalar>&
+solidTractionFvPatchVectorField::pressureQuadrature() const
+{
     if (pressureFieldPtr_.valid())
     {
         pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
@@ -538,53 +580,29 @@ solidTractionFvPatchVectorField::evaluateTractionQuadrature() const
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
 
-    const fvMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel& solMod = lookupSolidModel(mesh);
+    initialiseQuadratureFields();
 
-    // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementMLS().quadrature().faceQuadPoints();
-
-    labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
-    forAll(nQpPerFace, faceI)
+    forAll(pressureQuad_, faceI)
     {
-        const label globalFaceID = faceI + start;
-        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
-    }
-
-    autoPtr<CompactListList<vector>> tractionValues
-    (
-        new CompactListList<vector>(nQpPerFace)
-    );
-
-    // Get a reference to the actual data for easier access
-    CompactListList<vector>& tractionQuad = tractionValues();
-
-    forAll(*this, faceI)
-    {
-        const label globalFaceID = faceI + start;
-
-        // Get the number of quadrature points for this face
-        const label nPoints = faceQuadPoints[globalFaceID].size();
-
-        // Assign the same values to all quadrature points on this face
-        // We assume constant distributions over each face
-        for (label pointI = 0; pointI < nPoints; ++pointI)
+        // We assume a constant pressure distribution over each face
+        forAll(pressureQuad_[faceI], pointI)
         {
-            tractionQuad[faceI][pointI] = traction_[faceI];
+            pressureQuad_[faceI][pointI] = pressure_[faceI];
         }
     }
 
-    return tractionValues;
+    return pressureQuad_;
 }
 
 
 autoPtr<CompactListList<vector>>
 solidTractionFvPatchVectorField::evaluateQuadrature() const
 {
-    autoPtr<CompactListList<vector>> tractionValues =
-        evaluateTractionQuadrature();
+    autoPtr<CompactListList<vector>> tractionValues
+    (
+        new CompactListList<vector>(tractionQuadrature())
+    );
+    const CompactListList<scalar>& pressureQuad = pressureQuadrature();
 
     CompactListList<vector>& tractionQuad = tractionValues();
     const vectorField n(patch().nf());
@@ -592,10 +610,11 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
     forAll(tractionQuad, faceI)
     {
         UList<vector> faceTraction = tractionQuad[faceI];
+        const UList<scalar> facePressure = pressureQuad[faceI];
 
         forAll(faceTraction, pointI)
         {
-            faceTraction[pointI] -= n[faceI]*pressure_[faceI];
+            faceTraction[pointI] -= n[faceI]*facePressure[pointI];
         }
     }
 

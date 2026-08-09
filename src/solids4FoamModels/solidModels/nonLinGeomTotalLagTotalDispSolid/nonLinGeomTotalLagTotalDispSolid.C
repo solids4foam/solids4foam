@@ -218,11 +218,10 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                    /mesh().boundary()[patchI].magSf()
                 );
 
-                autoPtr<CompactListList<vector>> tractionValues =
-                    tracPatch.evaluateTractionQuadrature();
-
-                const CompactListList<vector>& tractionQuad = tractionValues();
-                const scalarField& pressure = tracPatch.pressure();
+                const CompactListList<vector>& tractionQuad =
+                    tracPatch.tractionQuadrature();
+                const CompactListList<scalar>& pressureQuad =
+                    tracPatch.pressureQuadrature();
 
                 forceP = vector::zero;
 
@@ -236,22 +235,6 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     // Get the number of quadrature points for this face
                     const label nPoints = faceQuadWeights[faceID].size();
 
-                    // Pressure is constant per face and currentSf() already
-                    // contains its quadrature-integrated Nanson mapping
-                    if (useUndeformedArea)
-                    {
-                        forceP[faceI] =
-                           -pressure[faceI]
-                           *mesh().boundary()[patchI].Sf()[faceI];
-                    }
-                    else
-                    {
-                        forceP[faceI] =
-                           -pressure[faceI]
-                           *magSfCurrent.boundaryField()[patchI][faceI]
-                           *nPatch[faceI];
-                    }
-
                     // Loop over quadrature points and add their contribution
                     for (label pointI = 0; pointI < nPoints; ++pointI)
                     {
@@ -261,7 +244,11 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                         if (useUndeformedArea)
                         {
                             forceP[faceI] +=
-                                weight*tractionQuad[faceI][pointI];
+                                weight*
+                                (
+                                    tractionQuad[faceI][pointI]
+                                  - pressureQuad[faceI][pointI]*nRef[faceI]
+                                );
                         }
                         else
                         {
@@ -278,6 +265,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                             (
                                 mag(areaMap)
                                *tractionQuad[faceI][pointI]
+                              - pressureQuad[faceI][pointI]*areaMap
                             );
                         }
                     }
