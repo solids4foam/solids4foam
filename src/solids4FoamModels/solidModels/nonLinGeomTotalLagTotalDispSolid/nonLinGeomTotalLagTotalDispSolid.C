@@ -220,13 +220,25 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 
                 const CompactListList<vector>& tractionQuad =
                     tracPatch.tractionQuadrature();
-                const CompactListList<scalar>& pressureQuad =
-                    tracPatch.pressureQuadrature();
+                const scalarField& pressure = tracPatch.pressure();
+                const scalarField& magSfRef =
+                    mesh().boundary()[patchI].magSf();
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
 
                 forceP = vector::zero;
 
                 forAll(mesh().boundaryMesh()[patchI], faceI)
                 {
+                    // The pressure is constant over each face, so use the
+                    // already calculated deformed face area and normal.
+                    forceP[faceI] = -pressure[faceI]*nPatch[faceI]*
+                    (
+                        useUndeformedArea
+                      ? magSfRef[faceI]
+                      : magSfCurrentPatch[faceI]
+                    );
+
                     const label start = mesh().boundaryMesh()[patchI].start();
 
                     // Get global face index
@@ -244,11 +256,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                         if (useUndeformedArea)
                         {
                             forceP[faceI] +=
-                                weight*
-                                (
-                                    tractionQuad[faceI][pointI]
-                                  - pressureQuad[faceI][pointI]*nRef[faceI]
-                                );
+                                weight*tractionQuad[faceI][pointI];
                         }
                         else
                         {
@@ -265,7 +273,6 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                             (
                                 mag(areaMap)
                                *tractionQuad[faceI][pointI]
-                              - pressureQuad[faceI][pointI]*areaMap
                             );
                         }
                     }
