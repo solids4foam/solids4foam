@@ -90,6 +90,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Record the hardware this job landed on, so that intermittent tutorial
+      # failures can be correlated with the CPU rather than inferred from the
+      # Azure region printed in the "Set up job" group. See issue #352.
+      # Every command is best-effort: this step must never fail a build.
+      - name: Runner hardware
+        run: |
+          lscpu | grep -E 'Model name|^Flags|^CPU\(s\)' || true
+          free -g || true
+          cat /proc/cpuinfo | grep -m1 'model name' || true
+
       - name: Allwmake
         shell: bash -l {0}
         run: |
