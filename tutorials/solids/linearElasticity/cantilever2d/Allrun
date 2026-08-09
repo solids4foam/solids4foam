@@ -19,6 +19,7 @@ Where [approach] is one of:
   segregated
   unsCoupled
   highOrder
+  highOrderJacobian
 
 Examples:
   ./Allrun
@@ -26,6 +27,7 @@ Examples:
   ./Allrun segregated
   ./Allrun unsCoupled
   ./Allrun highOrder
+  ./Allrun highOrderJacobian
 EOF
 }
 
@@ -52,7 +54,7 @@ APPROACH="${1:-petscSnes}"
 
 # Validate approach name
 case "$APPROACH" in
-    petscSnes|vertexCentred|segregated|unsCoupled|highOrder) ;;
+    petscSnes|vertexCentred|segregated|unsCoupled|highOrder|highOrderJacobian) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -81,7 +83,7 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "$APPROACH" in
-        petscSnes|vertexCentred|highOrder)
+        petscSnes|vertexCentred|highOrder|highOrderJacobian)
             solids4Foam::requirePetscOrExitSilently
             ;;
     esac
@@ -110,6 +112,11 @@ select_approach() {
             echo "Using the highOrder approach"
             solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "highOrder"
+            ;;
+        highOrderJacobian)
+            echo "Using the highOrderJacobian testing approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrderJacobian"
             ;;
     esac
 }

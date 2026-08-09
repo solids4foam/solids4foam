@@ -680,7 +680,24 @@ label Foam::hofvm::initialiseJacobian
 
     AssertPETSc(MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
     AssertPETSc(MatSetOption(jac, MAT_KEEP_NONZERO_PATTERN, PETSC_TRUE));
-    AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+
+    PetscBool matIsAIJ = PETSC_FALSE;
+    AssertPETSc
+    (
+        PetscObjectTypeCompareAny
+        (
+            reinterpret_cast<PetscObject>(jac),
+            &matIsAIJ,
+            MATSEQAIJ,
+            MATMPIAIJ,
+            ""
+        )
+    );
+
+    if (matIsAIJ)
+    {
+        AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+    }
 
     return 0;
 }

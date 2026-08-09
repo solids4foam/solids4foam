@@ -106,12 +106,14 @@ In solids4foam, there are several solid models which can solve this problem;
    the solver uses the same second-order Laplacian as approach 1 as a physical
    preconditioner. Alternatively, `highOrderJacobian true;` can be used to
    assemble the high-order Jacobian; this affects the timing but not the
-   accuracy. Note that when `highOrderJacobian` is set to `true`, Jacobian-free
-   Newton-Krylov iterations should not be required. By setting `snes_type
-   ksponly;` in `system/fvSolution`, one should get the same answer as with the
-   JFNK approach. This mimics the discretisation in [6]. The assembled
-   high-order Jacobian does not include stabilisation, so direct solving is
-   acceptable only on regular meshes; see [5].
+   accuracy. The `highOrder` Allrun option retains the Jacobian-free
+   Newton-Krylov solver settings and uses the assembled matrix as a physical
+   preconditioner. The `highOrderJacobian` option is a regression-only test:
+   it removes the matrix-free options, sets `snes_type ksponly;`, and disables
+   stabilisation so that it solves with the assembled high-order Jacobian.
+   This mimics the discretisation in [6]. The assembled high-order Jacobian
+   does not include stabilisation, so this direct solve is acceptable only on
+   regular meshes; see [5].
 
 ```note
 Approach 4 uses simplified uniform displacement (left) and uniform traction
