@@ -598,23 +598,33 @@ solidTractionFvPatchVectorField::pressureQuadrature() const
 autoPtr<CompactListList<vector>>
 solidTractionFvPatchVectorField::evaluateQuadrature() const
 {
+    const CompactListList<vector>& tractionQuad = tractionQuadrature();
+    labelList nQpPerFace(tractionQuad.size(), 0);
+
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = tractionQuad[faceI].size();
+    }
+
     autoPtr<CompactListList<vector>> tractionValues
     (
-        new CompactListList<vector>(tractionQuadrature())
+        new CompactListList<vector>(nQpPerFace)
     );
     const CompactListList<scalar>& pressureQuad = pressureQuadrature();
 
-    CompactListList<vector>& tractionQuad = tractionValues();
+    CompactListList<vector>& values = tractionValues();
     const vectorField n(patch().nf());
 
-    forAll(tractionQuad, faceI)
+    forAll(values, faceI)
     {
-        UList<vector> faceTraction = tractionQuad[faceI];
+        UList<vector> faceValues = values[faceI];
+        const UList<vector> faceTraction = tractionQuad[faceI];
         const UList<scalar> facePressure = pressureQuad[faceI];
 
-        forAll(faceTraction, pointI)
+        forAll(faceValues, pointI)
         {
-            faceTraction[pointI] -= n[faceI]*facePressure[pointI];
+            faceValues[pointI] =
+                faceTraction[pointI] - n[faceI]*facePressure[pointI];
         }
     }
 
