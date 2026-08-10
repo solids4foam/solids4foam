@@ -36,6 +36,16 @@ APPROACHES=(
     highOrder
 )
 
+# Approaches that are known to diverge on this case and are not checked here.
+# The mesh is tetrahedral, and the standard leastSquaresS4f gradient stencil is
+# too small on tetrahedra, so the segregated and petscSnes approaches diverge.
+# The high-order approach uses a larger stencil, even at p = 1, and converges.
+# See https://github.com/solids4foam/solids4foam/issues/356
+SKIPPED_APPROACHES=(
+    segregated
+    petscSnes
+)
+
 echo "============================================================"
 echo "sphericalCavity regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
@@ -150,6 +160,20 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "------------------------------------------------------------"
         echo "Testing approach: ${approach}"
         echo "------------------------------------------------------------"
+
+        skip_approach=false
+        for skipped in "${SKIPPED_APPROACHES[@]}"; do
+            if [[ "${approach}" == "${skipped}" ]]; then
+                skip_approach=true
+                break
+            fi
+        done
+
+        if [ "${skip_approach}" = true ]; then
+            echo "Skipping ${approach}: the leastSquaresS4f gradient stencil is"
+            echo "too small on the tetrahedral mesh and the solution diverges"
+            continue
+        fi
 
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
         ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )

@@ -13,17 +13,17 @@ jobs:
       matrix:
         container-image:
           - name: "OpenFOAM-v2512-PETSc"
-            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas"
+            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
             source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
             buildflags: "-j"
 
           - name: "OpenFOAM-9-PETSc"
-            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas-gmsh"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
 
           - name: "foam-extend-4.1-PETSc"
-            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas"
+            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas-gmsh"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
     container:
