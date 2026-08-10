@@ -24,6 +24,7 @@ License
 #include "FieldField.H"
 #include "pointIOField.H"
 #include "polyMesh.H"
+#include "Time.H"
 #include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
