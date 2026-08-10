@@ -72,7 +72,9 @@ check_history() {
     local n_steps
     local final_time
 
-    n_steps=$(awk '!/^#/ && NF {count++} END {print count + 0}' \
+    # OpenFOAM.org writes an entry for the initial time whereas OpenFOAM.com
+    # does not, so only the entries after time zero are counted
+    n_steps=$(awk '!/^#/ && NF && $1 + 0 != 0 {count++} END {print count + 0}' \
         "${case_dir}/${DISP_FILE}" 2>/dev/null || true)
     final_time=$(awk '!/^#/ && NF {time=$1} END {print time}' \
         "${case_dir}/${DISP_FILE}" 2>/dev/null || true)

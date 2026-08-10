@@ -84,6 +84,8 @@ case "$APPROACH" in
         ;;
     highOrder)
         echo "Using the highOrder approach"
+        # High-order MLS discretisation is not available in foam-extend
+        solids4Foam::caseDoesNotRunWithFoamExtend
         solids4Foam::requirePetscOrExitSilently
         link_files_for_suffix highOrder
         ;;
