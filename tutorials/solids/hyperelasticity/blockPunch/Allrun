@@ -14,6 +14,7 @@ Usage:
 Where [approach] is one of:
   segregated        (default)
   petscSnes
+  highOrder
 
 Where [mesh] is one of:
   hex               (default) structured hexahedral mesh
@@ -22,6 +23,7 @@ Where [mesh] is one of:
 Examples:
   ./Allrun
   ./Allrun petscSnes
+  ./Allrun highOrder
   ./Allrun segregated hex
   ./Allrun segregated tet
 EOF
@@ -39,7 +41,7 @@ MESH=hex
 for arg in "$@"
 do
     case "$arg" in
-        segregated|petscSnes)
+        segregated|petscSnes|highOrder)
             APPROACH="$arg"
             ;;
         hex|tet)
@@ -79,6 +81,11 @@ case "$APPROACH" in
         echo "Using the petscSnes approach"
         solids4Foam::requirePetscOrExitSilently
         link_files_for_suffix petscSnes
+        ;;
+    highOrder)
+        echo "Using the highOrder approach"
+        solids4Foam::requirePetscOrExitSilently
+        link_files_for_suffix highOrder
         ;;
 esac
 

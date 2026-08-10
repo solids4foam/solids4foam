@@ -315,6 +315,7 @@ void solidTractionFvPatchVectorField::autoMap
     traction_.autoMap(m);
     pressure_.autoMap(m);
 #endif
+
 }
 
 
@@ -538,51 +539,45 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
 
-    // Face unit normals
     const vectorField n(patch().nf());
 
-    // Patch traction
     const vectorField traction(traction_ - n*pressure_);
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
     const solidModel& solMod = lookupSolidModel(mesh);
 
-    // faceQuadPoints is list for the  whole mesh
+    // faceQuadPoints is list for the whole mesh
     const CompactListList<point>& faceQuadPoints =
         solMod.displacementMLS().quadrature().faceQuadPoints();
 
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = patch().start();
+
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
-        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
     }
 
-    autoPtr<CompactListList<vector>> tQuadPointsValue
+    autoPtr<CompactListList<vector>> tractionValues
     (
         new CompactListList<vector>(nQpPerFace)
     );
 
-    // Get a reference to the actual data for easier access
-    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+    CompactListList<vector>& values = tractionValues();
 
-    forAll(*this, faceI)
+    forAll(values, faceI)
     {
         const label globalFaceID = faceI + start;
-
-        // Get the number of quadrature points for this face
         const label nPoints = faceQuadPoints[globalFaceID].size();
 
-        // Assign the same value to all quadrature points on this face
-        // We assume constant distribution of traction!
         for (label pointI = 0; pointI < nPoints; ++pointI)
         {
-            quadPointsValue[faceI][pointI] = traction[faceI];
+            values[faceI][pointI] = traction[faceI];
         }
     }
 
-    return tQuadPointsValue;
+    return tractionValues;
 }
 #endif
 

@@ -80,7 +80,7 @@ class neoHookeanElastic
 
         //- Alternative definition of the Kirchhoff pressure
         //  default: -0.5*K*(pow(J, 2.0) - 1.0)
-        //  alternate: -0.5*K*(J - 1.0)
+        //  alternate: -K*(J - 1.0)
         const Switch alternatePressureDefinition_;
 
         //- Use pressure fields p/pf as the hydrostatic stress contribution
@@ -151,6 +151,16 @@ public:
             surfaceSymmTensorField& sigma,
             const surfaceTensorField& gradD
         ) const;
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+#ifndef FOAMEXTEND
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+#endif
 
         //- Calculate the stress using the deformation gradient
         virtual void correctF

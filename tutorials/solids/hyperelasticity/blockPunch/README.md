@@ -71,6 +71,7 @@ a first argument that specifies the solution approach:
 ./Allrun             # Defaults to the segregated  approach
 ./Allrun segregated  # Segregated second-order approach
 ./Allrun petscSnes   # PETSc SNES approach [2]
+./Allrun highOrder   # PETSc SNES high-order approach [3]
 ```
 
 and an optional second argument that specifies the mesh type:
@@ -99,3 +100,7 @@ format. `changeDictionary` is used to update patch types, after which the
 Newton-Krylov method for cell-centred finite volume solid mechanics.
 _International Journal for Numerical Methods in Engineering_, 127, e70268,
 2026, 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
+
+[3] [I. Batistić, P. Castrillo, P. Cardiff, High-order cell-centred finite-volume
+solid mechanics using a Jacobian-free Newton-Krylov method,
+_Journal of Computational Physics_, 115056, 2026.](https://doi.org/10.1016/j.jcp.2026.115056)

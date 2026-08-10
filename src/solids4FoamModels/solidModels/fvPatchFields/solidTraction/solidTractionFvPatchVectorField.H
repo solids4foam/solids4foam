@@ -101,7 +101,6 @@ class solidTractionFvPatchVectorField
         //- Current time index
         mutable label curTimeIndex_;
 
-
 public:
 
     //- Runtime type information
@@ -242,8 +241,7 @@ public:
 
 #ifndef FOAMEXTEND
         //- Return face quadrature values, used for high order solvers
-        virtual autoPtr<CompactListList<vector>>
-           evaluateQuadrature() const;
+        virtual autoPtr<CompactListList<vector>> evaluateQuadrature() const;
 #endif
 
 
