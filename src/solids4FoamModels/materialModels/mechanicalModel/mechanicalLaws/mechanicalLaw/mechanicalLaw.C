@@ -160,6 +160,8 @@ void Foam::mechanicalLaw::makeSigma0() const
             << "pointer already set" << abort(FatalError);
     }
 
+    bool mappedFromBaseMesh = false;
+
     // Check if a single
     if
     (
@@ -218,6 +220,8 @@ void Foam::mechanicalLaw::makeSigma0() const
     }
     else
     {
+        mappedFromBaseMesh = true;
+
         // Read sigma0 from the baseMesh
         const volSymmTensorField sigma0BaseMesh
         (
@@ -247,6 +251,16 @@ void Foam::mechanicalLaw::makeSigma0() const
                 )()
             )
         );
+    }
+
+    if
+    (
+        !mappedFromBaseMesh
+     && lookupSolidModel(mesh(), baseMeshRegionName_).restart()
+     && gMax(mag(sigma0Ptr_())()) > SMALL
+    )
+    {
+        sigma0Ptr_->writeOpt() = IOobject::AUTO_WRITE;
     }
 }
 
