@@ -556,4 +556,25 @@ void Foam::globalPolyPatch::movePoints(const pointField& p)
 }
 
 
+void Foam::globalPolyPatch::movePoints() const
+{
+    if (globalPatchPtr_)
+    {
+        const tmp<pointField> globalPoints
+        (
+            patchPointToGlobal(patch_.localPoints())
+        );
+        globalPatchPtr_->movePoints(globalPoints());
+
+        // standAlonePatch::movePoints only clears its geometry caches
+        const_cast<pointField&>(globalPatchPtr_->points()) = globalPoints();
+
+        if (interpPtr_)
+        {
+            interpPtr_->movePoints();
+        }
+    }
+}
+
+
 // ************************************************************************* //

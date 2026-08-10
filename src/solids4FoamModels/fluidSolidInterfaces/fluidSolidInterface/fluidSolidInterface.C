@@ -1274,6 +1274,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }
+
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        fluid().globalPatches()[interfaceI].movePoints();
+    }
 }
 
 

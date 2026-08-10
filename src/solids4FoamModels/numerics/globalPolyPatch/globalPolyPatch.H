@@ -209,6 +209,9 @@ public:
         //- Correct patch after moving points
         virtual void movePoints(const pointField&);
 
+        //- Synchronise patch points with the current mesh patch
+        void movePoints() const;
+
         //- Update for changes in topology
         virtual void updateMesh();
 };
