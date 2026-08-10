@@ -30,6 +30,7 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     petscSnes
     highOrder
+    highOrderJacobian
 )
 
 echo "============================================================"
@@ -172,9 +173,10 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
 
-        if [[ "${approach}" == "highOrder" ]] && ! check_high_order_errors; then
+        if [[ "${approach}" == highOrder* ]] && ! check_high_order_errors; then
             failures=$((failures + 1))
         fi
+
     done
 else
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then

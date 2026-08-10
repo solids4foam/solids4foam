@@ -122,19 +122,19 @@ inline void addTensorCoeff
 
 Foam::tensor Foam::hofvm::laplacianCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
 )
 {
-    return I*gammaMagSf*quadWeight*(gradInterpCoeff & faceNormal);
+    return I*gamma*quadWeight*(gradInterpCoeff & faceNormal);
 }
 
 
 Foam::tensor Foam::hofvm::laplacianTransposeCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
@@ -143,7 +143,7 @@ Foam::tensor Foam::hofvm::laplacianTransposeCoeff
     const vector& c = gradInterpCoeff;
     const vector& n = faceNormal;
 
-    return gammaMagSf*quadWeight
+    return gamma*quadWeight
        *tensor
         (
             c.x()*n.x(), c.x()*n.y(), c.x()*n.z(),
@@ -155,7 +155,7 @@ Foam::tensor Foam::hofvm::laplacianTransposeCoeff
 
 Foam::tensor Foam::hofvm::laplacianTraceCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
@@ -164,7 +164,7 @@ Foam::tensor Foam::hofvm::laplacianTraceCoeff
     const vector& c = gradInterpCoeff;
     const vector& n = faceNormal;
 
-    return gammaMagSf*quadWeight
+    return gamma*quadWeight
        *tensor
         (
             c.x()*n.x(), c.y()*n.x(), c.z()*n.x(),
@@ -194,7 +194,7 @@ static label hofvmLaplacianPETSc
     const volScalarField& diffusivity,
     tensor (*calcCoeff)
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -208,7 +208,6 @@ static label hofvmLaplacianPETSc
     const movingLeastSquaresStencil& stencil = mls.stencilData();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
-    const scalarField& magSfI = mesh.magSf().internalField();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const label nScalarEqns = nDisplacementEqns(mesh);
 
@@ -237,7 +236,7 @@ static label hofvmLaplacianPETSc
     forAll(owner, faceI)
     {
         const vector& faceNormal = n[faceI];
-        const scalar gammaMagSf = magSfI[faceI]*gammaI[faceI];
+        const scalar gammaFace = gammaI[faceI];
         const label ownCellID = owner[faceI];
         const label neiCellID = neighbour[faceI];
         const PetscInt globalOwnRow =
@@ -256,7 +255,7 @@ static label hofvmLaplacianPETSc
                 const tensor coeff =
                     calcCoeff
                     (
-                        gammaMagSf,
+                        gammaFace,
                         quadPointW,
                         gradCoeffs[faceI][qpI][cI],
                         faceNormal
@@ -304,7 +303,6 @@ static label hofvmLaplacianPETSc
 
         if (isA<processorPolyPatch>(pp))
         {
-            const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
             const scalarField& pGamma = gamma.boundaryField()[patchI];
             const vectorField patchNormal(mesh.boundary()[patchI].nf());
             const label start = pp.start();
@@ -316,7 +314,7 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                const scalar gammaFace = pGamma[faceI];
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)
@@ -329,7 +327,7 @@ static label hofvmLaplacianPETSc
                         const tensor coeff =
                             calcCoeff
                             (
-                                gammaMagSf,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
@@ -363,7 +361,6 @@ static label hofvmLaplacianPETSc
                 << abort(FatalError);
         }
 
-        const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
         const scalarField& pGamma = gamma.boundaryField()[patchI];
         const vectorField patchNormal(mesh.boundary()[patchI].nf());
         const label start = pp.start();
@@ -387,7 +384,7 @@ static label hofvmLaplacianPETSc
                 const vector& faceNormal = patchNormal[faceI];
                 const tensor R = I - 2.0*sqr(faceNormal);
 
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                const scalar gammaFace = pGamma[faceI];
                 const labelUList stencil = stencils[faceID];
                 const label stencilSize = stencil.size();
 
@@ -402,7 +399,7 @@ static label hofvmLaplacianPETSc
                         const tensor coeff =
                             calcCoeff
                             (
-                                gammaMagSf,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
@@ -411,7 +408,7 @@ static label hofvmLaplacianPETSc
                         const tensor mirrorCoeff =
                             calcCoeff
                             (
-                                gammaMagSf,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI + stencilSize],
                                 faceNormal
@@ -458,7 +455,7 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                const scalar gammaFace = pGamma[faceI];
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)
@@ -471,7 +468,7 @@ static label hofvmLaplacianPETSc
                         const tensor coeff =
                             calcCoeff
                             (
-                                gammaMagSf,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
@@ -683,7 +680,24 @@ label Foam::hofvm::initialiseJacobian
 
     AssertPETSc(MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
     AssertPETSc(MatSetOption(jac, MAT_KEEP_NONZERO_PATTERN, PETSC_TRUE));
-    AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+
+    PetscBool matIsAIJ = PETSC_FALSE;
+    AssertPETSc
+    (
+        PetscObjectTypeCompareAny
+        (
+            reinterpret_cast<PetscObject>(jac),
+            &matIsAIJ,
+            MATSEQAIJ,
+            MATMPIAIJ,
+            ""
+        )
+    );
+
+    if (matIsAIJ)
+    {
+        AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+    }
 
     return 0;
 }
