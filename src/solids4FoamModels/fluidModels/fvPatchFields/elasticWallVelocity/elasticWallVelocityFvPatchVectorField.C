@@ -94,8 +94,17 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
         Fc_[i] = patch().patch()[i].centre(points);
     }
 
-    oldFc_ = Fc_;
-    oldOldFc_ = Fc_;
+    if (dict.found("oldFaceCentres"))
+    {
+        oldFc_ = vectorField("oldFaceCentres", dict, p.size());
+        oldOldFc_ = vectorField("oldOldFaceCentres", dict, p.size());
+        timeIndex_ = mesh.time().timeIndex();
+    }
+    else
+    {
+        oldFc_ = Fc_;
+        oldOldFc_ = Fc_;
+    }
 }
 
 
@@ -467,8 +476,12 @@ void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
     fvPatchVectorField::write(os);
 #ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
+    writeEntry(os, "oldFaceCentres", oldFc_);
+    writeEntry(os, "oldOldFaceCentres", oldOldFc_);
 #else
     writeEntry("value", os);
+    oldFc_.writeEntry("oldFaceCentres", os);
+    oldOldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
 }
 
