@@ -196,7 +196,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 
     if (dict.found("prevPressure"))
     {
-        Field<scalar>::operator=(scalarField("prevPressure", dict, p.size()));
+        prevPressure_ = scalarField("prevPressure", dict, p.size());
     }
 
     if (constantHs_ < SMALL)
@@ -403,6 +403,12 @@ void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 #else
     prevPressure_.writeEntry("prevPressure", os);
 #endif
+
+    if (constantHs_ >= SMALL)
+    {
+        os.writeKeyword("constantHs")
+            << constantHs_ << token::END_STATEMENT << nl;
+    }
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
