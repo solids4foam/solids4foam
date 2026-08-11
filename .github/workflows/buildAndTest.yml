@@ -14,6 +14,7 @@ jobs:
     name: Build on ${{ matrix.container-image.name }}
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         container-image:
           # --------------------------------------------------
@@ -116,12 +117,21 @@ jobs:
           echo "PETSC_DIR = $PETSC_DIR"
           test -d "$PETSC_DIR/include"
 
+      - name: Pin OpenBLAS core type
+        if: contains(matrix.container-image.name, 'PETSc')
+        run: |
+          echo "OPENBLAS_CORETYPE=Haswell" >> "$GITHUB_ENV"
+          echo "OPENBLAS_CORETYPE = Haswell"
+
       - name: Alltest
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
           cd tutorials
-          export OMP_NUM_THREADS=1; export OPENBLAS_NUM_THREADS=1; export MKL_NUM_THREADS=1; ./Alltest
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./Alltest
 
       - name: Upload test logs
         if: ${{ failure() }}
