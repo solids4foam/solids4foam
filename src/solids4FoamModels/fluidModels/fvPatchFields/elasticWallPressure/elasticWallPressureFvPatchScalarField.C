@@ -169,8 +169,13 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 )
 :
     robinFvPatchScalarField(ptf, p, iF, mapper),
-    prevPressure_(p.patch().size(), 0),
-    prevAcceleration_(p.patch().size(), vector::zero),
+#ifdef OPENFOAM_ORG
+    prevPressure_(mapper(ptf.prevPressure_)),
+    prevAcceleration_(mapper(ptf.prevAcceleration_)),
+#else
+    prevPressure_(ptf.prevPressure_, mapper),
+    prevAcceleration_(ptf.prevAcceleration_, mapper),
+#endif
     rhoSolidHsPtr_(),
     constantHs_(ptf.constantHs_)
 {}
@@ -249,7 +254,17 @@ void elasticWallPressureFvPatchScalarField::autoMap
     const fvPatchFieldMapper& m
 )
 {
-    fvPatchField<scalar>::autoMap(m);
+    robinFvPatchScalarField::autoMap(m);
+
+#ifdef OPENFOAM_ORG
+    m(prevPressure_, prevPressure_);
+    m(prevAcceleration_, prevAcceleration_);
+#else
+    prevPressure_.autoMap(m);
+    prevAcceleration_.autoMap(m);
+#endif
+
+    rhoSolidHsPtr_.clear();
 }
 
 
@@ -259,7 +274,15 @@ void elasticWallPressureFvPatchScalarField::rmap
     const labelList& addr
 )
 {
-    fvPatchField<scalar>::rmap(ptf, addr);
+    robinFvPatchScalarField::rmap(ptf, addr);
+
+    const elasticWallPressureFvPatchScalarField& mptf =
+        refCast<const elasticWallPressureFvPatchScalarField>(ptf);
+
+    prevPressure_.rmap(mptf.prevPressure_, addr);
+    prevAcceleration_.rmap(mptf.prevAcceleration_, addr);
+
+    rhoSolidHsPtr_.clear();
 }
 
 void elasticWallPressureFvPatchScalarField::updateCoeffs()
