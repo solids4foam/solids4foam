@@ -539,18 +539,6 @@ public:
             //- Update interpolator
             virtual void updateInterpolatorAndGlobalPatches();
 
-            //- Synchronise the cached fluid and solid global patch geometry
-            //  with the current state of the fluid mesh and the solid
-            //  displacement field
-            //  The global patches hold their own copy of the interface points,
-            //  which does not otherwise follow the fluid mesh motion or the
-            //  solid deformation
-            //  Both interfaces are updated together: the interface-to-interface
-            //  mappings would otherwise be constructed from two different
-            //  configurations
-            //  Note: this is a collective operation in parallel
-            void syncGlobalPatches();
-
             //- Move fluid mesh
             virtual void moveFluidMesh();
 

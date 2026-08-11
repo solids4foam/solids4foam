@@ -102,10 +102,6 @@ void oneWayCouplingInterface::updateTraction()
 {
     Info<< "Update traction on solid patch/patches" << endl;
 
-    // Make sure the cached interface geometry corresponds to the current fluid
-    // mesh and solid deformation
-    syncGlobalPatches();
-
     forAll(fluid().globalPatches(), interfaceI)
     {
         const vectorField fluidZoneTraction

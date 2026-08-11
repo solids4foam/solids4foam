@@ -45,54 +45,29 @@ Foam::interfaceToInterfaceMapping::makeReferenceZone
 {
     const polyMesh& mesh = globalPatch.mesh();
 
-    IOobject referencePointsHeader
+    const pointIOField referencePoints
     (
-        "points",
-        mesh.time().constant(),
-        polyMesh::meshSubDir,
-        mesh,
-        IOobject::MUST_READ,
-        IOobject::NO_WRITE,
-        false
+        IOobject
+        (
+            "points",
+            mesh.time().constant(),
+            polyMesh::meshSubDir,
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
     );
-
-    // The undeformed mesh points are not always available in the constant
-    // instance: the mesh may be stored elsewhere, or the mesh topology may have
-    // changed since it was written.  In that case we fall back to the current
-    // configuration of the patch, which is the behaviour that predates the use
-    // of the reference configuration.  This is a degradation rather than an
-    // error: the correspondence is then built from whichever configuration the
-    // interface happens to be in
-#ifdef OPENFOAM_NOT_EXTEND
-    if (!referencePointsHeader.typeHeaderOk<pointIOField>(true))
-#else
-    if (!referencePointsHeader.headerOk())
-#endif
-    {
-        WarningInFunction
-            << "Cannot read the undeformed mesh points for patch "
-            << globalPatch.patchName() << " from the "
-            << mesh.time().constant() << " instance" << nl
-            << "    The interface-to-interface correspondence will be built"
-            << " from the current interface configuration instead" << endl;
-
-        return makeCurrentZone(globalPatch);
-    }
-
-    const pointIOField referencePoints(referencePointsHeader);
 
     if (referencePoints.size() != mesh.nPoints())
     {
-        WarningInFunction
+        FatalErrorInFunction
             << "Reference mesh points do not correspond to the current mesh"
             << nl
             << "    reference points : " << referencePoints.size() << nl
             << "    current points   : " << mesh.nPoints() << nl
-            << "    patch            : " << globalPatch.patchName() << nl
-            << "    The interface-to-interface correspondence will be built"
-            << " from the current interface configuration instead" << endl;
-
-        return makeCurrentZone(globalPatch);
+            << "    patch            : " << globalPatch.patchName()
+            << abort(FatalError);
     }
 
     const labelList& meshPoints = globalPatch.patch().meshPoints();
@@ -109,23 +84,6 @@ Foam::interfaceToInterfaceMapping::makeReferenceZone
         (
             globalPatch.globalPatch().localFaces(),
             globalPatch.patchPointToGlobal(patchPoints)()
-        )
-    );
-}
-
-
-Foam::autoPtr<Foam::standAlonePatch>
-Foam::interfaceToInterfaceMapping::makeCurrentZone
-(
-    const globalPolyPatch& globalPatch
-) const
-{
-    return autoPtr<standAlonePatch>
-    (
-        new standAlonePatch
-        (
-            globalPatch.globalPatch().localFaces(),
-            globalPatch.globalPatch().localPoints()
         )
     );
 }

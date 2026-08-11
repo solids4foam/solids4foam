@@ -81,15 +81,7 @@ class interfaceToInterfaceMapping
         void operator=(const interfaceToInterfaceMapping&);
 
         //- Build a zone from the constant mesh points
-        //  Falls back to makeCurrentZone() if the constant mesh points are
-        //  unavailable or do not correspond to the current mesh
         autoPtr<standAlonePatch> makeReferenceZone
-        (
-            const globalPolyPatch& globalPatch
-        ) const;
-
-        //- Build a zone from the current global patch points
-        autoPtr<standAlonePatch> makeCurrentZone
         (
             const globalPolyPatch& globalPatch
         ) const;
@@ -100,11 +92,6 @@ protected:
     // Protected Member Functions
 
         //- Return zoneA in the reference configuration
-        //  The interface correspondence is topological in body-fitted FSI: the
-        //  same faces face one another for the duration of the run.  It is
-        //  therefore built once from the undeformed geometry, rather than from
-        //  the current zones, which follow the fluid mesh motion and the solid
-        //  deformation
         const standAlonePatch& zoneARef() const;
 
         //- Return zoneB in the reference configuration

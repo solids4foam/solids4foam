@@ -403,39 +403,6 @@ void Foam::globalPolyPatch::calcInterp() const
 }
 
 
-void Foam::globalPolyPatch::setGlobalPoints(const pointField& globalPoints) const
-{
-    if (!globalPatchPtr_)
-    {
-        return;
-    }
-
-    if (globalPoints.size() != globalPatchPtr_->points().size())
-    {
-        FatalErrorIn
-        (
-            "void globalPolyPatch::setGlobalPoints(const pointField&) const"
-        )   << "Point field does not correspond to the global patch points.  "
-            << "Global patch points: " << globalPatchPtr_->points().size()
-            << " field size: " << globalPoints.size()
-            << abort(FatalError);
-    }
-
-    // standAlonePatch::movePoints only clears the cached geometry: it does not
-    // store the given points, as the standAlonePatch owns its point field.
-    // So we clear the geometry and then set the points directly
-    globalPatchPtr_->movePoints(globalPoints);
-    const_cast<pointField&>(globalPatchPtr_->points()) = globalPoints;
-
-    // Clear the interpolation weights, which are calculated from the patch
-    // geometry; they are re-calculated on demand
-    if (interpPtr_)
-    {
-        interpPtr_->movePoints();
-    }
-}
-
-
 void Foam::globalPolyPatch::check() const
 {
     label patchIndex = mesh_.boundaryMesh().findPatchID(patchName_);
@@ -580,9 +547,12 @@ void Foam::globalPolyPatch::updateMesh()
 }
 
 
-void Foam::globalPolyPatch::movePoints(const pointField& globalPoints)
+void Foam::globalPolyPatch::movePoints(const pointField& p)
 {
-    setGlobalPoints(globalPoints);
+    if (globalPatchPtr_)
+    {
+        globalPatchPtr_->movePoints(p);
+    }
 }
 
 
@@ -594,14 +564,18 @@ void Foam::globalPolyPatch::syncPoints() const
 
 void Foam::globalPolyPatch::syncPoints(const pointField& patchPoints) const
 {
-    // Only the processors that have constructed the global patch do any work;
-    // this is consistent across all processors as calcGlobalPatch() is itself
-    // a collective operation, so globalPatchPtr_ is either set on all
-    // processors or on none
     if (globalPatchPtr_)
     {
-        // Note: patchPointToGlobal performs a global reduction
-        setGlobalPoints(patchPointToGlobal(patchPoints)());
+        const pointField globalPoints(patchPointToGlobal(patchPoints));
+
+        // standAlonePatch::movePoints() only clears its geometry caches
+        const_cast<pointField&>(globalPatchPtr_->points()) = globalPoints;
+        globalPatchPtr_->movePoints(globalPoints);
+
+        if (interpPtr_)
+        {
+            interpPtr_->movePoints();
+        }
     }
 }
 

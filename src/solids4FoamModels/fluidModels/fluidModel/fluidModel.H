@@ -603,11 +603,7 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
-            //- Synchronise the cached global poly patch geometry with the
-            //  current fluid mesh
-            //  The fluid mesh is moved to the current configuration, so the
-            //  patch points are taken directly from the mesh
-            //  Note: this is a collective operation in parallel
+            //- Synchronise global patches with the current mesh points
             void syncGlobalPatches() const;
 
         // Edit
