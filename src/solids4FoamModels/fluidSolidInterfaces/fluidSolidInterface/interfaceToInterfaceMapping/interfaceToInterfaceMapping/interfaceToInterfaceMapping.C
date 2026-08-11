@@ -18,6 +18,9 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "interfaceToInterfaceMapping.H"
+#include "pointIOField.H"
+#include "polyMesh.H"
+#include "Time.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -25,6 +28,85 @@ namespace Foam
 {
     defineTypeNameAndDebug(interfaceToInterfaceMapping, 0);
     defineRunTimeSelectionTable(interfaceToInterfaceMapping, dictionary);
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::standAlonePatch>
+Foam::interfaceToInterfaceMapping::makeReferenceZone
+(
+    const globalPolyPatch& globalPatch
+) const
+{
+    const polyMesh& mesh = globalPatch.mesh();
+    const pointIOField referencePoints
+    (
+        IOobject
+        (
+            "points",
+            mesh.time().constant(),
+            polyMesh::meshSubDir,
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
+    );
+
+    if (referencePoints.size() != mesh.nPoints())
+    {
+        FatalErrorInFunction
+            << "Reference mesh points do not correspond to the current mesh"
+            << nl
+            << "    reference points : " << referencePoints.size() << nl
+            << "    current points   : " << mesh.nPoints() << nl
+            << "    patch            : " << globalPatch.patchName()
+            << abort(FatalError);
+    }
+
+    const labelList& meshPoints = globalPatch.patch().meshPoints();
+    pointField patchPoints(meshPoints.size());
+
+    forAll(meshPoints, pointI)
+    {
+        patchPoints[pointI] = referencePoints[meshPoints[pointI]];
+    }
+
+    return autoPtr<standAlonePatch>
+    (
+        new standAlonePatch
+        (
+            globalPatch.globalPatch().localFaces(),
+            globalPatch.patchPointToGlobal(patchPoints)()
+        )
+    );
+}
+
+
+// * * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * //
+
+const Foam::standAlonePatch&
+Foam::interfaceToInterfaceMapping::zoneARef() const
+{
+    if (zoneARefPtr_.empty())
+    {
+        zoneARefPtr_ = makeReferenceZone(globalPatchA());
+    }
+
+    return zoneARefPtr_();
+}
+
+
+const Foam::standAlonePatch&
+Foam::interfaceToInterfaceMapping::zoneBRef() const
+{
+    if (zoneBRefPtr_.empty())
+    {
+        zoneBRefPtr_ = makeReferenceZone(globalPatchB());
+    }
+
+    return zoneBRefPtr_();
 }
 
 

@@ -65,6 +65,12 @@ class interfaceToInterfaceMapping
         //- Const reference to the globalPatchB
         const globalPolyPatch& globalPatchB_;
 
+        // Demand-driven data
+
+            //- Reference-configuration copies used to construct the mapping
+            mutable autoPtr<standAlonePatch> zoneARefPtr_;
+            mutable autoPtr<standAlonePatch> zoneBRefPtr_;
+
 
     // Private Member Functions
 
@@ -73,6 +79,28 @@ class interfaceToInterfaceMapping
 
         //- Disallow default bitwise assignment
         void operator=(const interfaceToInterfaceMapping&);
+
+        //- Build a zone from the constant mesh points
+        autoPtr<standAlonePatch> makeReferenceZone
+        (
+            const globalPolyPatch& globalPatch
+        ) const;
+
+
+protected:
+
+    // Protected Member Functions
+
+        //- Return zoneA in the reference configuration
+        //  The interface correspondence is topological in body-fitted FSI: the
+        //  same faces face one another for the duration of the run.  It is
+        //  therefore built once from the undeformed geometry, rather than from
+        //  the current zones, which follow the fluid mesh motion and the solid
+        //  deformation
+        const standAlonePatch& zoneARef() const;
+
+        //- Return zoneB in the reference configuration
+        const standAlonePatch& zoneBRef() const;
 
 
 public:
