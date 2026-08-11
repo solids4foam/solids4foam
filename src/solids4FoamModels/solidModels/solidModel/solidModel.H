@@ -934,6 +934,18 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise the cached global poly patch geometry with the
+            //  current deformed configuration of the solid
+            //  As in makeGlobalPatches(..., currentConfiguration = true), the
+            //  deformed patch points are the mesh patch points displaced by
+            //  pointDorPointDD(): for moving mesh (updated Lagrangian)
+            //  approaches this is the displacement increment, whereas for
+            //  linear geometry and total Lagrangian approaches, where the mesh
+            //  remains in the initial configuration, it is the total
+            //  displacement
+            //  Note: this is a collective operation in parallel
+            void syncGlobalPatches() const;
+
         // Edit
 
             //- Set traction at specified patch

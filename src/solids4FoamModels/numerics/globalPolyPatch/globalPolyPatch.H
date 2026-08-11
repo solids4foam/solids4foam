@@ -102,6 +102,11 @@ class globalPolyPatch
         //- Make the interpolator
         void calcInterp() const;
 
+        //- Set the points of the cached global patch and invalidate all state
+        //  derived from them
+        //  Does nothing if the global patch has not yet been constructed
+        void setGlobalPoints(const pointField& globalPoints) const;
+
         //- Check
         void check() const;
 
@@ -206,8 +211,9 @@ public:
             ) const;
 
 
-        //- Correct patch after moving points
-        virtual void movePoints(const pointField&);
+        //- Correct patch after moving points, where the given field holds the
+        //  new positions of the global patch points
+        virtual void movePoints(const pointField& globalPoints);
 
         //- Synchronise the cached global patch points with the current
         //  positions of the mesh patch points, and invalidate the cached
@@ -215,6 +221,15 @@ public:
         //  Note: this is a collective operation in parallel, as the global
         //  patch points are gathered from all processors
         void syncPoints() const;
+
+        //- As syncPoints() above, except the current positions of the patch
+        //  points are given, rather than being taken from the mesh
+        //  This is required when the mesh is not in the configuration of
+        //  interest, e.g. total Lagrangian solid models, where the mesh remains
+        //  in the initial configuration and the deformation is held by the
+        //  point displacement field
+        //  Note: this is a collective operation in parallel
+        void syncPoints(const pointField& patchPoints) const;
 
         //- Update for changes in topology
         virtual void updateMesh();

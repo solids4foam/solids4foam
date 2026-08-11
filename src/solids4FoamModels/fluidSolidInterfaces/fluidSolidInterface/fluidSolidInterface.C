@@ -890,6 +890,13 @@ void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
 }
 
 
+void Foam::fluidSolidInterface::syncGlobalPatches()
+{
+    fluid().syncGlobalPatches();
+    solid().syncGlobalPatches();
+}
+
+
 void Foam::fluidSolidInterface::moveFluidMesh()
 {
     // Get fluid patch displacement from fluid zone displacement
@@ -1277,16 +1284,18 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
     // Update the cached fluid global patch geometry to follow the fluid mesh,
     // as the global patch holds its own copy of the interface points
-    forAll(fluid().globalPatches(), interfaceI)
-    {
-        fluid().globalPatches()[interfaceI].syncPoints();
-    }
+    fluid().syncGlobalPatches();
 }
 
 
 void Foam::fluidSolidInterface::updateForce()
 {
     Info<< "Setting traction on solid interfaces" << endl;
+
+    // Make sure the cached interface geometry corresponds to the current fluid
+    // mesh and solid deformation, in particular the fluid face normals used
+    // below to apply the pressure
+    syncGlobalPatches();
 
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
@@ -1376,6 +1385,9 @@ void Foam::fluidSolidInterface::updateForce()
 
 void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 {
+    // Make sure the cached interface geometry is up-to-date
+    syncGlobalPatches();
+
     // Check if coupling switch needs to be updated
     if (!coupled_)
     {
@@ -1458,6 +1470,10 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
+    // Make sure the cached interface geometry is up-to-date, as the solid has
+    // just been solved
+    syncGlobalPatches();
+
     // Maximum residual for all interfaces
     scalar maxResidual = 0;
 
@@ -1627,6 +1643,9 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
+    // Make sure the cached interface geometry is up-to-date
+    syncGlobalPatches();
+
     forAll(fluid().globalPatches(), interfaceI)
     {
         if
@@ -1707,6 +1726,9 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
+    // Make sure the cached interface geometry is up-to-date
+    syncGlobalPatches();
+
     forAll(fluid().globalPatches(), interfaceI)
     {
         // Set interface acceleration

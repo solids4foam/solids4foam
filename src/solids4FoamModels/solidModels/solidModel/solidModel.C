@@ -1661,6 +1661,31 @@ void Foam::solidModel::clearGlobalPatches() const
 }
 
 
+void Foam::solidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        const polyPatch& ppatch = globalPatchesPtrList_[i].patch();
+
+        // Displacement of the patch points: pointDD for moving mesh (updated
+        // Lagrangian) approaches and pointD otherwise
+        // Note: localPoints() and meshPoints() use the same ordering
+        const vectorField patchPointDorPointDD
+        (
+            pointDorPointDD().internalField(), ppatch.meshPoints()
+        );
+
+        // Patch points in the deformed configuration
+        const pointField deformedPatchPoints
+        (
+            ppatch.localPoints() + patchPointDorPointDD
+        );
+
+        globalPatchesPtrList_[i].syncPoints(deformedPatchPoints);
+    }
+}
+
+
 Foam::vector Foam::solidModel::pointU(const label pointID) const
 {
     pointVectorField pointU
