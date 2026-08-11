@@ -556,7 +556,7 @@ void Foam::globalPolyPatch::movePoints(const pointField& p)
 }
 
 
-void Foam::globalPolyPatch::movePoints() const
+void Foam::globalPolyPatch::syncPoints() const
 {
     if (globalPatchPtr_)
     {

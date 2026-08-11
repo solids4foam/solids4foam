@@ -1275,9 +1275,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //     fluidMesh().movePoints(newPoints);
     // }
 
+    // Update the cached fluid global patch geometry to follow the fluid mesh,
+    // as the global patch holds its own copy of the interface points
     forAll(fluid().globalPatches(), interfaceI)
     {
-        fluid().globalPatches()[interfaceI].movePoints();
+        fluid().globalPatches()[interfaceI].syncPoints();
     }
 }
 

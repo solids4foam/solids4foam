@@ -209,8 +209,12 @@ public:
         //- Correct patch after moving points
         virtual void movePoints(const pointField&);
 
-        //- Synchronise patch points with the current mesh patch
-        void movePoints() const;
+        //- Synchronise the cached global patch points with the current
+        //  positions of the mesh patch points, and invalidate the cached
+        //  interpolation weights
+        //  Note: this is a collective operation in parallel, as the global
+        //  patch points are gathered from all processors
+        void syncPoints() const;
 
         //- Update for changes in topology
         virtual void updateMesh();
