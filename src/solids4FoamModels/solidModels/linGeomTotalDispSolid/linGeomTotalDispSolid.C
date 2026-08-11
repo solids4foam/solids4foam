@@ -642,6 +642,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
     if (predictor_)
     {
+        // Construct U while the run time still points at the restart directory
+        U();
+
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
