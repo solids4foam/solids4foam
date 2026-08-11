@@ -81,7 +81,15 @@ class interfaceToInterfaceMapping
         void operator=(const interfaceToInterfaceMapping&);
 
         //- Build a zone from the constant mesh points
+        //  Falls back to makeCurrentZone() if the constant mesh points are
+        //  unavailable or do not correspond to the current mesh
         autoPtr<standAlonePatch> makeReferenceZone
+        (
+            const globalPolyPatch& globalPatch
+        ) const;
+
+        //- Build a zone from the current global patch points
+        autoPtr<standAlonePatch> makeCurrentZone
         (
             const globalPolyPatch& globalPatch
         ) const;
