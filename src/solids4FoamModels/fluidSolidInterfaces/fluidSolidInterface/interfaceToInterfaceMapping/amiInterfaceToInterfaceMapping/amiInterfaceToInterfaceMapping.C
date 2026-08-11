@@ -22,6 +22,9 @@ License
 #include "amiInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
+#include "pointIOField.H"
+#include "polyMesh.H"
+#include "Time.H"
 #include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -43,6 +46,81 @@ addToRunTimeSelectionTable
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+autoPtr<standAlonePatch>
+amiInterfaceToInterfaceMapping::makeReferenceZone
+(
+    const globalPolyPatch& globalPatch
+) const
+{
+    const polyMesh& mesh = globalPatch.mesh();
+    const pointIOField referencePoints
+    (
+        IOobject
+        (
+            "points",
+            mesh.time().constant(),
+            polyMesh::meshSubDir,
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
+    );
+
+    if (referencePoints.size() != mesh.nPoints())
+    {
+        FatalErrorInFunction
+            << "Reference mesh points do not correspond to the current mesh"
+            << nl
+            << "    reference points : " << referencePoints.size() << nl
+            << "    current points   : " << mesh.nPoints() << nl
+            << "    patch            : " << globalPatch.patchName()
+            << abort(FatalError);
+    }
+
+    const labelList& meshPoints = globalPatch.patch().meshPoints();
+    pointField patchPoints(meshPoints.size());
+
+    forAll(meshPoints, pointI)
+    {
+        patchPoints[pointI] = referencePoints[meshPoints[pointI]];
+    }
+
+    return autoPtr<standAlonePatch>
+    (
+        new standAlonePatch
+        (
+            globalPatch.globalPatch().localFaces(),
+            globalPatch.patchPointToGlobal(patchPoints)()
+        )
+    );
+}
+
+
+const standAlonePatch&
+amiInterfaceToInterfaceMapping::zoneARef() const
+{
+    if (zoneARefPtr_.empty())
+    {
+        zoneARefPtr_ = makeReferenceZone(globalPatchA());
+    }
+
+    return zoneARefPtr_();
+}
+
+
+const standAlonePatch&
+amiInterfaceToInterfaceMapping::zoneBRef() const
+{
+    if (zoneBRefPtr_.empty())
+    {
+        zoneBRefPtr_ = makeReferenceZone(globalPatchB());
+    }
+
+    return zoneBRefPtr_();
+}
+
+
 void amiInterfaceToInterfaceMapping::makeInterpolator() const
 {
     if (interpolatorPtr_.valid())
@@ -60,8 +138,8 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
     (
         new amiZoneInterpolation
         (
-            zoneA(),
-            zoneB(),
+            zoneARef(),
+            zoneBRef(),
             faceAreaIntersect::tmMesh, // triMode
             true,   // requireMatch
             //amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
@@ -143,7 +221,7 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
     zoneAPointAddressingPtr_ =
         new List<labelPair>
         (
-            zoneA().nPoints(), labelPair(-1,-1)
+            zoneARef().nPoints(), labelPair(-1,-1)
         );
     List<labelPair>& zoneAPointAddr = *zoneAPointAddressingPtr_;
 
@@ -155,10 +233,10 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
     // scalarField& zoneAPointDist = *zoneAPointDistancePtr_;
 
     const labelListList& zoneAFaceAddr = interpolator().srcAddress();
-    const labelListList& pointFaces = zoneA().pointFaces();
-    const faceList& zoneBFaces = zoneB().localFaces();
-    const pointField& zoneBPoints = zoneB().localPoints();
-    const pointField& zoneAPoints = zoneA().localPoints();
+    const labelListList& pointFaces = zoneARef().pointFaces();
+    const faceList& zoneBFaces = zoneBRef().localFaces();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
+    const pointField& zoneAPoints = zoneARef().localPoints();
 
     forAll(zoneAPointAddr, pointI)
     {
@@ -242,9 +320,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
 
     // Check orientation
 
-    const pointField& zoneAPointNormals = zoneA().pointNormals();
+    const pointField& zoneAPointNormals = zoneARef().pointNormals();
 
-    const vectorField& zoneBFaceNormals = zoneB().faceNormals();
+    const vectorField& zoneBFaceNormals = zoneBRef().faceNormals();
 
     scalarField orientation(zoneAPointAddr.size(), 0);
 
@@ -285,12 +363,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
     //     new FieldField<Field, scalar>(zoneA().nPoints());
     // FieldField<Field, scalar>& zoneAPointWeights = *zoneAPointWeightsPtr_;
     zoneAPointWeightsPtr_ =
-        new FieldField<Field, scalar>(zoneA().nPoints());
+        new FieldField<Field, scalar>(zoneARef().nPoints());
     FieldField<Field, scalar>& zoneAPointWeights = *zoneAPointWeightsPtr_;
 
-    const faceList& zoneBFaces = zoneB().localFaces();
-    const pointField& zoneBPoints = zoneB().localPoints();
-    const pointField& zoneAPoints = zoneA().localPoints();
+    const faceList& zoneBFaces = zoneBRef().localFaces();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
+    const pointField& zoneAPoints = zoneARef().localPoints();
 
     const List<labelPair>& addr = this->zoneAPointAddr();
 
@@ -346,7 +424,7 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
     zoneBPointAddressingPtr_ =
         new List<labelPair>
         (
-            zoneB().nPoints(), labelPair(-1,-1)
+            zoneBRef().nPoints(), labelPair(-1,-1)
         );
     List<labelPair>& zoneBPointAddr = *zoneBPointAddressingPtr_;
 
@@ -358,10 +436,10 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
     // scalarField& zoneBPointDist = *zoneBPointDistancePtr_;
 
     const labelListList& zoneBFaceAddr = interpolator().tgtAddress();
-    const labelListList& pointFaces = zoneB().pointFaces();
-    const faceList& zoneAFaces = zoneA().localFaces();
-    const pointField& zoneAPoints = zoneA().localPoints();
-    const pointField& zoneBPoints = zoneB().localPoints();
+    const labelListList& pointFaces = zoneBRef().pointFaces();
+    const faceList& zoneAFaces = zoneARef().localFaces();
+    const pointField& zoneAPoints = zoneARef().localPoints();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
 
     forAll(zoneBPointAddr, pointI)
     {
@@ -445,9 +523,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
 
     // Check orientation
 
-    const pointField& zoneBPointNormals = zoneB().pointNormals();
+    const pointField& zoneBPointNormals = zoneBRef().pointNormals();
 
-    const vectorField& zoneAFaceNormals = zoneA().faceNormals();
+    const vectorField& zoneAFaceNormals = zoneARef().faceNormals();
 
     scalarField orientation(zoneBPointAddr.size(), 0);
 
@@ -488,12 +566,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
     //     new FieldField<Field, scalar>(zoneB().nPoints());
     // FieldField<Field, scalar>& zoneBPointWeights = *zoneBPointWeightsPtr_;
     zoneBPointWeightsPtr_ =
-        new FieldField<Field, scalar>(zoneB().nPoints());
+        new FieldField<Field, scalar>(zoneBRef().nPoints());
     FieldField<Field, scalar>& zoneBPointWeights = *zoneBPointWeightsPtr_;
 
-    const faceList& zoneAFaces = zoneA().localFaces();
-    const pointField& zoneAPoints = zoneA().localPoints();
-    const pointField& zoneBPoints = zoneB().localPoints();
+    const faceList& zoneAFaces = zoneARef().localFaces();
+    const pointField& zoneAPoints = zoneARef().localPoints();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
     const List<labelPair>& addr = this->zoneBPointAddr();
 
     forAll(zoneBPointWeights, pointI)
@@ -599,6 +677,8 @@ amiInterfaceToInterfaceMapping::amiInterfaceToInterfaceMapping
     (
         type, dict, patchA, patchB, globalPatchA, globalPatchB
     ),
+    zoneARefPtr_(),
+    zoneBRefPtr_(),
     interpolatorPtr_(nullptr),
     zoneAPointAddressingPtr_(nullptr),
     zoneAPointWeightsPtr_(nullptr),
