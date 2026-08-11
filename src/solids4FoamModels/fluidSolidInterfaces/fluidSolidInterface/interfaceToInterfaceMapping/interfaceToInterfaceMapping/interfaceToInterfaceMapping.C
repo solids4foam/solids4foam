@@ -20,7 +20,11 @@ License
 #include "interfaceToInterfaceMapping.H"
 #include "pointIOField.H"
 #include "polyMesh.H"
-#include "Time.H"
+#ifdef FOAMEXTEND
+    #include "foamTime.H"
+#else
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
