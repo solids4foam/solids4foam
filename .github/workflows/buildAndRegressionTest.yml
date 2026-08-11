@@ -10,6 +10,7 @@ jobs:
     name: Build and regression test on ${{ matrix.container-image.name }}
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         container-image:
           - name: "OpenFOAM-v2512-PETSc"
@@ -52,6 +53,8 @@ jobs:
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
+          export OPENBLAS_CORETYPE=Haswell
+          echo "OPENBLAS_CORETYPE = $OPENBLAS_CORETYPE"
           export OMP_NUM_THREADS=1
           export OPENBLAS_NUM_THREADS=1
           export MKL_NUM_THREADS=1
