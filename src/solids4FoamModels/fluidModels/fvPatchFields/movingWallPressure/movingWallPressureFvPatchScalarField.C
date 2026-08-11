@@ -103,6 +103,7 @@ movingWallPressureFvPatchScalarField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+
 void movingWallPressureFvPatchScalarField::autoMap
 (
     const fvPatchFieldMapper& m
