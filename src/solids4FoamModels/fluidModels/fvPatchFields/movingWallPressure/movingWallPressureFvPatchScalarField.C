@@ -68,7 +68,11 @@ movingWallPressureFvPatchScalarField
 )
 :
     fixedGradientFvPatchScalarField(ptf, p, iF, mapper),
-    prevAcceleration_(p.patch().size(), vector::zero)
+#ifdef OPENFOAM_ORG
+    prevAcceleration_(mapper(ptf.prevAcceleration_))
+#else
+    prevAcceleration_(ptf.prevAcceleration_, mapper)
+#endif
 {}
 
 
@@ -98,6 +102,36 @@ movingWallPressureFvPatchScalarField
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void movingWallPressureFvPatchScalarField::autoMap
+(
+    const fvPatchFieldMapper& m
+)
+{
+    fixedGradientFvPatchScalarField::autoMap(m);
+
+#ifdef OPENFOAM_ORG
+    m(prevAcceleration_, prevAcceleration_);
+#else
+    prevAcceleration_.autoMap(m);
+#endif
+}
+
+
+void movingWallPressureFvPatchScalarField::rmap
+(
+    const fvPatchField<scalar>& ptf,
+    const labelList& addr
+)
+{
+    fixedGradientFvPatchScalarField::rmap(ptf, addr);
+
+    const movingWallPressureFvPatchScalarField& mptf =
+        refCast<const movingWallPressureFvPatchScalarField>(ptf);
+
+    prevAcceleration_.rmap(mptf.prevAcceleration_, addr);
+}
 
 
 // void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)

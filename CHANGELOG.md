@@ -65,6 +65,10 @@ release. For complete commit-level details and contributor information, see the
 - Fixed the `RBFMeshMotionSolver` setup for fluid-solid interaction, and
   documented a verified configuration.
 - Fixed `tmp<fvMatrix>` assembly on OpenFOAM.org.
+- Fixed the restart behaviour of the `elasticWallVelocity` boundary condition,
+  which previously discarded its face-centre history and so restarted with a
+  zero interface velocity. The history is now written to, and read from, the
+  time directories, and is mapped by `decomposePar` and `reconstructPar`.
 
 ### Removed in v2.4
 
