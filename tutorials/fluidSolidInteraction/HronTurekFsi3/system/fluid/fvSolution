@@ -69,7 +69,25 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    1;
+    nOuterCorrectors    50;
+
+    // IQN-ILS assumes a converged fluid solve in each coupling iteration.
+    // With a single corrector the interface traction is under-converged, which
+    // destabilises the coupling once the interface normals follow the deformed
+    // interface.
+    residualControl
+    {
+        "U.*"
+        {
+            tolerance       1e-6;
+            relTol          0;
+        }
+        "p.*"
+        {
+            tolerance       1e-6;
+            relTol          0;
+        }
+    }
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
 }
