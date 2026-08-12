@@ -92,6 +92,17 @@ release. For complete commit-level details and contributor information, see the
 - **Tutorial analytical solutions**: if a case or user library referenced an
   analytical solution function object from `libsolids4FoamModels`, link against
   the case-local library in the corresponding tutorial instead.
+- **Interface-to-interface mapping and the undeformed mesh**: all
+  interface-to-interface mappings (`ami`, `ggi`, `RBF` and `directMap`) now
+  build the interface correspondence from the undeformed mesh points in the
+  `constant` instance, rather than from the current interface. This keeps the
+  correspondence independent of when it is first constructed, now that the
+  cached interface geometry follows the mesh motion and the solid deformation.
+  Cases whose mesh changes topology during the run, or whose points are not
+  available in the `constant` instance, now fail with an explicit error instead
+  of silently building the correspondence from whatever configuration the
+  interface happened to be in. Previously only `ami` read the `constant`
+  points, so this affects a wider set of cases than before.
 
 ### Related to v2.4
 

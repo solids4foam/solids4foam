@@ -66,7 +66,16 @@ Foam::interfaceToInterfaceMapping::makeReferenceZone
             << nl
             << "    reference points : " << referencePoints.size() << nl
             << "    current points   : " << mesh.nPoints() << nl
-            << "    patch            : " << globalPatch.patchName()
+            << "    patch            : " << globalPatch.patchName() << nl << nl
+            << "The interface-to-interface correspondence is built from the "
+            << "undeformed mesh points in the \"" << mesh.time().constant()
+            << "\" instance, so the mesh must not change topology during the "
+            << "run." << nl
+            << "This case appears to change topology, which is not currently "
+            << "supported for mapped interfaces." << nl
+            << "Note that the correspondence is deliberately not rebuilt from "
+            << "the current interface geometry: that would make it depend on "
+            << "when it is first used."
             << abort(FatalError);
     }
 

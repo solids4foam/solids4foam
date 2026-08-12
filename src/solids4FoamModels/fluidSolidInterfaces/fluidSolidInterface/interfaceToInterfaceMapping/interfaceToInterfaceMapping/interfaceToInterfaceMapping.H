@@ -21,6 +21,21 @@ Class
 Description
     Virtual base class for mapping/interpolating between two interfaces
 
+    The interface-to-interface correspondence is topological in body-fitted
+    FSI: the same solid face lies beside the same fluid face for the duration
+    of the run.  It is therefore constructed once from the undeformed geometry
+    rather than from the current interface, which follows the fluid mesh motion
+    and the solid deformation.  Building it from the current interface would
+    make the correspondence depend on when it happens to be first used.
+
+    The undeformed geometry is read from the mesh points in the "constant"
+    instance, so every mesh whose interface is mapped must have its points
+    available there and must not change topology during the run.  Both
+    conditions are checked in makeReferenceZone(), which aborts if they are not
+    met: silently falling back to the current geometry would reintroduce the
+    ordering dependence described above, and a point-count mismatch may signal
+    a topology change for which no correspondence is well defined.
+
 Author
     Philip Cardiff, UCD.
 
