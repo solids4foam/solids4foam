@@ -102,6 +102,11 @@ class globalPolyPatch
         //- Make the interpolator
         void calcInterp() const;
 
+        //- Set the points of the cached global patch and invalidate the
+        //  geometry and interpolation weights derived from them
+        //  Does nothing if the global patch has not been constructed
+        void setGlobalPoints(const pointField& globalPoints) const;
+
         //- Check
         void check() const;
 
@@ -206,8 +211,14 @@ public:
             ) const;
 
 
-        //- Correct patch after moving points
-        virtual void movePoints(const pointField&);
+        //- Correct the patch after moving points, where the given field holds
+        //  the new positions of the global patch points
+        //  The points are stored, and the patch geometry and interpolation
+        //  weights derived from them are invalidated
+        //  Note: callers do not need to set the standAlonePatch points
+        //  themselves; the contact boundary conditions still do so, which is
+        //  now redundant
+        virtual void movePoints(const pointField& globalPoints);
 
         //- Synchronise with the current mesh patch points
         //  Collective in parallel
