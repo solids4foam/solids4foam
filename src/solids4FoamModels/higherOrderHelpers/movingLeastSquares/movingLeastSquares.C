@@ -40,7 +40,7 @@ defineTypeNameAndDebug(movingLeastSquares, 0);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-const movingLeastSquaresStencil& movingLeastSquares::stencil() const
+const leastSquaresStencil& movingLeastSquares::stencil() const
 {
     if (stencilPtr_.empty())
     {
@@ -199,7 +199,7 @@ void movingLeastSquares::makeStencils() const
 
     stencilPtr_.set
     (
-        new movingLeastSquaresStencil
+        new leastSquaresStencil
         (
             mesh_,
             haloDepthScale_,

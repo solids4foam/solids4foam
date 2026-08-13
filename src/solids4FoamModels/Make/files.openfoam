@@ -242,7 +242,7 @@ numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 
-higherOrderHelpers/movingLeastSquaresStencil/movingLeastSquaresStencil.C
+higherOrderHelpers/leastSquaresStencil/leastSquaresStencil.C
 higherOrderHelpers/quadrature/quadrature.C
 higherOrderHelpers/quadrature/tetQuadrature.C
 higherOrderHelpers/quadrature/triQuadrature.C

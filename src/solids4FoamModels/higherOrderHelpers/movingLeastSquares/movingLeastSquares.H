@@ -62,7 +62,7 @@ SourceFiles
 #include "weightFunction.H"
 #include "fvMeshQuadrature.H"
 #include "compatibilityFunctions.H"
-#include "movingLeastSquaresStencil.H"
+#include "leastSquaresStencil.H"
 #include "volFields.H"
 
 #include "fixedDisplacementFvPatchVectorField.H"
@@ -87,7 +87,7 @@ private:
         const fvMesh& mesh_;
 
         //- Cell and face stencil pointer
-        mutable autoPtr<movingLeastSquaresStencil> stencilPtr_;
+        mutable autoPtr<leastSquaresStencil> stencilPtr_;
 
         //- Quadrature points and weights pointer
         mutable autoPtr<fvMeshQuadrature> quadraturePtr_;
@@ -240,7 +240,7 @@ private:
         ) const;
 
         //- Return the cell and face stencil
-        const movingLeastSquaresStencil& stencil() const;
+        const leastSquaresStencil& stencil() const;
 
         //- Return the cell centre interpolation coefficients
         const CompactListList<scalar>& cellInterpCoeffs() const;
@@ -332,7 +332,7 @@ private:
         }
 
         //- Read-only access to the MLS stencil data
-        const movingLeastSquaresStencil& stencilData() const
+        const leastSquaresStencil& stencilData() const
         {
             return stencil();
         }

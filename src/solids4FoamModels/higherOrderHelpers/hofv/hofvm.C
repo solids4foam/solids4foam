@@ -205,7 +205,7 @@ static label hofvmLaplacianPETSc
 {
     const fvMesh& mesh = D.mesh();
 
-    const movingLeastSquaresStencil& stencil = mls.stencilData();
+    const leastSquaresStencil& stencil = mls.stencilData();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
