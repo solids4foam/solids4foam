@@ -27,6 +27,7 @@ License
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
 #include "addToRunTimeSelectionTable.H"
+#include "IFstream.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,6 +43,70 @@ namespace Foam
         {
             return runTime.controlDict().subOrEmptyDict("fluid")
                 .lookupOrDefault<word>("region", region);
+        }
+
+
+        void restoreFluxCorrectedVelocityRestartState(volVectorField& U)
+        {
+            const label nOldTimes = U.nOldTimes();
+
+            if (!nOldTimes)
+            {
+                return;
+            }
+
+            volVectorField* history = &U;
+            bool restoredHistory = false;
+
+            for (label oldI = 0; oldI < nOldTimes; ++oldI)
+            {
+                history = &history->oldTime();
+
+                IFstream fieldStream(history->objectPath());
+                if
+                (
+                    !fieldStream.good()
+                 || !history->readHeader(fieldStream)
+                )
+                {
+                    continue;
+                }
+
+                const dictionary fieldDict(fieldStream);
+                const dictionary& boundaryDict =
+                    fieldDict.subDict("boundaryField");
+
+                forAll(history->boundaryField(), patchI)
+                {
+                    fvPatchVectorField& patch =
+                        boundaryFieldRef(*history)[patchI];
+
+                    if (patch.type() == "fluxCorrectedVelocity")
+                    {
+                        const dictionary& patchDict =
+                            boundaryDict.subDict(patch.patch().name());
+
+                        patch == vectorField("value", patchDict, patch.size());
+                        restoredHistory = true;
+                    }
+                }
+            }
+
+            if (!restoredHistory)
+            {
+                // ddt construction can create old times without restart files
+                return;
+            }
+
+            forAll(U.boundaryField(), patchI)
+            {
+                fvPatchVectorField& patch = boundaryFieldRef(U)[patchI];
+
+                if (patch.type() == "fluxCorrectedVelocity")
+                {
+                    patch.evaluate();
+                }
+            }
         }
     }
 }
@@ -728,6 +793,8 @@ Foam::fluidModel::fluidModel
     // Set the useBoundaryFaceValues fields
     if (UPtr_.valid())
     {
+        restoreFluxCorrectedVelocityRestartState(U());
+
         forAll(useBoundaryFaceValuesU_, patchI)
         {
             if (UPtr_->boundaryField()[patchI].fixesValue())
