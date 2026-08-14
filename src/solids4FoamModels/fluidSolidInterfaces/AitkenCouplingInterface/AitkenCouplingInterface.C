@@ -128,6 +128,18 @@ bool AitkenCouplingInterface::evolve()
     }
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
+    const bool couplingConverged =
+        residualNorm <= outerCorrTolerance();
+
+    if (!couplingConverged)
+    {
+        FatalErrorInFunction
+            << "FSI coupling did not converge after " << outerCorr()
+            << " outer corrections. Final residual: " << residualNorm
+            << ", tolerance: " << outerCorrTolerance()
+            << abort(FatalError);
+    }
+
     solid().updateTotalFields();
 
     // Optional: correct fluid mesh to avoid build-up of interface position
