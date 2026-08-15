@@ -177,7 +177,7 @@ prepare_case() {
         ln -vnsf "controlDict.${coupling}" system/controlDict
         ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
 
-        if [[ "${variant}" == "foamextend" ]]; then
+if [[ "${variant}" == "foamextend" ]]; then
             ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
         elif [[ "${variant}" == "openfoamorg" ]]; then
             ln -vnsf "fvSolution.${coupling}.openfoamorg" system/fluid/fvSolution
@@ -305,18 +305,22 @@ check_case() {
     return "${failures}"
 }
 
+# Reference values updated for the interface-normal correction (PR #375): the
+# fluid pressure is now applied using the deformed interface normals rather
+# than the initial-configuration ones, which shifts every FSI result. See
+# https://github.com/solids4foam/solids4foam/pull/375
 if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=0.0395292
-    REF_FINAL_DISP=0.0387511
-    REF_FINAL_FORCE=6.63982
+    REF_MAX_DISP=0.0254734
+    REF_FINAL_DISP=0.0237615
+    REF_FINAL_FORCE=4.68516
 elif [[ "${variant}" == "openfoamorg" ]]; then
-    REF_MAX_DISP=0.0389623
-    REF_FINAL_DISP=0.0381231
-    REF_FINAL_FORCE=6.57859
+    REF_MAX_DISP=0.0249245
+    REF_FINAL_DISP=0.0231857
+    REF_FINAL_FORCE=4.58300
 else
-    REF_MAX_DISP=0.0389009
-    REF_FINAL_DISP=0.0380463
-    REF_FINAL_FORCE=6.57095
+    REF_MAX_DISP=0.0249071
+    REF_FINAL_DISP=0.0231620
+    REF_FINAL_FORCE=4.58284
 fi
 
 aitken_case=$(prepare_case aitken)
