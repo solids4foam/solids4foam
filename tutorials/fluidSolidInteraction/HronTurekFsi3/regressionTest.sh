@@ -16,7 +16,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 REG_END_TIME=2.5
 
 # Regression tolerances
-DISP_TOL=2e-5
+DISP_TOL=1e-4
 FX_TOL=1e-4
 FY_TOL=1e-3
 
@@ -30,7 +30,10 @@ FY_TOL=1e-3
 # https://github.com/solids4foam/solids4foam/pull/375
 # The HronTurekFsi3 values also include the fluid residualControl added in
 # the same PR, so their shift is not due to the interface normals alone.
-REF_TIP_UY=-0.00247428
+# The tip Uy tolerance is widened from 2e-5 to 1e-4 and the reference set to
+# the midpoint of the OpenFOAM.com versions: the spread between v2412 and
+# v2512 is now about 6.8e-5, against 4.2e-6 before this change.
+REF_TIP_UY=-0.0024405
 REF_FX=-0.0386691
 REF_FY=-0.0203155
 
