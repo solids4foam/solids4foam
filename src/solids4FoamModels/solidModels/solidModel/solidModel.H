@@ -935,6 +935,24 @@ public:
             void clearGlobalPatches() const;
 
             //- Synchronise global patches with the deformed solid points
+            //  The deformed patch points are the mesh patch points displaced
+            //  by pointDorPointDD(), which is the displacement increment for
+            //  moving mesh (updated Lagrangian) approaches and the total
+            //  displacement for the others.  This is the same expression
+            //  makeGlobalPatches() uses to build the zone in the first place
+            //
+            //  For a moving mesh this is only correct while the mesh still
+            //  holds the points that pointDD is measured from, that is before
+            //  moveMesh() is called for the current time step.  Calling it
+            //  after the mesh has been moved, but before pointDD is reset,
+            //  would add the same increment a second time
+            //
+            //  All current callers satisfy this: the only caller is
+            //  fluidSolidInterface::updateResidual(), and every coupling
+            //  scheme calls that before solid().updateTotalFields(), which is
+            //  where the mesh is moved
+            //
+            //  Note: this is a collective operation in parallel
             void syncGlobalPatches() const;
 
         // Edit
@@ -1033,6 +1051,12 @@ public:
             virtual scalar newDeltaT();
 
             //- Move the mesh by the provided point displacement field
+            //  Note: any global patches must be synchronised before this is
+            //  called.  syncGlobalPatches() displaces the mesh points by
+            //  pointDD, so once the mesh itself has been moved by pointDD the
+            //  same increment would be counted twice.  In fluid-solid
+            //  interaction this is reached from updateTotalFields(), after
+            //  the coupling loop has finished
             virtual void moveMesh
             (
                 const pointField& oldPoints,
