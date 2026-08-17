@@ -107,6 +107,8 @@ protected:
     // Protected Member Functions
 
         //- Return zoneA in the reference configuration
+        //  Use this, rather than zoneA(), for any geometry the mapping is
+        //  constructed from
         const standAlonePatch& zoneARef() const;
 
         //- Return zoneB in the reference configuration
@@ -208,13 +210,18 @@ public:
                 return globalPatchB_;
             };
 
-            //- Const access to the zoneA
+            //- Const access to the zoneA in its current configuration
+            //  This follows the fluid mesh motion and the solid deformation.
+            //  It identifies the zone, and gives its size, but the geometry
+            //  the mapping is built from comes from zoneARef(): see the class
+            //  description above
             const standAlonePatch& zoneA() const
             {
                 return globalPatchA_.globalPatch();
             }
 
-            //- Const access to the zoneB
+            //- Const access to the zoneB in its current configuration
+            //  As zoneA() above; the mapping geometry comes from zoneBRef()
             const standAlonePatch& zoneB() const
             {
                 return globalPatchB_.globalPatch();
