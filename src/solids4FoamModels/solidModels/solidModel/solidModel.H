@@ -800,9 +800,11 @@ public:
             }
 #ifndef FOAMEXTEND
             //- Return the displacement least-squares reconstruction scheme
+            //  for the high order discretisation
             const leastSquaresScheme& displacementLeastSquares() const;
 
             //- Return the pressure least-squares reconstruction scheme
+            //  for the high order discretisation
             const leastSquaresScheme& pressureLeastSquares() const;
 #endif
             //- Face zone point displacement increment

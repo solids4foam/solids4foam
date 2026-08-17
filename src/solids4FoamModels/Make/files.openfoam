@@ -254,6 +254,7 @@ higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
 higherOrderHelpers/leastSquaresScheme/leastSquaresScheme.C
 higherOrderHelpers/leastSquaresReconstruction/leastSquaresReconstruction.C
 higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
+higherOrderHelpers/kExactLeastSquares/kExactLeastSquares.C
 higherOrderHelpers/hofv/hofvm.C
 higherOrderHelpers/hofv/hofvc.C
 

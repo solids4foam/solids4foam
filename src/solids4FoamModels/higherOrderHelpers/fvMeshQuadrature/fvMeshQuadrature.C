@@ -884,6 +884,110 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     }
 }
 
+
+void fvMeshQuadrature::calcCellMoments() const
+{
+    if
+    (
+        secondOrderCellMomentsPtr_.valid()
+     || thirdOrderCellMomentsPtr_.valid()
+    )
+    {
+        FatalErrorInFunction
+            << "Pointers already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Cell moments are not required for integration order "
+            << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    secondOrderCellMomentsPtr_.set
+    (
+        new List<symmTensor>(mesh_.nCells(), symmTensor::zero)
+    );
+
+    if (cellOrder_ > 2)
+    {
+        thirdOrderCellMomentsPtr_.set
+        (
+            new List<symmTensor3rdOrder>
+            (
+                mesh_.nCells(),
+                symmTensor3rdOrder::zero
+            )
+        );
+    }
+
+    List<symmTensor>& secondOrderCellMoments =
+        *secondOrderCellMomentsPtr_;
+
+    forAll(cellCentres, cellI)
+    {
+        symmTensor& secondMoment = secondOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            secondMoment.xx() += w*r.x()*r.x();
+            secondMoment.xy() += w*r.x()*r.y();
+            secondMoment.yy() += w*r.y()*r.y();
+
+            if (!twoD)
+            {
+                secondMoment.xz() += w*r.x()*r.z();
+                secondMoment.yz() += w*r.y()*r.z();
+                secondMoment.zz() += w*r.z()*r.z();
+            }
+
+            if (thirdOrderCellMomentsPtr_.valid())
+            {
+                symmTensor3rdOrder& thirdMoment =
+                    (*thirdOrderCellMomentsPtr_)[cellI];
+
+                thirdMoment.xxx() += w*r.x()*r.x()*r.x();
+                thirdMoment.xxy() += w*r.x()*r.x()*r.y();
+                thirdMoment.xyy() += w*r.x()*r.y()*r.y();
+                thirdMoment.yyy() += w*r.y()*r.y()*r.y();
+
+                if (!twoD)
+                {
+                    thirdMoment.xxz() += w*r.x()*r.x()*r.z();
+                    thirdMoment.xyz() += w*r.x()*r.y()*r.z();
+                    thirdMoment.xzz() += w*r.x()*r.z()*r.z();
+                    thirdMoment.yyz() += w*r.y()*r.y()*r.z();
+                    thirdMoment.yzz() += w*r.y()*r.z()*r.z();
+                    thirdMoment.zzz() += w*r.z()*r.z()*r.z();
+                }
+            }
+        }
+
+        secondMoment /= cellVolumes[cellI];
+        if (thirdOrderCellMomentsPtr_.valid())
+        {
+            (*thirdOrderCellMomentsPtr_)[cellI] /= cellVolumes[cellI];
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fvMeshQuadrature::fvMeshQuadrature
@@ -901,7 +1005,9 @@ fvMeshQuadrature::fvMeshQuadrature
     faceQuadPointsPtr_(),
     faceQuadWeightsPtr_(),
     cellQuadPointsPtr_(),
-    cellQuadWeightsPtr_()
+    cellQuadWeightsPtr_(),
+    secondOrderCellMomentsPtr_(),
+    thirdOrderCellMomentsPtr_()
 {
 }
 
@@ -959,12 +1065,52 @@ const CompactListList<scalar>& fvMeshQuadrature::cellQuadWeights() const
     return autoPtrRef(cellQuadWeightsPtr_);
 }
 
+
+const List<symmTensor>& fvMeshQuadrature::secondOrderCellMoments() const
+{
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Second-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (secondOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return *secondOrderCellMomentsPtr_;
+}
+
+
+const List<symmTensor3rdOrder>&
+fvMeshQuadrature::thirdOrderCellMoments() const
+{
+    if (cellOrder_ < 3)
+    {
+        FatalErrorInFunction
+            << "Third-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (thirdOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return *thirdOrderCellMomentsPtr_;
+}
+
+
 void fvMeshQuadrature::clear()
 {
     faceQuadPointsPtr_.clear();
     faceQuadWeightsPtr_.clear();
     cellQuadPointsPtr_.clear();
     cellQuadWeightsPtr_.clear();
+    secondOrderCellMomentsPtr_.clear();
+    thirdOrderCellMomentsPtr_.clear();
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

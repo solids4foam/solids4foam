@@ -58,6 +58,7 @@ SourceFiles
 #include "fvMesh.H"
 #include "CompactListList.H"
 #include "compatibilityFunctions.H"
+#include "symmTensor3rdOrder.H"
 #include "triFaceList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -108,6 +109,12 @@ private:
         //- Cell quadrature points weights
         mutable autoPtr<CompactListList<scalar>> cellQuadWeightsPtr_;
 
+        //- Volume-normalised second-order central cell moments
+        mutable autoPtr<List<symmTensor>> secondOrderCellMomentsPtr_;
+
+        //- Volume-normalised third-order central cell moments
+        mutable autoPtr<List<symmTensor3rdOrder>> thirdOrderCellMomentsPtr_;
+
         //- Disallow default bitwise copy construct
         fvMeshQuadrature(const fvMeshQuadrature&);
 
@@ -134,6 +141,9 @@ private:
 
         //- Calls the corresponding function for 3D or for 2D meshes
         void calcQuadPointsAndWeights() const;
+
+        //- Calculate volume-normalised cell moments
+        void calcCellMoments() const;
 
 public:
     //- Runtime type information
@@ -186,6 +196,12 @@ public:
 
             //- Return the cell quadrature points
             const CompactListList<point>& cellQuadPoints() const;
+
+            //- Return volume-normalised second-order cell moments
+            const List<symmTensor>& secondOrderCellMoments() const;
+
+            //- Return volume-normalised third-order cell moments
+            const List<symmTensor3rdOrder>& thirdOrderCellMoments() const;
 
             //- Clear data after topo change
             void clear();
