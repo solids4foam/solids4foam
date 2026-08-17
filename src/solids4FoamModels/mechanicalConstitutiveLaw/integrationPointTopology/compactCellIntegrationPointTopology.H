@@ -96,7 +96,7 @@ public:
     //- Total number of integration points
     virtual label nIntegrationPoints() const override
     {
-        return cellToIntegrationPointIDs_.totalSize();
+        return cellToIntegrationPointIDs_.m().size();
     }
 
     //- Integration-point indices associated with a given cell

@@ -60,6 +60,7 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
+#include "CompactListList.H"
 #include "dictionary.H"
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
@@ -162,7 +163,7 @@ class mechanicalConstitutiveLawManager
             PtrList<mechanicalConstitutiveLawState> states_;
 
             //- Boundary constitutive state per law per patch (optional)
-            List<PtrList<mechanicalConstitutiveLawState>> boundaryStates_;
+            PtrList<PtrList<mechanicalConstitutiveLawState>> boundaryStates_;
 
             //- True if this topology supports boundary integration points
             bool boundaryAware_;
@@ -215,15 +216,15 @@ class mechanicalConstitutiveLawManager
             const word& context
         )
         {
-            const label nIP = out.totalSize();
+            const label nIP = out.m().size();
 
-            if (a.totalSize() != nIP || b.totalSize() != nIP)
+            if (a.m().size() != nIP || b.m().size() != nIP)
             {
                 FatalError
                     << "Inconsistent CompactListList sizes in " << context << nl
-                    << "Expected totalSize = " << nIP << nl
-                    << "Got: grad = " << a.totalSize()
-                    << ", grad0 = " << b.totalSize()
+                    << "Expected size = " << nIP << nl
+                    << "Got: grad = " << a.m().size()
+                    << ", grad0 = " << b.m().size()
                     << exit(FatalError);
             }
 

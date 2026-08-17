@@ -226,7 +226,7 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 void mechanicalConstitutiveLawState::storeOldTime()
 {
     // Scalars
-    forAllConstIters(scalarFields0_, iter)
+    forAllConstIter(scalarFields0_, iter)
     {
         const word& name = iter.key();
         if (!scalarFields_.found(name))
@@ -240,7 +240,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // Vectors
-    forAllConstIters(vectorFields0_, iter)
+    forAllConstIter(vectorFields0_, iter)
     {
         const word& name = iter.key();
         if (!vectorFields_.found(name))
@@ -254,7 +254,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // Tensors
-    forAllConstIters(tensorFields0_, iter)
+    forAllConstIter(tensorFields0_, iter)
     {
         const word& name = iter.key();
         if (!tensorFields_.found(name))
@@ -268,7 +268,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // SymmTensors
-    forAllConstIters(symmTensorFields0_, iter)
+    forAllConstIter(symmTensorFields0_, iter)
     {
         const word& name = iter.key();
         if (!symmTensorFields_.found(name))

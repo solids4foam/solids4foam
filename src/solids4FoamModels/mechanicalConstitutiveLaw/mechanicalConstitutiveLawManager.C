@@ -96,7 +96,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     //  - integration-point counts encoded in sub-list sizes
 
     // Build cell → IP addressing
-    CompactListList<label> cellToIP(layout.size(), layout.totalSize());
+    CompactListList<label> cellToIP(layout.size(), layout.m().size());
 
     for (label cellI = 0; cellI < layout.size(); ++cellI)
     {
@@ -237,7 +237,14 @@ Foam::mechanicalConstitutiveLawManager::topology
     {
         forAll(laws_, lawI)
         {
-            entry.boundaryStates_[lawI].setSize(mesh_.boundary().size());
+            entry.boundaryStates_.set
+            (
+                lawI,
+                new PtrList<mechanicalConstitutiveLawState>
+                (
+                    mesh_.boundary().size()
+                )
+            );
 
             forAll(mesh_.boundary(), patchI)
             {
