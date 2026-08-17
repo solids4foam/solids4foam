@@ -16,7 +16,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 REG_END_TIME=2.5
 
 # Regression tolerances
-DISP_TOL=1e-4
+DISP_TOL=2e-5
 FX_TOL=1e-4
 FY_TOL=1e-3
 
@@ -28,14 +28,11 @@ FY_TOL=1e-3
 # fluid pressure is now applied using the deformed interface normals rather than
 # the initial-configuration ones, which shifts every FSI result. See
 # https://github.com/solids4foam/solids4foam/pull/375
-# The HronTurekFsi3 values also include the fluid residualControl added in
-# the same PR, so their shift is not due to the interface normals alone.
-# The tip Uy tolerance is widened from 2e-5 to 1e-4 and the reference set to
-# the midpoint of the OpenFOAM.com versions: the spread between v2412 and
-# v2512 is now about 6.8e-5, against 4.2e-6 before this change.
-REF_TIP_UY=-0.0024405
-REF_FX=-0.0386691
-REF_FY=-0.0203155
+# The values are the midpoint of OpenFOAM-v2412, OpenFOAM-v2512 and
+# OpenFOAM-9; the spread across those is well inside the tolerances above.
+REF_TIP_UY=-0.00031014
+REF_FX=-0.0393827
+REF_FY=-0.0461165
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
