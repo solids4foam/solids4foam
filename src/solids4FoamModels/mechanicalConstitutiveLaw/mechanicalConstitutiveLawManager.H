@@ -180,7 +180,7 @@ class mechanicalConstitutiveLawManager
 
         //- Cache of topology-specific integration-point data and state
         //  Keyed by the address of the integrationPointTopology instance
-        mutable HashTable<topologyEntry> topologyEntries_;
+        mutable HashTable<autoPtr<topologyEntry>> topologyEntries_;
 
 
     // Private Member Functions

@@ -75,7 +75,13 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 {
     // Unique key per layout instance
     const word key =
-        "compactCell:" + Foam::name(reinterpret_cast<std::uintptr_t>(&layout));
+        "compactCell:" + Foam::name
+        (
+            static_cast<std::uint64_t>
+            (
+                reinterpret_cast<std::uintptr_t>(&layout)
+            )
+        );
 
     // Already constructed?
     if (topologyCache_.found(key))
@@ -135,12 +141,15 @@ Foam::mechanicalConstitutiveLawManager::topology
 ) const
 {
     // Use the address of the topology object as a unique key
-    const word key = Foam::name(reinterpret_cast<std::uintptr_t>(&topo));
+    const word key = Foam::name
+    (
+        static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&topo))
+    );
 
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
     {
-        return topologyEntries_[key];
+        return *topologyEntries_[key];
     }
 
     // ---------------------------------------------------------------------
@@ -150,8 +159,9 @@ Foam::mechanicalConstitutiveLawManager::topology
     DebugInfo
         << "Creating topologyEntry for " << key << endl;
 
-    topologyEntries_.insert(key, topologyEntry(topo));
-    topologyEntry& entry = topologyEntries_[key];
+    autoPtr<topologyEntry> entryPtr(new topologyEntry(topo));
+    topologyEntries_.insert(key, entryPtr);
+    topologyEntry& entry = *topologyEntries_[key];
 
     const label nLaws = laws_.size();
 
@@ -268,10 +278,10 @@ void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
         // Loop over all topology entries
         forAllIter
         (
-            HashTable<topologyEntry>, topologyEntries_, topoIter
+            HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
         )
         {
-            topologyEntry& entry = topoIter();
+            topologyEntry& entry = *topoIter();
 
             // Internal states
             forAll(entry.states_, lawI)
@@ -902,12 +912,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     }
 
     // Update boundaries including syncing coupled boundaries
+#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
+#endif
 }
 
 
@@ -1208,12 +1220,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
+#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
+#endif
 }
 
 
@@ -1682,12 +1696,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     }
 
     // Update boundaries including syncing coupled boundaries
+#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
+#endif
 }
 
 
@@ -1801,10 +1817,10 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     // Loop over all topology entries
     forAllIter
     (
-        HashTable<topologyEntry>, topologyEntries_, topoIter
+        HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
     )
     {
-        topologyEntry& tp = topoIter();
+        topologyEntry& tp = *topoIter();
 
         forAll(laws_, lawI)
         {
