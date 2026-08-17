@@ -53,7 +53,7 @@ fileHandler     uncollated;
 
 functions
 {
-   
+
     patchDisplacements
      {
          type            solidDisplacements;
@@ -86,7 +86,7 @@ functions
         type fsiConvergenceData;
         region fluid;
     }
-    
+
 courantNo
 {
     type            CourantNo;
@@ -133,7 +133,7 @@ courantNumberHistory
     writeInterval   1;
 }
 
-    
+
     wallShearStress1
     {
         // Mandatory entries

@@ -26,7 +26,7 @@ boundaryField
     {
       type processor;
     }
-  
+
      "Outlet[1-4]"
     {
         type         fixedValue;

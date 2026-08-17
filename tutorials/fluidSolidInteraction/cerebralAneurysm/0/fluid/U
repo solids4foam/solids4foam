@@ -32,7 +32,7 @@ boundaryField
       value uniform (0 0 0);
       inletValue uniform (0 0 0);
     }
-  
+
      "Inlet[1-2]"
     {
         type     flowRateInletVelocity;

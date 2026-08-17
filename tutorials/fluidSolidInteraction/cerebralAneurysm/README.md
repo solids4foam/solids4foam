@@ -3,6 +3,7 @@
 Prepared by Chanikya Valeti
 
 ## Tutorial Aims
+
 - Demonstrate a patient-specific vascular fluid-solid interaction simulation
   using `solids4foam`.
 - Demonstrate fluid and arterial-wall mesh generation using `cartesianMesh` and
@@ -104,4 +105,3 @@ cartesianMesh -> extrudeMesh -> createPatch -> checkMesh -> solids4Foam
 1. [Vascular Model Repository](https://vascularmodel.com/dataset.html), model
    `0199_H_CERE_CA`.
 2. [solids4foam tutorial documentation](https://www.solids4foam.com/tutorials/).
-

@@ -29,8 +29,8 @@ transportModel  Newtonian;
 BirdCarreauCoeffs
 {
   nu0   0.000151;
-  nuInf 3.3e-6; 
-  k     8.2;  
+  nuInf 3.3e-6;
+  k     8.2;
   n     0.2128;
   a     0.64;
 }
