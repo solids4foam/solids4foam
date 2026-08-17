@@ -23,8 +23,7 @@ Description
     small rotations are assumed, and the total displacement is the primary
     unknown.
 
-    The stress is calculated by run-time selectable mechanical laws controlled
-    mechanical law manager.
+    The stress is calculated by the run-time selectable mechanical law.
 
 Author
     Philip Cardiff, UCD.
@@ -44,6 +43,7 @@ SourceFiles
 #include "uniformDimensionedFields.H"
 #include "foamPetscSnesHelper.H"
 #include "hofvc.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,7 +69,7 @@ class linGeomTotalDispSolid
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        volScalarField impK_;
+        const volScalarField impK_;
 
         //- Implicit stiffness surface field
         surfaceScalarField impKf_;
@@ -77,7 +77,7 @@ class linGeomTotalDispSolid
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
-        volScalarField rImpK_;
+        const volScalarField rImpK_;
 
         //- Reciprocal of the bulk modulus
         //  Used in the pressure Jacobian when solvePressure is enabled

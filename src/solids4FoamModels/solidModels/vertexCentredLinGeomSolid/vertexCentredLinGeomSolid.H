@@ -63,15 +63,12 @@ SourceFiles
 namespace Foam
 {
 
-// Forward Declarations
-class mat66;
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace solidModels
 {
 
-/*---------------------------------------------------------------------------* \
+/*---------------------------------------------------------------------------*\
                   Class vertexCentredLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -86,18 +83,14 @@ private:
 
     // Private Data
 
-        //- Mechanical constitutive law manager for dual mesh
-        mutable autoPtr<mechanicalConstitutiveLawManager> dualMechManagerPtr_;
+        //- Mechanical model for dual mesh
+        autoPtr<dualMechanicalModel> dualMechanicalPtr_;
 
         //- Implicit stiffness used by segregated algorithm
         //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        surfaceScalarField dualImpKf_;
-
-        //- Fourth order material tangent defined at dual mesh faces
-        //  This is only populated if requested
-        List<mat66> dualMaterialTangent_;
+        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -122,7 +115,7 @@ private:
 
         //- Scale factor for the fixed degree of freedom equations to improve
         //  the matrix conditioning
-        scalar fixedDofScale_;
+        const scalar fixedDofScale_;
 
 #ifdef USE_PETSC
         //- Pointer to PETSc indexing object used for identifying fixed degrees
@@ -153,12 +146,6 @@ private:
         //- Divergence of sigma at each primary point
         pointVectorField pointDivSigma_;
 
-        //- Displacement gradient at each primary point 
-        pointTensorField pGradD_;
-
-        //- Sigma at each primary point 
-        pointSymmTensorField pSigma_;
-
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 
@@ -172,12 +159,6 @@ private:
 
 
     // Private Member Functions
-
-        //- Make the dual mechanical model manager
-        void makeDualMechManager() const;
-
-        //- Return non-const reference to the dual mechanical model manager
-        mechanicalConstitutiveLawManager& dualMechManager();
 
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma
@@ -223,11 +204,11 @@ private:
         }
 #endif
 
-        // //- Make dualImpKf field
-        // void makeDualImpKf() const;
+        //- Make dualImpKf field
+        void makeDualImpKf() const;
 
-        // //- Return dualImpK field
-        // const surfaceScalarField& dualImpKf() const;
+        //- Return dualImpK field
+        const surfaceScalarField& dualImpKf() const;
 
         //- Predict displacement field using the velocity field
         void predict();

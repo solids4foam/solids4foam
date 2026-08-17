@@ -27,9 +27,6 @@ infrastructure that:
 ## High-level overview
 
 ```text
-solidModel
-   |
-   v
 mechanicalConstitutiveLawManager
    |
    +-- mechanicalConstitutiveLaw (one per material)
@@ -42,17 +39,39 @@ mechanicalConstitutiveLawManager
           +-- compactCellIntegrationPointTopology
 ```
 
-At runtime:
+At runtime, a client of the framework:
 
-1. The **solid model** constructs a `mechanicalConstitutiveLawManager`.
-2. The manager reads and constructs one or more
-   `mechanicalConstitutiveLaw` objects.
-3. The manager builds a mapping from **cells → integration points**
-   using an `integrationPointTopology`.
-4. During each stress update, the manager:
+1. constructs a `mechanicalConstitutiveLawManager` with the mesh and the
+   `mechanicalProperties` dictionary;
+2. selects an `integrationPointTopology` appropriate to its storage;
+3. owns the kinematic, stress, and any requested tangent storage; and
+4. calls a matching manager stress-update function. The manager then:
    - constructs kinematic views,
    - passes them to the constitutive laws,
    - updates stresses and optional tangents in-place.
+
+## Solid-model integration boundary
+
+The framework is currently **not connected to any `solidModel`**. This is
+intentional: the manager and constitutive laws must remain independently
+buildable while the solid-model integration is redesigned against the current
+solver interfaces.
+
+A future solid model should use the manager only as a constitutive-update
+service. It is responsible for:
+
+- constructing and owning the manager for its mesh and `mechanicalProperties`;
+- selecting the integration-point topology that matches its field storage;
+- maintaining kinematics, stress, and solver state at the chosen locations;
+- calling the appropriate small- or finite-strain update at each solver stage;
+- applying boundary conditions, interpolation, assembly, and convergence
+  control itself.
+
+The manager is responsible for material selection, constitutive state, and
+writing the requested stress response to caller-owned storage. It must not
+depend on `solidModel`, create solver fields, select a solution algorithm, or
+drive a solver lifecycle. This one-way dependency keeps the material framework
+usable by cell-, face-, point-, and higher-order discretisations.
 
 ---
 
@@ -214,11 +233,24 @@ Both pathways support:
 
 ## Tangents and mixed formulations
 
-The framework supports **optional approximate scalar tangents**:
+The framework can return optional approximate scalar or fourth-order tangents
+when explicitly requested by a client. The manager does not retain a universal
+"current tangent" field and does not define an implicit or stabilisation
+coefficient for a solid model. The caller owns the requested tangent storage,
+chooses when it is refreshed, and decides how it enters its linearisation.
+
+This is deliberately left as an integration design decision. Current solid
+models obtain approximate material stiffness from their stabilisation pathway
+in some formulations, so a future integration must first define whether that
+quantity remains stabilisation-owned, is supplied by the constitutive manager,
+or is derived through a clearly specified adapter.
+
+Supported current requests include:
 
 - requested explicitly by the solver,
 - computed only when needed,
-- suitable for segregated or mixed formulations.
+- scalar tangents suitable for segregated or mixed formulations,
+- fourth-order tangents where the selected update interface supports them.
 
 ---
 

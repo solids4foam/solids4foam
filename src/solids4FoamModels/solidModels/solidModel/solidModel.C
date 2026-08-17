@@ -614,21 +614,6 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
-const Foam::enhancedVolPointInterpolation& Foam::solidModel::volToPoint() const
-{
-    return enhancedVolPointInterpolation::New(mesh());
-}
-
-
-#ifdef FOAM_EXTEND
-const Foam::newLeastSquaresVolPointInterpolation&
-Foam::solidModel::volToPointLeastSquares() const
-{
-    return newLeastSquaresVolPointInterpolation::New(mesh());
-}
-#endif
-
-
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
     if (dualMeshPtr_.empty())
@@ -671,6 +656,17 @@ bool Foam::solidModel::newTimeStep() const
     }
 
     return false;
+}
+
+
+Foam::volScalarField& Foam::solidModel::rho()
+{
+    if (rhoPtr_.empty())
+    {
+        makeRho();
+    }
+
+    return rhoPtr_();
 }
 
 
@@ -1430,11 +1426,6 @@ Foam::solidModel::~solidModel()
 
 const Foam::volScalarField& Foam::solidModel::rho() const
 {
-    if (mechManagerPtr_.valid())
-    {
-        return mechManagerPtr_->rho();
-    }
-
     if (rhoPtr_.empty())
     {
         makeRho();
@@ -1686,14 +1677,7 @@ Foam::vector Foam::solidModel::pointU(const label pointID) const
         dimensionedVector("0", dimVelocity, vector::zero)
     );
 
-    if (mechanicalPtr_.valid())
-    {
-        mechanical().volToPoint().interpolate(U(), pointU);
-    }
-    else
-    {
-        volToPoint().interpolate(U(), pointU);
-    }
+    mechanical().volToPoint().interpolate(U(), pointU);
 
     return pointU.internalField()[pointID];
 }
@@ -1751,15 +1735,7 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 
 void Foam::solidModel::updateTotalFields()
 {
-    if (mechanicalPtr_.valid())
-    {
-        mechanicalPtr_->updateTotalFields();
-    }
-
-    if (mechManagerPtr_.valid())
-    {
-        mechManagerPtr_->endTimeStep();
-    }
+    mechanical().updateTotalFields();
 }
 
 
@@ -1771,12 +1747,12 @@ void Foam::solidModel::end()
     );
     solidProperties_.regIOobject::write();
 
-    if (mechanicalPtr_.valid())
+    if (!mechanicalPtr_.empty())
     {
         mechanical().writeDict();
     }
 
-    if (thermalPtr_.valid())
+    if (!thermalPtr_.empty())
     {
         thermal().IOobject::rename
         (
@@ -2150,14 +2126,11 @@ void Foam::solidModel::writeFields(const Time& runTime)
 
 Foam::scalar Foam::solidModel::newDeltaT()
 {
-    scalar dt = runTime().deltaTValue();
-
-    if (mechanicalPtr_.valid())
-    {
-        dt = min(dt, mechanical().newDeltaT());
-    }
-
-    return dt;
+    return min
+    (
+        runTime().deltaTValue(),
+        mechanical().newDeltaT()
+    );
 }
 
 void Foam::solidModel::moveMesh
