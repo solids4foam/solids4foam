@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -Eeo pipefail
+set +u
+IFS=$'\n\t'
+
+caseDir="$(cd "$(dirname "$0")" && pwd)"
+cd "$caseDir"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+
+# Remove solver results, processor directories and application logs while
+# preserving the initial 0 directory and all case input dictionaries.
+cleanCase
+
+# The fluid and solid meshes are generated from meshDict by Allrun.
+rm -rf constant/polyMesh
+rm -rf constant/fluid/polyMesh
+rm -rf constant/solid/polyMesh
+rm -rf postProcessing
+
+echo "Case cleaned: generated meshes and results removed."
+

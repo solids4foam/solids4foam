@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     |                                                 |
+|   \\  /    A nd           |                                                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      extrudeMeshDict;
+}
+
+// Create a new mesh by extruding a patch
+constructFrom patch;
+
+// Allrun stages the fluid mesh as the default-region source mesh.
+sourceCase ".";
+
+// Patch to extrude
+sourcePatches
+(
+    Wall
+);
+
+// Name of the original/exposed side
+exposedPatchName innerWall;
+
+// Extrude in patch-normal direction
+flipNormals false;
+
+extrudeModel linearNormal;
+
+// Number of cells through thickness
+nLayers 3;
+
+// Layer expansion ratio
+// 1.0 = equal thickness layers
+expansionRatio 1.0;
+
+// Normal extrusion settings
+linearNormalCoeffs
+{
+    thickness 0.0003;
+}
+
+// Optional mesh merging controls
+mergeFaces false;
+mergeTol 0;
+
+// ************************************************************************* //

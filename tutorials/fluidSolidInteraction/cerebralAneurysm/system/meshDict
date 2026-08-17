@@ -1,0 +1,78 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version   2.0;
+    format    ascii;
+    class     dictionary;
+    location  "system";
+    object    meshDict;
+}
+
+surfaceFile "constant/triSurface/geometry.fms";
+
+// Coarsen the chamber core while retaining the original 0.8 mm surface and
+// opening resolution for high-fidelity boundary geometry.
+maxCellSize 0.001;
+boundaryCellSize 0.0003;
+
+localRefinement
+{
+    "Out1|Out2|Out3|Out4|In1|In2"
+    {
+        cellSize 0.0003;
+    }
+}
+
+renameBoundary
+{
+    defaultName Wall;
+    defaultType wall;
+
+    newPatchNames
+    {
+        Wall
+        {
+            newName Wall;
+            type wall;
+        }
+        Out1
+        {
+            newName Outlet1;
+            type patch;
+        }
+        In1
+        {
+            newName Inlet1;
+            type patch;
+        }
+        In2
+        {
+            newName Inlet2;
+            type patch;
+        }
+        Out2
+        {
+            newName Outlet2;
+            type patch;
+        }
+         Out3
+        {
+            newName Outlet3;
+            type patch;
+        }
+         Out4
+        {
+            newName Outlet4;
+            type patch;
+        }
+    }
+}
+
+boundaryLayers
+{
+    enable false;
+}
