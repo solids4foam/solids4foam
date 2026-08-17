@@ -70,8 +70,10 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     const vectorField& gradFieldI = gradField.internalField();
     scalarField& faceFluxI = Foam::primitiveFieldRef(faceFlux);
     const solidModel& solMod = lookupSolidModel(field.mesh());
-    const movingLeastSquares& displacementMLS = solMod.displacementMLS();
-    const label polynomialOrder = displacementMLS.polynomialOrder();
+    const leastSquaresScheme& displacementLeastSquares =
+        solMod.displacementLeastSquares();
+    const label polynomialOrder =
+        displacementLeastSquares.polynomialOrder();
     const vectorField deltaI(deltaVectors(mesh));
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const vectorField& nI = n.internalField();
@@ -91,7 +93,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     // Second gradient is computed on demand by MLS
     if (polynomialOrder >= 2)
     {
-        tSecondGrad = displacementMLS.secondGrad(field);
+        tSecondGrad = displacementLeastSquares.secondGrad(field);
         tmpRef(tSecondGrad).correctBoundaryConditions();
         secondGradI = &tSecondGrad().internalField();
     }
@@ -99,7 +101,7 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     // Third gradient is computed on demand by MLS
     if (polynomialOrder >= 3)
     {
-        tThirdGrad = displacementMLS.thirdGrad(field);
+        tThirdGrad = displacementLeastSquares.thirdGrad(field);
         thirdGrad = &tThirdGrad();
     }
 
@@ -302,8 +304,10 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     const tensorField& gradFieldI = gradField.internalField();
     vectorField& faceFluxI = Foam::primitiveFieldRef(faceFlux);
     const solidModel& solMod = lookupSolidModel(field.mesh());
-    const movingLeastSquares& displacementMLS = solMod.displacementMLS();
-    const label polynomialOrder = displacementMLS.polynomialOrder();
+    const leastSquaresScheme& displacementLeastSquares =
+        solMod.displacementLeastSquares();
+    const label polynomialOrder =
+        displacementLeastSquares.polynomialOrder();
     const vectorField deltaI(deltaVectors(mesh));
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const vectorField& nI = n.internalField();
@@ -336,9 +340,9 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     // Second gradient is computed on demand by MLS
     if (polynomialOrder >= 2)
     {
-        tSecondGradX = displacementMLS.secondGrad(fieldX);
-        tSecondGradY = displacementMLS.secondGrad(fieldY);
-        tSecondGradZ = displacementMLS.secondGrad(fieldZ);
+        tSecondGradX = displacementLeastSquares.secondGrad(fieldX);
+        tSecondGradY = displacementLeastSquares.secondGrad(fieldY);
+        tSecondGradZ = displacementLeastSquares.secondGrad(fieldZ);
         tmpRef(tSecondGradX).correctBoundaryConditions();
         tmpRef(tSecondGradY).correctBoundaryConditions();
         tmpRef(tSecondGradZ).correctBoundaryConditions();
@@ -351,9 +355,9 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     // Third gradient is computed on demand by MLS
     if (polynomialOrder >= 3)
     {
-        tThirdGradX = displacementMLS.thirdGrad(fieldX);
-        tThirdGradY = displacementMLS.thirdGrad(fieldY);
-        tThirdGradZ = displacementMLS.thirdGrad(fieldZ);
+        tThirdGradX = displacementLeastSquares.thirdGrad(fieldX);
+        tThirdGradY = displacementLeastSquares.thirdGrad(fieldY);
+        tThirdGradZ = displacementLeastSquares.thirdGrad(fieldZ);
 
         thirdGradX = &tThirdGradX();
         thirdGradY = &tThirdGradY();

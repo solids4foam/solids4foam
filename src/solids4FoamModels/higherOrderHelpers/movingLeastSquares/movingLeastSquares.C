@@ -103,6 +103,12 @@ movingLeastSquares::cellThirdGradCoeffs() const
 }
 
 
+const CompactListList<label>& movingLeastSquares::faceGradStencil() const
+{
+    return stencil().facesStencil();
+}
+
+
 const List<CompactListList<vector>>&
 movingLeastSquares::faceGradCoeffs() const
 {
@@ -802,7 +808,7 @@ void movingLeastSquares::calcFaceCoeffs() const
     }
 
     // Reference to face stencils, quadrature points and remote centres
-    const CompactListList<label>& stencils = stencil().facesStencil();
+    const CompactListList<label>& stencils = faceGradStencil();
     const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
 
     const Map<vector>& remoteCI = stencil().remoteCentresMap();

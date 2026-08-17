@@ -84,7 +84,7 @@ tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
 
     const vectorField normal(mesh().faceAreas()/mag(mesh().faceAreas()));
     const CompactListList<scalar>& quadW =
-        displacementMLS().quadrature().faceQuadWeights();
+        displacementLeastSquares().quadrature().faceQuadWeights();
     const CompactListList<tensor>& quadGradD = gradDQuad();
 
     // Only boundary values are required for enforcing traction conditions
@@ -208,7 +208,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature weights include the reference face area
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const CompactListList<tensor>& faceGradD = gradDQuad();
 
@@ -611,7 +611,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     {
 #ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
-        gradD() = displacementMLS().grad(D());
+        gradD() = displacementLeastSquares().grad(D());
         F_ = I + gradD().T();
         Finv_ = inv(F_);
         J_ = det(F_);
@@ -960,7 +960,7 @@ label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             D(),
             blockSize_
         );
@@ -1015,7 +1015,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
-        gradD() = displacementMLS().grad(D);
+        gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
@@ -1318,13 +1318,14 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         tmp<volScalarField> tLambda = impK_ - 2.0*mu;
         const volScalarField& lambda = tLambda();
 
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction =
+            displacementLeastSquares();
 
         hofvm::laplacianIntoPETScMatrix
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             mu
         );
@@ -1333,7 +1334,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             mu
         );
@@ -1342,7 +1343,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             lambda
         );

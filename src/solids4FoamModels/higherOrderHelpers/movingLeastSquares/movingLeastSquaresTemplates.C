@@ -183,7 +183,7 @@ void movingLeastSquares::fGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
     const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
-    const CompactListList<label>& stencils = stencil().facesStencil();
+    const CompactListList<label>& stencils = faceGradStencil();
     const List<CompactListList<vector>>& fGradCoeffs = this->faceGradCoeffs();
 
     // Get values from remote processors

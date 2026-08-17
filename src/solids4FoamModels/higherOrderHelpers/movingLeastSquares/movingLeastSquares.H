@@ -321,6 +321,9 @@ private:
         //- Return the cell and face stencil
         virtual const leastSquaresStencil& stencil() const;
 
+        //- Return addressing associated with face-gradient coefficients
+        virtual const CompactListList<label>& faceGradStencil() const;
+
         //- Return the face quadrature points gradient coefficients
         virtual const List<CompactListList<vector>>& faceGradCoeffs() const;
 

@@ -94,7 +94,7 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
             if
             (
                 solMod.highOrderResidual()
-             && solMod.displacementMLS().polynomialOrder() >= 2
+             && solMod.displacementLeastSquares().polynomialOrder() >= 2
             )
             {
                 volScalarField Dx(D.component(vector::X));
@@ -102,11 +102,11 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
                 volScalarField Dz(D.component(vector::Z));
 
                 tmp<volSymmTensorField> tSecondGradDx =
-                    solMod.displacementMLS().secondGrad(Dx);
+                    solMod.displacementLeastSquares().secondGrad(Dx);
                 tmp<volSymmTensorField> tSecondGradDy =
-                    solMod.displacementMLS().secondGrad(Dy);
+                    solMod.displacementLeastSquares().secondGrad(Dy);
                 tmp<volSymmTensorField> tSecondGradDz =
-                    solMod.displacementMLS().secondGrad(Dz);
+                    solMod.displacementLeastSquares().secondGrad(Dz);
 
                 pointDValue.x() +=
                     0.5*(distance & tSecondGradDx().internalField()[cellID_]
@@ -118,14 +118,17 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
                     0.5*(distance & tSecondGradDz().internalField()[cellID_]
                       & distance);
 
-                if (solMod.displacementMLS().polynomialOrder() >= 3)
+                if
+                (
+                    solMod.displacementLeastSquares().polynomialOrder() >= 3
+                )
                 {
                     autoPtr<List<symmTensor3rdOrder>> tThirdGradDx =
-                        solMod.displacementMLS().thirdGrad(Dx);
+                        solMod.displacementLeastSquares().thirdGrad(Dx);
                     autoPtr<List<symmTensor3rdOrder>> tThirdGradDy =
-                        solMod.displacementMLS().thirdGrad(Dy);
+                        solMod.displacementLeastSquares().thirdGrad(Dy);
                     autoPtr<List<symmTensor3rdOrder>> tThirdGradDz =
-                        solMod.displacementMLS().thirdGrad(Dz);
+                        solMod.displacementLeastSquares().thirdGrad(Dz);
 
                     pointDValue.x() +=
                         (1.0/6.0)*cubicForm((*tThirdGradDx)[cellID_], distance);

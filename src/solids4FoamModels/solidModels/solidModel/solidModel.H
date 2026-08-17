@@ -64,7 +64,7 @@ SourceFiles
 #endif
 
 #ifndef FOAMEXTEND
-    #include "movingLeastSquares.H"
+    #include "leastSquaresReconstruction.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -128,14 +128,6 @@ private:
 
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
-
-#ifndef FOAMEXTEND
-        //- Moving Least Square operator for the displacement field
-        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
-
-        //- Moving Least Square operator for the pressure field
-        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
-#endif
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
@@ -328,11 +320,6 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Make the displacement Moving Least Squares object
-        void makeDisplacementMLS() const;
-
-        //- Make the pressure Moving Least Squares object
-        void makePressureMLS() const;
 #endif
 
         //- Return root high-order coefficients dictionary
@@ -812,25 +799,11 @@ public:
                 return twoD_;
             }
 #ifndef FOAMEXTEND
-            //- Return displacement moving least squares interpolation
-            const movingLeastSquares& displacementMLS() const
-            {
-                if (displacementMLSPtr_.empty())
-                {
-                    makeDisplacementMLS();
-                }
-                return autoPtrRef(displacementMLSPtr_);
-            }
+            //- Return the displacement least-squares reconstruction scheme
+            const leastSquaresScheme& displacementLeastSquares() const;
 
-            //- Return pressure moving least squares interpolation
-            const movingLeastSquares& pressureMLS() const
-            {
-                if (pressureMLSPtr_.empty())
-                {
-                    makePressureMLS();
-                }
-                return autoPtrRef(pressureMLSPtr_);
-            }
+            //- Return the pressure least-squares reconstruction scheme
+            const leastSquaresScheme& pressureLeastSquares() const;
 #endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -992,8 +965,8 @@ public:
             //- Let the material model recalculate the density
             virtual void recalculateRho();
 
-            //- Clear Moving Least Squares interpolator
-            virtual void clearMovingLeastSquaresData();
+            //- Clear least-squares reconstruction data
+            virtual void clearLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);

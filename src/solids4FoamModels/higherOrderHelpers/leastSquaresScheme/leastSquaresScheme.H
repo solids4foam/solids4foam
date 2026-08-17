@@ -130,6 +130,9 @@ public:
         //- Return stencil data
         virtual const leastSquaresStencil& stencil() const = 0;
 
+        //- Return addressing associated with face-gradient coefficients
+        virtual const CompactListList<label>& faceGradStencil() const = 0;
+
         //- Return face-gradient reconstruction coefficients
         virtual const List<CompactListList<vector>>&
         faceGradCoeffs() const = 0;

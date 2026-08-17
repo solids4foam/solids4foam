@@ -189,7 +189,7 @@ static label hofvmLaplacianPETSc
 (
     Mat matrix,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     tensor (*calcCoeff)
@@ -205,7 +205,6 @@ static label hofvmLaplacianPETSc
 {
     const fvMesh& mesh = D.mesh();
 
-    const leastSquaresStencil& stencil = mls.stencil();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -220,9 +219,11 @@ static label hofvmLaplacianPETSc
     // Face quadrature points weights, stencils and gradient interpolation
     // coefficients
     const CompactListList<scalar>& faceQuadWeights =
-        mls.quadrature().faceQuadWeights();
-    const CompactListList<label>& stencils = stencil.facesStencil();
-    const List<CompactListList<vector>>& gradCoeffs = mls.faceGradCoeffs();
+        reconstruction.quadrature().faceQuadWeights();
+    const CompactListList<label>& stencils =
+        reconstruction.faceGradStencil();
+    const List<CompactListList<vector>>& gradCoeffs =
+        reconstruction.faceGradCoeffs();
 
     // Get the blockSize
     label blockSize = -1;
@@ -515,7 +516,7 @@ label Foam::hofvm::initialiseJacobian
 (
     Mat& jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const label blockSize,
     const bool createMat
@@ -545,7 +546,8 @@ label Foam::hofvm::initialiseJacobian
         AssertPETSc(MatSetFromOptions(jac));
     }
 
-    const CompactListList<label>& stencils = mls.stencil().facesStencil();
+    const CompactListList<label>& stencils =
+        reconstruction.faceGradStencil();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     List<labelHashSet> rowCols(blockn);
@@ -707,7 +709,7 @@ void Foam::hofvm::laplacianIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -718,7 +720,7 @@ void Foam::hofvm::laplacianIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
         diffusivity,
         hofvm::laplacianCoeff,
@@ -732,7 +734,7 @@ void Foam::hofvm::laplacianTransposeIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -743,7 +745,7 @@ void Foam::hofvm::laplacianTransposeIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
         diffusivity,
         hofvm::laplacianTransposeCoeff,
@@ -757,7 +759,7 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -768,7 +770,7 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
         diffusivity,
         hofvm::laplacianTraceCoeff,

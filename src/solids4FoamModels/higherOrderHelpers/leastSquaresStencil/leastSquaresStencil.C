@@ -1309,7 +1309,7 @@ void leastSquaresStencil::clear() const
     remoteCellsPerProcPtr_.clear();
     remoteCentresPerProcPtr_.clear();
     procCellsPtr_.clear();
-    remoteCentresMapPtr_();
+    remoteCentresMapPtr_.clear();
     remoteCellLocationPtr_.clear();
 }
 

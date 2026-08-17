@@ -449,46 +449,37 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
     return hoDict.subDict("pressure");
 }
 
-#ifndef FOAMEXTEND
-void Foam::solidModel::makeDisplacementMLS() const
-{
-    if (!displacementMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
 
+#ifndef FOAMEXTEND
+const Foam::leastSquaresScheme&
+Foam::solidModel::displacementLeastSquares() const
+{
     // Note: the mask is taken from the primary solution field: for incremental
     // solid models this is DD, as it is that field which carries the boundary
     // conditions
-    displacementMLSPtr_.set
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
+
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(incremental() ? DD_ : D_),
-            displacementHighOrderCoeffs()
-        )
+        "displacement",
+        fixedValuePatchMask(incremental() ? DD_ : D_),
+        displacementHighOrderCoeffs()
     );
 }
 
 
-void Foam::solidModel::makePressureMLS() const
+const Foam::leastSquaresScheme&
+Foam::solidModel::pressureLeastSquares() const
 {
-    if (!pressureMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
 
-    pressureMLSPtr_.set
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(p()),
-            pressureHighOrderCoeffs()
-        )
+        "pressure",
+        fixedValuePatchMask(p()),
+        pressureHighOrderCoeffs()
     );
 }
 
@@ -502,7 +493,7 @@ void Foam::solidModel::makeSigmaQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -534,7 +525,7 @@ void Foam::solidModel::makeGradDQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -932,10 +923,6 @@ Foam::solidModel::solidModel
     ),
     thermalPtr_(),
     mechanicalPtr_(),
-#ifndef FOAMEXTEND
-    displacementMLSPtr_(),
-    pressureMLSPtr_(),
-#endif
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -1416,9 +1403,6 @@ Foam::solidModel::~solidModel()
     thermalPtr_.clear();
     mechanicalPtr_.clear();
 
-#ifndef FOAMEXTEND
-    clearMovingLeastSquaresData();
-#endif
 }
 
 
@@ -2008,13 +1992,12 @@ void Foam::solidModel::recalculateRho()
 }
 
 
-void Foam::solidModel::clearMovingLeastSquaresData()
+void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
 #ifndef FOAMEXTEND
-    displacementMLSPtr_.clear();
-    pressureMLSPtr_.clear();
+    leastSquaresReconstruction::New(mesh()).clear();
 #endif
 }
 

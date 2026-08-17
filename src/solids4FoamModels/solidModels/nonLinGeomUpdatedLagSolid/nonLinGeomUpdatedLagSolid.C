@@ -96,7 +96,7 @@ void nonLinGeomUpdatedLagSolid::makeQuadratureKinematics() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -219,7 +219,7 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -512,7 +512,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     {
 #ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
-        gradDD() = displacementMLS().grad(DD());
+        gradDD() = displacementLeastSquares().grad(DD());
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);
         relJ_ = det(relF_);
@@ -886,7 +886,7 @@ label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             DD(),
             blockSize_
         );
@@ -942,7 +942,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Update cell-centre displacement increment gradient
-        gradDD() = displacementMLS().grad(DD);
+        gradDD() = displacementLeastSquares().grad(DD);
 
         // Update displacement increment gradient at the face quadrature points
         mechanical().grad(DD, gradDQuad());
@@ -1255,13 +1255,14 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         tmp<volScalarField> tLambda = impK_ - 2.0*mu;
         const volScalarField& lambda = tLambda();
 
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction =
+            displacementLeastSquares();
 
         hofvm::laplacianIntoPETScMatrix
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             mu
         );
@@ -1270,7 +1271,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             mu
         );
@@ -1279,7 +1280,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             lambda
         );
@@ -1439,9 +1440,9 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #ifndef FOAMEXTEND
     if (highOrderResidual() || highOrderJacobian())
     {
-        // The moving least squares stencils, quadrature points and
-        // interpolation coefficients are all geometric, so they are
-        // re-calculated here on the moved mesh
+        // The least-squares stencils, quadrature points and reconstruction
+        // coefficients are all geometric, so they are re-calculated here on
+        // the moved mesh
         //
         // This is the first solid model with a moving mesh to use the
         // high-order approach, so it is the first to face the choice between:
@@ -1464,7 +1465,7 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
         //
         // Note: FQuadOldPtr_ and gradDTotalQuadPtr_ are deliberately not
         // cleared, as the quadrature points move with the material
-        clearMovingLeastSquaresData();
+        clearLeastSquaresData();
     }
 #endif
 
