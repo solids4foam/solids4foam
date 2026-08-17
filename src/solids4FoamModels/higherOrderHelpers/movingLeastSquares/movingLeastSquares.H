@@ -53,6 +53,7 @@ SourceFiles
 #ifndef movingLeastSquares_H
 #define movingLeastSquares_H
 
+#include "leastSquaresScheme.H"
 #include "fvMesh.H"
 #include "CompactListList.H"
 #include "globalIndex.H"
@@ -79,12 +80,11 @@ namespace Foam
 \*---------------------------------------------------------------------------*/
 
 class movingLeastSquares
+:
+    public leastSquaresScheme
 {
 private:
     // Private data
-
-        //- Const reference to the mesh
-        const fvMesh& mesh_;
 
         //- Cell and face stencil pointer
         mutable autoPtr<leastSquaresStencil> stencilPtr_;
@@ -239,9 +239,6 @@ private:
             const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& W
         ) const;
 
-        //- Return the cell and face stencil
-        const leastSquaresStencil& stencil() const;
-
         //- Return the cell centre interpolation coefficients
         const CompactListList<scalar>& cellInterpCoeffs() const;
 
@@ -253,9 +250,6 @@ private:
 
         //- Return the cell centre  third derivative coefficients
         const CompactListList<symmTensor3rdOrder>& cellThirdGradCoeffs() const;
-
-        //- Return the face quadrature points  gradient coefficients
-        const List<CompactListList<vector>>& faceGradCoeffs() const;
 
         //- For global index return field value. Index can refer either to local
         //  or remote field.
@@ -290,21 +284,14 @@ private:
             const dictionary& dict
         );
 
-    // Destructor
-
-        virtual ~movingLeastSquares();
+    //- Destructor
+    virtual ~movingLeastSquares();
 
 
     // Member Functions
 
-        //- Return reference to mesh
-        const fvMesh& mesh() const
-        {
-            return mesh_;
-        }
-
         //- Return polynomial order of the local reconstruction
-        label polynomialOrder() const
+        virtual label polynomialOrder() const
         {
             return polynomialOrder_;
         };
@@ -321,7 +308,7 @@ private:
         }
 
         //- Const access to the quadrature data
-        const fvMeshQuadrature& quadrature() const
+        virtual const fvMeshQuadrature& quadrature() const
         {
             if (quadraturePtr_.empty())
             {
@@ -331,20 +318,14 @@ private:
             return *quadraturePtr_;
         }
 
-        //- Read-only access to the MLS stencil data
-        const leastSquaresStencil& stencilData() const
-        {
-            return stencil();
-        }
+        //- Return the cell and face stencil
+        virtual const leastSquaresStencil& stencil() const;
 
-        //- Read-only access to face-gradient interpolation coefficients
-        const List<CompactListList<vector>>& faceGradCoeffsData() const
-        {
-            return faceGradCoeffs();
-        }
+        //- Return the face quadrature points gradient coefficients
+        virtual const List<CompactListList<vector>>& faceGradCoeffs() const;
 
         //- Clear owned MLS data and cached coefficient data
-        void clear() const;
+        virtual void clear() const;
 
     // Evaluation
 
@@ -364,6 +345,20 @@ private:
             CompactListList<typename outerProduct<vector, Type>::type>& result
         ) const;
 
+        //- Gradient of scalar field at face quadrature points
+        virtual void fGrad
+        (
+            const volScalarField& vf,
+            CompactListList<vector>& result
+        ) const;
+
+        //- Gradient of vector field at face quadrature points
+        virtual void fGrad
+        (
+            const volVectorField& vf,
+            CompactListList<tensor>& result
+        ) const;
+
         //- Get patch face quadrature values
         template<class Type>
         autoPtr<CompactListList<Type>> patchFaceQuadValues
@@ -372,8 +367,15 @@ private:
             const label patchI
         ) const;
 
+        //- Get patch face quadrature values for scalar field
+        virtual autoPtr<CompactListList<scalar>> patchFaceQuadValues
+        (
+            const volScalarField& vf,
+            const label patchI
+        ) const;
+
         //- Get patch face quadrature values for vector field
-        autoPtr<CompactListList<vector>> patchFaceQuadValues
+        virtual autoPtr<CompactListList<vector>> patchFaceQuadValues
         (
             const GeometricField<vector, fvPatchField, volMesh>& vf,
             const label patchI
@@ -390,13 +392,22 @@ private:
             const GeometricField<Type, fvPatchField, volMesh>& vf
         ) const;
 
+        //- Cell centre gradient of scalar field
+        virtual tmp<volVectorField> grad(const volScalarField& vf) const;
+
+        //- Cell centre gradient of vector field
+        virtual tmp<volTensorField> grad(const volVectorField& vf) const;
+
         //- Calculate the second grad at the cell centres for the given scalar
         //  field. For vector fields we apply this per component.
-        tmp<volSymmTensorField> secondGrad(const volScalarField& s) const;
+        virtual tmp<volSymmTensorField> secondGrad
+        (
+            const volScalarField& s
+        ) const;
 
         //- Calculate the third grad at the cell centres for the given scalar
         //  field. For vector fields we apply this per component.
-        autoPtr<List<symmTensor3rdOrder>>
+        virtual autoPtr<List<symmTensor3rdOrder>>
         thirdGrad(const volScalarField& s) const;
 };
 

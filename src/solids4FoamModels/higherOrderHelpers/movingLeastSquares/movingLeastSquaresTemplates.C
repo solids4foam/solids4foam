@@ -163,7 +163,7 @@ movingLeastSquares::fGrad
         new CompactListList<GradType>(quadrature().faceQuadPoints().sizes())
     );
 
-    faceGrad(vf, autoPtrRef(tResult));
+    this->fGrad(vf, autoPtrRef(tResult));
 
     return tResult;
 }

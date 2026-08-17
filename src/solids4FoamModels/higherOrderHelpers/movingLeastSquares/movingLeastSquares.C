@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "movingLeastSquares.H"
+#include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "compatibilityFunctions.H"
@@ -37,6 +38,12 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(movingLeastSquares, 0);
+addToRunTimeSelectionTable
+(
+    leastSquaresScheme,
+    movingLeastSquares,
+    dictionary
+);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
@@ -1066,7 +1073,7 @@ movingLeastSquares::movingLeastSquares
     const dictionary& dict
 )
 :
-    mesh_(mesh),
+    leastSquaresScheme(mesh),
     stencilPtr_(),
     quadraturePtr_(),
     weightFuncPtr_(),
@@ -1170,6 +1177,55 @@ void Foam::movingLeastSquares::clear() const
     faceGradCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
     faceConditionNumberPtr_.clear();
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volScalarField& vf,
+    CompactListList<vector>& result
+) const
+{
+    this->fGrad<scalar>(vf, result);
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volVectorField& vf,
+    CompactListList<tensor>& result
+) const
+{
+    this->fGrad<vector>(vf, result);
+}
+
+
+tmp<volVectorField> movingLeastSquares::grad
+(
+    const volScalarField& vf
+) const
+{
+    return this->grad<scalar>(vf);
+}
+
+
+tmp<volTensorField> movingLeastSquares::grad
+(
+    const volVectorField& vf
+) const
+{
+    return this->grad<vector>(vf);
+}
+
+
+autoPtr<CompactListList<scalar>>
+movingLeastSquares::patchFaceQuadValues
+(
+    const volScalarField& vf,
+    const label patchI
+) const
+{
+    return this->patchFaceQuadValues<scalar>(vf, patchI);
 }
 
 

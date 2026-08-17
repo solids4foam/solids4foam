@@ -205,7 +205,7 @@ static label hofvmLaplacianPETSc
 {
     const fvMesh& mesh = D.mesh();
 
-    const leastSquaresStencil& stencil = mls.stencilData();
+    const leastSquaresStencil& stencil = mls.stencil();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -222,7 +222,7 @@ static label hofvmLaplacianPETSc
     const CompactListList<scalar>& faceQuadWeights =
         mls.quadrature().faceQuadWeights();
     const CompactListList<label>& stencils = stencil.facesStencil();
-    const List<CompactListList<vector>>& gradCoeffs = mls.faceGradCoeffsData();
+    const List<CompactListList<vector>>& gradCoeffs = mls.faceGradCoeffs();
 
     // Get the blockSize
     label blockSize = -1;
@@ -545,7 +545,7 @@ label Foam::hofvm::initialiseJacobian
         AssertPETSc(MatSetFromOptions(jac));
     }
 
-    const CompactListList<label>& stencils = mls.stencilData().facesStencil();
+    const CompactListList<label>& stencils = mls.stencil().facesStencil();
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     List<labelHashSet> rowCols(blockn);
