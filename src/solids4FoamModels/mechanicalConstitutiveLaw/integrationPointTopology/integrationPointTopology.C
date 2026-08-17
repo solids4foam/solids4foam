@@ -40,6 +40,7 @@ Foam::integrationPointTopology::New
     const fvMesh& mesh
 )
 {
+#if (OPENFOAM >= 2112)
     auto* ctorPtr = fvMeshConstructorTable(topologyType);
 
     if (!ctorPtr)
@@ -51,6 +52,22 @@ Foam::integrationPointTopology::New
             << fvMeshConstructorTablePtr_->sortedToc()
             << exit(FatalError);
     }
+#else
+    fvMeshConstructorTable::iterator cstrIter =
+        fvMeshConstructorTablePtr_->find(topologyType);
+
+    if (cstrIter == fvMeshConstructorTablePtr_->end())
+    {
+        FatalErrorInFunction
+            << "Unknown integrationPointTopology type: "
+            << topologyType << nl << nl
+            << "Valid integrationPointTopology types are:" << nl
+            << fvMeshConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    auto* ctorPtr = cstrIter();
+#endif
 
     return autoPtr<integrationPointTopology>(ctorPtr(mesh));
 }

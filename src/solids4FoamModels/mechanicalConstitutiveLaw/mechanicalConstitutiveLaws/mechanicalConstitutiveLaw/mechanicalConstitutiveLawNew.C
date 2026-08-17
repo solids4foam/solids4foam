@@ -37,6 +37,7 @@ mechanicalConstitutiveLaw::New(const dictionary& dict)
     Info<< "Selecting mechanical constitutive law: "
         << lawType << endl;
 
+#if (OPENFOAM >= 2112)
     auto* ctorPtr =
         mechanicalConstitutiveLawConstructorTable(lawType);
 
@@ -49,6 +50,22 @@ mechanicalConstitutiveLaw::New(const dictionary& dict)
             << mechanicalConstitutiveLawConstructorTablePtr_->sortedToc()
             << exit(FatalError);
     }
+#else
+    mechanicalConstitutiveLawConstructorTable::iterator cstrIter =
+        mechanicalConstitutiveLawConstructorTablePtr_->find(lawType);
+
+    if (cstrIter == mechanicalConstitutiveLawConstructorTablePtr_->end())
+    {
+        FatalErrorInFunction
+            << "Unknown mechanicalConstitutiveLaw type "
+            << lawType << nl << nl
+            << "Valid mechanicalConstitutiveLaw types are:" << nl
+            << mechanicalConstitutiveLawConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    auto* ctorPtr = cstrIter();
+#endif
 
     return autoPtr<mechanicalConstitutiveLaw>(ctorPtr(dict));
 }

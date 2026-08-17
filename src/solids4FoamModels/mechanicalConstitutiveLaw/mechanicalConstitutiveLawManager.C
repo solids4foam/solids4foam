@@ -96,14 +96,14 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     //  - integration-point counts encoded in sub-list sizes
 
     // Build cell → IP addressing
-    CompactListList<label> cellToIP(layout.size(), layout.m().size());
+    CompactListList<label> cellToIP(layout.sizes());
 
     for (label cellI = 0; cellI < layout.size(); ++cellI)
     {
-        const label n = layout.localSize(cellI);
+        const label n = layout[cellI].size();
         for (label j = 0; j < n; ++j)
         {
-            cellToIP(cellI, j) = layout.toGlobal(cellI, j);
+            cellToIP(cellI, j) = layout.index(cellI, j);
         }
     }
 
@@ -1436,9 +1436,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     updateOldTimeIfNeeded();
 
     // Access packed integration-point storage
-    const List<tensor>& gradDVals  = gradD.values();
-    const List<tensor>& gradD0Vals = gradD0.values();
-    List<symmTensor>& stressVals   = stress.values();
+    const List<tensor>& gradDVals  = gradD.m();
+    const List<tensor>& gradD0Vals = gradD0.m();
+    List<symmTensor>& stressVals   = stress.m();
 
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
@@ -1747,13 +1747,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     topologyEntry& tp = topology(topo);
 
     // Access packed integration-point storage
-    const List<tensor>& FVals = F.values();
-    const List<tensor>& F0Vals = F0.values();
-    const List<tensor>& FinvVals = Finv.values();
-    const List<tensor>& Finv0Vals = Finv0.values();
-    const List<scalar>& JVals = J.values();
-    const List<scalar>& J0Vals = J0.values();
-    List<symmTensor>& stressVals = stress.values();
+    const List<tensor>& FVals = F.m();
+    const List<tensor>& F0Vals = F0.m();
+    const List<tensor>& FinvVals = Finv.m();
+    const List<tensor>& Finv0Vals = Finv0.m();
+    const List<scalar>& JVals = J.m();
+    const List<scalar>& J0Vals = J0.m();
+    List<symmTensor>& stressVals = stress.m();
 
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
