@@ -39,7 +39,7 @@ boundaryField
 
         // Robin-Neumann condition approach
         type        elasticWallPressure;
-        constantHs  3e-4;
+        constantHs  5e-4;
         value       uniform 0;
     }
 }

@@ -16,110 +16,31 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// If using the Dirichlet-Neumann formulation (i.e. pimpleFluid + zeroGradient
-// BCs for the wall FSI interface), convergence is generally better with
-// IQN-ILS. The Aitken accelerator can also be used, but its parameters may
-// require tuning.
-//
-// If the Robin-Neumann formulation is employed (i.e. pimpleFluid + Robin BCs
-// for the wall FSI interface), the Aitken parameters in this template lead to
-// convergence at all time steps.
-
-// Optimised fixed-relaxation coupling; retain the aneurysm interface patches.
 fluidSolidInterface    fixedRelaxation;
 
 fixedRelaxationCoeffs
 {
+    // Solid interface patch
     solidPatch             innerWall;
+
+    // Fluid interface patch
     fluidPatch             wall;
+
+    // Interface relaxation factor
+    // Note: it is often fine to keep this at 1.0 when using the Robin condition
+    // for 0/fluid/p, where the Robin acceleration can be controlled via the
+    // `constantHs` parameter there
     relaxationFactor       1.0;
+
+    // FSI outer loop tolerance
     outerCorrTolerance     5e-5;
+
+    // Maximum FSI correctors per time step
+    nOuterCorr             30;
+
+    // Write FSI residuals to file
     writeResidualsToFile   yes;
 }
 
-AitkenCoeffs
-{
-    // Solid interface patch
-    solidPatch          innerWall;
-
-    // Fluid interface patch
-    fluidPatch          wall;
-
-    // Initial relaxation factor
-    relaxationFactor    0.5;
-
-    // FSI loop tolerance
-    outerCorrTolerance  5e-5;
-
-    // Max number of FSI correctors per time-step
-    nOuterCorr          30;
-
-    // Frequency of time-step at which the fluid-solid interface interpolation
-    // weights are updated
-    interpolatorUpdateFrequency 0;
-
-    // Move the entire fluid mesh when the interface moves further than this
-    // limit
-    interfaceDeformationLimit   0;
-
-    // Coupled from the start
-    coupled yes;
-}
-
-IQNILSCoeffs
-{
-    // Solid interface patch list
-    solidPatch         innerWall;
-
-    // Fluid interface patch list
-    fluidPatch         wall;
-
-    // Under-relaxation factor for passing the solid interface
-    // displacement/velocity to the fluid interface
-    // For fixedRelaxation, this value is used for all iterations
-    // For Aitken, this value is used for the first iteration each time-step,
-    // then it adaptively changes
-    // For IQNILS, this value is used for the first two iterations each
-    // time-step, then the IQNILS procedure is used
-    relaxationFactor   0.8;
-
-    // Tolerance for the FSI loop within each time-step
-    outerCorrTolerance 5e-5;
-
-    // Maximum number of outer FSI loop correctors within each time-step
-    nOuterCorr         30;
-
-    // Enable/disable coupling from the start
-    coupled             yes;
-
-    // Optional: if coupled is set to "no", couplingStartTime enables coupling
-    // at a specified time.
-    // Defaults to 0.0
-    // couplingStartTime    0.1;
-
-    // Optional (only for IQNILS): re-use modes from previous time-steps.
-    // The number of modes to be re-used is specified
-    // Defaults to 0 modes
-    couplingReuse       0;
-
-    // Optional: if any point on the fluid interface moves greater than the
-    // interfaceDeformationLimit then the entire fluid mesh is updated; if not
-    // then only the interface points are moved and the remaining fluid mesh is
-    // not. Note that interfaceDeformationLimit is a relative motion: the point
-    // displacement is normalised by the local cell size (delta coefficients
-    // are used).
-    // Defaults to 0.0 i.e. the fluid mesh is always updated
-    interfaceDeformationLimit 0;
-
-    // Frequency of time-step at which the fluid-solid interface interpolation
-    // weights are updated
-    // 0 means there will be no interpolator update during simulation, whereas
-    // 10 means the interpolator will be updated every 10 time-steps
-    // Defaults to 0
-    interpolatorUpdateFrequency 0;
-
-    // Write fsi residuals to file
-    writeResidualsToFile yes;
-}
 
 // ************************************************************************* //
