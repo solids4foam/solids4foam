@@ -15,6 +15,9 @@ source solids4FoamScripts.sh
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
 
+# The mesh-generation workflow is not supported on foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
 if ! command -v cartesianMesh &> /dev/null
 then
     echo
