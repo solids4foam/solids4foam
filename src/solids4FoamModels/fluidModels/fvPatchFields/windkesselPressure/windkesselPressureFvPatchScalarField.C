@@ -190,6 +190,17 @@ void Foam::windkesselPressureFvPatchScalarField::write(Ostream& os) const
 {
     fixedValueFvPatchScalarField::write(os);
 
+#ifdef OPENFOAM_COM
+    os.writeEntry("Qo", Qo_);
+    os.writeEntry("Qoo", Qoo_);
+    os.writeEntry("po", po_);
+    os.writeEntry("poo", poo_);
+
+    os.writeEntryIfDifferent<scalar>("R", 1, R_);
+    os.writeEntryIfDifferent<scalar>("Rch", 1, Rch_);
+    os.writeEntryIfDifferent<scalar>("C", 1, C_);
+    os.writeEntryIfDifferent<scalar>("rho", 1, rho_);
+#else
     writeEntry(os, "Qo", Qo_);
     writeEntry(os, "Qoo", Qoo_);
     writeEntry(os, "po", po_);
@@ -201,6 +212,7 @@ void Foam::windkesselPressureFvPatchScalarField::write(Ostream& os) const
     writeEntryIfDifferent<scalar>(os, "rho",  1, rho_);
 
     writeEntry(os, "value", *this);
+#endif
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
