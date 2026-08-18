@@ -163,6 +163,7 @@ $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/thermalRobin/thermalRobinFvPatchScalarField.C
 $(fluidFvPatchFields)/flowRateOutletPressure/flowRateOutletPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/windkesselPressure/windkesselPressureFvPatchScalarField.C
 
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
