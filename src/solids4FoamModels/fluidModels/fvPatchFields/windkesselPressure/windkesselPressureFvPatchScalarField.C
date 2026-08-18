@@ -47,7 +47,6 @@ windkesselPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAM_ORG
 Foam::windkesselPressureFvPatchScalarField::
 windkesselPressureFvPatchScalarField
 (
@@ -94,6 +93,7 @@ windkesselPressureFvPatchScalarField
 {}
 
 
+#ifndef OPENFOAM_ORG
 Foam::windkesselPressureFvPatchScalarField::
 windkesselPressureFvPatchScalarField
 (
