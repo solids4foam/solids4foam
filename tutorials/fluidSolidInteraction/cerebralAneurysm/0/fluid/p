@@ -22,10 +22,23 @@ internalField   uniform 0;
 
 boundaryField
 {
-    "outlet[1-4]"
+    "outlet[1-2]"
     {
-        type        fixedValue;
-        value       uniform 0;
+        type            windkesselPressure;
+        R               1.90e8;     // = Rp (Pa·s/m^3)
+        Rch             5.6e7;     // = Rd (Pa·s/m^3)
+        C               1.75e-14;   // (m^3/Pa)
+        rho             1050;       // kg/m^3
+        value           uniform 0;   
+    }
+    "outlet[3-4]"
+    {
+        type            windkesselPressure;
+        R               1.35e8;     // = Rp (Pa·s/m^3)
+        Rch             7.3e7;     // = Rd (Pa·s/m^3)
+        C               1.22e-14;   // (m^3/Pa)
+        rho             1050;       // kg/m^3
+        value           uniform 0;   
     }
     "inlet[1-2]"
     {
