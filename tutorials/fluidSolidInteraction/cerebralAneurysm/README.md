@@ -59,13 +59,19 @@ dictionaries under `system/fluid` and `system/solid`. After extrusion,
 - **Fluid:** incompressible Newtonian flow using `pimpleFluid`.
 - **Solid:** total-displacement linear-geometry formulation with a
   linear-elastic material, solved with PETSc SNES using a Jacobian-free
-  Newton-Krylov (JFNK) approach [3].
+  Newton-Krylov (JFNK) approach [3]. HYPRE BoomerAMG preconditions the
+  linear solves.
 - **Coupling:** partitioned fluid-solid interaction using fixed relaxation and
   a Robin pressure boundary condition. This added-mass procedure improves the
   stability of the partitioned coupling for the strongly coupled blood-wall
-  system [2].
+  system [2]. The case uses `constantHs 5e-4` and permits up to 30 FSI
+  correctors per time step.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
+
+The fixed time step is $$5\times10^{-5}\,\mathrm{s}$$. This setting completed
+the initial $$2\,\mathrm{ms}$$ transient with a maximum Courant number of 1.55
+and an average of 5.17 FSI correctors per time step on the tested hardware.
 
 The `endTime` in `system/controlDict` is currently `1`, which corresponds to
 one cardiac cycle. To simulate additional cycles, increase `endTime`; for
@@ -102,8 +108,10 @@ From the tutorial directory, run
 ./Allrun parallel
 ```
 
-The case is configured for eight subdomains and takes approximately 1–2 hours
-to complete on 8 cores. Omit `parallel` to run in serial.
+The case is configured for 16 subdomains. A short $$2\,\mathrm{ms}$$ benchmark
+completed in 48.5 s on 16 cores, compared with 61.3 s on 8 cores; performance
+will vary by hardware and during the cardiac cycle. Omit `parallel` to run in
+serial.
 
 The `Allrun` workflow is
 
