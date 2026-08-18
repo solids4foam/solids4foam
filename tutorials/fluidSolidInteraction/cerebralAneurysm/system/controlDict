@@ -15,7 +15,6 @@ FoamFile
     object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-libs            ();
 
 application     solids4Foam;
 
@@ -45,10 +44,9 @@ timeFormat      general;
 
 timePrecision   6;
 
-runTimeModifiable yes;
+runTimeModifiable no;
 
 adjustTimeStep  no;
-fileHandler     uncollated;
 
 functions
 {
@@ -65,6 +63,7 @@ functions
         region          solid;
         historyPatch    innerWall;
     }
+
     forces
     {
         type                forces;
@@ -80,6 +79,7 @@ functions
         CofR                (0.5 0.1 0);
         region              fluid;
     }
+
     fsiConvData
     {
         type            fsiConvergenceData;
