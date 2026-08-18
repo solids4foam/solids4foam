@@ -17,13 +17,13 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // If using the Dirichlet-Neumann formulation (i.e. pimpleFluid + zeroGradient
-// BCs for the wall FSI interface), the convergence is better with IQN-ILS.
-// The Aitken accelerator can also be used in this case, but a tunning of the
-// parameters may be required
+// BCs for the wall FSI interface), convergence is generally better with
+// IQN-ILS. The Aitken accelerator can also be used, but its parameters may
+// require tuning.
 //
 // If the Robin-Neumann formulation is employed (i.e. pimpleFluid + Robin BCs
-// for the wall FSI interface), then the Aitken parameters in this template
-// lead to convergence in all time-steps
+// for the wall FSI interface), the Aitken parameters in this template lead to
+// convergence at all time steps.
 
 // Optimised fixed-relaxation coupling; retain the aneurysm interface patches.
 fluidSolidInterface    fixedRelaxation;
@@ -92,8 +92,8 @@ IQNILSCoeffs
     // Enable/disable coupling from the start
     coupled             yes;
 
-    // Optional: if coupled is set to "no", then the couplingStartTime also you
-    // to enable coupling at specified time
+    // Optional: if coupled is set to "no", couplingStartTime enables coupling
+    // at a specified time.
     // Defaults to 0.0
     // couplingStartTime    0.1;
 
@@ -105,9 +105,9 @@ IQNILSCoeffs
     // Optional: if any point on the fluid interface moves greater than the
     // interfaceDeformationLimit then the entire fluid mesh is updated; if not
     // then only the interface points are moved and the remaining fluid mesh is
-    // not. Note than interfaceDeformationLimit is a relative motion: it is the
-    // point displacement normalised with respect to the local cell size (delta
-    // coeffs are used)
+    // not. Note that interfaceDeformationLimit is a relative motion: the point
+    // displacement is normalised by the local cell size (delta coefficients
+    // are used).
     // Defaults to 0.0 i.e. the fluid mesh is always updated
     interfaceDeformationLimit 0;
 

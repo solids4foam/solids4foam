@@ -19,13 +19,12 @@ libs            ();
 
 application     solids4Foam;
 
-startFrom      startTime;//latestTime; // startTime;
+startFrom       startTime;
 
 startTime       0;
 
 stopAt          endTime;
 
-// Four repetitions of the available 0.86 s placeholder PV waveform.
 endTime         1;
 
 deltaT          1e-4;
@@ -55,16 +54,16 @@ functions
 {
 
     patchDisplacements
-     {
-         type            solidDisplacements;
-         historyPatch    innerWall;
-     }
+    {
+        type            solidDisplacements;
+        historyPatch    innerWall;
+    }
 
     solidForce
     {
-        type           solidForces;
-        region         solid;
-        historyPatch   innerWall;
+        type            solidForces;
+        region          solid;
+        historyPatch    innerWall;
     }
     forces
     {
@@ -83,81 +82,69 @@ functions
     }
     fsiConvData
     {
-        type fsiConvergenceData;
-        region fluid;
+        type            fsiConvergenceData;
+        region          fluid;
     }
 
-courantNo
-{
-    type            CourantNo;
-    libs            (fieldFunctionObjects);
-    region          fluid;
+    courantNo
+    {
+        type            CourantNo;
+        libs            (fieldFunctionObjects);
+        region          fluid;
 
-    executeControl  timeStep;
-    executeInterval 1;
+        executeControl  timeStep;
+        executeInterval 1;
 
-    writeControl    none;
-    writeInterval   1;
-}
+        writeControl    none;
+        writeInterval   1;
+    }
 
-courantNumberHistory
-{
-    type            fieldMinMax;
-    libs            (fieldFunctionObjects);
-    region          fluid;
+    courantNumberHistory
+    {
+        type            fieldMinMax;
+        libs            (fieldFunctionObjects);
+        region          fluid;
 
-    fields          (Co);
-    mode            magnitude;
-    location        false;
+        fields          (Co);
+        mode            magnitude;
+        location        false;
 
-    executeControl  timeStep;
-    executeInterval 1;
+        executeControl  timeStep;
+        executeInterval 1;
 
-    writeControl    timeStep;
-    writeInterval   1;
-}
+        writeControl    timeStep;
+        writeInterval   1;
+    }
 
-   fluidSolverIterations
-{
-    type            solverInfo;
-    libs            (utilityFunctionObjects);
-    region          fluid;
+    fluidSolverIterations
+    {
+        type                solverInfo;
+        libs                (utilityFunctionObjects);
+        region              fluid;
 
-    fields          (U p);
-    writeResidualFields false;
+        fields              (U p);
+        writeResidualFields false;
 
-    executeControl  timeStep;
-    executeInterval 1;
+        executeControl      timeStep;
+        executeInterval     1;
 
-    writeControl    timeStep;
-    writeInterval   1;
-}
+        writeControl        timeStep;
+        writeInterval       1;
+    }
 
     wallShearStress1
     {
-        // Mandatory entries
         type            wallShearStress;
-        region fluid;
+        region          fluid;
         libs            (fieldFunctionObjects);
 
-        // Optional entries
         patches         (wall);
         writeFields     yes;
 
-        // Optional (inherited) entries
         writePrecision  10;
-        // writeControl    writeTime;
-        // writeInterval   -1;
         writeControl    runTime;
         writeInterval   0.01;
-
     }
-
-}
-
-DebugSwitches
-{
-    elasticWallPressure  1;
 }
 
 DebugSwitches

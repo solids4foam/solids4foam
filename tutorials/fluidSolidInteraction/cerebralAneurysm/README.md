@@ -58,10 +58,20 @@ dictionaries under `system/fluid` and `system/solid`. After extrusion,
 
 - **Fluid:** incompressible Newtonian flow using `pimpleFluid`.
 - **Solid:** total-displacement linear-geometry formulation with a
-  linear-elastic material.
-- **Coupling:** partitioned fluid-solid interaction using fixed relaxation.
+  linear-elastic material, solved with PETSc SNES using a Jacobian-free
+  Newton-Krylov (JFNK) approach [3].
+- **Coupling:** partitioned fluid-solid interaction using fixed relaxation and
+  a Robin pressure boundary condition. This added-mass procedure improves the
+  stability of the partitioned coupling for the strongly coupled blood-wall
+  system [2].
 - **Interface:** `Wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
+
+The `endTime` in `system/controlDict` is currently `1`, which corresponds to
+one cardiac cycle. To simulate additional cycles, increase `endTime`; for
+example, `endTime 4;` runs four cycles. The inlet-flow-rate table in
+`0/fluid/U` uses `outOfBounds repeat;`, so the waveform repeats for each
+additional cycle.
 
 ## Expected Results
 
@@ -83,16 +93,17 @@ below show representative fields from the simulation.
 
 **Figure 4: Wall shear stress distribution on the vascular wall.**
 
-These results are for illustrative purpose only.
-
 ## Running the Case
 
 From the tutorial directory, run
 
 ```bash
 ./Allclean
-./Allrun
+./Allrun parallel
 ```
+
+The case is configured for eight subdomains and takes approximately 1–2 hours
+to complete on 8 cores. Omit `parallel` to run in serial.
 
 The `Allrun` workflow is
 
@@ -102,6 +113,16 @@ cartesianMesh -> extrudeMesh -> createPatch -> checkMesh -> solids4Foam
 
 ## References
 
-1. [Vascular Model Repository](https://vascularmodel.com/dataset.html), model
-   `0199_H_CERE_CA`.
-2. [solids4foam tutorial documentation](https://www.solids4foam.com/tutorials/).
+1. N. M. Wilson, A. K. Ortiz, and A. B. Johnson, "The Vascular Model
+   Repository: A Public Resource of Medical Imaging Data and Blood Flow
+   Simulation Results," *Journal of Medical Devices*, 7(4), 040923 (2013).
+   <https://doi.org/10.1115/1.4025983>. Model `0199_H_CERE_CA`,
+   [Vascular Model Repository](https://vascularmodel.com/dataset.html).
+2. Ž. Tuković, M. Bukač, P. Cardiff, H. Jasak, and A. Ivanković (2019).
+   "Added Mass Partitioned Fluid–Structure Interaction Solver Based on a
+   Robin Boundary Condition for Pressure." In: J. Nóbrega and H. Jasak (eds),
+   *OpenFOAM®*. Springer, Cham. <https://doi.org/10.1007/978-3-319-60846-4_1>.
+3. P. Cardiff, D. Armfield, Ž. Tuković, and I. Batistić, "A Jacobian-Free
+   Newton-Krylov Method for Cell-Centred Finite Volume Solid Mechanics,"
+   *International Journal for Numerical Methods in Engineering*, 127(3),
+   e70268 (2026). <https://doi.org/10.1002/nme.70268>.
