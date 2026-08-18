@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -22,18 +22,14 @@ internalField   uniform 0;
 
 boundaryField
 {
-  processor
+    "Outlet[1-4]"
     {
-      type processor;
-    }
-     "Outlet[1-4]"
-    {
-      type fixedValue;
-      value uniform 0;
+        type fixedValue;
+        value uniform 0;
     }
     "Inlet[1-2]"
     {
-      type zeroGradient;
+        type zeroGradient;
     }
     "Wall"
     {

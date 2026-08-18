@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -58,15 +58,14 @@ solvers
 
     "U|UFinal"
     {
-      solver           smoothSolver;//PBiCG;
-      smoother         symGaussSeidel;
-      //preconditioner   DILU;
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
         tolerance       1e-06;
         relTol          0.001;
         minIter         1;
     }
 
-        "(kt|omega|kl)"
+    "(kt|omega|kl)"
     {
         solver          smoothSolver;
         smoother        symGaussSeidel;
@@ -74,29 +73,29 @@ solvers
         relTol          0.1;
     }
 
-              omegaFinal
-      {
+    omegaFinal
+    {
         solver          smoothSolver;
         smoother        symGaussSeidel;
-	tolerance       1e-04;
-          relTol          0;
-      }
+        tolerance       1e-04;
+        relTol          0;
+    }
 
-	  klFinal
-	  {
+    klFinal
+    {
         solver          smoothSolver;
         smoother        symGaussSeidel;
-	tolerance       1e-04;
-          relTol          0;
-      }
+        tolerance       1e-04;
+        relTol          0;
+    }
 
-     ktFinal
-     {
+    ktFinal
+    {
         solver          smoothSolver;
         smoother        symGaussSeidel;
-	tolerance       1e-04;
-          relTol          0;
-      }
+        tolerance       1e-04;
+        relTol          0;
+    }
 
     // In sonicLiquidFluid, the continuity equation is solved explicitly and
     // corrected in each time-step, so the choice of solver here is actually

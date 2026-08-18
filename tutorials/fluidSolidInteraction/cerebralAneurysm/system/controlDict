@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -63,7 +63,7 @@ functions
     solidForce
     {
         type           solidForces;
-	    region         solid;
+        region         solid;
         historyPatch   innerWall;
     }
     forces
@@ -133,12 +133,11 @@ courantNumberHistory
     writeInterval   1;
 }
 
-
     wallShearStress1
     {
         // Mandatory entries
         type            wallShearStress;
-	region fluid;
+        region fluid;
         libs            (fieldFunctionObjects);
 
         // Optional entries
@@ -147,10 +146,10 @@ courantNumberHistory
 
         // Optional (inherited) entries
         writePrecision  10;
-	// writeControl    writeTime;
+        // writeControl    writeTime;
         // writeInterval   -1;
-	writeControl    runTime;
-	writeInterval   0.01;
+        writeControl    runTime;
+        writeInterval   0.01;
 
     }
 

@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -28,12 +28,11 @@ transportModel  Newtonian;
 
 BirdCarreauCoeffs
 {
-  nu0   0.000151;
-  nuInf 3.3e-6;
-  k     8.2;
-  n     0.2128;
-  a     0.64;
+    nu0   0.000151;
+    nuInf 3.3e-6;
+    k     8.2;
+    n     0.2128;
+    a     0.64;
 }
-
 
 // ************************************************************************* //

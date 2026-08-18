@@ -12,6 +12,14 @@ cd "$caseDir"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
 # Allrun only builds and runs.  Cleanup is deliberately handled by Allclean.
 for generatedMesh in \
     constant/polyMesh \
@@ -31,9 +39,9 @@ runApplication -o cartesianMesh
 mkdir -p constant/fluid
 mv constant/polyMesh constant/fluid/polyMesh
 
-# Stage a disposable copy for the standard extrudeMesh utility.  Its
+# Stage a disposable copy for the standard extrudeMesh utility. Its
 # exposedPatchName must already exist, so add an empty innerWall patch only to
-# this staging mesh.  The actual fluid-region mesh remains unchanged.
+# this staging mesh. The actual fluid-region mesh remains unchanged.
 cp -R constant/fluid/polyMesh constant/polyMesh
 
 boundaryFile=constant/polyMesh/boundary
