@@ -142,6 +142,9 @@ public:
         windkesselPressureFvPatchScalarField
         (
             const windkesselPressureFvPatchScalarField&
+#ifdef OPENFOAM_ORG
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -152,6 +155,7 @@ public:
                 new windkesselPressureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         windkesselPressureFvPatchScalarField

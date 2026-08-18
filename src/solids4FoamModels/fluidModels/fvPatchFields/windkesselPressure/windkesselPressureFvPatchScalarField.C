@@ -47,6 +47,7 @@ windkesselPressureFvPatchScalarField
 {}
 
 
+#ifndef OPENFOAM_ORG
 Foam::windkesselPressureFvPatchScalarField::
 windkesselPressureFvPatchScalarField
 (
@@ -110,6 +111,7 @@ windkesselPressureFvPatchScalarField
     rho_(wkpsf.rho_),
     timeIndex_(wkpsf.timeIndex_)
 {}
+#endif
 
 
 Foam::windkesselPressureFvPatchScalarField::
