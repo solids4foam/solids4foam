@@ -23,7 +23,7 @@ sourceCase ".";
 // Patch to extrude
 sourcePatches
 (
-    Wall
+    wall
 );
 
 // Name of the original/exposed side

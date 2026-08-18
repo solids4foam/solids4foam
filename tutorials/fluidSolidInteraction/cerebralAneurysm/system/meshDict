@@ -32,44 +32,44 @@ localRefinement
 
 renameBoundary
 {
-    defaultName Wall;
+    defaultName wall;
     defaultType wall;
 
     newPatchNames
     {
         Wall
         {
-            newName Wall;
+            newName wall;
             type wall;
         }
         Out1
         {
-            newName Outlet1;
+            newName outlet1;
             type patch;
         }
         In1
         {
-            newName Inlet1;
+            newName inlet1;
             type patch;
         }
         In2
         {
-            newName Inlet2;
+            newName inlet2;
             type patch;
         }
         Out2
         {
-            newName Outlet2;
+            newName outlet2;
             type patch;
         }
         Out3
         {
-            newName Outlet3;
+            newName outlet3;
             type patch;
         }
         Out4
         {
-            newName Outlet4;
+            newName outlet4;
             type patch;
         }
     }

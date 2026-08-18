@@ -22,17 +22,17 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    "Outlet[1-4]"
+    "outlet[1-4]"
     {
         type        fixedValue;
         value       uniform (0 0 0);
     }
-    "Inlet[1-2]"
+    "inlet[1-2]"
     {
         type        fixedValue;
         value       uniform (0 0 0);
     }
-    "Wall"
+    "wall"
     {
         type        fixedValue;
         value       uniform (0 0 0);

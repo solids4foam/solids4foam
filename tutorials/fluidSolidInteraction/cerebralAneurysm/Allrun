@@ -110,7 +110,7 @@ mv "$boundaryTmp" "$boundaryFile"
 
 runApplication -o extrudeMesh
 
-# Standard extrudeMesh retains Wall for the exposed outer face.  Rename it to
+# Standard extrudeMesh retains wall for the exposed outer face. Rename it to
 # the solid boundary-condition name and install the result as the solid region.
 runApplication -o createPatch -dict system/createPatchDict.solid -overwrite
 mkdir -p constant/solid

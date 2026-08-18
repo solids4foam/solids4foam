@@ -31,7 +31,7 @@ fluidSolidInterface    fixedRelaxation;
 fixedRelaxationCoeffs
 {
     solidPatch             innerWall;
-    fluidPatch             Wall;
+    fluidPatch             wall;
     relaxationFactor       1.0;
     outerCorrTolerance     5e-5;
     writeResidualsToFile   yes;
@@ -43,7 +43,7 @@ AitkenCoeffs
     solidPatch          innerWall;
 
     // Fluid interface patch
-    fluidPatch          Wall;
+    fluidPatch          wall;
 
     // Initial relaxation factor
     relaxationFactor    0.5;
@@ -72,7 +72,7 @@ IQNILSCoeffs
     solidPatch         innerWall;
 
     // Fluid interface patch list
-    fluidPatch         Wall;
+    fluidPatch         wall;
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface

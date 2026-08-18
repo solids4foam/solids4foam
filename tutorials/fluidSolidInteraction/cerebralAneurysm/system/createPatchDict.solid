@@ -25,7 +25,7 @@ patches
             type wall;
         }
         constructFrom patches;
-        patches (Wall);
+        patches (wall);
     }
 );
 
