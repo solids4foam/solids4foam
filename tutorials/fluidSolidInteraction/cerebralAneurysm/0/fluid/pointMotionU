@@ -24,18 +24,18 @@ boundaryField
 {
     "Outlet[1-4]"
     {
-        type         fixedValue;
-        value        uniform (0 0 0);
+        type        fixedValue;
+        value       uniform (0 0 0);
     }
-     "Inlet[1-2]"
+    "Inlet[1-2]"
     {
-        type         fixedValue;
-        value        uniform (0 0 0);
+        type        fixedValue;
+        value       uniform (0 0 0);
     }
     "Wall"
     {
-        type         fixedValue;
-        value        uniform (0 0 0);
+        type        fixedValue;
+        value       uniform (0 0 0);
     }
 }
 

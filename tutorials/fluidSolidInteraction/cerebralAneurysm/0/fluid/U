@@ -24,9 +24,9 @@ boundaryField
 {
     "Outlet[1-4]"
     {
-        type inletOutlet;
-        value uniform (0 0 0);
-        inletValue uniform (0 0 0);
+        type        inletOutlet;
+        value       uniform (0 0 0);
+        inletValue  uniform (0 0 0);
     }
 
     "Inlet[1-2]"
@@ -136,8 +136,8 @@ boundaryField
             (0.99    2.978000e-06)
             (1       2.957000e-06)
         );
-        outOfBounds repeat;
-        value uniform (0 0 0);
+        outOfBounds         repeat;
+        value               uniform (0 0 0);
 
     }
     "Wall"
@@ -147,8 +147,8 @@ boundaryField
         // value        uniform (0 0 0);
 
         // Robin-Neumann condition approach
-        type         elasticWallVelocity;
-        value        uniform (0 0 0);
+        type        elasticWallVelocity;
+        value       uniform (0 0 0);
     }
 }
 

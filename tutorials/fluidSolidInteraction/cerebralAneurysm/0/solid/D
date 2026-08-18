@@ -22,12 +22,12 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-     "Inlet[1-2]"
+    "Inlet[1-2]"
     {
         type            fixedDisplacement;
         value           uniform (0 0 0);
     }
-     "Outlet[1-4]"
+    "Outlet[1-4]"
     {
         type            fixedDisplacement;
         value           uniform (0 0 0);
