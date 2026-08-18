@@ -12,6 +12,9 @@ cd "$caseDir"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
 if ! command -v cartesianMesh &> /dev/null
 then
     echo
