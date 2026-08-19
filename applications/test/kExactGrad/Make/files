@@ -1,0 +1,3 @@
+Test-kExactGrad.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-kExactGrad
