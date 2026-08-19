@@ -21,7 +21,11 @@ FORCE_MEAN_TOL=0.150    # mean force tolerance
 FORCE_AVG_SAMPLES=40
 
 # Reference values
-REF_MAX_DISP=-0.21
+# Reference values updated for the interface-normal correction (PR #375): the
+# fluid pressure is now applied using the deformed interface normals rather than
+# the initial-configuration ones, which shifts every FSI result. See
+# https://github.com/solids4foam/solids4foam/pull/375
+REF_MAX_DISP=-0.2024
 REF_MEAN_FORCE=-5.150
 
 # Log files
