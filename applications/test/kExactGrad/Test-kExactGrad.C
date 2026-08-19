@@ -51,6 +51,10 @@ Description
     quadrature weights sum to `mesh.V()`.
     Run `Test-cellMoments` on the same mesh to check both conditions.
 
+    In parallel, the utility also verifies that cell and internal-face
+    reconstruction stencils use off-processor cell values. Scalar and vector
+    gradients are also checked directly at processor-face quadrature points.
+
 Author
     Ivan Batistic, UCD.
     Philip Cardiff, UCD.
@@ -60,6 +64,7 @@ Author
 #include "fvCFD.H"
 #include "fvMeshQuadrature.H"
 #include "leastSquaresReconstruction.H"
+#include "processorPolyPatch.H"
 
 using namespace Foam;
 
@@ -163,13 +168,103 @@ struct polynomialErrors
 {
     scalar grad;
     scalar fGrad;
+    scalar processorFGrad;
+    scalar processorVectorFGrad;
 
     polynomialErrors()
     :
         grad(0.0),
-        fGrad(0.0)
+        fGrad(0.0),
+        processorFGrad(0.0),
+        processorVectorFGrad(0.0)
     {}
 };
+
+
+struct processorBoundaryCoverage
+{
+    label remoteValues;
+    label cellsUsingRemoteValues;
+    label internalFacesUsingRemoteValues;
+    label processorFaces;
+
+    processorBoundaryCoverage()
+    :
+        remoteValues(0),
+        cellsUsingRemoteValues(0),
+        internalFacesUsingRemoteValues(0),
+        processorFaces(0)
+    {}
+};
+
+
+processorBoundaryCoverage calculateProcessorBoundaryCoverage
+(
+    const fvMesh& mesh,
+    const leastSquaresScheme& reconstruction
+)
+{
+    processorBoundaryCoverage coverage;
+    const leastSquaresStencil& stencil = reconstruction.stencil();
+    const globalIndex& globalCells = stencil.globalCells();
+    const List<labelList>& remoteCells = stencil.remoteCellsPerProc();
+
+    forAll(remoteCells, procI)
+    {
+        coverage.remoteValues += remoteCells[procI].size();
+    }
+
+    const CompactListList<label>& cellStencils = stencil.cellsStencil();
+    forAll(cellStencils, cellI)
+    {
+        forAll(cellStencils[cellI], stencilI)
+        {
+            if (!globalCells.isLocal(cellStencils[cellI][stencilI]))
+            {
+                ++coverage.cellsUsingRemoteValues;
+                break;
+            }
+        }
+    }
+
+    const CompactListList<label>& faceStencils =
+        reconstruction.faceGradStencil();
+
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        forAll(faceStencils[faceI], stencilI)
+        {
+            if (!globalCells.isLocal(faceStencils[faceI][stencilI]))
+            {
+                ++coverage.internalFacesUsingRemoteValues;
+                break;
+            }
+        }
+    }
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const polyPatch& patch = mesh.boundaryMesh()[patchI];
+
+        if (isA<processorPolyPatch>(patch))
+        {
+            const processorPolyPatch& processorPatch =
+                refCast<const processorPolyPatch>(patch);
+
+            if (Pstream::myProcNo() < processorPatch.neighbProcNo())
+            {
+                coverage.processorFaces += patch.size();
+            }
+        }
+    }
+
+    reduce(coverage.remoteValues, sumOp<label>());
+    reduce(coverage.cellsUsingRemoteValues, sumOp<label>());
+    reduce(coverage.internalFacesUsingRemoteValues, sumOp<label>());
+    reduce(coverage.processorFaces, sumOp<label>());
+
+    return coverage;
+}
 
 
 polynomialErrors calculateErrors
@@ -252,6 +347,30 @@ polynomialErrors calculateErrors
     CompactListList<vector> faceGrad(faceQuadPoints.sizes());
     reconstruction.fGrad(phi, faceGrad);
 
+    const vector componentScales(1.0, -0.7, 1.3);
+    volVectorField vectorPhi
+    (
+        IOobject
+        (
+            "testVectorPhi",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("zero", dimless, vector::zero),
+        "zeroGradient"
+    );
+
+    forAll(vectorPhi, cellI)
+    {
+        vectorPhi[cellI] = phi[cellI]*componentScales;
+    }
+
+    CompactListList<tensor> vectorFaceGrad(faceQuadPoints.sizes());
+    reconstruction.fGrad(vectorPhi, vectorFaceGrad);
+
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
         forAll(faceQuadPoints[faceI], qI)
@@ -274,8 +393,60 @@ polynomialErrors calculateErrors
         }
     }
 
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const polyPatch& patch = mesh.boundaryMesh()[patchI];
+
+        if (!isA<processorPolyPatch>(patch))
+        {
+            continue;
+        }
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patch.start() + patchFaceI;
+
+            forAll(faceQuadPoints[faceI], qI)
+            {
+                errors.processorFGrad =
+                    max
+                    (
+                        errors.processorFGrad,
+                        mag
+                        (
+                            faceGrad[faceI][qI]
+                          - polynomialGrad
+                            (
+                                faceQuadPoints[faceI][qI],
+                                polynomialOrder,
+                                threeD
+                            )
+                        )
+                    );
+
+                errors.processorVectorFGrad =
+                    max
+                    (
+                        errors.processorVectorFGrad,
+                        mag
+                        (
+                            vectorFaceGrad[faceI][qI]
+                          - polynomialGrad
+                            (
+                                faceQuadPoints[faceI][qI],
+                                polynomialOrder,
+                                threeD
+                            )*componentScales
+                        )
+                    );
+            }
+        }
+    }
+
     reduce(errors.grad, maxOp<scalar>());
     reduce(errors.fGrad, maxOp<scalar>());
+    reduce(errors.processorFGrad, maxOp<scalar>());
+    reduce(errors.processorVectorFGrad, maxOp<scalar>());
 
     return errors;
 }
@@ -368,6 +539,34 @@ int main(int argc, char *argv[])
     const scalar fGradTolerance = 1e-8;
     bool passed = true;
 
+    const processorBoundaryCoverage parallelCoverage =
+        calculateProcessorBoundaryCoverage(mesh, reconstruction);
+
+    if (Pstream::parRun())
+    {
+        const bool parallelCoveragePassed =
+            parallelCoverage.remoteValues > 0
+         && parallelCoverage.cellsUsingRemoteValues > 0
+         && parallelCoverage.internalFacesUsingRemoteValues > 0
+         && parallelCoverage.processorFaces > 0;
+
+        passed = passed && parallelCoveragePassed;
+
+        Info<< nl
+            << "Processor-boundary stencil coverage" << nl
+            << "    exchanged remote cell values      : "
+            << parallelCoverage.remoteValues << nl
+            << "    cells using remote values          : "
+            << parallelCoverage.cellsUsingRemoteValues << nl
+            << "    internal faces using remote values : "
+            << parallelCoverage.internalFacesUsingRemoteValues << nl
+            << "    processor faces tested             : "
+            << parallelCoverage.processorFaces << nl
+            << "    result                             : "
+            << (parallelCoveragePassed ? "PASSED" : "FAILED")
+            << nl << endl;
+    }
+
     Info<< nl
         << "K-exact polynomial cell-average gradient test" << nl
         << "    geometric dimensions  : " << mesh.nGeometricD() << nl
@@ -389,7 +588,9 @@ int main(int argc, char *argv[])
         const bool expectedExact = order <= reconstruction.polynomialOrder();
         const bool orderPassed =
             errors.grad <= gradTolerance
-         && errors.fGrad <= fGradTolerance;
+         && errors.fGrad <= fGradTolerance
+         && errors.processorFGrad <= fGradTolerance
+         && errors.processorVectorFGrad <= fGradTolerance;
 
         if (expectedExact)
         {
@@ -399,6 +600,10 @@ int main(int argc, char *argv[])
         Info<< "    polynomial order " << order << nl
             << "        maximum grad error : " << errors.grad << nl
             << "        maximum fGrad error: " << errors.fGrad << nl
+            << "        maximum processor-face fGrad error: "
+            << errors.processorFGrad << nl
+            << "        maximum processor-face vector fGrad error: "
+            << errors.processorVectorFGrad << nl
             << "        expected exact     : "
             << (expectedExact ? "yes" : "no") << nl;
 

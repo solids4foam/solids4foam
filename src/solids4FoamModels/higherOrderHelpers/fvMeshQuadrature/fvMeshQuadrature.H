@@ -109,6 +109,9 @@ private:
         //- Cell quadrature points weights
         mutable autoPtr<CompactListList<scalar>> cellQuadWeightsPtr_;
 
+        //- Volume-normalised first-order central cell moments
+        mutable autoPtr<List<vector>> firstOrderCellMomentsPtr_;
+
         //- Volume-normalised second-order central cell moments
         mutable autoPtr<List<symmTensor>> secondOrderCellMomentsPtr_;
 
@@ -141,6 +144,9 @@ private:
 
         //- Calls the corresponding function for 3D or for 2D meshes
         void calcQuadPointsAndWeights() const;
+
+        //- Calculate volume-normalised first-order cell moments
+        void calcFirstOrderCellMoments() const;
 
         //- Calculate volume-normalised cell moments
         void calcCellMoments() const;
@@ -196,6 +202,9 @@ public:
 
             //- Return the cell quadrature points
             const CompactListList<point>& cellQuadPoints() const;
+
+            //- Return volume-normalised first-order cell moments
+            const List<vector>& firstOrderCellMoments() const;
 
             //- Return volume-normalised second-order cell moments
             const List<symmTensor>& secondOrderCellMoments() const;

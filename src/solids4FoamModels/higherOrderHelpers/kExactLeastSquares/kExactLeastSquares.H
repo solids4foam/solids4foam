@@ -51,6 +51,7 @@ Author
 #define kExactLeastSquares_H
 
 #include "leastSquaresScheme.H"
+#include "processorFvPatch.H"
 #include "weightFunction.H"
 #include <Eigen/Dense>
 
@@ -155,10 +156,10 @@ class kExactLeastSquares
 
     // Private Member Functions
 
-        //- Return minimum number of points for polynomialOrder_
+        //- Return number of non-constant polynomial terms for polynomialOrder_
         label minNn() const;
 
-        //- Calculate exponents for the Taylor series expansion terms
+        //- Calculate exponents for the non-constant Taylor expansion terms
         void generateExponents
         (
             const label N,
@@ -199,6 +200,22 @@ class kExactLeastSquares
         //- Calculate interpolation coefficients for the cell centres
         void calcCellCoeffs() const;
 
+        //- Calculate the cell reconstruction gradient coefficients at a
+        //  specified point, aligned with the cell stencil
+        void cellGradCoeffsAtPoint
+        (
+            const label cellI,
+            const point& x,
+            UList<vector>& coeffs
+        ) const;
+
+        //- Make merged owner- and neighbour-cell stencils for internal faces
+        void makeFaceGradStencil() const;
+
+        //- Calculate internal-face gradient coefficients at quadrature points
+        //  by merging contribution from owner and neigbour side
+        void calcFaceCoeffs() const;
+
         //- Solve using QR decomposition (Householder Method)
         QRSolution QRSolve
         (
@@ -225,6 +242,27 @@ class kExactLeastSquares
             const Map<FixedList<label, 2>>& remoteLocation,
             const UList<Type>& localField,
             const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Exchange a field across a processor patch
+        template<class Type>
+        void exchangeProcessorPatchField
+        (
+            const processorFvPatch& procPatch,
+            const Field<Type>& sendField,
+            Field<Type>& receiveField
+        ) const;
+
+        //- Evaluate the field gradient at internal- and processor-face
+        //  quadrature points
+        template<class Type>
+        void fGrad
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            CompactListList
+            <
+                typename outerProduct<vector, Type>::type
+            >& result
         ) const;
 
         //- Disallow default bitwise copy construct

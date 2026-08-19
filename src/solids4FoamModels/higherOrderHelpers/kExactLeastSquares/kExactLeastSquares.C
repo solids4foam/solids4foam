@@ -19,6 +19,7 @@ License
 
 #include "kExactLeastSquares.H"
 #include "addToRunTimeSelectionTable.H"
+#include "HashSet.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,13 +74,63 @@ kExactLeastSquares::cellThirdGradCoeffs() const
 }
 
 
+void kExactLeastSquares::cellGradCoeffsAtPoint
+(
+    const label cellI,
+    const point& x,
+    UList<vector>& coeffs
+) const
+{
+    const CompactListList<label>& stencils = stencil().cellsStencil();
+    const labelUList& cellStencil = stencils[cellI];
+
+    if (coeffs.size() != cellStencil.size())
+    {
+        FatalErrorInFunction
+            << "Coefficient list size " << coeffs.size()
+            << " does not match stencil size " << cellStencil.size()
+            << " for cell " << cellI << abort(FatalError);
+    }
+
+    const vector r = x - mesh_.C()[cellI];
+    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
+
+    const CompactListList<symmTensor>* secondGradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>* thirdGradCoeffsPtr = nullptr;
+
+    if (polynomialOrder() >= 2)
+    {
+        secondGradCoeffsPtr = &cellSecondGradCoeffs();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        thirdGradCoeffsPtr = &cellThirdGradCoeffs();
+    }
+
+    forAll(coeffs, cI)
+    {
+        coeffs[cI] = gradCoeffs[cI];
+
+        if (secondGradCoeffsPtr)
+        {
+            coeffs[cI] += (*secondGradCoeffsPtr)[cellI][cI] & r;
+        }
+        if (thirdGradCoeffsPtr)
+        {
+            coeffs[cI] +=
+                0.5*(((*thirdGradCoeffsPtr)[cellI][cI] & r) & r);
+        }
+    }
+}
+
+
 label kExactLeastSquares::minNn() const
 {
     // Taylor polynomial order in 2D case does not have terms related to z
     // coordinate
     if (mesh_.nGeometricD() == 2)
     {
-        return ((polynomialOrder_ + 1)*(polynomialOrder_ + 2)/2);
+        return ((polynomialOrder_ + 1)*(polynomialOrder_ + 2)/2) - 1;
     }
     else
     {
@@ -89,6 +140,7 @@ label kExactLeastSquares::minNn() const
           * (polynomialOrder_ + 2)
           * (polynomialOrder_ + 3)
           / 6
+          - 1
         );
     }
 }
@@ -110,9 +162,6 @@ void kExactLeastSquares::generateExponents
     const label estimatedSize = minNn();
     exponents.setCapacity(estimatedSize);
 
-    // Add the constant term first
-    exponents.append(FixedList<label, 3>{0, 0, 0});
-
     // 2D and 3D cases have different number of exponents in Taylor series
     if (mesh_.nGeometricD() == 2)
     {
@@ -121,7 +170,7 @@ void kExactLeastSquares::generateExponents
             for (label i = n; i >= 0; --i)
             {
                 const label j = n - i;
-                FixedList<label, 3> exponent  = {i, j, 1};
+                FixedList<label, 3> exponent = {i, j, 0};
                 exponents.append(exponent);
             }
         }
@@ -134,12 +183,7 @@ void kExactLeastSquares::generateExponents
             {
                 for (label j = n - i; j >= 0; --j)
                 {
-                    label k = n - i - j;
-                    if (i == 0 && j == 0 && k == 0)
-                    {
-                        // Skip the constant term as it's already added
-                        continue;
-                    }
+                    const label k = n - i - j;
                     FixedList<label, 3> exponent = {i, j, k};
                     exponents.append(exponent);
                 }
@@ -261,6 +305,194 @@ void kExactLeastSquares::makeCellConditionNumber() const
 }
 
 
+void kExactLeastSquares::makeFaceGradStencil() const
+{
+    if (faceGradStencilPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const globalIndex& globalCells = stencil().globalCells();
+    const CompactListList<label>& cellStencils =
+        stencil().cellsStencil();
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+
+    List<labelList> faceStencils(mesh.nFaces());
+
+    // Loop over internal faces
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        // Index of face owner and neighbour
+        const label ownCellI = owner[faceI];
+        const label neiCellI = neighbour[faceI];
+
+        // Owner and neighbour stencils
+        const labelUList& ownStencil = cellStencils[ownCellI];
+        const labelUList& neiStencil = cellStencils[neiCellI];
+
+        // We don't need to explicitly add  owner and neighbour but it does not
+        // matter
+        labelHashSet mergedStencil
+        (
+            ownStencil.size() + neiStencil.size() + 2
+        );
+
+        mergedStencil.insert(globalCells.toGlobal(ownCellI));
+        forAll(ownStencil, cI)
+        {
+            mergedStencil.insert(ownStencil[cI]);
+        }
+
+        mergedStencil.insert(globalCells.toGlobal(neiCellI));
+        forAll(neiStencil, cI)
+        {
+            mergedStencil.insert(neiStencil[cI]);
+        }
+
+        labelList mergedIDs(mergedStencil.toc());
+        sort(mergedIDs);
+        faceStencils[faceI].transfer(mergedIDs);
+    }
+
+    // TO_DO: paralle boundaries? patches?
+
+    // Store face stencils to faceGradStencilPtr_
+    labelList rowSizes(mesh.nFaces(), 0);
+    forAll(faceStencils, faceI)
+    {
+        rowSizes[faceI] = faceStencils[faceI].size();
+    }
+
+    faceGradStencilPtr_.set(new CompactListList<label>(rowSizes));
+    CompactListList<label>& faceGradStencils = *faceGradStencilPtr_;
+
+    forAll(faceStencils, faceI)
+    {
+        const labelList& src = faceStencils[faceI];
+        labelUList dst = faceGradStencils[faceI];
+
+        forAll(src, cI)
+        {
+            dst[cI] = src[cI];
+        }
+    }
+}
+
+
+void kExactLeastSquares::calcFaceCoeffs() const
+{
+    if (debug)
+    {
+        InfoInFunction << "start" << endl;
+    }
+
+    if (faceGradCoeffsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    // Preliminaries
+    const fvMesh& mesh = mesh_;
+    const globalIndex& globalCells = stencil().globalCells();
+    const CompactListList<label>& cellStencils =  stencil().cellsStencil();
+    const CompactListList<label>& faceStencils = faceGradStencil();
+    const CompactListList<point>& faceQuadPoints =
+        quadrature().faceQuadPoints();
+
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+
+    // Initialise faceGradCoeffsPtr_
+    faceGradCoeffsPtr_.set
+    (
+        new List<CompactListList<vector>>(mesh.nFaces())
+    );
+    List<CompactListList<vector>>& faceGradCoeffs = *faceGradCoeffsPtr_;
+
+    // Loop over internal faces
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        const label ownCellI = owner[faceI];
+        const label neiCellI = neighbour[faceI];
+
+        const labelUList& ownStencil = cellStencils[ownCellI];
+        const labelUList& neiStencil = cellStencils[neiCellI];
+
+        const labelUList& faceStencil = faceStencils[faceI];
+        const UList<point>& quadPoints = faceQuadPoints[faceI];
+
+        // Number of coefficients is equal to merged stencil size
+        labelList rowSizes(quadPoints.size(), faceStencil.size());
+        faceGradCoeffs[faceI] = CompactListList<vector>(rowSizes);
+
+        // Map global cell IDs onto positions in the merged face stencil
+        Map<label> faceCellToIndex(2*faceStencil.size());
+        forAll(faceStencil, stencilI)
+        {
+            faceCellToIndex.insert(faceStencil[stencilI], stencilI);
+        }
+
+        // Get stencil list position for owner and neighbour
+        const label ownIndex =
+            faceCellToIndex[globalCells.toGlobal(ownCellI)];
+        const label neiIndex =
+            faceCellToIndex[globalCells.toGlobal(neiCellI)];
+
+        vectorField ownCoeffs(ownStencil.size());
+        vectorField neiCoeffs(neiStencil.size());
+
+        forAll(quadPoints, qpI)
+        {
+            const point& quadPoint = quadPoints[qpI];
+            vector ownSum = vector::zero;
+            vector neiSum = vector::zero;
+            UList<vector> coeffs = faceGradCoeffs[faceI][qpI];
+
+            // Initialise to zero all coefficients of this quadrature point
+            forAll(coeffs, stencilI)
+            {
+                coeffs[stencilI] = vector::zero;
+            }
+
+            // Get owner side coefficients
+            cellGradCoeffsAtPoint(ownCellI, quadPoint, ownCoeffs);
+            forAll(ownStencil, cellI)
+            {
+                const vector& coeff = ownCoeffs[cellI];
+                const label faceStencilI =
+                    faceCellToIndex[ownStencil[cellI]];
+
+                coeffs[faceStencilI] += 0.5*coeff;
+                ownSum += coeff;
+            }
+            coeffs[ownIndex] -= 0.5*ownSum;
+
+            // Get neighbour side coefficients
+            cellGradCoeffsAtPoint(neiCellI, quadPoint, neiCoeffs);
+            forAll(neiStencil, cellI)
+            {
+                const vector& coeff = neiCoeffs[cellI];
+                const label faceStencilI =
+                    faceCellToIndex[neiStencil[cellI]];
+
+                coeffs[faceStencilI] += 0.5*coeff;
+                neiSum += coeff;
+            }
+            coeffs[neiIndex] -= 0.5*neiSum;
+        }
+    }
+
+    if (debug)
+    {
+        InfoInFunction << "end" << endl;
+    }
+}
+
+
 void kExactLeastSquares::makeStencils() const
 {
     if (stencilPtr_.valid())
@@ -270,7 +502,13 @@ void kExactLeastSquares::makeStencils() const
     }
 
     const label minStencilSize = minNn();
-    const label cellNn = minStencilSize + cellStencilExtraCells_;
+    // leastSquaresStencil expects Nc to include the central cell, whereas its
+    // cellsStencil() contains neighbours only
+    const label cellNn = minStencilSize + cellStencilExtraCells_ + 1;
+
+    // We will use same size for face stencil,
+    // but face stencil  will not be evaluated as it is not needed
+    const label faceNn = cellNn;
 
     stencilPtr_.set
     (
@@ -278,7 +516,7 @@ void kExactLeastSquares::makeStencils() const
         (
             mesh_,
             haloDepthScale_,
-            cellNn,
+            faceNn,
             cellNn
         )
     );
@@ -435,8 +673,9 @@ void kExactLeastSquares::calcCellCoeffs() const
     DynamicList<FixedList<label, 3>> exponents;
     generateExponents(polynomialOrder_, exponents);
 
-    // The constant coefficient is fixed by the owner-cell average
-    const label Np = exponents.size() - 1;
+    // The constant coefficient is fixed by the owner-cell average and is not
+    // included in exponents
+    const label Np = exponents.size();
 
     // Compute and store derivatives rows position in matrix A
     const derivativeRows dRows = calcDerivativeRows(exponents, twoD);
@@ -643,8 +882,7 @@ void kExactLeastSquares::calcCellCoeffs() const
             const label neiGlobalCellID = stencil[cI];
             const vector dx = cellCentre(neiGlobalCellID) - cellC;
 
-            // Skip the constant term, which is fixed by the owner-cell average
-            for (label p = 1; p < exponents.size(); ++p)
+            forAll(exponents, p)
             {
                 const FixedList<label, 3>& exponent = exponents[p];
                 const label i = exponent[0];
@@ -673,7 +911,7 @@ void kExactLeastSquares::calcCellCoeffs() const
                     k
                 );
 
-                Q(p - 1, cI) =
+                Q(p, cI) =
                     (neighbourAverage - ownerAverage)
                    /(pow(h, order)*factorialDenominator);
             }
@@ -699,10 +937,9 @@ void kExactLeastSquares::calcCellCoeffs() const
             cellConditionNumber()[cellI] = qrs.cond;
         }
 
-        // Matrix A excludes the constant exponent, hence the row offset
-        const label ix = rowOf(exponents, 1, 0, 0) - 1;
-        const label iy = rowOf(exponents, 0, 1, 0) - 1;
-        const label iz = twoD ? -1 : rowOf(exponents, 0, 0, 1) - 1;
+        const label ix = rowOf(exponents, 1, 0, 0);
+        const label iy = rowOf(exponents, 0, 1, 0);
+        const label iz = twoD ? -1 : rowOf(exponents, 0, 0, 1);
 
         Eigen::RowVectorXd cxRow = A.row(ix)/h;
         Eigen::RowVectorXd cyRow = A.row(iy)/h;
@@ -719,24 +956,24 @@ void kExactLeastSquares::calcCellCoeffs() const
         {
             const scalar invh2 = 1.0/(h*h);
 
-            Eigen::RowVectorXd cxxRow = A.row(dRows.ixx - 1) * invh2;
-            Eigen::RowVectorXd cyyRow = A.row(dRows.iyy - 1) * invh2;
-            Eigen::RowVectorXd cxyRow = A.row(dRows.ixy - 1) * invh2;
+            Eigen::RowVectorXd cxxRow = A.row(dRows.ixx) * invh2;
+            Eigen::RowVectorXd cyyRow = A.row(dRows.iyy) * invh2;
+            Eigen::RowVectorXd cxyRow = A.row(dRows.ixy) * invh2;
 
             Eigen::RowVectorXd czzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.izz - 1) * invh2).eval();
+                (A.row(dRows.izz) * invh2).eval();
 
             Eigen::RowVectorXd cxzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.ixz - 1) * invh2).eval();
+                (A.row(dRows.ixz) * invh2).eval();
 
             Eigen::RowVectorXd cyzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols())
-                : (A.row(dRows.iyz - 1) * invh2).eval();
+                : (A.row(dRows.iyz) * invh2).eval();
 
             // Store Hessian tensor
             for (label i = 0; i < A.cols(); ++i)
@@ -757,35 +994,35 @@ void kExactLeastSquares::calcCellCoeffs() const
         {
             const scalar invh3 = 1.0/(h*h*h);
 
-            Eigen::RowVectorXd cxxxRow = A.row(dRows.ixxx - 1) * invh3;
-            Eigen::RowVectorXd cxxyRow = A.row(dRows.ixxy - 1) * invh3;
-            Eigen::RowVectorXd cyyyRow = A.row(dRows.iyyy - 1) * invh3;
-            Eigen::RowVectorXd cxyyRow = A.row(dRows.ixyy - 1) * invh3;
+            Eigen::RowVectorXd cxxxRow = A.row(dRows.ixxx) * invh3;
+            Eigen::RowVectorXd cxxyRow = A.row(dRows.ixxy) * invh3;
+            Eigen::RowVectorXd cyyyRow = A.row(dRows.iyyy) * invh3;
+            Eigen::RowVectorXd cxyyRow = A.row(dRows.ixyy) * invh3;
 
             Eigen::RowVectorXd cxyzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.ixyz - 1) * invh3).eval();
+                (A.row(dRows.ixyz) * invh3).eval();
             Eigen::RowVectorXd cxzzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.ixzz - 1) * invh3).eval();
+                (A.row(dRows.ixzz) * invh3).eval();
             Eigen::RowVectorXd cxxzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.ixxz - 1) * invh3).eval();
+                (A.row(dRows.ixxz) * invh3).eval();
             Eigen::RowVectorXd cyyzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.iyyz - 1) * invh3).eval();
+                (A.row(dRows.iyyz) * invh3).eval();
             Eigen::RowVectorXd cyzzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.iyzz - 1) * invh3).eval();
+                (A.row(dRows.iyzz) * invh3).eval();
             Eigen::RowVectorXd czzzRow =
                 twoD ?
                 Eigen::RowVectorXd::Zero(A.cols()) :
-                (A.row(dRows.izzz - 1) * invh3).eval();
+                (A.row(dRows.izzz) * invh3).eval();
 
             for (label i = 0; i < A.cols(); ++i)
             {
@@ -919,16 +1156,24 @@ const leastSquaresStencil& kExactLeastSquares::stencil() const
 
 const CompactListList<label>& kExactLeastSquares::faceGradStencil() const
 {
-    NotImplemented;
-    return *faceGradStencilPtr_;
+    if (faceGradStencilPtr_.empty())
+    {
+        makeFaceGradStencil();
+    }
+
+    return autoPtrRef(faceGradStencilPtr_);
 }
 
 
 const List<CompactListList<vector>>&
 kExactLeastSquares::faceGradCoeffs() const
 {
-    NotImplemented;
-    return *faceGradCoeffsPtr_;
+    if (faceGradCoeffsPtr_.empty())
+    {
+        calcFaceCoeffs();
+    }
+
+    return autoPtrRef(faceGradCoeffsPtr_);
 }
 
 
@@ -961,21 +1206,21 @@ void kExactLeastSquares::clear() const
 
 void kExactLeastSquares::fGrad
 (
-    const volScalarField&,
-    CompactListList<vector>&
+    const volScalarField& vf,
+    CompactListList<vector>& result
 ) const
 {
-    NotImplemented;
+    this->fGrad<scalar>(vf, result);
 }
 
 
 void kExactLeastSquares::fGrad
 (
-    const volVectorField&,
-    CompactListList<tensor>&
+    const volVectorField& vf,
+    CompactListList<tensor>& result
 ) const
 {
-    NotImplemented;
+    this->fGrad<vector>(vf, result);
 }
 
 

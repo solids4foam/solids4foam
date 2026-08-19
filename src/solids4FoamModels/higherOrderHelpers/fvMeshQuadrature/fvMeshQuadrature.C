@@ -885,6 +885,64 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
 }
 
 
+void fvMeshQuadrature::calcFirstOrderCellMoments() const
+{
+    if (firstOrderCellMomentsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    firstOrderCellMomentsPtr_.set
+    (
+        new List<vector>(mesh_.nCells(), vector::zero)
+    );
+
+    List<vector>& firstOrderCellMoments = *firstOrderCellMomentsPtr_;
+
+    forAll(cellCentres, cellI)
+    {
+        vector& firstMoment = firstOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            firstMoment.x() += w*r.x();
+            firstMoment.y() += w*r.y();
+
+            if (!twoD)
+            {
+                firstMoment.z() += w*r.z();
+            }
+        }
+
+        firstMoment /= cellVolumes[cellI];
+    }
+}
+
+
 void fvMeshQuadrature::calcCellMoments() const
 {
     if
@@ -1006,6 +1064,7 @@ fvMeshQuadrature::fvMeshQuadrature
     faceQuadWeightsPtr_(),
     cellQuadPointsPtr_(),
     cellQuadWeightsPtr_(),
+    firstOrderCellMomentsPtr_(),
     secondOrderCellMomentsPtr_(),
     thirdOrderCellMomentsPtr_()
 {
@@ -1066,6 +1125,24 @@ const CompactListList<scalar>& fvMeshQuadrature::cellQuadWeights() const
 }
 
 
+const List<vector>& fvMeshQuadrature::firstOrderCellMoments() const
+{
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (firstOrderCellMomentsPtr_.empty())
+    {
+        calcFirstOrderCellMoments();
+    }
+
+    return *firstOrderCellMomentsPtr_;
+}
+
+
 const List<symmTensor>& fvMeshQuadrature::secondOrderCellMoments() const
 {
     if (cellOrder_ < 2)
@@ -1109,6 +1186,7 @@ void fvMeshQuadrature::clear()
     faceQuadWeightsPtr_.clear();
     cellQuadPointsPtr_.clear();
     cellQuadWeightsPtr_.clear();
+    firstOrderCellMomentsPtr_.clear();
     secondOrderCellMomentsPtr_.clear();
     thirdOrderCellMomentsPtr_.clear();
 }
