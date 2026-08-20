@@ -99,6 +99,12 @@ below show representative fields from the simulation.
 
 **Figure 4: Wall shear stress distribution on the vascular wall.**
 
+{% include youtube.html id="gFhhHJvkhM4" %}
+
+**Video 1: Time evolution of the equivalent (von Mises) stress distribution
+in the arterial wall over a cardiac cycle. The deformation has been scaled
+by a factor of 5.**
+
 ## Running the Case
 
 From the tutorial directory, run
