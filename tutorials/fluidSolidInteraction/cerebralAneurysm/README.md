@@ -147,15 +147,15 @@ stress vary spatially across the vascular surface, while the structural
 solution predicts elevated wall stress around the aneurysm region. The images
 below show representative fields from the simulation.
 
-![Velocity streamlines](images/velocity.jpeg)
+![Velocity streamlines](images/velocity.webp)
 
 **Figure 2: Fluid velocity streamlines coloured by velocity magnitude.**
 
-![Fluid pressure](images/pressure.jpeg)
+![Fluid pressure](images/pressure.webp)
 
 **Figure 3: Pressure distribution in the fluid domain.**
 
-![Wall shear stress](images/wallShearStress.jpeg)
+![Wall shear stress](images/wallShearStress.webp)
 
 **Figure 4: Wall shear stress distribution on the vascular wall.**
 
