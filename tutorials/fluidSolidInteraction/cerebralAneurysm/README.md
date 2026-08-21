@@ -1,6 +1,6 @@
----
+----
 sort: 9
----
+----
 
 # Cerebral aneurysm fluid-solid interaction: `cerebralAneurysm`
 
@@ -29,9 +29,16 @@ Blood is represented as an incompressible Newtonian fluid with a density of
 $$1050\,\mathrm{kg\,m^{-3}}$$ and a dynamic viscosity of
 $$3.5\times10^{-3}\,\mathrm{Pa\,s}$$. A representative pulsatile internal
 carotid artery flow-rate waveform based on values reported in the literature is
-prescribed at both inlets. The waveform is not patient-specific; consequently,
-the case demonstrates the numerical workflow and is not intended as a
-clinically validated prediction.
+prescribed at both inlets (Figure 2). Each of the four outlets uses a
+three-element Windkessel condition (`windkesselPressure` in `0/fluid/p`) to
+represent the downstream vasculature. The waveform is not patient-specific;
+consequently, the case demonstrates the numerical workflow and is not intended
+as a clinically validated prediction.
+
+![Inlet flow-rate waveform](images/flowRate.png)
+
+**Figure 2: Prescribed inlet volumetric flow-rate waveform over one cardiac
+cycle.**
 
 The arterial wall is represented as a linear-elastic material with a density of
 $$1200\,\mathrm{kg\,m^{-3}}$$, Young's modulus of $$640\,\mathrm{kPa}$$ and
@@ -55,8 +62,9 @@ Minimal root-level `fvSchemes` and `fvSolution` dictionaries are included
 because the standard `extrudeMesh` utility requires them when constructing its
 temporary default-region mesh. The simulation itself uses the region-specific
 dictionaries under `system/fluid` and `system/solid`. After extrusion,
-`createPatch` renames the solid interface and external boundaries to
-`innerWall` and `outerWall`, respectively.
+the exposed inner face of the extruded mesh is named `innerWall` (via
+`exposedPatchName` in `system/extrudeMeshDict`), and `createPatch` with
+`system/createPatchDict.solid` renames the outer face to `outerWall`.
 
 ## Numerical Approach
 
@@ -69,13 +77,19 @@ dictionaries under `system/fluid` and `system/solid`. After extrusion,
   a Robin pressure boundary condition. This added-mass procedure improves the
   stability of the partitioned coupling for the strongly coupled blood-wall
   system [2]. The case uses `constantHs 5e-4` and permits up to 30 FSI
-  correctors per time step.
+  correctors per time step. The `fixedRelaxation` coupling uses a relaxation
+  factor of 1.0, i.e. no additional under-relaxation is applied, as the Robin
+  condition already provides the required stability.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 
-The fixed time step is $$5\times10^{-5}\,\mathrm{s}$$. This setting completed
-the initial $$2\,\mathrm{ms}$$ transient with a maximum Courant number of 1.55
-and an average of 5.17 FSI correctors per time step on the tested hardware.
+The fixed time step is $$5\times10^{-5}\,\mathrm{s}$$, giving 20,000 time
+steps over the cardiac cycle. As the time step is fixed, the Courant number
+follows the flow-rate waveform: over the cycle it peaks at 8.84 near peak
+systole ($$t\approx0.098\,\mathrm{s}$$), with a cycle-averaged value of 4.32.
+The implicit PIMPLE fluid solution and the FSI coupling remain stable at these
+Courant numbers, requiring an average of 1.8 FSI correctors per time step
+(see Figure 6).
 
 The `endTime` in `system/controlDict` is currently `1`, which corresponds to
 one cardiac cycle. To simulate additional cycles, increase `endTime`; for
@@ -153,15 +167,15 @@ below show representative fields from the simulation.
 
 ![Velocity streamlines](images/velocity.webp)
 
-**Figure 2: Fluid velocity streamlines coloured by velocity magnitude.**
+**Figure 3: Fluid velocity streamlines coloured by velocity magnitude.**
 
 ![Fluid pressure](images/pressure.webp)
 
-**Figure 3: Pressure distribution in the fluid domain.**
+**Figure 4: Pressure distribution in the fluid domain.**
 
 ![Wall shear stress](images/wallShearStress.webp)
 
-**Figure 4: Wall shear stress distribution on the vascular wall.**
+**Figure 5: Wall shear stress distribution on the vascular wall.**
 
 {% include youtube.html id="gFhhHJvkhM4" %}
 
@@ -176,7 +190,7 @@ The number of FSI (outer) iterations performed in each time step is recorded in
 
 ![FSI iterations per time step](images/fsiIterations.png)
 
-**Figure 5: Number of fluid-solid interaction iterations per time step over one
+**Figure 6: Number of fluid-solid interaction iterations per time step over one
 cardiac cycle.**
 
 The partitioned coupling is inexpensive once the initial transient has passed:
@@ -204,11 +218,9 @@ $$5\times10^{-5}\,\mathrm{s}$$) completed in 9209 s of wall-clock time
 `numberOfSubdomains` reduced from the default 16 to 8. The hardware was an
 Apple Mac Studio with an M1 Ultra chip (20 cores: 16 performance and 4
 efficiency) and 64 GB of unified memory, running macOS 26.5 and OpenFOAM
-v2512. This timing excludes mesh generation, which takes a few seconds. An
-earlier short $$2\,\mathrm{ms}$$ benchmark completed in 48.5 s on 16 cores
-compared with 61.3 s on 8 cores; performance varies with hardware and through
-the cardiac cycle, as the cost per time step follows the FSI iteration count
-shown in Figure 5.
+v2512. This timing excludes mesh generation, which takes a few seconds.
+Performance varies with hardware and through the cardiac cycle, as the cost per
+time step follows the FSI iteration count shown in Figure 6.
 
 The `Allrun` workflow is
 
