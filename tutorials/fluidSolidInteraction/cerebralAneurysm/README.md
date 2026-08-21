@@ -92,13 +92,13 @@ formulation requires only two changes:
 
    ```cpp
    solidModel nonLinearGeometryTotalLagrangianTotalDisplacement;
-   
+
    nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
    {
        solutionAlgorithm PETScSNES;
-   
+
        predictor         yes;
-   
+
        stabilisation
        {
            momentum
