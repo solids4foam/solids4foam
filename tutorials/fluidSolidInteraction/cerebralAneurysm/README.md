@@ -1,3 +1,7 @@
+---
+sort: 9
+---
+
 # Cerebral aneurysm fluid-solid interaction: `cerebralAneurysm`
 
 Prepared by Chanikya Valeti, Philip Cardiff, and Ivan Batistić
