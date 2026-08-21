@@ -20,6 +20,7 @@ License
 #include "kExactLeastSquares.H"
 #include "addToRunTimeSelectionTable.H"
 #include "HashSet.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -35,6 +36,42 @@ addToRunTimeSelectionTable
     kExactLeastSquares,
     dictionary
 );
+
+
+scalar kExactLeastSquares::secondDerivativeMomentContraction
+(
+    const symmTensor& secondDerivative,
+    const symmTensor& secondMoment
+)
+{
+    return
+        secondDerivative.xx()*secondMoment.xx()
+      + 2.0*secondDerivative.xy()*secondMoment.xy()
+      + 2.0*secondDerivative.xz()*secondMoment.xz()
+      + secondDerivative.yy()*secondMoment.yy()
+      + 2.0*secondDerivative.yz()*secondMoment.yz()
+      + secondDerivative.zz()*secondMoment.zz();
+}
+
+
+scalar kExactLeastSquares::thirdDerivativeMomentContraction
+(
+    const symmTensor3rdOrder& thirdDerivative,
+    const symmTensor3rdOrder& thirdMoment
+)
+{
+    return
+        thirdDerivative.xxx()*thirdMoment.xxx()
+      + 3.0*thirdDerivative.xxy()*thirdMoment.xxy()
+      + 3.0*thirdDerivative.xxz()*thirdMoment.xxz()
+      + 3.0*thirdDerivative.xyy()*thirdMoment.xyy()
+      + 6.0*thirdDerivative.xyz()*thirdMoment.xyz()
+      + 3.0*thirdDerivative.xzz()*thirdMoment.xzz()
+      + thirdDerivative.yyy()*thirdMoment.yyy()
+      + 3.0*thirdDerivative.yyz()*thirdMoment.yyz()
+      + 3.0*thirdDerivative.yzz()*thirdMoment.yzz()
+      + thirdDerivative.zzz()*thirdMoment.zzz();
+}
 
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
@@ -71,6 +108,30 @@ kExactLeastSquares::cellThirdGradCoeffs() const
     }
 
     return autoPtrRef(cellThirdGradCoeffsPtr_);
+}
+
+
+const List<List<FixedList<label, 2>>>&
+kExactLeastSquares::faceBoundaryDataStencil() const
+{
+    if (faceBoundaryDataStencilPtr_.empty())
+    {
+        calcFaceCoeffs();
+    }
+
+    return autoPtrRef(faceBoundaryDataStencilPtr_);
+}
+
+
+const List<CompactListList<vector>>&
+kExactLeastSquares::faceBoundaryDataCoeffs() const
+{
+    if (faceBoundaryDataCoeffsPtr_.empty())
+    {
+        calcFaceCoeffs();
+    }
+
+    return autoPtrRef(faceBoundaryDataCoeffsPtr_);
 }
 
 
@@ -121,6 +182,90 @@ void kExactLeastSquares::cellGradCoeffsAtPoint
                 0.5*(((*thirdGradCoeffsPtr)[cellI][cI] & r) & r);
         }
     }
+}
+
+
+void kExactLeastSquares::cellValueCoeffsAtPoint
+(
+    const label cellI,
+    const point& x,
+    UList<scalar>& coeffs
+) const
+{
+    const UList<label>& cellStencil = stencil().cellsStencil()[cellI];
+
+    if (coeffs.size() != cellStencil.size() + 1)
+    {
+        FatalErrorInFunction
+            << "Coefficient list size " << coeffs.size()
+            << " does not match stencil plus owner size "
+            << cellStencil.size() + 1 << " for cell " << cellI
+            << abort(FatalError);
+    }
+
+    const vector r = x - mesh_.C()[cellI];
+    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
+    const CompactListList<symmTensor>* secondDerivativeCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>*
+        thirdDerivativeCoeffsPtr = nullptr;
+    const List<symmTensor>* secondMomentsPtr = nullptr;
+    const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
+
+    if (polynomialOrder() >= 2)
+    {
+        secondDerivativeCoeffsPtr = &cellSecondGradCoeffs();
+        secondMomentsPtr = &secondOrderCellMoments();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        thirdDerivativeCoeffsPtr = &cellThirdGradCoeffs();
+        thirdMomentsPtr = &thirdOrderCellMoments();
+    }
+
+    scalar stencilCoeffSum = 0.0;
+
+    forAll(cellStencil, stencilI)
+    {
+        scalar& coeff = coeffs[stencilI];
+        coeff = r & gradCoeffs[stencilI];
+
+        if (secondDerivativeCoeffsPtr)
+        {
+            const symmTensor& secondDerivativeCoeff =
+                (*secondDerivativeCoeffsPtr)[cellI][stencilI];
+
+            coeff +=
+                0.5
+               *(
+                    (r & (secondDerivativeCoeff & r))
+                  - secondDerivativeMomentContraction
+                    (
+                        secondDerivativeCoeff,
+                        (*secondMomentsPtr)[cellI]
+                    )
+                );
+        }
+        if (thirdDerivativeCoeffsPtr)
+        {
+            const symmTensor3rdOrder& thirdDerivativeCoeff =
+                (*thirdDerivativeCoeffsPtr)[cellI][stencilI];
+
+            coeff +=
+                (1.0/6.0)
+               *(
+                    cubicForm(thirdDerivativeCoeff, r)
+                  - thirdDerivativeMomentContraction
+                    (
+                        thirdDerivativeCoeff,
+                        (*thirdMomentsPtr)[cellI]
+                    )
+                );
+        }
+
+        stencilCoeffSum += coeff;
+    }
+
+    coeffs[cellStencil.size()] = 1.0 - stencilCoeffSum;
 }
 
 
@@ -357,7 +502,37 @@ void kExactLeastSquares::makeFaceGradStencil() const
         faceStencils[faceI].transfer(mergedIDs);
     }
 
-    // TO_DO: paralle boundaries? patches?
+    // A fixed-value boundary face uses the owner-cell stencil and the owner
+    // cell. Prescribed boundary values have separate addressing because they
+    // are known data rather than global cell unknowns.
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (!includePatchInStencils_[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const label ownCellI = owner[faceI];
+            const labelUList& ownStencil = cellStencils[ownCellI];
+
+            labelHashSet boundaryStencil(ownStencil.size() + 1);
+            boundaryStencil.insert(globalCells.toGlobal(ownCellI));
+
+            forAll(ownStencil, stencilI)
+            {
+                boundaryStencil.insert(ownStencil[stencilI]);
+            }
+
+            labelList boundaryIDs(boundaryStencil.toc());
+            sort(boundaryIDs);
+            faceStencils[faceI].transfer(boundaryIDs);
+        }
+    }
 
     // Store face stencils to faceGradStencilPtr_
     labelList rowSizes(mesh.nFaces(), 0);
@@ -389,7 +564,12 @@ void kExactLeastSquares::calcFaceCoeffs() const
         InfoInFunction << "start" << endl;
     }
 
-    if (faceGradCoeffsPtr_.valid())
+    if
+    (
+        faceGradCoeffsPtr_.valid()
+     || faceBoundaryDataStencilPtr_.valid()
+     || faceBoundaryDataCoeffsPtr_.valid()
+    )
     {
         FatalErrorInFunction
             << "Pointer already set!" << abort(FatalError);
@@ -412,6 +592,20 @@ void kExactLeastSquares::calcFaceCoeffs() const
         new List<CompactListList<vector>>(mesh.nFaces())
     );
     List<CompactListList<vector>>& faceGradCoeffs = *faceGradCoeffsPtr_;
+
+    faceBoundaryDataStencilPtr_.set
+    (
+        new List<List<FixedList<label, 2>>>(mesh.nFaces())
+    );
+    List<List<FixedList<label, 2>>>& faceBoundaryDataStencil =
+        *faceBoundaryDataStencilPtr_;
+
+    faceBoundaryDataCoeffsPtr_.set
+    (
+        new List<CompactListList<vector>>(mesh.nFaces())
+    );
+    List<CompactListList<vector>>& faceBoundaryDataCoeffs =
+        *faceBoundaryDataCoeffsPtr_;
 
     // Loop over internal faces
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
@@ -483,6 +677,411 @@ void kExactLeastSquares::calcFaceCoeffs() const
                 neiSum += coeff;
             }
             coeffs[neiIndex] -= 0.5*neiSum;
+        }
+    }
+
+    // Gather all fixed-value quadrature points belonging to each local cell.
+    // One weighted reconstruction is used for all fixed-value faces of the
+    // same cell.
+    List<DynamicList<FixedList<label, 2>>> cellBoundaryData(mesh.nCells());
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (!includePatchInStencils_[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const label ownCellI = owner[faceI];
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                FixedList<label, 2> address;
+                address[0] = faceI;
+                address[1] = qpI;
+                cellBoundaryData[ownCellI].append(address);
+            }
+        }
+    }
+
+    const bool twoD = mesh.nGeometricD() == 2;
+    const vectorField& CI = mesh.C().internalField();
+    const Map<vector>& remoteCI = stencil().remoteCentresMap();
+
+    DynamicList<FixedList<label, 3>> exponents;
+    generateExponents(polynomialOrder_, exponents);
+    const label Np = exponents.size();
+
+    List<scalar> factorials(polynomialOrder_ + 1, 1.0);
+    for (label n = 1; n <= polynomialOrder_; ++n)
+    {
+        factorials[n] = factorials[n - 1]*n;
+    }
+
+    const CompactListList<vector>& gradCoeffs = cellGradCoeffs();
+    const CompactListList<symmTensor>* secondGradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>* thirdGradCoeffsPtr = nullptr;
+    const List<symmTensor>* secondMomentsPtr = nullptr;
+    const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
+
+    if (polynomialOrder() >= 2)
+    {
+        secondGradCoeffsPtr = &cellSecondGradCoeffs();
+        secondMomentsPtr = &secondOrderCellMoments();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        thirdGradCoeffsPtr = &cellThirdGradCoeffs();
+        thirdMomentsPtr = &thirdOrderCellMoments();
+    }
+
+    const auto cellCentre =
+    [&](const label globalCellID) -> vector
+    {
+        if (globalCells.isLocal(globalCellID))
+        {
+            return CI[globalCells.toLocal(globalCellID)];
+        }
+
+        return remoteCI[globalCellID];
+    };
+
+    const auto ownerCentralMoment =
+    [&]
+    (
+        const label cellI,
+        const label i,
+        const label j,
+        const label k
+    ) -> scalar
+    {
+        const label order = i + j + k;
+
+        if (order == 1)
+        {
+            return 0.0;
+        }
+        else if (order == 2)
+        {
+            const symmTensor& moment = (*secondMomentsPtr)[cellI];
+
+            if (i == 2) return moment.xx();
+            if (j == 2) return moment.yy();
+            if (k == 2) return moment.zz();
+            if (i == 1 && j == 1) return moment.xy();
+            if (i == 1 && k == 1) return moment.xz();
+            if (j == 1 && k == 1) return moment.yz();
+        }
+        else if (order == 3)
+        {
+            const symmTensor3rdOrder& moment = (*thirdMomentsPtr)[cellI];
+
+            if (i == 3) return moment.xxx();
+            if (j == 3) return moment.yyy();
+            if (k == 3) return moment.zzz();
+            if (i == 2 && j == 1) return moment.xxy();
+            if (i == 2 && k == 1) return moment.xxz();
+            if (i == 1 && j == 2) return moment.xyy();
+            if (i == 1 && j == 1 && k == 1) return moment.xyz();
+            if (i == 1 && k == 2) return moment.xzz();
+            if (j == 2 && k == 1) return moment.yyz();
+            if (j == 1 && k == 2) return moment.yzz();
+        }
+
+        FatalErrorInFunction
+            << "Unsupported owner central moment exponent ("
+            << i << "," << j << "," << k << ")"
+            << abort(FatalError);
+
+        return 0.0;
+    };
+
+    const auto scaledDerivativeCoeff =
+    [&]
+    (
+        const label cellI,
+        const label stencilI,
+        const FixedList<label, 3>& exponent,
+        const scalar h
+    ) -> scalar
+    {
+        const label i = exponent[0];
+        const label j = exponent[1];
+        const label k = twoD ? 0 : exponent[2];
+        const label order = i + j + k;
+
+        if (order == 1)
+        {
+            const vector& coeff = gradCoeffs[cellI][stencilI];
+
+            if (i == 1) return h*coeff.x();
+            if (j == 1) return h*coeff.y();
+            if (k == 1) return h*coeff.z();
+        }
+        else if (order == 2)
+        {
+            const symmTensor& coeff =
+                (*secondGradCoeffsPtr)[cellI][stencilI];
+            const scalar h2 = h*h;
+
+            if (i == 2) return h2*coeff.xx();
+            if (j == 2) return h2*coeff.yy();
+            if (k == 2) return h2*coeff.zz();
+            if (i == 1 && j == 1) return h2*coeff.xy();
+            if (i == 1 && k == 1) return h2*coeff.xz();
+            if (j == 1 && k == 1) return h2*coeff.yz();
+        }
+        else if (order == 3)
+        {
+            const symmTensor3rdOrder& coeff =
+                (*thirdGradCoeffsPtr)[cellI][stencilI];
+            const scalar h3 = h*h*h;
+
+            if (i == 3) return h3*coeff.xxx();
+            if (j == 3) return h3*coeff.yyy();
+            if (k == 3) return h3*coeff.zzz();
+            if (i == 2 && j == 1) return h3*coeff.xxy();
+            if (i == 2 && k == 1) return h3*coeff.xxz();
+            if (i == 1 && j == 2) return h3*coeff.xyy();
+            if (i == 1 && j == 1 && k == 1) return h3*coeff.xyz();
+            if (i == 1 && k == 2) return h3*coeff.xzz();
+            if (j == 2 && k == 1) return h3*coeff.yyz();
+            if (j == 1 && k == 2) return h3*coeff.yzz();
+        }
+
+        FatalErrorInFunction
+            << "Unsupported scaled derivative exponent ("
+            << i << "," << j << "," << k << ")"
+            << abort(FatalError);
+
+        return 0.0;
+    };
+
+    // Calculate weighted coefficients for fixed-value boundary faces.
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (!includePatchInStencils_[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const label ownCellI = owner[faceI];
+            const labelUList& cellStencil = cellStencils[ownCellI];
+            const labelUList& faceStencil = faceStencils[faceI];
+            const DynamicList<FixedList<label, 2>>& boundaryData =
+                cellBoundaryData[ownCellI];
+
+            faceBoundaryDataStencil[faceI] =
+                List<FixedList<label, 2>>(boundaryData);
+
+            const label Nn = cellStencil.size();
+            const label Nc = boundaryData.size();
+
+            const vector& cellC = CI[ownCellI];
+            scalar maxDist = 0.0;
+
+            forAll(cellStencil, stencilI)
+            {
+                maxDist = max
+                (
+                    maxDist,
+                    mag(cellCentre(cellStencil[stencilI]) - cellC)
+                );
+            }
+
+            const scalar h = 2.0*maxDist;
+            Eigen::MatrixXd A(Np, Nn);
+            Eigen::MatrixXd Winv = Eigen::MatrixXd::Zero(Nn, Nn);
+
+            forAll(cellStencil, stencilI)
+            {
+                forAll(exponents, p)
+                {
+                    A(p, stencilI) = scaledDerivativeCoeff
+                    (
+                        ownCellI,
+                        stencilI,
+                        exponents[p],
+                        h
+                    );
+                }
+
+                const scalar d =
+                    mag(cellCentre(cellStencil[stencilI]) - cellC);
+                Winv(stencilI, stencilI) =
+                    1.0/weightFunc().weight(d, maxDist);
+            }
+
+            Eigen::MatrixXd D(Nc, Np);
+            Eigen::MatrixXd boundaryWinv =
+                Eigen::MatrixXd::Zero(Nc, Nc);
+
+            for (label boundaryI = 0; boundaryI < Nc; ++boundaryI)
+            {
+                const FixedList<label, 2>& address =
+                    boundaryData[boundaryI];
+                const point& x = faceQuadPoints[address[0]][address[1]];
+                const vector r = x - cellC;
+
+                boundaryWinv(boundaryI, boundaryI) =
+                    1.0/weightFunc().weight(mag(r), maxDist);
+
+                forAll(exponents, p)
+                {
+                    const FixedList<label, 3>& exponent = exponents[p];
+                    const label i = exponent[0];
+                    const label j = exponent[1];
+                    const label k = twoD ? 0 : exponent[2];
+                    const label order = i + j + k;
+                    const scalar factorialDenominator =
+                        factorials[i]*factorials[j]*factorials[k];
+                    const scalar pointMonomial =
+                        pow(r.x(), i)*pow(r.y(), j)*pow(r.z(), k);
+
+                    D(boundaryI, p) =
+                        (
+                            pointMonomial
+                          - ownerCentralMoment(ownCellI, i, j, k)
+                        )
+                       /(pow(h, order)*factorialDenominator);
+                }
+            }
+
+            // A maps neighbour average differences to the cell-only scaled
+            // derivative vector. Its weighted covariance gives the inverse
+            // cell-only least-squares Hessian. The boundary system is the
+            // Woodbury form of adding the weighted boundary rows to that
+            // least-squares problem.
+            const Eigen::MatrixXd Hinv = A*Winv*A.transpose();
+            const Eigen::MatrixXd boundarySystem =
+                boundaryWinv + D*Hinv*D.transpose();
+            Eigen::ColPivHouseholderQR<Eigen::MatrixXd> boundaryQr
+            (
+                boundarySystem
+            );
+
+            const Eigen::MatrixXd correction =
+                Hinv
+               *D.transpose()
+               *boundaryQr.solve(Eigen::MatrixXd::Identity(Nc, Nc));
+            const Eigen::MatrixXd cellMap =
+                (Eigen::MatrixXd::Identity(Np, Np) - correction*D)*A;
+            const Eigen::MatrixXd boundaryMap = correction;
+
+            labelList cellRowSizes
+            (
+                faceQuadPoints[faceI].size(),
+                faceStencil.size()
+            );
+            faceGradCoeffs[faceI] =
+                CompactListList<vector>(cellRowSizes);
+
+            labelList boundaryRowSizes
+            (
+                faceQuadPoints[faceI].size(),
+                Nc
+            );
+            faceBoundaryDataCoeffs[faceI] =
+                CompactListList<vector>(boundaryRowSizes);
+
+            Map<label> faceCellToIndex(2*faceStencil.size());
+            forAll(faceStencil, stencilI)
+            {
+                faceCellToIndex.insert(faceStencil[stencilI], stencilI);
+            }
+
+            const label ownIndex =
+                faceCellToIndex[globalCells.toGlobal(ownCellI)];
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                const vector r = faceQuadPoints[faceI][qpI] - cellC;
+                Eigen::MatrixXd L = Eigen::MatrixXd::Zero(3, Np);
+
+                forAll(exponents, p)
+                {
+                    const FixedList<label, 3>& exponent = exponents[p];
+                    const label i = exponent[0];
+                    const label j = exponent[1];
+                    const label k = twoD ? 0 : exponent[2];
+                    const label order = i + j + k;
+                    const scalar denominator =
+                        pow(h, order)
+                       *factorials[i]*factorials[j]*factorials[k];
+
+                    if (i > 0)
+                    {
+                        L(0, p) =
+                            i*pow(r.x(), i - 1)
+                             *pow(r.y(), j)*pow(r.z(), k)/denominator;
+                    }
+                    if (j > 0)
+                    {
+                        L(1, p) =
+                            j*pow(r.x(), i)
+                             *pow(r.y(), j - 1)*pow(r.z(), k)/denominator;
+                    }
+                    if (k > 0)
+                    {
+                        L(2, p) =
+                            k*pow(r.x(), i)
+                             *pow(r.y(), j)*pow(r.z(), k - 1)/denominator;
+                    }
+                }
+
+                const Eigen::MatrixXd cellGradientMap = L*cellMap;
+                const Eigen::MatrixXd boundaryGradientMap = L*boundaryMap;
+                UList<vector> coefficients = faceGradCoeffs[faceI][qpI];
+                UList<vector> boundaryCoefficients =
+                    faceBoundaryDataCoeffs[faceI][qpI];
+
+                forAll(coefficients, stencilI)
+                {
+                    coefficients[stencilI] = vector::zero;
+                }
+
+                vector coefficientSum = vector::zero;
+
+                forAll(cellStencil, stencilI)
+                {
+                    const vector coefficient
+                    (
+                        cellGradientMap(0, stencilI),
+                        cellGradientMap(1, stencilI),
+                        cellGradientMap(2, stencilI)
+                    );
+                    const label faceStencilI =
+                        faceCellToIndex[cellStencil[stencilI]];
+
+                    coefficients[faceStencilI] += coefficient;
+                    coefficientSum += coefficient;
+                }
+
+                for (label boundaryI = 0; boundaryI < Nc; ++boundaryI)
+                {
+                    const vector coefficient
+                    (
+                        boundaryGradientMap(0, boundaryI),
+                        boundaryGradientMap(1, boundaryI),
+                        boundaryGradientMap(2, boundaryI)
+                    );
+
+                    boundaryCoefficients[boundaryI] = coefficient;
+                    coefficientSum += coefficient;
+                }
+
+                coefficients[ownIndex] -= coefficientSum;
+            }
         }
     }
 
@@ -975,7 +1574,7 @@ void kExactLeastSquares::calcCellCoeffs() const
                 Eigen::RowVectorXd::Zero(A.cols())
                 : (A.row(dRows.iyz) * invh2).eval();
 
-            // Store Hessian tensor
+            // Store second-derivative tensor
             for (label i = 0; i < A.cols(); ++i)
             {
                 (*cellSecondGradCoeffsPtr_)[cellI][i] =
@@ -1092,6 +1691,8 @@ kExactLeastSquares::kExactLeastSquares
     cellThirdGradCoeffsPtr_(),
     faceGradStencilPtr_(),
     faceGradCoeffsPtr_(),
+    faceBoundaryDataStencilPtr_(),
+    faceBoundaryDataCoeffsPtr_(),
     cellConditionNumberPtr_()
 {
     if (polynomialOrder_ > 3 || polynomialOrder_ < 1)
@@ -1192,6 +1793,7 @@ kExactLeastSquares::thirdOrderCellMoments() const
 
 void kExactLeastSquares::clear() const
 {
+    clearFaceCentreValueCoeffs();
     stencilPtr_.clear();
     quadraturePtr_.clear();
     weightFuncPtr_.clear();
@@ -1200,6 +1802,8 @@ void kExactLeastSquares::clear() const
     cellThirdGradCoeffsPtr_.clear();
     faceGradStencilPtr_.clear();
     faceGradCoeffsPtr_.clear();
+    faceBoundaryDataStencilPtr_.clear();
+    faceBoundaryDataCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
 }
 
@@ -1237,12 +1841,49 @@ autoPtr<CompactListList<scalar>> kExactLeastSquares::patchFaceQuadValues
 
 autoPtr<CompactListList<vector>> kExactLeastSquares::patchFaceQuadValues
 (
-    const volVectorField&,
-    const label
+    const volVectorField& vf,
+    const label patchI
 ) const
 {
-    NotImplemented;
+    const fvPatchField<vector>& pf = vf.boundaryField()[patchI];
+
+    if (isA<fixedDisplacementFvPatchVectorField>(pf))
+    {
+        const fixedDisplacementFvPatchVectorField& patchField =
+            refCast<const fixedDisplacementFvPatchVectorField>(pf);
+
+        return patchField.evaluateQuadrature();
+    }
+
+    FatalErrorInFunction
+        << "Patch " << patchI << " fixes displacement, but quadrature-point "
+        << "evaluation is only implemented for "
+        << fixedDisplacementFvPatchVectorField::typeName
+        << abort(FatalError);
+
     return autoPtr<CompactListList<vector>>();
+}
+
+
+scalar kExactLeastSquares::valueAtPoint
+(
+    const volScalarField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<scalar>(vf, cellID, x);
+}
+
+
+vector kExactLeastSquares::valueAtPoint
+(
+    const volVectorField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<vector>(vf, cellID, x);
 }
 
 

@@ -232,6 +232,15 @@ private:
         //- Calculate interpolation coefficients for the faces quadrature points
         void calcFaceCoeffs() const;
 
+        //- Calculate value coefficients for one cell at a specified point
+        //  Stencil-cell coefficients are followed by the owner coefficient
+        virtual void cellValueCoeffsAtPoint
+        (
+            const label cellI,
+            const point& x,
+            UList<scalar>& coeffs
+        ) const;
+
         //- Solve using QR decomposition (Householder Method)
         QRSolution QRSolve
         (
@@ -261,6 +270,15 @@ private:
             const Map<FixedList<label, 2>>& remoteLocation,
             const UList<Type>& localField,
             const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Evaluate a field using the reconstruction associated with one cell
+        template<class Type>
+        Type evaluateAtPoint
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const label cellID,
+            const point& x
         ) const;
 
         //- Disallow default bitwise copy construct
@@ -331,6 +349,22 @@ private:
         virtual void clear() const;
 
     // Evaluation
+
+        //- Evaluate a scalar field reconstructed from a cell at a point
+        virtual scalar valueAtPoint
+        (
+            const volScalarField& vf,
+            const label cellID,
+            const point& x
+        ) const;
+
+        //- Evaluate a vector field reconstructed from a cell at a point
+        virtual vector valueAtPoint
+        (
+            const volVectorField& vf,
+            const label cellID,
+            const point& x
+        ) const;
 
         //- Gradient of field at face quadrature points
         template<class Type>

@@ -121,6 +121,67 @@ movingLeastSquares::faceGradCoeffs() const
 }
 
 
+void movingLeastSquares::cellValueCoeffsAtPoint
+(
+    const label cellI,
+    const point& x,
+    UList<scalar>& coeffs
+) const
+{
+    const UList<label>& cellStencil = stencil().cellsStencil()[cellI];
+
+    if (coeffs.size() != cellStencil.size() + 1)
+    {
+        FatalErrorInFunction
+            << "Coefficient list size " << coeffs.size()
+            << " does not match stencil plus owner size "
+            << cellStencil.size() + 1 << " for cell " << cellI
+            << abort(FatalError);
+    }
+
+    const vector r = x - mesh_.C()[cellI];
+    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
+    const CompactListList<symmTensor>* secondDerivativeCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>*
+        thirdDerivativeCoeffsPtr = nullptr;
+
+    if (polynomialOrder() >= 2)
+    {
+        secondDerivativeCoeffsPtr = &cellSecondGradCoeffs();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        thirdDerivativeCoeffsPtr = &cellThirdGradCoeffs();
+    }
+
+    forAll(coeffs, coeffI)
+    {
+        coeffs[coeffI] = r & gradCoeffs[coeffI];
+
+        if (secondDerivativeCoeffsPtr)
+        {
+            const symmTensor& secondDerivativeCoeff =
+                (*secondDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                0.5*(r & (secondDerivativeCoeff & r));
+        }
+        if (thirdDerivativeCoeffsPtr)
+        {
+            const symmTensor3rdOrder& thirdDerivativeCoeff =
+                (*thirdDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                (1.0/6.0)*cubicForm(thirdDerivativeCoeff, r);
+        }
+    }
+
+    // The final coefficient belongs to the central cell. Add the original
+    // cell-centre value from the Taylor expansion.
+    coeffs[cellStencil.size()] += 1.0;
+}
+
+
 volScalarField& movingLeastSquares::cellConditionNumber() const
 {
     if (cellConditionNumberPtr_.empty())
@@ -686,7 +747,7 @@ void movingLeastSquares::calcCellCoeffs() const
                 Eigen::RowVectorXd::Zero(A.cols())
                 : (A.row(dRows.iyz) * invh2).eval();
 
-            // Store Hessian tensor
+            // Store second-derivative tensor
             for (label i = 0; i < A.cols(); ++i)
             {
                 (*cellSecondGradCoeffsPtr_)[cellI][i] =
@@ -1173,6 +1234,7 @@ movingLeastSquares::~movingLeastSquares()
 
 void Foam::movingLeastSquares::clear() const
 {
+    clearFaceCentreValueCoeffs();
     stencilPtr_.clear();
     quadraturePtr_.clear();
     weightFuncPtr_.clear();
@@ -1269,6 +1331,28 @@ movingLeastSquares::patchFaceQuadValues
         << abort(FatalError);
 
     return autoPtr<CompactListList<vector>>();
+}
+
+
+scalar movingLeastSquares::valueAtPoint
+(
+    const volScalarField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<scalar>(vf, cellID, x);
+}
+
+
+vector movingLeastSquares::valueAtPoint
+(
+    const volVectorField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<vector>(vf, cellID, x);
 }
 
 

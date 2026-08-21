@@ -37,6 +37,8 @@ Author
 #include "runTimeSelectionTables.H"
 #include "fvMeshQuadrature.H"
 #include "leastSquaresStencil.H"
+#include "processorFvPatch.H"
+#include "surfaceFields.H"
 #include "symmTensor3rdOrder.H"
 #include "volFields.H"
 
@@ -59,9 +61,84 @@ protected:
         const fvMesh& mesh_;
 
 
+    // Protected Member Functions
+
+        //- Calculate value coefficients for one cell at a specified point
+        //  Stencil-cell coefficients are followed by the owner coefficient
+        virtual void cellValueCoeffsAtPoint
+        (
+            const label cellI,
+            const point& x,
+            UList<scalar>& coeffs
+        ) const = 0;
+
+        //- Clear cached face-centre value coefficients
+        void clearFaceCentreValueCoeffs() const;
+
+
 private:
 
+    // Private data
+
+        //- Owner-side value coefficients at face centres
+        mutable autoPtr<CompactListList<scalar>>
+            ownerFaceCentreValueCoeffsPtr_;
+
+        //- Neighbour-side value coefficients at internal-face centres
+        mutable autoPtr<CompactListList<scalar>>
+            neighbourFaceCentreValueCoeffsPtr_;
+
     // Private Member Functions
+
+        //- Calculate and cache face-centre value coefficients
+        void makeFaceCentreValueCoeffs() const;
+
+        //- Return owner-side face-centre value coefficients
+        const CompactListList<scalar>& ownerFaceCentreValueCoeffs() const;
+
+        //- Return neighbour-side face-centre value coefficients
+        const CompactListList<scalar>& neighbourFaceCentreValueCoeffs() const;
+
+        //- For global index return a local or remote field value
+        template<class Type, class GlobalCells>
+        inline Type fieldValue
+        (
+            const label globalCellID,
+            const GlobalCells& globalCells,
+            const Map<FixedList<label, 2>>& remoteLocation,
+            const UList<Type>& localField,
+            const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Apply one owner-last value-coefficient row
+        template<class Type, class GlobalCells>
+        Type evaluateCellValueCoeffs
+        (
+            const label cellI,
+            const UList<scalar>& coeffs,
+            const GlobalCells& globalCells,
+            const Map<FixedList<label, 2>>& remoteLocation,
+            const UList<Type>& localField,
+            const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Exchange reconstructed values across a processor patch
+        template<class Type>
+        void exchangeProcessorPatchField
+        (
+            const processorFvPatch& procPatch,
+            const Field<Type>& sendField,
+            Field<Type>& receiveField
+        ) const;
+
+        //- Evaluate owner- and neighbour-side values at face centres
+        template<class Type>
+        void evaluateFaceCentreValues
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            GeometricField<Type, fvsPatchField, surfaceMesh>& ownerValues,
+            GeometricField<Type, fvsPatchField, surfaceMesh>& neighbourValues
+        ) const;
 
         //- Disallow default bitwise copy construct
         leastSquaresScheme(const leastSquaresScheme&);
@@ -142,6 +219,38 @@ public:
 
 
     // Evaluation
+
+        //- Evaluate a scalar field reconstructed from a cell at a point
+        virtual scalar valueAtPoint
+        (
+            const volScalarField& vf,
+            const label cellID,
+            const point& x
+        ) const = 0;
+
+        //- Evaluate a vector field reconstructed from a cell at a point
+        virtual vector valueAtPoint
+        (
+            const volVectorField& vf,
+            const label cellID,
+            const point& x
+        ) const = 0;
+
+        //- Evaluate owner- and neighbour-side scalar values at face centres
+        void faceCentreValues
+        (
+            const volScalarField& vf,
+            surfaceScalarField& ownerValues,
+            surfaceScalarField& neighbourValues
+        ) const;
+
+        //- Evaluate owner- and neighbour-side vector values at face centres
+        void faceCentreValues
+        (
+            const volVectorField& vf,
+            surfaceVectorField& ownerValues,
+            surfaceVectorField& neighbourValues
+        ) const;
 
         //- Gradient of a scalar field at face quadrature points
         virtual void fGrad

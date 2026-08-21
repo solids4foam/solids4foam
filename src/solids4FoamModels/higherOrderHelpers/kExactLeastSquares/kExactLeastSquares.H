@@ -91,7 +91,7 @@ class kExactLeastSquares
         //- Weight function coefficients dictionary
         const dictionary weightFunctionCoeffs_;
 
-        //- Include patch in the stencils as ghost point
+        //- Include patch values in the boundary reconstruction
         const boolList includePatchInStencils_;
 
         //- Calculate the condition number field for cells
@@ -115,6 +115,18 @@ class kExactLeastSquares
 
         //- Face-gradient reconstruction coefficients
         mutable autoPtr<List<CompactListList<vector>>> faceGradCoeffsPtr_;
+
+        //- Prescribed boundary quadrature-point addressing used by each face
+        mutable autoPtr
+        <
+            List<List<FixedList<label, 2>>>
+        > faceBoundaryDataStencilPtr_;
+
+        //- Face-gradient coefficients multiplying prescribed boundary data
+        mutable autoPtr
+        <
+            List<CompactListList<vector>>
+        > faceBoundaryDataCoeffsPtr_;
 
         //- Cell condition number field of the least squares system
         mutable autoPtr<volScalarField> cellConditionNumberPtr_;
@@ -209,12 +221,30 @@ class kExactLeastSquares
             UList<vector>& coeffs
         ) const;
 
+        //- Calculate value coefficients for one cell at a specified point
+        //  Stencil-cell coefficients are followed by the owner coefficient
+        virtual void cellValueCoeffsAtPoint
+        (
+            const label cellI,
+            const point& x,
+            UList<scalar>& coeffs
+        ) const;
+
         //- Make merged owner- and neighbour-cell stencils for internal faces
         void makeFaceGradStencil() const;
 
         //- Calculate internal-face gradient coefficients at quadrature points
-        //  by merging contribution from owner and neigbour side
+        //  by merging contribution from owner and neighbour side, and
+        //  weighted coefficients for fixed-value boundary faces
         void calcFaceCoeffs() const;
+
+        //- Return prescribed boundary quadrature-point addressing
+        const List<List<FixedList<label, 2>>>&
+        faceBoundaryDataStencil() const;
+
+        //- Return face-gradient coefficients for prescribed boundary data
+        const List<CompactListList<vector>>&
+        faceBoundaryDataCoeffs() const;
 
         //- Solve using QR decomposition (Householder Method)
         QRSolution QRSolve
@@ -242,6 +272,29 @@ class kExactLeastSquares
             const Map<FixedList<label, 2>>& remoteLocation,
             const UList<Type>& localField,
             const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Contract second-derivative and second-moment tensors
+        static scalar secondDerivativeMomentContraction
+        (
+            const symmTensor& secondDerivative,
+            const symmTensor& secondMoment
+        );
+
+        //- Contract third-derivative and third-moment tensors
+        static scalar thirdDerivativeMomentContraction
+        (
+            const symmTensor3rdOrder& thirdDerivative,
+            const symmTensor3rdOrder& thirdMoment
+        );
+
+        //- Evaluate a field using the reconstruction associated with one cell
+        template<class Type>
+        Type evaluateAtPoint
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const label cellID,
+            const point& x
         ) const;
 
         //- Exchange a field across a processor patch
@@ -343,6 +396,22 @@ public:
 
 
     // Evaluation
+
+        //- Evaluate a scalar field reconstructed from a cell at a point
+        virtual scalar valueAtPoint
+        (
+            const volScalarField& vf,
+            const label cellID,
+            const point& x
+        ) const;
+
+        //- Evaluate a vector field reconstructed from a cell at a point
+        virtual vector valueAtPoint
+        (
+            const volVectorField& vf,
+            const label cellID,
+            const point& x
+        ) const;
 
         //- Cell centre gradient field
         template<class Type>

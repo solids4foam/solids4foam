@@ -57,6 +57,73 @@ inline Type kExactLeastSquares::fieldValue
 
 
 template<class Type>
+Type kExactLeastSquares::evaluateAtPoint
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    if (cellID >= mesh_.nCells())
+    {
+        FatalErrorInFunction
+            << "Cell ID " << cellID << " is outside the local cell range 0 to "
+            << mesh_.nCells() - 1 << abort(FatalError);
+    }
+
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+    const CompactListList<label>& stencils = stencil().cellsStencil();
+
+    // Construct all coefficient and moment tables collectively before
+    // checking for the negative cell marker used by parallel point evaluation.
+    (void)cellGradCoeffs();
+    if (polynomialOrder() >= 2)
+    {
+        (void)cellSecondGradCoeffs();
+        (void)secondOrderCellMoments();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        (void)cellThirdGradCoeffs();
+        (void)thirdOrderCellMoments();
+    }
+
+    const UList<Type>& vfI = vf.internalField();
+    const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
+
+    // A negative cell ID marks a point owned by another processor. All
+    // processors still perform the coefficient setup and field exchange above
+    // because these operations can require collective communication.
+    if (cellID < 0)
+    {
+        return pTraits<Type>::zero;
+    }
+
+    const UList<label>& cellStencil = stencils[cellID];
+    scalarField valueCoeffs(cellStencil.size() + 1);
+    cellValueCoeffsAtPoint(cellID, x, valueCoeffs);
+    Type value = valueCoeffs[cellStencil.size()]*vfI[cellID];
+
+    forAll(cellStencil, cI)
+    {
+        value +=
+            valueCoeffs[cI]
+           *fieldValue
+            (
+                cellStencil[cI],
+                globalCells,
+                remoteLoc,
+                vfI,
+                remoteField
+            );
+    }
+
+    return value;
+}
+
+
+template<class Type>
 void kExactLeastSquares::exchangeProcessorPatchField
 (
     const processorFvPatch& procPatch,
@@ -93,6 +160,10 @@ void kExactLeastSquares::fGrad
     const CompactListList<label>& stencils = faceGradStencil();
     const CompactListList<label>& cellStencils = stencil().cellsStencil();
     const List<CompactListList<vector>>& coeffs = faceGradCoeffs();
+    const List<List<FixedList<label, 2>>>& boundaryDataStencil =
+        faceBoundaryDataStencil();
+    const List<CompactListList<vector>>& boundaryDataCoeffs =
+        faceBoundaryDataCoeffs();
     const CompactListList<point>& faceQuadPoints =
         quadrature().faceQuadPoints();
 
@@ -307,6 +378,113 @@ void kExactLeastSquares::fGrad
 
             sendStart += sendSizes[patchFaceI];
             receiveStart += receiveSizes[patchFaceI];
+        }
+    }
+
+    // Read all prescribed quadrature-point values once. Boundary-cell
+    // reconstructions can depend on fixed-value points from more than one
+    // boundary face or patch.
+    List<Field<Type>> prescribedValues(mesh.nFaces());
+
+    forAll(vf.boundaryField(), patchI)
+    {
+        if (!includePatchInStencils_[patchI])
+        {
+            continue;
+        }
+
+        const fvPatchField<Type>& pf = vf.boundaryField()[patchI];
+
+        if (!pf.fixesValue())
+        {
+            FatalErrorInFunction
+                << "Patch " << patchI << " was included as fixed-value "
+                << "reconstruction data, but field " << vf.name()
+                << " does not fix its value on that patch"
+                << abort(FatalError);
+        }
+
+        autoPtr<CompactListList<Type>> patchValuesPtr =
+            patchFaceQuadValues(vf, patchI);
+        const CompactListList<Type>& patchValues = patchValuesPtr();
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        if (patchValues.size() != pp.size())
+        {
+            FatalErrorInFunction
+                << "Patch quadrature values have " << patchValues.size()
+                << " faces but patch " << pp.name() << " has " << pp.size()
+                << abort(FatalError);
+        }
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+
+            if
+            (
+                patchValues[patchFaceI].size()
+             != faceQuadPoints[faceI].size()
+            )
+            {
+                FatalErrorInFunction
+                    << "Patch quadrature-value count does not match face "
+                    << faceI << abort(FatalError);
+            }
+
+            prescribedValues[faceI] = patchValues[patchFaceI];
+        }
+    }
+
+    // Evaluate weighted one-sided reconstructions on fixed-value faces.
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (!includePatchInStencils_[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const labelUList& faceStencil = stencils[faceI];
+            const CompactListList<vector>& faceCoefficients = coeffs[faceI];
+            const List<FixedList<label, 2>>& dataStencil =
+                boundaryDataStencil[faceI];
+            const CompactListList<vector>& dataCoefficients =
+                boundaryDataCoeffs[faceI];
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                const UList<vector>& qpCoefficients =
+                    faceCoefficients[qpI];
+                const UList<vector>& qpDataCoefficients =
+                    dataCoefficients[qpI];
+
+                forAll(faceStencil, stencilI)
+                {
+                    result[faceI][qpI] +=
+                        qpCoefficients[stencilI]
+                       *fieldValue
+                        (
+                            faceStencil[stencilI],
+                            globalCells,
+                            remoteLoc,
+                            vfI,
+                            remoteField
+                        );
+                }
+
+                forAll(dataStencil, dataI)
+                {
+                    const FixedList<label, 2>& address = dataStencil[dataI];
+                    result[faceI][qpI] +=
+                        qpDataCoefficients[dataI]
+                       *prescribedValues[address[0]][address[1]];
+                }
+            }
         }
     }
 }
