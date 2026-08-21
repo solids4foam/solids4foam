@@ -105,6 +105,21 @@ below show representative fields from the simulation.
 in the arterial wall over a cardiac cycle. The deformation has been scaled
 by a factor of 5.**
 
+The number of FSI (outer) iterations performed in each time step is recorded in
+`postProcessing/fsiResiduals.dat`. `Allrun` post-processes this file with
+`fsiIterations.gnuplot` to produce `fsiIterations.pdf` and `fsiIterations.png`
+(this step is skipped if `gnuplot` is not installed).
+
+![FSI iterations per time step](images/fsiIterations.png)
+
+**Figure 5: Number of fluid-solid interaction iterations per time step over one
+cardiac cycle.**
+
+The partitioned coupling is inexpensive once the initial transient has passed:
+11 iterations are needed in the first time step, after which the count settles
+to one or two iterations, averaging 1.8 over the cardiac cycle. The limit of 30
+FSI correctors per time step is never reached.
+
 ## Running the Case
 
 From the tutorial directory, run
@@ -114,16 +129,54 @@ From the tutorial directory, run
 ./Allrun parallel
 ```
 
-The case is configured for 16 subdomains. A short $$2\,\mathrm{ms}$$ benchmark
-completed in 48.5 s on 16 cores, compared with 61.3 s on 8 cores; performance
-will vary by hardware and during the cardiac cycle. Omit `parallel` to run in
-serial.
+The case is configured for 16 subdomains by default
+(`system/decomposeParDict` and its `fluid` and `solid` counterparts); change
+`numberOfSubdomains` in all three to run on a different number of cores. Omit
+`parallel` to run in serial.
+
+As a representative run time, the full cardiac cycle (20,000 time steps of
+$$5\times10^{-5}\,\mathrm{s}$$) completed in 9209 s of wall-clock time
+(approximately 2 hours 34 minutes) using **8 cores**, i.e. with
+`numberOfSubdomains` reduced from the default 16 to 8. The hardware was an
+Apple Mac Studio with an M1 Ultra chip (20 cores: 16 performance and 4
+efficiency) and 64 GB of unified memory, running macOS 26.5 and OpenFOAM
+v2512. This timing excludes mesh generation, which takes a few seconds. An
+earlier short $$2\,\mathrm{ms}$$ benchmark completed in 48.5 s on 16 cores
+compared with 61.3 s on 8 cores; performance varies with hardware and through
+the cardiac cycle, as the cost per time step follows the FSI iteration count
+shown in Figure 5.
 
 The `Allrun` workflow is
 
 ```text
 cartesianMesh -> extrudeMesh -> createPatch -> checkMesh -> solids4Foam
 ```
+
+## Regression Test
+
+The case includes a `regressionTest.sh` script:
+
+```bash
+./regressionTest.sh
+```
+
+Because the full cardiac cycle takes hours, the script copies the case inputs
+to `cerebralAneurysm/regressionTests/main/`, reduces `endTime` to
+$$5\times10^{-4}\,\mathrm{s}$$ (the first 10 time steps of the initial
+transient) and runs the case in serial there; the tutorial directory itself is
+untouched. On the hardware above, the check takes approximately two minutes.
+
+The following quantities are then compared with stored reference values, within
+loose tolerances:
+
+- the largest `innerWall` displacement component from
+  `postProcessing/0/solidDisplacementsinnerWall.dat`,
+- the `innerWall` normal force from
+  `postProcessing/0/solidForcesinnerWall.dat`.
+
+Pass `--check-only` to re-check an existing regression run without re-running
+the case. If PETSc or `cartesianMesh` is unavailable, `Allrun` exits silently
+and the script skips the checks rather than reporting a failure.
 
 ## References
 

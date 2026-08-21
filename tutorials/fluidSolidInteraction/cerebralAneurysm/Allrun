@@ -130,3 +130,12 @@ then
 else
     solids4Foam::runApplication -o solids4Foam
 fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating fsiIterations.pdf and fsiIterations.png using gnuplot"
+    gnuplot fsiIterations.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

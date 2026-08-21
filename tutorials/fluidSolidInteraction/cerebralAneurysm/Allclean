@@ -20,6 +20,10 @@ rm -rf constant/polyMesh
 rm -rf constant/fluid/polyMesh
 rm -rf constant/solid/polyMesh
 rm -rf postProcessing
+rm -rf regressionTests
+
+# Remove the generated plots
+rm -f fsiIterations.pdf fsiIterations.png
 
 echo "Case cleaned: generated meshes and results removed."
 
