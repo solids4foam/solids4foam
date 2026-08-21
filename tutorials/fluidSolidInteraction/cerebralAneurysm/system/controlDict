@@ -1,0 +1,150 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1;
+
+deltaT          5e-5;
+
+writeControl    timeStep;
+
+writeInterval   100;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+adjustTimeStep  no;
+
+functions
+{
+
+    patchDisplacements
+    {
+        type            solidDisplacements;
+        historyPatch    innerWall;
+    }
+
+    solidForce
+    {
+        type            solidForces;
+        region          solid;
+        historyPatch    innerWall;
+    }
+
+    forces
+    {
+        type                forces;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
+        patches             (wall);
+        "pName|p"           p;
+        "UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 false;
+        rhoInf              1050;
+        CofR                (0.5 0.1 0);
+        region              fluid;
+    }
+
+    fsiConvData
+    {
+        type            fsiConvergenceData;
+        region          fluid;
+    }
+
+    courantNo
+    {
+        type            CourantNo;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        executeControl  timeStep;
+        executeInterval 1;
+
+        writeControl    none;
+        writeInterval   1;
+    }
+
+    courantNumberHistory
+    {
+        type            fieldMinMax;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        fields          (Co);
+        mode            magnitude;
+        location        false;
+
+        executeControl  timeStep;
+        executeInterval 1;
+
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
+    fluidSolverIterations
+    {
+        type                solverInfo;
+        libs                (utilityFunctionObjects);
+        region              fluid;
+
+        fields              (U p);
+        writeResidualFields false;
+
+        executeControl      timeStep;
+        executeInterval     1;
+
+        writeControl        timeStep;
+        writeInterval       1;
+    }
+
+    wallShearStress1
+    {
+        type            wallShearStress;
+        region          fluid;
+        libs            (fieldFunctionObjects);
+
+        patches         (wall);
+        writeFields     yes;
+
+        writePrecision  10;
+        writeControl    runTime;
+        writeInterval   0.01;
+    }
+}
+
+// ************************************************************************* //
