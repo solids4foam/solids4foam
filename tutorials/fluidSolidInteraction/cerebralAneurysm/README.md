@@ -79,6 +79,66 @@ example, `endTime 4;` runs four cycles. The inlet-flow-rate table in
 `0/fluid/U` uses `outOfBounds repeat;`, so the waveform repeats for each
 additional cycle.
 
+## Using a Nonlinear Geometry (Finite Strain) Formulation
+
+The case is configured with a linear geometry (small strain, small rotation)
+solid formulation. Switching to a nonlinear geometry (finite strain)
+formulation requires only two changes:
+
+1. In `constant/solid/solidProperties`, change the solid model from
+   `linearGeometryTotalDisplacement` to a nonlinear geometry model, for example
+   `nonLinearGeometryTotalLagrangianTotalDisplacement`, and rename the
+   corresponding `...Coeffs` sub-dictionary to match:
+
+   ```cpp
+   solidModel nonLinearGeometryTotalLagrangianTotalDisplacement;
+   
+   nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+   {
+       solutionAlgorithm PETScSNES;
+   
+       predictor         yes;
+   
+       stabilisation
+       {
+           momentum
+           {
+               type        RhieChow;
+               scaleFactor 0.5;
+           }
+       }
+   }
+   ```
+
+2. In `constant/solid/mechanicalProperties`, replace the small-strain
+   mechanical law with a finite-strain law, for example `neoHookeanElastic`:
+
+   ```cpp
+   mechanical
+   (
+       artery
+       {
+           type            neoHookeanElastic;
+           rho             rho [1 -3 0 0 0 0 0]  1200;
+           E               E   [1 -1 -2 0 0 0 0] 640e3;
+           nu              nu  [0 0 0 0 0 0 0]   0.45;
+       }
+   );
+   ```
+
+   The `neoHookeanElastic` law takes the same `E` and `nu` parameters as
+   `linearElastic`, so it needs no additional material data. Other
+   finite-strain laws, such as `StVenantKirchhoffElastic`, may be used in the
+   same way. Note that the mechanical law must be consistent with the solid
+   model: small-strain laws are for linear geometry solid models, whereas
+   finite-strain laws are for nonlinear geometry solid models.
+
+No changes are needed to the fluid settings, the FSI coupling settings, or the
+boundary conditions. For the wall stiffness and pressure levels used here, the
+wall strains remain small, and the nonlinear geometry solution is close to the
+linear geometry one; the finite-strain formulation becomes important for
+larger deformations, such as softer walls or higher transmural pressures.
+
 ## Expected Results
 
 The flow divides between the arterial branches and develops a recirculating,

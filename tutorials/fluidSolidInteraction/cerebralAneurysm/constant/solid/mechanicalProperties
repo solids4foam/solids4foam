@@ -20,10 +20,9 @@ planeStress no;
 
 mechanical
 (
-    pipe
+    artery
     {
         type            linearElastic;
-        //type            StVenantKirchhoffElastic;
         rho             rho [1 -3 0 0 0 0 0]  1200;
         E               E   [1 -1 -2 0 0 0 0] 640E3;
         nu              nu  [0 0 0 0 0 0 0]   0.45;

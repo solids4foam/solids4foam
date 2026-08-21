@@ -46,10 +46,6 @@ boundaryField
     }
     "wall"
     {
-        // Dirichlet-Neumann approach
-        // type        movingWallPressure;
-        // value       uniform 0;
-
         // Robin-Neumann condition approach
         type        elasticWallPressure;
         constantHs  5e-4;
