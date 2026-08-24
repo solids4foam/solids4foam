@@ -22,7 +22,7 @@ Description
     Op function class to perform operations on a list.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of OpenFOAM software via              |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "D|DD"
+    {
+        solver                  PCG;
+        preconditioner          FDIC;
+
+        minIter                 0;
+        maxIter                 500;
+
+        tolerance               1e-9;
+        relTol                  1e-2;
+    }
+}
+
+relaxationFactors
+{
+    fields
+    {
+         "D|DD"         0.5;
+    }
+
+    equations
+    {
+         "D|DD"         0.99;
+    }
+}
+
+// ************************************************************************* //

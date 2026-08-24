@@ -29,7 +29,7 @@ Description
     to dissipate high frequency energy in explicit simulations.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     mechanicalEnergies.C

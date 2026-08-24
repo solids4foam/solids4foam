@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -17,19 +17,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-solidModel       coupledUnsLinearGeometryLinearElastic;
-//solidModel       coupledUnsLinGeometry;
-//solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
+solidModel     linearGeometryTotalDisplacement;
 
-coupledUnsLinearGeometryLinearElasticCoeffs
+linearGeometryTotalDisplacementCoeffs
 {
+    // Solution algorithm
+    solutionAlgorithm    PETScSNES;
 
-}
-
-"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
-{
     // Maximum number of momentum correctors
     nCorrectors     1000;
 

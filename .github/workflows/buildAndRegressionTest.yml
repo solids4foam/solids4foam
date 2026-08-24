@@ -1,0 +1,73 @@
+# Build and regression test solids4foam using Docker containers
+name: Build and regression test
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  build-and-regression-test:
+    name: Build and regression test on ${{ matrix.container-image.name }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        container-image:
+          - name: "OpenFOAM-v2512-PETSc"
+            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+            source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "OpenFOAM-9-PETSc"
+            image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas-gmsh"
+            source: "/opt/openfoam9/etc/bashrc"
+            buildflags: "-j"
+
+          - name: "foam-extend-4.1-PETSc"
+            image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas-gmsh"
+            source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+            buildflags: ""
+    container:
+      image: ${{ matrix.container-image.image }}
+      options: --user 1001
+      env:
+        HOME: ${{ github.workspace }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Allwmake
+        shell: bash -l {0}
+        run: |
+          source ${{ matrix.container-image.source }}
+          export S4F_NO_FILE_FIXES=1; ./Allwmake ${{ matrix.container-image.buildflags }}
+
+      - name: PETSc sanity check
+        shell: bash -l {0}
+        run: |
+          source ${{ matrix.container-image.source }}
+          echo "PETSC_DIR = $PETSC_DIR"
+          test -d "$PETSC_DIR/include"
+
+      - name: Alltest-regression
+        shell: bash -l {0}
+        run: |
+          source ${{ matrix.container-image.source }}
+          export OPENBLAS_CORETYPE=Haswell
+          echo "OPENBLAS_CORETYPE = $OPENBLAS_CORETYPE"
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./tutorials/Alltest-regression -j
+
+      - name: Upload regression logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-logs.${{ matrix.container-image.name }}
+          path: tutorialsTest-regression
+          retention-days: 10
+
+      - name: Set job status
+        if: ${{ failure() }}
+        run: echo "::error::Alltest-regression failed, marking job as failed"

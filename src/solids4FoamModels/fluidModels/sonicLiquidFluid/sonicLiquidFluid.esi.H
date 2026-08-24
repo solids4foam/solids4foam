@@ -25,7 +25,7 @@ Description
 
 Author
     Iago Lessa de Oliveira, FEIS/UNESP/UCD.
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     sonicLiquidFluid.esi.C
@@ -82,6 +82,12 @@ class sonicLiquidFluid
 
         //- Fluid density
         volScalarField rho_;
+
+        //- Gravity related fields
+        uniformDimensionedScalarField hRef_;
+        dimensionedScalar ghRef_;
+        volScalarField gh_;
+        surfaceScalarField ghf_;
 
         //- Creates and initialises the momentum field rhoUf
         autoPtr<surfaceVectorField> rhoUf_;

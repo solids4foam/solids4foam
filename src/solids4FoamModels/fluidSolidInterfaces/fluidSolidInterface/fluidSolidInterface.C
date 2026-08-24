@@ -34,8 +34,14 @@ License
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "RBFMeshMotionSolver.H"
+#include "addToRunTimeSelectionTable.H"
+#ifndef S4F_NO_RBF
+    #include "RBFMeshMotionSolver.H"
+#endif
 #include "FieldSumOp.H"
+#ifdef OPENFOAM_COM
+    #include "dynamicMotionSolverFvMesh.H"
+#endif
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -45,6 +51,64 @@ namespace Foam
     defineTypeNameAndDebug(fluidSolidInterface, 0);
     defineRunTimeSelectionTable(fluidSolidInterface, dictionary);
     addToRunTimeSelectionTable(physicsModel, fluidSolidInterface, physicsModel);
+
+    namespace
+    {
+        word resolvedRegion
+        (
+            const Time& runTime,
+            const dictionary& fsiProperties,
+            const word& modelName,
+            const word& defaultRegion
+        )
+        {
+            const word controlDictRegion
+            (
+                runTime.controlDict().subOrEmptyDict(modelName)
+                    .lookupOrDefault<word>("region", defaultRegion)
+            );
+
+            return fsiProperties.lookupOrDefault<word>
+            (
+                modelName + "Region",
+                controlDictRegion
+            );
+        }
+
+
+        void warnOnConflictingRegion
+        (
+            const Time& runTime,
+            const dictionary& fsiProperties,
+            const word& modelName,
+            const word& resolvedRegionName,
+            const word& defaultRegion
+        )
+        {
+            if
+            (
+                fsiProperties.found(modelName + "Region")
+             && runTime.controlDict().subOrEmptyDict(modelName).found("region")
+            )
+            {
+                const word controlDictRegion
+                (
+                    runTime.controlDict().subOrEmptyDict(modelName)
+                        .lookupOrDefault<word>("region", defaultRegion)
+                );
+
+                if (controlDictRegion != resolvedRegionName)
+                {
+                    WarningInFunction
+                        << "Conflicting " << modelName << " region settings: "
+                        << "using '" << resolvedRegionName << "' from "
+                        << "fsiProperties and ignoring '" << controlDictRegion
+                        << "' from controlDict/" << modelName
+                        << "/region" << endl;
+                }
+            }
+        }
+    }
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -271,7 +335,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const word& region
 )
 :
-    physicsModel(type, runTime),
+    physicsModel(type, runTime, region),
     IOdictionary
     (
         IOobject
@@ -284,8 +348,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
         )
     ),
     fsiProperties_(subDict(type + "Coeffs")),
-    fluid_(fluidModel::New(runTime, "fluid")),
-    solid_(solidModel::New(runTime, "solid")),
+    fluid_(),
+    solid_(),
     solidPatchNames_(),
     fluidPatchNames_(),
     solidPatchIndices_(),
@@ -329,11 +393,22 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidZonesPointsDisplsPrev_(),
     solidZonesPointsDispls_(),
     solidZonesPointsDisplsRef_(),
+    fluidZonesTractions_(),
+    fluidZonesTractionsRef_(),
+    solidZonesTractions_(),
+    solidZonesTractionsRef_(),
     interfacesPointsDispls_(),
     interfacesPointsDisplsPrev_(),
     incrementalResiduals_
     (
         fsiProperties_.lookupOrAddDefault<Switch>("incrementalResiduals", true)
+    ),
+    requireAllResidualMeasures_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>
+        (
+            "requireAllResidualMeasures", false
+        )
     ),
     residuals_(),
     residualsPrev_(),
@@ -351,6 +426,37 @@ Foam::fluidSolidInterface::fluidSolidInterface
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
+    const word fluidRegion
+    (
+        resolvedRegion(runTime, fsiProperties_, "fluid", "fluid")
+    );
+
+    const word solidRegion
+    (
+        resolvedRegion(runTime, fsiProperties_, "solid", "solid")
+    );
+
+    warnOnConflictingRegion
+    (
+        runTime,
+        fsiProperties_,
+        "fluid",
+        fluidRegion,
+        "fluid"
+    );
+
+    warnOnConflictingRegion
+    (
+        runTime,
+        fsiProperties_,
+        "solid",
+        solidRegion,
+        "solid"
+    );
+
+    fluid_ = fluidModel::New(runTime, fluidRegion);
+    solid_ = solidModel::New(runTime, solidRegion);
+
     Info<< "additionalMeshCorrection: " << additionalMeshCorrection_ << endl;
 
     // Check if couplingStartTime is specified
@@ -470,6 +576,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidZonesPointsDisplsPrev_.setSize(nGlobalPatches_);
     solidZonesPointsDispls_.setSize(nGlobalPatches_);
     solidZonesPointsDisplsRef_.setSize(nGlobalPatches_);
+    fluidZonesTractions_.setSize(nGlobalPatches_);
+    fluidZonesTractionsRef_.setSize(nGlobalPatches_);
+    solidZonesTractions_.setSize(nGlobalPatches_);
+    solidZonesTractionsRef_.setSize(nGlobalPatches_);
     interfacesPointsDispls_.setSize(nGlobalPatches_);
     interfacesPointsDisplsPrev_.setSize(nGlobalPatches_);
     residuals_.setSize(nGlobalPatches_);
@@ -692,6 +802,10 @@ void Foam::fluidSolidInterface::initializeFields()
     {
         const label nPoints =
             fluid().globalPatches()[interfaceI].globalPatch().nPoints();
+        const label nFluidFaces =
+            fluid().globalPatches()[interfaceI].globalPatch().size();
+        const label nSolidFaces =
+            solid().globalPatches()[interfaceI].globalPatch().size();
 
         fluidZonesPointsDispls_[interfaceI] = vectorField(nPoints, vector::zero);
 
@@ -706,6 +820,18 @@ void Foam::fluidSolidInterface::initializeFields()
 
         solidZonesPointsDisplsRef_[interfaceI] =
             vectorField(nPoints, vector::zero);
+
+        fluidZonesTractions_[interfaceI] =
+            vectorField(nFluidFaces, vector::zero);
+
+        fluidZonesTractionsRef_[interfaceI] =
+            vectorField(nFluidFaces, vector::zero);
+
+        solidZonesTractions_[interfaceI] =
+            vectorField(nSolidFaces, vector::zero);
+
+        solidZonesTractionsRef_[interfaceI] =
+            vectorField(nSolidFaces, vector::zero);
 
         residualsPrev_[interfaceI] = residuals_[interfaceI];
 
@@ -911,16 +1037,41 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         // Check for RBF motion solver
-        bool rbfMotionSolver = false;
+        RBFMeshMotionSolver* rbfMotionSolverPtr = nullptr;
+#ifdef OPENFOAM_COM
+        if (isA<dynamicMotionSolverFvMesh>(fluidMesh()))
+        {
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    refCast<const dynamicMotionSolverFvMesh>
+                    (
+                        fluidMesh()
+                    ).motion()
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
+        }
+#else
         if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
         {
-            rbfMotionSolver = isA<RBFMeshMotionSolver>
-            (
-                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
-            );
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
         }
+#endif
 #endif
 
         // Set motion on FSI interface
@@ -1037,8 +1188,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAM_ORG
-        else if (rbfMotionSolver)
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
+        else if (rbfMotionSolverPtr)
         {
             // Prepare list of patch motions
             Field<vectorField> motion(fluidMesh().boundaryMesh().size());
@@ -1075,10 +1226,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             // Set motion field in RBF motion solver
             // Note: take displacement as opposed to velocity
-            const_cast<RBFMeshMotionSolver&>
-            (
-                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
-            ).setMotion(motion);
+            rbfMotionSolverPtr->setMotion(motion);
         }
 #endif
         else
@@ -1126,6 +1274,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }
+
+    fluid().syncGlobalPatches();
 }
 
 
@@ -1148,6 +1298,8 @@ void Foam::fluidSolidInterface::updateForce()
           - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
         );
 
+        fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
+
         // Initialise the solid zone traction field that is to be interpolated
         // from the fluid zone
         vectorField solidZoneTotalTraction(solidZone.size(), vector::zero);
@@ -1163,6 +1315,8 @@ void Foam::fluidSolidInterface::updateForce()
 
         // Flip traction sign after transferring from fluid to solid
         solidZoneTotalTraction = -solidZoneTotalTraction;
+
+        solidZonesTractions()[interfaceI] = solidZoneTotalTraction;
 
         // Set traction on solid
         if (coupled())
@@ -1299,6 +1453,8 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
+    solid().syncGlobalPatches();
+
     // Maximum residual for all interfaces
     scalar maxResidual = 0;
 
@@ -1445,9 +1601,18 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         Info<< "FSI residual2 norm for interface " << interfaceI
             << ": " << residualNorm2 << endl;
 
-        // For this interface, the residual is defined as the minium of
-        // residualNorm1 and residualNorm2
-        const scalar residualInterfaceI = min(residualNorm1, residualNorm2);
+        // Legacy solids4foam behavior uses the minimum of the two residual
+        // measures, while stricter convergence requires both to be small.
+        const scalar residualInterfaceI =
+            requireAllResidualMeasures_
+          ? max(residualNorm1, residualNorm2)
+          : min(residualNorm1, residualNorm2);
+
+        if (requireAllResidualMeasures_)
+        {
+            Info<< "FSI combined residual norm for interface " << interfaceI
+                << " (max): " << residualInterfaceI << endl;
+        }
 
         // Update the maximum residual for all interfaces
         maxResidual = max(maxResidual, residualInterfaceI);

@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "fluidSolidInterface.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -168,8 +169,13 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 )
 :
     robinFvPatchScalarField(ptf, p, iF, mapper),
-    prevPressure_(p.patch().size(), 0),
-    prevAcceleration_(p.patch().size(), vector::zero),
+#ifdef OPENFOAM_ORG
+    prevPressure_(mapper(ptf.prevPressure_)),
+    prevAcceleration_(mapper(ptf.prevAcceleration_)),
+#else
+    prevPressure_(ptf.prevPressure_, mapper),
+    prevAcceleration_(ptf.prevAcceleration_, mapper),
+#endif
     rhoSolidHsPtr_(),
     constantHs_(ptf.constantHs_)
 {}
@@ -195,7 +201,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 
     if (dict.found("prevPressure"))
     {
-        Field<scalar>::operator=(scalarField("prevPressure", dict, p.size()));
+        prevPressure_ = scalarField("prevPressure", dict, p.size());
     }
 
     if (constantHs_ < SMALL)
@@ -248,7 +254,17 @@ void elasticWallPressureFvPatchScalarField::autoMap
     const fvPatchFieldMapper& m
 )
 {
-    fvPatchField<scalar>::autoMap(m);
+    robinFvPatchScalarField::autoMap(m);
+
+#ifdef OPENFOAM_ORG
+    m(prevPressure_, prevPressure_);
+    m(prevAcceleration_, prevAcceleration_);
+#else
+    prevPressure_.autoMap(m);
+    prevAcceleration_.autoMap(m);
+#endif
+
+    rhoSolidHsPtr_.clear();
 }
 
 
@@ -258,7 +274,15 @@ void elasticWallPressureFvPatchScalarField::rmap
     const labelList& addr
 )
 {
-    fvPatchField<scalar>::rmap(ptf, addr);
+    robinFvPatchScalarField::rmap(ptf, addr);
+
+    const elasticWallPressureFvPatchScalarField& mptf =
+        refCast<const elasticWallPressureFvPatchScalarField>(ptf);
+
+    prevPressure_.rmap(mptf.prevPressure_, addr);
+    prevAcceleration_.rmap(mptf.prevAcceleration_, addr);
+
+    rhoSolidHsPtr_.clear();
 }
 
 void elasticWallPressureFvPatchScalarField::updateCoeffs()
@@ -390,11 +414,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
         rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
-    flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
-#else
-    flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();
-#endif
+    boundaryFieldRef(flux)[patch().index()] = rAU*snGrad()*patch().magSf();
 }
 
 
@@ -406,6 +426,12 @@ void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 #else
     prevPressure_.writeEntry("prevPressure", os);
 #endif
+
+    if (constantHs_ >= SMALL)
+    {
+        os.writeKeyword("constantHs")
+            << constantHs_ << token::END_STATEMENT << nl;
+    }
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

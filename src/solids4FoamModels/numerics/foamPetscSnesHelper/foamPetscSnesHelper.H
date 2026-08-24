@@ -35,7 +35,7 @@ Description
        approximation of the Jacobian, e.g. fvm::laplacian.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
 
 SourceFiles
     foamPetscSnesHelper.C
@@ -252,13 +252,17 @@ public:
                 return x_.v;
             }
 
-            //- Non-const access to the PETSc solution vector
+            //- Non-const access to the PETSc solution backup vector
             Vec solutionBackup()
             {
                 if (!xBackup_.v)
                 {
                     // Initialise based on x
-                    VecDuplicate(x_.v, xBackup_.put());
+                    // Note: we call solution() rather than accessing x_.v
+                    // directly, as x_ is lazily created by solution(); this
+                    // way, the backup vector can be created before the first
+                    // call to solve()
+                    VecDuplicate(solution(), xBackup_.put());
                 }
 
                 return xBackup_.v;
@@ -312,7 +316,14 @@ public:
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
-                VecCopy(solution(), solutionBackup());
+                // Note: the solution vector is lazily created, so we take a
+                // copy of it before calling solutionBackup(); the evaluation
+                // order of function arguments is unspecified in C++, so
+                // passing solution() and solutionBackup() directly to VecCopy
+                // would not guarantee that x is created first
+                Vec x = solution();
+
+                VecCopy(x, solutionBackup());
             }
 
             //- Reset the solution and snes object

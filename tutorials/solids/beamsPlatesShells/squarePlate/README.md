@@ -15,13 +15,6 @@ Prepared by Philip Cardiff and Ivan Batistić
 - Demonstrate analysing a simple plate-bending problem using a finite area
   implementation of a Kirchoff-Love plate model.
 
----
-
-```warning
-This case currently only runs with foam extend as it uses the foam extend
-finite area discretisation framework.
-```
-
 ## Plate Theory Assumptions
 
 Two types of beam/plate/shell theory are widely used:
@@ -121,6 +114,53 @@ literature [1]. Figures 3, 4, and 5 compare the predicted deflections, bending
 moment, and rotations. The `solids4foam` predictions closley match the reference
 results [1].
 
+The `squarePlateAnalyticalSolution` function object in `system/controlDict` is
+used to evaluate the analytical thin-plate solution. For the simply supported
+case, it writes the analytical displacement field `analyticalD` and the
+difference field `DDifference` in the time directories. For the clamped plate,
+only the maximum deflection is printed because the analytical field is available
+only for the simply supported case.
+
+Analytical solution takes the following form (all edges supported):
+
+$$
+w = \frac{4\,p\,a^4}{\pi^5 D}
+\sum_{m = 1,3,5,\dots}
+\frac{(-1)^{\frac{m-1}{2}}}{m^5} \,
+\cos\!\biggl(\frac{m\pi x}{a}\biggr)
+\Biggl[
+  1
+  - \frac{\alpha_m \,\tanh(\alpha_m) \;+\; 2\,
+  \cosh\!\bigl(\dfrac{m\pi y}{a}\bigr)}{2\,\cosh(\alpha_m)}
+  \;+\;
+  \frac{1}{2\,\cosh(\alpha_m)}\,\frac{m \pi y}{a}\,
+  \sinh\!\bigl(\dfrac{m\pi y}{a}\bigr)
+\Biggr].
+$$
+
+where $p$ is the applied pressure, $D$ is the plate bending stiffness, $a$ is
+the plate length (in the $x$-direction) and $\alpha_m=\pi m b/(2a)$.
+
+```c++
+functions
+{
+    analyticalSolution
+    {
+        type    squarePlateAnalyticalSolution;
+
+        a    10;    // Length of the plate (in x direction)
+        b    10;    // Width of the plate (in y direction)
+        h    0.1;   // Plate thickness
+        p    1000;  // Applied transverse pressure
+        E    2e11;  // Young's modulus
+        nu   0.3;   // Poisson's ratio
+
+        //boundaryConditions allEdgesSupported;
+        boundaryConditions allEdgesClamped;
+    }
+}
+```
+
 ![Figure 3: Deflection at the central point of the plate (point
 C).](./images/squarePlate-deflection.png)
 
@@ -143,9 +183,10 @@ Figure 5: Rotation at point A (point with the coordinates x=7.5 m, y=5 m).
 The tutorial case is located at
 `solids4foam/tutorials/solids/beamsPlatesShells/squarePlate`. The case can be
 run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
-Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) after
-which `makeFaMesh` (`> makeFaMesh`) command is used to create finite area mesh.
-Finally, the `solids4foam` solver is used to run the case (`> solids4Foam`).
+`Allrun` script compiles the tutorial-local library in the `src` directory,
+creates the mesh using `blockMesh` (`> blockMesh`), creates the finite area mesh
+using `makeFaMesh` (`> makeFaMesh`), and runs the case with the `solids4foam`
+solver (`> solids4Foam`).
 
 ---
 
@@ -154,3 +195,6 @@ Finally, the `solids4foam` solver is used to run the case (`> solids4Foam`).
 [1] M. Torlak, A Finite-Volume Method for Coupled Numerical Analysis of
 Incompressible Fluid Flow and Linear Deformation of Elastic Structures. PhD
 thesis, Technischen Universität Hamburg-Harburg, 2006.
+
+[2] [Timoshenko, S., & Woinowsky-Krieger, S., Theory of plates and shells.
+1959.](https://www.cap-recifal.com/ccs_files/articles/cuveaqua1_denisio/Timoshenko_-_Theory_of_plates_and_shells.pdf)

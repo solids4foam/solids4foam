@@ -1,3 +1,7 @@
+---
+sort: 13
+---
+
 # Spherical cavity under uniaxial tensions: `sphericalCavity`
 
 ---
@@ -9,8 +13,9 @@ Prepared by Philip Cardiff and Ivan Batistić
 ## Tutorial Aims
 
 - Demonstrate how to perform a 3D linear-static stress analysis in solids4foam
-- Demonstrate the process of meshing using the Gmsh meshing utility and
-  OpenFOAM `polyDualMesh` utility
+- Demonstrate the process of meshing using the Gmsh meshing utility, with
+  optional conversion to a polyhedral mesh using the OpenFOAM `polyDualMesh`
+  utility
 - Demonstrates using the solids4foam solid solver based on the PETSc SNES
   nonlinear solver
 
@@ -47,7 +52,8 @@ This classic 3-D problem consists of a spherical cavity with radius $a = 0.2$ m
 
 ![-](images/sphericalCavity-geometry.png)
 
-**Figure 1: Spherical cavity case geometry and mesh (4 555 cells).**
+**Figure 1: Spherical cavity case geometry and polyhedral mesh (4 555 cells),
+as produced by the optional `poly` mesh option.**
 
 ---
 
@@ -118,11 +124,11 @@ $$
 and $\mu$ is the shear modulus.
 
 The analytical solution is generated alongside solution fields using the
- function object `sphericalCavityAnalyticalSolution` located in the
- `system/controlDict`, where one needs to input geometry, laoding and material
- data:
+function object `sphericalCavityAnalyticalSolution` located in the
+`system/controlDict`, where one needs to input geometry, loading and material
+data:
 
-```plaintext
+```c++
 functions
 {
     cavityAnalytical
@@ -138,8 +144,11 @@ functions
         pointStress no;
     }
 }
-
 ```
+
+The function object writes the analytical displacement and stress fields
+`analyticalD` and `analyticalCellStress`, and the difference fields
+`DDifference` and `cellStressDifference`, in the time directories.
 
 The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
  Figure 2.
@@ -152,18 +161,43 @@ The distribution of $zz$-component of stress field (`sigma[ZZ]`) is shown in
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/sphericalCavity`.
- The case can be run using the included `Allrun` script, i.e. `./Allrun`. In this
- case, the `Allrun` creates the unstructured tetrahedral mesh using the Gmsh
- meshing utility, followed by conversion to its dual polyhedral representations
- using the OpenFOAM `polyDualMesh` utility:
+The tutorial case is located at
+`solids4foam/tutorials/solids/linearElasticity/sphericalCavity`. The case can
+be run using the included `Allrun` script. The `Allrun` script optionally takes
+a first argument that specifies the solution approach:
+
+```bash
+./Allrun             # Defaults to the PETSc SNES second-order approach [3]
+./Allrun segregated  # Segregated second-order approach
+./Allrun highOrder   # PETSc SNES high-order approach [4]
+```
+
+and an optional second argument that specifies the mesh type:
+
+```bash
+./Allrun petscSnes tet   # Defaults to the tetrahedral mesh
+./Allrun petscSnes poly  # Polyhedral (dual) mesh
+```
+
+The `Allrun` script starts by updating the files in the case to match the
+selected approach; the following files are updated: `constant/solidProperties`,
+`system/fvSchemes`, and `system/fvSolution`. Subsequently, the tutorial-local
+library in the `src` directory is compiled, and the unstructured tetrahedral
+mesh is created using the Gmsh meshing utility. If the `poly` mesh type is
+selected, the tetrahedral mesh is then converted to its dual polyhedral
+representation using the OpenFOAM `polyDualMesh` utility:
 
 ```bash
    # Create mesh with gmsh
     solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
     solids4Foam::runApplication gmshToFoam sphericalCavity.msh
-    solids4Foam::runApplication polyDualMesh 30 -overwrite
-    solids4Foam::runApplication combinePatchFaces 45 -overwrite
+
+    if [[ "$MESH" == "poly" ]]
+    then
+        solids4Foam::runApplication polyDualMesh 30 -overwrite
+        solids4Foam::runApplication combinePatchFaces 45 -overwrite
+    fi
+
     solids4Foam::runApplication changeDictionary
 ```
 
@@ -171,37 +205,17 @@ The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/s
 The case is currently only works with the COM version of OpenFOAM!
 ```
 
-The case is setup to use the small strain (linear geometry) cell-centred finite
- volume solid solver based on the PETSc SNES nonlinear solver, as defined in
- `constant/solidProperties`:
-
-```c++
-solidModel     linearGeometryTotalDisplacement;
-
-linearGeometryTotalDisplacementCoeffs
-{
-    // Solution algorithm
-    //solutionAlgorithm implicitSegregated;
-    solutionAlgorithm PETScSNES;
-    //solutionAlgorithm explicit;
-
-    // PETSc options file used by PETScSNES
-    optionsFile petscOptions.snes;
-}
-```
-
 Here, the `linearGeometryTotalDisplacement` solid solver can adopt one of three
- solution algorithms:
+solution approaches:
 
-- `implicitSegregated`: the standard segregated solution procedure, where each
-   displacement component equation is solved separately.
-- `PETScSNES`: using the PETSc SNES nonlinear solver, which is provided with
-   the a compact stencil, approcimate Jacobian. Various solution procedures can
-   be specified through the `optionsFile petscOptions.snes;` file included in
-   the case. The Jacobian-free Newton-Krylov approach is typically faster than
-   the segregated approach, as examined in Cardiff et al. (2025) [3].
-- `explicit`: fully-explicit (matrix-free) approach, where the time step size is
-   limited by the stand CFL criterion.
+- `segregated`: the standard segregated solution procedure, where each
+  displacement component equation is solved separately using second-order
+  spatial discretisation.
+- `petscSnes`: the PETSc SNES nonlinear solver, using the same second-order
+  spatial discretisation. The Jacobian-free Newton-Krylov approach is typically
+  faster than the segregated approach, as examined in Cardiff et al. (2026) [3].
+- `highOrder`: the PETSc SNES nonlinear solver using high-order spatial
+  discretisation for the residual.
 
 ---
 
@@ -215,6 +229,11 @@ Here, the `linearGeometryTotalDisplacement` solid solver can adopt one of three
 [2] [Goodier, J.N.: Concentration of stress around spherical and cylindrical
  inclusions and flaws. Journal of Applied Mechanics 1(2), 39–44 (1933)](https://asmedigitalcollection.asme.org/appliedmechanics/article-abstract/1/2/39/1112122/Concentration-of-Stress-Around-Spherical-and?redirectedFrom=fulltext)
 
-[3] [Cardiff, P., Armfield, D., Tukovic, Z., Batistic, I.: Assessing the
- potential of Jacobian-free Newton-Krylov methods for cell-centred finite
- volume solid mechanics. Preprint, arXiv](https://arxiv.org/abs/2502.17217)
+[3] [P. Cardiff, D. Armfield, Ž. Tuković, I. Batistić, A Jacobian-free
+Newton-Krylov method for cell-centred finite volume solid mechanics.
+_International Journal for Numerical Methods in Engineering_, 127, e70268,
+2026, 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
+
+[4] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)

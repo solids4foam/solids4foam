@@ -25,6 +25,7 @@ License
 
 #include "flowRateInletVelocityFvPatchVectorField.H"
 #include "fvc.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -267,13 +268,8 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
 
     scalar reqOutletFlowRate = -inletFlowRate*flowRateFraction_;
 
-#ifdef OPENFOAM_NOT_EXTEND
     scalarField& phip =
-        phi.boundaryFieldRef()[this->patch().index()];
-#else
-    scalarField& phip =
-        phi.boundaryField()[this->patch().index()];
-#endif
+        boundaryFieldRef(phi)[this->patch().index()];
 
     label size = this->patch().size();
     reduce(size, sumOp<label>());

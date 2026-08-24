@@ -22,8 +22,8 @@ Description
     Strong Dirichlet-Neumann coupling with Aitken accelerated under-relaxation.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     AitkenCouplingInterface.C

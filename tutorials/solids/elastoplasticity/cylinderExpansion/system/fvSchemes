@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -28,7 +28,8 @@ ddtSchemes
 
 gradSchemes
 {
-    default            leastSquares;
+    // Gauss linear is ok because the mesh is orthogonal
+    default            Gauss linear;
 }
 
 divSchemes

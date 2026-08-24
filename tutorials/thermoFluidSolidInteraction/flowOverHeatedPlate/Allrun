@@ -13,11 +13,11 @@ solids4Foam::convertCaseFormat .
 
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
 then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    if [[ -f system/fluid/fvSolution ]]
     then
         echo "OpenFOAM.org specific: replacing 'residualControl' with"
         echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/residualControl/outerCorrectorResidualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
+        sed -i "s/residualControl/outerCorrectorResidualControl/g" system/fluid/fvSolution
     fi
 fi
 

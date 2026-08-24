@@ -83,6 +83,13 @@ public:
             const faPatchFieldMapper&
         );
 
+#if (OPENFOAM >= 2606)
+        //- No copy construct without an internal field
+        clampedMomentFaPatchScalarField
+        (
+            const clampedMomentFaPatchScalarField&
+        ) = delete;
+#else
         //- Construct as copy
         clampedMomentFaPatchScalarField
         (
@@ -97,6 +104,7 @@ public:
                 new clampedMomentFaPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         clampedMomentFaPatchScalarField

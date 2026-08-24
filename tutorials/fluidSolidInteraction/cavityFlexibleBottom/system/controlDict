@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -63,7 +63,7 @@ functions
         "UName|U"           U;
         "rhoName|rho"       rhoInf;
         log                 true;
-        rhoInf              1000;
+        rhoInf              1;
         CofR                (0.45 0.15 -0.15);
     }
     pointDisp

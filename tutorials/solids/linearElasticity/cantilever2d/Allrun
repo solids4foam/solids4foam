@@ -18,12 +18,16 @@ Where [approach] is one of:
   vertexCentred
   segregated
   unsCoupled
+  highOrder
+  highOrderJacobian
 
 Examples:
   ./Allrun
   ./Allrun vertexCentred
   ./Allrun segregated
   ./Allrun unsCoupled
+  ./Allrun highOrder
+  ./Allrun highOrderJacobian
 EOF
 }
 
@@ -32,6 +36,7 @@ EOF
 # -------------------------------------------------------------------------
 
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
@@ -49,7 +54,7 @@ APPROACH="${1:-petscSnes}"
 
 # Validate approach name
 case "$APPROACH" in
-    petscSnes|vertexCentred|segregated|unsCoupled) ;;
+    petscSnes|vertexCentred|segregated|unsCoupled|highOrder|highOrderJacobian) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -67,6 +72,7 @@ link_files_for_suffix() {
     local found=0
     while IFS= read -r -d '' f; do
         found=1
+        rm -f "${f%.*}"
         ln -vnsf "$(basename "$f")" "${f%.*}"
     done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
 
@@ -77,13 +83,8 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "$APPROACH" in
-        petscSnes|vertexCentred)
-            if [[ -z "${PETSC_DIR:-}" ]]
-            then
-                echo; echo "Skipping this case as PETSc is not installed"
-                echo "Please set the PETSC_DIR variable"; echo
-                exit 0
-            fi
+        petscSnes|vertexCentred|highOrder|highOrderJacobian)
+            solids4Foam::requirePetscOrExitSilently
             ;;
     esac
 }
@@ -103,9 +104,19 @@ select_approach() {
             solids4Foam::caseOnlyRunsWithFoamExtend
             link_files_for_suffix "unsCoupled"
             ;;
-        petscSnes|*)
+        petscSnes)
             echo "Using the petscSnes approach"
             link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            ;;
+        highOrderJacobian)
+            echo "Using the highOrderJacobian testing approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrderJacobian"
             ;;
     esac
 }

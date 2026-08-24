@@ -4,6 +4,8 @@
 notes.txt
 todo*
 tutorialsTest*
+regressionTests*
+codex*.md
 
 # Build log files
 log.Allwmake
@@ -12,6 +14,9 @@ log.Allcheck
 # Library files which are replaced by links
 src/blockCoupledSolids4FoamTools/Make/files
 src/solids4FoamModels/Make/files
+
+# Generated unity build sources
+src/solids4FoamModels/unityBuild/
 
 # ignore eigen and ltensor libraries
 ThirdParty/eigen3

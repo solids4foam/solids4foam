@@ -1,0 +1,81 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      meshDict;
+}
+surfaceFile "constant/triSurface/geometry.fms";
+
+// Coarsen the chamber core while retaining the original 0.8 mm surface and
+// opening resolution for high-fidelity boundary geometry.
+maxCellSize 0.001;
+boundaryCellSize 0.0003;
+
+localRefinement
+{
+    "Out1|Out2|Out3|Out4|In1|In2"
+    {
+        cellSize 0.0003;
+    }
+}
+
+renameBoundary
+{
+    defaultName wall;
+    defaultType wall;
+
+    newPatchNames
+    {
+        Wall
+        {
+            newName wall;
+            type wall;
+        }
+        Out1
+        {
+            newName outlet1;
+            type patch;
+        }
+        In1
+        {
+            newName inlet1;
+            type patch;
+        }
+        In2
+        {
+            newName inlet2;
+            type patch;
+        }
+        Out2
+        {
+            newName outlet2;
+            type patch;
+        }
+        Out3
+        {
+            newName outlet3;
+            type patch;
+        }
+        Out4
+        {
+            newName outlet4;
+            type patch;
+        }
+    }
+}
+
+boundaryLayers
+{
+    enable false;
+}

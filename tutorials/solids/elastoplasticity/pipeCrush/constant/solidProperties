@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -25,7 +25,7 @@ solidModel     nonLinearGeometryUpdatedLagrangian;
 "nonLinearGeometryUpdatedLagrangianCoeffs|unsNonLinearGeometryUpdatedLagrangianCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors             2000;
+    nCorrectors             4000;
 
     // Solution tolerance for displacement
     solutionTolerance       1e-06;
@@ -37,7 +37,7 @@ solidModel     nonLinearGeometryUpdatedLagrangian;
     materialTolerance       1e-06;
 
     // Write frequency for the residuals
-    infoFrequency           100;
+    infoFrequency           400;
 }
 
 // ************************************************************************* //

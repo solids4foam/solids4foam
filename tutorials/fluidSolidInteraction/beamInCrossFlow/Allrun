@@ -6,6 +6,52 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Example usage
+# ./Allrun            # default behaviour is the tuned IQNILS setup
+# ./Allrun aitken
+# ./Allrun parallel
+# ./Allrun aitken parallel
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+coupling=iqnils
+runMode=serial
+fvSolutionSuffix=""
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    fvSolutionSuffix=".foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    fvSolutionSuffix=".openfoamorg"
+fi
+
+echo "Using ${coupling} coupling setup"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+ln -vnsf "controlDict.${coupling}" system/controlDict
+ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -14,11 +60,23 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
+
+    if [[ "$WM_PROJECT" == "foam" ]]; then
+        # foam-extend's processorPolyPatch face-matching check
+        # (patchFaceMatchTol, default 1e-3) can trip partway through this
+        # case: the parallel mesh-motion point interpolation is not exactly
+        # reproducible across processor boundaries, and the mismatch grows
+        # with the beam's oscillation amplitude until it exceeds the default
+        # tolerance. Loosen it for foam-extend only.
+        solids4Foam::runParallel solids4Foam -Tolerances patchFaceMatchTol=0.05
+    else
+        solids4Foam::runParallel solids4Foam
+    fi
+
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else

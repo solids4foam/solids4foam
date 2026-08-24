@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -41,7 +41,7 @@ poroLinearGeometryCoeffs
     porosity               porosity [0 0 0 0 0 0 0] 0.2;
     waterSpecificWeight    waterSpecificWeight [1 -2 -2 0 0 0 0] 1e+04;
     degreeOfSaturation     degreeOfSaturation [0 0 0 0 0 0 0] 0.98;
-    waterBulkModulus       waterBulkModulus [1 -1 -2 0 0 0 0] 2e+09;
+    waterBulkModulus       waterBulkModulus [1 -1 -2 0 0 0 0] 2.1e+09;
 }
 
 // ************************************************************************* //

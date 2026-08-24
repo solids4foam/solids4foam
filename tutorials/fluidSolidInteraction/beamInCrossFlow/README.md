@@ -1,11 +1,11 @@
 ---
-sort: 3
+sort: 4
 ---
 
 # My third tutorial: `beamInCrossFlow`
 
 You can find the files for this tutorial under
-[`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow).
+[`tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils).
 
 ---
 
@@ -147,14 +147,94 @@ ground, wall and outlet.
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script, i.e.
-`./Allrun`. The `Allrun` script is shown below:
+The tutorial case can be run using the included `Allrun` script. The tuned
+IQNILS setup is the default, i.e. `./Allrun`. The original Aitken setup can be
+selected with `./Allrun aitken`, and either option can be combined with
+`parallel`.
+
+For a higher-level overview of the available FSI coupling schemes and the main
+`fluidSolidInterface` options, see the
+[fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
+
+For the current settings, a fair comparison over the strongly-coupled transient
+window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,
+solid predictor, fluid residual control and shared FSI settings, gives:
+
+- Aitken: `279` outer FSI iterations and about `21.8 s` wall-clock.
+- IQNILS: `215` outer FSI iterations and about `16.3 s` wall-clock.
+
+So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
+iterations than Aitken.
+
+## Regression Test
+
+The case also includes a `regressionTest.sh` script which runs short regression
+checks for both coupling options:
+
+- `./regressionTest.sh`
+
+For efficiency, the script runs both the `aitken` and `iqnils` variants in
+local regression copies under `beamInCrossFlow/regressionTests/`, with the end
+time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
+then.
+
+The script checks that both variants converge to the same solution, within
+loose tolerances, by comparing:
+
+- the maximum tip `Dx`,
+- the final tip `Dx`,
+- the final total fluid force `Fx`.
+
+This is intended as a practical regression test for the case setup and the FSI
+coupling implementations, rather than as a strict bitwise comparison.
+
+The `Allrun` script is shown below:
 
 ```bash
 #!/bin/bash
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Example usage
+# ./Allrun            # default behaviour is the tuned IQNILS setup
+# ./Allrun aitken
+# ./Allrun parallel
+# ./Allrun aitken parallel
+
+coupling=iqnils
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+for file in \
+    constant/fsiProperties \
+    constant/solid/solidProperties \
+    system/controlDict \
+    system/fluid/fvSolution
+do
+    ln -vnsf "$(basename "$file").${coupling}" "$file"
+done
 
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
@@ -167,7 +247,7 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid

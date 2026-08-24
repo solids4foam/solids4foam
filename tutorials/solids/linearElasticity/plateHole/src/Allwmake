@@ -1,0 +1,23 @@
+#!/bin/bash
+cd "${0%/*}" || exit  # Run from this directory
+
+if [[ -n "${S4F_NO_USE_EIGEN:-}" ]]; then
+    echo "Eigen is required to compile this local library"
+    echo "Unset S4F_NO_USE_EIGEN and rebuild solids4foam"
+    exit 1
+fi
+
+if [ "$WM_PROJECT" = "foam" ]
+then
+    FILES_LIST="files.foamextend"
+else
+    FILES_LIST="files.openfoam"
+fi
+
+if [[ ! -L Make/files || "$(readlink Make/files)" != "${FILES_LIST}" ]]
+then
+    echo "Updating Make/files link to Make/${FILES_LIST}"
+    (cd Make && ln -sf "${FILES_LIST}" files)
+fi
+
+wmake $* libso

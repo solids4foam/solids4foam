@@ -1,9 +1,16 @@
+---
+sort: 2
+---
+
 # Contributing to solids4foam
 
 Thank you for considering contributing to **solids4foam**!
 
 Thanks for helping create a world where fluid and structure are solved using
 your favourite CFD code.
+
+By participating in this project, you agree to abide by our
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## How Can I Contribute?
 

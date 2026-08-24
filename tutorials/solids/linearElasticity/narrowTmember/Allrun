@@ -1,18 +1,107 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   petscSnes (default), segregated, unsCoupled
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  petscSnes       (default)
+  segregated
+  unsCoupled
+
+Examples:
+  ./Allrun
+  ./Allrun segregated
+  ./Allrun unsCoupled
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
-# Check case version is correct
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-petscSnes}"
+
+case "$APPROACH" in
+    petscSnes|segregated|unsCoupled) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    solids4Foam::requirePetscOrExitSilently
+}
+
+select_approach() {
+    case "$APPROACH" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        unsCoupled)
+            echo "Using the unsCoupled approach"
+            solids4Foam::caseOnlyRunsWithFoamExtend
+            link_files_for_suffix "unsCoupled"
+            ;;
+        petscSnes|*)
+            echo "Using the petscSnes approach"
+            require_petsc_or_exit_silently
+            link_files_for_suffix "petscSnes"
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
+
+select_approach
+
+echo
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
-
-# Create mesh
+echo
 solids4Foam::runApplication blockMesh
 
-# Run solver
+echo
 solids4Foam::runApplication solids4Foam

@@ -35,7 +35,7 @@ Young's modulus $$E = 206.9$$ MPa, Poisson's ratio $$\nu=0.29$$, initial yield
 stress $$\sigma_Y = 0.45$$ MPa and the hardening parameters
 $$\sigma_{\infty} = 0.715$$ MPa, $$\delta = 16.93$$, $$H = 0.12924$$ MPa. The
 strain hardening function is the one presented in
-[[1]]((https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)):
+[[1]](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705):
 
 $$
 \sigma_y = \sigma_Y + (\sigma_{\infty} -

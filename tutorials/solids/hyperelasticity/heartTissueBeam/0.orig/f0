@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      f0;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions [0 0 0 0 0 0 0];
+
+internalField uniform (1 0 0); //za ventricle 001
+
+boundaryField
+{
+    left
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    right
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    bottom
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    top
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    back
+    {
+        type		calculated;
+        value		$internalField;
+    }
+
+    front
+    {
+        type		calculated;
+        value		$internalField;
+    }
+}
+
+// ************************************************************************* //

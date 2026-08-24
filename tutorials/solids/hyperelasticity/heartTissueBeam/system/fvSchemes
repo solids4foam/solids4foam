@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default Euler; //CrankNicolson; //backward; //Euler;
+}
+
+// d2dt2Schemes
+// {
+//     default CrankNicolson; //backward; //Euler;
+// }
+
+gradSchemes
+{
+    default none;
+    // default pointCellsLeastSquares;
+
+    grad(Dp) updatedLagGauss linear;
+    // grad(Dp) Gauss linear;
+
+    grad(DD) stabLeastSquares;
+}
+
+divSchemes
+{
+    default none;
+    div(DD) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default none;
+    laplacian(DDD,DD) Gauss linear corrected;
+    laplacian(DD,D) Gauss linear corrected;
+    // laplacian(rAD,p) Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default corrected;
+    snGrad(DD) corrected;
+    // snGrad(DD)ho fourthPade;
+}
+
+interpolationSchemes
+{
+    default linear;
+}
+
+// ************************************************************************* //

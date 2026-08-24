@@ -26,7 +26,7 @@ Description
         0 means face is not allowed to break
 
 Authors
-    Philip Cardif, UCD. All rights reserved.
+    Philip Cardif, UCD.
 
 SourceFiles
     crackPathLimiter.C

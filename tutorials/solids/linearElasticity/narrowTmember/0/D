@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -25,7 +25,7 @@ boundaryField
 {
     loading
     {
-        type            blockSolidTraction;
+        type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform -1e6;
         value           uniform (0 0 0);
@@ -33,7 +33,7 @@ boundaryField
 
     tractionFree
     {
-        type            blockSolidTraction;
+        type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -41,7 +41,7 @@ boundaryField
 
     hole
     {
-        type            blockSolidTraction;
+        type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -49,7 +49,7 @@ boundaryField
 
     front
     {
-        type            blockSolidTraction;
+        type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -57,19 +57,19 @@ boundaryField
 
     fixed
     {
-        type            blockFixedDisplacement;
+        type            fixedDisplacement;
         value           uniform ( 0 0 0 );
     }
 
     symmx
     {
-        type            blockFixedDisplacementZeroShear;
+        type            fixedDisplacementZeroShear;
         value           uniform ( 0 0 0 );
     }
 
     symmz
     {
-        type            blockFixedDisplacementZeroShear;
+        type            fixedDisplacementZeroShear;
         value           uniform ( 0 0 0 );
     }
 }

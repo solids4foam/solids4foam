@@ -12,12 +12,15 @@ Prepared by Philip Cardiff
 
 - Demonstrate how to perform a linear-static stress analysis of a 3-D
   engineering component in solids4foam;
-- Compares the performance of two finite volume solid models: (i) the coupled
-  cell-centred `coupledUnsLinearGeometryLinearElastic` model, and (ii) the
-  segregated cell-centred `linearGeometryTotalDisplacement` model.
-- Shows how to modify a case, which uses the
-  `coupledUnsLinearGeometryLinearElastic` solid model, to use the
-  `linearGeometryTotalDisplacement` solid model.
+- Compare the performance of three variants of the same tutorial case:
+  `petscSnes`, which uses the `linearGeometryTotalDisplacement` solid model
+  with a PETSc SNES solution algorithm; `segregated`, which uses the same
+  solid model with an implicit segregated solution algorithm; and
+  `unsCoupled`, which uses the original
+  `coupledUnsLinearGeometryLinearElastic` solid model.
+- Show how to modify a case, which originally used the
+  `coupledUnsLinearGeometryLinearElastic` solid model, to instead use the
+  `linearGeometryTotalDisplacement` solid model with PETSc SNES.
 
 ## Case Overview
 
@@ -48,36 +51,31 @@ Figure 2 - Coarest hexahedral mesh (624 cells)
 
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/narrowTmember`. The case can be
-run using the included `Allrun` script, i.e. `./Allrun`. In this case, the
-Allrun simply consists of creating the mesh using blockMesh (`./blockMesh`)
-followed by running the solids4foam solver (`./solids4Foam`).
+run using the included `Allrun` script. Two variants are available:
 
-```warning
-The coupled version of this case, which uses the
-`coupledUnsLinearGeometryLinearElastic`, can currently only be run using
-solids4foam built on foam-extend.
+```bash
+./Allrun                # Defaults to the petscSnes variant
+./Allrun segregated     # Segregated variant
+./Allrun unsCoupled     # Original foam-extend-only variant
 ```
 
-To modify the case to run with the segregated `linearGeometryTotalDisplacement`
-solid model, the following changes are required:
+In both cases, the `Allrun` script simply creates the mesh using `blockMesh`
+and then runs the solids4foam solver.
 
-- In `0/D`
-  - Replace `blockSolidTraction` with `solidTraction`
-  - Replace `blockFixedDisplacement` with `fixedDisplacement`
-  - Replace `blockFixedDisplacementZeroShear` with `fixedDisplacementZeroShear`
-- In `constant/solidProperties`
-  - Replace `solidModel       coupledUnsLinearGeometryLinearElastic;` with
-    `solidModel     linearGeometryTotalDisplacement;`
-  - (This is already present in the tutorial case) Add the following dictionary
-    `linearGeometryTotalDisplacementCoeffs {}`
-- In `system/fvSchemes`
-  - Set the default `gradSchemes` to `pointCellsLeastSquares` for
-    OpenFOAM.com/OpenFOAM.org, or `leastSquares` for foam-extend
-  - Set the default `divSchemes` to `Gauss linear`
-  - Set the default `laplacianSchemes` to `Gauss linear skewCorrected 1`
-  - Set the default `interpolationSchemes` to `linear`
+The default `petscSnes` variant uses the `linearGeometryTotalDisplacement`
+solid model with PETSc SNES. The original `unsCoupled` variant is also
+provided through the `.unsCoupled` file suffixes, and uses the
+`coupledUnsLinearGeometryLinearElastic` solid model together with the original
+`block*` boundary conditions and coupled discretisation settings. The
+`unsCoupled` variant can currently only be run using solids4foam built on
+foam-extend.
 
-The case can the be run as before, i.e. `> blockMesh && solids4Foam`.
+The `segregated` variant uses the same `linearGeometryTotalDisplacement`
+solid model as `petscSnes`, but with `solutionAlgorithm implicitSegregated;`
+in `constant/solidProperties`. This variant is intended for comparison with the
+PETSc SNES path using the same geometry and boundary conditions.
+
+The case can then be run as before, i.e. `> blockMesh && solids4Foam`.
 
 ---
 
@@ -96,13 +94,13 @@ Struct.](https://www.sciencedirect.com/science/article/pii/S0045794916306046)
 (right) compared with results from Demirdzic et al. (left).**
 
 The wall-clock times and memory requirements for each run are given in Table 1,
-where the results for the coupled and segregated solid models are compared. The
-coupled solver used a bi-conjugate gradient stabilised linear solver with ILU(0)
-preconditioner, while the segregated solver used a conjugate gradient linear
-solver with ILU(0) preconditioner. Both approaches used a solution tolerance of
-$$1 \times 10^{-6}$$. In this case, the coupled solver is approximately four
-times faster than the segregated solver but requires about four times more
-memory.
+where the results for the `unsCoupled` and `segregated` variants are compared.
+The `unsCoupled` solver used a bi-conjugate gradient stabilised linear solver
+with ILU(0) preconditioner, while the `segregated` variant used an implicit
+segregated solve with the same convergence tolerance of
+$$1 \times 10^{-6}$$. In this case, the `unsCoupled` variant is approximately
+four times faster than the `segregated` variant but requires about four times
+more memory.
 
 ```note
 The wall-clock times given in Table 1 were recorded in 2015 using one core of a
@@ -112,13 +110,19 @@ machine.
 
 **Table 1: Wall-clock time (in s) and maximum memory usage (in MB).**
 
-| Mesh    | Coupled  |            | Segregated |            |
-| ------- | -------- | ---------- | ---------- | ---------- |
-|         | **Time** | **Memory** | **Time**   | **Memory** |
-| 624     | 0.2      | 15         | 0.7        | 8          |
-| 4 992   | 2        | 58         | 6          | 24         |
-| 39 936  | 29       | 340        | 98         | 88         |
-| 319 488 | 421      | 2 400      | 2 220      | 560        |
+| Mesh    | unsCoupled |            | segregated |            |
+| ------- | ---------- | ---------- | ---------- | ---------- |
+|         | **Time**   | **Memory** | **Time**   | **Memory** |
+| 624     | 0.2        | 15         | 0.7        | 8          |
+| 4 992   | 2          | 58         | 6          | 24         |
+| 39 936  | 29         | 340        | 98         | 88         |
+| 319 488 | 421        | 2 400      | 2 220      | 560        |
+
+```note
+PETSc timing and memory data for the `petscSnes` variant have not yet been
+added. Based on the current setup, the PETSc results are expected to be close
+to, or better than, the `unsCoupled` variant.
+```
 
 ```warning
 The `coupledUnsLinearGeometryLinearElastic` solid model currently does not run

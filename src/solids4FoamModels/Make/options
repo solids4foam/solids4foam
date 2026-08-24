@@ -50,11 +50,19 @@ else
     VERSION_SPECIFIC_INC += -I../../ThirdParty/eigen3
 endif
 
+ifdef S4F_NO_RBF
+    VERSION_SPECIFIC_INC += -DS4F_NO_RBF
+    RBF_LIB =
+else
+    VERSION_SPECIFIC_INC += \
+        -I$(SOLIDS4FOAM_ROOT)/src/RBFMeshMotionSolver/lnInclude
+    RBF_LIB = -lRBFMeshMotionSolver
+endif
+
 EXE_INC = \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
     -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
-    -I$(SOLIDS4FOAM_ROOT)/src/RBFMeshMotionSolver/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
@@ -113,4 +121,4 @@ LIB_LIBS = \
     -lmeshTools \
     -ltopoChangerFvMesh \
     -L$(FOAM_MODULE_LIBBIN) \
-    -lblockCoupledSolids4FoamTools -lRBFMeshMotionSolver
+    -lblockCoupledSolids4FoamTools $(RBF_LIB)

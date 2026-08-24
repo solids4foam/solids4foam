@@ -25,7 +25,7 @@ SourceFiles
     cellRemovalFvMesh.C
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
+    Philip Cardiff, UCD/UT.
 
 \*---------------------------------------------------------------------------*/
 

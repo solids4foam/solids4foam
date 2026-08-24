@@ -5,11 +5,16 @@ on:
   workflow_dispatch:
   pull_request:
 
+# The unity field selects the build mode, so that both are covered on every
+# supported version: the entries without PETSc build conventionally, which is
+# the default a user gets, and those with PETSc build as unity builds, where
+# the generated sources must also see the PETSc headers
 jobs:
   build-and-test:
     name: Build on ${{ matrix.container-image.name }}
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         container-image:
           # --------------------------------------------------
@@ -19,26 +24,31 @@ jobs:
             image: "philippic/openfoam-v2512:ubuntu-22.04"
             source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
             buildflags: "-j"
+            unity: "0"
 
           - name: "OpenFOAM-v2412"
             image: "philippic/openfoam-v2412:ubuntu-22.04"
             source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
             buildflags: "-j"
+            unity: "0"
 
           - name: "OpenFOAM-v2312"
             image: "opencfd/openfoam-dev:2312"
             source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
             buildflags: "-j"
+            unity: "0"
 
           - name: "OpenFOAM-9"
             image: "philippic/openfoam-9-ubuntu20.04:latest"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
+            unity: "0"
 
           - name: "foam-extend-4.1"
             image: "philippic/foam-extend-4.1-ubuntu20.04:latest"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
+            unity: "0"
 
           # --------------------------------------------------
           # OpenFOAM.com + PETSc
@@ -47,26 +57,31 @@ jobs:
             image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas"
             source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
             buildflags: "-j"
+            unity: "1"
 
           - name: "OpenFOAM-v2412-PETSc"
             image: "philippic/openfoam-v2412:ubuntu-22.04-petsc-no-openmp-system-blas"
             source: "/usr/lib/openfoam/openfoam2412/etc/bashrc"
             buildflags: "-j"
+            unity: "1"
 
           - name: "OpenFOAM-v2312-PETSc"
             image: "philippic/openfoam-v2312:ubuntu-22.04-petsc-no-openmp-system-blas"
             source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
             buildflags: "-j"
+            unity: "1"
 
           - name: "OpenFOAM-9-PETSc"
             image: "philippic/openfoam-9:ubuntu20.04-petsc-no-openmp-system-blas"
             source: "/opt/openfoam9/etc/bashrc"
             buildflags: "-j"
+            unity: "1"
 
           - name: "foam-extend-4.1-PETSc"
             image: "philippic/foam-extend-4.1:ubuntu20.04-petsc-no-openmp-system-blas"
             source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
             buildflags: ""
+            unity: "1"
     container:
       image: ${{ matrix.container-image.image }}
       options: --user 1001
@@ -76,11 +91,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Record the hardware this job landed on, so that intermittent tutorial
+      # failures can be correlated with the CPU rather than inferred from the
+      # Azure region printed in the "Set up job" group. See issue #352.
+      # Every command is best-effort: this step must never fail a build.
+      - name: Runner hardware
+        run: |
+          lscpu | grep -E 'Model name|^Flags|^CPU\(s\)' || true
+          free -g || true
+          cat /proc/cpuinfo | grep -m1 'model name' || true
+
       - name: Allwmake
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
-          export S4F_NO_FILE_FIXES=1; ./Allwmake ${{ matrix.container-image.buildflags }}
+          export S4F_NO_FILE_FIXES=1
+          export S4F_UNITY_BUILD=${{ matrix.container-image.unity }}
+          ./Allwmake ${{ matrix.container-image.buildflags }}
 
       - name: PETSc sanity check
         if: contains(matrix.container-image.name, 'PETSc')
@@ -90,12 +117,21 @@ jobs:
           echo "PETSC_DIR = $PETSC_DIR"
           test -d "$PETSC_DIR/include"
 
+      - name: Pin OpenBLAS core type
+        if: contains(matrix.container-image.name, 'PETSc')
+        run: |
+          echo "OPENBLAS_CORETYPE=Haswell" >> "$GITHUB_ENV"
+          echo "OPENBLAS_CORETYPE = Haswell"
+
       - name: Alltest
         shell: bash -l {0}
         run: |
           source ${{ matrix.container-image.source }}
           cd tutorials
-          export OMP_NUM_THREADS=1; export OPENBLAS_NUM_THREADS=1; export MKL_NUM_THREADS=1; ./Alltest
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./Alltest
 
       - name: Upload test logs
         if: ${{ failure() }}

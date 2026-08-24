@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -53,14 +53,14 @@ boundaryField
     }
     cavity
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        type            analyticalSphericalCavityTraction;
+        farFieldTractionZ 1e6;
+        cavityRadius    0.2;
+        nu              0.3;
         value           uniform (0 0 0);
     }
     posX
     {
-        type            solidTraction;
         type            analyticalSphericalCavityTraction;
         farFieldTractionZ 1e6;
         cavityRadius    0.2;

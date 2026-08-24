@@ -160,6 +160,8 @@ void Foam::mechanicalLaw::makeSigma0() const
             << "pointer already set" << abort(FatalError);
     }
 
+    bool mappedFromBaseMesh = false;
+
     // Check if a single
     if
     (
@@ -218,6 +220,8 @@ void Foam::mechanicalLaw::makeSigma0() const
     }
     else
     {
+        mappedFromBaseMesh = true;
+
         // Read sigma0 from the baseMesh
         const volSymmTensorField sigma0BaseMesh
         (
@@ -247,6 +251,16 @@ void Foam::mechanicalLaw::makeSigma0() const
                 )()
             )
         );
+    }
+
+    if
+    (
+        !mappedFromBaseMesh
+     && lookupSolidModel(mesh(), baseMeshRegionName_).restart()
+     && gMax(mag(sigma0Ptr_())()) > SMALL
+    )
+    {
+        sigma0Ptr_->writeOpt() = IOobject::AUTO_WRITE;
     }
 }
 
@@ -441,7 +455,12 @@ void Foam::mechanicalLaw::makeRelFf()
 
 void Foam::mechanicalLaw::makeSigmaHyd()
 {
-    if (sigmaHydPtr_.valid() || gradSigmaHydPtr_.valid())
+    if
+    (
+        sigmaHydPtr_.valid()
+     || useBoundaryFaceValuesSigmaHydPtr_.valid()
+     || gradSigmaHydPtr_.valid()
+    )
     {
         FatalErrorIn("void " + type() + "::makeSigmaHyd()")
             << "pointer already set" << abort(FatalError);
@@ -462,6 +481,22 @@ void Foam::mechanicalLaw::makeSigmaHyd()
             mesh(),
             dimensionedScalar("zero", dimPressure, 0.0),
             zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    useBoundaryFaceValuesSigmaHydPtr_.set
+    (
+        new boolIOList
+        (
+            IOobject
+            (
+                "useBoundaryFaceValues_sigmaHyd",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            boolList(mesh().boundary().size(), false)
         )
     );
 
@@ -929,11 +964,35 @@ Foam::volTensorField& Foam::mechanicalLaw::F()
 }
 
 
+const Foam::volTensorField& Foam::mechanicalLaw::F() const
+{
+    if (FPtr_.empty())
+    {
+        FatalErrorIn("const volTensorField& " + type() + "::F() const")
+            << "F is not stored by this mechanical law" << abort(FatalError);
+    }
+
+    return FPtr_();
+}
+
+
 Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 {
     if (FfPtr_.empty())
     {
         makeFf();
+    }
+
+    return FfPtr_();
+}
+
+
+const Foam::surfaceTensorField& Foam::mechanicalLaw::Ff() const
+{
+    if (FfPtr_.empty())
+    {
+        FatalErrorIn("const surfaceTensorField& " + type() + "::Ff() const")
+            << "Ff is not stored by this mechanical law" << abort(FatalError);
     }
 
     return FfPtr_();
@@ -1535,6 +1594,7 @@ Foam::mechanicalLaw::mechanicalLaw
         dict_.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
+    useBoundaryFaceValuesSigmaHydPtr_(),
     gradSigmaHydPtr_(),
     curTimeIndex_(-1),
     warnAboutEnforceLinear_(true)
@@ -1661,6 +1721,23 @@ void Foam::mechanicalLaw::correct
         " for the " + type() + " mechanical law"
     );
 }
+
+
+#ifndef FOAMEXTEND
+void Foam::mechanicalLaw::correct
+(
+    CompactListList<symmTensor>& sigmaQuad,
+    const CompactListList<tensor>& gradDQuad
+)
+{
+    notImplemented
+    (
+        type() + "::correct(CompactListList<symmTensor>&)\n"
+        "The correct(CompactListList<symmTensor>&) function is not implemented"
+        "\n for the " + type() + " mechanical law"
+    );
+}
+#endif
 
 
 Foam::scalar Foam::mechanicalLaw::residual()

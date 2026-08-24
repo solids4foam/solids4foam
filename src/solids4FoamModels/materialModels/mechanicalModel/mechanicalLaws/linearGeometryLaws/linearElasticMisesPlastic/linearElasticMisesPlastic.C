@@ -24,6 +24,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "pointFieldFunctions.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -679,6 +680,60 @@ Foam::linearElasticMisesPlastic::~linearElasticMisesPlastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::tmp<Foam::volScalarField>
+Foam::linearElasticMisesPlastic::bulkModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "bulkModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    tmpRef(tresult).correctBoundaryConditions();
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::linearElasticMisesPlastic::shearModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "shearModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            mu_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    tmpRef(tresult).correctBoundaryConditions();
+
+    return tresult;
+}
+
 
 Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const

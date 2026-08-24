@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -32,25 +32,24 @@ boundaryField
     inlet2
     {
         // OpenFOAM
-//        type            scaledFixedValue;
+        // Note: scaledFixedValue was used here previously, but it is broken in
+        // OpenFOAM-v2606, where scaledFixedValueFvPatchField's copy constructor
+        // calls the no-argument clone() that v2606 made NotImplemented, so any
+        // copy of a field with this patch type throws. uniformFixedValue with
+        // the table below is equivalent and works across all supported
+        // versions, so there is no need to change back if that bug is fixed.
+        type            uniformFixedValue;
 
-        // Time vs scale factor
-        scale table
+        // Time vs velocity
+        uniformValue    table
         (
-            (0.0 0.0)
-            (0.1 1.0)
-            (0.2 0.0)
+            (0.0 (0 0 0))
+            (0.1 (0 -1 0))
+            (0.2 (0 0 0))
         );
 
-        // The true velocity is the reference value times the scale factor
-        refValue
-        {
-            type            fixedValue;
-            value           uniform (0 -1 0);
-        }
-
         // foam extend
-        type            timeVaryingUniformFixedValue;
+//        type            timeVaryingUniformFixedValue;
         "file|fileName"   "$FOAM_CASE/constant/fluid/timeVsVelocity.fe41";
         outOfBounds       clamp;
     }

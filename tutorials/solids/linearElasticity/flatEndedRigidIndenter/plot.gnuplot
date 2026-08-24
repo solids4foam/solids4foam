@@ -26,7 +26,7 @@ set grid
 set xlabel "x [m]"
 set ylabel "p_n [MPa]"
 
-pathSigma = "postProcessing/surfaces/1/sigma_surface.raw"
+pathSigma = "postProcessing/sample.surfaces/1/sigma_surface.raw"
 
 plot [-0.015:0.015] pn(x) w l ls 1 title"Analytical",\
      pathSigma u 1:(abs($7)*1e-6) w lp ls 2 notitle smooth unique,\
@@ -38,7 +38,7 @@ set yrange [-0.1:-0.02]
 set key b r
 set ylabel "u_z [mm]"
 
-pathD = "postProcessing/surfaces/1/D_surface.raw"
+pathD = "postProcessing/sample.surfaces/1/D_surface.raw"
 
 plot u(x) w l ls 1 title"Analytical", d(x) w l ls 1 notitle,\
      pathD u 1:($5*1e3) w p ls 2 title"solids4foam"

@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -16,6 +16,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libpressurisedCylinderAnalytical.so");
+
 application     solids4Foam;
 
 startFrom       startTime;
@@ -24,9 +26,9 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         10;
+endTime         1;
 
-deltaT          10;
+deltaT          1;
 
 writeControl    runTime;
 
@@ -48,6 +50,20 @@ runTimeModifiable no;
 
 functions
 {
+    pressurisedCylinderAnalytical
+    {
+       type    pressurisedCylinderAnalyticalSolution;
+       Ri      7;
+       Ro      18.625;
+       p       10e6;
+       E       1e10;
+       nu      0.3;
+       cellDisplacement yes;
+       pointDisplacement no;
+       cellStress yes;
+       pointStress no;
+    }
+
     disp
     {
        type    solidPointDisplacement;

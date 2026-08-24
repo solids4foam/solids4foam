@@ -30,7 +30,7 @@ SourceFiles
     normalDisplacementZeroShearFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -100,7 +100,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAM_ORG
+#if defined(OPENFOAM_ORG) || (OPENFOAM >= 2606)
         //- Construct as copy
         normalDisplacementZeroShearFvPatchVectorField
         (

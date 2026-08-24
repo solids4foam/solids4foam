@@ -284,6 +284,21 @@ sonicLiquidFluid::sonicLiquidFluid
         ),
         rhoO_ + psi_*p()
     ),
+    hRef_
+    (
+        IOobject
+        (
+            "hRef",
+            runTime.constant(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        dimensionedScalar(dimLength, 0)
+    ),
+    ghRef_(-mag(g())*hRef_),
+    gh_("gh", (g() & mesh().C()) - ghRef_),
+    ghf_("ghf", (g() & mesh().Cf()) - ghRef_),
     rAU_
     (
         IOobject

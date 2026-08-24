@@ -30,7 +30,7 @@ SourceFiles
     fixedDisplacementZeroShearFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
+    Philip Cardiff, UCD/UT.
     Based on velocityDisplacement by Aleksandar Karac
 
 \*---------------------------------------------------------------------------*/
@@ -101,7 +101,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAM_ORG
+#if defined(OPENFOAM_ORG) || (OPENFOAM >= 2606)
         //- Construct as copy
         fixedDisplacementZeroShearFvPatchVectorField
         (

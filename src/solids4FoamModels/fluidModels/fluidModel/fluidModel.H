@@ -22,9 +22,9 @@ Description
     Virtual base class for fluid solvers.
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Hrvoje Jasak, Wikki Ltd.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     fluidModel.C
@@ -212,18 +212,6 @@ protected:
 
     // Protected member functions
 
-        //- Return fluid properties dictionary
-        dictionary& fluidProperties()
-        {
-            return fluidProperties_;
-        }
-
-        //- Return fluid properties dictionary
-        const dictionary& fluidProperties() const
-        {
-            return fluidProperties_;
-        }
-
         //- Update Robin boundary conditions, if found
         void updateRobinFsiInterface
         (
@@ -315,6 +303,18 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return fluid properties dictionary
+            dictionary& fluidProperties()
+            {
+                return fluidProperties_;
+            }
+
+            //- Return fluid properties dictionary
+            const dictionary& fluidProperties() const
+            {
+                return fluidProperties_;
+            }
 
             //- Return reference to the mesh
             dynamicFvMesh& mesh()
@@ -602,6 +602,9 @@ public:
 
             //- Clear global poly patches
             void clearGlobalPatches() const;
+
+            //- Synchronise global patches with the current mesh points
+            void syncGlobalPatches() const;
 
         // Edit
 

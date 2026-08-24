@@ -42,10 +42,11 @@ Description
 
 SourceFile
     movingLeastSquaresStencil.C
+    movingLeastSquaresStencilTemplates.C
 
 Author
-    Ivan Batistic, UCD. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Ivan Batistic, UCD.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -59,6 +60,7 @@ Author
 #include "treeBoundBox.H"
 #include "CompactListList.H"
 #include "boolList.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -98,15 +100,23 @@ class movingLeastSquaresStencil
         //- Face-centred MLS stencils (global cell IDs)
         mutable autoPtr<CompactListList<label>> facesStencilPtr_;
 
-        //- Cell-centred MLS stencils assembled from face stencils (global cell IDs)
+        //- Cell-centred MLS stencils assembled from face stencils
+        //  (global cell IDs)
         mutable autoPtr<CompactListList<label>> cellsStencilPtr_;
 
-        //- Remote (off-processor) cells referenced by stencils, grouped per processor
+        //- Remote (off-processor) cells referenced by stencils, grouped
+        //  per processor
         mutable autoPtr<List<labelList>> remoteCellsPerProcPtr_;
 
         //- Geometric centres corresponding to remoteCellsPerProc
         mutable autoPtr<List<vectorField>> remoteCentresPerProcPtr_;
 
+        //- Remote cell centres stored in a global cell id map
+        mutable autoPtr<Map<vector>> remoteCentresMapPtr_;
+
+        //- Remote cell location in remoteCellsPerProc mapped to global index
+        //  First value in list is proc ID and second value represents index
+        mutable autoPtr<Map<FixedList<label, 2>>> remoteCellLocationPtr_;
 
     // Private Member Functions
 
@@ -133,7 +143,7 @@ class movingLeastSquaresStencil
         labelList checkProcessorOverlap
         (
             const List<treeBoundBox>& allOwnedCellsBox,
-            const treeBoundBox& ownedFacesBox
+            const List<treeBoundBox>& allOwnedFacesBox
         ) const;
 
         //- Get remote cells candidates for stencil construction
@@ -187,18 +197,33 @@ public:
         const label Nc
     );
 
-    // Desctructor
+    // Destructor
     virtual ~movingLeastSquaresStencil() = default;
 
     // Member Functions
 
+        //- Stencil size for faces
+        label faceNn() const
+        {
+            return N_;
+        }
+
+        //- Stencil size for cells
+        label cellNn() const
+        {
+            return Nc_;
+        }
+
+        //- Return overall cell stencil size using cell faces stencils
+        tmp<labelField> cellFacesStencilSize() const;
+
         //- Marked cells at processor boundary
         const boolList& procCells() const;
 
-        //- Returns face stencils
+        //- Returns face stencils (global indexing)
         const CompactListList<label>& facesStencil() const;
 
-        //- Returns cell stencils
+        //- Returns cell stencils (global indexing)
         const CompactListList<label>& cellsStencil() const;
 
         //- Return remote cells per processor written in global indexing
@@ -207,14 +232,41 @@ public:
         //- Return remote cell centres per processor, same order as remoteCells
         const List<vectorField>& remoteCentresPerProc() const;
 
+        //- Return remote cell centres as a map keyed by global cell ID
+        const Map<vector>& remoteCentresMap() const;
+
+        //- Return const reference to globalCells
+        const globalIndex& globalCells() const;
+
+        //- Return map from remote global cell ID to {procI, index}
+        const Map<FixedList<label, 2>>& remoteCellLocation() const;
+
         //- Clear all data, call after mesh topology change
         void clear() const;
+
+    // Data exchange
+
+        //- Return remote field values per processor
+        template<class Type>
+        List<Field<Type>> remoteFieldPerProc(const UList<Type>& fld) const;
+
+        //- Return remote field values as a map keyed by global cell ID
+        //  Same as remoteCentresMap but cell centres are already exchanged
+        //  during stencil building.
+        template<class Type> Map<Type>
+        remoteFieldMap(const UList<Type>& fld) const;
 };
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#ifdef NoRepository
+    #include "movingLeastSquaresStencilTemplates.C"
 #endif
 
-// ************************************************************************* //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif

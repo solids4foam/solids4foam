@@ -35,7 +35,7 @@ SourceFiles
     cantileverDisplacementFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -166,6 +166,12 @@ public:
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
 
+#ifndef FOAMEXTEND
+            //- Return face quadrature values
+            //  Used for high order solvers
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
+#endif
 
         // Member functions
 

@@ -1,0 +1,6 @@
+analyticalSphericalCavityTraction/analyticalSphericalCavityTractionFvPatchVectorField.C
+
+sphericalCavityAnalyticalSolution/sphericalCavityAnalyticalSolution.C
+sphericalCavityAnalyticalSolution/sphericalCavityStressDisplacement.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libsphericalCavityAnalytical

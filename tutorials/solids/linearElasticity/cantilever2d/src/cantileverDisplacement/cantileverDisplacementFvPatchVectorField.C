@@ -22,6 +22,7 @@ InClass
 
 #include "cantileverDisplacementFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
+#include "lookupSolidModel.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -150,6 +151,57 @@ void Foam::cantileverDisplacementFvPatchVectorField::updateCoeffs()
 
     fixedValueFvPatchVectorField::updateCoeffs();
 }
+
+
+#ifndef FOAMEXTEND
+Foam::autoPtr<Foam::CompactListList<Foam::vector>>
+Foam::cantileverDisplacementFvPatchVectorField::evaluateQuadrature
+() const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is list for the  whole mesh
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementMLS().quadrature().faceQuadPoints();
+
+    // faceQuadPoints is list for whole mesh.
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Loop over faces
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the values to face quadrature points
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const point quadPoint = faceQuadPoints[globalFaceID][pointI];
+            quadPointsValue[faceI][pointI] =
+                analyticalSol_.displacement(quadPoint);
+        }
+    }
+
+    return tQuadPointsValue;
+}
+#endif
 
 
 void Foam::cantileverDisplacementFvPatchVectorField::write(Ostream& os) const

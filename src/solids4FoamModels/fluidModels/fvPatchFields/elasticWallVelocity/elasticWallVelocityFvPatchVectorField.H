@@ -60,6 +60,12 @@ class elasticWallVelocityFvPatchVectorField
     vectorField oldOldFc_;
 
 
+    // Private Member Functions
+
+        //- Set Fc_ to the current patch face centres
+        void setCurrentFaceCentres();
+
+
 public:
 
     //- Runtime type information

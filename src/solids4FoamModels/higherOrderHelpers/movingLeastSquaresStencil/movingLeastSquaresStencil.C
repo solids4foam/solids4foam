@@ -98,15 +98,16 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
         const label from = nbrs[i];
 
 #ifdef OPENFOAM_COM
-        if (pBufs.recvDataCount(from))
-#endif
+        if (!pBufs.recvDataCount(from))
         {
-            UIPstream is(from, pBufs);
-
-            scalar lenN;
-            is >> lenN;
-            neighbourHaloDepth[from] = lenN;
+            continue;
         }
+#endif
+        UIPstream is(from, pBufs);
+
+        scalar lenN;
+        is >> lenN;
+        neighbourHaloDepth[from] = lenN;
     }
 
     // Return averaged first halo depth per processor
@@ -116,18 +117,26 @@ List<scalar> movingLeastSquaresStencil::calcFirstHaloDepth() const
 labelList movingLeastSquaresStencil::checkProcessorOverlap
 (
     const List<treeBoundBox>& allOwnedCellsBox,
-    const treeBoundBox& ownedFacesBox
+    const List<treeBoundBox>& allOwnedFacesBox
 ) const
 {
     DynamicList<label> overlappingProcessor;
+    const label myProcNo = Pstream::myProcNo();
+    const treeBoundBox& ownedCellsBox = allOwnedCellsBox[myProcNo];
+    const treeBoundBox& ownedFacesBox = allOwnedFacesBox[myProcNo];
 
     for (label proc = 0; proc < Pstream::nProcs(); ++proc)
     {
-        if (proc == Pstream::myProcNo())
+        if (proc == myProcNo)
         {
             continue;
         }
-        if (allOwnedCellsBox[proc].overlaps(ownedFacesBox))
+
+        if
+        (
+            allOwnedCellsBox[proc].overlaps(ownedFacesBox)
+         || allOwnedFacesBox[proc].overlaps(ownedCellsBox)
+        )
         {
             overlappingProcessor.append(proc);
         }
@@ -203,12 +212,18 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
         forAll(procToQuery, i)
         {
             const label from = procToQuery[i];
-#ifdef OPENFOAM_COM
-            if (sBufs.recvDataCount(from) && from == Pstream::myProcNo())
-#endif
+
+            if (from == Pstream::myProcNo())
             {
                 continue;
             }
+
+#ifdef OPENFOAM_COM
+            if (!sBufs.recvDataCount(from))
+            {
+                continue;
+            }
+#endif
             UIPstream is(from, sBufs);
             treeBoundBox qb;
             is >> qb;
@@ -256,11 +271,11 @@ List<labelList> movingLeastSquaresStencil::remoteCandidates
         {
             const label fromProc = procToQuery[i];
 #ifdef OPENFOAM_COM
-            if (rBufs.recvDataCount(fromProc))
-#endif
+            if (!rBufs.recvDataCount(fromProc))
             {
                 continue;
             }
+#endif
             UIPstream is(fromProc, rBufs);
             labelList lst;
             is >> lst;
@@ -316,16 +331,17 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
     {
         const label fromProc = procToQuery[i];
 
-        if
-        (
-#ifdef OPENFOAM_COM
-            reqBufs.recvDataCount(fromProc) ||
-#endif
-            fromProc == Pstream::myProcNo()
-        )
+        if (fromProc == Pstream::myProcNo())
         {
             continue;
         }
+
+#ifdef OPENFOAM_COM
+        if (!reqBufs.recvDataCount(fromProc))
+        {
+            continue;
+        }
+#endif
 
         UIPstream is(fromProc, reqBufs);
 
@@ -358,7 +374,7 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
 
     repBufs.finishedSends();
 
-    // Phase 3: Send back populated cell centres lists
+    // Phase 3: send back populated cell centres lists
 
     forAll(procToQuery, i)
     {
@@ -370,13 +386,13 @@ List<vectorField> movingLeastSquaresStencil::remoteCandidatesCellCentres
         }
 
 #ifdef OPENFOAM_COM
-        if (repBufs.recvDataCount(p))
-#endif
+        if (!repBufs.recvDataCount(p))
         {
             FatalErrorInFunction
                 << "Did not receive centres from proc " << p << nl
                 << exit(FatalError);
         }
+#endif
 
         UIPstream is(p, repBufs);
 
@@ -417,6 +433,7 @@ void  movingLeastSquaresStencil::calcProcessorCells() const
         }
     }
 }
+
 
 labelList movingLeastSquaresStencil::buildFacesStencil
 (
@@ -580,8 +597,10 @@ labelList movingLeastSquaresStencil::buildFacesStencil
 
     // Phase 3: Radius from position posR = ceil(searchExpansionFactor*N)
 
-    label posR = label(std::ceil(searchExpansionFactor * scalar(N_)));
-    posR = min(max(posR, 0), localDist.size()-1);
+    const label unboundedPosR =
+        label(std::ceil(searchExpansionFactor * scalar(N_)));
+
+    label posR = min(max(unboundedPosR, 0), localDist.size()-1);
 
     const scalar R2 = localDist[posR].second();
 
@@ -630,6 +649,56 @@ labelList movingLeastSquaresStencil::buildFacesStencil
         }
     );
 
+    // The local radius is under-estimated if the processor partition contains
+    // too few local cells; use all exchanged remote candidates before failing.
+    if (allDist.size() < N_ && unboundedPosR >= localDist.size())
+    {
+        allDist.clear();
+        allDist.reserve(localDist.size() + 100);
+
+        forAll(localDist, i)
+        {
+            const label cellID = localDist[i].first();
+            const label globalCellID = globalCells_.toGlobal(cellID);
+            allDist.append
+            (
+                Tuple2<label, scalar>(globalCellID, localDist[i].second())
+            );
+        }
+
+        forAll(remoteCells, p)
+        {
+            const labelList& procCells = remoteCells[p];
+            const vectorField& procCellCentres = remoteCellsCentres[p];
+
+            if (procCells.empty())
+            {
+                continue;
+            }
+
+            forAll(procCells, i)
+            {
+                allDist.append
+                (
+                    Tuple2<label, scalar>
+                    (
+                        procCells[i],
+                        magSqr(procCellCentres[i] - faceCentre)
+                    )
+                );
+            }
+        }
+
+        Foam::sort
+        (
+            allDist,
+            [](const Tuple2<label, scalar>& A, const Tuple2<label, scalar>& B)
+            {
+                return A.second() < B.second();
+            }
+        );
+    }
+
     // Check minimum stencil size
     if ( allDist.size() < N_ )
     {
@@ -658,6 +727,7 @@ labelList movingLeastSquaresStencil::buildFacesStencil
 
     return faceStencil;
 }
+
 
 void movingLeastSquaresStencil::filterUnusedCandidates
 (
@@ -752,22 +822,27 @@ void movingLeastSquaresStencil::calcFacesStencil() const
     ownedFacesBox.inflate(scaledHaloDepth);
 #endif
 
-
     // Box for remote processors cells
     List<treeBoundBox> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
 
+    List<treeBoundBox> allOwnedFacesBox(Pstream::nProcs());
+    allOwnedFacesBox[Pstream::myProcNo()] = ownedFacesBox;
+
 #ifdef OPENFOAM_COM
     Pstream::allGatherList(allOwnedCellsBox);
+    Pstream::allGatherList(allOwnedFacesBox);
 #endif
 #ifdef OPENFOAM_ORG
     Pstream::gatherList(allOwnedCellsBox);
     Pstream::scatterList(allOwnedCellsBox);
+    Pstream::gatherList(allOwnedFacesBox);
+    Pstream::scatterList(allOwnedFacesBox);
 #endif
 
     // Get processors that may have stencil cells, detected using overlap test
     labelList procToQuery =
-       checkProcessorOverlap(allOwnedCellsBox, ownedFacesBox);
+       checkProcessorOverlap(allOwnedCellsBox, allOwnedFacesBox);
 
     // List of remote cells (per processor) written using global indexing
     List<labelList> remoteCells =
@@ -805,18 +880,6 @@ void movingLeastSquaresStencil::calcFacesStencil() const
         if (isA<emptyPolyPatch>(pp))
         {
             continue;
-        }
-
-        // Skip non-owned processor faces to avoid double counting
-        if (isA<processorPolyPatch>(pp))
-        {
-            const processorPolyPatch& ppp =
-                refCast<const processorPolyPatch>(pp);
-
-            if (!ppp.owner())
-            {
-                continue;
-            }
         }
 
         forAll(pp, i)
@@ -919,6 +982,16 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
             }
         }
 
+        // Remove the current cell itself from candidates.
+        // Cell-centre contribution is handled separately in MLS,
+        // so the stencil contain neighbours only.
+        const label globalCellID = globalCells_.toGlobal(cellI);
+
+        if (candidates.found(globalCellID))
+        {
+            candidates.erase(globalCellID);
+        }
+
         // Build distance list (squared distance to cell centre)
         dist.clear();
         if (dist.capacity() < candidates.size())
@@ -959,7 +1032,11 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
             }
         );
 
-        if (dist.size() < Nc_)
+        // Required numnber of cell is for one smaller becouse of cell centre
+        // which is also part of the stencil
+        const label nReq = Nc_ - 1;
+
+        if (dist.size() < nReq)
         {
             FatalErrorInFunction
                 << "Cell " << cellI << " has only " << dist.size()
@@ -968,10 +1045,10 @@ void movingLeastSquaresStencil::calcCellsStencil(const scalar relTol) const
         }
 
         // Enlarge stencil to include cells with the same distance
-        const scalar cut = dist[Nc_-1].second();
+        const scalar cut = dist[nReq-1].second();
         const scalar cutTol = cut*(1.0 + relTol);
 
-        label nPick = Nc_;
+        label nPick = nReq;
         while (nPick < dist.size() && dist[nPick].second() <= cutTol)
         {
             ++nPick;
@@ -1028,7 +1105,11 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
     Nc_(Nc),
     procCellsPtr_(),
     facesStencilPtr_(),
-    cellsStencilPtr_()
+    cellsStencilPtr_(),
+    remoteCellsPerProcPtr_(),
+    remoteCentresPerProcPtr_(),
+    remoteCentresMapPtr_(),
+    remoteCellLocationPtr_()
 {
 }
 
@@ -1036,37 +1117,72 @@ movingLeastSquaresStencil::movingLeastSquaresStencil
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
+tmp<labelField> movingLeastSquaresStencil::cellFacesStencilSize() const
+{
+    const fvMesh& mesh = mesh_;
+
+    tmp<labelField> tpnf(new labelField(mesh.nCells()));
+    labelField& pnf = tpnf.ref();
+
+    // Get each face stencil
+    const CompactListList<label>& facesStencil = this->facesStencil();
+
+    // Loop over cell faces stencils and merge thems into one
+    forAll(mesh.cells(), cellI)
+    {
+        labelHashSet cellStencil;
+
+        const labelList& cellFaces = mesh.cells()[cellI];
+
+        forAll(cellFaces, faceI)
+        {
+            label faceID = cellFaces[faceI];
+
+            // Loop over face stencil and store face stencil
+            forAll(facesStencil[faceID], i)
+            {
+                cellStencil.insert(facesStencil[faceID][i]);
+            }
+        }
+
+        pnf[cellI] = cellStencil.size();
+    }
+
+    return tpnf;
+}
+
+
 const CompactListList<label>& movingLeastSquaresStencil::facesStencil() const
 {
-    if (!facesStencilPtr_.valid())
+    if (facesStencilPtr_.empty())
     {
          calcFacesStencil();
     }
 
-    return facesStencilPtr_();
+    return autoPtrRef(facesStencilPtr_);
 }
 
 
 const CompactListList<label>& movingLeastSquaresStencil::cellsStencil() const
 {
     // Cells stencils are constructed from faces stencils
-    if (!facesStencilPtr_.valid())
+    if (facesStencilPtr_.empty())
     {
          calcFacesStencil();
     }
 
-    if (!cellsStencilPtr_.valid())
+    if (cellsStencilPtr_.empty())
     {
         calcCellsStencil();
     }
 
-    return cellsStencilPtr_();
+    return autoPtrRef(cellsStencilPtr_);
 }
 
 
 const List<labelList>& movingLeastSquaresStencil::remoteCellsPerProc() const
 {
-    if (!remoteCellsPerProcPtr_.valid())
+    if (remoteCellsPerProcPtr_.empty())
     {
          calcFacesStencil();
     }
@@ -1077,7 +1193,7 @@ const List<labelList>& movingLeastSquaresStencil::remoteCellsPerProc() const
 
 const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
 {
-    if (!remoteCentresPerProcPtr_.valid())
+    if (remoteCentresPerProcPtr_.empty())
     {
         calcFacesStencil();
     }
@@ -1088,7 +1204,7 @@ const List<vectorField>& movingLeastSquaresStencil::remoteCentresPerProc() const
 
 const boolList& movingLeastSquaresStencil::procCells() const
 {
-    if (!procCellsPtr_.valid())
+    if (procCellsPtr_.empty())
     {
         calcProcessorCells();
     }
@@ -1097,13 +1213,104 @@ const boolList& movingLeastSquaresStencil::procCells() const
 }
 
 
-void Foam::movingLeastSquaresStencil::clear() const
+const Map<vector>& movingLeastSquaresStencil::remoteCentresMap() const
+{
+    if (!remoteCentresMapPtr_.valid())
+    {
+        const labelListList& remoteCells = this->remoteCellsPerProc();
+        const List<vectorField>& remoteCentres = this->remoteCentresPerProc();
+
+        // Get number of entries to avoid dynamic allocation
+        label nRemote = 0;
+        forAll(remoteCells, procI)
+        {
+            nRemote += remoteCells[procI].size();
+        }
+        remoteCentresMapPtr_.set(new Map<vector>(2*nRemote));
+
+        Map<vector>& remoteCentresMap = *remoteCentresMapPtr_;
+
+        // Fill map
+        forAll(remoteCells, procI)
+        {
+            const labelList& curRemoteCells = remoteCells[procI];
+            const vectorField& curRemoteCentres = remoteCentres[procI];
+
+            if (curRemoteCells.size() != curRemoteCentres.size())
+            {
+                FatalErrorInFunction
+                    << "remoteCellsPerProc and remoteCentresPerProc sizes do "
+                    << "not match for processor " << procI << nl
+                    << "Number of remote cells = " << curRemoteCells.size()
+                    << nl << "Number of remote centres = "
+                    << curRemoteCentres.size()
+                    << abort(FatalError);
+            }
+
+            forAll(curRemoteCells, i)
+            {
+                remoteCentresMap.insert(curRemoteCells[i], curRemoteCentres[i]);
+            }
+        }
+    }
+
+    return *remoteCentresMapPtr_;
+}
+
+
+const globalIndex& movingLeastSquaresStencil::globalCells() const
+{
+    return globalCells_;
+}
+
+
+const Map<FixedList<label, 2>>&
+movingLeastSquaresStencil::remoteCellLocation() const
+{
+    if (!remoteCellLocationPtr_.valid())
+    {
+        const List<labelList>& remoteCells = remoteCellsPerProc();
+
+        label nRemote = 0;
+        forAll(remoteCells, procI)
+        {
+            nRemote += remoteCells[procI].size();
+        }
+
+        remoteCellLocationPtr_.set
+        (
+            new Map<FixedList<label, 2>>(2*nRemote)
+        );
+        Map<FixedList<label, 2>>& locMap = *remoteCellLocationPtr_;
+
+        forAll(remoteCells, procI)
+        {
+            const labelList& thisProcRemoteCells = remoteCells[procI];
+
+            forAll(thisProcRemoteCells, i)
+            {
+                FixedList<label, 2> loc;
+                loc[0] = procI;
+                loc[1] = i;
+
+                locMap.insert(thisProcRemoteCells[i], loc);
+            }
+        }
+    }
+
+    return *remoteCellLocationPtr_;
+}
+
+
+void movingLeastSquaresStencil::clear() const
 {
     facesStencilPtr_.clear();
     cellsStencilPtr_.clear();
     remoteCellsPerProcPtr_.clear();
     remoteCentresPerProcPtr_.clear();
     procCellsPtr_.clear();
+    remoteCentresMapPtr_();
+    remoteCellLocationPtr_.clear();
 }
 
 } // End namespace Foam

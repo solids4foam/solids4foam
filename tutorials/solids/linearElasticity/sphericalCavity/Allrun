@@ -1,25 +1,153 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+# -------------------------------------------------------------------------
+# solids4Foam Allrun script
+# Allows selection of solution approach:
+#   petscSnes (default), segregated, highOrder
+# -------------------------------------------------------------------------
 
-# Source solids4Foam scripts
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [approach] [mesh]
+
+Where [approach] is one of:
+  petscSnes         (default)
+  segregated
+  highOrder
+
+Where [mesh] is one of:
+  tet               (default) tetrahedral mesh from gmsh
+  poly              polyhedral mesh via polyDualMesh
+
+Examples:
+  ./Allrun
+  ./Allrun petscSnes
+  ./Allrun highOrder
+  ./Allrun petscSnes poly
+EOF
+}
+
+# -------------------------------------------------------------------------
+# Environment setup
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
+
+# -------------------------------------------------------------------------
+# Parse approach
+# -------------------------------------------------------------------------
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-petscSnes}"
+
+case "$APPROACH" in
+    segregated|petscSnes|highOrder) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+MESH="${2:-tet}"
+
+case "$MESH" in
+    tet|poly) ;;
+    *)
+        echo "Error: Unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
+# -------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------
+
+link_files_for_suffix() {
+    # $1 = suffix (e.g. petscSnes)
+    local suffix="$1"
+    local found=0
+    while IFS= read -r -d '' f; do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found )); then
+        echo "Warning: No *.${suffix} files found under ./constant ./system."
+    fi
+}
+
+require_petsc_or_exit_silently() {
+    case "$APPROACH" in
+        petscSnes|highOrder)
+            solids4Foam::requirePetscOrExitSilently
+            ;;
+    esac
+}
+
+select_approach() {
+    case "$APPROACH" in
+        segregated)
+            echo "Using the segregated approach"
+            link_files_for_suffix "segregated"
+            ;;
+        petscSnes)
+            echo "Using the petscSnes approach"
+            link_files_for_suffix "petscSnes"
+            ;;
+        highOrder)
+            echo "Using the highOrder approach"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            ;;
+    esac
+}
+
+# -------------------------------------------------------------------------
+# Main workflow
+# -------------------------------------------------------------------------
 
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
+require_petsc_or_exit_silently
+
+select_approach
+
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
 # Create the mesh
 if command -v gmsh &> /dev/null
 then
-    # Remporarily rename 0 to avoid issues
+    # Temporarily rename 0 to avoid issues
     mv 0 0.tmp
 
     # Create mesh with gmsh
     solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
     solids4Foam::runApplication gmshToFoam sphericalCavity.msh
-    solids4Foam::runApplication polyDualMesh 30 -overwrite
-    solids4Foam::runApplication combinePatchFaces 45 -overwrite
+
+    if [[ "$MESH" == "poly" ]]
+    then
+        echo "Converting the tetrahedral mesh to a polyhedral mesh"
+        solids4Foam::runApplication polyDualMesh 30 -overwrite
+        solids4Foam::runApplication combinePatchFaces 45 -overwrite
+    fi
+
     solids4Foam::runApplication changeDictionary
 
     # Move 0 back
@@ -31,6 +159,4 @@ else
 fi
 
 # Run solver
-#solids4Foam::runApplication solids4Foam
-echo "Running solids4Foam"
-mpirun -np 1 solids4Foam &> log.solids4Foam
+solids4Foam::runApplication solids4Foam

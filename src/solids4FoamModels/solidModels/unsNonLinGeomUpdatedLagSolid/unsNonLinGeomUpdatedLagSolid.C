@@ -268,14 +268,21 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
         DD().storePrevIter();
 
         // Momentum equation incremental updated Lagrangian form
+        // Assemble the RHS in stages.
+        tmp<fvVectorMatrix> tRhsEqn
+        (
+            fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+        );
+        tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)");
+        tmpRef(tRhsEqn) +=
+            fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_);
+        tmpRef(tRhsEqn) += rho()*g();
+
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
           + fvc::d2dt2(rho_, D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_)
-          + rho()*g()
+         == tRhsEqn
         );
 
         // Under-relax the linear system
@@ -349,11 +356,11 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
 
-    // Update gradient of total displacement
-    gradD() = fvc::grad(D().oldTime() + DD());
-
     // Total displacement
     D() = D().oldTime() + DD();
+
+    // Update gradient of total displacement
+    gradD() = fvc::grad(D());
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();

@@ -22,7 +22,7 @@ Description
     FunctionObject reports FSI convergence data
 
 Author
-    Zeljko Tukovic, FSB.  All rights reserved
+    Zeljko Tukovic, FSB.
 
 SourceFiles
     fsiConvergenceData.C

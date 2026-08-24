@@ -20,7 +20,7 @@ Description
     primitivePatches
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
 
 Modification by:
     Martin Beaudoin, Hydro-Quebec, (2008)

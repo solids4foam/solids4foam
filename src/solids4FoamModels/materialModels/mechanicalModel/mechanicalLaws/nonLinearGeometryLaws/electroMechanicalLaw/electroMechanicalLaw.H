@@ -29,7 +29,7 @@ SourceFiles
     electroMechanicalLaw.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -56,11 +56,32 @@ class electroMechanicalLaw
         //- Run-time selectable passive mechanical law
         autoPtr<mechanicalLaw> passiveMechLawPtr_;
 
-        //- Constant active tension
+        //- Fibre direction field (read from 0/solid/f0)
+        volVectorField f0_;
+
+        //- Fibre direction outer product f0 x f0
+        volSymmTensorField f0f0_;
+
+        //- Surface fibre direction field (read from 0/solid/f0f)
+        surfaceVectorField f0f_;
+
+        //- Surface fibre direction outer product
+        surfaceSymmTensorField f0f0f_;
+
+        //- Constant active tension (used when no field-based Ta is available)
         const dimensionedScalar Ta_;
 
         //- Ramp time over which Ta is increased from zero to its maximum value
         const scalar rampTime_;
+
+        //- Flag: true if a field-based "Ta" volScalarField is found in the
+        //  objectRegistry (set by the coupling model). Checked lazily at the
+        //  first call to correct() since the coupling model may register the
+        //  field after the mechanicalLaw is constructed.
+        mutable bool useFieldTa_;
+
+        //- Flag: true once useFieldTa_ has been determined
+        mutable bool fieldTaChecked_;
 
     // Private Member Functions
 

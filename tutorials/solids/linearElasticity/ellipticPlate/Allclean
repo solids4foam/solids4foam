@@ -7,8 +7,19 @@
 source solids4FoamScripts.sh
 
 cleanCase
+
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam postProcessing constant/polyMesh/boundary*
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
+
+# Link files back to default solid model settings
+for file in $(find ./0 ./constant ./system \( -type f -o -type l \) -name '*.petscSnes')
+do
+    ln -vnsf ${file##*/} ${file%.*}
+done
+
+# Link the OpenFOAM mesh dictionary back to the default location
+\rm -f constant/polyMesh/blockMeshDict system/blockMeshDict
+ln -vnsf blockMeshDict.openfoam system/blockMeshDict

@@ -43,6 +43,8 @@ Author
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
 #include "mat66.H"
+#include "CompactListList.H"
+#include "boolIOList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -124,6 +126,10 @@ class mechanicalLaw
 
         // Hydrostatic stress (negative of hydrostatic pressure) volField
         autoPtr<volScalarField> sigmaHydPtr_;
+
+        //- Boundary flag field used by the leastSquaresS4f gradient scheme
+        //  for the sigmaHyd field
+        autoPtr<boolIOList> useBoundaryFaceValuesSigmaHydPtr_;
 
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
@@ -478,6 +484,12 @@ public:
 
     // Member Functions
 
+        //- Return the total deformation gradient stored by this law
+        const volTensorField& F() const;
+
+        //- Return the total face deformation gradient stored by this law
+        const surfaceTensorField& Ff() const;
+
         //- Return name
         const word& name() const
         {
@@ -547,6 +559,16 @@ public:
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
         );
+
+        //- Calculate the stress at face quadrature points given the
+        //  displacement gradient at quadrature points
+#ifndef FOAMEXTEND
+        virtual void correct
+        (
+            CompactListList<symmTensor>& sigmaQuad,
+            const CompactListList<tensor>& gradDQuad
+        );
+#endif
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

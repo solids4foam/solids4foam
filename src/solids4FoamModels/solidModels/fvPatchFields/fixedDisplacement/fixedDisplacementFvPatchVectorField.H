@@ -28,7 +28,7 @@ SourceFiles
     fixedDisplacementFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
+    Philip Cardiff, UCD/UT.
 
 \*---------------------------------------------------------------------------*/
 
@@ -39,6 +39,7 @@ Author
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
 #include "primitivePatchInterpolation.H"
+#include "CompactListList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,6 +64,9 @@ class fixedDisplacementFvPatchVectorField
 
         //- Displacement time series
         interpolationTable<vector> dispSeries_;
+
+        //- Optionally, set point patch displacement field if it exists
+        const Switch enforcePointPatchField_;
 
         //- Patch interpolator to interpolate face values to the points
         mutable autoPtr<primitivePatchInterpolation> interpPtr_;
@@ -181,6 +185,13 @@ public:
             //- Return the matrix source coefficients corresponding to the
             //  evaluation of the gradient of this patchField
             virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
+
+#ifndef FOAMEXTEND
+            //- Return face quadrature points values,
+            //  used for high order solvers
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
+#endif
 
         // Mapping functions
 

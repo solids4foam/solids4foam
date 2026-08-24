@@ -26,8 +26,8 @@ SourceFiles
     standardPenaltyFriction.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
-    Matthias Schnaithmann, Universitat Stuttgart. All rights reserved.
+    Philip Cardiff, UCD.
+    Matthias Schnaithmann, Universitat Stuttgart.
 
 \*---------------------------------------------------------------------------*/
 

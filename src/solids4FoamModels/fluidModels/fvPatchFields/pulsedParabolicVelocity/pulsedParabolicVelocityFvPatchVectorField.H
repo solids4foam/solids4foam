@@ -36,7 +36,7 @@ SourceFiles
     pulsedParabolicVelocityFvPatchVectorField.C
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Hrvoje Jasak, Wikki Ltd.
     Modified by Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/

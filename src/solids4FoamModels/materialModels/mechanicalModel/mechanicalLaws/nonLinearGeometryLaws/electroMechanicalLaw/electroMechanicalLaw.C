@@ -56,8 +56,36 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
             nonLinGeom
         )
     ),
+    f0_
+    (
+        IOobject
+        (
+            "f0",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    ),
+    f0f0_("f0f0", sqr(f0_)),
+    f0f_
+    (
+        IOobject
+        (
+            "f0f",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    ),
+    f0f0f_("f0f0f", sqr(f0f_)),
     Ta_(dict.lookup("activeTension")),
-    rampTime_(readScalar(dict.lookup("rampTime")))
+    rampTime_(readScalar(dict.lookup("rampTime"))),
+    useFieldTa_(false),
+    fieldTaChecked_(false)
 {
     if (rampTime_ < 0.0)
     {
@@ -100,74 +128,112 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::shearModulus() const
 
 void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
 {
+    // Lazy check for field-based active tension
+    if (!fieldTaChecked_)
+    {
+        fieldTaChecked_ = true;
+        useFieldTa_ = mesh().foundObject<volScalarField>("Ta");
+
+        if (useFieldTa_)
+        {
+            Info<< "    electroMechanicalLaw: using field-based active tension"
+                << " (Ta volScalarField from objectRegistry)" << endl;
+        }
+        else
+        {
+            Info<< "    electroMechanicalLaw: using constant active tension"
+                << " Ta = " << Ta_.value()
+                << " with rampTime = " << rampTime_ << endl;
+        }
+    }
+
     // Calculate passive stress
     passiveMechLawPtr_->correct(sigma);
 
-    // Lookup the fibre directions
-    // How best should we do this to avoid duplicating the fibre field?
-    // For now, let's hard-code in the field name
-    const volSymmTensorField f0f0 =
-        mesh().lookupObject<volSymmTensorField>("f0f0");
-
-    // Take a reference to the deformation gradient to make the code easier to
-    // read
-    const volTensorField& F = this->F();
+    // Take a reference to the deformation gradient maintained by the passive law
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const volTensorField& F = passiveLaw.F();
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
 
-    // For now, we will assume a constant active stress
-    // The next step will be to include an active-stress model to convert
-    // muscle activation to fibre tension
-
-    // Calculate current value of Ta
-    dimensionedScalar currentTa = Ta_;
-    if (mesh().time().value() < rampTime_)
+    if (useFieldTa_)
     {
-        currentTa = (mesh().time().value()/rampTime_)*Ta_;
-    }
+        // Field-based active tension from the coupling model
+        const volScalarField& Ta =
+            mesh().lookupObject<volScalarField>("Ta");
 
-    // Add active stress to the passive stress
-    // Note that the active stress is converted from a 2nd Piola-Kirchhoff
-    // stress to a Cauchy stress
-    // sigma += J*symm(F & (currentTa*f0f0) & F.T());
-    sigma += symm(F & (currentTa*f0f0) & F.T())/J;
+        // Add active stress: convert 2nd Piola-Kirchhoff to Cauchy
+        sigma += symm(F & (Ta*f0f0_) & F.T())/J;
+    }
+    else
+    {
+        // Constant active tension with optional ramp
+        dimensionedScalar currentTa = Ta_;
+        if (mesh().time().value() < rampTime_)
+        {
+            currentTa = (mesh().time().value()/rampTime_)*Ta_;
+        }
+
+        sigma += symm(F & (currentTa*f0f0_) & F.T())/J;
+    }
 }
 
 
 void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
 {
+    // Lazy check for field-based active tension (same as vol variant)
+    if (!fieldTaChecked_)
+    {
+        fieldTaChecked_ = true;
+        useFieldTa_ = mesh().foundObject<volScalarField>("Ta");
+
+        if (useFieldTa_)
+        {
+            Info<< "    electroMechanicalLaw: using field-based active tension"
+                << " (Ta volScalarField from objectRegistry)" << endl;
+        }
+        else
+        {
+            Info<< "    electroMechanicalLaw: using constant active tension"
+                << " Ta = " << Ta_.value()
+                << " with rampTime = " << rampTime_ << endl;
+        }
+    }
+
     // Calculate passive stress
     passiveMechLawPtr_->correct(sigma);
 
-    // Lookup the fibre directions
-    // How best should we do this to avoid duplicating the fibre field?
-    // For now, let's hard-code in the field name
-    const surfaceSymmTensorField f0f0 =
-        mesh().lookupObject<surfaceSymmTensorField>("f0f0f");
-
-    // Take a reference to the deformation gradient to make the code easier to
-    // read
-    const surfaceTensorField& F = this->Ff();
+    // Take a reference to the face deformation gradient maintained by the
+    // passive law
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const surfaceTensorField& F = passiveLaw.Ff();
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));
 
-    // For now, we will assume a constant active stress
-    // The next step will be to include an active-stress model to convert
-    // muscle activation to fibre tension
-
-    // Calculate current value of Ta
-    dimensionedScalar currentTa = Ta_;
-    if (mesh().time().value() < rampTime_)
+    if (useFieldTa_)
     {
-        currentTa = (mesh().time().value()/rampTime_)*Ta_;
-    }
+        // Interpolate field-based active tension to faces
+        const volScalarField& Ta =
+            mesh().lookupObject<volScalarField>("Ta");
 
-    // Add active stress to the passive stress
-    // Note that the active stress is converted from a 2nd Piola-Kirchhoff
-    // stress to a Cauchy stress
-    sigma += J*symm(F & (currentTa*f0f0) & F.T());
+        const surfaceScalarField Taf(fvc::interpolate(Ta));
+
+        // Add active stress: convert 2nd Piola-Kirchhoff to Cauchy
+        sigma += J*symm(F & (Taf*f0f0f_) & F.T());
+    }
+    else
+    {
+        // Constant active tension with optional ramp
+        dimensionedScalar currentTa = Ta_;
+        if (mesh().time().value() < rampTime_)
+        {
+            currentTa = (mesh().time().value()/rampTime_)*Ta_;
+        }
+
+        sigma += J*symm(F & (currentTa*f0f0f_) & F.T());
+    }
 }
 
 

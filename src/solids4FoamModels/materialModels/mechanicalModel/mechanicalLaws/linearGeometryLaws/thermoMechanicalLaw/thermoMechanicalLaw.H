@@ -31,7 +31,7 @@ SourceFiles
     thermoMechanicalLaw.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD.
     Inspired by Denis Maier, BAW, code design suggestions.
 
 \*---------------------------------------------------------------------------*/
@@ -143,6 +143,9 @@ public:
 
 
     // Member Functions
+
+        //- Return bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

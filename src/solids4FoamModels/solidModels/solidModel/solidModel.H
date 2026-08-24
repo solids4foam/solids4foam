@@ -22,8 +22,8 @@ Description
     Virtual base class for solid mechanics models
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.
+    Philip Cardiff, UCD.
 
 SourceFiles
     solidModel.C
@@ -44,7 +44,6 @@ SourceFiles
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
-#include "momentumStabilisation.H"
 #include "globalPolyPatch.H"
 #include "setCellDisplacements.H"
 #include "OFstream.H"
@@ -55,11 +54,17 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "stabilisationModel.H"
+#include "CompactListList.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
 #else
     #include "NamedEnum.H"
+#endif
+
+#ifndef FOAMEXTEND
+    #include "movingLeastSquares.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -124,9 +129,21 @@ private:
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
+#ifndef FOAMEXTEND
+        //- Moving Least Square operator for the displacement field
+        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
+
+        //- Moving Least Square operator for the pressure field
+        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
+#endif
+
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
         boolIOList useBoundaryFaceValuesD_;
+
+        //- Boundary flag fields used by the leastSquaresS4f gradient scheme
+        //  DD field
+        boolIOList useBoundaryFaceValuesDD_;
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  p field
@@ -164,6 +181,10 @@ private:
         //- Gradient of total displacement
         volTensorField gradD_;
 
+        //- Gradient of total displacement at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -172,6 +193,10 @@ private:
         //  true (Cauchy) stress for nonlinear geometry (large strain)
         //  approaches
         volSymmTensorField sigma_;
+
+        //- Cauchy stress at face quadrature points
+        //  In use by high-order discretisation
+        mutable autoPtr<CompactListList<symmTensor>> sigmaQuadPtr_;
 
         //- Time-step index used to determine when it is a new time-step
         mutable label curTimeIndex_;
@@ -185,8 +210,16 @@ private:
         //- Damping coefficient
         const dimensionedScalar dampingCoeff_;
 
-        //- Stabilisation term for momentum equation
-        autoPtr<momentumStabilisation> stabilisationPtr_;
+        //- Optional stabilisation term for momentum equation
+        autoPtr<stabilisationModel> momentumStabilisationPtr_;
+
+        //- Optional stabilisation term for pressure equation
+        autoPtr<stabilisationModel> pressureStabilisationPtr_;
+
+        //- Reciprocal of the momentum equation diagonal, face-interpolated
+        //  Used as the stabilisation diffusivity in the pressure equation,
+        //  analogous to rAUf in pressure-velocity coupling
+        mutable autoPtr<surfaceScalarField> rAUfPtr_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -202,9 +235,6 @@ private:
 
         //- Maximum number of momentum correctors
         const int nCorr_;
-
-        //- Minium number of momentum correctors
-        const int minCorr_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation
@@ -255,9 +285,15 @@ private:
         //- Flag indicating that the pressure equation should be solved
         const Switch solvePressure_;
 
+        //- Calculate Jacobian using high order
+        Switch highOrderJacobian_;
+
+        //- High-order residual calculation
+        Switch highOrderResidual_;
+
         //- Pressure
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
-        autoPtr<volScalarField> pPtr_;
+        mutable autoPtr<volScalarField> pPtr_;
 
 #ifdef OPENFOAM_COM
         //- fvOptions
@@ -281,6 +317,32 @@ private:
 
         //- Make the U field
         void makeU() const;
+
+        //- Make the p field
+        void makeP() const;
+
+#ifndef FOAMEXTEND
+        //- Make the sigma at face quadrature points field
+        void makeSigmaQuad() const;
+
+        //- Make the gradD at face quadrature points field
+        void makeGradDQuad() const;
+
+        //- Make the displacement Moving Least Squares object
+        void makeDisplacementMLS() const;
+
+        //- Make the pressure Moving Least Squares object
+        void makePressureMLS() const;
+#endif
+
+        //- Return root high-order coefficients dictionary
+        const dictionary& highOrderCoeffsDict() const;
+
+        //- Return high-order coefficients for displacement
+        const dictionary& displacementHighOrderCoeffs() const;
+
+        //- Return high-order coefficients for pressure
+        const dictionary& pressureHighOrderCoeffs() const;
 
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
@@ -385,11 +447,26 @@ protected:
             return maxIterReached_;
         }
 
-        //- Return const reference to stabilisation
-        const momentumStabilisation& stabilisation() const
+        //- Return const reference to momentum stabilisation
+        const stabilisationModel& momentumStabilisation() const
         {
-            return stabilisationPtr_();
+            return momentumStabilisationPtr_();
         }
+
+        //- Return const reference to pressure stabilisation
+        const stabilisationModel& pressureStabilisation() const
+        {
+            return pressureStabilisationPtr_();
+        }
+
+        //- Allocate the rAUf field
+        void makeRAUf() const;
+
+        //- Return const access to rAUf (lazy construction)
+        const surfaceScalarField& rAUf() const;
+
+        //- Return non-const access to rAUf (lazy construction)
+        surfaceScalarField& rAUf();
 
         //- Make rhoD2dt2D
         void makeRhoD2dt2D() const;
@@ -405,6 +482,9 @@ protected:
 
         //- Non-const access to the pressure
         volScalarField& p();
+
+        //- Const access to the pressure
+        const volScalarField& p() const;
 
 #ifdef OPENFOAM_COM
         //- Return non-const access to fvOptions
@@ -501,6 +581,22 @@ public:
             const solutionAlgorithm& solutionAlg() const
             {
                 return solutionAlgorithm_;
+            }
+
+            //- Return true if the high-order residual discretisation is active
+            bool highOrderResidual() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderResidual_;
+            }
+
+            //- Return true if the high-order Jacobian is active
+            bool highOrderJacobian() const
+            {
+                return
+                    solutionAlg() == solutionAlgorithm::PETSC_SNES
+                 && highOrderJacobian_;
             }
 
             //- Is it a new time step? This function return true the first time
@@ -613,6 +709,30 @@ public:
                 return gradD_;
             }
 
+#ifndef FOAMEXTEND
+            //- Return non-const reference to gradD at face quadrature points
+            virtual CompactListList<tensor>& gradDQuad()
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+
+            //- Return const reference to gradD at face quadrature points
+            virtual const CompactListList<tensor>& gradDQuad() const
+            {
+                if (gradDQuadPtr_.empty())
+                {
+                    makeGradDQuad();
+                }
+
+                return autoPtrRef(gradDQuadPtr_);
+            }
+#endif
+
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
             {
@@ -636,6 +756,30 @@ public:
             {
                 return sigma_;
             }
+
+#ifndef FOAMEXTEND
+            //- Return non-const reference to sigma at face quarature points
+            virtual CompactListList<symmTensor>& sigmaQuad()
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
+            }
+
+            //- Return const reference to sigma at face quadrature points
+            virtual const CompactListList<symmTensor>& sigmaQuad() const
+            {
+                if (sigmaQuadPtr_.empty())
+                {
+                    makeSigmaQuad();
+                }
+
+                return autoPtrRef(sigmaQuadPtr_);
+            }
+#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
@@ -667,7 +811,27 @@ public:
             {
                 return twoD_;
             }
+#ifndef FOAMEXTEND
+            //- Return displacement moving least squares interpolation
+            const movingLeastSquares& displacementMLS() const
+            {
+                if (displacementMLSPtr_.empty())
+                {
+                    makeDisplacementMLS();
+                }
+                return autoPtrRef(displacementMLSPtr_);
+            }
 
+            //- Return pressure moving least squares interpolation
+            const movingLeastSquares& pressureMLS() const
+            {
+                if (pressureMLSPtr_.empty())
+                {
+                    makePressureMLS();
+                }
+                return autoPtrRef(pressureMLSPtr_);
+            }
+#endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -770,6 +934,27 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise global patches with the deformed solid points
+            //  The deformed patch points are the mesh patch points displaced
+            //  by pointDorPointDD(), which is the displacement increment for
+            //  moving mesh (updated Lagrangian) approaches and the total
+            //  displacement for the others.  This is the same expression
+            //  makeGlobalPatches() uses to build the zone in the first place
+            //
+            //  For a moving mesh this is only correct while the mesh still
+            //  holds the points that pointDD is measured from, that is before
+            //  moveMesh() is called for the current time step.  Calling it
+            //  after the mesh has been moved, but before pointDD is reset,
+            //  would add the same increment a second time
+            //
+            //  All current callers satisfy this: the only caller is
+            //  fluidSolidInterface::updateResidual(), and every coupling
+            //  scheme calls that before solid().updateTotalFields(), which is
+            //  where the mesh is moved
+            //
+            //  Note: this is a collective operation in parallel
+            void syncGlobalPatches() const;
+
         // Edit
 
             //- Set traction at specified patch
@@ -828,6 +1013,9 @@ public:
             //- Let the material model recalculate the density
             virtual void recalculateRho();
 
+            //- Clear Moving Least Squares interpolator
+            virtual void clearMovingLeastSquaresData();
+
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);
 
@@ -863,6 +1051,12 @@ public:
             virtual scalar newDeltaT();
 
             //- Move the mesh by the provided point displacement field
+            //  Note: any global patches must be synchronised before this is
+            //  called.  syncGlobalPatches() displaces the mesh points by
+            //  pointDD, so once the mesh itself has been moved by pointDD the
+            //  same increment would be counted twice.  In fluid-solid
+            //  interaction this is reached from updateTotalFields(), after
+            //  the coupling loop has finished
             virtual void moveMesh
             (
                 const pointField& oldPoints,
@@ -871,6 +1065,17 @@ public:
 
             //- End of the program
             virtual void end();
+
+        // Coupling
+
+            //- Return a coupling field by name.
+            //  Used by electro-mechanical coupling to extract fields such as
+            //  the deformation gradient from the solid model.
+            //  Default implementation triggers a FatalError.
+            virtual tmp<volTensorField> couplingField
+            (
+                const word& fieldName
+            ) const;
 
             //- Write function must be defined for regIOobjects
             virtual bool writeData(Ostream&) const
