@@ -31,6 +31,7 @@ License
 #include "triQuadrature.H"
 #include "tetQuadrature.H"
 #include "lineQuadrature.H"
+#include "processorFvPatch.H"
 
 namespace Foam
 {
@@ -234,6 +235,121 @@ void fvMeshQuadrature::calcQuadPointsAndWeights() const
             << mesh_.nGeometricD() << "D model!"
             << abort(FatalError);
     }
+}
+
+
+void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
+{
+    if (processorFaceQuadratureSynchronised_)
+    {
+        return;
+    }
+
+    if (!Pstream::parRun())
+    {
+        processorFaceQuadratureSynchronised_ = true;
+        return;
+    }
+
+    if (faceQuadPointsPtr_.empty() || faceQuadWeightsPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Face quadrature points and weights must be calculated before "
+            << "processor-face synchronisation"
+            << abort(FatalError);
+    }
+
+    CompactListList<point>& faceQuadPoints = *faceQuadPointsPtr_;
+    CompactListList<scalar>& faceQuadWeights = *faceQuadWeightsPtr_;
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh_.boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const processorFvPatch& procPatch =
+            refCast<const processorFvPatch>(patch);
+        const label patchStart = patch.start();
+
+        labelField localSizes(patch.size(), 0);
+        label nLocalValues = 0;
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patchStart + patchFaceI;
+            localSizes[patchFaceI] = faceQuadPoints[faceI].size();
+            nLocalValues += localSizes[patchFaceI];
+        }
+
+        if (Pstream::myProcNo() < procPatch.neighbProcNo())
+        {
+            pointField masterPoints(nLocalValues);
+            scalarField masterWeights(nLocalValues);
+            label valueI = 0;
+
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    masterPoints[valueI] = faceQuadPoints[faceI][qpI];
+                    masterWeights[valueI] = faceQuadWeights[faceI][qpI];
+                    ++valueI;
+                }
+            }
+
+            procPatch.send(Pstream::commsTypes::blocking, localSizes);
+            procPatch.send(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.send(Pstream::commsTypes::blocking, masterWeights);
+        }
+        else
+        {
+            labelField masterSizes(patch.size(), 0);
+            procPatch.receive(Pstream::commsTypes::blocking, masterSizes);
+
+            label nMasterValues = 0;
+            forAll(masterSizes, patchFaceI)
+            {
+                if (localSizes[patchFaceI] != masterSizes[patchFaceI])
+                {
+                    FatalErrorInFunction
+                        << "Processor patch " << patch.name() << " face "
+                        << patchFaceI << " has " << localSizes[patchFaceI]
+                        << " local quadrature points but "
+                        << masterSizes[patchFaceI]
+                        << " master quadrature points"
+                        << abort(FatalError);
+                }
+
+                nMasterValues += masterSizes[patchFaceI];
+            }
+
+            pointField masterPoints(nMasterValues);
+            scalarField masterWeights(nMasterValues);
+            procPatch.receive(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.receive(Pstream::commsTypes::blocking, masterWeights);
+
+            label valueI = 0;
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    faceQuadPoints[faceI][qpI] = masterPoints[valueI];
+                    faceQuadWeights[faceI][qpI] = masterWeights[valueI];
+                    ++valueI;
+                }
+            }
+        }
+    }
+
+    processorFaceQuadratureSynchronised_ = true;
 }
 
 
@@ -1062,6 +1178,7 @@ fvMeshQuadrature::fvMeshQuadrature
     allowDegenerateTriFallback_(allowDegenerateTriFallback),
     faceQuadPointsPtr_(),
     faceQuadWeightsPtr_(),
+    processorFaceQuadratureSynchronised_(false),
     cellQuadPointsPtr_(),
     cellQuadWeightsPtr_(),
     firstOrderCellMomentsPtr_(),
@@ -1089,6 +1206,8 @@ const CompactListList<point>& fvMeshQuadrature::faceQuadPoints() const
         calcQuadPointsAndWeights();
     }
 
+    synchroniseProcessorFaceQuadrature();
+
     return autoPtrRef(faceQuadPointsPtr_);
 }
 
@@ -1099,6 +1218,8 @@ const CompactListList<scalar>& fvMeshQuadrature::faceQuadWeights() const
     {
         calcQuadPointsAndWeights();
     }
+
+    synchroniseProcessorFaceQuadrature();
 
     return autoPtrRef(faceQuadWeightsPtr_);
 }
@@ -1182,6 +1303,7 @@ fvMeshQuadrature::thirdOrderCellMoments() const
 
 void fvMeshQuadrature::clear()
 {
+    processorFaceQuadratureSynchronised_ = false;
     faceQuadPointsPtr_.clear();
     faceQuadWeightsPtr_.clear();
     cellQuadPointsPtr_.clear();

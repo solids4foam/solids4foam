@@ -223,9 +223,8 @@ void kExactLeastSquares::fGrad
         }
     }
 
-    // Average owner-side reconstructions across processor patches. Exchange
-    // quadrature-point coordinates as the point order can be reversed on the
-    // neighbouring processor.
+    // Average owner-side reconstructions across processor patches. The face
+    // quadrature object guarantees the same point order on both sides.
     forAll(mesh.boundary(), patchI)
     {
         const fvPatch& patch = mesh.boundary()[patchI];
@@ -240,19 +239,16 @@ void kExactLeastSquares::fGrad
         const labelUList& faceCells = patch.faceCells();
         const label patchStart = patch.start();
 
-        labelField sendSizes(patch.size(), 0);
-        label nSendValues = 0;
+        label nValues = 0;
         forAll(patch, patchFaceI)
         {
             const label faceI = patchStart + patchFaceI;
-            sendSizes[patchFaceI] = faceQuadPoints[faceI].size();
-            nSendValues += sendSizes[patchFaceI];
+            nValues += faceQuadPoints[faceI].size();
         }
 
-        pointField sendPoints(nSendValues);
         Field<GradType> sendGrad
         (
-            nSendValues,
+            nValues,
             pTraits<GradType>::zero
         );
 
@@ -267,7 +263,6 @@ void kExactLeastSquares::fGrad
             forAll(faceQuadPoints[faceI], qpI)
             {
                 const point& qp = faceQuadPoints[faceI][qpI];
-                sendPoints[sendI] = qp;
                 cellGradCoeffsAtPoint(ownCellI, qp, ownCoeffs);
 
                 forAll(cellStencil, stencilI)
@@ -292,92 +287,24 @@ void kExactLeastSquares::fGrad
             }
         }
 
-        labelField receiveSizes(patch.size(), 0);
-        exchangeProcessorPatchField(procPatch, sendSizes, receiveSizes);
-
-        label nReceiveValues = 0;
-        forAll(receiveSizes, patchFaceI)
-        {
-            nReceiveValues += receiveSizes[patchFaceI];
-        }
-
-        pointField receivePoints(nReceiveValues);
-        Field<GradType> receiveGrad(nReceiveValues);
-        exchangeProcessorPatchField(procPatch, sendPoints, receivePoints);
+        Field<GradType> receiveGrad(nValues);
         exchangeProcessorPatchField(procPatch, sendGrad, receiveGrad);
 
-        label sendStart = 0;
-        label receiveStart = 0;
+        label start = 0;
         forAll(patch, patchFaceI)
         {
             const label faceI = patchStart + patchFaceI;
 
-            if (sendSizes[patchFaceI] != receiveSizes[patchFaceI])
-            {
-                FatalErrorInFunction
-                    << "Processor patch " << patch.name() << " face "
-                    << patchFaceI << " has " << sendSizes[patchFaceI]
-                    << " local quadrature points but "
-                    << receiveSizes[patchFaceI]
-                    << " neighbour quadrature points"
-                    << abort(FatalError);
-            }
-
-            boolList pointUsed(receiveSizes[patchFaceI], false);
-
             forAll(faceQuadPoints[faceI], qpI)
             {
-                const point& qp = faceQuadPoints[faceI][qpI];
-                scalar minDistance = GREAT;
-                label matchI = -1;
-
-                for
-                (
-                    label neighbourQpI = 0;
-                    neighbourQpI < receiveSizes[patchFaceI];
-                    ++neighbourQpI
-                )
-                {
-                    if (!pointUsed[neighbourQpI])
-                    {
-                        const scalar distance = mag
-                        (
-                            qp
-                          - receivePoints[receiveStart + neighbourQpI]
-                        );
-
-                        if (distance < minDistance)
-                        {
-                            minDistance = distance;
-                            matchI = neighbourQpI;
-                        }
-                    }
-                }
-
-                const scalar matchTolerance =
-                    1000.0*SMALL*max(scalar(1), mag(qp));
-
-                if (matchI < 0 || minDistance > matchTolerance)
-                {
-                    FatalErrorInFunction
-                        << "Cannot match quadrature point " << qpI
-                        << " on processor patch " << patch.name()
-                        << " face " << patchFaceI << nl
-                        << "Minimum point distance = " << minDistance
-                        << ", tolerance = " << matchTolerance
-                        << abort(FatalError);
-                }
-
-                pointUsed[matchI] = true;
                 result[faceI][qpI] = 0.5
                    *(
-                        sendGrad[sendStart + qpI]
-                      + receiveGrad[receiveStart + matchI]
+                        sendGrad[start + qpI]
+                      + receiveGrad[start + qpI]
                     );
             }
 
-            sendStart += sendSizes[patchFaceI];
-            receiveStart += receiveSizes[patchFaceI];
+            start += faceQuadPoints[faceI].size();
         }
     }
 

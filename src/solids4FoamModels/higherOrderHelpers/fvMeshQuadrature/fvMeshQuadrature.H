@@ -103,6 +103,9 @@ private:
         //- Face quadrature points weights
         mutable autoPtr<CompactListList<scalar>> faceQuadWeightsPtr_;
 
+        //- Processor-face points and weights use the same order on both sides
+        mutable bool processorFaceQuadratureSynchronised_;
+
         //- Cell quadrature points
         mutable autoPtr<CompactListList<point>> cellQuadPointsPtr_;
 
@@ -144,6 +147,9 @@ private:
 
         //- Calls the corresponding function for 3D or for 2D meshes
         void calcQuadPointsAndWeights() const;
+
+        //- Use the lower processor rank's point and weight order on both sides
+        void synchroniseProcessorFaceQuadrature() const;
 
         //- Calculate volume-normalised first-order cell moments
         void calcFirstOrderCellMoments() const;
@@ -191,10 +197,10 @@ public:
                 return faceOrder_;
             }
 
-            //- Return the face quadrature weights
+            //- Return the face quadrature weights.
             const CompactListList<scalar>& faceQuadWeights() const;
 
-            //- Return the face quadrature points
+            //- Return the face quadrature points.
             const CompactListList<point>& faceQuadPoints() const;
 
             //- Return the cell quadrature weights
