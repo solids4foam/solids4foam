@@ -385,8 +385,22 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     emptyDirs.yy() = (geometricD.y() == -1 ? 1.0 : 0.0);
     emptyDirs.zz() = (geometricD.z() == -1 ? 1.0 : 0.0);
 
+    // A simplex cell carries the smallest face stencil a mesh can offer: only
+    // nDim + 1 face neighbours, i.e. one more equation than unknowns. Such a
+    // stencil is formally full rank, so the eigenvalue test above sees nothing
+    // wrong with it, but it is far too small to reconstruct a cell-centred
+    // gradient accurately. Widen it in every simplex cell, independently of the
+    // eigenvalue test. Faces on empty patches carry no neighbour and so are
+    // discounted: a tetrahedron has 4 faces, and a triangular prism in a
+    // one-cell-thick 2-D mesh has 3 + 2 = 5
+    const label nEmptyDirs = 3 - mesh.nGeometricD();
+    const label maxSimplexFaces = mesh.nGeometricD() + 1 + 2*nEmptyDirs;
+
+    const cellList& cells = mesh.cells();
+
     labelList cellToWide(mesh.nCells(), -1);
     label nWide = 0;
+    label nSimplex = 0;
     scalar maxCond = 0.0;
 
     forAll(dd, cellI)
@@ -396,9 +410,21 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         const scalar lambdaMin = eVals[vector::X];
         const scalar lambdaMax = eVals[vector::Z];
 
-        if (lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax)
+        const bool rankDeficient =
+        (
+            lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax
+        );
+
+        const bool simplex = (cells[cellI].size() <= maxSimplexFaces);
+
+        if (rankDeficient || simplex)
         {
             cellToWide[cellI] = nWide++;
+
+            if (simplex && !rankDeficient)
+            {
+                nSimplex++;
+            }
         }
         else
         {
@@ -411,7 +437,10 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         Info<< "    leastSquaresS4fVectors: "
             << returnReduce(nWide, sumOp<label>()) << " of "
             << returnReduce(mesh.nCells(), sumOp<label>())
-            << " cells have a rank-deficient face stencil, max cond(dd) = "
+            << " cells use the wide stencil, of which "
+            << returnReduce(nSimplex, sumOp<label>())
+            << " are simplex cells with a full-rank face stencil,"
+            << " max cond(dd) = "
             << returnReduce(maxCond, maxOp<scalar>()) << endl;
     }
 
