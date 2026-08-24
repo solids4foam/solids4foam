@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "HashSet.H"
 #include "fixedDisplacementFvPatchVectorField.H"
+#include "fixedRotationFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1854,11 +1855,19 @@ autoPtr<CompactListList<vector>> kExactLeastSquares::patchFaceQuadValues
 
         return patchField.evaluateQuadrature();
     }
+    else if (isA<fixedRotationFvPatchVectorField>(pf))
+    {
+        const fixedRotationFvPatchVectorField& patchField =
+            refCast<const fixedRotationFvPatchVectorField>(pf);
+
+        return patchField.evaluateQuadrature();
+    }
 
     FatalErrorInFunction
         << "Patch " << patchI << " fixes displacement, but quadrature-point "
         << "evaluation is only implemented for "
-        << fixedDisplacementFvPatchVectorField::typeName
+        << fixedDisplacementFvPatchVectorField::typeName << " and "
+        << fixedRotationFvPatchVectorField::typeName
         << abort(FatalError);
 
     return autoPtr<CompactListList<vector>>();
