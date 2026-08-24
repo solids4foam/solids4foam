@@ -4,7 +4,7 @@ This changelog highlights significant user-facing changes in each solids4foam
 release. For complete commit-level details and contributor information, see the
 [GitHub Releases](https://github.com/solids4foam/solids4foam/releases) page.
 
-## [v2.4] - Unreleased
+## [v2.4] - 2026-08-24
 
 ### Added in v2.4
 
@@ -53,6 +53,8 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed in v2.4
 
+- Fixed a potential segmentation fault when PETSc SNES backs up its solution
+  before the first solve.
 - Fixed PETSc Jacobian preallocation by creating the Jacobian as a block AIJ
   matrix, resolving segmentation faults with recent PETSc versions.
 - Fixed old-time deformation gradient storage in `StVenantKirchhoffElastic`.
@@ -231,7 +233,7 @@ release. For complete commit-level details and contributor information, see the
 - Introduced three working `solidFoam` solid-mechanics solvers.
 - Established the foundation for further solids4foam development.
 
-[v2.4]: https://github.com/solids4foam/solids4foam/compare/v2.3...development
+[v2.4]: https://github.com/solids4foam/solids4foam/releases/tag/v2.4
 [v2.3]: https://github.com/solids4foam/solids4foam/releases/tag/v2.3
 [v2.2]: https://github.com/solids4foam/solids4foam/releases/tag/v2.2
 [v2.1]: https://github.com/solids4foam/solids4foam/releases/tag/v2.1
