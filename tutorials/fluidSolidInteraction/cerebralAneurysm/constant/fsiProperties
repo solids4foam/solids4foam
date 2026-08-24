@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface    fixedRelaxation;
+
+fixedRelaxationCoeffs
+{
+    // Solid interface patch
+    solidPatch             innerWall;
+
+    // Fluid interface patch
+    fluidPatch             wall;
+
+    // Interface relaxation factor
+    // Note: it is often fine to keep this at 1.0 when using the Robin condition
+    // for 0/fluid/p, where the Robin acceleration can be controlled via the
+    // `constantHs` parameter there
+    relaxationFactor       1.0;
+
+    // FSI outer loop tolerance
+    outerCorrTolerance     5e-5;
+
+    // Maximum FSI correctors per time step
+    nOuterCorr             30;
+
+    // Write FSI residuals to file
+    writeResidualsToFile   yes;
+}
+
+
+// ************************************************************************* //

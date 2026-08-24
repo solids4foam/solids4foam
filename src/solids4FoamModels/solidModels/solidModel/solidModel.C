@@ -1661,6 +1661,27 @@ void Foam::solidModel::clearGlobalPatches() const
 }
 
 
+void Foam::solidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        const polyPatch& ppatch = globalPatchesPtrList_[i].patch();
+
+        const vectorField patchPointDisplacement
+        (
+            pointDorPointDD().internalField(), ppatch.meshPoints()
+        );
+
+        const pointField patchPoints
+        (
+            ppatch.localPoints() + patchPointDisplacement
+        );
+
+        globalPatchesPtrList_[i].syncPoints(patchPoints);
+    }
+}
+
+
 Foam::vector Foam::solidModel::pointU(const label pointID) const
 {
     pointVectorField pointU
