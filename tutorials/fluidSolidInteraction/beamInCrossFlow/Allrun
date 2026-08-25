@@ -11,6 +11,8 @@ source solids4FoamScripts.sh
 # ./Allrun aitken
 # ./Allrun parallel
 # ./Allrun aitken parallel
+# ./Allrun iqnils highOrder
+# ./Allrun iqnils highOrder parallel
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
