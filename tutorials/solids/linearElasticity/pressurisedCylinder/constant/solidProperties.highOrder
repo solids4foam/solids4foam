@@ -31,6 +31,8 @@ linearGeometryTotalDisplacementCoeffs
 
         displacement
         {
+            type movingLeastSquares;
+
             // Polynomial order of displacement field
             polynomialOrder 2;
 

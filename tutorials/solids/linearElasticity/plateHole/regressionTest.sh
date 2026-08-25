@@ -14,7 +14,7 @@ fi
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# (segregated/petscSnes/highOrder) and pressure-displacement
+# (segregated/petscSnes/high-order variants) and pressure-displacement
 # solution options.
 # ============================================================
 
@@ -37,7 +37,8 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     segregated
     petscSnes
-    highOrder
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
 )
 
 PRESSURE_DISPLACEMENT_CASES=(
@@ -92,6 +93,18 @@ run_case() {
     local case_dir="${REGRESSION_ROOT}/${case_name}"
 
     prepare_case "${case_dir}"
+
+    case "${1}" in
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+            local least_squares_type="${1#highOrder-}"
+            sed -E -i.bak \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "${case_dir}/constant/solidProperties.highOrder"
+            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
+            set -- highOrder "${@:2}"
+            ;;
+    esac
+
     ( cd "${case_dir}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${case_dir}" && ./Allrun "$@" > "${ALLRUN_LOGFILE}" 2>&1 )
 

@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -38,6 +39,73 @@ namespace Foam
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void Foam::cantileverAnalyticalSolution::
+calculateAnalyticalCellDisplacement
+(
+    const fvMesh& mesh,
+    vectorField& analyticalD
+) const
+{
+    const solidModel& solMod = lookupSolidModel(mesh);
+    bool useCellAverage = false;
+
+    if (solMod.highOrderResidual())
+    {
+        const dictionary& displacementDict =
+            solMod.solidModelDict()
+           .subDict("highOrderCoeffs")
+           .subDict("displacement");
+
+        useCellAverage =
+            displacementDict.lookupOrDefault<word>
+            (
+                "type",
+                "movingLeastSquares"
+            ) == "kExactLeastSquares";
+    }
+
+    if (useCellAverage)
+    {
+        const fvMeshQuadrature& quadrature =
+            solMod.displacementLeastSquares().quadrature();
+        const CompactListList<point>& cellQuadPoints =
+            quadrature.cellQuadPoints();
+        const CompactListList<scalar>& cellQuadWeights =
+            quadrature.cellQuadWeights();
+        const scalarField& cellVolumes = mesh.V();
+
+        Info<< "Using cell-average analytical displacement" << endl;
+
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] = vector::zero;
+
+            forAll(cellQuadPoints[cellI], pointI)
+            {
+                analyticalD[cellI] +=
+                    cellQuadWeights[cellI][pointI]
+                   *analyticalSol_.displacement
+                    (
+                        cellQuadPoints[cellI][pointI]
+                    );
+            }
+
+            analyticalD[cellI] /= cellVolumes[cellI];
+        }
+    }
+    else
+    {
+        Info<< "Using point-valued analytical displacement" << endl;
+
+        const vectorField& cellCentres = mesh.C().internalField();
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] =
+                analyticalSol_.displacement(cellCentres[cellI]);
+        }
+    }
+}
 
 bool Foam::cantileverAnalyticalSolution::writeData()
 {
@@ -108,10 +176,11 @@ bool Foam::cantileverAnalyticalSolution::writeData()
                 sI[cellI] = analyticalSol_.stress(CI[cellI]);
             }
 
-            if (cellDisplacement_)
-            {
-                aDI[cellI] = analyticalSol_.displacement(CI[cellI]);
-            }
+        }
+
+        if (cellDisplacement_)
+        {
+            calculateAnalyticalCellDisplacement(mesh, aDI);
         }
 
         forAll(analyticalStress.boundaryField(), patchI)

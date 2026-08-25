@@ -5,6 +5,7 @@ sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 EXE_INC = \
     $(VERSION_SPECIFIC_INC) \
+    -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
     -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
     -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/numerics/compatibilityFunctions \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
@@ -27,4 +28,7 @@ EXE_INC = \
     -I$(LIB_SRC)/OSspecific/POSIX/lnInclude
 
 LIB_LIBS = \
-    -lfiniteVolume
+    -lfiniteVolume \
+    -L$(FOAM_MODULE_LIBBIN) \
+    -lblockCoupledSolids4FoamTools \
+    -lsolids4FoamModels

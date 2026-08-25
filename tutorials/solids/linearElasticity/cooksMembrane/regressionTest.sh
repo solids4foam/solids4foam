@@ -29,7 +29,8 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     segregated
     petscSnes
-    highOrder
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
 )
 
 # Settings for Test-leastSquaresS4fGrad test
@@ -78,6 +79,24 @@ extract_top_right_disp() {
     fi
 
     awk 'END {print $3}' "${value_file}"
+}
+
+select_run_approach() {
+    local requested="$1"
+
+    case "${requested}" in
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+            local least_squares_type="${requested#highOrder-}"
+            sed -E -i.bak \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "${CASE_DIR}/constant/solidProperties.highOrder"
+            rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+            RUN_APPROACH=highOrder
+            ;;
+        *)
+            RUN_APPROACH="${requested}"
+            ;;
+    esac
 }
 
 check_gradient_log() {
@@ -201,8 +220,9 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "Testing approach: ${approach}"
         echo "------------------------------------------------------------"
 
+        select_run_approach "${approach}"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+        ( cd "${CASE_DIR}" && ./Allrun "${RUN_APPROACH}" > "${ALLRUN_LOGFILE}" 2>&1 )
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"

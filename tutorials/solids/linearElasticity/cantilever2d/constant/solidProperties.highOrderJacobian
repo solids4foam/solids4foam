@@ -30,6 +30,8 @@ linearGeometryTotalDisplacementCoeffs
 
         displacement
         {
+            type movingLeastSquares;
+
             polynomialOrder 3;
             faceStencilExtraCells 15;
 

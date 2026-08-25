@@ -1530,6 +1530,19 @@ averaged with the owner reconstruction. Instead, prescribed values at boundary
 quadrature points are added as weighted observations to the owner-cell
 least-squares reconstruction.
 
+The resulting boundary-aware reconstruction is the only reconstruction used
+at that face:
+
+$$
+\nabla u_f(\boldsymbol{x}_{f,q})
+=
+\nabla u_P^R(\boldsymbol{x}_{f,q}).
+$$
+
+There is no factor $1/2$ because the prescribed boundary value is an
+observation used to determine the owner polynomial, not a second gradient to
+be averaged with the owner gradient.
+
 For every owner cell $P$ touching a selected fixed-value patch, the function
 collects all prescribed quadrature points on all selected faces of that cell.
 One address is stored as
@@ -1590,9 +1603,61 @@ This is the mean-free polynomial evaluated at a point. It differs from a
 neighbour-cell equation because no volume average over the boundary point is
 required.
 
-For example, for $p=2$ in 2D, one row of $\boldsymbol{D}_P$ is
+For a quadratic reconstruction in 2D, define
 
 $$
+r_{c,x}=x_c-x_P,
+\qquad
+r_{c,y}=y_c-y_P.
+$$
+
+The boundary observation equation written with ordinary, unscaled derivatives
+is
+
+$$
+\begin{aligned}
+u_c^D-\overline{u}_P
+={}&
+r_{c,x}u_{x,P}
++r_{c,y}u_{y,P}
+\\
+&+\frac{1}{2}
+\left(r_{c,x}^2-M_{xx}^P\right)u_{xx,P}
+\\
+&+\left(r_{c,x}r_{c,y}-M_{xy}^P\right)u_{xy,P}
+\\
+&+\frac{1}{2}
+\left(r_{c,y}^2-M_{yy}^P\right)u_{yy,P}.
+\end{aligned}
+$$
+
+The left-hand side is known: it is the prescribed value at boundary point
+$c$ minus the stored average of owner cell $P$. The quantities multiplying the
+unknown derivatives form one boundary observation.
+
+The code solves for the scaled derivative vector
+
+$$
+\boldsymbol{s}_P
+=
+\begin{bmatrix}
+h_Pu_{x,P}
+&
+h_Pu_{y,P}
+&
+h_P^2u_{xx,P}
+&
+h_P^2u_{xy,P}
+&
+h_P^2u_{yy,P}
+\end{bmatrix}^{T}.
+$$
+
+Therefore, the corresponding row of the boundary matrix is
+
+$$
+\boldsymbol{D}_{c,P}
+=
 \begin{bmatrix}
 r_{c,x}/h_P
 &
@@ -1606,119 +1671,116 @@ r_{c,y}/h_P
 \end{bmatrix}.
 $$
 
+The same observation equation can consequently be written as
+
+$$
+u_c^D-\overline{u}_P
+=
+\boldsymbol{D}_{c,P}\boldsymbol{s}_P.
+$$
+
+The factors $1/2$ appear only for the pure second derivatives $u_{xx}$ and
+$u_{yy}$ because $2!=2$. The mixed derivative $u_{xy}$ has no factor $1/2$
+because its factorial denominator is $1!1!=1$.
+
+In 3D, the same row additionally contains the $z$, $xz$, $yz$, and $zz$
+terms.
+
 Every collected prescribed quadrature point supplies one row of
 $\boldsymbol{D}_P$ and one entry of the known-data vector
 $\boldsymbol{b}_P$.
 
-**Weighted augmentation of the cell-only reconstruction**
+**Combined cell and boundary least-squares system**
 
-From `calcCellCoeffs()`, the cell-only reconstruction is
+The cell equations used in `calcCellCoeffs()` are rebuilt for the boundary
+cell. The prescribed boundary-point equations are then appended to them. The
+complete known-data vector is
 
 $$
-\boldsymbol{s}_P
+\boldsymbol{y}_P
 =
-\boldsymbol{A}_P
-\Delta\overline{\boldsymbol{u}}_P.
+\begin{bmatrix}
+\Delta\overline{\boldsymbol{u}}_P
+\\
+\boldsymbol{b}_P
+\end{bmatrix},
 $$
 
-In this function, `scaledDerivativeCoeff` reconstructs
-$\boldsymbol{A}_P$ from the stored $C_x$, $C_{xx}$ and $C_{xxx}$ coefficient
-rows by multiplying them by $h_P$, $h_P^2$ and $h_P^3$, respectively.
+where $\Delta\overline{\boldsymbol{u}}_P$ contains the stencil-cell average
+differences and $\boldsymbol{b}_P$ contains the prescribed boundary-value
+differences. The combined polynomial matrix and weight matrix are
+$$
+\boldsymbol{Q}_P^{\mathrm{aug}}
+=
+\begin{bmatrix}
+\boldsymbol{Q}_P
+&
+\boldsymbol{D}_P^T
+\end{bmatrix},
+$$
 
-The boundary-aware reconstruction is equivalent to solving
+and
+
+$$
+\boldsymbol{W}_P^{\mathrm{aug}}
+=
+\begin{bmatrix}
+\boldsymbol{W}_P & \boldsymbol{0}
+\\
+\boldsymbol{0} & \boldsymbol{W}_P^D
+\end{bmatrix}.
+$$
+
+The first $N_n$ columns of $\boldsymbol{Q}_P^{\mathrm{aug}}$ represent
+stencil-cell average equations. The following $N_c$ columns represent
+prescribed boundary-point equations. This column-oriented storage is the
+orientation expected by `QRSolve()`.
+
+The boundary-aware reconstruction solves
 
 $$
 \begin{aligned}
 \min_{\boldsymbol{s}_P}\quad
 &\left\|
-\boldsymbol{W}_P^{1/2}
+\left(\boldsymbol{W}_P^{\mathrm{aug}}\right)^{1/2}
 \left(
-\boldsymbol{Q}_P^T\boldsymbol{s}_P
--\Delta\overline{\boldsymbol{u}}_P
+\left(\boldsymbol{Q}_P^{\mathrm{aug}}\right)^T
+\boldsymbol{s}_P
+-\boldsymbol{y}_P
 \right)
 \right\|_2^2
-\\
-&+
-\left\|
-\left(\boldsymbol{W}_P^D\right)^{1/2}
-\left(
-\boldsymbol{D}_P\boldsymbol{s}_P
--\boldsymbol{b}_P
-\right)
-\right\|_2^2.
 \end{aligned}
 $$
 
 Thus, prescribed boundary values are weighted least-squares observations.
-They are not enforced as exact equality constraints and no arbitrarily large
-penalty is used.
+They are not enforced as exact equality constraints, and no arbitrarily large
+penalty is used. The same distance-based `weightFunction` is applied to both
+cell and boundary observations.
 
-The implementation updates the already available cell-only map rather than
-rebuilding and decomposing the complete least-squares matrix. Define
-
-$$
-\boldsymbol{R}_P
-=
-\boldsymbol{A}_P
-\boldsymbol{W}_P^{-1}
-\boldsymbol{A}_P^T.
-$$
-
-In the code, $\boldsymbol{R}_P$ is named `Hinv`. It is the inverse
-cell-only normal matrix, expressed using the already calculated
-$\boldsymbol{A}_P$.
-
-The small boundary system is
-
-$$
-\boldsymbol{S}_P
-=
-\left(\boldsymbol{W}_P^D\right)^{-1}
-+
-\boldsymbol{D}_P
-\boldsymbol{R}_P
-\boldsymbol{D}_P^T.
-$$
-
-The code solves systems with $\boldsymbol{S}_P$ using
-`ColPivHouseholderQR`. In the following equations,
-$\boldsymbol{S}_P^{-1}$ denotes that solve, not an explicitly calculated
-matrix inverse.
-
-The correction map is
-
-$$
-\boldsymbol{K}_P
-=
-\boldsymbol{R}_P
-\boldsymbol{D}_P^T
-\boldsymbol{S}_P^{-1}.
-$$
-
-The scaled derivatives can then be written as
+`QRSolve()` directly calculates the combined coefficient matrix
+$\boldsymbol{A}_P^{\mathrm{aug}}$. The scaled derivatives are therefore
 
 $$
 \boldsymbol{s}_P
 =
-\underbrace{
-\left(
-\boldsymbol{I}
--\boldsymbol{K}_P\boldsymbol{D}_P
-\right)
-\boldsymbol{A}_P
-}_{\text{cellMap}}
-\Delta\overline{\boldsymbol{u}}_P
-+
-\underbrace{
-\boldsymbol{K}_P
-}_{\text{boundaryMap}}
-\boldsymbol{b}_P.
+\boldsymbol{A}_P^{\mathrm{aug}}
+\boldsymbol{y}_P.
 $$
 
-This equation shows the practical effect of the augmentation:
+The implementation uses a weighted QR decomposition. Splitting
+the columns according to their input data gives
+$$
+\boldsymbol{A}_P^{\mathrm{aug}}
+=
+\begin{bmatrix}
+\boldsymbol{A}_P^{\mathrm{cell}}
+&
+\boldsymbol{A}_P^D
+\end{bmatrix}.
+$$
 
-- `cellMap` contains the modified influence of the unknown cell averages;
-- `boundaryMap` contains the influence of the known prescribed values.
+The first part maps the stencil-cell differences, while the second part maps
+the prescribed boundary-value differences.
 
 **Gradient evaluation at a boundary quadrature point**
 
@@ -1731,19 +1793,17 @@ $$
 \boldsymbol{L}_{f,q}\boldsymbol{s}_P.
 $$
 
-The two gradient maps are
+The complete gradient map is
 
 $$
-\boldsymbol{C}_{\mathrm{cell}}^{f,q}
+\boldsymbol{C}^{f,q}
 =
-\boldsymbol{L}_{f,q}\,\text{cellMap},
-\qquad
-\boldsymbol{C}_{D}^{f,q}
-=
-\boldsymbol{L}_{f,q}\,\text{boundaryMap}.
+\boldsymbol{L}_{f,q}\boldsymbol{A}_P^{\mathrm{aug}}.
 $$
 
-These are named `cellGradientMap` and `boundaryGradientMap` in the code.
+This matrix is named `gradientMap` in the code. Its first $N_n$ columns
+multiply stencil-cell differences, and its following $N_c$ columns multiply
+prescribed boundary-value differences.
 
 Before conversion to absolute values, the gradient is
 

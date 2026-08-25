@@ -308,6 +308,81 @@ void kExactLeastSquares::fGrad
         }
     }
 
+    // Evaluate one-sided reconstructions on symmetry faces. Coefficients are
+    // ordered as physical neighbours, mirrored owner, and mirrored
+    // neighbours. Mirrored values are transformed with the same reflection
+    // tensor used to construct the geometrical stencil.
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh.boundary()[patchI];
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        if
+        (
+           !isA<symmetryPolyPatch>(pp)
+         && !isA<symmetryPlanePolyPatch>(pp)
+        )
+        {
+            continue;
+        }
+
+        const labelUList& faceCells = patch.faceCells();
+        const vectorField patchNormals(patch.nf());
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patch.start() + patchFaceI;
+            const label ownCellI = faceCells[patchFaceI];
+            const labelUList& cellStencil = cellStencils[ownCellI];
+            const label Nn = cellStencil.size();
+            const tensor R =
+                I - 2.0*sqr(patchNormals[patchFaceI]);
+            const Type& ownerValue = vfI[ownCellI];
+            const Type mirroredOwnerValue = transform(R, ownerValue);
+            const CompactListList<vector>& faceCoefficients =
+                coeffs[faceI];
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                const UList<vector>& qpCoefficients =
+                    faceCoefficients[qpI];
+
+                if (qpCoefficients.size() != 2*Nn + 1)
+                {
+                    FatalErrorInFunction
+                        << "Symmetry face " << faceI << " has "
+                        << qpCoefficients.size() << " coefficients, but "
+                        << 2*Nn + 1 << " are required"
+                        << abort(FatalError);
+                }
+
+                forAll(cellStencil, stencilI)
+                {
+                    const Type value = fieldValue
+                    (
+                        cellStencil[stencilI],
+                        globalCells,
+                        remoteLoc,
+                        vfI,
+                        remoteField
+                    );
+
+                    result[faceI][qpI] +=
+                        qpCoefficients[stencilI]
+                       *(value - ownerValue);
+
+                    result[faceI][qpI] +=
+                        qpCoefficients[Nn + 1 + stencilI]
+                       *(transform(R, value) - ownerValue);
+                }
+
+                result[faceI][qpI] +=
+                    qpCoefficients[Nn]
+                   *(mirroredOwnerValue - ownerValue);
+            }
+        }
+    }
+
     // Read all prescribed quadrature-point values once. Boundary-cell
     // reconstructions can depend on fixed-value points from more than one
     // boundary face or patch.

@@ -52,6 +52,8 @@ Author
 
 #include "leastSquaresScheme.H"
 #include "processorFvPatch.H"
+#include "symmetryPolyPatch.H"
+#include "symmetryPlanePolyPatch.H"
 #include "weightFunction.H"
 #include <Eigen/Dense>
 

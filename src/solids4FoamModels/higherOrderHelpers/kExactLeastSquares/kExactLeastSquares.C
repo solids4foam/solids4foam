@@ -503,17 +503,22 @@ void kExactLeastSquares::makeFaceGradStencil() const
         faceStencils[faceI].transfer(mergedIDs);
     }
 
-    // A fixed-value boundary face uses the owner-cell stencil and the owner
-    // cell. Prescribed boundary values have separate addressing because they
-    // are known data rather than global cell unknowns.
+    // A fixed-value or symmetry boundary face uses the owner-cell stencil and
+    // the owner cell. Prescribed boundary values have separate addressing
+    // because they are known data rather than global cell unknowns. On a
+    // symmetry face, this addressing represents the physical half of the
+    // stencil; its mirrored half is implicit.
     forAll(mesh.boundaryMesh(), patchI)
     {
-        if (!includePatchInStencils_[patchI])
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+        const bool symmetryPatch =
+            isA<symmetryPolyPatch>(pp)
+         || isA<symmetryPlanePolyPatch>(pp);
+
+        if (!includePatchInStencils_[patchI] && !symmetryPatch)
         {
             continue;
         }
-
-        const polyPatch& pp = mesh.boundaryMesh()[patchI];
 
         forAll(pp, patchFaceI)
         {
@@ -586,6 +591,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
+    const vectorField& faceCentres = mesh.faceCentres();
 
     // Initialise faceGradCoeffsPtr_
     faceGradCoeffsPtr_.set
@@ -869,6 +875,396 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
         return average;
     };
+
+    // Return a central moment of a cell after reflection with tensor R.
+    // Second- and third-order moments are transformed in every tensor index.
+    const auto reflectedCentralMoment =
+    [&]
+    (
+        const label globalCellID,
+        const tensor& R,
+        const label i,
+        const label j,
+        const label k
+    ) -> scalar
+    {
+        const label order = i + j + k;
+
+        if (order == 0)
+        {
+            return 1.0;
+        }
+        if (order == 1)
+        {
+            return 0.0;
+        }
+
+        FixedList<label, 3> directions;
+        label directionI = 0;
+        for (label n = 0; n < i; ++n)
+        {
+            directions[directionI++] = 0;
+        }
+        for (label n = 0; n < j; ++n)
+        {
+            directions[directionI++] = 1;
+        }
+        for (label n = 0; n < k; ++n)
+        {
+            directions[directionI++] = 2;
+        }
+
+        if (order > 3)
+        {
+            FatalErrorInFunction
+                << "Cannot reflect central moment of order " << order
+                << abort(FatalError);
+        }
+
+        scalar moment = 0.0;
+        const label thirdIndexSize = order == 3 ? 3 : 1;
+
+        for (direction a = 0; a < 3; ++a)
+        {
+            for (direction b = 0; b < 3; ++b)
+            {
+                for (direction c = 0; c < thirdIndexSize; ++c)
+                {
+                    FixedList<label, 3> sourceExponent = {0, 0, 0};
+                    ++sourceExponent[a];
+                    ++sourceExponent[b];
+
+                    scalar transformation =
+                        R(direction(directions[0]), a)
+                       *R(direction(directions[1]), b);
+
+                    if (order == 3)
+                    {
+                        ++sourceExponent[c];
+                        transformation *=
+                            R(direction(directions[2]), c);
+                    }
+
+                    moment +=
+                        transformation
+                       *centralMoment
+                        (
+                            globalCellID,
+                            sourceExponent[0],
+                            sourceExponent[1],
+                            sourceExponent[2]
+                        );
+                }
+            }
+        }
+
+        return moment;
+    };
+
+    // Return the cell average of an owner-centred monomial over a reflected
+    // cell. The vector d points from the owner centre to the reflected cell
+    // centre.
+    const auto reflectedAverageMonomial =
+    [&]
+    (
+        const label globalCellID,
+        const tensor& R,
+        const vector& d,
+        const label i,
+        const label j,
+        const label k
+    ) -> scalar
+    {
+        scalar average = 0.0;
+
+        for (label a = 0; a <= i; ++a)
+        {
+            const scalar binomialI =
+                factorials[i]/(factorials[a]*factorials[i - a]);
+
+            for (label b = 0; b <= j; ++b)
+            {
+                const scalar binomialJ =
+                    factorials[j]/(factorials[b]*factorials[j - b]);
+
+                for (label c = 0; c <= k; ++c)
+                {
+                    const scalar binomialK =
+                        factorials[k]/(factorials[c]*factorials[k - c]);
+
+                    average +=
+                        binomialI*binomialJ*binomialK
+                       *pow(d.x(), i - a)
+                       *pow(d.y(), j - b)
+                       *pow(d.z(), k - c)
+                       *reflectedCentralMoment
+                        (
+                            globalCellID,
+                            R,
+                            a,
+                            b,
+                            c
+                        );
+                }
+            }
+        }
+
+        return average;
+    };
+
+    // Calculate one-sided face-gradient coefficients on symmetry patches.
+    // Each physical neighbour is accompanied by its reflected cell, and the
+    // owner cell itself supplies one additional reflected observation.
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+
+        if
+        (
+           !isA<symmetryPolyPatch>(pp)
+         && !isA<symmetryPlanePolyPatch>(pp)
+        )
+        {
+            continue;
+        }
+
+        if (includePatchInStencils_[patchI])
+        {
+            FatalErrorInFunction
+                << "Patch " << pp.name() << " is a symmetry patch but is "
+                << "also configured as prescribed-value reconstruction data"
+                << abort(FatalError);
+        }
+
+        const vectorField patchNormals(mesh.boundary()[patchI].nf());
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const label ownCellI = owner[faceI];
+            const labelUList& cellStencil = cellStencils[ownCellI];
+            const label Nn = cellStencil.size();
+            const label numberOfObservations = 2*Nn + 1;
+            const vector& cellC = CI[ownCellI];
+            const vector& faceNormal = patchNormals[patchFaceI];
+            const tensor R = I - 2.0*sqr(faceNormal);
+            const label ownerGlobalCellID =
+                globalCells.toGlobal(ownCellI);
+
+            scalar maxDist = mag(cellC - faceCentres[faceI]);
+            forAll(cellStencil, stencilI)
+            {
+                maxDist = max
+                (
+                    maxDist,
+                    mag
+                    (
+                        cellCentre(cellStencil[stencilI])
+                      - faceCentres[faceI]
+                    )
+                );
+            }
+
+            if (maxDist < VSMALL)
+            {
+                FatalErrorInFunction
+                    << "Zero-sized symmetry reconstruction stencil at face "
+                    << faceI << abort(FatalError);
+            }
+
+            if (numberOfObservations < Np)
+            {
+                FatalErrorInFunction
+                    << "Symmetry reconstruction at face " << faceI
+                    << " has " << numberOfObservations << " observations but "
+                    << Np << " polynomial derivative unknowns"
+                    << abort(FatalError);
+            }
+
+            const scalar h = 2.0*maxDist;
+            Eigen::MatrixXd Q(Np, numberOfObservations);
+            Eigen::DiagonalMatrix<double, Eigen::Dynamic> W
+            (
+                numberOfObservations
+            );
+
+            forAll(cellStencil, stencilI)
+            {
+                const label neighbourGlobalCellID = cellStencil[stencilI];
+                const vector dx =
+                    cellCentre(neighbourGlobalCellID) - cellC;
+
+                forAll(exponents, p)
+                {
+                    const FixedList<label, 3>& exponent = exponents[p];
+                    const label i = exponent[0];
+                    const label j = exponent[1];
+                    const label k = twoD ? 0 : exponent[2];
+                    const label order = i + j + k;
+                    const scalar factorialDenominator =
+                        factorials[i]*factorials[j]*factorials[k];
+                    const scalar ownerAverage = averageMonomial
+                    (
+                        ownerGlobalCellID,
+                        vector::zero,
+                        i,
+                        j,
+                        k
+                    );
+
+                    Q(p, stencilI) =
+                        (
+                            averageMonomial
+                            (
+                                neighbourGlobalCellID,
+                                dx,
+                                i,
+                                j,
+                                k
+                            )
+                          - ownerAverage
+                        )
+                       /(pow(h, order)*factorialDenominator);
+
+                    const vector mirroredCentre =
+                        faceCentres[faceI]
+                      + transform
+                        (
+                            R,
+                            cellCentre(neighbourGlobalCellID)
+                          - faceCentres[faceI]
+                        );
+
+                    Q(p, Nn + 1 + stencilI) =
+                        (
+                            reflectedAverageMonomial
+                            (
+                                neighbourGlobalCellID,
+                                R,
+                                mirroredCentre - cellC,
+                                i,
+                                j,
+                                k
+                            )
+                          - ownerAverage
+                        )
+                       /(pow(h, order)*factorialDenominator);
+                }
+
+                const scalar distance = mag
+                (
+                    cellCentre(neighbourGlobalCellID) - faceCentres[faceI]
+                );
+                const scalar weight =
+                    weightFunc().weight(distance, maxDist);
+                W.diagonal()[stencilI] = weight;
+                W.diagonal()[Nn + 1 + stencilI] = weight;
+            }
+
+            const vector mirroredOwnerCentre =
+                faceCentres[faceI]
+              + transform(R, cellC - faceCentres[faceI]);
+
+            forAll(exponents, p)
+            {
+                const FixedList<label, 3>& exponent = exponents[p];
+                const label i = exponent[0];
+                const label j = exponent[1];
+                const label k = twoD ? 0 : exponent[2];
+                const label order = i + j + k;
+                const scalar factorialDenominator =
+                    factorials[i]*factorials[j]*factorials[k];
+
+                Q(p, Nn) =
+                    (
+                        reflectedAverageMonomial
+                        (
+                            ownerGlobalCellID,
+                            R,
+                            mirroredOwnerCentre - cellC,
+                            i,
+                            j,
+                            k
+                        )
+                      - averageMonomial
+                        (
+                            ownerGlobalCellID,
+                            vector::zero,
+                            i,
+                            j,
+                            k
+                        )
+                    )
+                   /(pow(h, order)*factorialDenominator);
+            }
+
+            W.diagonal()[Nn] = weightFunc().weight
+            (
+                mag(cellC - faceCentres[faceI]),
+                maxDist
+            );
+
+            const QRSolution qrs = QRSolve(Q, W);
+            const Eigen::MatrixXd& A = qrs.A;
+            labelList rowSizes
+            (
+                faceQuadPoints[faceI].size(),
+                numberOfObservations
+            );
+            faceGradCoeffs[faceI] =
+                CompactListList<vector>(rowSizes);
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                const vector r = faceQuadPoints[faceI][qpI] - cellC;
+                Eigen::MatrixXd L = Eigen::MatrixXd::Zero(3, Np);
+
+                forAll(exponents, p)
+                {
+                    const FixedList<label, 3>& exponent = exponents[p];
+                    const label i = exponent[0];
+                    const label j = exponent[1];
+                    const label k = twoD ? 0 : exponent[2];
+                    const label order = i + j + k;
+                    const scalar denominator =
+                        pow(h, order)
+                       *factorials[i]*factorials[j]*factorials[k];
+
+                    if (i > 0)
+                    {
+                        L(0, p) =
+                            i*pow(r.x(), i - 1)
+                             *pow(r.y(), j)*pow(r.z(), k)/denominator;
+                    }
+                    if (j > 0)
+                    {
+                        L(1, p) =
+                            j*pow(r.x(), i)
+                             *pow(r.y(), j - 1)*pow(r.z(), k)/denominator;
+                    }
+                    if (k > 0)
+                    {
+                        L(2, p) =
+                            k*pow(r.x(), i)
+                             *pow(r.y(), j)*pow(r.z(), k - 1)/denominator;
+                    }
+                }
+
+                const Eigen::MatrixXd gradientMap = L*A;
+                UList<vector> coefficients = faceGradCoeffs[faceI][qpI];
+
+                forAll(coefficients, observationI)
+                {
+                    coefficients[observationI] = vector
+                    (
+                        gradientMap(0, observationI),
+                        gradientMap(1, observationI),
+                        gradientMap(2, observationI)
+                    );
+                }
+            }
+        }
+    }
 
     // Calculate weighted coefficients for fixed-value boundary faces.
     forAll(mesh.boundaryMesh(), patchI)
