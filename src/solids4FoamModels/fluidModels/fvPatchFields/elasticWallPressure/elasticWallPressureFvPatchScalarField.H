@@ -63,6 +63,12 @@ class elasticWallPressureFvPatchScalarField
         //  field mapped to the fluid patch
         mutable autoPtr<scalarField> rhoSolidHsPtr_;
 
+        //- Time index at which rhoSolidHsPtr_ was last updated
+        mutable label rhoSolidHsTimeIndex_;
+
+        //- Time index at which the Robin number was last reported
+        label robinNumberTimeIndex_;
+
         //- Optional constant solid thickness
         //  If constantHs < SMALL, it indicates that it should not be used and
         // instead a virtual solid thickness is calculated on the fly
@@ -73,6 +79,9 @@ class elasticWallPressureFvPatchScalarField
 
         //- Return (and construct, if needed) the rhoSolid field
         const scalarField& rhoSolidHs() const;
+
+        //- Report the dimensionless Robin number once per time step
+        void reportRobinNumber(const scalarField&);
 
 
 public:
