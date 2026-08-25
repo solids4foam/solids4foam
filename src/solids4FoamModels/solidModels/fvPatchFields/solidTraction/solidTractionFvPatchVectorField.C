@@ -241,13 +241,16 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
 #ifdef OPENFOAM_ORG
     traction_(mapper(pvf.traction_)),
-    pressure_(mapper(pvf.pressure_)),
 #else
     traction_(pvf.traction_, mapper),
-    pressure_(pvf.pressure_, mapper),
 #endif
 #ifndef FOAMEXTEND
     tractionQuadraturePtr_(),
+#endif
+#ifdef OPENFOAM_ORG
+    pressure_(mapper(pvf.pressure_)),
+#else
+    pressure_(pvf.pressure_, mapper),
 #endif
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
@@ -468,7 +471,13 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     }
     else if (tractionSeries_.size())
     {
-        setTraction(tractionSeries_(this->db().time().timeOutputValue()));
+        setTraction
+        (
+            vectorField
+            (
+                size(), tractionSeries_(this->db().time().timeOutputValue())
+            )
+        );
     }
 
     if (pressureFieldPtr_.valid())
@@ -634,7 +643,10 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
     {
         const_cast<solidTractionFvPatchVectorField&>(*this).setTraction
         (
-            tractionSeries_(this->db().time().timeOutputValue())
+            vectorField
+            (
+                size(), tractionSeries_(this->db().time().timeOutputValue())
+            )
         );
     }
 
@@ -674,7 +686,10 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
     const vectorField n(patch().nf());
     forAll(values, faceI)
     {
-        values[faceI] -= n[faceI]*pressure_[faceI];
+        forAll(values[faceI], pointI)
+        {
+            values[faceI][pointI] -= n[faceI]*pressure_[faceI];
+        }
     }
 
     return tractionValues;
