@@ -382,10 +382,27 @@ void solidTractionFvPatchVectorField::setTractionQuadrature
         traction_[faceI] /= weightSum;
     }
 
+    // CompactListList is non-copyable in OpenFOAM-9, so make an explicit
+    // layout-preserving copy of the supplied quadrature tractions.
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = tractionQuadrature[faceI].size();
+    }
+
     tractionQuadraturePtr_.set
     (
-        new CompactListList<vector>(tractionQuadrature)
+        new CompactListList<vector>(nQpPerFace)
     );
+
+    forAll(tractionQuadraturePtr_(), faceI)
+    {
+        forAll(tractionQuadraturePtr_()[faceI], pointI)
+        {
+            tractionQuadraturePtr_()[faceI][pointI] =
+                tractionQuadrature[faceI][pointI];
+        }
+    }
 }
 #endif
 
@@ -677,9 +694,17 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
         }
     }
 
+    // CompactListList is non-copyable in OpenFOAM-9, so make an explicit
+    // layout-preserving copy before applying the pressure contribution.
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = tractionQuadraturePtr_()[faceI].size();
+    }
+
     autoPtr<CompactListList<vector>> tractionValues
     (
-        new CompactListList<vector>(tractionQuadraturePtr_())
+        new CompactListList<vector>(nQpPerFace)
     );
 
     CompactListList<vector>& values = tractionValues();
@@ -688,7 +713,8 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
     {
         forAll(values[faceI], pointI)
         {
-            values[faceI][pointI] -= n[faceI]*pressure_[faceI];
+            values[faceI][pointI] = tractionQuadraturePtr_()[faceI][pointI]
+                - n[faceI]*pressure_[faceI];
         }
     }
 

@@ -181,7 +181,10 @@ For efficiency, the script runs both the `aitken` and `iqnils` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
 then. It also runs the `iqnils highOrder` variant and checks that it reaches the
-shortened end time.
+shortened end time. On supported OpenFOAM versions, the high-order result is
+checked against the same displacement and force references as the lower-order
+variants; the displacement tolerance is widened to allow the expected
+discretisation difference. The high-order variant is skipped on foam-extend.
 
 The script checks that both variants converge to the same solution, within
 loose tolerances, by comparing:
