@@ -236,7 +236,7 @@ class kExactLeastSquares
         //- Calculate internal-face gradient coefficients at quadrature points
         //  by merging contribution from owner and neighbour side, and
         //  weighted coefficients for fixed-value boundary faces
-        void calcFaceCoeffs() const;
+        void calcFaceGradCoeffs() const;
 
         //- Return prescribed boundary quadrature-point addressing
         const List<List<FixedList<label, 2>>>&

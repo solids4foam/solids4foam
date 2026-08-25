@@ -117,7 +117,7 @@ kExactLeastSquares::faceBoundaryDataStencil() const
 {
     if (faceBoundaryDataStencilPtr_.empty())
     {
-        calcFaceCoeffs();
+        calcFaceGradCoeffs();
     }
 
     return autoPtrRef(faceBoundaryDataStencilPtr_);
@@ -129,7 +129,7 @@ kExactLeastSquares::faceBoundaryDataCoeffs() const
 {
     if (faceBoundaryDataCoeffsPtr_.empty())
     {
-        calcFaceCoeffs();
+        calcFaceGradCoeffs();
     }
 
     return autoPtrRef(faceBoundaryDataCoeffsPtr_);
@@ -558,7 +558,7 @@ void kExactLeastSquares::makeFaceGradStencil() const
 }
 
 
-void kExactLeastSquares::calcFaceCoeffs() const
+void kExactLeastSquares::calcFaceGradCoeffs() const
 {
     if (debug)
     {
@@ -1772,7 +1772,7 @@ kExactLeastSquares::faceGradCoeffs() const
 {
     if (faceGradCoeffsPtr_.empty())
     {
-        calcFaceCoeffs();
+        calcFaceGradCoeffs();
     }
 
     return autoPtrRef(faceGradCoeffsPtr_);
