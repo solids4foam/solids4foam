@@ -153,7 +153,8 @@ patch_end_time() {
 
 prepare_case() {
     local coupling="$1"
-    local case_dir="${REGRESSION_ROOT}/${coupling}"
+    local case_name="${2:-${coupling}}"
+    local case_dir="${REGRESSION_ROOT}/${case_name}"
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -211,6 +212,31 @@ run_case() {
             ln -s forces.dat force.dat
         fi
     )
+}
+
+run_high_order_case() {
+    local case_dir="$1"
+
+    echo "Running high-order IQNILS regression case"
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun iqnils highOrder > "${ALLRUN_LOGFILE}" 2>&1
+    )
+}
+
+check_high_order_case() {
+    local case_dir="$1"
+
+    if grep -q "Time = ${REGRESSION_END_TIME}" \
+        "${case_dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "PASS [highOrder]: IQNILS high-order case reached end time"
+        return 0
+    fi
+
+    echo "FAIL [highOrder]: IQNILS high-order case did not reach end time"
+    return 1
 }
 
 check_case() {
@@ -329,6 +355,9 @@ run_case "${aitken_case}" aitken
 iqnils_case=$(prepare_case iqnils)
 run_case "${iqnils_case}" iqnils
 
+high_order_case=$(prepare_case iqnils highOrder)
+run_high_order_case "${high_order_case}"
+
 echo
 
 failures=0
@@ -340,6 +369,8 @@ check_case aitken "${aitken_case}" \
 check_case iqnils "${iqnils_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
+
+check_high_order_case "${high_order_case}" || failures=$((failures + $?))
 
 echo
 if (( failures == 0 )); then

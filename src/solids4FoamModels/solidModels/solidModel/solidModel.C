@@ -1905,7 +1905,7 @@ void Foam::solidModel::setTraction
         solidTractionFvPatchVectorField& patchD =
             refCast<solidTractionFvPatchVectorField>(tractionPatch);
 
-        patchD.traction() = traction;
+        patchD.setTraction(traction);
     }
 #ifdef FOAMEXTEND
     else if
@@ -1940,6 +1940,30 @@ void Foam::solidModel::setTraction
             << abort(FatalError);
     }
 }
+
+#ifndef FOAMEXTEND
+void Foam::solidModel::setTractionQuadrature
+(
+    fvPatchVectorField& tractionPatch,
+    const CompactListList<vector>& traction
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.setTractionQuadrature(traction);
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Boundary condition " << tractionPatch.type() << " for patch "
+            << tractionPatch.patch().name() << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName << abort(FatalError);
+    }
+}
+#endif
 
 
 void Foam::solidModel::setTraction

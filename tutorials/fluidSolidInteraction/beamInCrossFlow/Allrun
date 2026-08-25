@@ -18,6 +18,7 @@ solids4Foam::requirePetscOrExitSilently
 coupling=iqnils
 runMode=serial
 fvSolutionSuffix=""
+solidPropertiesSuffix=""
 
 for arg in "$@"
 do
@@ -31,9 +32,12 @@ do
         parallel)
             runMode=parallel
             ;;
+        highOrder)
+            solidPropertiesSuffix=".highOrder"
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils] [highOrder] [parallel]"
             exit 1
             ;;
     esac
@@ -48,7 +52,7 @@ fi
 echo "Using ${coupling} coupling setup"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
+ln -vnsf "solidProperties.${coupling}${solidPropertiesSuffix}" constant/solid/solidProperties
 ln -vnsf "controlDict.${coupling}" system/controlDict
 ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
 
