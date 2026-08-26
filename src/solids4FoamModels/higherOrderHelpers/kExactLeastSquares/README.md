@@ -1,6 +1,6 @@
-# kExactLeastSquares
+# `kExactLeastSquares`
 
-<!-- markdownlint-disable MD013 MD036 -->
+## Class principal functions
 
 This document provides explanation of the principal functions documented below
 and their roles in the reconstruction procedure.
@@ -11,27 +11,31 @@ and their roles in the reconstruction procedure.
 - `cellValueCoeffsAtPoint()`
   - Constructs scalar coefficients that multiply the owner and stencil-cell
     averages to obtain the reconstructed value at $\boldsymbol{x}$.
-  - It converts the derivative-coefficient rows stored for cell $P$ into scalar value coefficients at the requested point $$\boldsymbol{x}$$.
+  - It converts the derivative-coefficient rows stored for cell $P$ into scalar
+    value coefficients at the requested point $$\boldsymbol{x}$$.
 - `cellGradCoeffsAtPoint()`
   - Constructs vector coefficients that multiply stencil-minus-owner cell
-    average differences to obtain the reconstructed gradient at $$\boldsymbol{x}$$.
-  - It converts the derivative-coefficient rows stored for cell $P$ into vector coefficients at the requested point $$\boldsymbol{x}$$.
+    average differences to obtain the reconstructed gradient
+    at $$\boldsymbol{x}$$.
+  - It converts the derivative-coefficient rows stored for cell $P$ into vector
+    coefficients at the requested point $$\boldsymbol{x}$$.
 - `faceGradStencil()` and `makeFaceGradStencil()`
   - Lazily provide and construct the merged global-cell addressing required
     for face-gradient reconstruction.
 - `calcFaceGradCoeffs()`
-  - Calculates gradient coefficients at face quadrature points for internal and boundary faces.
+  - Calculates gradient coefficients at face quadrature points for
+    internal and boundary faces.
 - `calcCellCoeffs()`
   - Solves the weighted k-exact least-squares systems and stores the
     cell-centred first-, second- and third-derivative coefficient rows.
 
-## General
+### General
 
 The derivation is presented for one scalar field component $u$. For the
 displacement field, the same reconstruction and the same geometrical
 coefficients are applied independently to $u_x$, $u_y$, and $u_z$.
 
-**Stored cell value**
+### Stored cell value
 
 The value stored in cell $P$ is the cell volume average
 
@@ -73,7 +77,7 @@ $$
 \overline{u}_P.
 $$
 
-**Cell moments**
+### Cell moments
 
 The volume-normalised central moments of cell $P$ are denoted by $M^P$.
 For example,
@@ -110,7 +114,7 @@ this property directly and sets first-order central moments to zero. The
 `cellMoments` test utility can be used to measure the numerical quadrature
 error in this identity on a particular mesh.
 
-**Explicit mean-free reconstruction**
+### Explicit mean-free reconstruction
 
 Using derivative components instead of compact second- and third-order
 derivative tensor notation, the reconstruction through third order is
@@ -145,7 +149,7 @@ u_P^R(\boldsymbol{x})={}&\overline{u}_P
 \end{aligned}
 $$
 
-**Compact tensor form**
+### Compact tensor form
 
 The same reconstruction can be written more compactly as
 
@@ -268,7 +272,7 @@ Every bracket containing a second- or third-order monomial has zero average
 over cell $P$. Consequently, the average of the complete reconstruction is
 exactly $\overline{u}_P$.
 
-**Stencil-coefficient notation used in this README**
+### Stencil-coefficient notation used in this README
 
 Uppercase $C$ denotes the geometry-dependent coefficients stored by the
 code. For stencil cell $N\in\mathcal{S}_P$, the derivative coefficients are
@@ -318,8 +322,10 @@ $$
 The same rule applies to every derivative component. In the code:
 
 - `cellGradCoeffs()` stores $C_{x,N}^P,C_{y,N}^P,C_{z,N}^P$, $$\to \mathbf{C}_x^P=(C_{x,N}^P,C_{y,N}^P,C_{z,N}^P)$$;
-- `cellSecondGradCoeffs()` stores $C_{xx,N}^P,C_{xy,N}^P,\ldots,C_{zz,N}^P$, $$\to \mathbf{C}_{xx}^P=(C_{xx,N}^P,C_{xy,N}^P,\ldots,C_{zz,N}^P)$$;
-- `cellThirdGradCoeffs()` stores $C_{xxx,N}^P,C_{xxy,N}^P,\ldots,C_{zzz,N}^P$ , $$\to \mathbf{C}_{xxx}^P=(C_{xxx,N}^P,C_{xxy,N}^P,\ldots,C_{zzz,N}^P)$$.
+- `cellSecondGradCoeffs()` stores $C_{xx,N}^P,C_{xy,N}^P,\ldots,C_{zz,N}^P$,
+   $$\to \mathbf{C}_{xx}^P=(C_{xx,N}^P,C_{xy,N}^P,\ldots,C_{zz,N}^P)$$;
+- `cellThirdGradCoeffs()` stores $C_{xxx,N}^P,C_{xxy,N}^P,\ldots,C_{zzz,N}^P$ ,
+   $$\to \mathbf{C}_{xxx}^P=(C_{xxx,N}^P,C_{xxy,N}^P,\ldots,C_{zzz,N}^P)$$.
 
 ## `valueAtPoint`
 
@@ -420,7 +426,7 @@ C_{z,N}^P
 \right).
 $$
 
-**Value coefficient for stencil cell \(N\)**
+### Value coefficient for stencil cell \(N\)
 
 The scalar coefficient multiplying the value stored in stencil cell $N$ is
 
@@ -453,7 +459,7 @@ second- and third-order contributions. The corresponding point-dependent parts
 are calculated by `r & (secondDerivativeCoeff & r)` and
 `cubicForm(thirdDerivativeCoeff, r)`.
 
-**Difference form and owner coefficient**
+### Difference form and owner coefficient
 
 The derivative coefficient rows multiply differences between stencil and owner
 cell averages. Substitution into the mean-free polynomial therefore gives
@@ -501,7 +507,7 @@ C_P^P(\boldsymbol{x})\overline{u}_P
 C_N^P(\boldsymbol{x})\overline{u}_N.
 $$
 
-**Output ordering**
+### Output ordering
 
 The caller must provide `coeffs` with
 
@@ -541,7 +547,7 @@ constant preservation follows from the sum of all absolute coefficients being
 one, or equivalently from
 $\overline{u}_N-\overline{u}_P=0$ in the difference form.
 
-**How the coefficients are used**
+### How the coefficients are used
 
 Once the required local and remote field values are available, evaluation can
 be written schematically as
@@ -595,7 +601,7 @@ The moment corrections do not appear in this equation because
 $\boldsymbol{M}_P^{(2)}$ and $\boldsymbol{M}_P^{(3)}$ are constant for cell
 $P$. Their derivatives with respect to $\boldsymbol{x}$ are zero.
 
-**Gradient coefficient for stencil cell \(N\)**
+### Gradient coefficient for stencil cell \(N\)
 
 For each stencil cell $N\in\mathcal{S}_P$, the function calculates
 
@@ -616,7 +622,8 @@ Here:
 - $\boldsymbol{C}_{x,N}^P$ is the first-derivative coefficient vector;
 - $\boldsymbol{C}_{xx,N}^P$ is the second-derivative coefficient tensor;
 - $\boldsymbol{C}_{xxx,N}^P$ is the third-derivative coefficient tensor;
-- $\boldsymbol{C}_N^P(\boldsymbol{x})$ is the resulting vector coefficient for the gradient at $\boldsymbol{x}$.
+- $\boldsymbol{C}_N^P(\boldsymbol{x})$ is the resulting vector coefficient
+  for the gradient at $\boldsymbol{x}$.
 
 In the implementation:
 
@@ -631,7 +638,7 @@ gradient is constant inside cell $P$. For $p=2$, the second-derivative term
 makes the gradient linear in $\boldsymbol{r}$. For $p=3$, the third-derivative
 term adds quadratic variation.
 
-**Difference form**
+### Difference form
 
 The returned coefficients retain the neighbour-minus-owner form:
 
@@ -667,7 +674,7 @@ $$
 
 This ensures that the reconstructed gradient of a constant field is zero.
 
-**Output ordering**
+#### Output ordering for newly calculated coefficients
 
 The caller must provide `coeffs` with exactly
 
@@ -689,7 +696,7 @@ $$
 
 There is no additional owner entry.
 
-**Scalar and vector fields**
+#### Scalar and vector fields
 
 For a scalar field, each returned vector coefficient is multiplied by a
 cell-average scalar difference:
@@ -704,7 +711,6 @@ $$
 
 For displacement, the same operation is applied component-wise and produces
 the displacement-gradient tensor:
-
 $$
 \nabla\boldsymbol{D}_P^R(\boldsymbol{x})
 =
@@ -724,7 +730,7 @@ close to owner cell $P$, particularly face quadrature points.
 The entries are global cell IDs. This is necessary because a cell
 reconstruction stencil can contain cells owned by another processor.
 
-**Internal faces**
+### Grad stencil for internal faces
 
 For an internal face $f$ with owner cell $P$ and neighbour cell $N$,
 `makeFaceGradStencil()` constructs
@@ -744,7 +750,7 @@ The resulting IDs are sorted before storage, so the face-stencil ordering is
 deterministic but does not separately identify owner-side and neighbour-side
 entries.
 
-**Fixed-value boundary faces**
+### Fixed-value boundary faces
 
 For a boundary patch selected by `includePatchInStencils_`, the face stencil
 contains the owner cell and its reconstruction stencil:
@@ -785,7 +791,7 @@ Each stored row follows the ordering of
 `stencil().cellsStencil()[cellI]`. The owner cell is not appended because the
 derivative reconstruction uses stencil-minus-owner cell-average differences.
 
-**Polynomial basis**
+### Polynomial basis
 
 A polynomial basis is simply the list of polynomial terms that the
 reconstruction is allowed to contain. Instead of writing a separate case for
@@ -808,7 +814,7 @@ $$
 =r_x^i r_y^j r_z^k.
 $$
 
-**How to read the multi-index notation**
+#### How to read the multi-index notation
 
 The multi-index is only a compact bookkeeping notation. The three numbers
 $(i,j,k)$ are the powers of $r_x$, $r_y$ and $r_z$. The same three numbers
@@ -855,7 +861,8 @@ In 3D:
 
 - $p=1$: $r_x,\ r_y,\ r_z$;
 - $p=2$: add $r_x^2,\ r_xr_y,\ r_xr_z,\ r_y^2,\ r_yr_z,\ r_z^2$;
-- $p=3$: add $r_x^3,\ r_x^2r_y,\ r_x^2r_z,\ r_xr_y^2,\ r_xr_yr_z,r_xr_z^2,\ r_y^3,\ r_y^2r_z,\ r_yr_z^2,\ r_z^3$.
+- $p=3$: add $r_x^3,\ r_x^2r_y,\ r_x^2r_z,\ r_xr_y^2,\$
+  $r_xr_yr_z,r_xr_z^2,\ r_y^3,\ r_y^2r_z,\ r_yr_z^2,\ r_z^3$.
 
 These lists show only the monomial part of each basis function. The
 second- and third-order cell moments are still subtracted to make the basis
@@ -903,7 +910,7 @@ $(i,j,k)$. `calcDerivativeRows()` records the rows required to construct the
 second- and third-derivative tensors. Consequently, the code does not depend on
 manually assumed row positions.
 
-**Cell-average equations**
+#### Cell-average equations
 
 The mean-free reconstruction associated with owner cell $P$ can be written as
 
@@ -977,7 +984,7 @@ measured from the owner centroid $\boldsymbol{x}_P$. This distinction is why
 both the neighbour-cell centre offset and the neighbour central moments are
 needed.
 
-**The averageMonomial calculation**
+#### The averageMonomial calculation
 
 Let
 
@@ -1098,7 +1105,8 @@ This equation explains the three nested loops in `averageMonomial()`:
 - index $b$ expands the power in the $y$ direction;
 - index $c$ expands the power in the $z$ direction.
 
-For each stencil cell and each polynomial term, `calcCellCoeffs()` calls `averageMonomial()` twice:
+For each stencil cell and each polynomial term, `calcCellCoeffs()`
+calls `averageMonomial()` twice:
 
 1. with cell $N$ and $\boldsymbol{d}_{PN}$ to calculate the neighbour-cell
    average;
@@ -1108,7 +1116,7 @@ For each stencil cell and each polynomial term, `calcCellCoeffs()` calls `averag
 Their difference becomes one entry of the matrix $\boldsymbol{Q}_P$ after
 division by the distance scaling and factorial.
 
-**Complete 2D quadratic example**
+#### Complete 2D quadratic example
 
 For $p=2$ in 2D, the cell-average equation associated with one stencil cell
 $N$ is
@@ -1191,7 +1199,7 @@ returns $M_P^{(i,j,k)}$. First-order central moments are set to zero because
 cell centres are volume centroids. Second- and third-order moments are read
 from `fvMeshQuadrature` and exchanged when a stencil contains remote cells.
 
-**Distance scaling and matrix \(Q\)**
+#### Distance scaling and matrix \(Q\)
 
 For each owner cell, the code defines
 
@@ -1258,7 +1266,7 @@ The factor $h_P^{|\boldsymbol{\alpha}|}$ makes the matrix rows associated with
 different derivative orders dimensionally comparable. The derivatives are
 unscaled again before their coefficients are stored.
 
-**Weights and QR solution**
+#### Weights and QR solution
 
 The diagonal weight matrix contains one spatial weight for every stencil cell:
 
@@ -1306,7 +1314,7 @@ not formed explicitly. If `calcConditionNumber` is enabled, the condition
 number of the square upper factor is calculated and written to the
 `cellConditionNumber` field.
 
-**Unscaling and storing derivative coefficients**
+#### Unscaling and storing derivative coefficients
 
 For derivative $\boldsymbol{\alpha}$, row $\boldsymbol{\alpha}$ of
 $\boldsymbol{A}_P$ gives
@@ -1351,9 +1359,11 @@ $$
 
 in `cellGradCoeffsPtr_`.
 
-For $p\ge2$, the second-derivative rows are divided by $h_P^2$ and stored as the `symmTensor` $\boldsymbol{C}_{xx,N}^P$ in `cellSecondGradCoeffsPtr_`.
+For $p\ge2$, the second-derivative rows are divided by $h_P^2$ and stored as
+the `symmTensor` $\boldsymbol{C}_{xx,N}^P$ in `cellSecondGradCoeffsPtr_`.
 
-For $p\ge3$, the third-derivative rows are divided by $h_P^3$ and stored as the `symmTensor3rdOrder` $\boldsymbol{C}_{xxx,N}^P$ in `cellThirdGradCoeffsPtr_`.
+For $p\ge3$, the third-derivative rows are divided by $h_P^3$ and stored as
+the `symmTensor3rdOrder` $\boldsymbol{C}_{xxx,N}^P$ in `cellThirdGradCoeffsPtr_`.
 
 In 2D, every stored component containing a $z$ derivative is explicitly set
 to zero. Each coefficient table has one row per local owner cell, and each row
@@ -1386,7 +1396,7 @@ caches:
 
 Internal face and fixed-value boundary faces require different constructions.
 
-**Internal faces**
+### Internal faces
 
 Consider an internal face $f$ with owner cell $P$, neighbour cell $R$, and
 quadrature point $\boldsymbol{x}_{f,q}$. A generic cell in either
@@ -1428,9 +1438,10 @@ $$
 \nabla u_R^R(\boldsymbol{x}_{f,q}).
 $$
 
-`cellGradCoeffsAtPoint()` calculates $$\boldsymbol{C}_N^P(\boldsymbol{x}_{f,q})$$ and $$\boldsymbol{C}_N^R(\boldsymbol{x}_{f,q})$$.
+`cellGradCoeffsAtPoint()` calculates $$\boldsymbol{C}_N^P(\boldsymbol{x}_{f,q})$$
+and $$\boldsymbol{C}_N^R(\boldsymbol{x}_{f,q})$$.
 
-**Converting the internal-face differences to absolute values**
+#### Converting the internal-face differences to absolute values
 
 For the owner side,
 
@@ -1510,7 +1521,7 @@ $$
 
 so the face gradient of a constant field is zero.
 
-**Internal-face storage**
+#### Internal-face storage
 
 For each internal face:
 
@@ -1522,7 +1533,7 @@ The owner-side and neighbour-side labels are needed only while constructing
 the operator. After the contributions have been merged, `fGrad()` only needs
 the global cell ID and its final coefficient.
 
-**Why fixed-value boundary faces are different**
+#### Why fixed-value boundary faces are different
 
 A fixed-value boundary face has no neighbour cell whose reconstruction can be
 averaged with the owner reconstruction. Instead, prescribed values at boundary
@@ -1559,11 +1570,12 @@ are known. `calcFaceGradCoeffs()` does not read the actual prescribed field
 values. `fGrad()` obtains those values later through
 `patchFaceQuadValues()`.
 
-**Boundary equations**
+---
+
+### Boundary equations
 
 Let $c$ denote one prescribed boundary quadrature point with location
 $\boldsymbol{x}_c$ and prescribed value $u_c^D$. Define
-
 $$
 b_c
 =
@@ -1689,12 +1701,11 @@ Every collected prescribed quadrature point supplies one row of
 $\boldsymbol{D}_P$ and one entry of the known-data vector
 $\boldsymbol{b}_P$.
 
-**Combined cell and boundary least-squares system**
+#### Combined cell and boundary least-squares system
 
 The cell equations used in `calcCellCoeffs()` are rebuilt for the boundary
 cell. The prescribed boundary-point equations are then appended to them. The
 complete known-data vector is
-
 $$
 \boldsymbol{y}_P
 =
@@ -1781,7 +1792,7 @@ $$
 The first part maps the stencil-cell differences, while the second part maps
 the prescribed boundary-value differences.
 
-**Gradient evaluation at a boundary quadrature point**
+#### Gradient evaluation at a boundary quadrature point
 
 For every target quadrature point $\boldsymbol{x}_{f,q}$, the matrix
 $\boldsymbol{L}_{f,q}$ differentiates the scaled mean-free polynomial:
@@ -1859,7 +1870,7 @@ coefficients[ownIndex] -= coefficientSum;
 The resulting absolute coefficients again give zero gradient for a constant
 field when the cell averages and prescribed values contain the same constant.
 
-**Boundary-face storage and use by fGrad**
+#### Boundary-face storage and use by fGrad
 
 For a selected fixed-value boundary face:
 
