@@ -38,10 +38,13 @@ jobs:
     # Ubuntu 22.04 (jammy), matching the preCICE package installed below, and
     # with PETSc, which the upstream solid case requires.
     # Unlike the other workflows, this one runs the container as root, so that
-    # the preCICE package can be installed with its dependencies (boost-log and
-    # PETSc runtime libraries). Unpacking the package instead is not enough:
-    # those dependencies would be missing and the adapter library would fail to
-    # load at run time, with the function object silently unavailable.
+    # the preCICE package can be installed with apt, which resolves its
+    # Depends. Installing it without apt, by unpacking it, skips those, and the
+    # image ships neither the boost-log nor the PETSc runtime libraries that
+    # libprecice.so.3 needs: the adapter library then fails to dlopen and the
+    # run aborts with "Cannot load function type preciceAdapterFunctionObject".
+    # The dlerror line naming the missing library is printed unprefixed about
+    # 20 lines earlier, so it is easy to miss.
     container:
       image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
       env:
@@ -80,8 +83,10 @@ jobs:
       - name: Build the OpenFOAM preCICE adapter
         shell: bash -l {0}
         run: |
-          # Source the OpenFOAM bashrc before enabling errexit: it returns a
-          # non-zero status, which would otherwise abort the step silently.
+          # Source the OpenFOAM bashrc before enabling errexit: under "set -e"
+          # it aborts the shell at _foamAddLibAuto returning 1 for boost-system
+          # in etc/config.sh/CGAL. Its own exit status is 0, so this shows up
+          # only under errexit.
           source "${FOAM_BASHRC}"
           set -e
           git config --global --add safe.directory '*'
