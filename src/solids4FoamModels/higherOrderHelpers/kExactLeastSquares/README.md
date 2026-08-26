@@ -1,6 +1,6 @@
-
-
 # kExactLeastSquares
+
+<!-- markdownlint-disable MD013 MD036 -->
 
 This document provides explanation of the principal functions documented below
 and their roles in the reconstruction procedure.
@@ -10,7 +10,7 @@ and their roles in the reconstruction procedure.
     requested point $\boldsymbol{x}$.
 - `cellValueCoeffsAtPoint()`
   - Constructs scalar coefficients that multiply the owner and stencil-cell
-    averages to obtain the reconstructed value at $\boldsymbol{x}$. 
+    averages to obtain the reconstructed value at $\boldsymbol{x}$.
   - It converts the derivative-coefficient rows stored for cell $P$ into scalar value coefficients at the requested point $$\boldsymbol{x}$$.
 - `cellGradCoeffsAtPoint()`
   - Constructs vector coefficients that multiply stencil-minus-owner cell
@@ -185,7 +185,6 @@ $$
   \right).
   \end{aligned}
 $$
-
 
 The second-order derivative tensor contains all second derivatives:
 $$
@@ -718,7 +717,7 @@ $$
 $$
 
 Although the helper accepts any point, it is intended for points inside or
-close to owner cell $P$, particularly face quadrature points. 
+close to owner cell $P$, particularly face quadrature points.
 
 ## `faceGradStencil`
 
