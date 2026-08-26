@@ -24,7 +24,6 @@ ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
@@ -104,7 +103,7 @@ extract_final_force() {
     }
     END {
         if (last != "") print last
-    }' "${1}/${FORCE_FILE}"
+    }' "${1}"
 }
 
 abs() {
@@ -273,7 +272,7 @@ check_case() {
 
     max_disp=$(extract_max_displacement "${case_dir}")
     final_disp=$(extract_final_displacement "${case_dir}")
-    final_force=$(extract_final_force "${case_dir}")
+    final_force=$(extract_final_force "${force_file}")
 
     if [[ -z "${max_disp}" || -z "${final_disp}" || -z "${final_force}" ]]; then
         echo "FAIL [${coupling}]: Could not extract regression quantities"
