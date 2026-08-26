@@ -964,6 +964,15 @@ public:
                 const vectorField& traction
             );
 
+#ifndef FOAMEXTEND
+            //- Set traction component at specified patch quadrature points
+            virtual void setTractionQuadrature
+            (
+                fvPatchVectorField& tractionPatch,
+                const CompactListList<vector>& traction
+            );
+#endif
+
             //- Set traction at specified patch
             virtual void setTraction
             (
