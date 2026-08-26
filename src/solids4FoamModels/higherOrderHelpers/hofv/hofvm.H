@@ -126,6 +126,20 @@ namespace hofvm
         const label colOffset = 0
     );
 
+    //- Add the high-order alpha-stabilisation derivative to the PETSc matrix
+    //  Serial implementation; for now no contribution is inserted in parallel
+    void insertAlphaStabIntoPETScMatrix
+    (
+        Mat jac,
+        const foamPetscSnesHelper& petscSnesHelper,
+        const leastSquaresScheme& reconstruction,
+        const volVectorField& D,
+        const surfaceScalarField& diffusivity,
+        const scalar scaleFactor,
+        const label rowOffset = 0,
+        const label colOffset = 0
+    );
+
 } // End namespace hofvm
 
 } // End namespace Foam

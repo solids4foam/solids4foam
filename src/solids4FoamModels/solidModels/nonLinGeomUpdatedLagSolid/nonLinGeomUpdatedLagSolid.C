@@ -29,6 +29,7 @@ License
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #ifndef FOAMEXTEND
+    #include "alphaStab.H"
     #include "hofvm.H"
 #endif
 
@@ -1284,6 +1285,19 @@ label nonLinGeomUpdatedLagSolid::formJacobian
             DD,
             lambda
         );
+
+        if (isA<alphaStab>(momentumStabilisation()))
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                DD,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
+        }
 
         fvVectorMatrix transientJ
         (

@@ -56,8 +56,7 @@ void leastSquaresScheme::makeFaceCentreValueCoeffs() const
     for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
     {
         ownerRowSizes[faceI] = cellStencils[owner[faceI]].size() + 1;
-        neighbourRowSizes[faceI] =
-            cellStencils[neighbour[faceI]].size() + 1;
+        neighbourRowSizes[faceI] = cellStencils[neighbour[faceI]].size() + 1;
     }
 
     forAll(mesh_.boundaryMesh(), patchI)
@@ -81,8 +80,7 @@ void leastSquaresScheme::makeFaceCentreValueCoeffs() const
         new CompactListList<scalar>(neighbourRowSizes)
     );
 
-    CompactListList<scalar>& ownerCoeffs =
-        *ownerFaceCentreValueCoeffsPtr_;
+    CompactListList<scalar>& ownerCoeffs =  *ownerFaceCentreValueCoeffsPtr_;
     CompactListList<scalar>& neighbourCoeffs =
         *neighbourFaceCentreValueCoeffsPtr_;
 
@@ -248,19 +246,23 @@ void leastSquaresScheme::evaluateFaceCentreValues
     GeometricField<Type, fvsPatchField, surfaceMesh>& neighbourValues
 ) const
 {
+    // Preliminaries
     const CompactListList<scalar>& ownerCoeffs =
         ownerFaceCentreValueCoeffs();
     const CompactListList<scalar>& neighbourCoeffs =
         neighbourFaceCentreValueCoeffs();
+
     const leastSquaresStencil& cellStencil = stencil();
     const globalIndex& globalCells = cellStencil.globalCells();
     const Map<FixedList<label, 2>>& remoteLocation =
         cellStencil.remoteCellLocation();
+
     const labelUList& owner = mesh_.owner();
     const labelUList& neighbour = mesh_.neighbour();
     const UList<Type>& vfI = vf.internalField();
     const List<Field<Type>> remoteField =
         cellStencil.remoteFieldPerProc(vfI);
+
     Field<Type>& ownerValuesI = Foam::primitiveFieldRef(ownerValues);
     Field<Type>& neighbourValuesI = Foam::primitiveFieldRef(neighbourValues);
 

@@ -1356,11 +1356,15 @@ Foam::solidModel::solidModel
         const word stabType =
             momentumDict.lookupOrDefault<word>("type", "default");
 
-        if (stabType != "alpha" && highOrderResidual())
+        if
+        (
+            stabType != "alpha"
+         && (highOrderResidual() || highOrderJacobian())
+        )
         {
             FatalErrorInFunction
                 << "Only alpha stabilisation is supported with high-order "
-                << "residual calculation"
+                << "residual or Jacobian calculation"
                 << abort(FatalError);
         }
     }

@@ -93,12 +93,6 @@ private:
         //- Calculate and cache face-centre value coefficients
         void makeFaceCentreValueCoeffs() const;
 
-        //- Return owner-side face-centre value coefficients
-        const CompactListList<scalar>& ownerFaceCentreValueCoeffs() const;
-
-        //- Return neighbour-side face-centre value coefficients
-        const CompactListList<scalar>& neighbourFaceCentreValueCoeffs() const;
-
         //- For global index return a local or remote field value
         template<class Type, class GlobalCells>
         inline Type fieldValue
@@ -213,6 +207,12 @@ public:
         //- Return face-gradient reconstruction coefficients
         virtual const List<CompactListList<vector>>&
         faceGradCoeffs() const = 0;
+
+        //- Return owner-side face-centre value coefficients
+        const CompactListList<scalar>& ownerFaceCentreValueCoeffs() const;
+
+        //- Return neighbour-side face-centre value coefficients
+        const CompactListList<scalar>& neighbourFaceCentreValueCoeffs() const;
 
         //- Clear owned geometry-dependent data and coefficients
         virtual void clear() const = 0;

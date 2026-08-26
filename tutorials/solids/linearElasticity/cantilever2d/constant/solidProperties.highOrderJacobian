@@ -30,7 +30,7 @@ linearGeometryTotalDisplacementCoeffs
 
         displacement
         {
-            type movingLeastSquares;
+            type kExactLeastSquares;
 
             polynomialOrder 3;
             faceStencilExtraCells 15;
@@ -49,7 +49,7 @@ linearGeometryTotalDisplacementCoeffs
         momentum
         {
             type        alpha;
-            scaleFactor 0;
+            scaleFactor 0.1;
         }
     }
 }

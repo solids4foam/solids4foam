@@ -25,6 +25,7 @@ License
 #include "fvc.H"
 #include "fvmD2dt2.H"
 #include "compatibilityFunctions.H"
+#include "deltaVectors.H"
 #include "surfaceFields.H"
 #include "petscErrorHandling.H"
 #include "emptyPolyPatch.H"
@@ -548,6 +549,11 @@ label Foam::hofvm::initialiseJacobian
 
     const CompactListList<label>& stencils =
         reconstruction.faceGradStencil();
+    const CompactListList<label>& cellStencils =
+        reconstruction.stencil().cellsStencil();
+    const globalIndex& reconstructionGlobalCells =
+        reconstruction.stencil().globalCells();
+
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     List<labelHashSet> rowCols(blockn);
@@ -570,6 +576,32 @@ label Foam::hofvm::initialiseJacobian
         forAll(faceStencil, cI)
         {
             const label globalCellID = faceStencil[cI];
+            rowCols[ownCellID].insert(globalCellID);
+            rowCols[neiCellID].insert(globalCellID);
+        }
+
+        // Here we will insert cells that are being used by stabilisation
+        // Stabilisation is using cell centred stencils
+        const label globalOwnCellID =
+            reconstructionGlobalCells.toGlobal(ownCellID);
+        const label globalNeiCellID =
+            reconstructionGlobalCells.toGlobal(neiCellID);
+
+        rowCols[ownCellID].insert(globalOwnCellID);
+        rowCols[ownCellID].insert(globalNeiCellID);
+        rowCols[neiCellID].insert(globalOwnCellID);
+        rowCols[neiCellID].insert(globalNeiCellID);
+
+        forAll(cellStencils[ownCellID], cI)
+        {
+            const label globalCellID = cellStencils[ownCellID][cI];
+            rowCols[ownCellID].insert(globalCellID);
+            rowCols[neiCellID].insert(globalCellID);
+        }
+
+        forAll(cellStencils[neiCellID], cI)
+        {
+            const label globalCellID = cellStencils[neiCellID][cI];
             rowCols[ownCellID].insert(globalCellID);
             rowCols[neiCellID].insert(globalCellID);
         }
@@ -633,6 +665,17 @@ label Foam::hofvm::initialiseJacobian
                 forAll(faceStencil, cI)
                 {
                     rowCols[ownCellID].insert(faceStencil[cI]);
+                }
+
+                if (patchField.fixesValue())
+                {
+                    const labelUList cellStencil =
+                        cellStencils[ownCellID];
+
+                    forAll(cellStencil, cI)
+                    {
+                        rowCols[ownCellID].insert(cellStencil[cI]);
+                    }
                 }
             }
         }
@@ -777,6 +820,190 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
         rowOffset,
         colOffset
     );
+}
+
+
+void Foam::hofvm::insertAlphaStabIntoPETScMatrix
+(
+    Mat jac,
+    const foamPetscSnesHelper& petscSnesHelper,
+    const leastSquaresScheme& reconstruction,
+    const volVectorField& D,
+    const surfaceScalarField& diffusivity,
+    const scalar scaleFactor,
+    const label rowOffset,
+    const label colOffset
+)
+{
+    // Support for processor-face coefficient assembly will be added
+    if (Pstream::parRun())
+    {
+        return;
+    }
+
+     // Skip in the case of very small stabilisation factor
+    if ( mag(scaleFactor) < SMALL)
+    {
+        return;
+    }
+
+    // Preliminaries
+    const fvMesh& mesh = D.mesh();
+    const label nScalarEqns = nDisplacementEqns(mesh);
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+    const vectorField& C = mesh.C();
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    const vectorField& nI = n.internalField();
+    const vectorField deltaI(deltaVectors(mesh));
+    const scalarField& magSfI = mesh.magSf().internalField();
+    const scalarField& diffusivityI = diffusivity.internalField();
+
+    const CompactListList<label>& cellStencils =
+        reconstruction.stencil().cellsStencil();
+    const globalIndex& globalCells = reconstruction.stencil().globalCells();
+
+    // Get owner and neighbour side value reconstruction coefficients
+    const CompactListList<scalar>& ownerCoeffs =
+        reconstruction.ownerFaceCentreValueCoeffs();
+    const CompactListList<scalar>& neighbourCoeffs =
+        reconstruction.neighbourFaceCentreValueCoeffs();
+
+    label blockSize = -1;
+    AssertPETSc(MatGetBlockSize(jac, &blockSize));
+    List<PetscScalar> values(blockSize*blockSize, 0.0);
+
+    // Insert one reconstructed face value. Coefficients are ordered as the
+    // cell stencil followed by the reconstruction owner.
+    const auto insertReconstruction =
+    [&]
+    (
+        const label cellID,
+        const UList<scalar>& coeffs,
+        const scalar coeffScale,
+        const PetscInt globalRow,
+        const PetscInt* oppositeRow
+    )
+    {
+        const labelUList cellStencil = cellStencils[cellID];
+
+        forAll(coeffs, coeffI)
+        {
+            const PetscInt globalCellID =
+                coeffI < cellStencil.size()
+              ? cellStencil[coeffI]
+              : globalCells.toGlobal(cellID);
+            const tensor coeff = coeffScale*coeffs[coeffI]*I;
+
+            addTensorCoeff
+            (
+                jac,
+                values,
+                coeff,
+                globalRow,
+                globalCellID,
+                blockSize,
+                nScalarEqns,
+                rowOffset,
+                colOffset
+            );
+
+            if (oppositeRow != nullptr)
+            {
+                addTensorCoeff
+                (
+                    jac,
+                    values,
+                    -coeff,
+                    *oppositeRow,
+                    globalCellID,
+                    blockSize,
+                    nScalarEqns,
+                    rowOffset,
+                    colOffset
+                );
+            }
+        }
+    };
+
+    // Internal-face stabilisation is added to the owner cell and subtracted
+    // from the neighbour cell.
+    forAll(owner, faceI)
+    {
+        const label ownCellID = owner[faceI];
+        const label neiCellID = neighbour[faceI];
+        const PetscInt globalOwnRow =
+            petscSnesHelper.globalCells().toGlobal(ownCellID);
+        const PetscInt globalNeiRow =
+            petscSnesHelper.globalCells().toGlobal(neiCellID);
+        const scalar faceScale =
+            scaleFactor*diffusivityI[faceI]*magSfI[faceI]
+           /max(mag(nI[faceI] & deltaI[faceI]), VSMALL);
+
+        // Insert owner side
+        insertReconstruction
+        (
+            ownCellID,
+            ownerCoeffs[faceI],
+            -faceScale,
+            globalOwnRow,
+            &globalNeiRow
+        );
+        // Insert neighbour side
+        insertReconstruction
+        (
+            neiCellID,
+            neighbourCoeffs[faceI],
+            faceScale,
+            globalOwnRow,
+            &globalNeiRow
+        );
+    }
+
+    // On fixed-value boundaries, the prescribed face value is independent of
+    // the cell unknowns, so only the owner reconstruction is added.
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatchVectorField& patchField = D.boundaryField()[patchI];
+
+        // Only patch that have prescribed value has stabilisation included
+        if (!patchField.fixesValue())
+        {
+            continue;
+        }
+
+        const fvPatch& patch = mesh.boundary()[patchI];
+        const labelUList& faceCells = patch.faceCells();
+        const vectorField patchN(patch.nf());
+        const vectorField& patchCf = patch.Cf();
+        const scalarField& patchMagSf = mesh.magSf().boundaryField()[patchI];
+        const scalarField& patchDiffusivity =
+            diffusivity.boundaryField()[patchI];
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patch.start() + patchFaceI;
+            const label ownCellID = faceCells[patchFaceI];
+            const PetscInt globalOwnRow =
+                petscSnesHelper.globalCells().toGlobal(ownCellID);
+            const vector d = patchCf[patchFaceI] - C[ownCellID];
+
+            const scalar faceScale =
+                scaleFactor*patchDiffusivity[patchFaceI]
+               *patchMagSf[patchFaceI]
+               /max(mag(patchN[patchFaceI] & d), VSMALL);
+
+            // Insert owner side
+            insertReconstruction
+            (
+                ownCellID,
+                ownerCoeffs[faceI],
+                -faceScale,
+                globalOwnRow,
+                nullptr
+            );
+        }
+    }
 }
 
 } // End namespace Foam
