@@ -300,7 +300,6 @@ Prepared by Ivan Batistić with edits by Philip Cardiff
   `solids/hyperelasticity/cylinderCrush`
   `fluidSolidInteraction/3dTube`
   `fluidSolidInteraction/3dTubeRobin`
-  `fluidSolidInteraction-preCICE/3dTube`
 
 ## `solidForcesDisplacements`
 

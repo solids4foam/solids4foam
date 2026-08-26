@@ -1,0 +1,355 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+#------------------------------------------------------------------------------
+# License
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
+#
+# Script
+#     Alltest-precice
+#
+# Description
+#     Driver for the preCICE coupling tests.
+#
+#     solids4foam's preCICE cases live upstream in github.com/precice/tutorials,
+#     not in this repository. This script clones that repository at the commit
+#     pinned in versions.txt, runs the registered participant combinations
+#     against the locally installed preCICE and OpenFOAM adapter, and hands each
+#     result to the case's own regressionTest.sh.
+#
+#     Every immediate subdirectory of this directory that contains a "caseSetup"
+#     file is a registered case, so adding a case requires no change here.
+#
+#     The tests are skipped, with a zero exit status, when preCICE or the
+#     OpenFOAM adapter is not installed.
+#
+#------------------------------------------------------------------------------
+
+echo "============================================================"
+echo "solids4foam preCICE coupling tests"
+echo "============================================================"
+
+START_TIME=${SECONDS}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+WORK_DIR="${ROOT_DIR}/tutorialsTest-precice"
+TUTORIALS_DIR="${WORK_DIR}/tutorials"
+TUTORIALS_URL="https://github.com/precice/tutorials.git"
+
+usage()
+{
+    cat <<'EOF'
+Usage: Alltest-precice [OPTION] [CASE...]
+
+Run the preCICE coupling tests. With no CASE arguments, every registered case
+is run.
+
+  -k, --keep      Reuse an existing tutorials clone and working directory
+  -h, --help      Print this message
+
+Registered cases are the subdirectories of tests/precice containing a
+"caseSetup" file.
+EOF
+}
+
+KEEP=false
+REQUESTED_CASES=()
+
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+        -h|-help|--help)
+            usage
+            exit 0
+            ;;
+        -k|--keep)
+            KEEP=true
+            ;;
+        -*)
+            echo "Unknown option: $1" 1>&2
+            usage 1>&2
+            exit 1
+            ;;
+        *)
+            REQUESTED_CASES+=("$1")
+            ;;
+    esac
+    shift
+done
+
+
+#------------------------------------------------------------------------------
+# Check that preCICE and the OpenFOAM adapter are available
+#------------------------------------------------------------------------------
+
+if ! command -v pkg-config > /dev/null 2>&1 || \
+   ! pkg-config --exists libprecice
+then
+    echo
+    echo "Skipping the preCICE tests as preCICE is not installed"
+    echo
+    exit 0
+fi
+
+if [[ ! -f "${FOAM_USER_LIBBIN:-}/libpreciceAdapterFunctionObject.so" && \
+      ! -f "${FOAM_USER_LIBBIN:-}/libpreciceAdapterFunctionObject.dylib" ]]
+then
+    echo
+    echo "Skipping the preCICE tests as the OpenFOAM preCICE adapter is not"
+    echo "installed in FOAM_USER_LIBBIN"
+    echo
+    exit 0
+fi
+
+echo
+echo "preCICE version: $(pkg-config --modversion libprecice)"
+echo "OpenFOAM version: ${WM_PROJECT_VERSION:-unknown}"
+echo
+
+
+#------------------------------------------------------------------------------
+# Read the pinned versions
+#------------------------------------------------------------------------------
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/versions.txt"
+
+if [[ -z "${TUTORIALS_REF:-}" ]]
+then
+    echo "ERROR: TUTORIALS_REF is not set in ${SCRIPT_DIR}/versions.txt" 1>&2
+    exit 1
+fi
+
+echo "Pinned precice/tutorials ref: ${TUTORIALS_REF}"
+echo
+
+
+#------------------------------------------------------------------------------
+# Find the registered cases
+#------------------------------------------------------------------------------
+
+ALL_CASES=()
+for setup in "${SCRIPT_DIR}"/*/caseSetup
+do
+    [[ -f "${setup}" ]] || continue
+    ALL_CASES+=("$(basename "$(dirname "${setup}")")")
+done
+
+if (( ${#ALL_CASES[@]} == 0 ))
+then
+    echo "ERROR: no registered cases found in ${SCRIPT_DIR}" 1>&2
+    exit 1
+fi
+
+if (( ${#REQUESTED_CASES[@]} > 0 ))
+then
+    for requested in "${REQUESTED_CASES[@]}"
+    do
+        if [[ ! -f "${SCRIPT_DIR}/${requested}/caseSetup" ]]
+        then
+            echo "ERROR: '${requested}' is not a registered case" 1>&2
+            echo "Registered cases: ${ALL_CASES[*]}" 1>&2
+            exit 1
+        fi
+    done
+    CASES=("${REQUESTED_CASES[@]}")
+else
+    CASES=("${ALL_CASES[@]}")
+fi
+
+echo "Cases to run: ${CASES[*]}"
+echo
+
+
+#------------------------------------------------------------------------------
+# Fetch the preCICE tutorials
+#------------------------------------------------------------------------------
+
+if [[ "${KEEP}" == false ]]
+then
+    rm -rf "${WORK_DIR}"
+fi
+mkdir -p "${WORK_DIR}"
+
+if [[ -d "${TUTORIALS_DIR}/.git" ]]
+then
+    echo "Reusing the existing preCICE tutorials clone in ${TUTORIALS_DIR}"
+    (
+        cd "${TUTORIALS_DIR}"
+        git fetch --quiet origin "${TUTORIALS_REF}" || git fetch --quiet origin
+        git checkout --quiet --force "${TUTORIALS_REF}"
+    )
+else
+    echo "Cloning the preCICE tutorials into ${TUTORIALS_DIR}"
+    # The reference results are stored in Git LFS but are not used here, so a
+    # blobless clone without LFS is enough and is much smaller.
+    GIT_LFS_SKIP_SMUDGE=1 git clone --quiet --filter=blob:none \
+        "${TUTORIALS_URL}" "${TUTORIALS_DIR}"
+    (
+        cd "${TUTORIALS_DIR}"
+        git checkout --quiet --force "${TUTORIALS_REF}"
+    )
+fi
+
+echo "preCICE tutorials at $(cd "${TUTORIALS_DIR}" && git rev-parse --short HEAD)"
+echo
+
+
+#------------------------------------------------------------------------------
+# Run the cases
+#------------------------------------------------------------------------------
+
+# Reset the per-case variables, so that a value left over from a previous
+# caseSetup cannot silently leak into one that does not set it
+resetCaseVariables()
+{
+    unset TUTORIAL PARTICIPANTS MAX_TIME TIMEOUT
+}
+
+# Rewrite <max-time value="..."/> in a preCICE configuration, so that the case
+# runs for a small fraction of its full duration. This is the same truncation
+# the upstream system tests apply via the "max_time" key in tests/tests.yaml.
+setMaxTime()
+{
+    local config="$1"
+    local maxTime="$2"
+
+    if ! grep -q "<max-time " "${config}"
+    then
+        echo "ERROR: no <max-time> entry found in ${config}" 1>&2
+        return 1
+    fi
+
+    # No backup file: the configuration is restored by the git checkout at the
+    # start of the next run
+    sed -i \
+        -e "s|<max-time value=\"[^\"]*\"|<max-time value=\"${maxTime}\"|" \
+        "${config}"
+}
+
+runCase()
+{
+    local caseName="$1"
+
+    resetCaseVariables
+
+    # shellcheck source=/dev/null
+    source "${SCRIPT_DIR}/${caseName}/caseSetup"
+
+    local tutorialDir="${TUTORIALS_DIR}/${TUTORIAL}"
+
+    if [[ ! -d "${tutorialDir}" ]]
+    then
+        echo "ERROR: tutorial '${TUTORIAL}' not found in the tutorials clone"
+        return 1
+    fi
+
+    # Clean any results from a previous run
+    if [[ -x "${TUTORIALS_DIR}/tools/clean-tutorial.sh" ]]
+    then
+        "${TUTORIALS_DIR}/tools/clean-tutorial.sh" "${tutorialDir}" \
+            > /dev/null 2>&1 || true
+    fi
+    rm -rf "${tutorialDir}/precice-run"
+
+    if [[ -n "${MAX_TIME:-}" ]]
+    then
+        echo "  Truncating the run to max-time = ${MAX_TIME}"
+        setMaxTime "${tutorialDir}/precice-config.xml" "${MAX_TIME}" || return 1
+    fi
+
+    # Launch the participants concurrently. The tutorial run.sh scripts source
+    # ../../tools/ by relative path, so they must be run in place in the clone.
+    # IFS is restricted at the top of this script, so PARTICIPANTS has to be
+    # split on spaces explicitly
+    local participants=()
+    IFS=' ' read -r -a participants <<< "${PARTICIPANTS}"
+
+    local pids=()
+    local participant
+    for participant in "${participants[@]}"
+    do
+        echo "  Starting participant ${participant} (timeout ${TIMEOUT:-1800}s)"
+        (
+            cd "${tutorialDir}/${participant}" \
+                && timeout "${TIMEOUT:-1800}" ./run.sh
+        ) > "${tutorialDir}/${participant}/log.run" 2>&1 &
+        pids+=("$!")
+    done
+
+    # Wait for all of them, remembering whether any failed. Note that a failing
+    # participant is not necessarily a test failure: regressionTest.sh decides,
+    # since a case that did not reach the requested end time is reported as a
+    # skip rather than a failure.
+    local runStatus=0
+    local pid
+    for pid in "${pids[@]}"
+    do
+        wait "${pid}" || runStatus=1
+    done
+
+    if (( runStatus != 0 ))
+    then
+        echo "  At least one participant exited with a non-zero status"
+    fi
+
+    # Hand over to the case's own checks
+    (
+        cd "${tutorialDir}" && "${SCRIPT_DIR}/${caseName}/regressionTest.sh"
+    )
+}
+
+PASSED=()
+FAILED=()
+
+for caseName in "${CASES[@]}"
+do
+    echo "------------------------------------------------------------"
+    echo "Running ${caseName}"
+    echo "------------------------------------------------------------"
+
+    caseLog="${WORK_DIR}/log.${caseName}"
+
+    # runCase must not abort the driver on failure, and its status must be
+    # taken from runCase rather than from tee at the end of the pipeline
+    set +e
+    runCase "${caseName}" 2>&1 | tee "${caseLog}"
+    status="${PIPESTATUS[0]}"
+    set -e
+
+    if (( status == 0 ))
+    then
+        echo "PASS: ${caseName}"
+        PASSED+=("${caseName}")
+    else
+        echo "FAIL: ${caseName} (see ${caseLog})"
+        FAILED+=("${caseName}")
+    fi
+    echo
+done
+
+
+#------------------------------------------------------------------------------
+# Summary
+#------------------------------------------------------------------------------
+
+ELAPSED=$((SECONDS - START_TIME))
+
+echo "============================================================"
+echo "preCICE coupling test summary"
+echo "============================================================"
+echo "  Passed: ${#PASSED[@]} ${PASSED[*]:-}"
+echo "  Failed: ${#FAILED[@]} ${FAILED[*]:-}"
+printf '  Elapsed: %dm %ds\n' "$((ELAPSED / 60))" "$((ELAPSED % 60))"
+echo "  Working directory: ${WORK_DIR}"
+echo "============================================================"
+
+if (( ${#FAILED[@]} > 0 ))
+then
+    exit 1
+fi
+
+exit 0

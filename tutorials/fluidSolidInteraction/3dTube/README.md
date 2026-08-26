@@ -221,9 +221,12 @@ The `Allrun` script updates the case with links to the correct files to be used
   time.
 - `fsiConvergence.pdf`: this plots the number of FSI iterations per time step.
 
-The tutorial case for approach 6, which uses preCICE, is located at
-`solids4foam/tutorials/fluidSolidInteraction-preCICE/3dTube`; once again, the
-`Allrun` script runs the case.
+Approach 6 uses preCICE. solids4foam's preCICE cases are maintained in the
+[preCICE tutorials](https://precice.org/tutorials.html) rather than in this
+repository, and are exercised by `tests/precice`; see
+`tests/precice/README.md`. A standalone preCICE version of this case was
+distributed with solids4foam up to v2.4 and remains available as an archive
+from the solids4foam website.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
