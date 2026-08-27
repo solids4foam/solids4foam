@@ -343,6 +343,32 @@ private:
             return faceGradCoeffs();
         }
 
+        // Read-only access to the cell-centre coefficient tables. These allow
+        // a solver to assemble its own high-order operators directly, rather
+        // than going through the evaluation functions below. Row cellI is
+        // indexed by stencilData().cellsStencil()[cellI], and carries one
+        // extra trailing entry, at index cellsStencil()[cellI].size(),
+        // holding the coefficient of the cell itself.
+
+        //- Read-only access to cell-centre gradient coefficients
+        const CompactListList<vector>& cellGradCoeffsData() const
+        {
+            return cellGradCoeffs();
+        }
+
+        //- Read-only access to cell-centre second derivative coefficients
+        const CompactListList<symmTensor>& cellSecondGradCoeffsData() const
+        {
+            return cellSecondGradCoeffs();
+        }
+
+        //- Read-only access to cell-centre third derivative coefficients
+        const CompactListList<symmTensor3rdOrder>&
+        cellThirdGradCoeffsData() const
+        {
+            return cellThirdGradCoeffs();
+        }
+
         //- Clear owned MLS data and cached coefficient data
         void clear() const;
 
