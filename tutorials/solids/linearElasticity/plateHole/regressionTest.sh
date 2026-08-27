@@ -33,12 +33,17 @@ PD_P_TOL=9.0e4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+PARALLEL_N_PROCS=2
 
 APPROACHES=(
     segregated
     petscSnes
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-movingLeastSquares-parallel
+    highOrder-kExactLeastSquares-parallel
+    highOrderJacobian-movingLeastSquares-parallel
+    highOrderJacobian-kExactLeastSquares-parallel
 )
 
 PRESSURE_DISPLACEMENT_CASES=(
@@ -84,6 +89,11 @@ prepare_case() {
             "${case_dir}/src/Make/options"
     fi
 
+    sed -E -i.bak \
+        "s/^[[:space:]]*numberOfSubdomains[[:space:]]+[0-9]+;/numberOfSubdomains ${PARALLEL_N_PROCS};/" \
+        "${case_dir}/system/decomposeParDict"
+    rm -f "${case_dir}/system/decomposeParDict.bak"
+
 }
 
 run_case() {
@@ -91,17 +101,38 @@ run_case() {
     shift
 
     local case_dir="${REGRESSION_ROOT}/${case_name}"
+    local requested="$1"
 
     prepare_case "${case_dir}"
 
-    case "${1}" in
+    case "${requested}" in
         highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
-            local least_squares_type="${1#highOrder-}"
+            local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
                 "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
             set -- highOrder "${@:2}"
+            ;;
+        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel)
+            local least_squares_type="${requested#highOrder-}"
+            least_squares_type="${least_squares_type%-parallel}"
+            sed -E -i.bak \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
+                "${case_dir}/constant/solidProperties.highOrder"
+            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
+            set -- highOrder parallel
+            ;;
+        highOrderJacobian-movingLeastSquares-parallel|highOrderJacobian-kExactLeastSquares-parallel)
+            local least_squares_type="${requested#highOrderJacobian-}"
+            least_squares_type="${least_squares_type%-parallel}"
+            sed -E -i.bak \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian true;/" \
+                "${case_dir}/constant/solidProperties.highOrder"
+            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
+            set -- highOrder parallel
             ;;
     esac
 
