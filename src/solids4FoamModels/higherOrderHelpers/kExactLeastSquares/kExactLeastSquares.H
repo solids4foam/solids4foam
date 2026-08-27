@@ -19,20 +19,32 @@ Class
     Foam::kExactLeastSquares
 
 Description
-    Run-time selectable skeleton for cell-average k-exact least-squares
-    reconstruction. Numerical reconstruction operations are not implemented.
+    The class constructs local polynomial approximations of a scalar field
+    whose stored cell values represent cell volume averages. A weighted
+    k-exact least-squares procedure is applied over each cell stencil to
+    reconstruct a polynomial of order N about the owner-cell centre.
+    Neighbour observations are formed from differences between cell averages.
+    Consequently, a polynomial of degree up to N is reproduced
+    exactly when the reconstruction system has sufficient rank.
+
+    The resulting coefficients allow reconstruction of the field value,
+    gradient, and second and third derivatives. Reconstruction coefficients
+    are precomputed and stored for reuse during the simulation, allowing
+    efficient evaluation at cell centres, arbitrary points, and face
+    quadrature points during the discretisation phase.
+
+    For each cell, the class solves a small dense weighted least-squares system
+    in which the matrix contains volume-averaged, mean-free polynomial basis
+    functions evaluated over the stencil cells. At internal faces, gradients
+    from the owner and neighbour reconstructions are averaged at each
+    quadrature point. Prescribed-value boundaries use the boundary values at
+    the quadrature points as additional weighted observations, while symmetry
+    boundaries use reflected cell observations.
 
     Sources:
         Sejekan CB, Ollivier-Gooch CF. Improving finite-volume diffusive
         fluxes through better reconstruction. Computers & Fluids, 139:
         216-232, 2016.
-
-        Jalali A, Ollivier-Gooch CF. Higher-Order Finite Volume Solution
-        Reconstruction on Highly Anisotropic Meshes. 21st AIAA Computational
-        Fluid Dynamics Conference, 2013.
-
-        Pereira da Costa RD. Advanced computational methods towards
-        high-performance polymer processing simulations. PhD thesis, 2020.
 
         Ollivier-Gooch C, Van Altena M. A High-Order-Accurate Unstructured
         Mesh Finite-Volume Scheme for the Advection-Diffusion Equation.
@@ -40,6 +52,7 @@ Description
 
 SourceFiles
     kExactLeastSquares.C
+    kExactLeastSquaresTemplates.C
 
 Author
     Ivan Batistic, UCD.
