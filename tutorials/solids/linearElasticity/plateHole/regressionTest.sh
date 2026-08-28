@@ -14,8 +14,14 @@ fi
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# (segregated/petscSnes/highOrder) and pressure-displacement
+# (segregated/petscSnes/petscSnesPressure/highOrder) and pressure-displacement
 # solution options.
+#
+# Note that petscSnesPressure and pressureDisplacement* are different things:
+# petscSnesPressure is the mixed displacement-pressure form of
+# linearGeometryTotalDisplacement (solvePressure yes), whereas
+# pressureDisplacement* selects coupledPressureDisplacementSolid, which runs
+# on foam-extend only.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -37,6 +43,7 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     segregated
     petscSnes
+    petscSnesPressure
     highOrder
 )
 

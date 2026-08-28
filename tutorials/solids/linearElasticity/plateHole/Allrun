@@ -5,7 +5,7 @@ IFS=$'\n\t'
 # -------------------------------------------------------------------------
 # solids4Foam Allrun script
 # Allows selection of solution approach:
-#   segregated (default), petscSnes, highOrder
+#   segregated (default), petscSnes, petscSnesPressure, highOrder
 #   pressureDisplacementCompressible [coarse|medium]
 #   pressureDisplacementIncompressible [coarse|medium]
 # -------------------------------------------------------------------------
@@ -18,11 +18,13 @@ Usage:
 Where [approach] is one of:
   segregated                           (default)
   petscSnes
+  petscSnesPressure
   highOrder
   pressureDisplacementCompressible
   pressureDisplacementIncompressible
 
-For segregated|petscSnes|highOrder, the second argument is the run mode:
+For segregated|petscSnes|petscSnesPressure|highOrder, the second argument is
+the run mode:
   serial                               (default)
   parallel
 
@@ -35,6 +37,7 @@ Examples:
   ./Allrun
   ./Allrun segregated
   ./Allrun petscSnes parallel
+  ./Allrun petscSnesPressure
   ./Allrun highOrder
   ./Allrun pressureDisplacementCompressible medium
   ./Allrun pressureDisplacementIncompressible medium
@@ -69,7 +72,7 @@ if [[ "${APPROACH}" == "parallel" ]]; then
 fi
 
 case "${APPROACH}" in
-    segregated|petscSnes|highOrder)
+    segregated|petscSnes|petscSnesPressure|highOrder)
         RUN_MODE="${ARG2:-serial}"
         case "${RUN_MODE}" in
             serial|parallel) ;;
@@ -131,7 +134,7 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "${APPROACH}" in
-        petscSnes|highOrder)
+        petscSnes|petscSnesPressure|highOrder)
             solids4Foam::requirePetscOrExitSilently
             ;;
     esac
@@ -195,6 +198,12 @@ select_approach() {
             echo "Using the petscSnes approach"
             link_files_for_suffix "petscSnes"
             ;;
+        petscSnesPressure)
+            echo "Using the petscSnes approach with the mixed"\
+                 "displacement-pressure formulation"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "petscSnesPressure"
+            ;;
         highOrder)
             echo "Using the highOrder approach"
             solids4Foam::caseDoesNotRunWithFoamExtend
@@ -227,7 +236,7 @@ echo
 solids4Foam::runApplication blockMesh
 
 case "${APPROACH}" in
-    segregated|petscSnes|highOrder)
+    segregated|petscSnes|petscSnesPressure|highOrder)
         if [[ "${RUN_MODE}" == "parallel" ]]; then
             solids4Foam::runApplication decomposePar
             solids4Foam::runParallel solids4Foam
