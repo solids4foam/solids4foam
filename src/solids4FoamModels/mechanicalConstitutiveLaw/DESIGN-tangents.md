@@ -1343,10 +1343,21 @@ regression, but it means:
   are foam-extend only, and that solid model never calls `shearModulus()`.
   So they do not touch `linGeomTotalDispSolid.C:574`.
 
-  The line being changed is therefore genuinely untested, and the change is
-  regression-free by accident rather than by design. PR-1 should add a mixed
-  u-p case for `linGeomTotalDispSolid`, otherwise `solvePressure` is being
-  changed with no test able to detect a mistake.
+  The line being changed was therefore genuinely untested. **Resolved in PR-1**
+  by adding a `petscSnesPressure` approach to the plateHole tutorial and its
+  regression test. The path runs and converges; measured against the
+  plate-with-hole analytical solution, `(4/3)*mu` improves on `2*mu` in every
+  metric at the same SNES iteration count:
+
+  | metric | `(4/3)*mu` | `2*mu` |
+  |---|---|---|
+  | `DDifference` LInf | 4.22837e-08 | 4.30140e-08 |
+  | `pointDDifference` LInf | 5.03405e-08 | 5.68787e-08 |
+  | stress component-0 LInf | 71259.9 | 82738.6 |
+
+  This also confirms the expected behaviour of the stabilisation term: it is a
+  consistency error that shrinks under refinement, so scaling it differently
+  moves the discrete answer slightly without changing the continuum limit.
 
 Supersedes the "2*mu both sides, bit-for-bit" claims in §1.6 and §3.8, and
 resolves D2 and OQ-4.
@@ -1433,7 +1444,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 
 | PR | Content |
 |---|---|
-| 1 | Defect fixes D1, D3, D4, D5 and the `(4/3)*mu` change of §8.2 **including** `linGeomTotalDispSolid.C:574`; a new mixed u-p regression case (none exists); `planeStress` injection (§8.1) and `planeStress` support in the three new laws; `supportsFourthOrderTangent()` + manager guard. |
+| 1 | **Done.** Defect fixes D1, D4, D5 and the `(4/3)*mu` change of §8.2 including `linGeomTotalDispSolid.C:574`; the `petscSnesPressure` u-p regression case; `planeStress` injection (§8.1) and support in the three new laws; `supportsFourthOrderTangent()` + manager guard. D3 is left to PR-2, which deletes the line. plateHole, wobblyNewton and perforatedPlate all pass. |
 | 2 | Flat-list `updateStressSmallStrain`/`FiniteStrain`/`updateTangent` primitives with existing overloads re-expressed on them; `registerTopology()`; `dualFaceIntegrationPointTopology`. |
 | 3 | `solidModel::jacobianTangent(deflt)`; `approximateJacobian` deprecation shim; optional manager owned by `solidModel` behind `useMechanicalConstitutiveLawManager` (default `no`). |
 | 4 | `vertexCentredLinGeomSolid` tangent-only adoption (§8.4). |
