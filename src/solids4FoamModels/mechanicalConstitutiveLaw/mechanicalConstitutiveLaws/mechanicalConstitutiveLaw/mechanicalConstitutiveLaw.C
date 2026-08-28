@@ -53,13 +53,21 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
             << exit(FatalError);
     }
 
-    const scalar h = 1e-8;  // configurable later
+    // Relative perturbation floor. An absolute step is not usable across the
+    // range of strains encountered in practice: it is not a small perturbation
+    // below strains of order 1e-6, and it approaches round-off in the stress
+    // above strains of order 1e-2
+    const scalar hMin = 1e-8;
+    const scalar hRel = 1e-6;
 
     auto& stress = response.stress();
     auto& Cfield = response.fourthOrderTangent();
 
     forAll(stress, ipI)
     {
+        // Scale the perturbation with the local displacement gradient
+        const scalar h = max(hMin, hRel*mag(kin.gradD()[ipI]));
+
         mat66& C = Cfield[ipI];
         C.clear();   // mat66 is not zero-initialised
 
