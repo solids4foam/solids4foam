@@ -109,11 +109,11 @@ In solids4foam, there are several solid models which can solve this problem;
    accuracy. The `highOrder` Allrun option retains the Jacobian-free
    Newton-Krylov solver settings and uses the assembled matrix as a physical
    preconditioner. The `highOrderJacobian` option is a regression-only test:
-   it removes the matrix-free options, sets `snes_type ksponly;`, and disables
-   stabilisation so that it solves with the assembled high-order Jacobian.
-   This mimics the discretisation in [6]. The assembled high-order Jacobian
-   does not include stabilisation, so this direct solve is acceptable only on
-   regular meshes; see [5].
+   it removes the matrix-free options, sets `snes_type ksponly;`, and solves
+   the problem with the assembled high-order Jacobian. This Jacobian includes
+   the stabilisation contribution, which improves convergence on irregular
+   meshes; see [5]. This extends the discretisation presented in [6], which
+   was formulated without stabilisation.
 
 ```note
 Approach 4 uses simplified uniform displacement (left) and uniform traction
