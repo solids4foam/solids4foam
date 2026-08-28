@@ -190,6 +190,51 @@ run_gradient_test() {
     )
 }
 
+run_high_order_grad_test() {
+    local least_squares_type="$1"
+    local suffix="${least_squares_type}.serial"
+    local log_file="${CASE_DIR}/log.Test-highOrderGrad.${suffix}"
+
+    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+        echo "SKIP: Test-highOrderGrad is not available with foam-extend"
+        return 0
+    fi
+
+    if ! command -v Test-highOrderGrad >/dev/null 2>&1; then
+        echo "SKIP: Test-highOrderGrad is not available"
+        return 0
+    fi
+
+    sed -E -i.bak \
+        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\1type ${least_squares_type};/" \
+        "${CASE_DIR}/constant/solidProperties.highOrder"
+    rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+
+    if ! grep -qE \
+        "^[[:space:]]*type[[:space:]]+${least_squares_type};" \
+        "${CASE_DIR}/constant/solidProperties.highOrder"
+    then
+        echo "FAIL: Could not select ${least_squares_type}"
+        return 1
+    fi
+
+    (
+        cd "${CASE_DIR}"
+        solids4Foam::runApplication \
+            -o -s "${suffix}" Test-highOrderGrad >/dev/null 2>&1
+    )
+
+    if grep -q "Overall result: PASSED" "${log_file}" \
+        && ! grep -q '^ERROR$' "${log_file}"
+    then
+        echo "PASS: Test-highOrderGrad (${least_squares_type}, serial)"
+        return 0
+    fi
+
+    echo "FAIL: Test-highOrderGrad (${least_squares_type}, serial)"
+    return 1
+}
+
 check_top_right_disp() {
     local approach="$1"
     local top_right_disp
@@ -227,6 +272,14 @@ if [ "$CHECK_ONLY" = false ]; then
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
             continue
+        fi
+
+        if [[ "${approach}" == highOrder-* ]]; then
+            least_squares_type="${approach#highOrder-}"
+
+            if ! run_high_order_grad_test "${least_squares_type}"; then
+                failures=$((failures + 1))
+            fi
         fi
 
         if ! check_top_right_disp "${approach}"; then

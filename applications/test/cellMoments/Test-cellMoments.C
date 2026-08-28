@@ -40,6 +40,8 @@ Description
     hexahedron can have non-zero second-order cross moments when expressed in
     the global coordinate system.
 
+    This utility is not available with foam-extend and reports SKIPPED there.
+
 Author
     Ivan Batistic, UCD.
     Philip Cardiff, UCD.
@@ -47,6 +49,21 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
+
+#ifdef FOAMEXTEND
+
+using namespace Foam;
+
+int main(int argc, char *argv[])
+{
+    Info<< "Test-cellMoments: SKIPPED (not available with foam-extend)"
+        << nl << endl;
+
+    return 0;
+}
+
+#else
+
 #include "fvMeshQuadrature.H"
 #include "globalIndex.H"
 
@@ -168,3 +185,5 @@ int main(int argc, char *argv[])
 
 
 // ************************************************************************* //
+
+#endif // FOAMEXTEND
