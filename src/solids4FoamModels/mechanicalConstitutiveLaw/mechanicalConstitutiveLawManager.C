@@ -1206,7 +1206,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         {
             if (collapseRule == stressCollapseRule::average)
             {
-                (*scalarTangentPtr)[faceI] = w/(*tangentWeightPtr)[faceI];
+                // Arithmetic mean of the contributing tangents
+                (*scalarTangentPtr)[faceI] = (*tangentWeightPtr)[faceI]/w;
             }
             else if (collapseRule == stressCollapseRule::harmonic)
             {
