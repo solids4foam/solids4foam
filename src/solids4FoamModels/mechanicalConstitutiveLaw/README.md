@@ -141,6 +141,12 @@ Supported tangent modes:
 - `none`
 - `scalar`
 - `scalarDeviatoric`
+- `fourthOrder`
+- `fourthOrderFiniteDifference`
+
+Fourth-order tangents are only available on integration-point topologies that
+report `supportsFourthOrderTangent()`, i.e. those whose integration points are
+the locations at which a Jacobian operator evaluates fluxes.
 
 ---
 
@@ -200,6 +206,8 @@ Current implementations:
 
 - `cellCentredIntegrationPointTopology`
 - `compactCellIntegrationPointTopology`
+- `faceCentredIntegrationPointTopology`
+- `pointCentredIntegrationPointTopology`
 
 ---
 
@@ -239,11 +247,12 @@ when explicitly requested by a client. The manager does not retain a universal
 coefficient for a solid model. The caller owns the requested tangent storage,
 chooses when it is refreshed, and decides how it enters its linearisation.
 
-This is deliberately left as an integration design decision. Current solid
-models obtain approximate material stiffness from their stabilisation pathway
-in some formulations, so a future integration must first define whether that
-quantity remains stabilisation-owned, is supplied by the constitutive manager,
-or is derived through a clearly specified adapter.
+This question is resolved in `DESIGN-tangents.md`. In summary: the solid model
+owns its implicit stiffness fields (`impK`, `impKf`, `rImpK`) and obtains their
+values from this framework via `tangentRequest::scalar`; the fidelity of the
+material tangent used in the Jacobian is a separate, per-solid-model dictionary
+choice. The stabilisation model supplies the discrete operator, never the
+coefficient, so the two are never additively combined.
 
 Supported current requests include:
 
@@ -283,4 +292,9 @@ This framework is designed to:
 Planned extensions include:
 
 - additional tangent types,
-- face- and vertex-based integration point topologies.
+- a dual-face integration point topology for the vertex-centred solid models,
+- a law-defined hydrostatic response for mixed displacement-pressure solvers.
+
+See `DESIGN-tangents.md` for the design that resolves how solid models obtain
+material stiffness for their residual and their Jacobian, and for the staged
+plan by which solid models adopt this framework.
