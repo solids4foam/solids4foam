@@ -19,6 +19,7 @@ License
 
 #include "linearElasticMisesPlasticMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -167,6 +168,18 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
             << "Invalid Poisson's ratio nu = " << nu_.value()
             << ". Expected -1 <= nu for linear elasticity."
             << exit(FatalIOError);
+    }
+
+    // Plane stress is not supported, matching the legacy linearElasticMisesPlastic
+    // Note: the planeStress entry is injected into this dictionary by the
+    // mechanicalConstitutiveLawManager from the top-level entry in
+    // mechanicalProperties; it is not given by the user in this sub-dictionary
+    if (Switch(dict.lookupOrDefault<Switch>("planeStress", false)))
+    {
+        FatalIOErrorInFunction(dict)
+            << "Not implemented for planeStress. If needed, you can solve the "
+            << "case in 3-D and set the back to a symmetryPlane and the front "
+            << "to traction-free" << exit(FatalIOError);
     }
 
     // Set mu and kappa

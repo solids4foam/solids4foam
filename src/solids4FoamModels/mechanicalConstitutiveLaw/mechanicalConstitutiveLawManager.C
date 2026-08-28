@@ -22,6 +22,7 @@ License
 #include "integrationPointTopologies.H"
 #include "emptyFvPatch.H"
 #include "mat66.H"
+#include "Switch.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -536,10 +537,32 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     // Create a map for each cell to its mechanical law
     labelList cellToLaw(mesh_.nCells(), -1);
 
+    // Plane stress is defined once for the whole mechanicalProperties
+    // dictionary. It is injected into each law's sub-dictionary below rather
+    // than looked up from the object registry, so that a mechanical
+    // constitutive law depends on nothing but the dictionary it is given
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
+
     forAll(lawNames, lawI)
     {
         const word& lawName = lawNames[lawI];
-        const dictionary& lawDict = lawEntries[lawI].dict();
+
+        // Take a copy so that the shared settings can be injected
+        dictionary lawDict(lawEntries[lawI].dict());
+
+        if (lawDict.found("planeStress"))
+        {
+            FatalIOErrorInFunction(lawDict)
+                << "'planeStress' is set once for all materials in the "
+                << "mechanicalProperties dictionary and must not be given "
+                << "inside the '" << lawName << "' sub-dictionary."
+                << exit(FatalIOError);
+        }
+
+        lawDict.add("planeStress", planeStress);
 
         // Construct law
         laws_.set

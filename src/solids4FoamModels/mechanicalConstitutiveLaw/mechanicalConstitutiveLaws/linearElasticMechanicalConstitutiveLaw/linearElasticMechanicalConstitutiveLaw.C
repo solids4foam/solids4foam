@@ -20,6 +20,7 @@ License
 #include "linearElasticMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
 #include "mat66.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -84,10 +85,26 @@ linearElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Set lambda, mu and kappa
-    lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+    // Set mu, lambda and kappa
+    // Note: the planeStress entry is injected into this dictionary by the
+    // mechanicalConstitutiveLawManager from the top-level entry in
+    // mechanicalProperties; it is not given by the user in this sub-dictionary
+    const Switch planeStress(dict.lookupOrDefault<Switch>("planeStress", false));
+
     mu_ = E_/(2.0*(1.0 + nu_));
-    kappa_ = E_/(3.0*(1 - 2*nu_));
+
+    if (planeStress)
+    {
+        lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - nu_));
+    }
+    else
+    {
+        lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+    }
+
+    // Note: for the three-dimensional case, this is equivalent to
+    // E/(3*(1 - 2*nu))
+    kappa_ = lambda_ + (2.0/3.0)*mu_;
 }
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
