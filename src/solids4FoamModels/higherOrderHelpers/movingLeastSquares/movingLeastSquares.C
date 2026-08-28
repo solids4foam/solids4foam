@@ -1330,6 +1330,275 @@ autoPtr<List<symmTensor3rdOrder>> movingLeastSquares::thirdGrad
     return tThirdGrad;
 }
 
+
+void movingLeastSquares::cellDerivatives
+(
+    const volScalarField& s,
+    vectorField* gradPtr,
+    symmTensorField* secondGradPtr,
+    List<symmTensor3rdOrder>* thirdGradPtr
+) const
+{
+    if (!gradPtr && !secondGradPtr && !thirdGradPtr)
+    {
+        return;
+    }
+
+    const fvMesh& mesh = mesh_;
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+
+    const CompactListList<label>& stencils = stencil().cellsStencil();
+
+    const scalarField& sI = s.internalField();
+
+    // A single halo exchange, shared by every requested derivative order
+    const List<Field<scalar>> remoteField = stencil().remoteFieldPerProc(sI);
+
+    // Only the coefficients of the requested orders are accessed, so that an
+    // order which is not requested is not calculated on demand
+    const CompactListList<vector>* gradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor>* secondGradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>* thirdGradCoeffsPtr = nullptr;
+
+    if (gradPtr)
+    {
+        gradCoeffsPtr = &cellGradCoeffs();
+        gradPtr->setSize(mesh.nCells());
+        *gradPtr = vector::zero;
+    }
+
+    if (secondGradPtr)
+    {
+        secondGradCoeffsPtr = &cellSecondGradCoeffs();
+        secondGradPtr->setSize(mesh.nCells());
+        *secondGradPtr = symmTensor::zero;
+    }
+
+    if (thirdGradPtr)
+    {
+        thirdGradCoeffsPtr = &cellThirdGradCoeffs();
+        thirdGradPtr->setSize(mesh.nCells());
+        *thirdGradPtr = symmTensor3rdOrder::zero;
+    }
+
+    // Field values at the stencil points of the current cell. Resolving a
+    // stencil point to a local or a remote value is the expensive part of the
+    // loop, so it is done once per point and reused by every order
+    scalarField stencilValues;
+
+    forAll(stencils, cellI)
+    {
+        const UList<label>& stencilCells = stencils[cellI];
+
+        if (stencilCells.size() > stencilValues.size())
+        {
+            stencilValues.setSize(stencilCells.size());
+        }
+
+        forAll(stencilCells, cI)
+        {
+            stencilValues[cI] =
+                fieldValue
+                (
+                    stencilCells[cI],
+                    globalCells,
+                    remoteLoc,
+                    sI,
+                    remoteField
+                );
+        }
+
+        if (gradPtr)
+        {
+            const UList<vector>& coeffs = (*gradCoeffsPtr)[cellI];
+            vector& cellGrad = (*gradPtr)[cellI];
+
+            // Stencil contribution
+            forAll(stencilCells, cI)
+            {
+                cellGrad += coeffs[cI]*stencilValues[cI];
+            }
+
+            // Cell-centre contribution
+            cellGrad += coeffs[stencilCells.size()]*sI[cellI];
+        }
+
+        if (secondGradPtr)
+        {
+            const UList<symmTensor>& coeffs = (*secondGradCoeffsPtr)[cellI];
+            symmTensor& cellSecondGrad = (*secondGradPtr)[cellI];
+
+            // Stencil contribution
+            forAll(stencilCells, cI)
+            {
+                cellSecondGrad += coeffs[cI]*stencilValues[cI];
+            }
+
+            // Cell-centre contribution
+            cellSecondGrad += coeffs[stencilCells.size()]*sI[cellI];
+        }
+
+        if (thirdGradPtr)
+        {
+            const UList<symmTensor3rdOrder>& coeffs =
+                (*thirdGradCoeffsPtr)[cellI];
+            symmTensor3rdOrder& cellThirdGrad = (*thirdGradPtr)[cellI];
+
+            // Stencil contribution
+            forAll(stencilCells, cI)
+            {
+                cellThirdGrad += coeffs[cI]*stencilValues[cI];
+            }
+
+            // Cell-centre contribution
+            cellThirdGrad += coeffs[stencilCells.size()]*sI[cellI];
+        }
+    }
+}
+
+
+void movingLeastSquares::cellDerivatives
+(
+    const volVectorField& v,
+    tensorField* gradPtr,
+    FixedList<symmTensorField, 3>* secondGradPtr,
+    FixedList<List<symmTensor3rdOrder>, 3>* thirdGradPtr
+) const
+{
+    if (!gradPtr && !secondGradPtr && !thirdGradPtr)
+    {
+        return;
+    }
+
+    const fvMesh& mesh = mesh_;
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+
+    const CompactListList<label>& stencils = stencil().cellsStencil();
+
+    const vectorField& vI = v.internalField();
+
+    // A single halo exchange, shared by the gradient and by all three
+    // components of the higher derivatives
+    const List<Field<vector>> remoteField = stencil().remoteFieldPerProc(vI);
+
+    const CompactListList<vector>* gradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor>* secondGradCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>* thirdGradCoeffsPtr = nullptr;
+
+    if (gradPtr)
+    {
+        gradCoeffsPtr = &cellGradCoeffs();
+        gradPtr->setSize(mesh.nCells());
+        *gradPtr = tensor::zero;
+    }
+
+    if (secondGradPtr)
+    {
+        secondGradCoeffsPtr = &cellSecondGradCoeffs();
+
+        for (direction cmpt = 0; cmpt < vector::nComponents; cmpt++)
+        {
+            (*secondGradPtr)[cmpt].setSize(mesh.nCells());
+            (*secondGradPtr)[cmpt] = symmTensor::zero;
+        }
+    }
+
+    if (thirdGradPtr)
+    {
+        thirdGradCoeffsPtr = &cellThirdGradCoeffs();
+
+        for (direction cmpt = 0; cmpt < vector::nComponents; cmpt++)
+        {
+            (*thirdGradPtr)[cmpt].setSize(mesh.nCells());
+            (*thirdGradPtr)[cmpt] = symmTensor3rdOrder::zero;
+        }
+    }
+
+    vectorField stencilValues;
+
+    forAll(stencils, cellI)
+    {
+        const UList<label>& stencilCells = stencils[cellI];
+
+        if (stencilCells.size() > stencilValues.size())
+        {
+            stencilValues.setSize(stencilCells.size());
+        }
+
+        forAll(stencilCells, cI)
+        {
+            stencilValues[cI] =
+                fieldValue
+                (
+                    stencilCells[cI],
+                    globalCells,
+                    remoteLoc,
+                    vI,
+                    remoteField
+                );
+        }
+
+        if (gradPtr)
+        {
+            const UList<vector>& coeffs = (*gradCoeffsPtr)[cellI];
+            tensor& cellGrad = (*gradPtr)[cellI];
+
+            // Stencil contribution
+            forAll(stencilCells, cI)
+            {
+                cellGrad += coeffs[cI]*stencilValues[cI];
+            }
+
+            // Cell-centre contribution
+            cellGrad += coeffs[stencilCells.size()]*vI[cellI];
+        }
+
+        if (secondGradPtr)
+        {
+            const UList<symmTensor>& coeffs = (*secondGradCoeffsPtr)[cellI];
+
+            for (direction cmpt = 0; cmpt < vector::nComponents; cmpt++)
+            {
+                symmTensor& cellSecondGrad = (*secondGradPtr)[cmpt][cellI];
+
+                // Stencil contribution
+                forAll(stencilCells, cI)
+                {
+                    cellSecondGrad += coeffs[cI]*stencilValues[cI][cmpt];
+                }
+
+                // Cell-centre contribution
+                cellSecondGrad +=
+                    coeffs[stencilCells.size()]*vI[cellI][cmpt];
+            }
+        }
+
+        if (thirdGradPtr)
+        {
+            const UList<symmTensor3rdOrder>& coeffs =
+                (*thirdGradCoeffsPtr)[cellI];
+
+            for (direction cmpt = 0; cmpt < vector::nComponents; cmpt++)
+            {
+                symmTensor3rdOrder& cellThirdGrad =
+                    (*thirdGradPtr)[cmpt][cellI];
+
+                // Stencil contribution
+                forAll(stencilCells, cI)
+                {
+                    cellThirdGrad += coeffs[cI]*stencilValues[cI][cmpt];
+                }
+
+                // Cell-centre contribution
+                cellThirdGrad +=
+                    coeffs[stencilCells.size()]*vI[cellI][cmpt];
+            }
+        }
+    }
+}
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam

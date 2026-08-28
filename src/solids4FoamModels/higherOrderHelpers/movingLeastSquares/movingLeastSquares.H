@@ -424,6 +424,35 @@ private:
         //  field. For vector fields we apply this per component.
         autoPtr<List<symmTensor3rdOrder>>
         thirdGrad(const volScalarField& s) const;
+
+        //- Evaluate the cell-centre gradient, second derivative and third
+        //  derivative of a scalar field, using a single halo exchange and
+        //  resolving each stencil point once. Any output pointer may be null,
+        //  in which case that derivative is not evaluated and its coefficients
+        //  are not calculated. The outputs are resized and zeroed on entry,
+        //  and the contributions are accumulated in the same order as grad(),
+        //  secondGrad() and thirdGrad(), so the results are identical to
+        //  calling those functions separately.
+        void cellDerivatives
+        (
+            const volScalarField& s,
+            vectorField* gradPtr,
+            symmTensorField* secondGradPtr,
+            List<symmTensor3rdOrder>* thirdGradPtr
+        ) const;
+
+        //- As above, for a vector field, with a single halo exchange shared by
+        //  the gradient and by all three components of the higher derivatives.
+        //  The gradient is identical to grad(), and the second and third
+        //  derivatives are indexed by component and are identical to calling
+        //  secondGrad() and thirdGrad() on each component of the field.
+        void cellDerivatives
+        (
+            const volVectorField& v,
+            tensorField* gradPtr,
+            FixedList<symmTensorField, 3>* secondGradPtr,
+            FixedList<List<symmTensor3rdOrder>, 3>* thirdGradPtr
+        ) const;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
