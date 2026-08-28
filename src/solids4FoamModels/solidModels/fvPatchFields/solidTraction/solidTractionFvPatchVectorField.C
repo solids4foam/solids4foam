@@ -345,9 +345,9 @@ void solidTractionFvPatchVectorField::setTractionQuadrature
 {
     const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
     const CompactListList<point>& faceQuadPoints =
-        solMod.displacementMLS().quadrature().faceQuadPoints();
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
     const CompactListList<scalar>& faceQuadWeights =
-        solMod.displacementMLS().quadrature().faceQuadWeights();
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights();
     const label start = patch().start();
 
     if (tractionQuadrature.size() != size())
