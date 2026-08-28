@@ -150,7 +150,11 @@ ground, wall and outlet.
 The tutorial case can be run using the included `Allrun` script. The tuned
 IQNILS setup is the default, i.e. `./Allrun`. The original Aitken setup can be
 selected with `./Allrun aitken`, and either option can be combined with
-`parallel`.
+`parallel`. The high-order total-Lagrangian solid configuration can be run with
+`./Allrun iqnils highOrder`; it can also be combined with `parallel`. This mode
+selects `solidProperties.iqnils.highOrder`, enables the high-order MLS
+residual, and uses the existing face-based IQNILS traction transfer with a
+piecewise-constant traction at every solid face quadrature point.
 
 For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
@@ -176,7 +180,11 @@ checks for both coupling options:
 For efficiency, the script runs both the `aitken` and `iqnils` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
-then.
+then. It also runs the `iqnils highOrder` variant and checks that it reaches the
+shortened end time. On supported OpenFOAM versions, the high-order result is
+checked against the same displacement and force references as the lower-order
+variants; the displacement tolerance is widened to allow the expected
+discretisation difference. The high-order variant is skipped on foam-extend.
 
 The script checks that both variants converge to the same solution, within
 loose tolerances, by comparing:
@@ -201,6 +209,8 @@ The `Allrun` script is shown below:
 # ./Allrun aitken
 # ./Allrun parallel
 # ./Allrun aitken parallel
+# ./Allrun iqnils highOrder
+# ./Allrun iqnils highOrder parallel
 
 coupling=iqnils
 runMode=serial

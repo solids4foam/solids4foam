@@ -10,7 +10,9 @@ assignees: ""
 
 - [ ] All target PRs merged into `development`; CI green (`buildAndTest`, `buildAndRegressionTest`)
 - [ ] `./Alltest` and `./Alltest-regression` pass locally on each supported OpenFOAM/foam-extend version
-- [ ] Update `CITATION.cff` (`version`, `date-released`, and DOI if a new one is minted)
+- [ ] Update and validate `CITATION.cff` for CFF 1.2.0 (`version`,
+      `date-released`, `repository-code`, and author affiliations as strings);
+      retain any paper DOI under `preferred-citation` unless a software DOI is minted
 - [ ] Update `CONTRIBUTORS.md` if new contributors since last release
 - [ ] Update `solids4foamVersion` in
       `applications/scripts/solids4FoamUpdateCaseFileHeader.sh` and run the
@@ -28,11 +30,16 @@ assignees: ""
 ## Docker images
 
 - [ ] Run `docker-release.yml` (workflow_dispatch) with the new version tag
-- [ ] Pull each pushed image (`openfoam-v2412`, `openfoam-v2312`, `openfoam-9`, `foam-extend-4.1`) and sanity-check it runs a tutorial
+- [ ] Pull each pushed image (`openfoam-v2512`, `openfoam-v2412`,
+      `openfoam-v2312`, `openfoam-9`, `foam-extend-4.1`) and sanity-check it
+      runs a tutorial
+- [ ] Run `docker-promote-latest.yml` (workflow_dispatch) for the validated
+      primary image
 
 ## Website
 
-- [ ] Confirm `update-submodule.yml` ran on push to `development`/`master` and solids4foam.github.io picked up the new commit
+- [ ] Confirm `update-submodule.yml` ran on push to `development` and
+      solids4foam.github.io picked up the new commit
 - [ ] Spot-check solids4foam.github.io renders correctly (no broken links/build)
 
 ## Announce

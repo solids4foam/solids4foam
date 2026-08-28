@@ -1649,6 +1649,27 @@ void Foam::solidModel::clearGlobalPatches() const
 }
 
 
+void Foam::solidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        const polyPatch& ppatch = globalPatchesPtrList_[i].patch();
+
+        const vectorField patchPointDisplacement
+        (
+            pointDorPointDD().internalField(), ppatch.meshPoints()
+        );
+
+        const pointField patchPoints
+        (
+            ppatch.localPoints() + patchPointDisplacement
+        );
+
+        globalPatchesPtrList_[i].syncPoints(patchPoints);
+    }
+}
+
+
 Foam::vector Foam::solidModel::pointU(const label pointID) const
 {
     pointVectorField pointU
@@ -1872,7 +1893,7 @@ void Foam::solidModel::setTraction
         solidTractionFvPatchVectorField& patchD =
             refCast<solidTractionFvPatchVectorField>(tractionPatch);
 
-        patchD.traction() = traction;
+        patchD.setTraction(traction);
     }
 #ifdef FOAMEXTEND
     else if
@@ -1907,6 +1928,30 @@ void Foam::solidModel::setTraction
             << abort(FatalError);
     }
 }
+
+#ifndef FOAMEXTEND
+void Foam::solidModel::setTractionQuadrature
+(
+    fvPatchVectorField& tractionPatch,
+    const CompactListList<vector>& traction
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.setTractionQuadrature(traction);
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Boundary condition " << tractionPatch.type() << " for patch "
+            << tractionPatch.patch().name() << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName << abort(FatalError);
+    }
+}
+#endif
 
 
 void Foam::solidModel::setTraction
