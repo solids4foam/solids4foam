@@ -314,9 +314,10 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
                 // 2mu + lambda = 4/3 mu + kappa
                 if (response.tangentReq() == tangentRequest::scalarDeviatoric)
                 {
-                    // We could use (4/3)*mu or 2*mu: which is better?
-                    // (*scalarTanPtr)[i] = (4.0/3.0)*mu; // deviatoric part only
-                    (*scalarTanPtr)[i] = 2.0*mu;
+                    // Scalar Laplacian surrogate for div(dev(sigma)), which is
+                    // mu*lap(D) + (1/3)*mu*grad(div(D)).
+                    // This is the theta = 1 limit of the plastic branch below
+                    (*scalarTanPtr)[i] = (4.0/3.0)*mu;
                 }
                 else
                 {

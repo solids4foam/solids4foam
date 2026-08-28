@@ -145,7 +145,9 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
                 break;
 
             case tangentRequest::scalarDeviatoric:
-                Keff = 2.0*mu_.value();
+                // Scalar Laplacian surrogate for div(dev(sigma)), which is
+                // mu*lap(D) + (1/3)*mu*grad(div(D))
+                Keff = (4.0/3.0)*mu_.value();
                 break;
 
             default:
