@@ -119,6 +119,21 @@ public:
     //- Does this topology store boundary integration points per patch
     virtual bool boundaryAware() const = 0;
 
+    //- Can this topology carry a fourth-order (mat66) material tangent?
+    //  This is true only where the integration points are the locations at
+    //  which a Jacobian operator evaluates fluxes, i.e. face-like rather than
+    //  cell-like topologies. Cell-, point- and cell-quadrature-based
+    //  topologies never carry a fourth-order tangent, because the operators
+    //  that consume one are assembled from face fluxes.
+    //  Note that this is a structural property of the topology alone. The
+    //  separate requirement that each integration point belong to exactly one
+    //  mechanical constitutive law is expressed by
+    //  requiresUniqueIntegrationPointsPerMaterial().
+    virtual bool supportsFourthOrderTangent() const
+    {
+        return false;
+    }
+
     //- Should integration-point indices be unique when aggregating across
     //  multiple cells belonging to the same material.
     //  For cell-centred topologies, each cell maps to a unique integration

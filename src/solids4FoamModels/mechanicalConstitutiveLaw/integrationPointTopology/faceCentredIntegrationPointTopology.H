@@ -109,6 +109,16 @@ public:
     {
         return true;
     }
+
+    //- Faces are flux-evaluation points, so a fourth-order tangent is
+    //  meaningful here. Note that requiresUniqueIntegrationPointsPerMaterial()
+    //  is true, so a fourth-order tangent is only usable with a single
+    //  mechanical constitutive law: a face on a material interface has no
+    //  single tangent
+    virtual bool supportsFourthOrderTangent() const override
+    {
+        return true;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

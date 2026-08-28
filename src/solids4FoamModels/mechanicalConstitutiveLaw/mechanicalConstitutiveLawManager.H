@@ -291,6 +291,14 @@ class mechanicalConstitutiveLawManager
              || req == tangentRequest::fourthOrderFiniteDifference;
         }
 
+        //- Check that the requested tangent can be provided at the integration
+        //  points of the given topology for the current set of laws
+        void checkTangentRequest
+        (
+            const integrationPointTopology& topo,
+            const tangentRequest req
+        );
+
         //- Create (if required) and return scratch containers for surface
         //  fields
         surfaceSymmTensorField& surfaceStressSum() const;

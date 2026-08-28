@@ -270,6 +270,46 @@ Foam::mechanicalConstitutiveLawManager::topology
 }
 
 
+void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
+(
+    const integrationPointTopology& topo,
+    const tangentRequest req
+)
+{
+    if (!needsFourthOrderTangent(req))
+    {
+        return;
+    }
+
+    if (!topo.supportsFourthOrderTangent())
+    {
+        FatalErrorInFunction
+            << "A " << tangentRequestName(req) << " tangent was requested but "
+            << "the integration-point topology " << topo.type()
+            << " does not provide one." << nl
+            << "Fourth-order tangents are only available where the integration "
+            << "points are the locations at which a Jacobian operator "
+            << "evaluates fluxes."
+            << exit(FatalError);
+    }
+
+    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
+    {
+        FatalErrorInFunction
+            << "A " << tangentRequestName(req) << " tangent was requested on "
+            << "topology " << topo.type() << " with " << laws_.size()
+            << " mechanical constitutive laws." << nl
+            << "Integration points of this topology are shared between cells, "
+            << "so an integration point on a material interface belongs to "
+            << "more than one law and has no single fourth-order tangent. "
+            << "There is no meaningful collapse rule for a fourth-order "
+            << "tangent: interface continuity is a normal-direction traction "
+            << "and displacement matching problem, not an average."
+            << exit(FatalError);
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
 {
     const label timeIndex = mesh_.time().timeIndex();
@@ -782,6 +822,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
 
+    checkTangentRequest(topo, tangentReq);
+
     topologyEntry& tp = topology(topo);
 
     forAll(laws_, lawI)
@@ -1012,15 +1054,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         tangentWeightPtr = &tangentWeight;
     }
 
-    // We need to introduce weights for the fourthOrderTangent
-    if (needsFourthOrderTangent(tangentReq) && laws_.size() > 1)
-    {
-        notImplemented
-        (
-            "Currently the fourth order tangent can only be used with one "
-            "material"
-        );
-    }
+    checkTangentRequest(topo, tangentReq);
 
     // Loop over constitutive laws
     forAll(laws_, lawI)
@@ -1290,6 +1324,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const integrationPointTopology& topo =
         topologyFor(pointCentredIntegrationPointTopology::typeName);
 
+    checkTangentRequest(topo, tangentReq);
+
     topologyEntry& tp = topology(topo);
 
     updateOldTimeIfNeeded();
@@ -1454,6 +1490,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(gradD);
 
+    checkTangentRequest(topo, tangentReq);
+
     topologyEntry& tp = topology(topo);
 
     // Update old time fields at the start of a new time step
@@ -1552,6 +1590,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    checkTangentRequest(topo, tangentReq);
 
     topologyEntry& tp = topology(topo);
 
@@ -1767,6 +1807,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(F);
+
+    checkTangentRequest(topo, tangentReq);
 
     topologyEntry& tp = topology(topo);
 
