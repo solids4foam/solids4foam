@@ -88,19 +88,23 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderScalar
     autoPtr<List<symmTensor3rdOrder>> tThirdGrad;
     const List<symmTensor3rdOrder>* thirdGrad = nullptr;
 
-    // Second gradient is computed on demand by MLS
+    // The higher derivatives are computed on demand by MLS, sharing a single
+    // halo exchange and a single traversal of the stencil
     if (polynomialOrder >= 2)
     {
-        tSecondGrad = displacementMLS.secondGrad(field);
-        tmpRef(tSecondGrad).correctBoundaryConditions();
-        secondGradI = &tSecondGrad().internalField();
-    }
+        displacementMLS.cellDerivatives
+        (
+            field,
+            &tSecondGrad,
+            polynomialOrder >= 3 ? &tThirdGrad : nullptr
+        );
 
-    // Third gradient is computed on demand by MLS
-    if (polynomialOrder >= 3)
-    {
-        tThirdGrad = displacementMLS.thirdGrad(field);
-        thirdGrad = &tThirdGrad();
+        secondGradI = &tSecondGrad().internalField();
+
+        if (polynomialOrder >= 3)
+        {
+            thirdGrad = &tThirdGrad();
+        }
     }
 
     forAll(owner, facei)
@@ -312,52 +316,39 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
 
-    // Decompose vector field into scalar components
-    volScalarField fieldX(field.component(vector::X));
-    volScalarField fieldY(field.component(vector::Y));
-    volScalarField fieldZ(field.component(vector::Z));
-
-    // Initialise storage for second gradint
-    tmp<volSymmTensorField> tSecondGradX;
-    tmp<volSymmTensorField> tSecondGradY;
-    tmp<volSymmTensorField> tSecondGradZ;
+    // Initialise storage for second gradint, indexed by component
+    FixedList<tmp<volSymmTensorField>, 3> tSecondGrad;
     const symmTensorField* secondGradXI = nullptr;
     const symmTensorField* secondGradYI = nullptr;
     const symmTensorField* secondGradZI = nullptr;
 
-    // Initialise storage for third gradient
-    autoPtr<List<symmTensor3rdOrder>> tThirdGradX;
-    autoPtr<List<symmTensor3rdOrder>> tThirdGradY;
-    autoPtr<List<symmTensor3rdOrder>> tThirdGradZ;
+    // Initialise storage for third gradient, indexed by component
+    FixedList<autoPtr<List<symmTensor3rdOrder>>, 3> tThirdGrad;
     const List<symmTensor3rdOrder>* thirdGradX = nullptr;
     const List<symmTensor3rdOrder>* thirdGradY = nullptr;
     const List<symmTensor3rdOrder>* thirdGradZ = nullptr;
 
-    // Second gradient is computed on demand by MLS
+    // The higher derivatives of all three components are computed on demand by
+    // MLS, sharing a single halo exchange and a single traversal of the stencil
     if (polynomialOrder >= 2)
     {
-        tSecondGradX = displacementMLS.secondGrad(fieldX);
-        tSecondGradY = displacementMLS.secondGrad(fieldY);
-        tSecondGradZ = displacementMLS.secondGrad(fieldZ);
-        tmpRef(tSecondGradX).correctBoundaryConditions();
-        tmpRef(tSecondGradY).correctBoundaryConditions();
-        tmpRef(tSecondGradZ).correctBoundaryConditions();
+        displacementMLS.cellDerivatives
+        (
+            field,
+            &tSecondGrad,
+            polynomialOrder >= 3 ? &tThirdGrad : nullptr
+        );
 
-        secondGradXI = &tSecondGradX().internalField();
-        secondGradYI = &tSecondGradY().internalField();
-        secondGradZI = &tSecondGradZ().internalField();
-    }
+        secondGradXI = &tSecondGrad[0]().internalField();
+        secondGradYI = &tSecondGrad[1]().internalField();
+        secondGradZI = &tSecondGrad[2]().internalField();
 
-    // Third gradient is computed on demand by MLS
-    if (polynomialOrder >= 3)
-    {
-        tThirdGradX = displacementMLS.thirdGrad(fieldX);
-        tThirdGradY = displacementMLS.thirdGrad(fieldY);
-        tThirdGradZ = displacementMLS.thirdGrad(fieldZ);
-
-        thirdGradX = &tThirdGradX();
-        thirdGradY = &tThirdGradY();
-        thirdGradZ = &tThirdGradZ();
+        if (polynomialOrder >= 3)
+        {
+            thirdGradX = &tThirdGrad[0]();
+            thirdGradY = &tThirdGrad[1]();
+            thirdGradZ = &tThirdGrad[2]();
+        }
     }
 
     forAll(owner, facei)
@@ -447,11 +438,14 @@ inline void Foam::alphaStab::computeDiffStencilHighOrderVector
             if (polynomialOrder >= 2)
             {
                 tNeiProcSecondGradX =
-                    tSecondGradX().boundaryField()[patchi].patchNeighbourField();
+                    tSecondGrad[0]().boundaryField()[patchi]
+                   .patchNeighbourField();
                 tNeiProcSecondGradY =
-                    tSecondGradY().boundaryField()[patchi].patchNeighbourField();
+                    tSecondGrad[1]().boundaryField()[patchi]
+                   .patchNeighbourField();
                 tNeiProcSecondGradZ =
-                    tSecondGradZ().boundaryField()[patchi].patchNeighbourField();
+                    tSecondGrad[2]().boundaryField()[patchi]
+                   .patchNeighbourField();
 
                 neiProcSecondGradX = &tNeiProcSecondGradX();
                 neiProcSecondGradY = &tNeiProcSecondGradY();

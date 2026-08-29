@@ -1331,6 +1331,39 @@ autoPtr<List<symmTensor3rdOrder>> movingLeastSquares::thirdGrad
 }
 
 
+// Create a zeroed second derivative field, matching what secondGrad() returns
+static tmp<volSymmTensorField> newZeroedSecondGrad
+(
+    const fvMesh& mesh,
+    const word& name,
+    const dimensionSet& dims
+)
+{
+    return tmp<volSymmTensorField>
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                name,
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor
+            (
+                "zero",
+                dims/sqr(dimLength),
+                symmTensor::zero
+            ),
+            "zeroGradient"
+        )
+    );
+}
+
+
 void movingLeastSquares::cellDerivatives
 (
     const volScalarField& s,
@@ -1595,6 +1628,118 @@ void movingLeastSquares::cellDerivatives
                 cellThirdGrad +=
                     coeffs[stencilCells.size()]*vI[cellI][cmpt];
             }
+        }
+    }
+}
+
+
+void movingLeastSquares::cellDerivatives
+(
+    const volScalarField& s,
+    tmp<volSymmTensorField>* secondGradPtr,
+    autoPtr<List<symmTensor3rdOrder>>* thirdGradPtr
+) const
+{
+    if (!secondGradPtr && !thirdGradPtr)
+    {
+        return;
+    }
+
+    // A single halo exchange and stencil traversal, via the internal-field
+    // overload
+    symmTensorField secondGradI;
+    List<symmTensor3rdOrder> thirdGradI;
+
+    cellDerivatives
+    (
+        s,
+        nullptr,
+        secondGradPtr ? &secondGradI : nullptr,
+        thirdGradPtr ? &thirdGradI : nullptr
+    );
+
+    if (secondGradPtr)
+    {
+        *secondGradPtr = newZeroedSecondGrad
+        (
+            mesh_,
+            "secondGrad(" + s.name() + ')',
+            s.dimensions()
+        );
+
+        volSymmTensorField& secondGrad = tmpRef(*secondGradPtr);
+        primitiveFieldRef(secondGrad).transfer(secondGradI);
+        secondGrad.correctBoundaryConditions();
+    }
+
+    if (thirdGradPtr)
+    {
+        *thirdGradPtr =
+            autoPtr<List<symmTensor3rdOrder>>
+            (
+                new List<symmTensor3rdOrder>()
+            );
+
+        autoPtrRef(*thirdGradPtr).transfer(thirdGradI);
+    }
+}
+
+
+void movingLeastSquares::cellDerivatives
+(
+    const volVectorField& v,
+    FixedList<tmp<volSymmTensorField>, 3>* secondGradPtr,
+    FixedList<autoPtr<List<symmTensor3rdOrder>>, 3>* thirdGradPtr
+) const
+{
+    if (!secondGradPtr && !thirdGradPtr)
+    {
+        return;
+    }
+
+    // A single halo exchange and stencil traversal for all three components,
+    // via the internal-field overload
+    FixedList<symmTensorField, 3> secondGradI;
+    FixedList<List<symmTensor3rdOrder>, 3> thirdGradI;
+
+    cellDerivatives
+    (
+        v,
+        nullptr,
+        secondGradPtr ? &secondGradI : nullptr,
+        thirdGradPtr ? &thirdGradI : nullptr
+    );
+
+    for (direction cmpt = 0; cmpt < vector::nComponents; cmpt++)
+    {
+        if (secondGradPtr)
+        {
+            const word cmptName
+            (
+                v.name() + ".component(" + Foam::name(label(cmpt)) + ')'
+            );
+
+            (*secondGradPtr)[cmpt] = newZeroedSecondGrad
+            (
+                mesh_,
+                "secondGrad(" + cmptName + ')',
+                v.dimensions()
+            );
+
+            volSymmTensorField& secondGrad = tmpRef((*secondGradPtr)[cmpt]);
+            primitiveFieldRef(secondGrad).transfer(secondGradI[cmpt]);
+            secondGrad.correctBoundaryConditions();
+        }
+
+        if (thirdGradPtr)
+        {
+            (*thirdGradPtr)[cmpt] =
+                autoPtr<List<symmTensor3rdOrder>>
+                (
+                    new List<symmTensor3rdOrder>()
+                );
+
+            autoPtrRef((*thirdGradPtr)[cmpt]).transfer(thirdGradI[cmpt]);
         }
     }
 }

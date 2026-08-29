@@ -453,6 +453,28 @@ private:
             FixedList<symmTensorField, 3>* secondGradPtr,
             FixedList<List<symmTensor3rdOrder>, 3>* thirdGradPtr
         ) const;
+
+        //- As the scalar overload above, but returning the second derivative
+        //  as a complete field with its boundary conditions evaluated, for
+        //  callers that also need the boundary values. Either output may be
+        //  null. The results are identical to secondGrad() and thirdGrad().
+        void cellDerivatives
+        (
+            const volScalarField& s,
+            tmp<volSymmTensorField>* secondGradPtr,
+            autoPtr<List<symmTensor3rdOrder>>* thirdGradPtr
+        ) const;
+
+        //- As the vector overload above, but returning the second derivative
+        //  of each component as a complete field with its boundary conditions
+        //  evaluated. Either output may be null. The results are identical to
+        //  calling secondGrad() and thirdGrad() on each component.
+        void cellDerivatives
+        (
+            const volVectorField& v,
+            FixedList<tmp<volSymmTensorField>, 3>* secondGradPtr,
+            FixedList<autoPtr<List<symmTensor3rdOrder>>, 3>* thirdGradPtr
+        ) const;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
