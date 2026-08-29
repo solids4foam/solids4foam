@@ -1348,27 +1348,6 @@ Foam::solidModel::solidModel
         stabDict.add("pressure", defaultStabSubDict);
     }
 
-    // Only alpha stabilisation is allowed with high-order residual calculation
-    if (stabDict.found("momentum"))
-    {
-        const dictionary& momentumDict = stabDict.subDict("momentum");
-
-        const word stabType =
-            momentumDict.lookupOrDefault<word>("type", "default");
-
-        if
-        (
-            stabType != "alpha"
-         && (highOrderResidual() || highOrderJacobian())
-        )
-        {
-            FatalErrorInFunction
-                << "Only alpha stabilisation is supported with high-order "
-                << "residual or Jacobian calculation"
-                << abort(FatalError);
-        }
-    }
-
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1376,6 +1355,21 @@ Foam::solidModel::solidModel
             stabDict.subDict("momentum"),
             dimless
         );
+
+    // Only stabilisation models that support high-order residual/Jacobian
+    // calculation are allowed when high-order is enabled
+    if
+    (
+        (highOrderResidual() || highOrderJacobian())
+     && !momentumStabilisationPtr_->supportsHighOrderResidual()
+    )
+    {
+        FatalErrorInFunction
+            << "Momentum stabilisation type "
+            << momentumStabilisationPtr_->type()
+            << " does not support high-order residual or Jacobian "
+            << "calculation" << abort(FatalError);
+    }
 
     pressureStabilisationPtr_ =
         stabilisationModel::New

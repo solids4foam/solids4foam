@@ -29,7 +29,6 @@ License
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #ifndef FOAMEXTEND
-    #include "alphaStab.H"
     #include "hofvm.H"
 #endif
 
@@ -1286,7 +1285,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
             lambda
         );
 
-        if (isA<alphaStab>(momentumStabilisation()))
+        if (momentumStabilisation().supportsHighOrderResidual())
         {
             hofvm::insertAlphaStabIntoPETScMatrix
             (

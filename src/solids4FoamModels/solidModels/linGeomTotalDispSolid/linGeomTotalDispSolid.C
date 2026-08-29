@@ -27,7 +27,6 @@ License
 #include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #ifndef FOAMEXTEND
-    #include "alphaStab.H"
     #include "hofvm.H"
 #endif
 
@@ -1207,7 +1206,7 @@ label linGeomTotalDispSolid::formJacobian
             lambda
         );
 
-        if (isA<alphaStab>(momentumStabilisation()))
+        if (momentumStabilisation().supportsHighOrderResidual())
         {
             hofvm::insertAlphaStabIntoPETScMatrix
             (
