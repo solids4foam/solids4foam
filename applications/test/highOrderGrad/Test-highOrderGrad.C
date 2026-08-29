@@ -55,6 +55,10 @@ Description
     reconstruction stencils use off-processor cell values. Scalar and vector
     gradients are also checked directly at processor-face quadrature points.
 
+    Scalar and vector gradients are checked at physical traction/Neumann face
+    quadrature points in serial and parallel. These patches are identified by
+    the fixedGradient base type of the primary displacement boundary field.
+
     In serial, fixed-displacement boundary tests use patches whose exact
     runtime type is fixedDisplacement in the primary displacement field
     selected by the solid model (D or DD). Derived analytical boundary
@@ -86,6 +90,7 @@ int main(int argc, char *argv[])
 
 #include "fvMeshQuadrature.H"
 #include "fixedDisplacementFvPatchVectorField.H"
+#include "fixedGradientFvPatchFields.H"
 #include "leastSquaresReconstruction.H"
 #include "processorPolyPatch.H"
 #include "solidModel.H"
@@ -196,6 +201,8 @@ struct polynomialErrors
     scalar vectorFGrad;
     scalar processorFGrad;
     scalar processorVectorFGrad;
+    scalar neumannFGrad;
+    scalar neumannVectorFGrad;
 
     polynomialErrors()
     :
@@ -204,7 +211,9 @@ struct polynomialErrors
         fGrad(0.0),
         vectorFGrad(0.0),
         processorFGrad(0.0),
-        processorVectorFGrad(0.0)
+        processorVectorFGrad(0.0),
+        neumannFGrad(0.0),
+        neumannVectorFGrad(0.0)
     {}
 };
 
@@ -292,6 +301,60 @@ processorBoundaryCoverage calculateProcessorBoundaryCoverage
     reduce(coverage.processorFaces, sumOp<label>());
 
     return coverage;
+}
+
+
+boolList physicalNeumannPatchMask
+(
+    const fvMesh& mesh,
+    const volVectorField& displacement
+)
+{
+    boolList patchMask(mesh.boundary().size(), false);
+
+    forAll(patchMask, patchI)
+    {
+        const polyPatch& patch = mesh.boundaryMesh()[patchI];
+        const fvPatchVectorField& patchField =
+            displacement.boundaryField()[patchI];
+
+        patchMask[patchI] =
+           !patch.coupled()
+         && isA<fixedGradientFvPatchVectorField>(patchField);
+    }
+
+    return patchMask;
+}
+
+
+label countPatchQuadraturePoints
+(
+    const boolList& patchMask,
+    const fvMesh& mesh,
+    const leastSquaresScheme& reconstruction
+)
+{
+    const CompactListList<point>& faceQuadPoints =
+        reconstruction.quadrature().faceQuadPoints();
+    label nPoints = 0;
+
+    forAll(patchMask, patchI)
+    {
+        if (!patchMask[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& patch = mesh.boundaryMesh()[patchI];
+        forAll(patch, patchFaceI)
+        {
+            nPoints += faceQuadPoints[patch.start() + patchFaceI].size();
+        }
+    }
+
+    reduce(nPoints, sumOp<label>());
+
+    return nPoints;
 }
 
 
@@ -629,6 +692,7 @@ void calculateFaceGradErrors
 (
     const label polynomialOrder,
     const bool threeD,
+    const boolList& physicalNeumannPatches,
     const fvMesh& mesh,
     const leastSquaresScheme& reconstruction,
     const volScalarField& phi,
@@ -731,6 +795,56 @@ void calculateFaceGradErrors
             }
         }
     }
+
+    forAll(physicalNeumannPatches, patchI)
+    {
+        if (!physicalNeumannPatches[patchI])
+        {
+            continue;
+        }
+
+        const polyPatch& patch = mesh.boundaryMesh()[patchI];
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patch.start() + patchFaceI;
+
+            forAll(faceQuadPoints[faceI], qI)
+            {
+                errors.neumannFGrad =
+                    max
+                    (
+                        errors.neumannFGrad,
+                        mag
+                        (
+                            faceGrad[faceI][qI]
+                          - polynomialGrad
+                            (
+                                faceQuadPoints[faceI][qI],
+                                polynomialOrder,
+                                threeD
+                            )
+                        )
+                    );
+
+                errors.neumannVectorFGrad =
+                    max
+                    (
+                        errors.neumannVectorFGrad,
+                        mag
+                        (
+                            vectorFaceGrad[faceI][qI]
+                          - polynomialGrad
+                            (
+                                faceQuadPoints[faceI][qI],
+                                polynomialOrder,
+                                threeD
+                            )*componentScales
+                        )
+                    );
+            }
+        }
+    }
 }
 
 
@@ -738,6 +852,7 @@ polynomialErrors calculateErrors
 (
     const label polynomialOrder,
     const bool cellAverageUnknown,
+    const boolList& physicalNeumannPatches,
     const fvMesh& mesh,
     const leastSquaresScheme& reconstruction,
     const fvMeshQuadrature& exactQuadrature,
@@ -801,6 +916,7 @@ polynomialErrors calculateErrors
     (
         polynomialOrder,
         threeD,
+        physicalNeumannPatches,
         mesh,
         reconstruction,
         phi,
@@ -814,6 +930,8 @@ polynomialErrors calculateErrors
     reduce(errors.vectorFGrad, maxOp<scalar>());
     reduce(errors.processorFGrad, maxOp<scalar>());
     reduce(errors.processorVectorFGrad, maxOp<scalar>());
+    reduce(errors.neumannFGrad, maxOp<scalar>());
+    reduce(errors.neumannVectorFGrad, maxOp<scalar>());
 
     return errors;
 }
@@ -900,6 +1018,15 @@ int main(int argc, char *argv[])
     const bool cellAverageUnknown =
         reconstruction.type() == "kExactLeastSquares";
 
+    const boolList physicalNeumannPatches =
+        physicalNeumannPatchMask(mesh, solid.solutionD());
+    const label nNeumannQuadraturePoints = countPatchQuadraturePoints
+    (
+        physicalNeumannPatches,
+        mesh,
+        reconstruction
+    );
+
     if
     (
         !cellAverageUnknown
@@ -959,6 +1086,9 @@ int main(int argc, char *argv[])
         << reconstruction.polynomialOrder() << nl
         << "    grad tolerance          : " << gradTolerance << nl
         << "    fGrad tolerance         : " << fGradTolerance
+        << nl
+        << "    traction/Neumann boundary quadrature points: "
+        << nNeumannQuadraturePoints
         << nl << endl;
 
     for (label order = 1; order <= 3; ++order)
@@ -967,6 +1097,7 @@ int main(int argc, char *argv[])
         (
             order,
             cellAverageUnknown,
+            physicalNeumannPatches,
             mesh,
             reconstruction,
             exactQuadrature,
@@ -979,7 +1110,16 @@ int main(int argc, char *argv[])
          && errors.fGrad <= fGradTolerance
          && errors.vectorFGrad <= fGradTolerance
          && errors.processorFGrad <= fGradTolerance
-         && errors.processorVectorFGrad <= fGradTolerance;
+         && errors.processorVectorFGrad <= fGradTolerance
+         &&
+            (
+                nNeumannQuadraturePoints == 0
+             ||
+                (
+                    errors.neumannFGrad <= fGradTolerance
+                 && errors.neumannVectorFGrad <= fGradTolerance
+                )
+            );
 
         if (expectedExact)
         {
@@ -999,6 +1139,10 @@ int main(int argc, char *argv[])
             << errors.processorFGrad << nl
             << "        maximum processor-face vector fGrad error: "
             << errors.processorVectorFGrad << nl
+            << "        maximum traction/Neumann-face scalar fGrad error: "
+            << errors.neumannFGrad << nl
+            << "        maximum traction/Neumann-face vector fGrad error: "
+            << errors.neumannVectorFGrad << nl
             << "        expected exact     : "
             << (expectedExact ? "yes" : "no") << nl;
 
@@ -1013,6 +1157,14 @@ int main(int argc, char *argv[])
         }
 
         Info<< endl;
+    }
+
+    if (nNeumannQuadraturePoints == 0)
+    {
+        Info<< "Physical traction/Neumann boundary gradient test: SKIPPED"
+            << nl
+            << "    No fixedGradient boundary quadrature points were found"
+            << nl << endl;
     }
 
     if (!Pstream::parRun())
