@@ -503,19 +503,20 @@ void kExactLeastSquares::makeFaceGradStencil() const
         faceStencils[faceI].transfer(mergedIDs);
     }
 
-    // A fixed-value or symmetry boundary face uses the owner-cell stencil and
-    // the owner cell. Prescribed boundary values have separate addressing
-    // because they are known data rather than global cell unknowns. On a
-    // symmetry face, this addressing represents the physical half of the
-    // stencil; its mirrored half is implicit.
+    // Every non-coupled boundary face uses the owner-cell stencil and the
+    // owner cell. This covers fixed-value, symmetry and plain (e.g.
+    // traction/Neumann) patches alike; they differ only in how the
+    // coefficients for this addressing are computed below. Prescribed
+    // boundary values have separate addressing because they are known data
+    // rather than global cell unknowns. On a symmetry face, this addressing
+    // represents the physical half of the stencil; its mirrored half is
+    // implicit. Coupled (e.g. processor) patches are excluded: those are
+    // handled directly in fGrad via inter-processor communication.
     forAll(mesh.boundaryMesh(), patchI)
     {
         const polyPatch& pp = mesh.boundaryMesh()[patchI];
-        const bool symmetryPatch =
-            isA<symmetryPolyPatch>(pp)
-         || isA<symmetryPlanePolyPatch>(pp);
 
-        if (!includePatchInStencils_[patchI] && !symmetryPatch)
+        if (pp.coupled())
         {
             continue;
         }
@@ -1491,6 +1492,84 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                 }
 
                 coefficients[ownIndex] -= coefficientSum;
+            }
+        }
+    }
+
+    // Calculate one-sided face-gradient coefficients on plain boundary faces,
+    // e.g. traction/Neumann patches, that are neither fixed-value nor
+    // symmetry. The owner cell's own k-exact polynomial is evaluated
+    // directly at the face quadrature points, exactly as is already done for
+    // the owner side of an internal face, but without averaging against a
+    // neighbour since none exists. No boundary condition data is folded into
+    // the fit.
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+        const bool symmetryPatch =
+            isA<symmetryPolyPatch>(pp)
+         || isA<symmetryPlanePolyPatch>(pp);
+
+        if
+        (
+            pp.coupled()
+         || symmetryPatch
+         || includePatchInStencils_[patchI]
+        )
+        {
+            continue;
+        }
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = pp.start() + patchFaceI;
+            const label ownCellI = owner[faceI];
+
+            const labelUList& ownStencil = cellStencils[ownCellI];
+            const labelUList& faceStencil = faceStencils[faceI];
+            const UList<point>& quadPoints = faceQuadPoints[faceI];
+
+            // Number of coefficients is equal to the owner stencil plus the
+            // owner cell itself
+            labelList rowSizes(quadPoints.size(), faceStencil.size());
+            faceGradCoeffs[faceI] = CompactListList<vector>(rowSizes);
+
+            // Map global cell IDs onto positions in the face stencil
+            Map<label> faceCellToIndex(2*faceStencil.size());
+            forAll(faceStencil, stencilI)
+            {
+                faceCellToIndex.insert(faceStencil[stencilI], stencilI);
+            }
+
+            const label ownIndex =
+                faceCellToIndex[globalCells.toGlobal(ownCellI)];
+
+            vectorField ownCoeffs(ownStencil.size());
+
+            forAll(quadPoints, qpI)
+            {
+                const point& quadPoint = quadPoints[qpI];
+                vector ownSum = vector::zero;
+                UList<vector> coeffs = faceGradCoeffs[faceI][qpI];
+
+                // Initialise to zero all coefficients of this quadrature
+                // point
+                forAll(coeffs, stencilI)
+                {
+                    coeffs[stencilI] = vector::zero;
+                }
+
+                cellGradCoeffsAtPoint(ownCellI, quadPoint, ownCoeffs);
+                forAll(ownStencil, cellI)
+                {
+                    const vector& coeff = ownCoeffs[cellI];
+                    const label faceStencilI =
+                        faceCellToIndex[ownStencil[cellI]];
+
+                    coeffs[faceStencilI] += coeff;
+                    ownSum += coeff;
+                }
+                coeffs[ownIndex] -= ownSum;
             }
         }
     }

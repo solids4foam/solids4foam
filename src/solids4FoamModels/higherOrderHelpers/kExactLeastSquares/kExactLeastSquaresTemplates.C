@@ -223,6 +223,57 @@ void kExactLeastSquares::fGrad
         }
     }
 
+    // Loop over plain boundary faces (e.g. traction/Neumann patches) that
+    // are neither coupled, symmetry, nor fixed-value: calcFaceGradCoeffs()
+    // has already populated a one-sided reconstruction for these using the
+    // owner cell's own polynomial, addressed exactly like an internal face's
+    // owner side, so the same evaluation applies unmodified.
+    forAll(mesh.boundary(), patchI)
+    {
+        const polyPatch& pp = mesh.boundaryMesh()[patchI];
+        const bool symmetryPatch =
+            isA<symmetryPolyPatch>(pp)
+         || isA<symmetryPlanePolyPatch>(pp);
+
+        if
+        (
+            pp.coupled()
+         || symmetryPatch
+         || includePatchInStencils_[patchI]
+        )
+        {
+            continue;
+        }
+
+        const label patchStart = pp.start();
+
+        forAll(pp, patchFaceI)
+        {
+            const label faceI = patchStart + patchFaceI;
+            const UList<label>& stencil = stencils[faceI];
+            const CompactListList<vector>& faceCoeffs = coeffs[faceI];
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                const UList<vector>& qpCoeffs = faceCoeffs[qpI];
+
+                forAll(stencil, stencilI)
+                {
+                    result[faceI][qpI] +=
+                        qpCoeffs[stencilI]
+                      * fieldValue
+                        (
+                            stencil[stencilI],
+                            globalCells,
+                            remoteLoc,
+                            vfI,
+                            remoteField
+                        );
+                }
+            }
+        }
+    }
+
     // Average owner-side reconstructions across processor patches. The face
     // quadrature object guarantees the same point order on both sides.
     forAll(mesh.boundary(), patchI)
