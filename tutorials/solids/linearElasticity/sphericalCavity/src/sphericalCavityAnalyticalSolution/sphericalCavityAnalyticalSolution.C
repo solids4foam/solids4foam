@@ -50,6 +50,7 @@ calculateAnalyticalCellDisplacement
     vectorField& analyticalD
 ) const
 {
+#ifndef FOAMEXTEND
     const solidModel& solMod = lookupSolidModel(mesh);
     bool useCellAverage = false;
 
@@ -102,6 +103,7 @@ calculateAnalyticalCellDisplacement
         }
     }
     else
+#endif
     {
         Info<< "Using point-valued analytical displacement" << endl;
 

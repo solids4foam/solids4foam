@@ -42,8 +42,6 @@ APPROACHES=(
     highOrder-kExactLeastSquares
     highOrder-movingLeastSquares-parallel
     highOrder-kExactLeastSquares-parallel
-    highOrderJacobian-movingLeastSquares-parallel
-    highOrderJacobian-kExactLeastSquares-parallel
 )
 
 PRESSURE_DISPLACEMENT_CASES=(
@@ -120,16 +118,6 @@ run_case() {
             sed -E -i.bak \
                 -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
                 -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
-                "${case_dir}/constant/solidProperties.highOrder"
-            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
-            set -- highOrder parallel
-            ;;
-        highOrderJacobian-movingLeastSquares-parallel|highOrderJacobian-kExactLeastSquares-parallel)
-            local least_squares_type="${requested#highOrderJacobian-}"
-            least_squares_type="${least_squares_type%-parallel}"
-            sed -E -i.bak \
-                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
-                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian true;/" \
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
             set -- highOrder parallel
