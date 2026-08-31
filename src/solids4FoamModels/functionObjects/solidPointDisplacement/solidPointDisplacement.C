@@ -68,7 +68,7 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
         if (solMod.highOrderResidual())
         {
             // This call is deliberately made on every processor. The scheme
-            // evaluates the required derivative fields collectively and
+            // constructs the required reconstruction data collectively and
             // returns zero where cellID_ is negative.
             pointDValue =
                 solMod.displacementLeastSquares().valueAtPoint
