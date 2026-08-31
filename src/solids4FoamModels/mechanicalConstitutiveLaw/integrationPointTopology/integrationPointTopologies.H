@@ -30,6 +30,7 @@ Author
 
 #include "cellCentredIntegrationPointTopology.H"
 #include "compactCellIntegrationPointTopology.H"
+#include "dualFaceIntegrationPointTopology.H"
 #include "faceCentredIntegrationPointTopology.H"
 #include "pointCentredIntegrationPointTopology.H"
 
