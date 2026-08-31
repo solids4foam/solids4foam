@@ -283,9 +283,9 @@ label kExactLeastSquares::minNn() const
         return
         (
             (polynomialOrder_ + 1)
-          * (polynomialOrder_ + 2)
-          * (polynomialOrder_ + 3)
-          / 6
+           *(polynomialOrder_ + 2)
+           *(polynomialOrder_ + 3)
+           /6
           - 1
         );
     }
@@ -1023,7 +1023,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         if
         (
            !isA<symmetryPolyPatch>(pp)
-         && !isA<symmetryPlanePolyPatch>(pp)
+        && !isA<symmetryPlanePolyPatch>(pp)
         )
         {
             continue;
@@ -1946,7 +1946,7 @@ void kExactLeastSquares::calcCellCoeffs() const
         }
 
         // Scaling factor for Taylor series
-        const scalar h = 2.0 * maxDist;
+        const scalar h = 2.0*maxDist;
 
         // Number of neighbours in stencil
         const label Nn = stencil.size();
