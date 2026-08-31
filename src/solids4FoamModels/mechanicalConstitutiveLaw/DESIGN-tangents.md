@@ -143,7 +143,7 @@ the lifecycle. Fortunately it does — see §1.6.
 
 Rearranged, the fixed point satisfies
 
-```
+```text
 impK*(snGrad(D) - (n & gradD_patch)) = traction_applied - (n & sigma_patch)
 ```
 
@@ -181,6 +181,8 @@ why freezing `impK_`/`rImpK_` while refreshing `impKf_` is legitimate *there*.
 
 ### 1.5 Consumers that straddle
 
+<!-- markdownlint-disable MD013 -->
+
 | Consumer | Straddles? | Why |
 |---|---|---|
 | `traction += impKf_*...faceVector()` | **Yes** | Written as a residual term; behaves as a stabilisation coefficient; changes converged answer. |
@@ -191,7 +193,11 @@ why freezing `impK_`/`rImpK_` while refreshing `impKf_` is legitimate *there*.
 | `momentumStabilisation().vectorJacobian(D, &impKf_)` (`:1229`) | No | Jacobian only. |
 | `fixedDofScale_` (`vertexCentredLinGeomSolid.C:816-826`) | No | Diagonal magnitude for `MatZeroRowsColumnsIS`; conditioning only. |
 
+<!-- markdownlint-enable MD013 -->
+
 ### 1.6 The new framework already reproduces `impK` exactly
+
+<!-- markdownlint-disable MD013 -->
 
 | Law | Legacy `impK()` | New `tangentRequest::scalar` | Match |
 |---|---|---|---|
@@ -200,6 +206,8 @@ why freezing `impK_`/`rImpK_` while refreshing `impKf_` is legitimate *there*.
 | `linearElasticMisesPlastic`, elastic point | `(4/3)mu + K` | `(4/3)mu + kappa` (`...MisesPlastic...C:310`) | exact |
 | `linearElasticMisesPlastic`, plastic point | `scaleFactor*(4/3)mu + K` (`linearElasticMisesPlastic.C:739-777`) | `theta*(4/3)mu + kappa` (`...C:416`) | exact |
 | `linearElastic` `mat66` | `linearElastic.C:295-309` | `linearElasticMechanicalConstitutiveLaw.C:191-205` | identical, same Voigt convention (`mu` on the shear diagonal) |
+
+<!-- markdownlint-enable MD013 -->
 
 `2.0*mechanical().shearModulus()` (the `solvePressure()` branch at
 `linGeomTotalDispSolid.C:574`) equals `2*mu`, which is exactly
@@ -214,6 +222,8 @@ Line numbers are on `feature-mechanicalConstitutiveLaw` @ `5c4a03c7`.
 "Free" = the value may change without changing the converged solution.
 
 ### 2.1 `solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C|.H`
+
+<!-- markdownlint-disable MD013 -->
 
 | Line | Expression | Role | Free? |
 |---|---|---|---|
@@ -237,7 +247,11 @@ Line numbers are on `feature-mechanicalConstitutiveLaw` @ `5c4a03c7`.
 | `.C:1284` | `fvm::laplacian(impKf_, D, "preconditionD")` | preconditioner | Yes |
 | `.C:1331,1334,1352,1353` | `tractionBoundarySnGrad` | boundary condition | Yes (§1.4) |
 
+<!-- markdownlint-enable MD013 -->
+
 ### 2.2 Other solid models (same taxonomy)
+
+<!-- markdownlint-disable MD013 -->
 
 | File | Lines | Role | Free? |
 |---|---|---|---|
@@ -267,10 +281,14 @@ Line numbers are on `feature-mechanicalConstitutiveLaw` @ `5c4a03c7`.
 | | 1331-1332 `materialTangentFaceField(List<mat66>&)` | **Jacobian, mat66** | Yes |
 | `vertexCentredNonLinGeomTotalLagSolid.C` | 760, 1082, 1380, 1684-1685 | same as above | same |
 
+<!-- markdownlint-enable MD013 -->
+
 ### 2.3 Consumers outside `solidModels/`
 
 All of these obtain `impK` by **registry lookup of a `volScalarField` literally
 named `"impK"`**. This is a hard constraint on any redesign.
+
+<!-- markdownlint-disable MD013 -->
 
 | File | Line | Mechanism | Role | Free? |
 |---|---|---|---|---|
@@ -283,8 +301,10 @@ named `"impK"`**. This is a hard constraint on any redesign.
 | `materialModels/.../solidSubMeshes.C` | 1667 | registry `"impK"` | sub-mesh mapping | — |
 | `numerics/mechanicalEnergies/mechanicalEnergies.C` | 171 | argument | **unused** (only in commented-out laplacian-smoothing energy at `:271`) | — |
 | `materialModels/mechanicalModel/mechanicalModel.C` | 354-418 | `impK()`, `impKf()` | provider | — |
-| `materialModels/mechanicalModel/dualMechanicalModel.C` | 334-358 `materialTangentFaceField`; 361-413 `impKf()` | provider (dual mesh) | — |
-| `abaqusUMATs/abaqusUmatLinearElastic` | 4 hits | provider | — |
+| `materialModels/mechanicalModel/dualMechanicalModel.C` | 334-358, 361-413 | `materialTangentFaceField()`, `impKf()` | provider (dual mesh) | — |
+| `abaqusUMATs/abaqusUmatLinearElastic` | 4 hits | `impK()` | provider | — |
+
+<!-- markdownlint-enable MD013 -->
 
 **Constraint C1: a `volScalarField` registered under the name `"impK"` must
 continue to exist on the solid mesh for the whole run.** Six independent
@@ -345,11 +365,15 @@ iterations, so it is not on the hot path. `mechanicalConstitutiveLawState` is
 
 **Lifecycle, stated explicitly (this reproduces today's behaviour exactly):**
 
+<!-- markdownlint-disable MD013 -->
+
 | Field | Built | Refreshed | Invalidated by |
 |---|---|---|---|
 | `impK_` | solid model constructor, from `updateScalarTangent(gradD(), gradD0(), 0, impK_, req)` where `req = solvePressure() ? scalarDeviatoric : scalar` | **never** | topological mesh change only (`crackerFvMesh`) |
 | `impKf_` | constructor, `fvc::interpolate(impK_)` | `linGeom*`, `nonLinGeom*`, `uns*`: **never**. `thermalLinGeomSolid`, `poroLinGeomSolid`: every 10th outer iteration. `coupledPressureDisplacementSolid`: once per `updateTotalFields()`. | as above |
 | `rImpK_` | constructor, `1.0/impK_` | **never** | as above |
+
+<!-- markdownlint-enable MD013 -->
 
 The cadence is *not* generalised into a new dictionary entry in this design.
 Each solid model keeps its own hard-coded cadence, because that cadence is
@@ -368,7 +392,7 @@ makes `impK_` restart-dependent today. See OQ-1.
 dictionary. It replaces `approximateJacobian` entirely. It is orthogonal to
 `highOrderJacobian` and does not replace it.**
 
-```
+```text
 linearGeometryTotalDisplacementCoeffs
 {
     // Fidelity of the material tangent used to build the Jacobian.
@@ -398,12 +422,16 @@ Why `approximateJacobian` is subsumed but `highOrderJacobian` is not:
   discretisation switch in the material section of the dictionary. Keep them
   separate; they compose:
 
+  <!-- markdownlint-disable MD013 -->
+
   | `highOrderJacobian` | `jacobianTangent` | Assembled Jacobian |
   |---|---|---|
   | no | `scalar` | `momentumStabilisation().vectorJacobian(D, &impKf_)` — today's default |
   | no | `fourthOrder` | **not supported** — no cell-centred operator consumes `mat66`; fatal error (see §3.4) |
   | yes | `scalar` | `hofvm::laplacian*IntoPETScMatrix` with back-derived `mu`/`lambda` — today's behaviour, retained for one release as deprecated |
   | yes | `fourthOrder` | `hofvm::divSigmaIntoPETScMatrix(C)` — the new correct path (§3.5) |
+
+  <!-- markdownlint-enable MD013 -->
 
 **Defaults are per solid model, not global**, because today's defaults differ:
 
@@ -532,6 +560,8 @@ Encode the rule rather than documenting it:
 
 Applying the rule to the existing topologies:
 
+<!-- markdownlint-disable MD013 -->
+
 | Topology | `supportsFourthOrderTangent()` | Why |
 |---|---|---|
 | `cellCentredIntegrationPointTopology` | `false` | The cell-centred Jacobian is always operator-based (`fvm::laplacian` with a face-interpolated coefficient, or `hofvm` with per-face `gamma`). Fluxes are never evaluated at cell centres. **Your suspicion is correct: the cell-centred solvers genuinely never need a `mat66`.** |
@@ -540,6 +570,8 @@ Applying the rule to the existing topologies:
 | `compactCellIntegrationPointTopology` | `false` | Cell-interior quadrature points; `hofvm` evaluates on *face* quadrature points. |
 | **`dualFaceIntegrationPointTopology`** (new, §3.6) | `true` | Each dual face lies in exactly one primary cell, hence exactly one law. |
 | `compactFaceIntegrationPointTopology` (future) | `true` when built | Face quadrature points; needed if `hofvm` moves from per-face to per-quadrature-point `gamma`. |
+
+<!-- markdownlint-enable MD013 -->
 
 The manager should assert this once, at the top of any update that is passed a
 fourth-order request:
@@ -592,7 +624,7 @@ The three coefficient kernels
 (`hofvm.C:123-172`: `laplacianCoeff`, `laplacianTransposeCoeff`,
 `laplacianTraceCoeff`) together compute, for isotropic `C`,
 
-```
+```text
 coeff_ij = w*( mu*(n.g)*delta_ij + mu*g_i*n_j + lambda*n_i*g_j )
 ```
 
@@ -687,7 +719,7 @@ worth stating plainly: there is no multi-material dual face.**
 
 **Evidence.** `dualMeshToMeshMap.C:102-107`:
 
-```
+```c
 // Set dualFaceToCell
 // All internal dual faces should uniquely lie within one primary cell. For
 // boundary faces, each dual face will uniquely lie on the boundary of one
@@ -1065,7 +1097,8 @@ final time directories with `foamListTimes` + `diff -r`.
 
 * Construct a `mechanicalConstitutiveLawManager` alongside the existing
   `mechanicalModel`, behind
-  `solidModelDict().lookupOrDefault<Switch>("useMechanicalConstitutiveLawManager", false)`.
+  `solidModelDict().lookupOrDefault<Switch>
+  ("useMechanicalConstitutiveLawManager", false)`.
 * When on: fill `impK_` via `updateScalarTangent`, with
   `solvePressure() ? scalarDeviatoric : scalar` (§3.8); keep `impKf_` and
   `rImpK_` derived exactly as now; keep `impK_` registered under `"impK"`
@@ -1397,7 +1430,9 @@ Consequences:
 
 Resolves OQ-2 for the near term.
 
-### 8.4 First mover: `vertexCentredLinGeomSolid` — supersedes the Stage 2/4 order in §5
+### 8.4 First mover: `vertexCentredLinGeomSolid`
+
+Supersedes the Stage 2/4 order in §5.
 
 **Decision.** `vertexCentredLinGeomSolid` adopts first, not
 `linGeomTotalDispSolid`.
@@ -1407,12 +1442,16 @@ tangent *is* the whole of `impK`: both consumers are Jacobian-only, so a
 tangent-only slice is the complete `impK` migration for this solver, at zero
 bit-for-bit risk.
 
+<!-- markdownlint-disable MD013 -->
+
 | Site | Today | After |
 |---|---|---|
 | `vertexCentredLinGeomSolid.C:1324` (`jacobianTangent scalar`) | `dualImpKf()` = `dualMechanicalPtr_().impKf()` | manager scalar tangent on dual faces |
 | `:1331-1332` (`jacobianTangent fourthOrder`, the default) | `dualMechanicalPtr_().materialTangentFaceField(List<mat66>&)` | manager `mat66` on dual faces |
 | `:1310` | `dualMechanicalPtr_().correct(dualSigmaf_)` | **unchanged** — stress stays legacy in this slice |
 | `:822`, `:1037` | `average(mechanical().impK())`, `sqrt(impK/rho)` on the **primary** mesh | **unchanged** |
+
+<!-- markdownlint-enable MD013 -->
 
 `dualMechanicalModel` is therefore *not* removed by this PR; it is removed when
 stress moves, in the following one. That is the intended thin slice.
@@ -1453,6 +1492,8 @@ The `volScalarField` form of §3.1 becomes a thin wrapper over this.
 
 Supersedes the stage numbering in §5. Content is otherwise as described there.
 
+<!-- markdownlint-disable MD013 -->
+
 | PR | Content |
 |---|---|
 | 1 | **Done.** Defect fixes D1, D4, D5 and the `(4/3)*mu` change of §8.2 including `linGeomTotalDispSolid.C:574`; the `petscSnesPressure` u-p regression case; `planeStress` injection (§8.1) and support in the three new laws; `supportsFourthOrderTangent()` + manager guard. D3 is left to PR-2, which deletes the line. plateHole, wobblyNewton and perforatedPlate all pass. |
@@ -1463,6 +1504,8 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
 | 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
+
+<!-- markdownlint-enable MD013 -->
 
 Every increment from PR-3 onward carries a foam-extend follow-on step, per
 §8.7: verify on OpenFOAM.com first, then make that increment's code
@@ -1548,11 +1591,15 @@ topologies, the law base class and its run-time selector compile clean.** Only
 two files fail, in three classes of defect, all in our own code and all
 mechanical:
 
+<!-- markdownlint-disable MD013 -->
+
 | Class | Sites | Fix |
 |---|---|---|
 | `autoPtr<T>::operator*` does not exist in foam-extend | 10, all in `mechanicalConstitutiveLawManager.C` | use `ptr()`, or add an `operator*` shim to `compatibilityFunctions.H` |
 | `GeometricField::boundaryFieldRef()` does not exist | 3, in `mechanicalConstitutiveLawManager.C` | use the existing `Foam::boundaryFieldRef()` from `compatibilityFunctions.H` |
 | `Field<T>(label, const zero&)` and `setSize(label, const zero&)` | 9, in `mechanicalConstitutiveLawState.C` | use `pTraits<T>::zero` |
+
+<!-- markdownlint-enable MD013 -->
 
 Plus one blocker that is **not ours**: foam-extend's own
 `CompactListList<T>::operator[](const label) const` returns
