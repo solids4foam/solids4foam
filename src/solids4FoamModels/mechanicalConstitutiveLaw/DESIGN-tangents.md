@@ -1464,6 +1464,11 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
+Every increment from PR-3 onward carries a foam-extend follow-on step, per
+§8.7: verify on OpenFOAM.com first, then make that increment's code
+foam-extend-clean and add it to `files.foamextend`. PR-1 and PR-2 owe that
+step too; §8.7 lists exactly what it costs.
+
 ### 8.6 Notes from PR-2
 
 **The tangent-only update is named per formulation.** §8.4 proposed a single
@@ -1511,43 +1516,60 @@ fault inside the primitive moves them together; only the closed-form check sees
 that. Second, the test requires every material to be `linearElastic`, so it
 does not exercise the plastic law or the finite-strain path.
 
-### 8.7 foam-extend: the framework is not built there at all
+### 8.7 foam-extend support is part of the plan, not an afterthought
 
 `src/solids4FoamModels/Make/files.foamextend` contains **no**
 `mechanicalConstitutiveLaw` entries, while `files.openfoam` contains fourteen.
-On foam-extend the framework is therefore not compiled, and "it builds on
-foam-extend" is true only by omission.
+The framework has therefore never been compiled on foam-extend, and "it builds
+on foam-extend" has been true only by omission.
 
-This surfaced in PR-2 because `Test-mechanicalConstitutiveLaw` is the first
-thing in the tree to include `mechanicalConstitutiveLawManager.H`
-unconditionally. The foam-extend build then failed on two things:
+**Decision.** foam-extend is a supported fork and must remain one. The endgame
+is that the legacy `mechanicalModel` and `mechanicalLaw` classes are deprecated
+and removed; if the new framework never builds on foam-extend, that endgame
+silently removes mechanical modelling from foam-extend altogether. That is not
+acceptable, so the framework must end up building and running there.
 
-1. `mechanicalConstitutiveLaw.H` returned `dimensionedScalar()` from the two
-   "keep the compiler happy" default implementations. `dimensioned<Type>` has
-   no default constructor in foam-extend. **Fixed in PR-2** — the dummies are
-   now constructed explicitly, which is portable and better anyway.
-2. foam-extend's own `CompactListList<T>::operator[](const label) const`
-   returns `UList<T>(m_.begin(), ...)`, where `m_.begin()` on a const `List`
-   is a `const T*` and the `UList` constructor wants a `T*`. This is a bug in
-   foam-extend, not in solids4foam, and it fires whenever that operator is
-   instantiated. Not fixed; the test application is guarded with
-   `#ifdef FOAMEXTEND` instead.
+**Sequencing.** Portability is a *follow-on step within each increment*, taken
+once that increment's design is agreed and its OpenFOAM.com behaviour is
+verified — not before, and not deferred to one large sweep at the end. Doing it
+before the design settles means redoing it; doing it only at the end means an
+undirected sweep across code nobody remembers. So from PR-3 onward, each
+increment has two parts:
 
-**This needs a project-level decision, and it is more consequential than any
-open question below.** The stated endgame is that the legacy `mechanicalModel`
-and `mechanicalLaw` classes are deprecated and removed. If the new framework
-never builds on foam-extend, that endgame removes solids4foam's mechanical
-modelling from foam-extend entirely. Either:
+1. design, implement and verify on OpenFOAM.com;
+2. make that increment's code foam-extend-clean, and extend `files.foamextend`
+   to cover it.
 
-- the framework gets a portability pass (mostly avoiding `CompactListList`
-  const-indexing in anything foam-extend compiles, plus whatever else a real
-  build turns up), and `files.foamextend` gains the sources; or
-- dropping foam-extend for the new mechanics is made an explicit, documented
-  decision, and the legacy classes are kept alive there rather than removed.
+**What actually breaks today.** A survey was run for PR-2: the fourteen
+framework sources were added to `files.foamextend` in a throwaway worktree and
+built against foam-extend-4.1. Every source was compiled. The result is much
+better than feared — **all five constitutive laws, all five integration-point
+topologies, the law base class and its run-time selector compile clean.** Only
+two files fail, in three classes of defect, all in our own code and all
+mechanical:
 
-Deciding this late is expensive: every increment from PR-3 onward either does
-or does not have to stay foam-extend-clean, and that changes what may be used
-in a header.
+| Class | Sites | Fix |
+|---|---|---|
+| `autoPtr<T>::operator*` does not exist in foam-extend | 10, all in `mechanicalConstitutiveLawManager.C` | use `ptr()`, or add an `operator*` shim to `compatibilityFunctions.H` |
+| `GeometricField::boundaryFieldRef()` does not exist | 3, in `mechanicalConstitutiveLawManager.C` | use the existing `Foam::boundaryFieldRef()` from `compatibilityFunctions.H` |
+| `Field<T>(label, const zero&)` and `setSize(label, const zero&)` | 9, in `mechanicalConstitutiveLawState.C` | use `pTraits<T>::zero` |
+
+Plus one blocker that is **not ours**: foam-extend's own
+`CompactListList<T>::operator[](const label) const` returns
+`UList<T>(m_.begin(), ...)`, passing a `const T*` where a `T*` is wanted. It
+fires whenever that operator is instantiated. Options, in preference order:
+avoid const-indexing a `CompactListList` in anything foam-extend compiles and
+go through `m()` and the offsets directly; or carry a patched copy; or, as a
+last resort, relax the flag for that translation unit. Note the `CompactListList`
+overloads are a convenience layer over the flat-list primitive of §3.7, so the
+first option is cheap.
+
+Two caveats on that survey. It fixed nothing, so a second class of error may sit
+behind the first in the two failing files. And it says nothing about whether the
+framework *runs* correctly on foam-extend, only that it compiles — the
+`Test-mechanicalConstitutiveLaw` application of §8.6 is the instrument for that,
+and its `FOAMEXTEND` guard should be removed as soon as the framework builds
+there.
 
 ### 8.8 Open questions still outstanding
 
