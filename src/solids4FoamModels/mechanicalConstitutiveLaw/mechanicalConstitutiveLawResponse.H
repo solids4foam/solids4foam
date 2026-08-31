@@ -76,7 +76,7 @@ namespace Foam
 {
 
 // Forward Declarations
-class mat66;
+struct mat66;
 
 /*---------------------------------------------------------------------------* \
                Class mechanicalConstitutiveLawResponse Declaration

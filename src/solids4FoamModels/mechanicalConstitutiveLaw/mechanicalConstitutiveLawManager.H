@@ -76,7 +76,7 @@ namespace Foam
 // Forward Declarations
 class integrationPointTopology;
 class CompactListListBase;
-class mat66;
+struct mat66;
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
@@ -125,6 +125,13 @@ class mechanicalConstitutiveLawManager
         mutable autoPtr<pointSymmTensorField> pointStressSumPtr_;
         mutable autoPtr<pointScalarField>     pointStressWeightPtr_;
         mutable autoPtr<pointScalarField>     pointTangentWeightPtr_;
+
+        //- Scratch stress storage used by the tangent-only updates.
+        //  A constitutive law always produces a stress alongside a tangent, so
+        //  a tangent-only update needs somewhere to put it that is not the
+        //  caller's storage. The contents are never read. The list is sized
+        //  on demand, which in practice means once per topology size
+        mutable List<symmTensor> scratchStress_;
 
         //- Density field
         mutable autoPtr<volScalarField> rhoPtr_;
@@ -239,12 +246,40 @@ class mechanicalConstitutiveLawManager
             }
         }
 
-        //- Return (and lazily construct) an integration-point topology by type
-        //  name
-        const integrationPointTopology& topologyFor
+        //- Check that a flat integration-point list has the size the topology
+        //  requires
+        inline void checkIntegrationPointListSize
         (
-            const word& topologyTypeName
-        ) const;
+            const label expected,
+            const label actual,
+            const word& listName,
+            const word& context
+        ) const
+        {
+            if (actual != expected)
+            {
+                FatalErrorInFunction
+                    << "Inconsistent list size in " << context << nl
+                    << "List '" << listName << "' has " << actual
+                    << " entries but the integration-point topology has "
+                    << expected << " integration points"
+                    << exit(FatalError);
+            }
+        }
+
+        //- Check that the tangent storage required by the request has been
+        //  supplied
+        void checkTangentStorage
+        (
+            const bool haveScalarTangent,
+            const bool haveFourthOrderTangent,
+            const tangentRequest req,
+            const word& context
+        );
+
+        //- Return scratch stress storage sized for the given number of
+        //  integration points
+        List<symmTensor>& scratchStress(const label nIntegrationPoints) const;
 
         //- Return (and lazily construct) a compact cell-based integration-point
         //  topology inferred from a CompactListList layout.
@@ -321,6 +356,8 @@ class mechanicalConstitutiveLawManager
             pointStressSumPtr_.clear();
             pointStressWeightPtr_.clear();
             pointTangentWeightPtr_.clear();
+
+            scratchStress_.clear();
         }
 
         //- No copy construct
@@ -357,6 +394,17 @@ public:
 
     // Access
 
+        //- Return (and lazily construct) a run-time selectable
+        //  integration-point topology by type name.
+        //  The topology is owned and cached by the manager and remains valid
+        //  for the lifetime of the manager.
+        //  Topologies that need more than the mesh to be built go through
+        //  registerTopology() instead
+        const integrationPointTopology& topologyFor
+        (
+            const word& topologyTypeName
+        ) const;
+
         //- Const-access to the density field
         const volScalarField& rho() const;
 
@@ -365,11 +413,119 @@ public:
 
     // Edit
 
+        //- Register an externally constructed integration-point topology and
+        //  return a reference to it.
+        //  This is required for topologies that cannot be built from the mesh
+        //  alone, and so cannot go through the run-time selection table, e.g.
+        //  dualFaceIntegrationPointTopology, which also needs the
+        //  dual-face-to-cell map.
+        //  The manager takes ownership and the topology remains valid for the
+        //  lifetime of the manager.
+        //  The key shares a namespace with the run-time selectable topology
+        //  type names, so it must not collide with one.
+        //  The call is idempotent: registering a key that is already present
+        //  returns the topology already held and discards the supplied one.
+        //  This matters because constitutive state is keyed on the topology
+        //  object, so replacing it would silently start a second, empty set of
+        //  history variables
+        const integrationPointTopology& registerTopology
+        (
+            const word& key,
+            autoPtr<integrationPointTopology> topoPtr
+        ) const;
+
         //- Reset cached material property fields (e.g. rho, bulk modulus).
         //  This does not modify constitutive laws or their state; it only
         //  clears cached volScalarField representations so they will be
         //  rebuilt on next access.
         void resetMaterialPropertyFields();
+
+        //- Update the engineering (small-strain) stress at the integration
+        //  points of the supplied topology.
+        //  This is the primitive form of the small-strain update: the
+        //  GeometricField and CompactListList overloads below are implemented
+        //  in terms of it.
+        //  The caller owns all storage and is responsible for its indexing,
+        //  which must match the integration-point indices returned by the
+        //  topology. The lists need not be associated with the manager's mesh,
+        //  which is what allows evaluation on a dual or otherwise derived mesh.
+        //  Only internal integration points are visited: boundary states are
+        //  the business of the GeometricField overloads.
+        //  No stress or tangent collapse is performed, so the topology must
+        //  return requiresUniqueIntegrationPointsPerMaterial() == false.
+        //  A fourth-order tangent request additionally requires
+        //  topo.supportsFourthOrderTangent().
+        //  Unlike the GeometricField overloads, a tangent request that is not
+        //  matched by the corresponding storage is an error rather than a
+        //  silently skipped tangent
+        void updateStressSmallStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& gradD,
+            const UList<tensor>& gradD0,
+            const scalar dt,
+            UList<symmTensor>& stress,
+            UList<scalar>* scalarTangentPtr = nullptr,
+            UList<mat66>* fourthOrderTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Finite-strain counterpart of the flat-list small-strain update
+        //  above, with the same storage, indexing and tangent requirements
+        void updateStressFiniteStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& F,
+            const UList<tensor>& F0,
+            const UList<tensor>& Finv,
+            const UList<tensor>& Finv0,
+            const UList<scalar>& J,
+            const UList<scalar>& J0,
+            const scalar dt,
+            UList<symmTensor>& stress,
+            UList<scalar>* scalarTangentPtr = nullptr,
+            UList<mat66>* fourthOrderTangentPtr = nullptr,
+            const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Evaluate only the requested small-strain tangent at the integration
+        //  points of the supplied topology, leaving the caller's stress
+        //  storage untouched.
+        //  This is for solid models that take their Jacobian from the manager
+        //  while their residual stress still comes from elsewhere, which is the
+        //  intended migration path.
+        //  Note that the constitutive state of this topology is advanced
+        //  exactly as the corresponding updateStress call would advance it: a
+        //  law computes its tangent and its stress together. For a history-
+        //  dependent law this is only harmless because the topology used for
+        //  the Jacobian carries its own state, separate from the topology used
+        //  for the residual
+        void updateTangentSmallStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& gradD,
+            const UList<tensor>& gradD0,
+            const scalar dt,
+            UList<scalar>* scalarTangentPtr,
+            UList<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq
+        );
+
+        //- Finite-strain counterpart of updateTangentSmallStrain
+        void updateTangentFiniteStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& F,
+            const UList<tensor>& F0,
+            const UList<tensor>& Finv,
+            const UList<tensor>& Finv0,
+            const UList<scalar>& J,
+            const UList<scalar>& J0,
+            const scalar dt,
+            UList<scalar>* scalarTangentPtr,
+            UList<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq
+        );
 
         //- Update the engineering (small-strain) stress field using the
         //  configured mechanical constitutive laws.

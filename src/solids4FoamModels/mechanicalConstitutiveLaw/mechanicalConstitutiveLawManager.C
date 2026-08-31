@@ -35,6 +35,47 @@ namespace Foam
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
 
+void Foam::mechanicalConstitutiveLawManager::checkTangentStorage
+(
+    const bool haveScalarTangent,
+    const bool haveFourthOrderTangent,
+    const tangentRequest req,
+    const word& context
+)
+{
+    if (needsScalarTangent(req) && !haveScalarTangent)
+    {
+        FatalErrorInFunction
+            << "A " << tangentRequestName(req) << " tangent was requested in "
+            << context << " but no scalar tangent storage was supplied."
+            << exit(FatalError);
+    }
+
+    if (needsFourthOrderTangent(req) && !haveFourthOrderTangent)
+    {
+        FatalErrorInFunction
+            << "A " << tangentRequestName(req) << " tangent was requested in "
+            << context << " but no fourth-order tangent storage was supplied."
+            << exit(FatalError);
+    }
+}
+
+
+Foam::List<Foam::symmTensor>&
+Foam::mechanicalConstitutiveLawManager::scratchStress
+(
+    const label nIntegrationPoints
+) const
+{
+    if (scratchStress_.size() != nIntegrationPoints)
+    {
+        scratchStress_.setSize(nIntegrationPoints);
+    }
+
+    return scratchStress_;
+}
+
+
 const Foam::integrationPointTopology&
 Foam::mechanicalConstitutiveLawManager::topologyFor
 (
@@ -786,10 +827,379 @@ Foam::mechanicalConstitutiveLawManager::kappa() const
 }
 
 
+const Foam::integrationPointTopology&
+Foam::mechanicalConstitutiveLawManager::registerTopology
+(
+    const word& key,
+    autoPtr<integrationPointTopology> topoPtr
+) const
+{
+    if (!topoPtr.valid())
+    {
+        FatalErrorInFunction
+            << "Null integrationPointTopology registered under key " << key
+            << exit(FatalError);
+    }
+
+    // Already registered?
+    if (topologyCache_.found(key))
+    {
+        const integrationPointTopology& existing = *topologyCache_[key];
+
+        if (existing.type() != topoPtr->type())
+        {
+            FatalErrorInFunction
+                << "An integrationPointTopology of type " << existing.type()
+                << " is already registered under the key " << key << ", but a "
+                << "topology of type " << topoPtr->type() << " was supplied."
+                << nl
+                << "Keys must identify a topology uniquely: the constitutive "
+                << "state is keyed on the topology object, so two topologies "
+                << "sharing a key would share history variables."
+                << exit(FatalError);
+        }
+
+        // Discard the supplied topology and keep the one already in use, so
+        // that its constitutive state is preserved
+        return topology(existing).topology_;
+    }
+
+    topologyCache_.insert(key, topoPtr);
+
+    return topology(*topologyCache_[key]).topology_;
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::resetMaterialPropertyFields()
 {
     rhoPtr_.clear();
     kappaPtr_.clear();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& gradD,
+    const UList<tensor>& gradD0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    const word context = "updateStressSmallStrain (flat list)";
+    const label nIP = topo.nIntegrationPoints();
+
+    checkIntegrationPointListSize(nIP, gradD.size(), "gradD", context);
+    checkIntegrationPointListSize(nIP, gradD0.size(), "gradD0", context);
+    checkIntegrationPointListSize(nIP, stress.size(), "stress", context);
+
+    checkTangentRequest(topo, tangentReq);
+
+    checkTangentStorage
+    (
+        scalarTangentPtr != nullptr,
+        fourthOrderTangentPtr != nullptr,
+        tangentReq,
+        context
+    );
+
+    if (scalarTangentPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, scalarTangentPtr->size(), "scalarTangent", context
+        );
+    }
+
+    if (fourthOrderTangentPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, fourthOrderTangentPtr->size(), "fourthOrderTangent", context
+        );
+    }
+
+    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    {
+        FatalErrorInFunction
+            << "The flat-list update does not perform stress collapse, but "
+            << "topology " << topo.type() << " shares integration points "
+            << "between cells, so an integration point on a material interface "
+            << "would be written more than once." << nl
+            << "Use the surfaceField or pointField overload, which takes a "
+            << "stressCollapseRule."
+            << exit(FatalError);
+    }
+
+    // Update old time fields at the start of a new time step
+    updateOldTimeIfNeeded();
+
+    topologyEntry& tp = topology(topo);
+
+    // Loop over mechanical constitutive laws
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        if (ipIDs.empty())
+        {
+            continue;
+        }
+
+        // Views into integration-point data (no copies)
+        const UIndirectList<tensor> gradDView(gradD, ipIDs);
+        const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
+        UIndirectList<symmTensor> stressView(stress, ipIDs);
+
+        // Kinematics wrapper
+        smallStrainMechanicalConstitutiveLawKinematics kin
+        (
+            gradDView, gradD0View, dt
+        );
+
+        // Constitutive response
+        if (needsScalarTangent(tangentReq))
+        {
+            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else if (needsFourthOrderTangent(tangentReq))
+        {
+            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else
+        {
+            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    const word context = "updateStressFiniteStrain (flat list)";
+    const label nIP = topo.nIntegrationPoints();
+
+    checkIntegrationPointListSize(nIP, F.size(), "F", context);
+    checkIntegrationPointListSize(nIP, F0.size(), "F0", context);
+    checkIntegrationPointListSize(nIP, Finv.size(), "Finv", context);
+    checkIntegrationPointListSize(nIP, Finv0.size(), "Finv0", context);
+    checkIntegrationPointListSize(nIP, J.size(), "J", context);
+    checkIntegrationPointListSize(nIP, J0.size(), "J0", context);
+    checkIntegrationPointListSize(nIP, stress.size(), "stress", context);
+
+    checkTangentRequest(topo, tangentReq);
+
+    checkTangentStorage
+    (
+        scalarTangentPtr != nullptr,
+        fourthOrderTangentPtr != nullptr,
+        tangentReq,
+        context
+    );
+
+    if (scalarTangentPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, scalarTangentPtr->size(), "scalarTangent", context
+        );
+    }
+
+    if (fourthOrderTangentPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, fourthOrderTangentPtr->size(), "fourthOrderTangent", context
+        );
+    }
+
+    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    {
+        FatalErrorInFunction
+            << "The flat-list update does not perform stress collapse, but "
+            << "topology " << topo.type() << " shares integration points "
+            << "between cells, so an integration point on a material interface "
+            << "would be written more than once."
+            << exit(FatalError);
+    }
+
+    // Update old time fields at the start of a new time step
+    updateOldTimeIfNeeded();
+
+    topologyEntry& tp = topology(topo);
+
+    // Loop over mechanical constitutive laws
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        if (ipIDs.empty())
+        {
+            continue;
+        }
+
+        // Views into integration-point data (no copies)
+        const UIndirectList<tensor> FView(F, ipIDs);
+        const UIndirectList<tensor> F0View(F0, ipIDs);
+        const UIndirectList<tensor> FinvView(Finv, ipIDs);
+        const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+        const UIndirectList<scalar> JView(J, ipIDs);
+        const UIndirectList<scalar> J0View(J0, ipIDs);
+        UIndirectList<symmTensor> stressView(stress, ipIDs);
+
+        // Kinematics wrapper
+        finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView,
+            F0View,
+            JView,
+            J0View,
+            FinvView,
+            Finv0View,
+            dt
+        );
+
+        // Constitutive response
+        if (needsScalarTangent(tangentReq))
+        {
+            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else if (needsFourthOrderTangent(tangentReq))
+        {
+            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
+
+            mechanicalConstitutiveLawResponse response
+            (
+                stressView, tangentView, tangentReq
+            );
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+        else
+        {
+            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+
+            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& gradD,
+    const UList<tensor>& gradD0,
+    const scalar dt,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    if (tangentReq == tangentRequest::none)
+    {
+        FatalErrorInFunction
+            << "updateTangentSmallStrain was called with tangentRequest::none, "
+            << "so there is nothing to compute."
+            << exit(FatalError);
+    }
+
+    // A constitutive law produces a stress alongside its tangent, so give it
+    // somewhere to put one that is not the caller's storage
+    updateStressSmallStrain
+    (
+        topo,
+        gradD,
+        gradD0,
+        dt,
+        scratchStress(topo.nIntegrationPoints()),
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0,
+    const scalar dt,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    if (tangentReq == tangentRequest::none)
+    {
+        FatalErrorInFunction
+            << "updateTangentFiniteStrain was called with "
+            << "tangentRequest::none, so there is nothing to compute."
+            << exit(FatalError);
+    }
+
+    // A constitutive law produces a stress alongside its tangent, so give it
+    // somewhere to put one that is not the caller's storage
+    updateStressFiniteStrain
+    (
+        topo,
+        F,
+        F0,
+        Finv,
+        Finv0,
+        J,
+        J0,
+        dt,
+        scratchStress(topo.nIntegrationPoints()),
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq
+    );
 }
 
 
@@ -822,79 +1232,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
 
-    checkTangentRequest(topo, tangentReq);
+    // Update the internal field via the flat-list primitive: a cell-centred
+    // topology has one integration point per cell, so the internal fields are
+    // already in the flat form it expects
+    updateStressSmallStrain
+    (
+        topo,
+        Foam::primitiveField(gradD),
+        Foam::primitiveField(gradD0),
+        dt,
+        Foam::primitiveFieldRef(stress),
+        scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
+        nullptr,
+        tangentReq
+    );
 
     topologyEntry& tp = topology(topo);
 
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Update the internal field
-        {
-            // "View" into the gradD for this material => does not copy data
-            const UIndirectList<tensor> gradDView
-            (
-                gradD.internalField(), ipIDs
-            );
-
-            // "View" into the gradD0 for this material => does not copy data
-            const UIndirectList<tensor> gradD0View
-            (
-                gradD0.internalField(), ipIDs
-            );
-
-            // "View" into the stress for this material => does not copy data
-            UIndirectList<symmTensor> stressView
-            (
-                stress.internalField(), ipIDs
-            );
-
-            // Create wrapper for kinematic data: input to material law
-            // This does not copy data
-            smallStrainMechanicalConstitutiveLawKinematics kin
-            (
-                gradDView, gradD0View, dt
-            );
-
-            // Create wrapper for output
-            if (scalarTangentPtr && needsScalarTangent(tangentReq))
-            {
-                // "View" into the tangent for this material => does not copy
-                // data
-                UIndirectList<scalar> tangentView
-                (
-                    scalarTangentPtr->internalField(),
-                    ipIDs
-                );
-
-                // Create wrapper for material: output from material law
-                // This does not copy data
-                mechanicalConstitutiveLawResponse response
-                (
-                    stressView,
-                    tangentView,
-                    tangentReq
-                );
-
-                // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-            }
-            else
-            {
-                // Create wrapper for material: output from material law
-                // This does not copy data
-                mechanicalConstitutiveLawResponse response
-                (
-                    stressView,
-                    tangentReq
-                );
-
-                // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-            }
-        }
-
         // Optionally, update the boundary field
         // Boundary constitutive response uses independent state objects,
         // allowing history-dependent laws to operate correctly on boundary faces.
@@ -1490,67 +1846,20 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(gradD);
 
-    checkTangentRequest(topo, tangentReq);
-
-    topologyEntry& tp = topology(topo);
-
-    // Update old time fields at the start of a new time step
-    updateOldTimeIfNeeded();
-
-    // Access packed integration-point storage
-    const List<tensor>& gradDVals  = gradD.m();
-    const List<tensor>& gradD0Vals = gradD0.m();
-    List<symmTensor>& stressVals   = stress.m();
-
-    // Loop over mechanical constitutive laws
-    forAll(laws_, lawI)
-    {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Views into integration-point data (no copies)
-        const UIndirectList<tensor> gradDView(gradDVals, ipIDs);
-
-        const UIndirectList<tensor> gradD0View(gradD0Vals, ipIDs);
-
-        UIndirectList<symmTensor> stressView(stressVals, ipIDs);
-
-        // Kinematics wrapper
-        smallStrainMechanicalConstitutiveLawKinematics kin
-        (
-            gradDView, gradD0View, dt
-        );
-
-        // Constitutive response
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                *scalarTangentPtr, ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate
-            (
-                kin, tp.states_[lawI], response
-            );
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate
-            (
-                kin, tp.states_[lawI], response
-            );
-        }
-    }
+    // Evaluate on the packed integration-point storage. A compact cell
+    // topology maps each cell to its own integration points, so the packed
+    // lists are already in the flat form the primitive expects
+    updateStressSmallStrain
+    (
+        topo,
+        gradD.m(),
+        gradD0.m(),
+        dt,
+        stress.m(),
+        scalarTangentPtr,
+        nullptr,
+        tangentReq
+    );
 }
 
 
@@ -1591,78 +1900,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
 
-    checkTangentRequest(topo, tangentReq);
+    // Update the internal field via the flat-list primitive: a cell-centred
+    // topology has one integration point per cell, so the internal fields are
+    // already in the flat form it expects
+    updateStressFiniteStrain
+    (
+        topo,
+        Foam::primitiveField(F),
+        Foam::primitiveField(F0),
+        Foam::primitiveField(Finv),
+        Foam::primitiveField(Finv0),
+        Foam::primitiveField(J),
+        Foam::primitiveField(J0),
+        dt,
+        Foam::primitiveFieldRef(stress),
+        scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
+        nullptr,
+        tangentReq
+    );
 
     topologyEntry& tp = topology(topo);
 
     forAll(laws_, lawI)
     {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Update the internal field
-        {
-            // "View" into the F for this material => does not copy data
-            const UIndirectList<tensor> FView(F.internalField(), ipIDs);
-
-            // "View" into the F0 for this material => does not copy data
-            const UIndirectList<tensor> F0View(F0.internalField(), ipIDs);
-
-            // "View" into the J for this material => does not copy data
-            const UIndirectList<scalar> JView(J.internalField(), ipIDs);
-
-            // "View" into the J0 for this material => does not copy data
-            const UIndirectList<scalar> J0View(J0.internalField(), ipIDs);
-
-            // "View" into the Finv for this material => does not copy data
-            const UIndirectList<tensor> FinvView(Finv.internalField(), ipIDs);
-
-            // "View" into the Finv0 for this material => does not copy data
-            const UIndirectList<tensor> Finv0View(Finv0.internalField(), ipIDs);
-
-            // "View" into the stress for this material => does not copy data
-            UIndirectList<symmTensor> stressView(stress.internalField(), ipIDs);
-
-            // Create wrapper for kinematic data: input to material law
-            // This does not copy data
-            finiteStrainMechanicalConstitutiveLawKinematics kin
-            (
-                FView, F0View, JView, J0View, FinvView, Finv0View, dt
-            );
-
-            // Create wrapper for output
-            if (scalarTangentPtr && needsScalarTangent(tangentReq))
-            {
-                // "View" into the tangent for this material => does not copy
-                // data
-                UIndirectList<scalar> tangentView
-                (
-                    scalarTangentPtr->internalField(), ipIDs
-                );
-
-                // Create wrapper for material: output from material law
-                // This does not copy data
-                mechanicalConstitutiveLawResponse response
-                (
-                    stressView, tangentView, tangentReq
-                );
-
-                // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-            }
-            else
-            {
-                // Create wrapper for material: output from material law
-                // This does not copy data
-                mechanicalConstitutiveLawResponse response
-                (
-                    stressView, tangentReq
-                );
-
-                // Update the material response, e.g. update the stress
-                laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-            }
-        }
-
         // Update the boundary field
         // Boundary constitutive response uses independent state objects,
         // allowing history-dependent laws to operate correctly on boundary faces.
@@ -1802,83 +2062,27 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         "updateStressFiniteStrain (CompactListList)"
     );
 
-    // Update old time fields at the start of a new time step
-    updateOldTimeIfNeeded();
-
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(F);
 
-    checkTangentRequest(topo, tangentReq);
-
-    topologyEntry& tp = topology(topo);
-
-    // Access packed integration-point storage
-    const List<tensor>& FVals = F.m();
-    const List<tensor>& F0Vals = F0.m();
-    const List<tensor>& FinvVals = Finv.m();
-    const List<tensor>& Finv0Vals = Finv0.m();
-    const List<scalar>& JVals = J.m();
-    const List<scalar>& J0Vals = J0.m();
-    List<symmTensor>& stressVals = stress.m();
-
-    // Loop over mechanical constitutive laws
-    forAll(laws_, lawI)
-    {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Views into integration-point data (no copies)
-        const UIndirectList<tensor> FView(FVals, ipIDs);
-        const UIndirectList<tensor> F0View(F0Vals, ipIDs);
-        const UIndirectList<tensor> FinvView(FinvVals, ipIDs);
-        const UIndirectList<tensor> Finv0View(Finv0Vals, ipIDs);
-        const UIndirectList<scalar> JView(JVals, ipIDs);
-        const UIndirectList<scalar> J0View(J0Vals, ipIDs);
-
-        UIndirectList<symmTensor> stressView(stressVals, ipIDs);
-
-        // Kinematics wrapper
-        finiteStrainMechanicalConstitutiveLawKinematics kin
-        (
-            FView,
-            F0View,
-            JView,
-            J0View,
-            FinvView,
-            Finv0View,
-            dt
-        );
-
-        // Constitutive response
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                *scalarTangentPtr, ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate
-            (
-                kin, tp.states_[lawI], response
-            );
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate
-            (
-                kin, tp.states_[lawI], response
-            );
-        }
-    }
+    // Evaluate on the packed integration-point storage. A compact cell
+    // topology maps each cell to its own integration points, so the packed
+    // lists are already in the flat form the primitive expects
+    updateStressFiniteStrain
+    (
+        topo,
+        F.m(),
+        F0.m(),
+        Finv.m(),
+        Finv0.m(),
+        J.m(),
+        J0.m(),
+        dt,
+        stress.m(),
+        scalarTangentPtr,
+        nullptr,
+        tangentReq
+    );
 }
 
 
