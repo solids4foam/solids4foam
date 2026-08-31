@@ -66,7 +66,7 @@ class compactCellIntegrationPointTopology
 public:
 
     //- Runtime type information
-    TypeName("cellCentredIntegrationPointTopology");
+    TypeName("compactCellIntegrationPointTopology");
 
     //- Construct from mesh and cell-to-integration-point addressing
     compactCellIntegrationPointTopology

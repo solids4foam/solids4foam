@@ -65,7 +65,7 @@ class cellCentredIntegrationPointTopology
 public:
 
     //- Runtime type information
-    TypeName("compactCellIntegrationPointTopology");
+    TypeName("cellCentredIntegrationPointTopology");
 
     //- Construct from mesh
     explicit cellCentredIntegrationPointTopology(const fvMesh& mesh)
