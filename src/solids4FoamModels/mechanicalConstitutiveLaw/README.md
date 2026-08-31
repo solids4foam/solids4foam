@@ -194,8 +194,22 @@ The flat-list form is the primitive: the `volField` and `CompactListList`
 overloads are implemented in terms of it, and it is the only form that works on
 storage belonging to a mesh other than the manager's own, such as a dual mesh.
 There are also tangent-only updates, `updateTangentSmallStrain` and
-`updateTangentFiniteStrain`, for solid models that take their Jacobian from the
-manager while their residual stress still comes from elsewhere.
+`updateTangentFiniteStrain`, plus `updateScalarTangent` for the cell-centred
+case, for solid models that take their Jacobian from the manager while their
+residual stress still comes from elsewhere.
+
+A tangent query never disturbs constitutive state. Each law is evaluated
+against a **shadow** of its state, which aliases the parent's old-time fields -
+read-only through it - and owns its own current-time fields. This works because
+a law is a pure function of the kinematics and the old-time state: it reads
+only `*0` fields, through the `get*` accessors, and writes only current-time
+fields. History is never copied, only aliased, so the cost is one set of
+current-time fields.
+
+The same mechanism makes the `fourthOrderFiniteDifference` tangent safe: it
+evaluates the law once per Voigt strain component at perturbed kinematics, and
+those perturbed results must not be left where `endTimeStep()` can read them or
+`storeOldTime()` can commit them.
 
 The manager is **discretisation-agnostic**.
 
@@ -302,10 +316,14 @@ closed-form linear elastic stress and tangent, agreement between the flat-list,
 dual-face topology addressing and its fourth-order tangent, and the misuse
 guards.
 
-It requires every material to be `linearElastic`, and is run by the
-`layeredPipe` tutorial's `regressionTest.sh`, that being the only tutorial with
-more than one material. No solid model uses this framework yet, so that is
-currently its only runtime coverage.
+The closed-form checks need every material to be `linearElastic`; the rest
+apply to any law. It is run by two tutorials' `regressionTest.sh`:
+`layeredPipe`, the only one with more than one material, and `perforatedPlate`,
+the only one whose material is history dependent and so the only place a
+tangent query has any history to disturb.
+
+No solid model sources its stress or tangent from this framework yet, so that
+is currently its only runtime coverage.
 
 ---
 

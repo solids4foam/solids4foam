@@ -358,10 +358,23 @@ obtain a tangent today is to also perform a stress update, which would write to
         );
 ```
 
-The state copy is the price of the "a tangent query never mutates state"
-invariant. It is paid once at construction and then at most once every N outer
-iterations, so it is not on the hot path. `mechanicalConstitutiveLawState` is
-`Field`-based and copyable, so this is a handful of `Field` copies per law.
+**Correction, from PR-3.** The copy described above is both heavier than
+necessary and was not expressible: `mechanicalConstitutiveLawState` had copy
+construction and assignment `= delete`d. What is implemented instead is a
+*shadow*: a state that aliases the parent's old-time fields, which are
+read-only through it, and owns its own current-time fields.
+
+This works because a constitutive law is a pure function of the kinematics and
+the old-time state. `evaluate()` reads only `*0` fields and writes only
+current-time fields; the plastic law's `sigmaY` is an output, with the trial
+value coming from `yieldStress(epsilonPEq0[i])`. History is therefore read-only
+during evaluation, so copying it is waste. A shadow costs one set of
+current-time fields and no copy of history, and the invariant becomes
+structural: a shadow *cannot* write history because it does not own it, and
+says so with a `FatalError` if asked.
+
+The same mechanism serves the finite-difference tangent, which is the other
+consumer that must not disturb state. See §8.9.
 
 **Lifecycle, stated explicitly (this reproduces today's behaviour exactly):**
 
@@ -1498,7 +1511,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 |---|---|
 | 1 | **Done.** Defect fixes D1, D4, D5 and the `(4/3)*mu` change of §8.2 including `linGeomTotalDispSolid.C:574`; the `petscSnesPressure` u-p regression case; `planeStress` injection (§8.1) and support in the three new laws; `supportsFourthOrderTangent()` + manager guard. D3 is left to PR-2, which deletes the line. plateHole, wobblyNewton and perforatedPlate all pass. |
 | 2 | **Done.** Flat-list `updateStressSmallStrain`/`updateStressFiniteStrain`/`updateTangentSmallStrain`/`updateTangentFiniteStrain` primitives, with the two `CompactListList` overloads and the internal-field half of the two `volTensorField` overloads re-expressed on them; `registerTopology()` and `topologyFor()` made public; `dualFaceIntegrationPointTopology`; defect D6. Plus `Test-mechanicalConstitutiveLaw`, run by the `layeredPipe` regression test. See §8.6. |
-| 3 | `solidModel::jacobianTangent(deflt)`; `approximateJacobian` deprecation shim; optional manager owned by `solidModel` behind `useMechanicalConstitutiveLawManager` (default `no`). |
+| 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
 | 4 | `vertexCentredLinGeomSolid` tangent-only adoption (§8.4). |
 | 5 | `vertexCentredNonLinGeomTotalLagSolid` tangent-only; then stress for both, removing `dualMechanicalModel` and requiring OQ-2 to be settled. |
 | 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
@@ -1618,7 +1631,66 @@ framework *runs* correctly on foam-extend, only that it compiles — the
 and its `FOAMEXTEND` guard should be removed as soon as the framework builds
 there.
 
-### 8.8 Open questions still outstanding
+### 8.8 Notes from PR-3
+
+**The shadow state, and why not a copy.** §3.1 is corrected above. The one
+thing worth restating: the threat a tangent query poses is not to history, which
+`evaluate()` never writes, but to the **current-time** fields, which
+`endTimeStep()` reads and which `storeOldTime()` promotes to history at the next
+time step. A tangent query therefore needs somewhere to put a law's *outputs*,
+not a copy of its *inputs*.
+
+**A latent contract violation this exposed.** The plastic law reached its
+old-time fields through the non-const accessor, e.g.
+`state.symmTensorField0("epsilonP")`, because `state` is a non-const reference
+and overload resolution then picks the create-and-modify overload. The shadow's
+guard rejected it immediately. Fixed by reading history through
+`getSymmTensorField0()` / `getScalarField0()`, which say what is meant. The rule
+is now enforced rather than assumed: **inside `evaluate()`, read `*0` fields
+only through the `get*` accessors, and write only current-time fields.**
+
+**`fourthOrderFiniteDifference` did not work at all.** It contained a
+`FatalErrorInFunction` placeholder reading "In FD material tangent, make copy of
+state", and separately computed each finite-difference column but never wrote it
+into the `mat66`. This settles OQ-5: the mode was advertised in `README.md` but
+could not run. It is now implemented.
+
+**It is evaluated field-wise, not point-wise.** The original sketch looped six
+Voigt components inside a loop over integration points, i.e. `6*N` calls into
+the law with one-element views. It now perturbs every integration point at once
+and calls the law six times in total. Same arithmetic, one sixth of the calls,
+better vectorisation, and one shadow for the whole assembly instead of one per
+point.
+
+**The perturbation convention was wrong for shear.** `gradDPerturbed` added `h`
+to both off-diagonals of `gradD`, which moves `eps_xy` by `h` and therefore the
+engineering shear `gamma_xy = 2*eps_xy` by `2h`. Against an analytical `mat66`
+where `C(XY,XY)` is `mu`, the finite difference came out a factor of two high on
+every shear column. The perturbation is now defined on the Voigt strain vector:
+a shear component moves each off-diagonal by `h/2`. Verified by comparing the
+finite-difference and analytical tangents for `linearElastic`, which now agree
+to 4e-10.
+
+**The plastic law now supports a finite-difference tangent** and refuses an
+analytical `fourthOrder` one with a message pointing at the alternative.
+Previously it silently ignored a fourth-order request and left the caller's
+`List<mat66>` holding uninitialised memory.
+
+**A test that looked right and proved nothing.** The first version of the
+state-preservation check evaluated a stress, took tangent queries at wildly
+perturbed kinematics, evaluated the same stress again, and required the two to
+agree. They always do - with or without the shadow - precisely because a law
+recomputes current-time state from old-time state. Disabling the shadow did not
+fail it. The check now straddles a time step, so that `storeOldTime()` commits
+whatever the queries left behind; without the shadow it fails by 114%.
+
+**Deferred from PR-3.** §8.5 also listed an optional manager owned by
+`solidModel` behind `useMechanicalConstitutiveLawManager`. It is left to PR-4,
+which is where the first consumer appears: it is inert on its own, and the
+question of which dictionary object the manager is constructed from is better
+answered next to a caller than in the abstract.
+
+### 8.9 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term
