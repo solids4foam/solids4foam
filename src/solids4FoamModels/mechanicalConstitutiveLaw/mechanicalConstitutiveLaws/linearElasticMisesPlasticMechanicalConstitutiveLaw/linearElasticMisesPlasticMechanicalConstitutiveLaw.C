@@ -244,10 +244,12 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
     // State (current + old-time)
     Field<symmTensor>& epsilonP = state.symmTensorField("epsilonP");
-    const Field<symmTensor>& epsilonP0 = state.symmTensorField0("epsilonP");
+    const Field<symmTensor>& epsilonP0 =
+        state.getSymmTensorField0("epsilonP");
 
     Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
-    const Field<scalar>& epsilonPEq0 = state.scalarField0("epsilonPEq");
+    const Field<scalar>& epsilonPEq0 =
+        state.getScalarField0("epsilonPEq");
 
     // Optional yield stress state (handy for debugging/post-proc)
     Field<scalar>& sigmaY = state.scalarField("sigmaY");
@@ -431,6 +433,24 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             }
         }
     }
+
+    // Fourth-order tangent.
+    // There is no analytical consistent tangent for this law yet, but the
+    // finite-difference tangent of the base class is well defined for any law
+    // and is evaluated against a shadow state, so it neither disturbs the
+    // return mapping just performed nor the history it started from
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
+    }
 }
 
 
@@ -442,7 +462,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
 ) const
 {
     const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
-    const Field<scalar>& epsilonPEq0 = state.scalarField0("epsilonPEq");
+    const Field<scalar>& epsilonPEq0 =
+        state.getScalarField0("epsilonPEq");
 
     label nYielding = 0;
     scalar curDEpsilonPEq = 0.0;
