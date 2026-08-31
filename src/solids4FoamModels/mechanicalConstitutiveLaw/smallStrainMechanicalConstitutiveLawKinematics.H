@@ -163,6 +163,14 @@ public:
         //  h = perturbation magnitude
         //  This can be used for calculating material tangents with finite
         //  differences
+        //- Return gradD at integration point ipI with Voigt strain component
+        //  j perturbed by h.
+        //  The perturbation is defined on the Voigt strain vector, which uses
+        //  engineering shear: gamma_xy = 2*eps_xy. A shear component therefore
+        //  moves each off-diagonal of gradD by h/2, so that the corresponding
+        //  Voigt component moves by exactly h. This is what makes a
+        //  finite-difference tangent directly comparable with an analytical
+        //  one, where for isotropic elasticity C(XY,XY) is mu rather than 2*mu
         inline tensor gradDPerturbed
         (
             const label ipI, const label j, const scalar h
@@ -196,18 +204,18 @@ public:
                     break;
 
                 case symmTensor::YZ:
-                    g.yz() += h;
-                    g.zy() += h;
+                    g.yz() += 0.5*h;
+                    g.zy() += 0.5*h;
                     break;
 
                 case symmTensor::XZ:
-                    g.xz() += h;
-                    g.zx() += h;
+                    g.xz() += 0.5*h;
+                    g.zx() += 0.5*h;
                     break;
 
                 case symmTensor::XY:
-                    g.xy() += h;
-                    g.yx() += h;
+                    g.xy() += 0.5*h;
+                    g.yx() += 0.5*h;
                     break;
 
                 default:
