@@ -97,42 +97,38 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
              && solMod.displacementMLS().polynomialOrder() >= 2
             )
             {
-                volScalarField Dx(D.component(vector::X));
-                volScalarField Dy(D.component(vector::Y));
-                volScalarField Dz(D.component(vector::Z));
+                const bool thirdOrder =
+                    solMod.displacementMLS().polynomialOrder() >= 3;
 
-                tmp<volSymmTensorField> tSecondGradDx =
-                    solMod.displacementMLS().secondGrad(Dx);
-                tmp<volSymmTensorField> tSecondGradDy =
-                    solMod.displacementMLS().secondGrad(Dy);
-                tmp<volSymmTensorField> tSecondGradDz =
-                    solMod.displacementMLS().secondGrad(Dz);
+                // The higher derivatives of all three components share a
+                // single halo exchange and a single traversal of the stencil.
+                // Only the cell values are needed here, so no fields are built
+                FixedList<symmTensorField, 3> secondGradD;
+                FixedList<List<symmTensor3rdOrder>, 3> thirdGradD;
+
+                solMod.displacementMLS().cellDerivatives
+                (
+                    D,
+                    nullptr,
+                    &secondGradD,
+                    thirdOrder ? &thirdGradD : nullptr
+                );
 
                 pointDValue.x() +=
-                    0.5*(distance & tSecondGradDx().internalField()[cellID_]
-                      & distance);
+                    0.5*(distance & secondGradD[0][cellID_] & distance);
                 pointDValue.y() +=
-                    0.5*(distance & tSecondGradDy().internalField()[cellID_]
-                      & distance);
+                    0.5*(distance & secondGradD[1][cellID_] & distance);
                 pointDValue.z() +=
-                    0.5*(distance & tSecondGradDz().internalField()[cellID_]
-                      & distance);
+                    0.5*(distance & secondGradD[2][cellID_] & distance);
 
-                if (solMod.displacementMLS().polynomialOrder() >= 3)
+                if (thirdOrder)
                 {
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDx =
-                        solMod.displacementMLS().thirdGrad(Dx);
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDy =
-                        solMod.displacementMLS().thirdGrad(Dy);
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDz =
-                        solMod.displacementMLS().thirdGrad(Dz);
-
                     pointDValue.x() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDx)[cellID_], distance);
+                        (1.0/6.0)*cubicForm(thirdGradD[0][cellID_], distance);
                     pointDValue.y() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDy)[cellID_], distance);
+                        (1.0/6.0)*cubicForm(thirdGradD[1][cellID_], distance);
                     pointDValue.z() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDz)[cellID_], distance);
+                        (1.0/6.0)*cubicForm(thirdGradD[2][cellID_], distance);
                 }
             }
         }
