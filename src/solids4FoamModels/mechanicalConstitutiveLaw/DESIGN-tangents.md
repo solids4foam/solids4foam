@@ -1512,7 +1512,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 1 | **Done.** Defect fixes D1, D4, D5 and the `(4/3)*mu` change of §8.2 including `linGeomTotalDispSolid.C:574`; the `petscSnesPressure` u-p regression case; `planeStress` injection (§8.1) and support in the three new laws; `supportsFourthOrderTangent()` + manager guard. D3 is left to PR-2, which deletes the line. plateHole, wobblyNewton and perforatedPlate all pass. |
 | 2 | **Done.** Flat-list `updateStressSmallStrain`/`updateStressFiniteStrain`/`updateTangentSmallStrain`/`updateTangentFiniteStrain` primitives, with the two `CompactListList` overloads and the internal-field half of the two `volTensorField` overloads re-expressed on them; `registerTopology()` and `topologyFor()` made public; `dualFaceIntegrationPointTopology`; defect D6. Plus `Test-mechanicalConstitutiveLaw`, run by the `layeredPipe` regression test. See §8.6. |
 | 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
-| 4 | `vertexCentredLinGeomSolid` tangent-only adoption (§8.4). |
+| 4 | **Done.** `vertexCentredLinGeomSolid` tangent-only adoption (§8.4), plus the optional manager deferred from PR-3. See §8.9. |
 | 5 | `vertexCentredNonLinGeomTotalLagSolid` tangent-only; then stress for both, removing `dualMechanicalModel` and requiring OQ-2 to be settled. |
 | 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
 | 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
@@ -1690,7 +1690,53 @@ which is where the first consumer appears: it is inert on its own, and the
 question of which dictionary object the manager is constructed from is better
 answered next to a caller than in the abstract.
 
-### 8.9 Open questions still outstanding
+### 8.9 Notes from PR-4
+
+`vertexCentredLinGeomSolid` now takes its Jacobian material tangent from the
+framework, behind `useMechanicalConstitutiveLawManager` (default `no`). Both
+arms move: the scalar tangent that fed `vfvm::laplacian` and the `mat66` field
+that fed `vfvm::divSigma`. The residual stress at dual faces still comes from
+`dualMechanicalModel`, so this is the thin slice §8.3 asked for.
+
+**Verified byte-identical.** On `cantilever2d` with `solidProperties.vertexCentred`,
+the manager and legacy paths produce identical output fields and the same SNES
+iteration count. Confirmed the switch actually engaged, rather than the result
+being identical because nothing happened: the new framework constructs a law
+only in the manager run.
+
+**The manager path no longer depends on `dualImpKf()`.** The first version
+built its scalar field by copying it, which pulled in
+`dualMechanicalModel::impKf()` and with it the `interpolate(impK)`
+interpolation scheme - on a path whose whole purpose is to need neither. The
+field is now constructed directly.
+
+**Caveat worth carrying into PR-5: the manager's constitutive state is never
+advanced in a tangent-only slice.** Nothing calls a stress update on the
+manager, so its current-time fields stay at their initialised values and each
+time step commits those to history. For `linearElastic` this is vacuous, since
+the law has no state. For a history-dependent material the manager would
+return the tangent at the *initial* state rather than the consistent tangent,
+which is a Jacobian-quality issue rather than a correctness one, but it means
+the tangent-only slice is only fully meaningful for elastic materials. It
+resolves itself in PR-5, when stress moves and the state starts advancing.
+
+**Not exercised end to end: the scalar Jacobian arm.** No tutorial runs
+`vertexCentredLinGeomSolid` with a scalar tangent, and doing so needs two
+dictionary entries no case provides - `compactImplicitStencil`, which has no
+default, and `interpolate(impK)` in `system/dualMesh/fvSchemes`. Both
+requirements pre-date this work. The scalar tangent *value* is covered by
+`Test-mechanicalConstitutiveLaw` instead.
+
+**From an independent review of PR-3.** A shadow constructed from a temporary
+would dangle; the rvalue overload is now deleted. And the tangent-only updates
+do participate in the once-per-time-step old-time rollover, so if one is the
+first call of a new time step it is what commits the previous step's converged
+state. That is bookkeeping owed to whoever evaluates first rather than
+something the query computed - shadows never write current-time fields, so the
+committed values are the same whichever call triggers it - but the contract now
+says so instead of claiming the query modifies nothing at all.
+
+### 8.10 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term

@@ -512,6 +512,52 @@ void vertexCentredLinGeomSolid::makeFixedDofRowsIS() const
 #endif // USE_PETSC
 
 
+mechanicalConstitutiveLawManager&
+vertexCentredLinGeomSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+const integrationPointTopology&
+vertexCentredLinGeomSolid::dualFaceTopology() const
+{
+    if (!dualFaceTopologyPtr_)
+    {
+        // Materials are defined per primary-mesh cell, and each internal dual
+        // face lies within exactly one of them, so the topology is built from
+        // the primary mesh and the dual-face-to-cell map. It cannot come from
+        // the run-time selection table, which supplies only a mesh
+        dualFaceTopologyPtr_ =
+            &mechanicalManager().registerTopology
+            (
+                "dualFaces",
+                autoPtr<integrationPointTopology>
+                (
+                    new dualFaceIntegrationPointTopology
+                    (
+                        mesh(),
+                        dualMeshMap().dualFaceToCell(),
+                        dualMesh().nInternalFaces()
+                    )
+                )
+            );
+    }
+
+    return *dualFaceTopologyPtr_;
+}
+
+
 void vertexCentredLinGeomSolid::makeDualImpKf() const
 {
     if (dualImpKfPtr_.valid())
@@ -802,6 +848,15 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
             dualMeshMap().dualFaceToCell()
         )
     ),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
+    dualFaceTopologyPtr_(nullptr),
     blockSize_
     (
         solvePressure()
@@ -1317,19 +1372,71 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (jacTangent == tangentRequest::scalar)
     {
-        // Add laplacian term as a compact approximate linearisation of
-        // div(sigma)
-        vfvm::laplacian
-        (
-            jac,
-            Switch(solidModelDict().lookup("compactImplicitStencil")),
-            zetaImplicit,
-            dualMesh(),
-            blockSize_,     // nScalarEqns
-            globalPoints().localToGlobalPointMap(),
-            dualImpKf(),
-            false           // flip sign
-        );
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            // Scalar tangent at the internal dual faces, taken from the
+            // constitutive law framework. A tangent query does not disturb
+            // constitutive state, so this is safe alongside the residual
+            // stress update above.
+            // The field is built here rather than copied from dualImpKf(),
+            // which would pull in dualMechanicalModel::impKf() and with it the
+            // "interpolate(impK)" scheme, on a path whose whole point is not
+            // to need either
+            surfaceScalarField dualImpKfNew
+            (
+                IOobject
+                (
+                    "dualImpKf",
+                    mesh.time().timeName(),
+                    dualMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                dualMesh(),
+                dimensionedScalar("0", dimPressure, 0.0)
+            );
+
+            scalarField& tangent = Foam::primitiveFieldRef(dualImpKfNew);
+
+            mechanicalManager().updateTangentSmallStrain
+            (
+                dualFaceTopology(),
+                Foam::primitiveField(dualGradDf_),
+                Foam::primitiveField(dualGradDf_.oldTime()),
+                mesh.time().deltaTValue(),
+                &tangent,
+                nullptr,
+                tangentRequest::scalar
+            );
+
+            vfvm::laplacian
+            (
+                jac,
+                Switch(solidModelDict().lookup("compactImplicitStencil")),
+                zetaImplicit,
+                dualMesh(),
+                blockSize_,     // nScalarEqns
+                globalPoints().localToGlobalPointMap(),
+                dualImpKfNew,
+                false           // flip sign
+            );
+        }
+        else
+        {
+            // Add laplacian term as a compact approximate linearisation of
+            // div(sigma)
+            vfvm::laplacian
+            (
+                jac,
+                Switch(solidModelDict().lookup("compactImplicitStencil")),
+                zetaImplicit,
+                dualMesh(),
+                blockSize_,     // nScalarEqns
+                globalPoints().localToGlobalPointMap(),
+                dualImpKf(),
+                false           // flip sign
+            );
+        }
     }
     else if (jacTangent != tangentRequest::fourthOrder)
     {
@@ -1342,9 +1449,28 @@ label vertexCentredLinGeomSolid::formJacobian
     }
     else
     {
-        // Calculate the material tangent
-        List<mat66> materialTangent(mesh.nFaces());
-        dualMechanicalPtr_().materialTangentFaceField(materialTangent);
+        // Calculate the material tangent.
+        // Only internal dual faces are ever read by vfvm::divSigma, which
+        // iterates dualMesh.owner()
+        List<mat66> materialTangent(dualMesh().nInternalFaces());
+
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            mechanicalManager().updateTangentSmallStrain
+            (
+                dualFaceTopology(),
+                Foam::primitiveField(dualGradDf_),
+                Foam::primitiveField(dualGradDf_.oldTime()),
+                mesh.time().deltaTValue(),
+                nullptr,
+                &materialTangent,
+                tangentRequest::fourthOrder
+            );
+        }
+        else
+        {
+            dualMechanicalPtr_().materialTangentFaceField(materialTangent);
+        }
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma

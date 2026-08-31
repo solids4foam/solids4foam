@@ -549,7 +549,14 @@ public:
         //  intended migration path.
         //  Each law is evaluated against a shadow of its constitutive state,
         //  so a tangent query never disturbs history, whichever topology it is
-        //  made on
+        //  made on.
+        //  One qualification. Like every other update, this participates in
+        //  the once-per-time-step old-time rollover, so if it is the first
+        //  call of a new time step it is what commits the previous step's
+        //  converged state. That is bookkeeping the framework owes whoever
+        //  evaluates first, not something the query computed: shadows never
+        //  write current-time fields, so the values committed are the same
+        //  whichever call triggers the rollover
         void updateTangentSmallStrain
         (
             const integrationPointTopology& topo,
