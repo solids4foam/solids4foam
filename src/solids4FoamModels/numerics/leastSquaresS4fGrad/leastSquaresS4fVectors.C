@@ -21,6 +21,7 @@ License
 #include "volFields.H"
 #include "symmetryPolyPatch.H"
 #include "compatibilityFunctions.H"
+#include "cellZoneInterface.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlanePolyPatch.H"
 #endif
@@ -154,11 +155,18 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
     const surfaceScalarField& w = mesh.weights();
     const surfaceScalarField& magSf = mesh.magSf();
 
+    const Field<bool> interface(cellZoneInterface(mesh));
 
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh.nCells(), symmTensor::zero);
     forAll(owner, facei)
     {
+        if (interface[facei])
+        {
+            // Skip contributions across interfaces
+            continue;
+        }
+
         label own = owner[facei];
         label nei = neighbour[facei];
 
@@ -255,6 +263,15 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
     // Revisit all faces and calculate the pVectors_ and nVectors_ vectors
     forAll(owner, facei)
     {
+        if (interface[facei])
+        {
+            // Set face contribution to zero across interfaces
+            pVectors_[facei] = vector::zero;
+            nVectors_[facei] = vector::zero;
+
+            continue;
+        }
+
         label own = owner[facei];
         label nei = neighbour[facei];
 

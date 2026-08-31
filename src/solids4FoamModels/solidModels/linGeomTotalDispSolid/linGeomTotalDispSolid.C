@@ -570,8 +570,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     ),
     impK_
     (
+        // Note: for the mixed displacement-pressure formulation, the implicit
+        // stiffness is the scalar Laplacian surrogate for div(dev(sigma)),
+        // which is mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu.
+        // This matches tangentRequest::scalarDeviatoric in the
+        // mechanicalConstitutiveLaw framework
         solvePressure()
-      ? 2.0*mechanical().shearModulus()
+      ? (4.0/3.0)*mechanical().shearModulus()
       : mechanical().impK()
     ),
     impKf_(fvc::interpolate(impK_)),

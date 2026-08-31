@@ -215,6 +215,7 @@ numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
 numerics/leastSquaresS4fGrad/leastSquaresS4fGrads.C
 numerics/leastSquaresS4fGrad/leastSquaresS4fVectors.C
+numerics/leastSquaresS4fGrad/cellZoneInterface.C
 numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
