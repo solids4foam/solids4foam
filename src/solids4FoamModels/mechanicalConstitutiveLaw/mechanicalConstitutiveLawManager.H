@@ -326,6 +326,41 @@ class mechanicalConstitutiveLawManager
              || req == tangentRequest::fourthOrderFiniteDifference;
         }
 
+        //- Flat-list small-strain evaluation.
+        //  Shared implementation of the public stress and tangent-only
+        //  updates. With preserveState, each law is evaluated against a
+        //  shadow of its state, so history is read but never written
+        void evaluateSmallStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& gradD,
+            const UList<tensor>& gradD0,
+            const scalar dt,
+            UList<symmTensor>& stress,
+            UList<scalar>* scalarTangentPtr,
+            UList<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq,
+            const bool preserveState
+        );
+
+        //- Finite-strain counterpart of evaluateSmallStrain
+        void evaluateFiniteStrain
+        (
+            const integrationPointTopology& topo,
+            const UList<tensor>& F,
+            const UList<tensor>& F0,
+            const UList<tensor>& Finv,
+            const UList<tensor>& Finv0,
+            const UList<scalar>& J,
+            const UList<scalar>& J0,
+            const scalar dt,
+            UList<symmTensor>& stress,
+            UList<scalar>* scalarTangentPtr,
+            UList<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq,
+            const bool preserveState
+        );
+
         //- Check that the requested tangent can be provided at the integration
         //  points of the given topology for the current set of laws
         void checkTangentRequest
@@ -488,18 +523,33 @@ public:
             const tangentRequest tangentReq = tangentRequest::none
         );
 
+        //- Evaluate only the requested scalar tangent at cell centres,
+        //  modifying nothing else.
+        //  Each law is evaluated against a shadow of its constitutive state,
+        //  so history is read but never written, and the stress goes to
+        //  manager-owned scratch storage. Neither the caller's fields nor any
+        //  history variable is disturbed.
+        //  Intended for solid models that need an implicit stiffness
+        //  coefficient at construction time, before any stress update has been
+        //  performed, or at a chosen refresh cadence between updates
+        void updateScalarTangent
+        (
+            const volTensorField& gradD,
+            const volTensorField& gradD0,
+            const scalar dt,
+            volScalarField& scalarTangent,
+            const tangentRequest tangentReq = tangentRequest::scalar
+        );
+
         //- Evaluate only the requested small-strain tangent at the integration
         //  points of the supplied topology, leaving the caller's stress
         //  storage untouched.
         //  This is for solid models that take their Jacobian from the manager
         //  while their residual stress still comes from elsewhere, which is the
         //  intended migration path.
-        //  Note that the constitutive state of this topology is advanced
-        //  exactly as the corresponding updateStress call would advance it: a
-        //  law computes its tangent and its stress together. For a history-
-        //  dependent law this is only harmless because the topology used for
-        //  the Jacobian carries its own state, separate from the topology used
-        //  for the residual
+        //  Each law is evaluated against a shadow of its constitutive state,
+        //  so a tangent query never disturbs history, whichever topology it is
+        //  made on
         void updateTangentSmallStrain
         (
             const integrationPointTopology& topo,

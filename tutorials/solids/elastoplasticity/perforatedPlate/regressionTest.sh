@@ -124,6 +124,45 @@ else
     failures=$((failures + 1))
 fi
 
+# Exercise the mechanicalConstitutiveLawManager on this case. It is the only
+# tutorial in the regression set whose material is history dependent, so it is
+# the only one where a tangent query has any history to disturb
+run_constitutive_test() {
+    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
+        return 0
+    fi
+
+    if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
+        echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
+        return 0
+    fi
+
+    if ( cd "${CASE_DIR}" && Test-mechanicalConstitutiveLaw \
+            > "log.Test-mechanicalConstitutiveLaw" 2>&1 )
+    then
+        local n_passed
+        n_passed=$(grep -c 'PASS:' \
+            "${CASE_DIR}/log.Test-mechanicalConstitutiveLaw" || true)
+
+        if (( n_passed == 0 )); then
+            echo "SKIP: mechanicalConstitutiveLaw checks (not built on this fork)"
+            return 0
+        fi
+
+        echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
+        return 0
+    fi
+
+    echo "FAIL: mechanicalConstitutiveLaw checks"
+    grep 'FAIL:' "${CASE_DIR}/log.Test-mechanicalConstitutiveLaw" || true
+    return 1
+}
+
+if ! run_constitutive_test; then
+    failures=$((failures + 1))
+fi
+
 # Clean case again
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 

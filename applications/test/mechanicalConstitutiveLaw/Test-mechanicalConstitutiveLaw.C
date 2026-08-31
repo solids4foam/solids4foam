@@ -45,7 +45,13 @@ Description
          the dual faces uses the material of the owning primary cell.
       6. A fourth-order tangent on the dual faces matches the closed-form
          isotropic stiffness, including with more than one material.
-      7. The misuse guards fire: a fourth-order tangent on a topology that
+      7. The finite-difference fourth-order tangent reproduces the analytical
+         one, which also checks its Voigt shear convention.
+      8. A tangent query leaves the constitutive state untouched, so a stress
+         evaluated before and after intervening queries at wildly different
+         kinematics is identical.
+      9. updateScalarTangent agrees with the tangent from a stress update.
+     10. The misuse guards fire: a fourth-order tangent on a topology that
          cannot carry one, a flat-list update on a topology whose integration
          points are shared between cells, a tangent request with no storage,
          and a duplicate registerTopology key.
@@ -213,16 +219,26 @@ int main(int argc, char *argv[])
     scalarField refMu(mesh.nCells(), 0.0);
     scalarField refLambda(mesh.nCells(), 0.0);
 
+    // The closed-form checks need a law whose stress and tangent are known
+    // here. Everything else - path agreement, state preservation, the
+    // topologies and the guards - applies to any law, and a history-dependent
+    // law is the only thing that exercises the shadow state properly
+    bool allLinearElastic = true;
+    forAll(lawEntries, lawI)
+    {
+        if (word(lawEntries[lawI].dict().lookup("type")) != "linearElastic")
+        {
+            allLinearElastic = false;
+        }
+    }
+
     forAll(lawEntries, lawI)
     {
         const dictionary& lawDict = lawEntries[lawI].dict();
 
-        if (word(lawDict.lookup("type")) != "linearElastic")
+        if (!allLinearElastic)
         {
-            FatalErrorInFunction
-                << "This test assumes every material is linearElastic, but "
-                << lawEntries[lawI].keyword() << " is of type "
-                << word(lawDict.lookup("type")) << exit(FatalError);
+            continue;
         }
 
         const scalar E = dimensionedScalar(lawDict.lookup("E")).value();
@@ -266,7 +282,8 @@ int main(int argc, char *argv[])
 
     Info<< "    materials: " << lawEntries.size()
         << ", planeStress: " << planeStress
-        << ", cells: " << mesh.nCells() << endl;
+        << ", cells: " << mesh.nCells()
+        << ", closed-form checks: " << Switch(allLinearElastic) << endl;
 
     // ---------------------------------------------------------------------
     // Construct the manager and the test kinematics
@@ -374,19 +391,27 @@ int main(int argc, char *argv[])
             refImpK[cellI] = 2.0*refMu[cellI] + refLambda[cellI];
         }
 
-        reportError
-        (
-            "stress matches the closed form",
-            relativeDifference(Foam::primitiveField(sigma), refSigma),
-            1e-12
-        );
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "stress matches the closed form",
+                relativeDifference(Foam::primitiveField(sigma), refSigma),
+                1e-12
+            );
 
-        reportError
-        (
-            "scalar tangent matches 2*mu + lambda",
-            relativeDifference(Foam::primitiveField(impK), refImpK),
-            1e-12
-        );
+            reportError
+            (
+                "scalar tangent matches 2*mu + lambda",
+                relativeDifference(Foam::primitiveField(impK), refImpK),
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: closed-form stress and tangent "
+                << "(not all materials are linearElastic)" << endl;
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -672,12 +697,20 @@ int main(int argc, char *argv[])
               + refLambda[cellI]*tr(dualGradD[dualFaceI])*I;
         }
 
-        reportError
-        (
-            "dual-face stress uses the owning cell's material",
-            relativeDifference(dualSigma, refDualSigma),
-            1e-12
-        );
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "dual-face stress uses the owning cell's material",
+                relativeDifference(dualSigma, refDualSigma),
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: dual-face closed-form stress "
+                << "(not all materials are linearElastic)" << endl;
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -686,6 +719,12 @@ int main(int argc, char *argv[])
 
     Info<< nl << "6. Fourth-order tangent on the dual faces" << endl;
 
+    if (!allLinearElastic)
+    {
+        Info<< "    SKIP: no analytical fourth-order tangent for these "
+            << "materials" << endl;
+    }
+    else
     {
         List<mat66> dualC(nInternalDualFaces);
 
@@ -731,19 +770,231 @@ int main(int argc, char *argv[])
             maxRelError = max(maxRelError, mag(C(XX, XY))/scale);
         }
 
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "the tangent matches the closed-form isotropic stiffness",
+                maxRelError,
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: closed-form isotropic stiffness "
+                << "(not all materials are linearElastic)" << endl;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 7. Finite-difference fourth-order tangent
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "7. Finite-difference fourth-order tangent" << endl;
+
+    {
+        List<mat66> fdC(nInternalDualFaces);
+        List<mat66> fdCagain(nInternalDualFaces);
+
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt,
+            nullptr, &fdC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        if (allLinearElastic)
+        {
+            // Compare against the analytical tangent rather than a
+            // hand-written closed form, so the check is on the finite
+            // difference itself, including its Voigt shear convention
+            List<mat66> analyticC(nInternalDualFaces);
+
+            manager.updateTangentSmallStrain
+            (
+                dualTopo, dualGradD, dualGradD0, dt,
+                nullptr, &analyticC, tangentRequest::fourthOrder
+            );
+
+            scalar maxRelError = 0.0;
+            forAll(fdC, dualFaceI)
+            {
+                const label cellI = dualFaceToCell[dualFaceI];
+                const scalar scale = refLambda[cellI] + 2.0*refMu[cellI];
+
+                for (label i = 0; i < 6; ++i)
+                {
+                    for (label j = 0; j < 6; ++j)
+                    {
+                        maxRelError =
+                            max
+                            (
+                                maxRelError,
+                                mag
+                                (
+                                    fdC[dualFaceI](i, j)
+                                  - analyticC[dualFaceI](i, j)
+                                )/scale
+                            );
+                    }
+                }
+            }
+
+            reportError("matches the analytical tangent", maxRelError, 1e-6);
+        }
+
+        // With no analytical tangent to compare against, require that the
+        // finite difference is finite and that repeating it gives exactly the
+        // same answer. For a history-dependent law that is a direct check that
+        // the perturbed evaluations left no trace in the state
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt,
+            nullptr, &fdCagain, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        bool finiteAndRepeatable = true;
+        forAll(fdC, dualFaceI)
+        {
+            for (label i = 0; i < 6; ++i)
+            {
+                for (label j = 0; j < 6; ++j)
+                {
+                    const scalar a = fdC[dualFaceI](i, j);
+
+                    if (a != a || mag(a) > GREAT)
+                    {
+                        finiteAndRepeatable = false;
+                    }
+
+                    if (a != fdCagain[dualFaceI](i, j))
+                    {
+                        finiteAndRepeatable = false;
+                    }
+                }
+            }
+        }
+
+        report
+        (
+            "is finite and exactly repeatable",
+            finiteAndRepeatable
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // 8. A tangent query leaves the constitutive state alone
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "8. Tangent queries preserve constitutive state" << endl;
+
+    {
+        // A law is a function of the kinematics and the OLD-time state, so a
+        // stress evaluated straight after a tangent query cannot see anything
+        // the query wrote: it recomputes from the same history. The damage a
+        // query can do is to the CURRENT-time fields, which endTimeStep()
+        // reads and which storeOldTime() promotes to history at the next time
+        // step. So the query has to be straddled by a time step to be seen.
+        symmTensorField sigmaA(nInternalDualFaces, symmTensor::zero);
+        symmTensorField sigmaB(nInternalDualFaces, symmTensor::zero);
+
+        // Establish history at the working strain
+        manager.updateStressSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt, sigmaA
+        );
+
+        // A tangent query at a strain far beyond the working one. Left in the
+        // current-time fields, this is what would be committed below
+        tensorField wildGradD(nInternalDualFaces, tensor::zero);
+        forAll(wildGradD, i)
+        {
+            wildGradD[i] = 50.0*dualGradD[i];
+        }
+
+        scalarField throwaway(nInternalDualFaces, 0.0);
+        List<mat66> throwawayC(nInternalDualFaces);
+
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, wildGradD, dualGradD0, dt,
+            &throwaway, nullptr, tangentRequest::scalar
+        );
+
+        if (allLinearElastic)
+        {
+            manager.updateTangentSmallStrain
+            (
+                dualTopo, wildGradD, dualGradD0, dt,
+                nullptr, &throwawayC, tangentRequest::fourthOrder
+            );
+        }
+
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, wildGradD, dualGradD0, dt,
+            nullptr, &throwawayC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        // Cross a time step, which commits the current-time fields to history,
+        // then evaluate the same strain again
+        runTime++;
+
+        manager.updateStressSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt, sigmaB
+        );
+
         reportError
         (
-            "the tangent matches the closed-form isotropic stiffness",
-            maxRelError,
+            "the same strain gives the same stress across a committed "
+            "time step",
+            relativeDifference(sigmaA, sigmaB),
             1e-12
         );
     }
 
     // ---------------------------------------------------------------------
-    // 7. Misuse guards
+    // 9. updateScalarTangent, the cell-centred convenience form
     // ---------------------------------------------------------------------
 
-    Info<< nl << "7. Misuse guards" << endl;
+    Info<< nl << "9. Cell-centred scalar tangent query" << endl;
+
+    {
+        volScalarField queriedImpK
+        (
+            IOobject
+            (
+                "queriedImpK",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        manager.updateScalarTangent
+        (
+            gradD, gradD0, dt, queriedImpK, tangentRequest::scalar
+        );
+
+        reportError
+        (
+            "agrees with the tangent from the stress update",
+            relativeDifference
+            (
+                Foam::primitiveField(impK), Foam::primitiveField(queriedImpK)
+            ),
+            1e-15
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // 10. Misuse guards
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "10. Misuse guards" << endl;
 
     {
         symmTensorField scratch(mesh.nCells(), symmTensor::zero);

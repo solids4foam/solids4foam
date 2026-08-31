@@ -90,6 +90,42 @@ inline const word tangentRequestName
     return "unknown";
 }
 
+
+// Return the tangent request with the given name.
+// Written by hand rather than with NamedEnum or Enum, whose interfaces differ
+// between the supported forks
+inline tangentRequest tangentRequestNamed(const word& name)
+{
+    if (name == "none")
+    {
+        return tangentRequest::none;
+    }
+    else if (name == "scalar")
+    {
+        return tangentRequest::scalar;
+    }
+    else if (name == "scalarDeviatoric")
+    {
+        return tangentRequest::scalarDeviatoric;
+    }
+    else if (name == "fourthOrder")
+    {
+        return tangentRequest::fourthOrder;
+    }
+    else if (name == "fourthOrderFiniteDifference")
+    {
+        return tangentRequest::fourthOrderFiniteDifference;
+    }
+
+    FatalErrorInFunction
+        << "Unknown tangent request '" << name << "'." << nl
+        << "Valid options are: none, scalar, scalarDeviatoric, fourthOrder, "
+        << "fourthOrderFiniteDifference"
+        << exit(FatalError);
+
+    return tangentRequest::none;
+}
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam

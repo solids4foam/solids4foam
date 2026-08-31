@@ -877,7 +877,7 @@ void Foam::mechanicalConstitutiveLawManager::resetMaterialPropertyFields()
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
 (
     const integrationPointTopology& topo,
     const UList<tensor>& gradD,
@@ -886,7 +886,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     UList<symmTensor>& stress,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool preserveState
 )
 {
     const word context = "updateStressSmallStrain (flat list)";
@@ -949,6 +950,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             continue;
         }
 
+        // A tangent query evaluates against a shadow of the law's state: the
+        // shadow aliases the old-time fields, so history is read but never
+        // written, and the law's outputs land where they are discarded
+        autoPtr<mechanicalConstitutiveLawState> shadowPtr;
+        if (preserveState)
+        {
+            shadowPtr.set
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    tp.states_[lawI],
+                    mechanicalConstitutiveLawState::SHADOW
+                )
+            );
+        }
+
+        mechanicalConstitutiveLawState& lawState =
+            preserveState ? shadowPtr() : tp.states_[lawI];
+
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> gradDView(gradD, ipIDs);
         const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
@@ -970,7 +990,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
         else if (needsFourthOrderTangent(tangentReq))
         {
@@ -981,19 +1001,19 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
         else
         {
             mechanicalConstitutiveLawResponse response(stressView, tangentReq);
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
     }
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
 (
     const integrationPointTopology& topo,
     const UList<tensor>& F,
@@ -1006,7 +1026,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     UList<symmTensor>& stress,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool preserveState
 )
 {
     const word context = "updateStressFiniteStrain (flat list)";
@@ -1071,6 +1092,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             continue;
         }
 
+        // A tangent query evaluates against a shadow of the law's state: the
+        // shadow aliases the old-time fields, so history is read but never
+        // written, and the law's outputs land where they are discarded
+        autoPtr<mechanicalConstitutiveLawState> shadowPtr;
+        if (preserveState)
+        {
+            shadowPtr.set
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    tp.states_[lawI],
+                    mechanicalConstitutiveLawState::SHADOW
+                )
+            );
+        }
+
+        mechanicalConstitutiveLawState& lawState =
+            preserveState ? shadowPtr() : tp.states_[lawI];
+
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> FView(F, ipIDs);
         const UIndirectList<tensor> F0View(F0, ipIDs);
@@ -1102,7 +1142,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
         else if (needsFourthOrderTangent(tangentReq))
         {
@@ -1113,15 +1153,77 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
         else
         {
             mechanicalConstitutiveLawResponse response(stressView, tangentReq);
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, lawState, response);
         }
     }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& gradD,
+    const UList<tensor>& gradD0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    evaluateSmallStrain
+    (
+        topo,
+        gradD,
+        gradD0,
+        dt,
+        stress,
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq,
+        false           // commit the constitutive state
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    evaluateFiniteStrain
+    (
+        topo,
+        F,
+        F0,
+        Finv,
+        Finv0,
+        J,
+        J0,
+        dt,
+        stress,
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq,
+        false           // commit the constitutive state
+    );
 }
 
 
@@ -1146,7 +1248,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    updateStressSmallStrain
+    evaluateSmallStrain
     (
         topo,
         gradD,
@@ -1155,7 +1257,8 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
-        tangentReq
+        tangentReq,
+        true            // preserve the constitutive state
     );
 }
 
@@ -1185,7 +1288,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    updateStressFiniteStrain
+    evaluateFiniteStrain
     (
         topo,
         F,
@@ -1198,8 +1301,54 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
+        tangentReq,
+        true            // preserve the constitutive state
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
+(
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    volScalarField& scalarTangent,
+    const tangentRequest tangentReq
+)
+{
+    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
+    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
+    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
+
+    if (!needsScalarTangent(tangentReq))
+    {
+        FatalErrorInFunction
+            << "updateScalarTangent was asked for a "
+            << tangentRequestName(tangentReq) << " tangent." << nl
+            << "This interface returns a scalar tangent at cell centres, so "
+            << "the request must be scalar or scalarDeviatoric."
+            << exit(FatalError);
+    }
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
+
+    updateTangentSmallStrain
+    (
+        topo,
+        Foam::primitiveField(gradD),
+        Foam::primitiveField(gradD0),
+        dt,
+        &tangent,
+        nullptr,
         tangentReq
     );
+
+#ifndef OPENFOAM_ORG
+    scalarTangent.correctBoundaryConditions();
+#endif
 }
 
 

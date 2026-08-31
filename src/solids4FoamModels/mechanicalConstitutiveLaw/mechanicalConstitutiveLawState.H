@@ -82,6 +82,12 @@ class mechanicalConstitutiveLawState
 
         label size_;
 
+        //- Parent state shadowed by this one, or nullptr if this state owns
+        //  its history.
+        //  A shadow aliases the parent's old-time fields, which are read-only
+        //  through it, and owns its own current-time fields
+        const mechanicalConstitutiveLawState* shadowedPtr_;
+
 
     // Private helper interface
 
@@ -113,6 +119,15 @@ class mechanicalConstitutiveLawState
         ) const;
 
 
+        //- Fatal error if this state is a shadow, for operations that would
+        //  write history
+        void checkNotShadow(const word& what) const;
+
+        //- The old-time table to read from: the parent's when shadowing
+        template<class Type>
+        const HashTable<autoPtr<Field<Type>>>& readableFields0() const;
+
+
     // No copy
 
         mechanicalConstitutiveLawState
@@ -124,11 +139,48 @@ class mechanicalConstitutiveLawState
 
 public:
 
+    // Public Types
+
+        //- Tag selecting the shadow constructor.
+        //  Copy construction stays deleted: a shadow is not a copy, and the
+        //  distinction matters enough to be spelled out at the call site
+        enum shadowType
+        {
+            SHADOW
+        };
+
+
     // Constructors
 
         explicit mechanicalConstitutiveLawState(const label size = 0)
         :
-            size_(size)
+            size_(size),
+            shadowedPtr_(nullptr)
+        {}
+
+        //- Construct a shadow of another state.
+        //  The shadow aliases the parent's old-time fields, which are
+        //  read-only through it, and owns its own current-time fields.
+        //  A constitutive law is a function of the kinematics and the old-time
+        //  state: it reads only old-time fields and writes only current-time
+        //  fields. Evaluating a law into a shadow therefore produces the
+        //  correct answer while leaving every one of the parent's fields
+        //  untouched, which is exactly what a tangent query needs - including
+        //  a finite-difference tangent, which evaluates repeatedly at
+        //  perturbed kinematics and must not leave those perturbed values
+        //  where endTimeStep() can read them or storeOldTime() can commit them.
+        //  History is aliased rather than copied because it is only ever read,
+        //  so the cost is one set of current-time fields and no copy of the
+        //  parent's history.
+        //  The parent must outlive the shadow
+        mechanicalConstitutiveLawState
+        (
+            const mechanicalConstitutiveLawState& parent,
+            const shadowType
+        )
+        :
+            size_(parent.size()),
+            shadowedPtr_(&parent)
         {}
 
 
@@ -137,6 +189,12 @@ public:
         label size() const
         {
             return size_;
+        }
+
+        //- Is this state a shadow of another?
+        bool isShadow() const
+        {
+            return shadowedPtr_ != nullptr;
         }
 
 

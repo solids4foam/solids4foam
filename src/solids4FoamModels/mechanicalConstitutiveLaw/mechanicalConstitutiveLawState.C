@@ -181,10 +181,41 @@ const Field<Type>& mechanicalConstitutiveLawState::getField
 }
 
 
+void mechanicalConstitutiveLawState::checkNotShadow(const word& what) const
+{
+    if (isShadow())
+    {
+        FatalErrorInFunction
+            << "'" << what << "' would modify history through a shadow state."
+            << nl
+            << "A shadow aliases the old-time fields of its parent so that a "
+            << "tangent query can evaluate a law without disturbing them. "
+            << "Only current-time fields may be written through a shadow."
+            << exit(FatalError);
+    }
+}
+
+
+template<class Type>
+const HashTable<autoPtr<Field<Type>>>&
+mechanicalConstitutiveLawState::readableFields0() const
+{
+    // A shadow reads its parent's history, never its own
+    if (isShadow())
+    {
+        return shadowedPtr_->readableFields0<Type>();
+    }
+
+    return fields0<Type>();
+}
+
+
 // * * * * * * * * * * * * Public interface * * * * * * * * * * * * * * * //
 
 void mechanicalConstitutiveLawState::setSize(const label newSize)
 {
+    checkNotShadow("setSize");
+
     size_ = newSize;
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
@@ -225,6 +256,8 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 
 void mechanicalConstitutiveLawState::storeOldTime()
 {
+    checkNotShadow("storeOldTime");
+
     // Scalars
 #ifdef OPENFOAM_COM
     forAllConstIters(scalarFields0_, iter)
@@ -319,6 +352,8 @@ const Field<scalar>& mechanicalConstitutiveLawState::scalarField
 
 Field<scalar>& mechanicalConstitutiveLawState::scalarField0(const word& name)
 {
+    checkNotShadow("scalarField0");
+
     return accessField(fields0<scalar>(), name);
 }
 
@@ -327,7 +362,7 @@ const Field<scalar>& mechanicalConstitutiveLawState::scalarField0
     const word& name
 ) const
 {
-    return getField(fields0<scalar>(), name);
+    return getField(readableFields0<scalar>(), name);
 }
 
 const Field<scalar>& mechanicalConstitutiveLawState::getScalarField
@@ -343,7 +378,7 @@ const Field<scalar>& mechanicalConstitutiveLawState::getScalarField0
     const word& name
 ) const
 {
-    return getField(fields0<scalar>(), name);
+    return getField(readableFields0<scalar>(), name);
 }
 
 
@@ -364,6 +399,8 @@ const Field<vector>& mechanicalConstitutiveLawState::vectorField
 
 Field<vector>& mechanicalConstitutiveLawState::vectorField0(const word& name)
 {
+    checkNotShadow("vectorField0");
+
     return accessField(fields0<vector>(), name);
 }
 
@@ -372,7 +409,7 @@ const Field<vector>& mechanicalConstitutiveLawState::vectorField0
     const word& name
 ) const
 {
-    return getField(fields0<vector>(), name);
+    return getField(readableFields0<vector>(), name);
 }
 
 const Field<vector>& mechanicalConstitutiveLawState::getVectorField
@@ -388,7 +425,7 @@ const Field<vector>& mechanicalConstitutiveLawState::getVectorField0
     const word& name
 ) const
 {
-    return getField(fields0<vector>(), name);
+    return getField(readableFields0<vector>(), name);
 }
 
 
@@ -409,6 +446,8 @@ const Field<tensor>& mechanicalConstitutiveLawState::tensorField
 
 Field<tensor>& mechanicalConstitutiveLawState::tensorField0(const word& name)
 {
+    checkNotShadow("tensorField0");
+
     return accessField(fields0<tensor>(), name);
 }
 
@@ -417,7 +456,7 @@ const Field<tensor>& mechanicalConstitutiveLawState::tensorField0
     const word& name
 ) const
 {
-    return getField(fields0<tensor>(), name);
+    return getField(readableFields0<tensor>(), name);
 }
 
 const Field<tensor>& mechanicalConstitutiveLawState::getTensorField
@@ -433,7 +472,7 @@ const Field<tensor>& mechanicalConstitutiveLawState::getTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<tensor>(), name);
+    return getField(readableFields0<tensor>(), name);
 }
 
 
@@ -460,6 +499,8 @@ Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
     const word& name
 )
 {
+    checkNotShadow("symmTensorField0");
+
     return accessField(fields0<symmTensor>(), name);
 }
 
@@ -468,7 +509,7 @@ const Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<symmTensor>(), name);
+    return getField(readableFields0<symmTensor>(), name);
 }
 
 const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField
@@ -484,7 +525,7 @@ const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<symmTensor>(), name);
+    return getField(readableFields0<symmTensor>(), name);
 }
 
 } // End namespace Foam
