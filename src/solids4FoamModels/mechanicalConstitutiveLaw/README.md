@@ -187,7 +187,15 @@ Responsibilities:
 - Provide stress update functions for:
   - small strain / finite strain,
   - low-order (`volField`) and
-  - higher-order (`CompactListList`) storage.
+  - higher-order (`CompactListList`) storage,
+  - flat `UList` storage at the integration points of any topology.
+
+The flat-list form is the primitive: the `volField` and `CompactListList`
+overloads are implemented in terms of it, and it is the only form that works on
+storage belonging to a mesh other than the manager's own, such as a dual mesh.
+There are also tangent-only updates, `updateTangentSmallStrain` and
+`updateTangentFiniteStrain`, for solid models that take their Jacobian from the
+manager while their residual stress still comes from elsewhere.
 
 The manager is **discretisation-agnostic**.
 
@@ -200,7 +208,9 @@ Abstract base class defining how **cells map to integration points**.
 Responsibilities:
 
 - describe how many integration points exist,
-- map a cell to its associated integration point IDs.
+- map a cell to its associated integration point IDs,
+- state whether integration points are shared between cells, and whether they
+  can carry a fourth-order (`mat66`) material tangent.
 
 Current implementations:
 
@@ -208,6 +218,13 @@ Current implementations:
 - `compactCellIntegrationPointTopology`
 - `faceCentredIntegrationPointTopology`
 - `pointCentredIntegrationPointTopology`
+- `dualFaceIntegrationPointTopology`
+
+A topology that can be built from the mesh alone is obtained by type name from
+`mechanicalConstitutiveLawManager::topologyFor()`. One that needs more, such as
+`dualFaceIntegrationPointTopology` with its dual-face-to-cell map, is
+constructed by the caller and handed over with `registerTopology()`, which
+takes ownership.
 
 ---
 
@@ -273,6 +290,22 @@ CompactListList<Type>
 
 The constitutive framework operates on the **packed storage only**;
 topology remains solver-owned.
+
+---
+
+## Testing
+
+`Test-mechanicalConstitutiveLaw` (in `applications/test/`) exercises the
+manager on a case mesh and its `constant/mechanicalProperties`. It checks the
+closed-form linear elastic stress and tangent, agreement between the flat-list,
+`CompactListList` and `GeometricField` paths, the tangent-only update, the
+dual-face topology addressing and its fourth-order tangent, and the misuse
+guards.
+
+It requires every material to be `linearElastic`, and is run by the
+`layeredPipe` tutorial's `regressionTest.sh`, that being the only tutorial with
+more than one material. No solid model uses this framework yet, so that is
+currently its only runtime coverage.
 
 ---
 

@@ -1181,6 +1181,17 @@ For strains below ~1e-6 this is not a small perturbation, and for strains above
 advertise `fourthOrderFiniteDifference` as production-ready until it is fixed
 (see OQ-5).
 
+**D6. The two cell-centred topologies declare each other's type name.**
+`cellCentredIntegrationPointTopology.H:68` declares
+`TypeName("compactCellIntegrationPointTopology")` and
+`compactCellIntegrationPointTopology.H:69` declares
+`TypeName("cellCentredIntegrationPointTopology")`. Nothing misbehaves, because
+the run-time selection entry and the manager's lookup both go through
+`cellCentredIntegrationPointTopology::typeName` and so agree with each other.
+But `topo.type()` names the wrong class in every diagnostic, including the
+tangent guards of PR-1, and both classes register the same debug switch. Found
+and fixed in PR-2.
+
 **D5. `README.md` is stale.** Lines 139-144 list the supported tangent modes as
 `none`, `scalar`, `scalarDeviatoric` only, and lines 283-286 list face- and
 vertex-based topologies as "planned" although
@@ -1445,7 +1456,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | PR | Content |
 |---|---|
 | 1 | **Done.** Defect fixes D1, D4, D5 and the `(4/3)*mu` change of §8.2 including `linGeomTotalDispSolid.C:574`; the `petscSnesPressure` u-p regression case; `planeStress` injection (§8.1) and support in the three new laws; `supportsFourthOrderTangent()` + manager guard. D3 is left to PR-2, which deletes the line. plateHole, wobblyNewton and perforatedPlate all pass. |
-| 2 | Flat-list `updateStressSmallStrain`/`FiniteStrain`/`updateTangent` primitives with existing overloads re-expressed on them; `registerTopology()`; `dualFaceIntegrationPointTopology`. |
+| 2 | **Done.** Flat-list `updateStressSmallStrain`/`updateStressFiniteStrain`/`updateTangentSmallStrain`/`updateTangentFiniteStrain` primitives, with the two `CompactListList` overloads and the internal-field half of the two `volTensorField` overloads re-expressed on them; `registerTopology()` and `topologyFor()` made public; `dualFaceIntegrationPointTopology`; defect D6. Plus `Test-mechanicalConstitutiveLaw`, run by the `layeredPipe` regression test. See §8.6. |
 | 3 | `solidModel::jacobianTangent(deflt)`; `approximateJacobian` deprecation shim; optional manager owned by `solidModel` behind `useMechanicalConstitutiveLawManager` (default `no`). |
 | 4 | `vertexCentredLinGeomSolid` tangent-only adoption (§8.4). |
 | 5 | `vertexCentredNonLinGeomTotalLagSolid` tangent-only; then stress for both, removing `dualMechanicalModel` and requiring OQ-2 to be settled. |
@@ -1453,7 +1464,54 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
-### 8.6 Open questions still outstanding
+### 8.6 Notes from PR-2
+
+**The tangent-only update is named per formulation.** §8.4 proposed a single
+`updateTangent`. It is implemented as `updateTangentSmallStrain` and
+`updateTangentFiniteStrain`, matching `updateStressSmallStrain` /
+`updateStressFiniteStrain`. The finite-strain form is not needed until PR-5,
+but it is the same shape and adding it now avoids revisiting the API. Both are
+one-line wrappers over the corresponding stress primitive with manager-owned
+scratch stress storage.
+
+**The flat-list primitives are strict where the GeometricField overloads were
+lenient.** A tangent request with no matching storage is a `FatalError` rather
+than a silently skipped tangent. Because the GeometricField overloads now
+route through the primitives, they inherit that strictness. No consumer exists
+yet, so this costs nothing and removes a class of silent-wrong-Jacobian bug.
+
+**A new defect, D6: the cell-centred topology type names were swapped.**
+`cellCentredIntegrationPointTopology` declared
+`TypeName("compactCellIntegrationPointTopology")` and vice versa. Self-
+consistent, because the run-time selection entry and the manager's lookup both
+went through `cellCentredIntegrationPointTopology::typeName`, so nothing
+misbehaved — but `topo.type()` reported the wrong class in every diagnostic,
+including the tangent guards added in PR-1, and the two classes registered the
+same debug switch. Fixed.
+
+**`registerTopology` is idempotent by design.** Constitutive state is keyed on
+the topology *object*, so replacing the topology held under a key would
+silently start a second, empty set of history variables. Re-registering a key
+returns the topology already held; registering a key with a different topology
+type is an error.
+
+**The framework had no runtime coverage at all.** Nothing in `src/` or
+`applications/` constructs a `mechanicalConstitutiveLawManager`, so everything
+added in PR-1 and PR-2 was compile-tested only. `Test-mechanicalConstitutiveLaw`
+now covers the closed-form stress and scalar tangent, agreement between the
+flat-list, `CompactListList` and `GeometricField` paths, the tangent-only
+update, the dual-face topology addressing and its fourth-order tangent, and the
+four misuse guards. It runs on `layeredPipe` because that is the only tutorial
+with two materials, and it is checked by that tutorial's `regressionTest.sh`.
+A deliberate mutation of the flat-list primitive was confirmed to fail it.
+
+Two limits worth stating. First, the path-agreement checks compare the
+overloads with each other, and the overloads now share the primitive, so a
+fault inside the primitive moves them together; only the closed-form check sees
+that. Second, the test requires every material to be `linearElastic`, so it
+does not exercise the plastic law or the finite-strain path.
+
+### 8.7 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term
