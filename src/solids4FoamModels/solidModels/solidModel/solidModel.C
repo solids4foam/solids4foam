@@ -2179,4 +2179,46 @@ const Foam::dictionary& Foam::solidModel::solidModelDict() const
     return solidProperties_.subDict(type_ + "Coeffs");
 }
 
+
+Foam::tangentRequest Foam::solidModel::jacobianTangent
+(
+    const tangentRequest deflt
+) const
+{
+    const dictionary& dict = solidModelDict();
+
+    if (dict.found("approximateJacobian"))
+    {
+        if (dict.found("jacobianTangent"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "Both 'approximateJacobian' and 'jacobianTangent' are set."
+                << nl
+                << "'approximateJacobian' is deprecated: use "
+                << "'jacobianTangent' only."
+                << exit(FatalIOError);
+        }
+
+        const Switch approximate(dict.lookup("approximateJacobian"));
+
+        const tangentRequest req =
+            approximate
+          ? tangentRequest::scalar
+          : tangentRequest::fourthOrder;
+
+        WarningInFunction
+            << "'approximateJacobian' is deprecated. Replace it with "
+            << "'jacobianTangent " << tangentRequestName(req) << ";'" << endl;
+
+        return req;
+    }
+
+    if (!dict.found("jacobianTangent"))
+    {
+        return deflt;
+    }
+
+    return tangentRequestNamed(word(dict.lookup("jacobianTangent")));
+}
+
 // ************************************************************************* //

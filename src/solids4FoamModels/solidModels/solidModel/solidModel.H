@@ -56,6 +56,7 @@ SourceFiles
 #include "compatibilityFunctions.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -598,6 +599,22 @@ public:
                     solutionAlg() == solutionAlgorithm::PETSC_SNES
                  && highOrderJacobian_;
             }
+
+            //- Requested fidelity of the material tangent used to build the
+            //  Jacobian, from the 'jacobianTangent' entry of the solid model
+            //  coefficients dictionary.
+            //  Each solid model supplies its own default, because today's
+            //  defaults differ: the cell-centred models want a scalar tangent,
+            //  the vertex-centred ones a fourth-order one. Existing cases
+            //  therefore keep their behaviour without dictionary changes.
+            //  This entry is orthogonal to highOrderJacobian(), which selects
+            //  a different discrete operator rather than a tangent fidelity.
+            //  The deprecated 'approximateJacobian' switch is still read, and
+            //  maps yes to scalar and no to fourthOrder
+            tangentRequest jacobianTangent
+            (
+                const tangentRequest deflt
+            ) const;
 
             //- Is it a new time step? This function return true the first time
             //  it is called in a time step
