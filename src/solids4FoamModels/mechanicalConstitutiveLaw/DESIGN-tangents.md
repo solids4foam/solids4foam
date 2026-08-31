@@ -1511,7 +1511,45 @@ fault inside the primitive moves them together; only the closed-form check sees
 that. Second, the test requires every material to be `linearElastic`, so it
 does not exercise the plastic law or the finite-strain path.
 
-### 8.7 Open questions still outstanding
+### 8.7 foam-extend: the framework is not built there at all
+
+`src/solids4FoamModels/Make/files.foamextend` contains **no**
+`mechanicalConstitutiveLaw` entries, while `files.openfoam` contains fourteen.
+On foam-extend the framework is therefore not compiled, and "it builds on
+foam-extend" is true only by omission.
+
+This surfaced in PR-2 because `Test-mechanicalConstitutiveLaw` is the first
+thing in the tree to include `mechanicalConstitutiveLawManager.H`
+unconditionally. The foam-extend build then failed on two things:
+
+1. `mechanicalConstitutiveLaw.H` returned `dimensionedScalar()` from the two
+   "keep the compiler happy" default implementations. `dimensioned<Type>` has
+   no default constructor in foam-extend. **Fixed in PR-2** — the dummies are
+   now constructed explicitly, which is portable and better anyway.
+2. foam-extend's own `CompactListList<T>::operator[](const label) const`
+   returns `UList<T>(m_.begin(), ...)`, where `m_.begin()` on a const `List`
+   is a `const T*` and the `UList` constructor wants a `T*`. This is a bug in
+   foam-extend, not in solids4foam, and it fires whenever that operator is
+   instantiated. Not fixed; the test application is guarded with
+   `#ifdef FOAMEXTEND` instead.
+
+**This needs a project-level decision, and it is more consequential than any
+open question below.** The stated endgame is that the legacy `mechanicalModel`
+and `mechanicalLaw` classes are deprecated and removed. If the new framework
+never builds on foam-extend, that endgame removes solids4foam's mechanical
+modelling from foam-extend entirely. Either:
+
+- the framework gets a portability pass (mostly avoiding `CompactListList`
+  const-indexing in anything foam-extend compiles, plus whatever else a real
+  build turns up), and `files.foamextend` gains the sources; or
+- dropping foam-extend for the new mechanics is made an explicit, documented
+  decision, and the legacy classes are kept alive there rather than removed.
+
+Deciding this late is expensive: every increment from PR-3 onward either does
+or does not have to stay foam-extend-clean, and that changes what may be used
+in a header.
+
+### 8.8 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term

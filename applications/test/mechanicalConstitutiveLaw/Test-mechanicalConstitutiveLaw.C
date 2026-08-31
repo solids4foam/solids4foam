@@ -56,6 +56,24 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
+
+#ifdef FOAMEXTEND
+
+// The mechanical constitutive law framework is not part of the foam-extend
+// build: its sources are absent from src/solids4FoamModels/Make/files.foamextend
+// and its headers do not compile there. There is nothing to test on this fork
+int main(int argc, char *argv[])
+{
+    Info<< nl
+        << "The mechanical constitutive law framework is not built for "
+        << "foam-extend, so there is nothing to test." << nl << nl
+        << "End" << nl << endl;
+
+    return 0;
+}
+
+#else
+
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
@@ -867,5 +885,7 @@ int main(int argc, char *argv[])
     return 1;
 }
 
+
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

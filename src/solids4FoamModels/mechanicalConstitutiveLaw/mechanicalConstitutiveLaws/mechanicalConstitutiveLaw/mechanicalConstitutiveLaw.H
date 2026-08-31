@@ -67,6 +67,7 @@ Author
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawResponse.H"
 #include "dimensionedScalar.H"
+#include "dimensionSets.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -155,8 +156,10 @@ public:
                 << "Density (rho) not defined for mechanical constitutive "
                 << "law of type " << type() << exit(FatalError);
 
-            // Keep the compiler happy
-            return dimensionedScalar();
+            // Keep the compiler happy.
+            // Note: dimensioned<Type> has no default constructor in
+            // foam-extend, so the dummy must be constructed explicitly
+            return dimensionedScalar("rho", dimDensity, 0.0);
         }
 
         //- Return the bulk modulus for this constitutive law
@@ -167,8 +170,10 @@ public:
                 << "Bulk modulus (kapp) not defined for mechanical constitutive "
                 << "law of type " << type() << exit(FatalError);
 
-            // Keep the compiler happy
-            return dimensionedScalar();
+            // Keep the compiler happy.
+            // Note: dimensioned<Type> has no default constructor in
+            // foam-extend, so the dummy must be constructed explicitly
+            return dimensionedScalar("kappa", dimPressure, 0.0);
         }
 
     // Edit
