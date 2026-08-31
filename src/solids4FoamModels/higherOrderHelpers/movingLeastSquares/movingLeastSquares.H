@@ -345,6 +345,32 @@ private:
         //- Return the face quadrature points gradient coefficients
         virtual const List<CompactListList<vector>>& faceGradCoeffs() const;
 
+        // Read-only access to the cell-centre coefficient tables. These allow
+        // a solver to assemble its own high-order operators directly, rather
+        // than going through the evaluation functions below. Row cellI is
+        // indexed by stencilData().cellsStencil()[cellI], and carries one
+        // extra trailing entry, at index cellsStencil()[cellI].size(),
+        // holding the coefficient of the cell itself.
+
+        //- Read-only access to cell-centre gradient coefficients
+        const CompactListList<vector>& cellGradCoeffsData() const
+        {
+            return cellGradCoeffs();
+        }
+
+        //- Read-only access to cell-centre second derivative coefficients
+        const CompactListList<symmTensor>& cellSecondGradCoeffsData() const
+        {
+            return cellSecondGradCoeffs();
+        }
+
+        //- Read-only access to cell-centre third derivative coefficients
+        const CompactListList<symmTensor3rdOrder>&
+        cellThirdGradCoeffsData() const
+        {
+            return cellThirdGradCoeffs();
+        }
+
         //- Clear owned MLS data and cached coefficient data
         virtual void clear() const;
 
@@ -446,6 +472,57 @@ private:
         //  field. For vector fields we apply this per component.
         virtual autoPtr<List<symmTensor3rdOrder>>
         thirdGrad(const volScalarField& s) const;
+
+        //- Evaluate the cell-centre gradient, second derivative and third
+        //  derivative of a scalar field, using a single halo exchange and
+        //  resolving each stencil point once. Any output pointer may be null,
+        //  in which case that derivative is not evaluated and its coefficients
+        //  are not calculated. The outputs are resized and zeroed on entry,
+        //  and the contributions are accumulated in the same order as grad(),
+        //  secondGrad() and thirdGrad(), so the results are identical to
+        //  calling those functions separately.
+        void cellDerivatives
+        (
+            const volScalarField& s,
+            vectorField* gradPtr,
+            symmTensorField* secondGradPtr,
+            List<symmTensor3rdOrder>* thirdGradPtr
+        ) const;
+
+        //- As above, for a vector field, with a single halo exchange shared by
+        //  the gradient and by all three components of the higher derivatives.
+        //  The gradient is identical to grad(), and the second and third
+        //  derivatives are indexed by component and are identical to calling
+        //  secondGrad() and thirdGrad() on each component of the field.
+        void cellDerivatives
+        (
+            const volVectorField& v,
+            tensorField* gradPtr,
+            FixedList<symmTensorField, 3>* secondGradPtr,
+            FixedList<List<symmTensor3rdOrder>, 3>* thirdGradPtr
+        ) const;
+
+        //- As the scalar overload above, but returning the second derivative
+        //  as a complete field with its boundary conditions evaluated, for
+        //  callers that also need the boundary values. Either output may be
+        //  null. The results are identical to secondGrad() and thirdGrad().
+        void cellDerivatives
+        (
+            const volScalarField& s,
+            tmp<volSymmTensorField>* secondGradPtr,
+            autoPtr<List<symmTensor3rdOrder>>* thirdGradPtr
+        ) const;
+
+        //- As the vector overload above, but returning the second derivative
+        //  of each component as a complete field with its boundary conditions
+        //  evaluated. Either output may be null. The results are identical to
+        //  calling secondGrad() and thirdGrad() on each component.
+        void cellDerivatives
+        (
+            const volVectorField& v,
+            FixedList<tmp<volSymmTensorField>, 3>* secondGradPtr,
+            FixedList<autoPtr<List<symmTensor3rdOrder>>, 3>* thirdGradPtr
+        ) const;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

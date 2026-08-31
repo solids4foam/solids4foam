@@ -1159,6 +1159,17 @@ Foam::solidModel::solidModel
     fvOptions_(fv::options::New(*meshPtr_))
 #endif
 {
+    // As far as the finite volume discretisation is concerned, the solid mesh
+    // is not a "moving mesh": the solid models which do update the mesh, e.g.
+    // the updated Lagrangian ones, explicitly clear the moving flag after each
+    // mesh motion, as the mesh motion is not a flow of material through the
+    // faces.
+    // On a restart, however, the fvMesh constructor marks the mesh as moving if
+    // it finds a 'meshPhi' or 'V0' field in the start time directory, and then,
+    // for example, backwardD2dt2Scheme stops with a "not implemented for a
+    // moving mesh" error (issue #184). So the flag is cleared here
+    mesh().moving(false);
+
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
     {
@@ -1527,97 +1538,53 @@ void Foam::solidModel::makeGlobalPatches
                 << abort(FatalError);
         }
 
+        // Lookup patch index
+        if (mesh().boundaryMesh().findPatchID(patchNames[i]) == -1)
+        {
+            FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
+                << "Patch " << patchNames[i] << " not found!"
+                << abort(FatalError);
+        }
+
+        // Create the global patch based on the undeformed mesh
+        globalPatchesPtrList_.set
+        (
+            i,
+            new globalPolyPatch(patchNames[i], mesh())
+        );
+
         if (currentConfiguration)
         {
-            // The global patch will create a standAlone zone based on the
-            // current point positions. So we will temporarily move the mesh to
-            // the deformed position, then create the globalPatch, then move the
-            // mesh back
-            const pointField pointsBackup = mesh().points();
-
-            // Lookup patch index
-            const label patchID =
-                mesh().boundaryMesh().findPatchID(patchNames[i]);
-            if (patchID == -1)
-            {
-                FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
-                    << "Patch not found!" << abort(FatalError);
-            }
-
-            // Patch point displacement
-            const vectorField pointDisplacement
-            (
-                pointDorPointDD().internalField(),
-                mesh().boundaryMesh()[patchID].meshPoints()
-            );
-
-            // Calculate deformation point positions
-            const pointField newPoints
-            (
-                mesh().points() + pointDorPointDD().internalField()
-            );
-
-            // Move the mesh to deformed position
-            // const_cast is justified as it is not our intention to permanently
-            // move the mesh; however, it would be better if we did not need it
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-
-            // Create global patch based on deformed mesh
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-
-            // Force creation of standAlonePatch
+            // Force creation of standAlonePatch, so that its points can be set
+            // to the current configuration by syncGlobalPatches() below
             globalPatchesPtrList_[i].globalPatch();
+        }
+    }
 
-            // Move the mesh back
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-        }
-        else
-        {
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-        }
+    if (currentConfiguration)
+    {
+        // The global patches are required in the current (deformed)
+        // configuration, so displace their points by pointD/pointDD
+        // Note: the global patches are always constructed on the undeformed
+        // mesh above and then moved here; previously, the mesh itself was
+        // temporarily moved to the deformed configuration while the global
+        // patches were constructed, and then moved back. That approach had two
+        // undesirable side-effects (issue #184):
+        //   - fvMesh::movePoints() creates the mesh motion flux field (meshPhi)
+        //     and marks the mesh points as AUTO_WRITE; consequently, meshPhi
+        //     and polyMesh/points were written to every time directory, even
+        //     though the solid mesh is not moved for linear geometry and total
+        //     Lagrangian approaches. On restart, the presence of meshPhi makes
+        //     OpenFOAM consider the solid mesh to be moving, e.g. causing
+        //     backwardD2dt2Scheme to stop with a "not implemented for a moving
+        //     mesh" error, and the reduced-precision points written to the time
+        //     directory can break the processor patch face matching checks in
+        //     parallel.
+        //   - globalPolyPatch merges coincident points across processor
+        //     boundaries using exact point coordinate comparisons; the
+        //     undeformed point coordinates are bit-identical on either side of
+        //     a processor boundary, whereas the deformed ones need not be.
+        syncGlobalPatches();
     }
 }
 
