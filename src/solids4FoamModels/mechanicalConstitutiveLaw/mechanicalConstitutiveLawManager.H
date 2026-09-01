@@ -66,6 +66,10 @@ Author
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
 
+#ifdef OPENFOAM_ORG
+#include "CompactListList.H"
+#endif
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -77,12 +81,12 @@ class integrationPointTopology;
 class CompactListListBase;
 struct mat66;
 
-//- Declared rather than included. Including CompactListList.H here would
-//  instantiate foam-extend's CompactListList<T>::operator[](label) const in
-//  every translation unit that includes this header, and that member passes a
-//  const T* where a T* is wanted. Only references appear below, so the
-//  declaration suffices
+//- OpenFOAM.org's CompactListList has two template parameters, so its header
+//  is included above. The other forks have one template parameter; forward
+//  declare it to avoid instantiating foam-extend's broken const operator[].
+#ifndef OPENFOAM_ORG
 template<class T> class CompactListList;
+#endif
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
