@@ -60,7 +60,6 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "CompactListList.H"
 #include "dictionary.H"
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
@@ -77,6 +76,13 @@ namespace Foam
 class integrationPointTopology;
 class CompactListListBase;
 struct mat66;
+
+//- Declared rather than included. Including CompactListList.H here would
+//  instantiate foam-extend's CompactListList<T>::operator[](label) const in
+//  every translation unit that includes this header, and that member passes a
+//  const T* where a T* is wanted. Only references appear below, so the
+//  declaration suffices
+template<class T> class CompactListList;
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
@@ -213,38 +219,17 @@ class mechanicalConstitutiveLawManager
             }
         }
 
-        //- Check the provided compact list sizes are consistent
-        inline void checkCompactLayoutConsistency
+        //- Check the provided compact list sizes are consistent.
+        //  Defined in the .C so that this header does not need the complete
+        //  CompactListList type
+        void checkCompactLayoutConsistency
         (
             const CompactListList<tensor>& a,
             const CompactListList<tensor>& b,
             const CompactListList<symmTensor>& out,
             const List<scalar>* tangentPtr,
             const word& context
-        )
-        {
-            const label nIP = out.m().size();
-
-            if (a.m().size() != nIP || b.m().size() != nIP)
-            {
-                FatalError
-                    << "Inconsistent CompactListList sizes in " << context << nl
-                    << "Expected size = " << nIP << nl
-                    << "Got: grad = " << a.m().size()
-                    << ", grad0 = " << b.m().size()
-                    << exit(FatalError);
-            }
-
-            if (tangentPtr && tangentPtr->size() != nIP)
-            {
-                FatalError
-                    << "Scalar tangent list has incorrect size in " << context
-                    << nl
-                    << "Expected: " << nIP
-                    << ", got: " << tangentPtr->size()
-                    << exit(FatalError);
-            }
-        }
+        );
 
         //- Check that a flat integration-point list has the size the topology
         //  requires

@@ -23,6 +23,7 @@ License
 #include "emptyFvPatch.H"
 #include "mat66.H"
 #include "Switch.H"
+#include "CompactListList.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -33,6 +34,39 @@ namespace Foam
 }
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
+
+
+void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
+(
+    const CompactListList<tensor>& a,
+    const CompactListList<tensor>& b,
+    const CompactListList<symmTensor>& out,
+    const List<scalar>* tangentPtr,
+    const word& context
+)
+{
+    const label nIP = out.m().size();
+
+    if (a.m().size() != nIP || b.m().size() != nIP)
+    {
+        FatalError
+            << "Inconsistent CompactListList sizes in " << context << nl
+            << "Expected size = " << nIP << nl
+            << "Got: grad = " << a.m().size()
+            << ", grad0 = " << b.m().size()
+            << exit(FatalError);
+    }
+
+    if (tangentPtr && tangentPtr->size() != nIP)
+    {
+        FatalError
+            << "Scalar tangent list has incorrect size in " << context
+            << nl
+            << "Expected: " << nIP
+            << ", got: " << tangentPtr->size()
+            << exit(FatalError);
+    }
+}
 
 
 void Foam::mechanicalConstitutiveLawManager::checkTangentStorage
