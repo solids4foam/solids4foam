@@ -2072,6 +2072,30 @@ the framework implements. Its migration is committed with the switch
 defaulting off and the legacy path verified unchanged, but the framework arm
 is unexercised and should be treated as such.
 
+### 8.18 impK under the mixed formulation: the two solvers disagreed
+
+Review caught that the framework arm of `nonLinGeomTotalLagTotalDispSolid`
+does not reproduce its legacy `impK` when `solvePressure()` is set. The legacy
+code uses `2*mu`; the framework request `scalarDeviatoric` yields `(4/3)*mu`.
+
+That is a real difference, and worth stating rather than quietly matching,
+because the two migrated solvers did not agree with each other to begin with:
+`linGeomTotalDispSolid` already used `(4/3)*mu` for exactly the same
+formulation. So there was no single legacy convention to preserve.
+
+`(4/3)*mu` is kept. It is the value the surrogate implies - the scalar
+Laplacian standing in for `div(dev(sigma))` is
+`mu*lap(D) + (1/3)*mu*grad(div(D))` - and it makes the two solvers agree.
+`impK` is the coefficient of a Laplacian that is added implicitly and
+subtracted explicitly, so it sets how the solution is reached and not what it
+is: only the convergence path changes, and only when the framework is switched
+on. Nothing in the default configuration moves.
+
+The general point: "matches the legacy value" is not always a well-defined
+target, and where the legacy values disagree among themselves it is better to
+pick the defensible one and say so than to reproduce an arbitrary choice per
+solver.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

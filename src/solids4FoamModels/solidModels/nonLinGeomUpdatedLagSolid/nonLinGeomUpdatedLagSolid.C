@@ -619,7 +619,13 @@ Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
     // updated Lagrangian solver. impK is a material stiffness scale, not an
     // increment, and it is the total configuration that the material is in.
     // This is a construction-time call, so the temporary inverse below is
-    // formed once and then released
+    // formed once and then released.
+    //
+    // Finv.oldTime() is a snapshot of inv(F_) rather than inv(F_.oldTime()).
+    // At construction the two are the same field - F_ is either the identity
+    // or the restart value, and its old time is initialised from it - so this
+    // is correct here, and this function is only ever called from the
+    // constructor
     const volTensorField Finv(inv(F_));
 
     mechanicalManager().updateScalarTangentFiniteStrain

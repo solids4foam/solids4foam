@@ -673,6 +673,17 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::mechanicalManager() const
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
+    // With the mixed displacement-pressure formulation the implicit stiffness
+    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
+    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu.
+    //
+    // The legacy branch below uses 2*mu here instead. That difference is
+    // deliberate and is left in: impK is the coefficient of a Laplacian that
+    // is added and subtracted, so it sets how the solution is reached and not
+    // what it is, and (4/3)*mu is the value the surrogate actually implies.
+    // linGeomTotalDispSolid already uses (4/3)*mu for the same formulation, so
+    // this also makes the two solvers agree. Only the convergence path
+    // changes, and only when the framework is switched on
     const tangentRequest req =
         solvePressure()
       ? tangentRequest::scalarDeviatoric
