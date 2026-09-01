@@ -1596,7 +1596,24 @@ increment has two parts:
 2. make that increment's code foam-extend-clean, and extend `files.foamextend`
    to cover it.
 
-**What actually breaks today.** A survey was run for PR-2: the fourteen
+**Status: done.** The framework now builds *and runs* on foam-extend-4.1. Its
+fourteen sources are in `files.foamextend`, the test application's `FOAMEXTEND`
+guard is gone, and all 23 checks pass there, with the finite-difference tangent
+matching the analytical one to 3.8e-10 - the same figure as on OpenFOAM.com.
+
+It was forced sooner than the per-increment plan intended: once a compiled
+solid model referenced the manager, the foam-extend link broke, so the choice
+was to finish the portability work or guard the reference away. The survey
+below had already costed it, and the estimate held.
+
+The `CompactListList` blocker turned out to be avoidable rather than fatal.
+Two internal uses of its const `operator[]` are gone -
+`compactCellIntegrationPointTopology` now stores its addressing flat, and
+`compactCellTopologyFor` uses `sizes()`. **The container remains the interface
+for higher-order discretisations with quadrature points per cell or per face**;
+the manager's `CompactListList` overloads are untouched.
+
+**What broke, as surveyed before the work.** A survey was run for PR-2: the fourteen
 framework sources were added to `files.foamextend` in a throwaway worktree and
 built against foam-extend-4.1. Every source was compiled. The result is much
 better than feared — **all five constitutive laws, all five integration-point
