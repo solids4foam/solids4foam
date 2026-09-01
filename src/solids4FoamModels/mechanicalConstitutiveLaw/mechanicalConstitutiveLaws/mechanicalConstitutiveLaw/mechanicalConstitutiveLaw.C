@@ -71,13 +71,16 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
     }
 
     // The unperturbed stress, which the caller has already evaluated into the
-    // response. Taking a copy leaves the caller's storage untouched below
-    const Field<symmTensor> sigma0(stress);
+    // response. Taking a copy leaves the caller's storage untouched below.
+    // Copied element-wise because Field has no constructor from a
+    // UIndirectList on every supported fork
+    Field<symmTensor> sigma0(nIP);
 
     // Per-integration-point perturbation, scaled with the local gradient
     Field<scalar> h(nIP);
     forAll(h, ipI)
     {
+        sigma0[ipI] = stress[ipI];
         h[ipI] = max(hMin, hRel*mag(kin.gradD()[ipI]));
     }
 

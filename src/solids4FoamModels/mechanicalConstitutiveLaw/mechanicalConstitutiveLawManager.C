@@ -119,7 +119,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Already constructed?
     if (topologyCache_.found(topologyTypeName))
     {
-        return topology(*topologyCache_[topologyTypeName]).topology_;
+        return topology(topologyCache_[topologyTypeName]()).topology_;
     }
 
     // Lazily construct via OpenFOAM runtime selection
@@ -139,7 +139,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Cache and return
     topologyCache_.insert(topologyTypeName, topoPtr);
 
-    return topology(*topologyCache_[topologyTypeName]).topology_;
+    return topology(topologyCache_[topologyTypeName]()).topology_;
 }
 
 
@@ -162,7 +162,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     // Already constructed?
     if (topologyCache_.found(key))
     {
-        return topology(*topologyCache_[key]).topology_;
+        return topology(topologyCache_[key]()).topology_;
     }
 
     // Construct topology lazily
@@ -172,11 +172,15 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     //  - integration-point counts encoded in sub-list sizes
 
     // Build cell → IP addressing
-    CompactListList<label> cellToIP(layout.sizes());
+    const labelList rowSizes(layout.sizes());
+
+    CompactListList<label> cellToIP(rowSizes);
 
     for (label cellI = 0; cellI < layout.size(); ++cellI)
     {
-        const label n = layout[cellI].size();
+        // sizes() rather than layout[cellI].size(): the const operator[] does
+        // not compile on foam-extend
+        const label n = rowSizes[cellI];
         for (label j = 0; j < n; ++j)
         {
             cellToIP(cellI, j) = layout.index(cellI, j);
@@ -191,7 +195,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     // Cache and return
     topologyCache_.insert(key, topoPtr);
 
-    return topology(*topologyCache_[key]).topology_;
+    return topology(topologyCache_[key]()).topology_;
 }
 
 
@@ -225,7 +229,7 @@ Foam::mechanicalConstitutiveLawManager::topology
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
     {
-        return *topologyEntries_[key];
+        return topologyEntries_[key]();
     }
 
     // ---------------------------------------------------------------------
@@ -237,7 +241,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
     autoPtr<topologyEntry> entryPtr(new topologyEntry(topo));
     topologyEntries_.insert(key, entryPtr);
-    topologyEntry& entry = *topologyEntries_[key];
+    topologyEntry& entry = topologyEntries_[key]();
 
     const label nLaws = laws_.size();
 
@@ -404,7 +408,7 @@ void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
             HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
         )
         {
-            topologyEntry& entry = *topoIter();
+            topologyEntry& entry = topoIter()();
 
             // Internal states
             forAll(entry.states_, lawI)
@@ -878,7 +882,7 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
     // Already registered?
     if (topologyCache_.found(key))
     {
-        const integrationPointTopology& existing = *topologyCache_[key];
+        const integrationPointTopology& existing = topologyCache_[key]();
 
         if (existing.type() != topoPtr->type())
         {
@@ -900,7 +904,7 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
 
     topologyCache_.insert(key, topoPtr);
 
-    return topology(*topologyCache_[key]).topology_;
+    return topology(topologyCache_[key]()).topology_;
 }
 
 
@@ -1468,7 +1472,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     );
                     UIndirectList<symmTensor> stressView
                     (
-                        stress.boundaryFieldRef()[patchI], faces
+                        Foam::boundaryFieldRef(stress)[patchI], faces
                     );
 
                     // Create wrapper for kinematic data: input to material law
@@ -1727,7 +1731,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     );
                     UIndirectList<symmTensor> stressView
                     (
-                        stress.boundaryFieldRef()[patchI], faces
+                        Foam::boundaryFieldRef(stress)[patchI], faces
                     );
 
                     // Create wrapper for kinematic data: input to material law
@@ -2156,7 +2160,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 // "View" into the stress for this material => does not copy data
                 UIndirectList<symmTensor> stressView
                 (
-                    stress.boundaryFieldRef()[patchI], faces
+                    Foam::boundaryFieldRef(stress)[patchI], faces
                 );
 
                 // Create wrapper for kinematic data: input to material law
@@ -2280,7 +2284,7 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
         HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
     )
     {
-        topologyEntry& tp = *topoIter();
+        topologyEntry& tp = topoIter()();
 
         forAll(laws_, lawI)
         {

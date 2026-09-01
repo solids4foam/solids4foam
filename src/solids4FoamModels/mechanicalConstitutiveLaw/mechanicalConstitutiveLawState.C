@@ -154,7 +154,10 @@ Field<Type>& mechanicalConstitutiveLawState::accessField
         table.insert
         (
             name,
-            autoPtr<Field<Type>>(new Field<Type>(size_, Zero))
+            autoPtr<Field<Type>>
+            (
+                new Field<Type>(size_, pTraits<Type>::zero)
+            )
         );
     }
 
@@ -220,36 +223,36 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 }
 
