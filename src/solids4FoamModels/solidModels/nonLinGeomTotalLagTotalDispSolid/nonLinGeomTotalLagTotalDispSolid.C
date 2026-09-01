@@ -651,6 +651,102 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
+{
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        if (solvePressure())
+        {
+            return tmp<volScalarField>
+            (
+                new volScalarField(2.0*mechanical().shearModulus())
+            );
+        }
+
+        return mechanical().impK();
+    }
+
+    // Announce it, so that a case which sets the switch can be shown to have
+    // taken this path. The switch lives in the <type>Coeffs sub-dictionary,
+    // and a switch that silently does nothing when misplaced is worse than no
+    // switch at all
+    Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
+        << " (" << tangentRequestName(req) << ")" << endl;
+
+    // Match the legacy field exactly in name, dimensions and boundary types:
+    // it is registered under "impK" and looked up by that name by the contact
+    // and cohesive zone models
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the current deformation gradient, which is the identity on
+    // a cold start and the restart value otherwise - the same state dependence
+    // the legacy impK() has, since it is likewise frozen at construction.
+    // F_, Finv_ and J_ are declared before impK_, so they are already built
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        req
+    );
+
+    return tImpK;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
@@ -724,12 +820,15 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         ),
         fvc::d2dt2(D())
     ),
-    impK_
+    useMechanicalConstitutiveLawManager_
     (
-        solvePressure()
-      ? 2.0*mechanical().shearModulus()
-      : mechanical().impK()
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
     ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     rKappaPtr_(),

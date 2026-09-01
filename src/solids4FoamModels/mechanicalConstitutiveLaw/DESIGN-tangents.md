@@ -1980,6 +1980,45 @@ applications must be rebuilt **together** before any result from the test
 application means anything - the same trap as the vtable mismatch in section
 8.14. A test result from a half-rebuilt tree is not evidence.
 
+### 8.16 Empty patches: the boundary fix was still incomplete
+
+Section 8.14 fixed the flat-list update to evaluate boundary integration
+points. It was still wrong, and the first two-dimensional case to exercise it
+said so immediately.
+
+`lawBoundaryFaces_` is built from `mesh.boundary()`, the **fv** boundary. An
+`empty` patch has no fvPatch faces at all, so that list is empty for it, and
+the code skipped the patch. But an empty patch's **polyPatch** faces still
+occupy slots in the face-centred topology's index space, because
+`nIntegrationPoints()` is `mesh.nFaces()`. Those slots were left unwritten -
+precisely the defect of section 8.14, surviving in the two-dimensional case.
+
+`blockPunch` is three-dimensional and has no empty patch, so the regression
+guard added in section 8.15 could not see it. `rotatingCylinder` is
+two-dimensional, and its boundary check failed on the first run with a
+relative error of 3714 - which is `GREAT/(lambda + 2 mu)`, i.e. the poison,
+untouched. The poison is what made the diagnosis immediate rather than a
+puzzle: an unpoisoned buffer would have shown an arbitrary number.
+
+**Fixed** by addressing such patches through the polyPatch and taking the law
+from the owner cell. Two consequences worth stating:
+
+- These faces take no part in the finite volume discretisation - that is what
+  `empty` means - so they are evaluated against a **scratch state**, not the
+  per-patch state, which does not exist for them. They get a well-defined
+  value without committing history for a face the discretisation does not
+  have.
+- That scratch state must be handed to `initialiseState`, exactly as a real
+  state is. Skipping that made `perforatedPlate` fail with "Requested state
+  field 'epsilonP' does not exist" - a history-dependent law failing to find
+  its own history. A bare state of the right size is not a usable state.
+
+**The lesson repeats.** Each round of this defect was found by a case with a
+mesh feature the previous cases lacked, never by reasoning about the code.
+Coverage of a topology contract means coverage of the mesh variety the
+contract has to survive: 3D, 2D with empty patches, and - still untested here
+- wedge, cyclic and processor patches.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

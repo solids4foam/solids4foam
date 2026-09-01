@@ -211,6 +211,7 @@ int main(int argc, char *argv[])
     // law is the only thing that exercises the shadow state properly
     bool allLinearElastic = true;
     bool allNeoHookean = true;
+    bool allStVenantKirchhoff = true;
     forAll(lawEntries, lawI)
     {
         const word type(lawEntries[lawI].dict().lookup("type"));
@@ -224,13 +225,22 @@ int main(int argc, char *argv[])
         {
             allNeoHookean = false;
         }
+
+        if (type != "StVenantKirchhoffElastic")
+        {
+            allStVenantKirchhoff = false;
+        }
     }
+
+    // Both are finite-strain-only laws: they implement no small-strain
+    // evaluation, and both linearise to isotropic elasticity near F = I
+    const bool allFiniteStrainOnly = allNeoHookean || allStVenantKirchhoff;
 
     forAll(lawEntries, lawI)
     {
         const dictionary& lawDict = lawEntries[lawI].dict();
 
-        if (!allLinearElastic && !allNeoHookean)
+        if (!allLinearElastic && !allFiniteStrainOnly)
         {
             continue;
         }
@@ -353,11 +363,11 @@ int main(int argc, char *argv[])
     // Finite-strain finite-difference tangent
     //
     // Run first, and on its own, because a finite-strain law such as
-    // neoHookeanElastic implements no small-strain evaluation: every check
-    // below would fatal on it
+    // neoHookeanElastic or StVenantKirchhoffElastic implements no small-strain
+    // evaluation: every check below would fatal on it
     // ---------------------------------------------------------------------
 
-    if (allNeoHookean)
+    if (allFiniteStrainOnly)
     {
         Info<< nl << "Finite-strain finite-difference tangent" << endl;
 

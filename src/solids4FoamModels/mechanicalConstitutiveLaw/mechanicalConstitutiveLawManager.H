@@ -144,6 +144,11 @@ class mechanicalConstitutiveLawManager
         mutable List<symmTensor> scratchStress_;
 
         //- Density field
+        //- Mechanical constitutive law index of each cell.
+        //  Needed by the flat-list boundary update for patches that carry no
+        //  fvPatch faces, where lawBoundaryFaces_ cannot supply the law
+        labelList cellToLaw_;
+
         mutable autoPtr<volScalarField> rhoPtr_;
 
         //- Bulk modulus field
@@ -528,6 +533,26 @@ public:
         (
             const volTensorField& gradD,
             const volTensorField& gradD0,
+            const scalar dt,
+            volScalarField& scalarTangent,
+            const tangentRequest tangentReq = tangentRequest::scalar
+        );
+
+        //- Finite-strain counterpart of updateScalarTangent.
+        //  Returns a scalar tangent at cell centres, evaluated from the
+        //  deformation gradient rather than the displacement gradient, for a
+        //  finite-strain solid model that needs an implicit stiffness
+        //  coefficient. Like its small-strain counterpart it evaluates each
+        //  law against a shadow of its state, so it neither writes a stress
+        //  nor disturbs history
+        void updateScalarTangentFiniteStrain
+        (
+            const volTensorField& F,
+            const volTensorField& F0,
+            const volTensorField& Finv,
+            const volTensorField& Finv0,
+            const volScalarField& J,
+            const volScalarField& J0,
             const scalar dt,
             volScalarField& scalarTangent,
             const tangentRequest tangentReq = tangentRequest::scalar

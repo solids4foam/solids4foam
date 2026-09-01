@@ -654,7 +654,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     }
 
     // Create a map for each cell to its mechanical law
-    labelList cellToLaw(mesh_.nCells(), -1);
+    cellToLaw_.setSize(mesh_.nCells(), -1);
+    labelList& cellToLaw = cellToLaw_;
 
     // Plane stress is defined once for the whole mechanicalProperties
     // dictionary. It is injected into each law's sub-dictionary below rather
@@ -1066,17 +1067,6 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         {
             forAll(mesh_.boundary(), patchI)
             {
-                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                if
-                (
-                    faces.empty()
-                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                )
-                {
-                    continue;
-                }
-
                 const labelList patchIPs
                 (
                     topo.boundaryIntegrationPointIDs(patchI)
@@ -1087,15 +1077,80 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     continue;
                 }
 
-                // This law's faces on this patch, as integration-point indices
-                labelList ipIDs(faces.size());
-                forAll(faces, i)
+                // An empty patch has no fvPatch faces, so lawBoundaryFaces_
+                // is empty for it, yet its polyPatch faces still occupy slots
+                // in this topology's index space. Skipping it would leave
+                // those slots unwritten, which is what a caller sizing its
+                // list to nIntegrationPoints() then reads. So address them
+                // through the polyPatch instead, and take the law from the
+                // owner cell.
+                //
+                // These faces take no part in the finite volume
+                // discretisation - that is what empty means - so they are
+                // evaluated against a shadow of the law's state. They get a
+                // well-defined value without committing history for a face
+                // the discretisation does not have
+                const bool viaPolyPatch =
+                    isA<emptyFvPatch>(mesh_.boundary()[patchI]);
+
+                labelList ipIDs;
+
+                if (viaPolyPatch)
                 {
-                    ipIDs[i] = patchIPs[faces[i]];
+                    const labelUList& ownCells =
+                        mesh_.boundaryMesh()[patchI].faceCells();
+
+                    DynamicList<label> ids(ownCells.size());
+                    forAll(ownCells, faceI)
+                    {
+                        if (cellToLaw_[ownCells[faceI]] == lawI)
+                        {
+                            ids.append(patchIPs[faceI]);
+                        }
+                    }
+
+                    ipIDs.transfer(ids);
+                }
+                else
+                {
+                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                    // This law's faces on this patch, as integration-point
+                    // indices
+                    ipIDs.setSize(faces.size());
+                    forAll(faces, i)
+                    {
+                        ipIDs[i] = patchIPs[faces[i]];
+                    }
                 }
 
+                if (ipIDs.empty())
+                {
+                    continue;
+                }
+
+                // An empty patch has no per-patch state: boundaryStates_ is
+                // sized to the fvPatch, which has no faces there. Its faces
+                // take no part in the discretisation, so give them a scratch
+                // state of the right size rather than a shadow of a state
+                // that is the wrong length. Nothing reads it afterwards
+                autoPtr<mechanicalConstitutiveLawState> bScratchPtr;
                 autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
-                if (preserveState)
+
+                if (viaPolyPatch)
+                {
+                    bScratchPtr.set
+                    (
+                        new mechanicalConstitutiveLawState(ipIDs.size())
+                    );
+
+                    // The law must be given the chance to register the state
+                    // fields it reads, exactly as for a real state. Without
+                    // this a history-dependent law fails looking up its own
+                    // history, e.g. epsilonP for the plastic law
+                    laws_[lawI].initialiseState(bScratchPtr());
+                }
+                else if (preserveState)
                 {
                     bShadowPtr.set
                     (
@@ -1108,7 +1163,9 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                 }
 
                 mechanicalConstitutiveLawState& bState =
-                    preserveState
+                    viaPolyPatch
+                  ? bScratchPtr()
+                  : preserveState
                   ? bShadowPtr()
                   : tp.boundaryStates_[lawI][patchI];
 
@@ -1328,17 +1385,6 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         {
             forAll(mesh_.boundary(), patchI)
             {
-                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                if
-                (
-                    faces.empty()
-                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                )
-                {
-                    continue;
-                }
-
                 const labelList patchIPs
                 (
                     topo.boundaryIntegrationPointIDs(patchI)
@@ -1349,15 +1395,80 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     continue;
                 }
 
-                // This law's faces on this patch, as integration-point indices
-                labelList ipIDs(faces.size());
-                forAll(faces, i)
+                // An empty patch has no fvPatch faces, so lawBoundaryFaces_
+                // is empty for it, yet its polyPatch faces still occupy slots
+                // in this topology's index space. Skipping it would leave
+                // those slots unwritten, which is what a caller sizing its
+                // list to nIntegrationPoints() then reads. So address them
+                // through the polyPatch instead, and take the law from the
+                // owner cell.
+                //
+                // These faces take no part in the finite volume
+                // discretisation - that is what empty means - so they are
+                // evaluated against a shadow of the law's state. They get a
+                // well-defined value without committing history for a face
+                // the discretisation does not have
+                const bool viaPolyPatch =
+                    isA<emptyFvPatch>(mesh_.boundary()[patchI]);
+
+                labelList ipIDs;
+
+                if (viaPolyPatch)
                 {
-                    ipIDs[i] = patchIPs[faces[i]];
+                    const labelUList& ownCells =
+                        mesh_.boundaryMesh()[patchI].faceCells();
+
+                    DynamicList<label> ids(ownCells.size());
+                    forAll(ownCells, faceI)
+                    {
+                        if (cellToLaw_[ownCells[faceI]] == lawI)
+                        {
+                            ids.append(patchIPs[faceI]);
+                        }
+                    }
+
+                    ipIDs.transfer(ids);
+                }
+                else
+                {
+                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                    // This law's faces on this patch, as integration-point
+                    // indices
+                    ipIDs.setSize(faces.size());
+                    forAll(faces, i)
+                    {
+                        ipIDs[i] = patchIPs[faces[i]];
+                    }
                 }
 
+                if (ipIDs.empty())
+                {
+                    continue;
+                }
+
+                // An empty patch has no per-patch state: boundaryStates_ is
+                // sized to the fvPatch, which has no faces there. Its faces
+                // take no part in the discretisation, so give them a scratch
+                // state of the right size rather than a shadow of a state
+                // that is the wrong length. Nothing reads it afterwards
+                autoPtr<mechanicalConstitutiveLawState> bScratchPtr;
                 autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
-                if (preserveState)
+
+                if (viaPolyPatch)
+                {
+                    bScratchPtr.set
+                    (
+                        new mechanicalConstitutiveLawState(ipIDs.size())
+                    );
+
+                    // The law must be given the chance to register the state
+                    // fields it reads, exactly as for a real state. Without
+                    // this a history-dependent law fails looking up its own
+                    // history, e.g. epsilonP for the plastic law
+                    laws_[lawI].initialiseState(bScratchPtr());
+                }
+                else if (preserveState)
                 {
                     bShadowPtr.set
                     (
@@ -1370,7 +1481,9 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                 }
 
                 mechanicalConstitutiveLawState& bState =
-                    preserveState
+                    viaPolyPatch
+                  ? bScratchPtr()
+                  : preserveState
                   ? bShadowPtr()
                   : tp.boundaryStates_[lawI][patchI];
 
@@ -1614,6 +1727,77 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
     // so taking the patch-internal value is exact rather than an
     // approximation. Without this the boundary stays at whatever the field was
     // constructed with, which a caller forming 1/tangent then divides by
+    forAll(scalarTangent.boundaryField(), patchI)
+    {
+        if (!scalarTangent.boundaryField()[patchI].coupled())
+        {
+            Foam::boundaryFieldRef(scalarTangent)[patchI] =
+                scalarTangent.boundaryField()[patchI].patchInternalField();
+        }
+    }
+
+#ifndef OPENFOAM_ORG
+    // Sync the coupled patches
+    scalarTangent.correctBoundaryConditions();
+#endif
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
+(
+    const volTensorField& F,
+    const volTensorField& F0,
+    const volTensorField& Finv,
+    const volTensorField& Finv0,
+    const volScalarField& J,
+    const volScalarField& J0,
+    const scalar dt,
+    volScalarField& scalarTangent,
+    const tangentRequest tangentReq
+)
+{
+    checkMeshConsistency(mesh_, F.mesh(), F.name());
+    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
+    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
+    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
+    checkMeshConsistency(mesh_, J.mesh(), J.name());
+    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
+    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
+
+    if (!needsScalarTangent(tangentReq))
+    {
+        FatalErrorInFunction
+            << "updateScalarTangentFiniteStrain was asked for a "
+            << tangentRequestName(tangentReq) << " tangent." << nl
+            << "This interface returns a scalar tangent at cell centres, so "
+            << "the request must be scalar or scalarDeviatoric."
+            << exit(FatalError);
+    }
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
+
+    updateTangentFiniteStrain
+    (
+        topo,
+        Foam::primitiveField(F),
+        Foam::primitiveField(F0),
+        Foam::primitiveField(Finv),
+        Foam::primitiveField(Finv0),
+        Foam::primitiveField(J),
+        Foam::primitiveField(J0),
+        dt,
+        &tangent,
+        nullptr,
+        tangentReq
+    );
+
+    // As in updateScalarTangent: a boundary face belongs to the material of
+    // its owner cell, so the patch-internal value is exact, and a caller
+    // forming 1/tangent must not be handed whatever the field was constructed
+    // with
     forAll(scalarTangent.boundaryField(), patchI)
     {
         if (!scalarTangent.boundaryField()[patchI].coupled())
