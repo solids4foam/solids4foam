@@ -23,6 +23,7 @@ DISP_Z_MAX=-0.163
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
+CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 
 APPROACHES=(
@@ -36,6 +37,7 @@ echo "blockPunch regression test"
 echo "Time steps: ${EXPECTED_TIME_STEPS}"
 echo "Final time: ${REGRESSION_END_TIME}"
 echo "Point-A disp_z between ${DISP_Z_MAX} and ${DISP_Z_MIN}"
+echo "Plus the finite-strain mechanicalConstitutiveLaw framework checks"
 echo "============================================================"
 echo
 
@@ -128,6 +130,44 @@ check_displacement() {
     fi
 }
 
+# Exercise the finite-strain paths of the mechanicalConstitutiveLawManager on
+# this case. This tutorial is used because its law is neoHookeanElastic, which
+# implements no small-strain evaluation, so it is the only runtime coverage of
+# the finite-strain kinematics, the finite-difference fourth-order tangent, and
+# the boundary integration points of a face-centred topology
+run_constitutive_test() {
+    local case_dir="$1"
+
+    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
+        return 0
+    fi
+
+    if [[ ! -d "${case_dir}/constant/polyMesh" ]]; then
+        echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
+        return 0
+    fi
+
+    if ( cd "${case_dir}" && Test-mechanicalConstitutiveLaw \
+            > "${CONSTITUTIVE_LOGFILE}" 2>&1 )
+    then
+        local n_passed
+        n_passed=$(grep -c 'PASS:' "${case_dir}/${CONSTITUTIVE_LOGFILE}" || true)
+
+        if (( n_passed == 0 )); then
+            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
+            return 0
+        fi
+
+        echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
+        return 0
+    fi
+
+    echo "FAIL: mechanicalConstitutiveLaw checks"
+    grep 'FAIL:' "${case_dir}/${CONSTITUTIVE_LOGFILE}" || true
+    return 1
+}
+
 CHECK_ONLY=false
 
 for arg in "$@"; do
@@ -148,6 +188,10 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 failures=0
+
+# The framework checks depend only on the mesh and the material, so they are
+# run once rather than once per approach
+constitutive_tested=false
 
 for approach in "${APPROACHES[@]}"; do
     CASE_DIR="${REGRESSION_ROOT}/${approach}"
@@ -182,6 +226,15 @@ for approach in "${APPROACHES[@]}"; do
 
     if ! check_displacement "${CASE_DIR}" "${approach}"; then
         failures=$((failures + 1))
+    fi
+
+    # Before the Allclean below, which removes the mesh
+    if [ "${constitutive_tested}" = false ]; then
+        constitutive_tested=true
+
+        if ! run_constitutive_test "${CASE_DIR}"; then
+            failures=$((failures + 1))
+        fi
     fi
 
     if [ "$CHECK_ONLY" = false ]; then

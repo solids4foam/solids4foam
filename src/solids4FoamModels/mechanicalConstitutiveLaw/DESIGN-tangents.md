@@ -1944,6 +1944,42 @@ It was found by the finite-strain tangent test, which sized its comparison to
 `nIntegrationPoints()` and got a relative error of exactly 1 on the unwritten
 entries - a number too clean to be anything but "never assigned".
 
+### 8.15 The boundary check earns its place, and how that was established
+
+The finite-strain tangent test now compares **every** integration point of the
+face-centred topology, splitting the report into an internal and a boundary
+check rather than stopping at `nInternalFaces`. That restriction existed only
+as a workaround for the defect of section 8.14, so removing it is what turns
+the test into the regression guard for the fix.
+
+Two things make the boundary check trustworthy rather than decorative:
+
+1. The comparison buffer is **poisoned** with `GREAT` before the call. `mat66`
+   is a POD, so an unpoisoned `List<mat66>` holds whatever memory held, and an
+   integration point the manager never reaches would be compared against
+   arbitrary values - a test that passes or fails by luck.
+
+2. It was **mutation tested**. With `boundaryIntegrationPointIDs` reverted to
+   returning an empty list, i.e. exactly the pre-fix behaviour, the internal
+   check still passes and the boundary check fails with a relative error of
+   1.7e12: the poison, untouched. With the fix in place both pass at 2.2e-4.
+   The check fails when, and only when, the defect is present.
+
+Coverage is on `blockPunch`, whose law is `neoHookeanElastic` and which
+therefore has no small-strain evaluation at all. It is the only runtime
+coverage of the finite-strain kinematics, the finite-difference fourth-order
+tangent, and the boundary integration points. Its material is given as `mu` and
+`K`, which is why the law was extended to accept that form alongside `E` and
+`nu`.
+
+**A build lesson that cost time twice.** The first mutation run reported a
+pass. The mutation was genuinely in the library, but the test application had
+not been relinked, because the library and the applications were built in
+separate steps and only the library step was repeated. The library and the
+applications must be rebuilt **together** before any result from the test
+application means anything - the same trap as the vtable mismatch in section
+8.14. A test result from a half-rebuilt tree is not evidence.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

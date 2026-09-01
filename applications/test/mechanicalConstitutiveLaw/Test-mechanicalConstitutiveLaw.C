@@ -401,7 +401,21 @@ int main(int argc, char *argv[])
             J[ipI] = det(F[ipI]);
         }
 
+        // Poisoned, so that an integration point the manager fails to
+        // reach fails the comparison deterministically. mat66 is a POD, so
+        // left alone its contents would be whatever memory held, which is a
+        // test that passes or fails by luck
         List<mat66> fdC(n);
+        forAll(fdC, ipI)
+        {
+            for (label i = 0; i < 6; ++i)
+            {
+                for (label j = 0; j < 6; ++j)
+                {
+                    fdC[ipI](i, j) = GREAT;
+                }
+            }
+        }
 
         manager.updateTangentFiniteStrain
         (
@@ -414,33 +428,58 @@ int main(int argc, char *argv[])
         const label ZZ = symmTensor::ZZ;
         const label XY = symmTensor::XY;
 
-        // Internal faces only. The face-centred topology reports nFaces
-        // integration points but assigns only the internal ones to cells, and
-        // therefore to laws, so the boundary entries are never written
+        // Every integration point of the topology, boundary faces included.
+        // The deformation is uniform, so the tangent is the same everywhere
+        // and the boundary points are held to exactly the same standard as
+        // the internal ones.
+        //
+        // This is deliberate, and is the regression guard for the defect of
+        // section 8.14: the face-centred topology reports nFaces integration
+        // points, and until the manager evaluated the boundary ones, every
+        // entry from nInternalFaces upwards was left unwritten. Restricting
+        // this loop to internal faces would hide a repeat of that defect
         const label nInternal = mesh.nInternalFaces();
 
         // Single material here, so the constants are uniform
-        scalar maxRelError = 0.0;
-        for (label ipI = 0; ipI < nInternal; ++ipI)
+        const scalar mu = refMu[0];
+        const scalar lambda = refLambda[0];
+        const scalar scale = lambda + 2.0*mu;
+
+        scalar maxRelErrorInternal = 0.0;
+        scalar maxRelErrorBoundary = 0.0;
+
+        for (label ipI = 0; ipI < n; ++ipI)
         {
-            const scalar mu = refMu[0];
-            const scalar lambda = refLambda[0];
-            const scalar scale = lambda + 2.0*mu;
             const mat66& C = fdC[ipI];
 
-            maxRelError =
-                max(maxRelError, mag(C(XX, XX) - (lambda + 2.0*mu))/scale);
-            maxRelError =
-                max(maxRelError, mag(C(ZZ, ZZ) - (lambda + 2.0*mu))/scale);
-            maxRelError = max(maxRelError, mag(C(XX, YY) - lambda)/scale);
-            maxRelError = max(maxRelError, mag(C(XY, XY) - mu)/scale);
-            maxRelError = max(maxRelError, mag(C(XX, XY))/scale);
+            scalar e = 0.0;
+            e = max(e, mag(C(XX, XX) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(ZZ, ZZ) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(XX, YY) - lambda)/scale);
+            e = max(e, mag(C(XY, XY) - mu)/scale);
+            e = max(e, mag(C(XX, XY))/scale);
+
+            if (ipI < nInternal)
+            {
+                maxRelErrorInternal = max(maxRelErrorInternal, e);
+            }
+            else
+            {
+                maxRelErrorBoundary = max(maxRelErrorBoundary, e);
+            }
         }
 
         reportError
         (
             "reproduces the small-strain isotropic tangent near F = I",
-            maxRelError,
+            maxRelErrorInternal,
+            1e-3
+        );
+
+        reportError
+        (
+            "reproduces that tangent on boundary faces too",
+            maxRelErrorBoundary,
             1e-3
         );
 
