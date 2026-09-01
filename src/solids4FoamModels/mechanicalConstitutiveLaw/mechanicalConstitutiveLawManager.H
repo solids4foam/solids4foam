@@ -475,8 +475,11 @@ public:
         //  which is what allows evaluation on a dual or otherwise derived mesh.
         //  Only internal integration points are visited: boundary states are
         //  the business of the GeometricField overloads.
-        //  No stress or tangent collapse is performed, so the topology must
-        //  return requiresUniqueIntegrationPointsPerMaterial() == false.
+        //  No stress or tangent collapse is performed. A topology whose
+        //  integration points are shared between cells is therefore allowed
+        //  only with a single mechanical constitutive law, where no
+        //  integration point can belong to two materials and there is nothing
+        //  to collapse.
         //  A fourth-order tangent request additionally requires
         //  topo.supportsFourthOrderTangent().
         //  Unlike the GeometricField overloads, a tangent request that is not

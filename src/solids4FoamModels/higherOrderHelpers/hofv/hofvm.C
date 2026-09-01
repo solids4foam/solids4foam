@@ -22,6 +22,7 @@ License
 #include <algorithm>
 
 #include "hofvm.H"
+#include "multiplyCoeff.H"
 #include "fvc.H"
 #include "fvmD2dt2.H"
 #include "compatibilityFunctions.H"
@@ -191,7 +192,7 @@ static label hofvmLaplacianPETSc
     const foamPetscSnesHelper& petscSnesHelper,
     const movingLeastSquares& mls,
     const volVectorField& D,
-    const volScalarField& diffusivity,
+    const volScalarField* diffusivityPtr,
     tensor (*calcCoeff)
     (
         const scalar& gamma,
@@ -199,6 +200,7 @@ static label hofvmLaplacianPETSc
         const vector& gradInterpCoeff,
         const vector& faceNormal
     ),
+    const List<mat66>* materialTangentPtr,
     const label rowOffset,
     const label colOffset
 )
@@ -214,8 +216,49 @@ static label hofvmLaplacianPETSc
     // Diffusion coefficient linearly interpolated to face centres.
     // If Gamma is not constant, next step is to interpolate diffusivity to
     // quad points using  hofvc::interpolate
-    const surfaceScalarField gamma(fvc::interpolate(diffusivity));
-    const scalarField& gammaI = gamma.internalField();
+    // Interpolated only on the scalar-coefficient path. With a full material
+    // tangent there is no scalar diffusivity to interpolate
+    autoPtr<surfaceScalarField> gammaPtr;
+    if (diffusivityPtr)
+    {
+        gammaPtr.set(new surfaceScalarField(fvc::interpolate(*diffusivityPtr)));
+    }
+
+    // Coefficient at one quadrature point.
+    // Either one of the three isotropic kernels scaled by a scalar
+    // diffusivity, or the full material tangent contracted with the face area
+    // vector and the gradient interpolation coefficient. The two agree
+    // identically for an isotropic tangent: summing the laplacian, transpose
+    // and trace kernels gives w*(mu*(n.g)*I + mu*g_i*n_j + lambda*n_i*g_j),
+    // which is Sf_m C_mikl g_k delta_lj with Sf = w*n
+    auto coeffAt =
+        [&]
+        (
+            const label faceID,
+            const scalar gammaFace,
+            const scalar quadPointW,
+            const vector& gradInterpCoeff,
+            const vector& faceNormal
+        ) -> tensor
+        {
+            if (materialTangentPtr)
+            {
+                tensor c(tensor::zero);
+                multiplyCoeff
+                (
+                    c,
+                    quadPointW*faceNormal,
+                    (*materialTangentPtr)[faceID],
+                    gradInterpCoeff
+                );
+                return c;
+            }
+
+            return calcCoeff
+            (
+                gammaFace, quadPointW, gradInterpCoeff, faceNormal
+            );
+        };
 
     // Face quadrature points weights, stencils and gradient interpolation
     // coefficients
@@ -236,7 +279,10 @@ static label hofvmLaplacianPETSc
     forAll(owner, faceI)
     {
         const vector& faceNormal = n[faceI];
-        const scalar gammaFace = gammaI[faceI];
+        const scalar gammaFace =
+            diffusivityPtr
+          ? Foam::primitiveField(gammaPtr())[faceI]
+          : 0.0;
         const label ownCellID = owner[faceI];
         const label neiCellID = neighbour[faceI];
         const PetscInt globalOwnRow =
@@ -253,8 +299,9 @@ static label hofvmLaplacianPETSc
             {
                 const PetscInt globalCellID = stencil[cI];
                 const tensor coeff =
-                    calcCoeff
+                    coeffAt
                     (
+                        faceI,
                         gammaFace,
                         quadPointW,
                         gradCoeffs[faceI][qpI][cI],
@@ -303,7 +350,12 @@ static label hofvmLaplacianPETSc
 
         if (isA<processorPolyPatch>(pp))
         {
-            const scalarField& pGamma = gamma.boundaryField()[patchI];
+            const scalarField pGamma
+            (
+                diffusivityPtr
+              ? scalarField(gammaPtr().boundaryField()[patchI])
+              : scalarField(pp.size(), 0.0)
+            );
             const vectorField patchNormal(mesh.boundary()[patchI].nf());
             const label start = pp.start();
 
@@ -325,8 +377,9 @@ static label hofvmLaplacianPETSc
                     {
                         const PetscInt globalCellID = stencil[cI];
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
+                                faceID,
                                 gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
@@ -361,7 +414,12 @@ static label hofvmLaplacianPETSc
                 << abort(FatalError);
         }
 
-        const scalarField& pGamma = gamma.boundaryField()[patchI];
+        const scalarField pGamma
+        (
+            diffusivityPtr
+          ? scalarField(gammaPtr().boundaryField()[patchI])
+          : scalarField(pp.size(), 0.0)
+        );
         const vectorField patchNormal(mesh.boundary()[patchI].nf());
         const label start = pp.start();
 
@@ -397,8 +455,9 @@ static label hofvmLaplacianPETSc
                         const PetscInt globalCellID = stencil[cI];
 
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
+                                faceID,
                                 gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
@@ -406,8 +465,9 @@ static label hofvmLaplacianPETSc
                             );
 
                         const tensor mirrorCoeff =
-                            calcCoeff
+                            coeffAt
                             (
+                                faceID,
                                 gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI + stencilSize],
@@ -466,8 +526,9 @@ static label hofvmLaplacianPETSc
                     {
                         const PetscInt globalCellID = stencil[cI];
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
+                                faceID,
                                 gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
@@ -720,8 +781,9 @@ void Foam::hofvm::laplacianIntoPETScMatrix
         petscSnesHelper,
         mls,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianCoeff,
+        nullptr,          // no material tangent on this path
         rowOffset,
         colOffset
     );
@@ -745,8 +807,9 @@ void Foam::hofvm::laplacianTransposeIntoPETScMatrix
         petscSnesHelper,
         mls,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianTransposeCoeff,
+        nullptr,          // no material tangent on this path
         rowOffset,
         colOffset
     );
@@ -770,8 +833,44 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
         petscSnesHelper,
         mls,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianTraceCoeff,
+        nullptr,          // no material tangent on this path
+        rowOffset,
+        colOffset
+    );
+}
+
+
+void Foam::hofvm::divSigmaIntoPETScMatrix
+(
+    Mat jac,
+    const foamPetscSnesHelper& petscSnesHelper,
+    const movingLeastSquares& mls,
+    const volVectorField& D,
+    const List<mat66>& materialTangent,
+    const label rowOffset,
+    const label colOffset
+)
+{
+    if (materialTangent.size() != D.mesh().nFaces())
+    {
+        FatalErrorInFunction
+            << "The material tangent must be indexed by mesh face and sized "
+            << D.mesh().nFaces() << ", but it has "
+            << materialTangent.size() << " entries."
+            << exit(FatalError);
+    }
+
+    hofvm::hofvmLaplacianPETSc
+    (
+        jac,
+        petscSnesHelper,
+        mls,
+        D,
+        nullptr,          // no scalar diffusivity on this path
+        nullptr,          // and so no scalar coefficient kernel
+        &materialTangent,
         rowOffset,
         colOffset
     );

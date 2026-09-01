@@ -104,6 +104,25 @@ public:
         return true;
     }
 
+    //- Global face indices for a boundary patch.
+    //  A patch occupies a contiguous block of the global face numbering
+    //  starting at its own start index
+    virtual labelList boundaryIntegrationPointIDs
+    (
+        const label patchI
+    ) const override
+    {
+        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+
+        labelList ids(pp.size());
+        forAll(ids, faceI)
+        {
+            ids[faceI] = pp.start() + faceI;
+        }
+
+        return ids;
+    }
+
     //- Faces are shared between cells → uniqueness required
     virtual bool requiresUniqueIntegrationPointsPerMaterial() const override
     {

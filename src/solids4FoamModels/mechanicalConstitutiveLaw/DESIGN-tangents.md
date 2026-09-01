@@ -622,13 +622,39 @@ tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
 tmp<volScalarField> tLambda = impK_ - 2.0*mu;
 ```
 
-This inverts `impK = 2*mu + lambda` and `K = lambda + (2/3)*mu` and is valid
-**only** if the law's `impK()` is exactly `2*mu + lambda` and its `bulkModulus()`
-is exactly `lambda + (2/3)*mu`. That holds for `linearElastic` and, coincidentally,
-for `linearElasticMisesPlastic` at an elastic point. It is silently wrong for
-`linearElasticMisesPlastic` at a plastic point (`impK` carries the `theta`
-scaling, so the back-derived `mu` is not the shear modulus), for
-`orthotropicLinearElastic`, and for every hyperelastic law.
+This inverts `impK = (4/3)*mu_eff + K` to recover the isotropic tangent pair
+that `impK` and `bulkModulus()` encode between them.
+
+**Correction, from a later reading.** An earlier version of this section said the
+inversion is wrong for `linearElasticMisesPlastic` once a point yields. It is
+not. That law returns `impK = scaleFactor*(4/3)*mu_ + K_` and
+`bulkModulus() = K_`, so the back-derivation gives
+`mu_back = scaleFactor*mu_`, exactly the softened shear modulus, and
+`lambda_back = K_ - (2/3)*scaleFactor*mu_`, exactly the matching lambda for
+deviatoric softening at unchanged bulk modulus - which is the right structure
+for J2 plasticity. `linearElastic` and `neoHookeanElastic` define `impK` in the
+same form, so all three are inverted exactly.
+
+The real objection is structural rather than numerical. The solid model assumes
+every law's `impK()` has that algebraic form and that `bulkModulus()` is the
+matching `K`. `impK` is explicitly the "whatever converges best" coefficient, so
+a law is entitled to return something else, and nothing declares, checks or
+documents the assumption. A law that exercises that freedom gets a wrong pair
+with no diagnostic.
+
+Where an isotropic pair cannot represent the tangent at all - the orthotropic
+and anisotropic hyperelastic laws - no way of obtaining `mu` and `lambda` helps.
+`orthotropicLinearElastic` is protected only by an accident: it implements
+`impK` but not `bulkModulus`, which is `notImplemented` in the base class, so
+the back-derivation fatal-errors there rather than computing nonsense.
+
+**Note also that the obvious repair is a trap.** `shearModulus()` exists, but
+`linearElasticMisesPlastic::shearModulus()` returns the elastic `mu_` with no
+`scaleFactor`, so substituting it would discard the softening the
+back-derivation captures. It is also `notImplemented` in the base class and
+overridden by only seven of about twenty-five laws. Adding a
+`tangentShearModulus()` would re-encode the same implicit contract under a new
+name and still could not express an anisotropic tangent.
 
 **Decision: replace the three separate `hofvm` calls with one `mat66`-driven
 call. No new mathematics is required — the kernel already exists.**
@@ -1514,7 +1540,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
 | 4 | **Done.** `vertexCentredLinGeomSolid` tangent-only adoption (§8.4), plus the optional manager deferred from PR-3. See §8.9. |
 | 5 | Stress for `vertexCentredLinGeomSolid`, removing its dependence on `dualMechanicalModel`. Its nonlinear sibling is disabled, see §8.11. |
-| 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
+| 6 | **Done for `linGeomTotalDispSolid`.** `hofvm::divSigmaIntoPETScMatrix(mat66)`; the back-derivation is retained as the default rather than deleted, so existing cases are unchanged. The two `nonLinGeom*` solvers still carry it. See §8.13. |
 | 7…n | Cell-centred solvers and their high-order variants, the ones in common use and now the priority, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
@@ -1848,7 +1874,77 @@ non-coupled patch from its patch-internal value, which is exact for a scalar
 tangent because a boundary face belongs to its owner cell's material, then
 syncs the coupled patches. Any cell-centred caller would have hit this.
 
-### 8.13 Open questions still outstanding
+### 8.13 Notes from the high-order Jacobian
+
+`hofvm::divSigmaIntoPETScMatrix` assembles the high-order Jacobian from a full
+`mat66` per mesh face, and `linGeomTotalDispSolid` uses it when
+`jacobianTangent fourthOrder` is set. The `(impK_ - K)*3/4` back-derivation
+stays as the default, so existing cases are untouched.
+
+**The case against the back-derivation is structural, not numerical.** See the
+correction in §3.5: it inverts exactly for every law currently defining `impK`
+in the standard form, plastic points included. What is wrong with it is that it
+depends on an undocumented contract about the form of `impK()`, and that no
+isotropic pair can represent an anisotropic tangent however it is obtained. A
+solid model does not need material constants; it needs a Jacobian operator, and
+the material tangent is the general way to supply one.
+
+**No new mathematics was needed, as §3.5 predicted.** The three isotropic
+kernels sum to `w*(mu*(n.g)*I + mu*g_i*n_j + lambda*n_i*g_j)`, which is
+`Sf_m C_mikl g_k delta_lj` with `Sf = w*n` - already implemented as
+`multiplyCoeff` and already used by the vertex-centred solver. The assembler
+was generalised to take either a scalar diffusivity with one of the kernels or
+a material tangent, rather than being duplicated, so the internal, processor,
+symmetry and generic patch handling stays in one place.
+
+**Verified byte-identical**, with the same Newton iteration count and the same
+convergence reason, on `plateHole` with a linear elastic material - which is
+precisely the case where the back-derivation is valid, and therefore the only
+case where the two *should* agree. `plateHole` gains a `highOrderFourthOrder`
+approach so this stays covered.
+
+**A guard was relaxed to make this possible.** The flat-list update refused any
+topology whose integration points are shared between cells. The reason for that
+rule is stress collapse at a material interface, which cannot arise with a
+single law, so it now refuses only when there is more than one. The face-centred
+topology is shared by construction, so without this the material tangent could
+not be obtained per face at all.
+
+The test application asserted the old blanket rule and duly failed on
+`perforatedPlate`, which has one material. It now asserts the real contract:
+rejected with several materials, allowed with one.
+
+### 8.14 Boundary integration points in the flat-list update
+
+`faceCentredIntegrationPointTopology::nIntegrationPoints()` returns
+`mesh.nFaces()`, but its cell-to-integration-point map covers **internal faces
+only**, and says so. Laws are matched to integration points through that map,
+so a flat-list update left every boundary entry of the caller's storage exactly
+as it was found. `linGeomTotalDispSolid::faceMaterialTangent()` sizes its
+`List<mat66>` to `nFaces` and hands it to an assembler that does iterate the
+boundary patches, so it was reading unwritten memory.
+
+**Fixed** by giving the topology a `boundaryIntegrationPointIDs(patchI)` query
+and having both flat-list primitives evaluate the boundary points of a
+`boundaryAware` topology, using the per-law, per-patch boundary state the
+manager already keeps. This is the general fix: any topology that declares
+itself boundary-aware now has its boundary points covered, rather than the
+caller working around the gap.
+
+**Why this went unnoticed, which is the part worth remembering.** The
+`highOrderFourthOrder` variant was byte-identical to `highOrder`, with the same
+Newton iteration count, and that was reported as strong verification. It is
+not. This is a *Jacobian*: a wrong one changes the path to the solution, not the
+solution, and PETSc SNES converges to its tolerance either way. **A
+byte-identical converged result is exactly what a wrong Jacobian looks like
+when the residual is right.** No end-to-end solver comparison can validate a
+Jacobian; only a direct comparison of the tangent itself can.
+
+It was found by the finite-strain tangent test, which sized its comparison to
+`nIntegrationPoints()` and got a relative error of exactly 1 on the unwritten
+entries - a number too clean to be anything but "never assigned".
+
+### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term

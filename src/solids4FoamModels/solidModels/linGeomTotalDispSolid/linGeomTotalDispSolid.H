@@ -38,6 +38,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
@@ -79,6 +80,10 @@ class linGeomTotalDispSolid
 
         //- Mechanical constitutive law manager, when the above is set
         mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
+        //- Material tangent at mesh faces, for the high-order Jacobian.
+        //  Held here so it is allocated once rather than per assembly
+        mutable List<mat66> faceMaterialTangent_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -123,6 +128,10 @@ class linGeomTotalDispSolid
 
         //- Return the reciprocal of the bulk modulus, from the same source
         tmp<volScalarField> makeRKappa() const;
+
+        //- Return the material tangent at mesh faces, indexed by face, for
+        //  the high-order Jacobian
+        const List<mat66>& faceMaterialTangent() const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
