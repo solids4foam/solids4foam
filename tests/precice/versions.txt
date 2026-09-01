@@ -1,0 +1,29 @@
+#------------------------------------------------------------------------------
+# License
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
+#
+# File
+#     tests/precice/versions.txt
+#
+# Description
+#     Pinned versions of the external preCICE components used by the preCICE
+#     coupling tests. Sourced by Alltest-precice and read by the
+#     .github/workflows/preciceTest.yml workflow.
+#
+#     Pin commit SHAs rather than branch names so that the tests are
+#     reproducible and so that upgrades are deliberate, reviewable changes.
+#
+#------------------------------------------------------------------------------
+
+# preCICE library release. The CI container is Ubuntu 22.04 and preCICE v3.4 was
+# the last release to ship a jammy package, so moving to a newer preCICE means
+# moving the container base image at the same time.
+PRECICE_VERSION=3.4.1
+PRECICE_DEB_DISTRO=jammy
+
+# github.com/precice/openfoam-adapter, develop
+OPENFOAM_ADAPTER_REF=c7e95a8a2cc868e5e5cc8fbab05e874dd56d6a0c
+
+# github.com/precice/tutorials, develop
+TUTORIALS_REF=9afc7c84d0c72b64312d6dec27769002a022252a

@@ -4,6 +4,26 @@ This changelog highlights significant user-facing changes in each solids4foam
 release. For complete commit-level details and contributor information, see the
 [GitHub Releases](https://github.com/solids4foam/solids4foam/releases) page.
 
+## [Unreleased]
+
+### Added
+
+- Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
+  the [preCICE tutorials](https://github.com/precice/tutorials) against the
+  current source and checks them against stored reference values. The preCICE
+  team's own system tests pin a released solids4foam image, so they cannot
+  catch a regression introduced on a branch; this closes that gap. Run by the
+  `preCICE coupling test` workflow for pull requests targeting `master`, for
+  any pull request labelled `test-precice`, and on request.
+
+### Removed
+
+- Removed `tutorials/fluidSolidInteraction-preCICE`, which held standalone
+  `3dTube` and `flexibleOversetCylinder` preCICE cases that were not covered by
+  any test. solids4foam's preCICE cases are now maintained upstream in the
+  preCICE tutorials and tested by `tests/precice`. The removed cases remain
+  available as an archive from the solids4foam website.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4

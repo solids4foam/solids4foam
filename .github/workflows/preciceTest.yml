@@ -1,0 +1,145 @@
+# Test the preCICE coupling of solids4foam.
+#
+# solids4foam's preCICE cases live upstream in github.com/precice/tutorials,
+# not in this repository. This workflow builds preCICE, the OpenFOAM preCICE
+# adapter and solids4foam, then runs the cases registered under tests/precice
+# against them.
+#
+# The preCICE team run the perpendicular-flap case in their own system tests,
+# but those pin a released solids4foam Docker image, so they cannot catch a
+# regression introduced on a branch. This workflow closes that gap.
+#
+# Building solids4foam dominates the run time, so the job is not run on every
+# pull request. It runs:
+#   - always, for pull requests targeting master, which precede a release
+#   - on any pull request labelled "test-precice" (remove and re-add the label
+#     to trigger it again)
+#   - manually, via workflow_dispatch
+name: preCICE coupling test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  precice-test:
+    name: preCICE coupling test
+    # Do not filter the trigger above with "branches:": that would stop the
+    # workflow firing at all on pull requests into development, which would
+    # disable the label route.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.base_ref == 'master' ||
+      contains(github.event.pull_request.labels.*.name, 'test-precice')
+
+    runs-on: ubuntu-22.04
+
+    # Ubuntu 22.04 (jammy), matching the preCICE package installed below, and
+    # with PETSc, which the upstream solid case requires.
+    # Unlike the other workflows, this one runs the container as root, so that
+    # the preCICE package can be installed with apt, which resolves its
+    # Depends. Installing it without apt, by unpacking it, skips those, and the
+    # image ships neither the boost-log nor the PETSc runtime libraries that
+    # libprecice.so.3 needs: the adapter library then fails to dlopen and the
+    # run aborts with "Cannot load function type preciceAdapterFunctionObject".
+    # The dlerror line naming the missing library is printed unprefixed about
+    # 20 lines earlier, so it is easy to miss.
+    container:
+      image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+      env:
+        HOME: ${{ github.workspace }}
+
+    env:
+      FOAM_BASHRC: /usr/lib/openfoam/openfoam2512/etc/bashrc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned versions
+        # GITHUB_ENV accepts only KEY=VALUE lines, so drop the comments and
+        # blank lines that versions.txt carries for human readers
+        run: grep -E '^[A-Z][A-Z0-9_]*=' tests/precice/versions.txt >> "$GITHUB_ENV"
+
+      - name: Install preCICE
+        shell: bash -l {0}
+        run: |
+          set -e
+          wget -q "https://github.com/precice/precice/releases/download/v${PRECICE_VERSION}/libprecice3_${PRECICE_VERSION}_${PRECICE_DEB_DISTRO}.deb"
+          apt-get -qq update
+          apt-get -qq -y install "./libprecice3_${PRECICE_VERSION}_${PRECICE_DEB_DISTRO}.deb"
+          pkg-config --modversion libprecice
+
+      - name: PETSc sanity check
+        shell: bash -l {0}
+        run: |
+          # Installing preCICE pulls in the distribution PETSc packages. Check
+          # that PETSC_DIR still points at the PETSc solids4foam is built
+          # against, so that this does not silently change the build.
+          source "${FOAM_BASHRC}"
+          echo "PETSC_DIR = $PETSC_DIR"
+          test -d "$PETSC_DIR/include"
+
+      - name: Build the OpenFOAM preCICE adapter
+        shell: bash -l {0}
+        run: |
+          # Source the OpenFOAM bashrc before enabling errexit: under "set -e"
+          # it aborts the shell at _foamAddLibAuto returning 1 for boost-system
+          # in etc/config.sh/CGAL. Its own exit status is 0, so this shows up
+          # only under errexit.
+          source "${FOAM_BASHRC}"
+          set -e
+          git config --global --add safe.directory '*'
+          # HOME is the repository checkout, so clone alongside it rather than
+          # into it
+          git clone --quiet https://github.com/precice/openfoam-adapter.git "${HOME}/../openfoam-adapter"
+          cd "${HOME}/../openfoam-adapter"
+          git checkout --quiet "${OPENFOAM_ADAPTER_REF}"
+          ./Allwmake -j
+          test -f "${FOAM_USER_LIBBIN}/libpreciceAdapterFunctionObject.so"
+
+      - name: Allwmake
+        shell: bash -l {0}
+        run: |
+          source "${FOAM_BASHRC}"
+          export S4F_NO_FILE_FIXES=1; ./Allwmake -j
+
+      - name: Alltest-precice
+        shell: bash -l {0}
+        run: |
+          source "${FOAM_BASHRC}"
+          export OPENBLAS_CORETYPE=Haswell
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./tests/precice/Alltest-precice
+
+      - name: Collect the preCICE test logs
+        if: ${{ failure() }}
+        shell: bash -l {0}
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/precice-test-logs"
+          cd "${GITHUB_WORKSPACE}"
+          cp tutorialsTest-precice/log.* \
+             "${GITHUB_WORKSPACE}/precice-test-logs/" 2>/dev/null || true
+          find tutorialsTest-precice/tutorials \
+               -name 'log.run' -o -name 'precice-*.log' \
+            | while read -r f
+              do
+                  target="${GITHUB_WORKSPACE}/precice-test-logs/$(echo "${f}" \
+                      | sed 's|tutorialsTest-precice/tutorials/||; s|/|_|g')"
+                  cp "${f}" "${target}" 2>/dev/null || true
+              done
+          ls -la "${GITHUB_WORKSPACE}/precice-test-logs"
+
+      - name: Upload preCICE test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: precice-test-logs
+          path: precice-test-logs
+          retention-days: 10
+
+      - name: Set job status
+        if: ${{ failure() }}
+        run: echo "::error::The preCICE coupling test failed, marking job as failed"

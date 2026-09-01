@@ -172,5 +172,5 @@ Cases that select `StVenantKirchhoffElastic`:
 - `solids/hyperelasticity/rigidRotation/rotatingSphere`
 - `fluidSolidInteraction/cavityFlexibleBottom`
 
-The `fluidSolidInteraction/3dTube` and `fluidSolidInteraction-preCICE/3dTube`
-cases ship the law as a commented alternative to `linearElastic`.
+The `fluidSolidInteraction/3dTube` case ships the law as a commented
+alternative to `linearElastic`.
