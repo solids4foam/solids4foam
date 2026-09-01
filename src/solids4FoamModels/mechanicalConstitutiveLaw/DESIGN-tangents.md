@@ -622,13 +622,39 @@ tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
 tmp<volScalarField> tLambda = impK_ - 2.0*mu;
 ```
 
-This inverts `impK = 2*mu + lambda` and `K = lambda + (2/3)*mu` and is valid
-**only** if the law's `impK()` is exactly `2*mu + lambda` and its `bulkModulus()`
-is exactly `lambda + (2/3)*mu`. That holds for `linearElastic` and, coincidentally,
-for `linearElasticMisesPlastic` at an elastic point. It is silently wrong for
-`linearElasticMisesPlastic` at a plastic point (`impK` carries the `theta`
-scaling, so the back-derived `mu` is not the shear modulus), for
-`orthotropicLinearElastic`, and for every hyperelastic law.
+This inverts `impK = (4/3)*mu_eff + K` to recover the isotropic tangent pair
+that `impK` and `bulkModulus()` encode between them.
+
+**Correction, from a later reading.** An earlier version of this section said the
+inversion is wrong for `linearElasticMisesPlastic` once a point yields. It is
+not. That law returns `impK = scaleFactor*(4/3)*mu_ + K_` and
+`bulkModulus() = K_`, so the back-derivation gives
+`mu_back = scaleFactor*mu_`, exactly the softened shear modulus, and
+`lambda_back = K_ - (2/3)*scaleFactor*mu_`, exactly the matching lambda for
+deviatoric softening at unchanged bulk modulus - which is the right structure
+for J2 plasticity. `linearElastic` and `neoHookeanElastic` define `impK` in the
+same form, so all three are inverted exactly.
+
+The real objection is structural rather than numerical. The solid model assumes
+every law's `impK()` has that algebraic form and that `bulkModulus()` is the
+matching `K`. `impK` is explicitly the "whatever converges best" coefficient, so
+a law is entitled to return something else, and nothing declares, checks or
+documents the assumption. A law that exercises that freedom gets a wrong pair
+with no diagnostic.
+
+Where an isotropic pair cannot represent the tangent at all - the orthotropic
+and anisotropic hyperelastic laws - no way of obtaining `mu` and `lambda` helps.
+`orthotropicLinearElastic` is protected only by an accident: it implements
+`impK` but not `bulkModulus`, which is `notImplemented` in the base class, so
+the back-derivation fatal-errors there rather than computing nonsense.
+
+**Note also that the obvious repair is a trap.** `shearModulus()` exists, but
+`linearElasticMisesPlastic::shearModulus()` returns the elastic `mu_` with no
+`scaleFactor`, so substituting it would discard the softening the
+back-derivation captures. It is also `notImplemented` in the base class and
+overridden by only seven of about twenty-five laws. Adding a
+`tangentShearModulus()` would re-encode the same implicit contract under a new
+name and still could not express an anisotropic tangent.
 
 **Decision: replace the three separate `hofvm` calls with one `mat66`-driven
 call. No new mathematics is required — the kernel already exists.**
@@ -1853,8 +1879,15 @@ syncs the coupled patches. Any cell-centred caller would have hit this.
 `hofvm::divSigmaIntoPETScMatrix` assembles the high-order Jacobian from a full
 `mat66` per mesh face, and `linGeomTotalDispSolid` uses it when
 `jacobianTangent fourthOrder` is set. The `(impK_ - K)*3/4` back-derivation
-stays as the default, so existing cases are untouched, but it is no longer the
-only option and the comment beside it now says exactly when it is wrong.
+stays as the default, so existing cases are untouched.
+
+**The case against the back-derivation is structural, not numerical.** See the
+correction in §3.5: it inverts exactly for every law currently defining `impK`
+in the standard form, plastic points included. What is wrong with it is that it
+depends on an undocumented contract about the form of `impK()`, and that no
+isotropic pair can represent an anisotropic tangent however it is obtained. A
+solid model does not need material constants; it needs a Jacobian operator, and
+the material tangent is the general way to supply one.
 
 **No new mathematics was needed, as §3.5 predicted.** The three isotropic
 kernels sum to `w*(mu*(n.g)*I + mu*g_i*n_j + lambda*n_i*g_j)`, which is

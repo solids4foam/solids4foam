@@ -1358,19 +1358,28 @@ label linGeomTotalDispSolid::formJacobian
         }
         else
         {
-            // Back-derive mu and lambda from impK and the bulk modulus.
+            // Back-derive an isotropic tangent pair from impK and the bulk
+            // modulus, inverting impK = (4/3)*mu_eff + K.
             //
-            // This inverts impK = 2*mu + lambda and K = lambda + (2/3)*mu, so
-            // it is correct only where the law's impK() is exactly 2*mu +
-            // lambda and its bulkModulus() exactly lambda + (2/3)*mu. That
-            // holds for linearElastic, and for linearElasticMisesPlastic only
-            // while a point is elastic: once it yields, impK carries the
-            // scaling factor and the back-derived mu is not the shear modulus.
-            // It is wrong for the orthotropic and hyperelastic laws.
+            // This is exact for every law that currently defines impK in that
+            // form, plastic points included: linearElasticMisesPlastic returns
+            // scaleFactor*(4/3)*mu + K, so mu_eff comes back as scaleFactor*mu
+            // and lambda as K - (2/3)*scaleFactor*mu, which is deviatoric
+            // softening at unchanged bulk modulus.
             //
-            // Retained as the default so that existing cases are unchanged.
-            // Set 'jacobianTangent fourthOrder' to assemble from the material
-            // tangent instead, which is correct for any law
+            // What is wrong with it is structural. It assumes an algebraic
+            // form for impK() that nothing declares or checks, and impK is
+            // deliberately the "whatever converges best" coefficient, so a law
+            // is free to return something else. And no isotropic pair can
+            // represent an anisotropic tangent however it is obtained; the
+            // orthotropic law escapes only because it leaves bulkModulus()
+            // unimplemented, so this branch fatal-errors rather than
+            // computing nonsense.
+            //
+            // Retained as the default so existing cases are unchanged. Set
+            // 'jacobianTangent fourthOrder' to assemble from the material
+            // tangent instead, which needs no assumption about impK and works
+            // for an anisotropic law
             tmp<volScalarField> tK = mechanical().bulkModulus();
             const volScalarField& K = tK();
 
