@@ -102,6 +102,21 @@ protected:
         mechanicalConstitutiveLawResponse& response
     ) const;
 
+        //- Finite-strain counterpart of the above.
+        //  Perturbs the deformation gradient rather than the displacement
+        //  gradient, recomputing its inverse and determinant for each
+        //  perturbed state, and differences the resulting Cauchy stress.
+        //  The perturbation is defined on the same Voigt strain vector, so a
+        //  tangent taken here is directly comparable with a small-strain one:
+        //  at F close to the identity a hyperelastic law should return its
+        //  linearised isotropic tangent
+        void finiteDifferenceFourthOrder
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const;
+
 
 public:
 
