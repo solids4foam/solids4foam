@@ -192,6 +192,76 @@ Foam::scalar Foam::plateHoleAnalyticalSolution::plateHoleHydPressure
 }
 
 
+void Foam::plateHoleAnalyticalSolution::calculateAnalyticalCellDisplacement
+(
+    const fvMesh& mesh,
+    vectorField& analyticalD
+) const
+{
+#ifndef FOAMEXTEND
+    const solidModel& solMod = lookupSolidModel(mesh);
+    bool useCellAverage = false;
+
+    if (solMod.highOrderResidual())
+    {
+        const dictionary& displacementDict =
+            solMod.solidModelDict()
+           .subDict("highOrderCoeffs")
+           .subDict("displacement");
+
+        useCellAverage =
+            displacementDict.lookupOrDefault<word>
+            (
+                "type",
+                "movingLeastSquares"
+            ) == "kExactLeastSquares";
+    }
+
+    if (useCellAverage)
+    {
+        const fvMeshQuadrature& quadrature =
+            solMod.displacementLeastSquares().quadrature();
+        const CompactListList<point>& cellQuadPoints =
+            quadrature.cellQuadPoints();
+        const CompactListList<scalar>& cellQuadWeights =
+            quadrature.cellQuadWeights();
+        const scalarField& cellVolumes = mesh.V();
+
+        Info<< "Using cell-average analytical displacement" << endl;
+
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] = vector::zero;
+
+            forAll(cellQuadPoints[cellI], pointI)
+            {
+                analyticalD[cellI] +=
+                    cellQuadWeights[cellI][pointI]
+                   *plateHoleDisplacement
+                    (
+                        cellQuadPoints[cellI][pointI],
+                        mesh
+                    );
+            }
+
+            analyticalD[cellI] /= cellVolumes[cellI];
+        }
+    }
+    else
+#endif
+    {
+        Info<< "Using point-valued analytical displacement" << endl;
+
+        const vectorField& cellCentres = mesh.C().internalField();
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] =
+                plateHoleDisplacement(cellCentres[cellI], mesh);
+        }
+    }
+}
+
+
 void Foam::plateHoleAnalyticalSolution::writePressureDisplacementData
 (
     const fvMesh& mesh,
@@ -448,10 +518,11 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                 sI[cellI] = plateHoleStress(CI[cellI]);
             }
 
-            if (cellDisplacement_)
-            {
-                aDI[cellI] = plateHoleDisplacement(CI[cellI], mesh);
-            }
+        }
+
+        if (cellDisplacement_)
+        {
+            calculateAnalyticalCellDisplacement(mesh, aDI);
         }
 
         forAll(analyticalStress.boundaryField(), patchI)

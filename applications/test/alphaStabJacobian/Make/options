@@ -1,0 +1,37 @@
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+ifdef PETSC_DIR
+    ifeq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+        ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
+            include $(GENERAL_RULES)/mplibType
+        else
+            include $(GENERAL_RULES)/mpi-rules
+        endif
+        VERSION_SPECIFIC_INC += \
+            $(PINC) -I$(PETSC_DIR)/include \
+            -I$(PETSC_DIR)/$(PETSC_ARCH)/include -DUSE_PETSC
+        VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
+    endif
+endif
+
+EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
+    -Wno-old-style-cast \
+    -I$(SOLIDS4FOAM_ROOT)/ThirdParty/eigen3 \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude
+
+EXE_LIBS = \
+    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels \
+    $(VERSION_SPECIFIC_LIBS) \
+    -lfiniteVolume \
+    -lmeshTools

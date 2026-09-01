@@ -23,9 +23,6 @@ License
 #include "pointFields.H"
 #include "OSspecific.H"
 #include "lookupSolidModel.H"
-#ifndef FOAMEXTEND
-    #include "symmTensor3rdOrder.H"
-#endif
 #ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
@@ -66,9 +63,23 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
 
     if (mesh.foundObject<volVectorField>("D"))
     {
-        if (cellID_ > -1)
+        const volVectorField& D = mesh.lookupObject<volVectorField>("D");
+
+        if (solMod.highOrderResidual())
         {
-            const volVectorField& D = mesh.lookupObject<volVectorField>("D");
+            // This call is deliberately made on every processor. The scheme
+            // constructs the required reconstruction data collectively and
+            // returns zero where cellID_ is negative.
+            pointDValue =
+                solMod.displacementLeastSquares().valueAtPoint
+                (
+                    D,
+                    cellID_,
+                    point_
+                );
+        }
+        else if (cellID_ > -1)
+        {
             pointDValue = D[cellID_];
 
             const vector distance = point_ - mesh.C()[cellID_];
@@ -88,48 +99,6 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
                 // Without gradient available we will write closest cell centre
                 // displacement
                 closestPointDisplacement();
-            }
-
-            // Extrapolate from cell using higher order gradient
-            if
-            (
-                solMod.highOrderResidual()
-             && solMod.displacementMLS().polynomialOrder() >= 2
-            )
-            {
-                const bool thirdOrder =
-                    solMod.displacementMLS().polynomialOrder() >= 3;
-
-                // The higher derivatives of all three components share a
-                // single halo exchange and a single traversal of the stencil.
-                // Only the cell values are needed here, so no fields are built
-                FixedList<symmTensorField, 3> secondGradD;
-                FixedList<List<symmTensor3rdOrder>, 3> thirdGradD;
-
-                solMod.displacementMLS().cellDerivatives
-                (
-                    D,
-                    nullptr,
-                    &secondGradD,
-                    thirdOrder ? &thirdGradD : nullptr
-                );
-
-                pointDValue.x() +=
-                    0.5*(distance & secondGradD[0][cellID_] & distance);
-                pointDValue.y() +=
-                    0.5*(distance & secondGradD[1][cellID_] & distance);
-                pointDValue.z() +=
-                    0.5*(distance & secondGradD[2][cellID_] & distance);
-
-                if (thirdOrder)
-                {
-                    pointDValue.x() +=
-                        (1.0/6.0)*cubicForm(thirdGradD[0][cellID_], distance);
-                    pointDValue.y() +=
-                        (1.0/6.0)*cubicForm(thirdGradD[1][cellID_], distance);
-                    pointDValue.z() +=
-                        (1.0/6.0)*cubicForm(thirdGradD[2][cellID_], distance);
-                }
             }
         }
     }

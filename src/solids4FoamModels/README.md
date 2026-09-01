@@ -70,8 +70,9 @@ uses it, so the two can be varied independently:
 - `numerics`: discretisation and linear algebra support, including gradient
   schemes, stabilisation models, interpolation, additional tensor types and
   PETSc helpers;
-- `higherOrderHelpers`: higher-order finite volume support, including moving
-  least squares, quadrature and the associated operators;
+- [`higherOrderHelpers`](higherOrderHelpers/README.md): higher-order finite
+  volume support, including moving least squares, quadrature and the associated
+  operators;
 - `dynamicFvMesh`: meshes which change topology, such as `crackerFvMesh` for
   crack propagation;
 - `functionObjects`: run-time post-processing, and the analytical solutions

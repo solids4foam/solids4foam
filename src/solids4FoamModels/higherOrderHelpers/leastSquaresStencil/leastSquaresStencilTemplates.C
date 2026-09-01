@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "movingLeastSquaresStencil.H"
+#include "leastSquaresStencil.H"
 #include "fvMesh.H"
 
 // * * * * * * * * * * *  Public Member Functions  * * * * * * * * * * * * * //
@@ -25,7 +25,7 @@ License
 
 template<class Type>
 Foam::Map<Type>
-Foam::movingLeastSquaresStencil::remoteFieldMap
+Foam::leastSquaresStencil::remoteFieldMap
 (
     const UList<Type>& fld
 ) const
@@ -67,7 +67,7 @@ Foam::movingLeastSquaresStencil::remoteFieldMap
 
 template<class Type>
 Foam::List<Foam::Field<Type>>
-Foam::movingLeastSquaresStencil::remoteFieldPerProc
+Foam::leastSquaresStencil::remoteFieldPerProc
 (
     const UList<Type>& fld
 ) const
