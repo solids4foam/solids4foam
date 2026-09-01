@@ -73,10 +73,10 @@ class neoHookeanElasticMechanicalConstitutiveLaw
         const dimensionedScalar rho_;
 
         //- Young's modulus
-        const dimensionedScalar E_;
+        dimensionedScalar E_;
 
         //- Poisson's ration
-        const dimensionedScalar nu_;
+        dimensionedScalar nu_;
 
         //- First Lamé parameter
         dimensionedScalar lambda_;

@@ -51,6 +51,8 @@ Description
          evaluated before and after intervening queries at wildly different
          kinematics is identical.
       9. updateScalarTangent agrees with the tangent from a stress update.
+     9a. The finite-strain finite-difference tangent of a hyperelastic law
+         reproduces the analytical small-strain isotropic tangent near F = I.
      10. The misuse guards fire: a fourth-order tangent on a topology that
          cannot carry one, a flat-list update on a topology whose integration
          points are shared between cells and where more than one material
@@ -208,11 +210,19 @@ int main(int argc, char *argv[])
     // topologies and the guards - applies to any law, and a history-dependent
     // law is the only thing that exercises the shadow state properly
     bool allLinearElastic = true;
+    bool allNeoHookean = true;
     forAll(lawEntries, lawI)
     {
-        if (word(lawEntries[lawI].dict().lookup("type")) != "linearElastic")
+        const word type(lawEntries[lawI].dict().lookup("type"));
+
+        if (type != "linearElastic")
         {
             allLinearElastic = false;
+        }
+
+        if (type != "neoHookeanElastic")
+        {
+            allNeoHookean = false;
         }
     }
 
@@ -220,13 +230,29 @@ int main(int argc, char *argv[])
     {
         const dictionary& lawDict = lawEntries[lawI].dict();
 
-        if (!allLinearElastic)
+        if (!allLinearElastic && !allNeoHookean)
         {
             continue;
         }
 
-        const scalar E = dimensionedScalar(lawDict.lookup("E")).value();
-        const scalar nu = dimensionedScalar(lawDict.lookup("nu")).value();
+        // A law may be given as E and nu or as mu and K, so accept either
+        // here too rather than assuming the first form
+        scalar E = 0.0;
+        scalar nu = 0.0;
+
+        if (lawDict.found("mu") && lawDict.found("K"))
+        {
+            const scalar muIn = dimensionedScalar(lawDict.lookup("mu")).value();
+            const scalar KIn = dimensionedScalar(lawDict.lookup("K")).value();
+
+            E = 9.0*KIn*muIn/(3.0*KIn + muIn);
+            nu = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+        }
+        else
+        {
+            E = dimensionedScalar(lawDict.lookup("E")).value();
+            nu = dimensionedScalar(lawDict.lookup("nu")).value();
+        }
 
         const scalar mu = E/(2.0*(1.0 + nu));
 
@@ -322,6 +348,159 @@ int main(int argc, char *argv[])
     );
 
     const scalar dt = runTime.deltaTValue();
+
+    // ---------------------------------------------------------------------
+    // Finite-strain finite-difference tangent
+    //
+    // Run first, and on its own, because a finite-strain law such as
+    // neoHookeanElastic implements no small-strain evaluation: every check
+    // below would fatal on it
+    // ---------------------------------------------------------------------
+
+    if (allNeoHookean)
+    {
+        Info<< nl << "Finite-strain finite-difference tangent" << endl;
+
+        // A hyperelastic law linearises to isotropic elasticity as F
+        // approaches the identity, so at a small deformation its
+        // finite-difference spatial tangent must reproduce the analytical
+        // small-strain tangent built from the same constants. That checks the
+        // perturbation, the recomputed inverse and determinant, and the Voigt
+        // convention at once
+        // Face-centred: a cell-centred topology deliberately cannot carry a
+        // fourth-order tangent, since the operators that consume one are
+        // assembled from face fluxes
+        const integrationPointTopology& topo =
+            manager.topologyFor
+            (
+                faceCentredIntegrationPointTopology::typeName
+            );
+
+        const label n = topo.nIntegrationPoints();
+
+        tensorField F(n, tensor::zero);
+        tensorField Finv(n, tensor::zero);
+        scalarField J(n, 0.0);
+        const tensorField F0(n, I);
+        const tensorField Finv0(n, I);
+        const scalarField J0(n, 1.0);
+
+        // A uniform small deformation is enough: the check is on the tangent,
+        // not on any particular strain state
+        const tensor gradDSmall
+        (
+            1e-4,  0.5e-4, 0.0,
+            0.5e-4, -0.7e-4, 0.0,
+            0.0,    0.0,   0.3e-4
+        );
+
+        forAll(F, ipI)
+        {
+            F[ipI] = I + gradDSmall;
+            Finv[ipI] = inv(F[ipI]);
+            J[ipI] = det(F[ipI]);
+        }
+
+        // Poisoned, so that an integration point the manager fails to
+        // reach fails the comparison deterministically. mat66 is a POD, so
+        // left alone its contents would be whatever memory held, which is a
+        // test that passes or fails by luck
+        List<mat66> fdC(n);
+        forAll(fdC, ipI)
+        {
+            for (label i = 0; i < 6; ++i)
+            {
+                for (label j = 0; j < 6; ++j)
+                {
+                    fdC[ipI](i, j) = GREAT;
+                }
+            }
+        }
+
+        manager.updateTangentFiniteStrain
+        (
+            topo, F, F0, Finv, Finv0, J, J0, dt,
+            nullptr, &fdC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        const label XX = symmTensor::XX;
+        const label YY = symmTensor::YY;
+        const label ZZ = symmTensor::ZZ;
+        const label XY = symmTensor::XY;
+
+        // Every integration point of the topology, boundary faces included.
+        // The deformation is uniform, so the tangent is the same everywhere
+        // and the boundary points are held to exactly the same standard as
+        // the internal ones.
+        //
+        // This is deliberate, and is the regression guard for the defect of
+        // section 8.14: the face-centred topology reports nFaces integration
+        // points, and until the manager evaluated the boundary ones, every
+        // entry from nInternalFaces upwards was left unwritten. Restricting
+        // this loop to internal faces would hide a repeat of that defect
+        const label nInternal = mesh.nInternalFaces();
+
+        // Single material here, so the constants are uniform
+        const scalar mu = refMu[0];
+        const scalar lambda = refLambda[0];
+        const scalar scale = lambda + 2.0*mu;
+
+        scalar maxRelErrorInternal = 0.0;
+        scalar maxRelErrorBoundary = 0.0;
+
+        for (label ipI = 0; ipI < n; ++ipI)
+        {
+            const mat66& C = fdC[ipI];
+
+            scalar e = 0.0;
+            e = max(e, mag(C(XX, XX) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(ZZ, ZZ) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(XX, YY) - lambda)/scale);
+            e = max(e, mag(C(XY, XY) - mu)/scale);
+            e = max(e, mag(C(XX, XY))/scale);
+
+            if (ipI < nInternal)
+            {
+                maxRelErrorInternal = max(maxRelErrorInternal, e);
+            }
+            else
+            {
+                maxRelErrorBoundary = max(maxRelErrorBoundary, e);
+            }
+        }
+
+        reportError
+        (
+            "reproduces the small-strain isotropic tangent near F = I",
+            maxRelErrorInternal,
+            1e-3
+        );
+
+        reportError
+        (
+            "reproduces that tangent on boundary faces too",
+            maxRelErrorBoundary,
+            1e-3
+        );
+
+        Info<< nl
+            << "============================================================"
+            << nl;
+
+        if (nFailed_ == 0)
+        {
+            Info<< "All mechanicalConstitutiveLaw checks passed" << nl
+                << "============================================================"
+                << nl << nl << "End" << nl << endl;
+            return 0;
+        }
+
+        Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
+            << "============================================================"
+            << nl << endl;
+
+        return 1;
+    }
 
     // ---------------------------------------------------------------------
     // 1. Closed-form stress and scalar tangent through the volField overload

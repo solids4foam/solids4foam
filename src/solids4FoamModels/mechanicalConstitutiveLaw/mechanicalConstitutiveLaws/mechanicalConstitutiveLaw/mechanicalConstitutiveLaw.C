@@ -152,6 +152,124 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
     }
 }
 
+
+void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
+(
+    const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    mechanicalConstitutiveLawState& state,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    if (!response.hasFourthOrderTangent())
+    {
+        FatalErrorInFunction
+            << "Finite difference tangent requested but response has no storage"
+            << exit(FatalError);
+    }
+
+    // Relative perturbation floor, as for the small-strain form. The scale
+    // here is the displacement gradient F - I rather than F itself, since it
+    // is the deformation that sets the useful step, not the identity
+    const scalar hMin = 1e-8;
+    const scalar hRel = 1e-6;
+
+    UIndirectList<symmTensor>& stress = response.stress();
+    UIndirectList<mat66>& Cfield = response.fourthOrderTangent();
+
+    const label nIP = stress.size();
+
+    if (nIP == 0)
+    {
+        return;
+    }
+
+    // The unperturbed stress, which the caller has already evaluated into the
+    // response. Copied element-wise because Field has no constructor from a
+    // UIndirectList on every supported fork
+    Field<symmTensor> sigma0(nIP);
+
+    Field<scalar> h(nIP);
+    forAll(h, ipI)
+    {
+        sigma0[ipI] = stress[ipI];
+        h[ipI] = max(hMin, hRel*mag(kin.F()[ipI] - I));
+    }
+
+    // Evaluate the perturbed states against a shadow, so each column starts
+    // from the same history and the perturbed results are discarded
+    mechanicalConstitutiveLawState shadow
+    (
+        state, mechanicalConstitutiveLawState::SHADOW
+    );
+
+    // Work storage. Every integration point is perturbed at once and the law
+    // evaluated once per Voigt component, as in the small-strain form
+    Field<tensor> FPert(nIP);
+    Field<tensor> FinvPert(nIP);
+    Field<scalar> JPert(nIP);
+    Field<symmTensor> sigmaPert(nIP, symmTensor::zero);
+
+    labelList addr(nIP);
+    forAll(addr, ipI)
+    {
+        addr[ipI] = ipI;
+    }
+
+    const UIndirectList<tensor> FPertView(FPert, addr);
+    const UIndirectList<tensor> FinvPertView(FinvPert, addr);
+    const UIndirectList<scalar> JPertView(JPert, addr);
+    UIndirectList<symmTensor> sigmaPertView(sigmaPert, addr);
+
+    forAll(Cfield, ipI)
+    {
+        // mat66 is not zero-initialised
+        Cfield[ipI].clear();
+    }
+
+    for (label j = 0; j < 6; ++j)
+    {
+        forAll(FPert, ipI)
+        {
+            FPert[ipI] = kin.FPerturbed(ipI, j, h[ipI]);
+
+            // The inverse and determinant must follow the perturbation, or the
+            // kinematics handed to the law would be inconsistent
+            FinvPert[ipI] = inv(FPert[ipI]);
+            JPert[ipI] = det(FPert[ipI]);
+        }
+
+        finiteStrainMechanicalConstitutiveLawKinematics kinPert
+        (
+            FPertView,
+            kin.F0(),
+            JPertView,
+            kin.J0(),
+            FinvPertView,
+            kin.Finv0(),
+            kin.dt()
+        );
+
+        mechanicalConstitutiveLawResponse respPert
+        (
+            sigmaPertView, tangentRequest::none
+        );
+
+        evaluate(kinPert, shadow, respPert);
+
+        forAll(Cfield, ipI)
+        {
+            mat66& C = Cfield[ipI];
+            const symmTensor ds((sigmaPert[ipI] - sigma0[ipI])/h[ipI]);
+
+            for (label i = 0; i < 6; ++i)
+            {
+                C(i, j) = ds[i];
+            }
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mechanicalConstitutiveLaw::mechanicalConstitutiveLaw

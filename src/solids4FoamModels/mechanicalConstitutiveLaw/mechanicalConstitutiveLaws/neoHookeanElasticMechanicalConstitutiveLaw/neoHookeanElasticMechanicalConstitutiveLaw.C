@@ -45,12 +45,49 @@ neoHookeanElasticMechanicalConstitutiveLaw
 :
     mechanicalConstitutiveLaw(dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    lambda_("lambda", E_.dimensions(), 0.0),
-    mu_("mu", E_.dimensions(), 0.0),
-    kappa_("kappa", E_.dimensions(), 0.0)
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
+    lambda_("lambda", dimPressure, 0.0),
+    mu_("mu", dimPressure, 0.0),
+    kappa_("kappa", dimPressure, 0.0)
 {
+    // The material may be given either as E and nu or as mu and K, matching
+    // the legacy neoHookeanElastic law, so that an existing case dictionary
+    // needs no change. Exactly one of the two pairs must be present
+    const bool haveENu = dict.found("E") && dict.found("nu");
+    const bool haveMuK = dict.found("mu") && dict.found("K");
+
+    if (haveENu == haveMuK)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Specify the elastic properties either as 'E' and 'nu' or as "
+            << "'mu' and 'K', and not as both."
+            << exit(FatalIOError);
+    }
+
+    if (haveMuK)
+    {
+        const dimensionedScalar mu(dict.lookup("mu"));
+        const dimensionedScalar K(dict.lookup("K"));
+
+        if (mu.dimensions() != dimPressure || K.dimensions() != dimPressure)
+        {
+            FatalIOErrorInFunction(dict)
+                << "The shear modulus mu and bulk modulus K must both have "
+                << "dimensions " << dimPressure
+                << exit(FatalIOError);
+        }
+
+        // Invert mu = E/(2*(1 + nu)) and K = E/(3*(1 - 2*nu))
+        E_ = 9.0*K*mu/(3.0*K + mu);
+        nu_ = (3.0*K - 2.0*mu)/(2.0*(3.0*K + mu));
+    }
+    else
+    {
+        E_ = dimensionedScalar(dict.lookup("E"));
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+    }
+
     if (E_.dimensions() != dimPressure)
     {
         FatalIOErrorInFunction(dict)
@@ -111,7 +148,7 @@ neoHookeanElasticMechanicalConstitutiveLaw
 void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
 (
     const finiteStrainMechanicalConstitutiveLawKinematics& kin,
-    mechanicalConstitutiveLawState& /*state*/,
+    mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
 {
@@ -172,6 +209,24 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         {
             K[i] = Keff;
         }
+    }
+
+    // Fourth-order tangent.
+    // There is no analytical spatial tangent for this law yet, but the
+    // finite-difference tangent of the base class is well defined for any
+    // finite-strain law and is evaluated against a shadow state, so it leaves
+    // neither the stress just computed nor the history it started from
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
     }
 }
 
