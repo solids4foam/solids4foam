@@ -961,13 +961,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         );
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
     {
         FatalErrorInFunction
             << "The flat-list update does not perform stress collapse, but "
             << "topology " << topo.type() << " shares integration points "
-            << "between cells, so an integration point on a material interface "
-            << "would be written more than once." << nl
+            << "between cells, and there are " << laws_.size()
+            << " mechanical constitutive laws, so an integration point on a "
+            << "material interface would be written more than once." << nl
             << "Use the surfaceField or pointField overload, which takes a "
             << "stressCollapseRule."
             << exit(FatalError);
@@ -1105,13 +1106,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         );
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
     {
         FatalErrorInFunction
             << "The flat-list update does not perform stress collapse, but "
             << "topology " << topo.type() << " shares integration points "
-            << "between cells, so an integration point on a material interface "
-            << "would be written more than once."
+            << "between cells, and there are " << laws_.size()
+            << " mechanical constitutive laws, so an integration point on a "
+            << "material interface would be written more than once."
             << exit(FatalError);
     }
 

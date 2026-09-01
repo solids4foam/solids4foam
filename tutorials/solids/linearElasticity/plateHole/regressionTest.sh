@@ -46,6 +46,7 @@ APPROACHES=(
     petscSnes
     petscSnesPressure
     highOrder
+    highOrderFourthOrder
 )
 
 PRESSURE_DISPLACEMENT_CASES=(

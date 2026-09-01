@@ -629,6 +629,75 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 }
 
 
+const Foam::List<Foam::mat66>&
+Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        FatalErrorInFunction
+            << "'jacobianTangent fourthOrder' needs the material tangent from "
+            << "the mechanical constitutive law framework, but "
+            << "'useMechanicalConstitutiveLawManager' is not set." << nl
+            << "The legacy mechanicalModel cannot supply one on the primary "
+            << "mesh."
+            << exit(FatalError);
+    }
+
+    const fvMesh& m = mesh();
+
+    // Indexed by mesh face, which is what hofvm::divSigmaIntoPETScMatrix
+    // expects and what the face-centred topology provides
+    faceMaterialTangent_.setSize(m.nFaces());
+
+    const integrationPointTopology& faceTopo =
+        mechanicalManager().topologyFor
+        (
+            faceCentredIntegrationPointTopology::typeName
+        );
+
+    // The topology spans internal faces then boundary faces in patch order,
+    // so gather the face gradients into one flat field in the same order
+    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+    const surfaceTensorField gradDf0(fvc::interpolate(gradD().oldTime()));
+
+    Field<tensor> gradDFlat(m.nFaces(), tensor::zero);
+    Field<tensor> gradD0Flat(m.nFaces(), tensor::zero);
+
+    const label nInt = m.nInternalFaces();
+    for (label faceI = 0; faceI < nInt; ++faceI)
+    {
+        gradDFlat[faceI] = Foam::primitiveField(gradDf)[faceI];
+        gradD0Flat[faceI] = Foam::primitiveField(gradDf0)[faceI];
+    }
+
+    forAll(m.boundary(), patchI)
+    {
+        const label start = m.boundaryMesh()[patchI].start();
+        const fvsPatchTensorField& pGradD = gradDf.boundaryField()[patchI];
+        const fvsPatchTensorField& pGradD0 = gradDf0.boundaryField()[patchI];
+
+        forAll(pGradD, faceI)
+        {
+            gradDFlat[start + faceI] = pGradD[faceI];
+            gradD0Flat[start + faceI] = pGradD0[faceI];
+        }
+    }
+
+    mechanicalManager().updateTangentSmallStrain
+    (
+        faceTopo,
+        gradDFlat,
+        gradD0Flat,
+        mesh().time().deltaTValue(),
+        nullptr,
+        &faceMaterialTangent_,
+        tangentRequest::fourthOrder
+    );
+
+    return faceMaterialTangent_;
+}
+
+
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeRKappa() const
 {
@@ -1273,43 +1342,50 @@ label linGeomTotalDispSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        tmp<volScalarField> tK = mechanical().bulkModulus();
-        const volScalarField& K = tK();
-
-        tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
-        const volScalarField& mu = tMu();
-
-        tmp<volScalarField> tLambda = impK_ - 2.0*mu;
-        const volScalarField& lambda = tLambda();
-
         const movingLeastSquares& mls = displacementMLS();
 
-        hofvm::laplacianIntoPETScMatrix
-        (
-            jac,
-            *this,
-            mls,
-            D,
-            mu
-        );
+        if (jacobianTangent(tangentRequest::scalar) == tangentRequest::fourthOrder)
+        {
+            // Assemble from the full material tangent
+            hofvm::divSigmaIntoPETScMatrix
+            (
+                jac,
+                *this,
+                mls,
+                D,
+                faceMaterialTangent()
+            );
+        }
+        else
+        {
+            // Back-derive mu and lambda from impK and the bulk modulus.
+            //
+            // This inverts impK = 2*mu + lambda and K = lambda + (2/3)*mu, so
+            // it is correct only where the law's impK() is exactly 2*mu +
+            // lambda and its bulkModulus() exactly lambda + (2/3)*mu. That
+            // holds for linearElastic, and for linearElasticMisesPlastic only
+            // while a point is elastic: once it yields, impK carries the
+            // scaling factor and the back-derived mu is not the shear modulus.
+            // It is wrong for the orthotropic and hyperelastic laws.
+            //
+            // Retained as the default so that existing cases are unchanged.
+            // Set 'jacobianTangent fourthOrder' to assemble from the material
+            // tangent instead, which is correct for any law
+            tmp<volScalarField> tK = mechanical().bulkModulus();
+            const volScalarField& K = tK();
 
-        hofvm::laplacianTransposeIntoPETScMatrix
-        (
-            jac,
-            *this,
-            mls,
-            D,
-            mu
-        );
+            tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
+            const volScalarField& mu = tMu();
 
-        hofvm::laplacianTraceIntoPETScMatrix
-        (
-            jac,
-            *this,
-            mls,
-            D,
-            lambda
-        );
+            tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+            const volScalarField& lambda = tLambda();
+
+            hofvm::laplacianIntoPETScMatrix(jac, *this, mls, D, mu);
+
+            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, mls, D, mu);
+
+            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, mls, D, lambda);
+        }
 
         fvVectorMatrix transientJ
         (

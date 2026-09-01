@@ -53,8 +53,9 @@ Description
       9. updateScalarTangent agrees with the tangent from a stress update.
      10. The misuse guards fire: a fourth-order tangent on a topology that
          cannot carry one, a flat-list update on a topology whose integration
-         points are shared between cells, a tangent request with no storage,
-         and a duplicate registerTopology key.
+         points are shared between cells and where more than one material
+         could claim them, a tangent request with no storage, and a duplicate
+         registerTopology key.
 
 Author
     Philip Cardiff, UCD.
@@ -1052,7 +1053,29 @@ int main(int argc, char *argv[])
                 threw = true;
             }
 
-            report("a flat-list update on shared points is rejected", threw);
+            // The flat-list update performs no collapse, so a topology whose
+            // integration points are shared between cells is refused only
+            // when there is more than one law: with a single material no
+            // integration point can belong to two materials and there is
+            // nothing to collapse
+            if (lawEntries.size() > 1)
+            {
+                report
+                (
+                    "a flat-list update on shared points is rejected with "
+                    "several materials",
+                    threw
+                );
+            }
+            else
+            {
+                report
+                (
+                    "a flat-list update on shared points is allowed with one "
+                    "material",
+                    !threw
+                );
+            }
         }
 
         // A tangent request with no storage to put it in

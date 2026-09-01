@@ -1514,7 +1514,7 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
 | 4 | **Done.** `vertexCentredLinGeomSolid` tangent-only adoption (§8.4), plus the optional manager deferred from PR-3. See §8.9. |
 | 5 | Stress for `vertexCentredLinGeomSolid`, removing its dependence on `dualMechanicalModel`. Its nonlinear sibling is disabled, see §8.11. |
-| 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
+| 6 | **Done for `linGeomTotalDispSolid`.** `hofvm::divSigmaIntoPETScMatrix(mat66)`; the back-derivation is retained as the default rather than deleted, so existing cases are unchanged. The two `nonLinGeom*` solvers still carry it. See §8.13. |
 | 7…n | Cell-centred solvers and their high-order variants, the ones in common use and now the priority, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
@@ -1848,7 +1848,40 @@ non-coupled patch from its patch-internal value, which is exact for a scalar
 tangent because a boundary face belongs to its owner cell's material, then
 syncs the coupled patches. Any cell-centred caller would have hit this.
 
-### 8.13 Open questions still outstanding
+### 8.13 Notes from the high-order Jacobian
+
+`hofvm::divSigmaIntoPETScMatrix` assembles the high-order Jacobian from a full
+`mat66` per mesh face, and `linGeomTotalDispSolid` uses it when
+`jacobianTangent fourthOrder` is set. The `(impK_ - K)*3/4` back-derivation
+stays as the default, so existing cases are untouched, but it is no longer the
+only option and the comment beside it now says exactly when it is wrong.
+
+**No new mathematics was needed, as §3.5 predicted.** The three isotropic
+kernels sum to `w*(mu*(n.g)*I + mu*g_i*n_j + lambda*n_i*g_j)`, which is
+`Sf_m C_mikl g_k delta_lj` with `Sf = w*n` - already implemented as
+`multiplyCoeff` and already used by the vertex-centred solver. The assembler
+was generalised to take either a scalar diffusivity with one of the kernels or
+a material tangent, rather than being duplicated, so the internal, processor,
+symmetry and generic patch handling stays in one place.
+
+**Verified byte-identical**, with the same Newton iteration count and the same
+convergence reason, on `plateHole` with a linear elastic material - which is
+precisely the case where the back-derivation is valid, and therefore the only
+case where the two *should* agree. `plateHole` gains a `highOrderFourthOrder`
+approach so this stays covered.
+
+**A guard was relaxed to make this possible.** The flat-list update refused any
+topology whose integration points are shared between cells. The reason for that
+rule is stress collapse at a material interface, which cannot arise with a
+single law, so it now refuses only when there is more than one. The face-centred
+topology is shared by construction, so without this the material tangent could
+not be obtained per face at all.
+
+The test application asserted the old blanket rule and duly failed on
+`perforatedPlate`, which has one material. It now asserts the real contract:
+rejected with several materials, allowed with one.
+
+### 8.14 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term

@@ -38,6 +38,7 @@ Author
 #include "fvMatrices.H"
 #include "volFields.H"
 #include "movingLeastSquares.H"
+#include "mat66.H"
 #include "foamPetscSnesHelper.H"
 
 namespace Foam
@@ -115,6 +116,26 @@ namespace hofvm
     );
 
     // Add coefficients to the matrix for the Laplacian trace
+    //- Add the linearisation of div(sigma) to the PETSc matrix using a full
+    //  fourth-order material tangent, rather than the three isotropic kernels
+    //  driven by a back-derived mu and lambda.
+    //  materialTangent must be indexed by mesh face index and sized
+    //  mesh.nFaces(): internal faces first, then boundary faces in patch
+    //  order, which is the standard OpenFOAM face numbering.
+    //  For an isotropic tangent this is identical to summing
+    //  laplacianIntoPETScMatrix, laplacianTransposeIntoPETScMatrix and
+    //  laplacianTraceIntoPETScMatrix with the corresponding mu and lambda
+    void divSigmaIntoPETScMatrix
+    (
+        Mat jac,
+        const foamPetscSnesHelper& petscSnesHelper,
+        const movingLeastSquares& mls,
+        const volVectorField& D,
+        const List<mat66>& materialTangent,
+        const label rowOffset = 0,
+        const label colOffset = 0
+    );
+
     void laplacianTraceIntoPETScMatrix
     (
         Mat jac,
