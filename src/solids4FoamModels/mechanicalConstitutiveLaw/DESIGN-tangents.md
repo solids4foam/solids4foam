@@ -2019,6 +2019,59 @@ Coverage of a topology contract means coverage of the mesh variety the
 contract has to survive: 3D, 2D with empty patches, and - still untested here
 - wedge, cyclic and processor patches.
 
+### 8.17 The blocker is law coverage, not solver plumbing
+
+Migrating `nonLinGeomTotalLagTotalDispSolid` and `nonLinGeomUpdatedLagSolid`
+turned out to be straightforward: both hold their kinematics as volFields and
+evaluate stress at cell centres only, so no face-based finite-strain
+kinematics were needed after all. What stopped both from being *verifiable*
+was the set of laws the framework implements.
+
+Counting the tutorials by law:
+
+| Solver | Tutorials | Laws they use |
+|---|---|---|
+| `linGeomTotalDispSolid` | 16 | `linearElastic`, `linearElasticMisesPlastic` |
+| `nonLinGeomUpdatedLagSolid` | 9 | `neoHookeanElasticMisesPlastic`, `MooneyRivlinElastic` |
+| `nonLinGeomTotalLagTotalDispSolid` | 8 | `MooneyRivlinElastic`, `StVenantKirchhoffElastic` |
+
+The framework had `linearElastic`, `linearElasticMisesPlastic` and
+`neoHookeanElastic`. That covers the first row completely and the other two
+not at all: the only neo-Hookean cases using the finite-strain solvers are
+FSI. Adding `StVenantKirchhoffElastic` bought coverage of one case,
+`rotatingCylinder`, and that single case immediately found the empty-patch
+defect of section 8.16.
+
+**`MooneyRivlinElastic` does not fit the current law contract.** It calls
+`updateSigmaHyd`, which, when `pressureSmoothingScaleFactor` is set, *solves a
+Laplacian equation* for the hydrostatic stress over the whole field. A
+`mechanicalConstitutiveLaw` is a pure function of integration-point kinematics
+and old-time state; a field-level implicit solve is not expressible in that
+interface, and pretending otherwise by dropping the smoothing would change
+results.
+
+So this is a real design question rather than a porting chore:
+
+- Does the framework grow a notion of a law with a field-level correction
+  stage, run once per update after the per-point pass?
+- Or is pressure smoothing properly the solid model's business, not the law's,
+  in which case the law reduces to the per-point part and the solver owns the
+  smoothing?
+
+The second reads better - it is a stabilisation of the discretisation, not
+constitutive behaviour - but it moves behaviour across the interface and
+cannot be done without changing which object owns `sigmaHyd`.
+
+`neoHookeanElasticMisesPlastic`, which nine tutorials need, is the other gap;
+it is history-dependent finite-strain plasticity and is a substantial law in
+its own right.
+
+**Until one of those is answered, `nonLinGeomUpdatedLagSolid` has no runtime
+coverage of its framework path**, because no tutorial that uses it has a law
+the framework implements. Its migration is committed with the switch
+defaulting off and the legacy path verified unchanged, but the framework arm
+is unexercised and should be treated as such.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

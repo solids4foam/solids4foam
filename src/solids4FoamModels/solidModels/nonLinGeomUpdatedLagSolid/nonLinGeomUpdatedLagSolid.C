@@ -556,6 +556,107 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModels::nonLinGeomUpdatedLagSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impK();
+    }
+
+    // Match the legacy field exactly in name, dimensions and boundary types:
+    // it is registered under "impK" and looked up by that name by the contact
+    // and cohesive zone models
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the total deformation gradient, which is the identity on a
+    // cold start and the restart value otherwise, the same state dependence
+    // the legacy impK() has since it is likewise frozen at construction.
+    //
+    // The total F is used rather than the relative one even though this is an
+    // updated Lagrangian solver. impK is a material stiffness scale, not an
+    // increment, and it is the total configuration that the material is in.
+    // This is a construction-time call, so the temporary inverse below is
+    // formed once and then released
+    const volTensorField Finv(inv(F_));
+
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv,
+        Finv.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        tangentRequest::scalar
+    );
+
+    Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
+        << endl;
+
+    return tImpK;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpKf() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impKf();
+    }
+
+    // Interpolate the framework impK rather than asking the legacy
+    // mechanicalModel for a second, independently built field: the two must
+    // describe the same material for the Laplacian term to telescope
+    return fvc::interpolate(impK_);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
@@ -666,8 +767,16 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         mesh(),
         dimensionedVector("zero", dimVelocity/dimTime, vector::zero)
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),

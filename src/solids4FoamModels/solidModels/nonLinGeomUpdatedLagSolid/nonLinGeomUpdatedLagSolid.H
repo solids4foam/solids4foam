@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomUpdatedLagSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
 #include "hofvc.H"
 
@@ -85,6 +86,14 @@ class nonLinGeomUpdatedLagSolid
 
         //- Acceleration
         volVectorField A_;
+
+        //- Take the implicit stiffness from the mechanicalConstitutiveLaw
+        //  framework rather than from the legacy mechanicalModel.
+        //  Declared before impK_ because makeImpK() consults it
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- The mechanicalConstitutiveLaw framework, built on demand
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -148,6 +157,17 @@ class nonLinGeomUpdatedLagSolid
         void makeRKappa() const;
 
         //- Return const access to the reciprocal of the bulk modulus
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Construct impK from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
+        //  mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf to match whichever impK was built
+        tmp<surfaceScalarField> makeImpKf() const;
+
         const volScalarField& rKappa() const;
 
         //- Enforce traction boundary conditions on the provided traction field
