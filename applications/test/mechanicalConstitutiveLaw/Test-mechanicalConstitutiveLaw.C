@@ -212,6 +212,7 @@ int main(int argc, char *argv[])
     bool allLinearElastic = true;
     bool allNeoHookean = true;
     bool allStVenantKirchhoff = true;
+    bool allMooneyRivlin = true;
     forAll(lawEntries, lawI)
     {
         const word type(lawEntries[lawI].dict().lookup("type"));
@@ -230,11 +231,17 @@ int main(int argc, char *argv[])
         {
             allStVenantKirchhoff = false;
         }
+
+        if (type != "MooneyRivlinElastic")
+        {
+            allMooneyRivlin = false;
+        }
     }
 
     // Both are finite-strain-only laws: they implement no small-strain
     // evaluation, and both linearise to isotropic elasticity near F = I
-    const bool allFiniteStrainOnly = allNeoHookean || allStVenantKirchhoff;
+    const bool allFiniteStrainOnly =
+        allNeoHookean || allStVenantKirchhoff || allMooneyRivlin;
 
     forAll(lawEntries, lawI)
     {
@@ -250,7 +257,36 @@ int main(int argc, char *argv[])
         scalar E = 0.0;
         scalar nu = 0.0;
 
-        if (lawDict.found("mu") && lawDict.found("K"))
+        if (allMooneyRivlin)
+        {
+            // Mooney-Rivlin is given as c10, c01, c11 and either K or nu.
+            // Its small-strain limit has mu = 2*(c10 + c01), and where nu is
+            // given the bulk modulus follows from E = 6*(c10 + c01), exactly
+            // as the law itself derives them
+            const scalar c10 =
+                dimensionedScalar(lawDict.lookup("c10")).value();
+            const scalar c01 =
+                dimensionedScalar(lawDict.lookup("c01")).value();
+
+            const scalar muIn = 2.0*(c10 + c01);
+
+            scalar KIn = 0.0;
+            if (lawDict.found("K"))
+            {
+                KIn = dimensionedScalar(lawDict.lookup("K")).value();
+            }
+            else
+            {
+                const scalar nuIn =
+                    dimensionedScalar(lawDict.lookup("nu")).value();
+
+                KIn = 6.0*(c10 + c01)/(3.0*(1.0 - 2.0*nuIn));
+            }
+
+            E = 9.0*KIn*muIn/(3.0*KIn + muIn);
+            nu = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+        }
+        else if (lawDict.found("mu") && lawDict.found("K"))
         {
             const scalar muIn = dimensionedScalar(lawDict.lookup("mu")).value();
             const scalar KIn = dimensionedScalar(lawDict.lookup("K")).value();

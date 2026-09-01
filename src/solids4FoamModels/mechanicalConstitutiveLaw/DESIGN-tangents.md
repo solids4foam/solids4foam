@@ -2047,30 +2047,37 @@ defect of section 8.16.
 Laplacian equation* for the hydrostatic stress over the whole field. A
 `mechanicalConstitutiveLaw` is a pure function of integration-point kinematics
 and old-time state; a field-level implicit solve is not expressible in that
-interface, and pretending otherwise by dropping the smoothing would change
-results.
+interface.
 
-So this is a real design question rather than a porting chore:
+**Resolved: the smoothing does not come across.** Pressure smoothing is the
+solid model's business, not the law's - it stabilises the discretisation, it
+does not describe the material - and the field-level solve is to be added at
+the solid model level separately. The framework law therefore drops
+`updateSigmaHyd` entirely and returns the unsmoothed hydrostatic stress
+`p = K (J^2 - 1)/2`, which keeps `mechanicalConstitutiveLaw` a pure function
+of integration-point kinematics and old-time state.
 
-- Does the framework grow a notion of a law with a field-level correction
-  stage, run once per update after the per-point pass?
-- Or is pressure smoothing properly the solid model's business, not the law's,
-  in which case the law reduces to the per-point part and the solver owns the
-  smoothing?
+That decision is what made `MooneyRivlinElastic` implementable here. Note the
+consequence: until the solid model provides the smoothing, a case that relied
+on `pressureSmoothingScaleFactor` will converge differently under the
+framework. The two migrations in this PR are unaffected, because they take
+only `impK` from the framework and never call a law for a stress.
 
-The second reads better - it is a stabilisation of the discretisation, not
-constitutive behaviour - but it moves behaviour across the interface and
-cannot be done without changing which object owns `sigmaHyd`.
+With `MooneyRivlinElastic` in place the coverage gap largely closes.
+`longWall` exercises the total Lagrangian solver's framework path, and
+`cylinderCrush` the updated Lagrangian one - the latter only under
+foam-extend, since it uses contact.
 
-`neoHookeanElasticMisesPlastic`, which nine tutorials need, is the other gap;
-it is history-dependent finite-strain plasticity and is a substantial law in
-its own right.
+`neoHookeanElasticMisesPlastic`, which nine tutorials need, remains the other
+gap. It is history-dependent finite-strain plasticity, a substantial law in
+its own right, and is left for a later increment.
 
-**Until one of those is answered, `nonLinGeomUpdatedLagSolid` has no runtime
-coverage of its framework path**, because no tutorial that uses it has a law
-the framework implements. Its migration is committed with the switch
-defaulting off and the legacy path verified unchanged, but the framework arm
-is unexercised and should be treated as such.
+One further limitation worth recording: the framework's material constants are
+uniform per law, whereas the legacy `MooneyRivlinElastic` holds `c10`, `c01`
+and `c11` as volScalarFields that may be read per cell. Spatially varying
+constants belong with the wider question of how the framework carries
+per-integration-point material data, alongside initial stress and fibre
+directions - see `DESIGN-state-io.md`.
 
 ### 8.18 impK under the mixed formulation: the two solvers disagreed
 
