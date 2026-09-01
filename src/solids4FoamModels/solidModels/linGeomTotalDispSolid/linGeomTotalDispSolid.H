@@ -37,6 +37,7 @@ SourceFiles
 #define linGeomTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
@@ -65,6 +66,19 @@ class linGeomTotalDispSolid
     public foamPetscSnesHelper
 {
     // Private data
+
+        //- Take the implicit stiffness from the mechanical constitutive law
+        //  framework rather than from the legacy mechanicalModel.
+        //  Opt-in, and declared before impK_ so that it is set when impK_ is
+        //  constructed.
+        //  impK is a Jacobian and a stabilisation coefficient, not a material
+        //  response, so this changes the convergence path and the size of a
+        //  stabilisation term that vanishes under mesh refinement. The stress
+        //  still comes from mechanicalModel either way
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- Mechanical constitutive law manager, when the above is set
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -97,6 +111,18 @@ class linGeomTotalDispSolid
         volScalarField ds_;
 
     // Private Member Functions
+
+        //- Return the mechanical constitutive law manager, constructing it on
+        //  first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Return the implicit stiffness, from the constitutive law framework
+        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  legacy mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
+
+        //- Return the reciprocal of the bulk modulus, from the same source
+        tmp<volScalarField> makeRKappa() const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
