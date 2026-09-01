@@ -64,70 +64,120 @@ works.** It only needs a different answer where the old one cannot reach.
 
 ---
 
-## 3. Why the new framework cannot simply do the same
+## 3. The general shape of an integration-point topology
 
-State in the new framework lives at the integration points of a *topology*, and
-only one topology is one-to-one with cells:
+State lives at the integration points of a *topology*, and the first draft
+treated those as either "cell-shaped" or "awkward". That is too coarse. Every
+topology in use or planned is of one form:
+
+> **n integration points attached to each entity of some mesh**, where the
+> entity is a cell, a face or a point.
+
+Writing it that way makes the IO question answerable uniformly, because
+OpenFOAM already has a mesh-aware, parallel-aware, decomposable container for
+each entity kind.
 
 <!-- markdownlint-disable MD013 -->
 
-| Topology | Integration points per cell | Cell-shaped? |
-|---|---|---|
-| `cellCentred` | 1 | yes |
-| `compactCell` (quadrature) | fixed n | no, but regular |
-| `faceCentred` | shared between cells | no, but `surfaceField` fits |
-| `pointCentred` | shared between cells | no, but `pointField` fits |
-| `dualFace` | variable, many | no |
+| Topology | Mesh | Entity | n per entity | Natural container |
+|---|---|---|---|---|
+| `cellCentred` | primary | cell | 1 | `volField` |
+| `faceCentred` | primary | face | 1 | `surfaceField` |
+| `pointCentred` | primary | point | 1 | `pointField` |
+| Gauss points in cells (`compactCell`) | primary | cell | fixed n | n `volField`s |
+| Gauss points on faces | primary | face | fixed n | n `surfaceField`s |
+| `dualFace` | **dual** | face | variable | none - see §7 |
 
 <!-- markdownlint-enable MD013 -->
 
-Two qualifications, both from review.
+So the classification that matters for IO is not "is it cells" but three
+independent properties:
 
-`faceCentred` and `pointCentred` are **not** short of a container: OpenFOAM has
-mesh-aware surface and point fields with proper parallel handling. What they are
-short of is *semantics* - an integration point shared between two cells can be
-reached from two materials, so a single value per face is not obviously the
-right model. That is a different problem from having nowhere to put the number.
+1. **Which mesh** the entities belong to. The primary mesh is decomposed,
+   reconstructed and written by the standard tools; a derived mesh such as the
+   dual is not.
+2. **Which entity kind**, which selects the container.
+3. **Whether n is fixed**. A fixed n becomes n containers with an index suffix;
+   a variable n has no entity-shaped representation at all.
 
-`setFields` sets the internal and boundary values of `volField`s, and finite-area
-fields. It does not set `surfaceField`s, `pointField`s or arbitrary `IOField`s.
-So "a per-cell `volField` is what `setFields` can write" is right; "and nothing
-else" was too strong.
+**A topology is standard-IO-capable when its mesh is the primary mesh and n is
+fixed.** Everything in the table except `dualFace` satisfies that, including
+both Gauss-point cases. This is worth stating as an interface:
+
+```c++
+        //- The mesh entity that integration points are attached to
+        enum class entityKind { cell, face, point };
+
+        //- Entity kind for this topology
+        virtual entityKind entity() const = 0;
+
+        //- Integration points per entity, or -1 where it varies
+        virtual label pointsPerEntity() const = 0;
+
+        //- True if the entities belong to the mesh the manager was built on,
+        //  rather than to a derived mesh such as a dual
+        virtual bool onPrimaryMesh() const = 0;
+```
+
+The manager then chooses the container generically, and a new topology gets IO
+for free by answering three questions rather than by having IO written for it.
+
+Two qualifications carried over from review.
+
+`setFields` sets the internal and boundary values of `volField`s, and
+finite-area fields. It does not set `surfaceField`s, `pointField`s or arbitrary
+`IOField`s. So the `setFields` route exists for cell-entity topologies and not
+for the others - which matters for prescribing inputs (§4), not for restart.
+
+A shared integration point - a face or point reachable from two cells - can be
+reached from two *materials*. That is a semantic problem, not a storage one,
+and it is what §4 has to deal with.
 
 ---
 
 ## 4. Decision
 
-**The user-facing form is always a `volField` on the primary mesh. The manager
-maps between that and integration points.**
+**Prescribed inputs are always specified as a `volField` on the primary mesh.
+Persistent state is stored in the container its topology's entity implies.**
 
-Materials are already defined per primary cell, `setFields` operates on
-volFields, and a per-cell initial condition is what a user actually wants to
-specify. The manager broadcasts a cell's value to every integration point of
+The two directions genuinely differ, which is why they get different answers.
+
+**Prescribed (R2, R3).** A user specifies an initial stress, an initial strain
+or a fibre direction per *region of material*, and materials are already
+defined per primary cell. A cell-shaped input is therefore the natural
+specification and not a loss of fidelity, and it is the one form `setFields`
+can write. The manager broadcasts a cell's value to every integration point of
 that cell.
 
-**This is exact only where an integration point belongs to exactly one cell**,
-i.e. where `requiresUniqueIntegrationPointsPerMaterial()` is false -
-`cellCentred`, `compactCell`, `dualFace`. For `faceCentred` and `pointCentred`
-an integration point is reachable from two cells that may carry different
-prescribed values, and the broadcast is then ambiguous. The first draft called
+This is exact where an integration point belongs to exactly one cell, i.e.
+where `requiresUniqueIntegrationPointsPerMaterial()` is false - `cellCentred`,
+`compactCell`, `dualFace`. For `faceCentred`, `pointCentred` and face Gauss
+points an integration point is reachable from two cells that may carry
+different values, and the broadcast is then ambiguous. The first draft called
 the cell-shaped form "not a compromise"; that is false for shared topologies.
-Those need a stated mapping policy - reject a discontinuity across the point,
-take the owner cell, or interpolate - and the policy has to be part of the
-declaration rather than an implicit choice.
+Those need a mapping policy stated in the declaration - reject a discontinuity
+across the point, take the owner cell, or interpolate - rather than an implicit
+choice.
 
-For R1 the direction reverses and the mapping has to be lossless, so it depends
-on the topology:
+**Persistent (R1).** The direction reverses and the mapping must be lossless,
+so the container follows the entity:
 
 <!-- markdownlint-disable MD013 -->
 
 | Topology | Restart representation | Standard tools? |
 |---|---|---|
-| `cellCentred` | one `volField`, `READ_IF_PRESENT` / `AUTO_WRITE`. Identical to legacy | yes, fully |
-| `compactCell`, fixed n per cell | n `volField`s, suffixed `_0` … `_n-1` | yes, fully |
-| `dualFace`, `faceCentred`, `pointCentred` | `IOField` under `<time>/mechanicalState/<topology>/<law>/<name>` | **no** — see §7 |
+| `cellCentred` | one `volField`, `READ_IF_PRESENT` / `AUTO_WRITE`. Identical to legacy | yes |
+| `faceCentred` | one `surfaceField` | yes |
+| `pointCentred` | one `pointField` | yes |
+| Gauss points in cells | n `volField`s, suffixed `_0` … `_n-1` | yes |
+| Gauss points on faces | n `surfaceField`s, suffixed likewise | yes |
+| `dualFace` | none available | **no** - see §7 |
 
 <!-- markdownlint-enable MD013 -->
+
+The suffix convention is deliberate: n separate fields of a standard type
+decompose, reconstruct and plot with no new tooling, where one field of n
+values per entity would need all three written from scratch.
 
 ---
 
@@ -251,9 +301,12 @@ draft.
 
 ## 7. The awkward case, and what to do about it
 
-For `dualFace` and the other shared-point topologies there is no cell-shaped
-lossless representation, because the number of integration points per cell
-varies. Three options:
+§4 leaves exactly one topology without a representation: `dualFace`, and any
+future topology on a derived mesh or with a variable count. `faceCentred`,
+`pointCentred` and both Gauss-point cases are now covered by standard
+containers, so the awkward set is smaller than the first draft assumed.
+
+For that remaining case there are three options:
 
 1. **A topology-aware persistent field per topology per law.** Not a bare
    `IOField`: that is an ordered `Field` plus IO and nothing more
@@ -272,9 +325,16 @@ varies. Three options:
 
 **Recommendation: 3 now, 1 next, never 2.** With one widening from review: the
 guard in 3 must cover *every* combination that lacks an exact defined mapping,
-not just the multi-point topologies. That includes boundary state, shared
-integration points with conflicting cell values, and any mesh that can change
-topology. Option 2 produces a run that
+not just topologies on a derived mesh. That includes boundary state, shared
+integration points with conflicting prescribed values, and any mesh that can
+change topology.
+
+Note how little this now blocks. The cell-centred solid models and their
+high-order Gauss-point variants - the ones in common use, and the priority for
+migration - are all standard-IO-capable by §4, so restart works for them
+through the same mechanism the legacy laws already use. Only the vertex-centred
+path is held back, and it currently runs `linearElastic`, which has no history
+to lose. Option 2 produces a run that
 restarts to a subtly different state with no indication that anything was lost,
 which is the worst property a restart can have. Option 3 costs one guard and is
 honest. Option 1 is the real answer and can be built when someone needs a
@@ -293,11 +353,11 @@ works today.
 | Step | Content | Unblocks |
 |---|---|---|
 | 1 | `declareState` and the spec object; manager allocates and applies defaults. No IO yet | the rest |
-| 2 | `prescribed` fields read from `volField`s and broadcast to integration points | R2, R3, fibre directions, `setFields` |
+| 2 | `prescribed` fields read from `volField`s in `constant/` and broadcast to integration points, with a declared mapping policy for shared points | R2, R3, fibre directions, `setFields` |
 | 3 | `initialStress` and `initialStrain` applied by the manager, small strain only | the specific request |
-| 4 | `persistent` fields written and read as `volField`s for cell-shaped topologies | R1 for cell-centred solid models |
-| 5 | Guard refusing history-dependent laws on non-cell-shaped topologies | honest failure instead of silent loss |
-| 6 | Topology-aware persistent state with integration-point identity, plus decompose/reconstruct/redistribute support | R1 everywhere |
+| 4 | `persistent` fields written and read in the container the topology's entity implies: `volField`, `surfaceField`, `pointField`, or n of them for a fixed Gauss-point count | R1 for the cell-centred solid models and their high-order variants |
+| 5 | Guard refusing history-dependent laws wherever the mapping is not exact: derived meshes, variable counts, unresolved shared points, changing topology | honest failure instead of silent loss |
+| 6 | Topology-aware persistent state with integration-point identity, plus decompose/reconstruct/redistribute support, for topologies on a derived mesh or with a variable count | R1 everywhere |
 | 7 | `mapPolyMesh` handling so history survives a topology change | `crackerFvMesh` with a history-dependent law |
 
 <!-- markdownlint-enable MD013 -->
@@ -345,7 +405,12 @@ implementing it as written. The substantive corrections, all incorporated above:
    was too strong (§3).
 2. `faceCentred` and `pointCentred` are not short of a container - mesh-aware
    surface and point fields exist. Their difficulty is shared integration
-   points, which is a semantic problem, not a storage one (§3).
+   points, which is a semantic problem, not a storage one (§3). Following this
+   through is what produced the general classification now in §3: the question
+   is not whether a topology is cell-shaped but which mesh and entity its
+   points attach to, and whether the count per entity is fixed. Gauss points in
+   cells and Gauss points on faces both come out standard-IO-capable, and only
+   a derived mesh or a variable count does not.
 3. The per-cell broadcast is exact only where an integration point belongs to
    one cell. Calling it "not a compromise" was wrong for shared topologies,
    which need a declared mapping policy (§4).

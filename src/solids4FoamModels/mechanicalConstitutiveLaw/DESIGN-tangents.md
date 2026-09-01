@@ -1513,9 +1513,9 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 2 | **Done.** Flat-list `updateStressSmallStrain`/`updateStressFiniteStrain`/`updateTangentSmallStrain`/`updateTangentFiniteStrain` primitives, with the two `CompactListList` overloads and the internal-field half of the two `volTensorField` overloads re-expressed on them; `registerTopology()` and `topologyFor()` made public; `dualFaceIntegrationPointTopology`; defect D6. Plus `Test-mechanicalConstitutiveLaw`, run by the `layeredPipe` regression test. See §8.6. |
 | 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
 | 4 | **Done.** `vertexCentredLinGeomSolid` tangent-only adoption (§8.4), plus the optional manager deferred from PR-3. See §8.9. |
-| 5 | `vertexCentredNonLinGeomTotalLagSolid` tangent-only; then stress for both, removing `dualMechanicalModel` and requiring OQ-2 to be settled. |
+| 5 | Stress for `vertexCentredLinGeomSolid`, removing its dependence on `dualMechanicalModel`. Its nonlinear sibling is disabled, see §8.11. |
 | 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
-| 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
+| 7…n | Cell-centred solvers and their high-order variants, the ones in common use and now the priority, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
 <!-- markdownlint-enable MD013 -->
@@ -1797,7 +1797,26 @@ rejected as an endpoint: leaving boundary stress with `dualMechanicalModel`,
 because then it can never be removed - though it would work as a stepping
 stone.
 
-### 8.11 Open questions still outstanding
+### 8.11 `vertexCentredNonLinTotalLagGeometry` is disabled
+
+Its compilation is commented out in `Make/files.openfoam` and
+`Make/files.foamextend`, and the reason is recorded in the solver's own
+`README.md`. No tutorial ever selected it, and an attempt to give it one failed:
+three of its dictionary entries have no defaults and are set by no case, and
+with those supplied the run dies in a floating point exception inside the PETSc
+solve on the first Newton step.
+
+That state pre-dates this work and is independent of it. Fixing it is separate
+from the constitutive law migration, so the migration skips it rather than
+carrying an untestable solver.
+
+**Consequence for the plan.** PR-5's original content - the nonlinear
+vertex-centred tangent, then stress for both vertex-centred models - reduces to
+stress for `vertexCentredLinGeomSolid` alone. The priority after that moves to
+the cell-centred solid models and their high-order variants, which are the ones
+in common use.
+
+### 8.12 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term
