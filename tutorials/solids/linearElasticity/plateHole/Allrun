@@ -206,6 +206,7 @@ select_approach() {
             ;;
         highOrderFourthOrder)
             echo "Using the highOrder approach with a full material tangent"
+            solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "highOrder"
             rm -f constant/solidProperties
             ln -s solidProperties.highOrderFourthOrder constant/solidProperties
