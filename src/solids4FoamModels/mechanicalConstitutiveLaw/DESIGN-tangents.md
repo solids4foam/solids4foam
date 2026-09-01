@@ -1914,7 +1914,37 @@ The test application asserted the old blanket rule and duly failed on
 `perforatedPlate`, which has one material. It now asserts the real contract:
 rejected with several materials, allowed with one.
 
-### 8.14 Open questions still outstanding
+### 8.14 Boundary integration points in the flat-list update
+
+`faceCentredIntegrationPointTopology::nIntegrationPoints()` returns
+`mesh.nFaces()`, but its cell-to-integration-point map covers **internal faces
+only**, and says so. Laws are matched to integration points through that map,
+so a flat-list update left every boundary entry of the caller's storage exactly
+as it was found. `linGeomTotalDispSolid::faceMaterialTangent()` sizes its
+`List<mat66>` to `nFaces` and hands it to an assembler that does iterate the
+boundary patches, so it was reading unwritten memory.
+
+**Fixed** by giving the topology a `boundaryIntegrationPointIDs(patchI)` query
+and having both flat-list primitives evaluate the boundary points of a
+`boundaryAware` topology, using the per-law, per-patch boundary state the
+manager already keeps. This is the general fix: any topology that declares
+itself boundary-aware now has its boundary points covered, rather than the
+caller working around the gap.
+
+**Why this went unnoticed, which is the part worth remembering.** The
+`highOrderFourthOrder` variant was byte-identical to `highOrder`, with the same
+Newton iteration count, and that was reported as strong verification. It is
+not. This is a *Jacobian*: a wrong one changes the path to the solution, not the
+solution, and PETSc SNES converges to its tolerance either way. **A
+byte-identical converged result is exactly what a wrong Jacobian looks like
+when the residual is right.** No end-to-end solver comparison can validate a
+Jacobian; only a direct comparison of the tangent itself can.
+
+It was found by the finite-strain tangent test, which sized its comparison to
+`nIntegrationPoints()` and got a relative error of exactly 1 on the unwritten
+entries - a number too clean to be anything but "never assigned".
+
+### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term

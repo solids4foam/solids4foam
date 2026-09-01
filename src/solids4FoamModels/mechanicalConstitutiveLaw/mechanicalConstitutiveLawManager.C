@@ -1049,6 +1049,115 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             laws_[lawI].evaluate(kin, lawState, response);
         }
     }
+
+    // Boundary integration points.
+    // The topology's cell-to-integration-point map covers internal points
+    // only, so without this every boundary entry of the caller's storage is
+    // left exactly as it was found - which, for a caller that sized its list
+    // to nIntegrationPoints(), means unwritten memory.
+    // A topology with no boundary slots in its flat index space returns an
+    // empty list per patch below and nothing happens, which is the right
+    // outcome for a cell-centred topology: it is boundaryAware because it
+    // keeps a state per patch, not because its index space extends past the
+    // cells
+    if (tp.boundaryAware_)
+    {
+        forAll(laws_, lawI)
+        {
+            forAll(mesh_.boundary(), patchI)
+            {
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
+                {
+                    continue;
+                }
+
+                const labelList patchIPs
+                (
+                    topo.boundaryIntegrationPointIDs(patchI)
+                );
+
+                if (patchIPs.empty())
+                {
+                    continue;
+                }
+
+                // This law's faces on this patch, as integration-point indices
+                labelList ipIDs(faces.size());
+                forAll(faces, i)
+                {
+                    ipIDs[i] = patchIPs[faces[i]];
+                }
+
+                autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
+                if (preserveState)
+                {
+                    bShadowPtr.set
+                    (
+                        new mechanicalConstitutiveLawState
+                        (
+                            tp.boundaryStates_[lawI][patchI],
+                            mechanicalConstitutiveLawState::SHADOW
+                        )
+                    );
+                }
+
+                mechanicalConstitutiveLawState& bState =
+                    preserveState
+                  ? bShadowPtr()
+                  : tp.boundaryStates_[lawI][patchI];
+
+                const UIndirectList<tensor> gradDView(gradD, ipIDs);
+                const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
+                UIndirectList<symmTensor> stressView(stress, ipIDs);
+
+                smallStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    gradDView, gradD0View, dt
+                );
+
+                if (needsScalarTangent(tangentReq))
+                {
+                    UIndirectList<scalar> tanView(*scalarTangentPtr, ipIDs);
+
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tanView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+                else if (needsFourthOrderTangent(tangentReq))
+                {
+                    UIndirectList<mat66> tanView
+                    (
+                        *fourthOrderTangentPtr, ipIDs
+                    );
+
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tanView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+                else
+                {
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+            }
+        }
+    }
 }
 
 
@@ -1200,6 +1309,119 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
             mechanicalConstitutiveLawResponse response(stressView, tangentReq);
 
             laws_[lawI].evaluate(kin, lawState, response);
+        }
+    }
+
+    // Boundary integration points.
+    // The topology's cell-to-integration-point map covers internal points
+    // only, so without this every boundary entry of the caller's storage is
+    // left exactly as it was found - which, for a caller that sized its list
+    // to nIntegrationPoints(), means unwritten memory.
+    // A topology with no boundary slots in its flat index space returns an
+    // empty list per patch below and nothing happens, which is the right
+    // outcome for a cell-centred topology: it is boundaryAware because it
+    // keeps a state per patch, not because its index space extends past the
+    // cells
+    if (tp.boundaryAware_)
+    {
+        forAll(laws_, lawI)
+        {
+            forAll(mesh_.boundary(), patchI)
+            {
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
+                {
+                    continue;
+                }
+
+                const labelList patchIPs
+                (
+                    topo.boundaryIntegrationPointIDs(patchI)
+                );
+
+                if (patchIPs.empty())
+                {
+                    continue;
+                }
+
+                // This law's faces on this patch, as integration-point indices
+                labelList ipIDs(faces.size());
+                forAll(faces, i)
+                {
+                    ipIDs[i] = patchIPs[faces[i]];
+                }
+
+                autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
+                if (preserveState)
+                {
+                    bShadowPtr.set
+                    (
+                        new mechanicalConstitutiveLawState
+                        (
+                            tp.boundaryStates_[lawI][patchI],
+                            mechanicalConstitutiveLawState::SHADOW
+                        )
+                    );
+                }
+
+                mechanicalConstitutiveLawState& bState =
+                    preserveState
+                  ? bShadowPtr()
+                  : tp.boundaryStates_[lawI][patchI];
+
+                const UIndirectList<tensor> FView(F, ipIDs);
+                const UIndirectList<tensor> F0View(F0, ipIDs);
+                const UIndirectList<tensor> FinvView(Finv, ipIDs);
+                const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+                const UIndirectList<scalar> JView(J, ipIDs);
+                const UIndirectList<scalar> J0View(J0, ipIDs);
+                UIndirectList<symmTensor> stressView(stress, ipIDs);
+
+                finiteStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    FView, F0View, JView, J0View, FinvView, Finv0View, dt
+                );
+
+                if (needsScalarTangent(tangentReq))
+                {
+                    UIndirectList<scalar> tanView(*scalarTangentPtr, ipIDs);
+
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tanView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+                else if (needsFourthOrderTangent(tangentReq))
+                {
+                    UIndirectList<mat66> tanView
+                    (
+                        *fourthOrderTangentPtr, ipIDs
+                    );
+
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tanView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+                else
+                {
+                    mechanicalConstitutiveLawResponse response
+                    (
+                        stressView, tangentReq
+                    );
+
+                    laws_[lawI].evaluate(kin, bState, response);
+                }
+            }
         }
     }
 }
