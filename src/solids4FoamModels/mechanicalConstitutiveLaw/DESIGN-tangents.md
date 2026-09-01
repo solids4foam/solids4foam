@@ -1513,9 +1513,9 @@ Supersedes the stage numbering in §5. Content is otherwise as described there.
 | 2 | **Done.** Flat-list `updateStressSmallStrain`/`updateStressFiniteStrain`/`updateTangentSmallStrain`/`updateTangentFiniteStrain` primitives, with the two `CompactListList` overloads and the internal-field half of the two `volTensorField` overloads re-expressed on them; `registerTopology()` and `topologyFor()` made public; `dualFaceIntegrationPointTopology`; defect D6. Plus `Test-mechanicalConstitutiveLaw`, run by the `layeredPipe` regression test. See §8.6. |
 | 3 | **Done.** `solidModel::jacobianTangent(deflt)` and the `approximateJacobian` deprecation shim, used by both vertex-centred solvers; the shadow state of §3.1; a working `fourthOrderFiniteDifference` tangent. The optional manager on `solidModel` moves to PR-4. See §8.8. |
 | 4 | **Done.** `vertexCentredLinGeomSolid` tangent-only adoption (§8.4), plus the optional manager deferred from PR-3. See §8.9. |
-| 5 | `vertexCentredNonLinGeomTotalLagSolid` tangent-only; then stress for both, removing `dualMechanicalModel` and requiring OQ-2 to be settled. |
+| 5 | Stress for `vertexCentredLinGeomSolid`, removing its dependence on `dualMechanicalModel`. Its nonlinear sibling is disabled, see §8.11. |
 | 6 | `hofvm::divSigmaIntoPETScMatrix(mat66)` + uniform-tangent fast path; delete the `(impK_-K)*3/4` back-derivation from the three cell-centred solvers. |
-| 7…n | Cell-centred solvers, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
+| 7…n | Cell-centred solvers and their high-order variants, the ones in common use and now the priority, risk-ordered: `uns*` → `thermal`/`poro` → `nonLinGeom*` → `linGeomTotalDispSolid` → `coupledPressureDisplacementSolid`. |
 | final | Retire the legacy tangent interface and migrate or bless the six `"impK"` registry consumers (OQ-8). |
 
 <!-- markdownlint-enable MD013 -->
@@ -1753,7 +1753,70 @@ something the query computed - shadows never write current-time fields, so the
 committed values are the same whichever call triggers it - but the contract now
 says so instead of claiming the query modifies nothing at all.
 
-### 8.10 Open questions still outstanding
+### 8.10 Correction: boundary dual faces *are* read, by the residual
+
+§8.4 states that "no boundary dual face is ever read" and concludes that
+`dualFaceIntegrationPointTopology::nIntegrationPoints()` should be
+`dualMesh().nInternalFaces()`. **That is true of the Jacobian and false of the
+residual**, and the distinction was missed because only the Jacobian had moved.
+
+The three `vfvm` assembly routines do iterate `dualMesh.owner()`, i.e. internal
+dual faces only. But the residual path in
+`vertexCentredLinGeomSolid::updatePointDivSigma` does this:
+
+```c++
+surfaceVectorField dualTraction(dualN & dualSigmaf_);
+enforceTractionBoundaries(pointD, dualTraction, mesh(), ...);
+const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
+```
+
+`fvc::div` of a surface field sums fluxes over every face of each cell,
+boundary faces included, so the **boundary field** of `dualSigmaf_` is read.
+`enforceTractionBoundaries` overwrites it only on patches whose `pointD`
+boundary condition is a `solidTractionPointPatchVectorField`; a
+fixed-displacement patch keeps `dualN & dualSigmaf_`. `cantilever2d` has a
+clamped end, so this is live in the one case that covers this solver.
+
+**Consequence.** The tangent-only slice of PR-4 is unaffected: it only ever
+needed internal faces. Moving *stress* onto the manager needs boundary dual
+faces as well, which the present topology deliberately excludes. The stress
+move is therefore blocked on a decision about how to represent them.
+
+**Recommended.** One topology covering all dual faces, indexed
+`[0, nInternalFaces)` for internal and `[nInternalFaces, nFaces)` for boundary,
+with the solid model gathering `dualGradDf_` and scattering `dualSigmaf_`
+across the internal field and the boundary patches. One topology means one set
+of constitutive state, which is the property that matters: a history-dependent
+law must not have its plastic strain split across two state objects. The
+Jacobian then reads the first `nInternalFaces` entries of the same arrays, and
+`vfvm::divSigma` is indifferent to a longer list.
+
+Rejected: a second, boundary-only topology, because it gives each dual face
+family its own `mechanicalConstitutiveLawState` and so splits history. Also
+rejected as an endpoint: leaving boundary stress with `dualMechanicalModel`,
+because then it can never be removed - though it would work as a stepping
+stone.
+
+### 8.11 `vertexCentredNonLinTotalLagGeometry` is disabled
+
+Its compilation is commented out in `Make/files.openfoam` and
+`Make/files.foamextend`, and the reason is recorded in the solver's own
+`README.md`. No tutorial ever selected it, and an attempt to give it one failed:
+three of its dictionary entries have no defaults and are set by no case, and
+with those supplied the run dies in a floating point exception inside the PETSc
+solve on the first Newton step.
+
+That state pre-dates this work and is independent of it. Fixing it is separate
+from the constitutive law migration, so the migration skips it rather than
+carrying an untestable solver.
+
+**Consequence for the plan.** PR-5's original content - the nonlinear
+vertex-centred tangent, then stress for both vertex-centred models - reduces to
+stress for `vertexCentredLinGeomSolid` alone. The priority after that moves to
+the cell-centred solid models and their high-order variants, which are the ones
+in common use.
+
+### 8.12 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term
