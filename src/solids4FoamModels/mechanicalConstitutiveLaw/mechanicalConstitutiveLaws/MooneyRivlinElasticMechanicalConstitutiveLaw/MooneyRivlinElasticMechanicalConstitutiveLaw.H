@@ -47,6 +47,11 @@ Description
     belongs to the solid model, where it is to be provided separately. This
     law therefore returns the unsmoothed p = K (J^2 - 1)/2.
 
+    The legacy law also adds a pushed-forward initial stress,
+    symm(F sigma0 F^T), to the Cauchy stress. No law in this framework carries
+    an initial stress yet, so that term is absent here; a case that relies on
+    a non-zero sigma0 is not yet reproduced.
+
     The material constants are uniform here, whereas the legacy law holds them
     as volScalarFields that may be read per cell. Spatially varying material
     constants are part of the wider question of how the framework carries

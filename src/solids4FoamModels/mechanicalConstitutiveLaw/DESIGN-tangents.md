@@ -2063,10 +2063,29 @@ on `pressureSmoothingScaleFactor` will converge differently under the
 framework. The two migrations in this PR are unaffected, because they take
 only `impK` from the framework and never call a law for a stress.
 
-With `MooneyRivlinElastic` in place the coverage gap largely closes.
-`longWall` exercises the total Lagrangian solver's framework path, and
-`cylinderCrush` the updated Lagrangian one - the latter only under
-foam-extend, since it uses contact.
+With `MooneyRivlinElastic` in place the coverage gap partly closes.
+`longWall` exercises the total Lagrangian solver's framework path in CI.
+
+The updated Lagrangian solver was verified **by hand, not in CI**, on
+`cylinderCrush` under foam-extend, which is the only tutorial pairing that
+solver with a law the framework implements. Both arms agree exactly:
+force_y = -70145.7 N and disp_y = -0.0998977 m with the legacy impK and with
+the framework impK, and the framework's own constitutive checks pass on that
+mesh.
+
+It is deliberately **not** wired into CI, for a reason worth recording. Run
+locally the case completes all 30 time steps of its 30 s ramp. The regression
+bands it is checked against, force_y in [-550, -545] N and disp_y in
+[-0.0034, -0.0032] m, correspond instead to roughly t = 1 s: the displacement
+ramps to about -0.0999 m at t = 30, and one thirtieth of that is -0.0033,
+which is what CI reports (-0.00329221). So in CI the case appears to stop
+after about one time step, and the expected values encode that truncated run
+rather than the completed one.
+
+Until that discrepancy is understood, this case is not a trustworthy vehicle
+for a two-arm comparison, and doubling a long contact run in CI on top of an
+unexplained early stop is not a good trade. The single-arm test is left
+exactly as it was.
 
 `neoHookeanElasticMisesPlastic`, which nine tutorials need, remains the other
 gap. It is history-dependent finite-strain plasticity, a substantial law in
