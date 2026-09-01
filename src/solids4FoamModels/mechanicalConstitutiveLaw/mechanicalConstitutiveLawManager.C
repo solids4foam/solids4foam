@@ -1384,7 +1384,23 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
         tangentReq
     );
 
+    // The flat-list primitive fills internal integration points only, so give
+    // the boundary usable values. A scalar tangent is a per-cell material
+    // property, and a boundary face belongs to the material of its owner cell,
+    // so taking the patch-internal value is exact rather than an
+    // approximation. Without this the boundary stays at whatever the field was
+    // constructed with, which a caller forming 1/tangent then divides by
+    forAll(scalarTangent.boundaryField(), patchI)
+    {
+        if (!scalarTangent.boundaryField()[patchI].coupled())
+        {
+            Foam::boundaryFieldRef(scalarTangent)[patchI] =
+                scalarTangent.boundaryField()[patchI].patchInternalField();
+        }
+    }
+
 #ifndef OPENFOAM_ORG
+    // Sync the coupled patches
     scalarTangent.correctBoundaryConditions();
 #endif
 }

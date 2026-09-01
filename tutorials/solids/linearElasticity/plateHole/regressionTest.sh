@@ -42,6 +42,7 @@ ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     segregated
+    segregatedManager
     petscSnes
     petscSnesPressure
     highOrder

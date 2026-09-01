@@ -1816,7 +1816,39 @@ stress for `vertexCentredLinGeomSolid` alone. The priority after that moves to
 the cell-centred solid models and their high-order variants, which are the ones
 in common use.
 
-### 8.12 Open questions still outstanding
+### 8.12 Notes from the first cell-centred adoption
+
+`linGeomTotalDispSolid` now sources `impK` - and `rKappa` - from the framework
+behind `useMechanicalConstitutiveLawManager`, default `no`. `impKf_` and
+`rImpK_` stay derived from `impK_` exactly as before, `impK_` is still
+registered under `"impK"` for the contact and cohesive-zone models that look it
+up by name, and the stress still comes from `mechanicalModel`.
+
+**Byte-identical with the switch on**, on `plateHole` (linear elastic) and on
+`perforatedPlate` (elastoplastic, twenty time steps), including the yielding
+diagnostics. The switch was confirmed to engage rather than the agreement being
+vacuous: the framework constructs a law only in the manager runs.
+
+The elastoplastic case agreeing exactly is worth understanding rather than just
+noting. `impK_` is frozen at construction, and on a cold start the constitutive
+state is zero, so the legacy state-dependent `impK()` and the framework's
+tangent query are evaluated at the same state. That is OQ-1 restated: the
+agreement is exact from a cold start and would not be from a restart, for
+either implementation, because both freeze a state-dependent quantity at
+construction.
+
+`plateHole` gains a `segregatedManager` approach so the path has continuous
+coverage rather than a one-off manual check.
+
+**A gap this found in `updateScalarTangent`.** The flat-list primitive fills
+internal integration points only, so the returned `volScalarField` had a
+zero boundary field, and the first thing this caller does is form `1/impK_` -
+a floating point exception in the constructor. The manager now fills each
+non-coupled patch from its patch-internal value, which is exact for a scalar
+tangent because a boundary face belongs to its owner cell's material, then
+syncs the coupled patches. Any cell-centred caller would have hit this.
+
+### 8.13 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
 OQ-5 (`fourthOrderFiniteDifference` production status), OQ-6 (stabilisation term
