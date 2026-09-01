@@ -63,23 +63,6 @@ Author
 
 #include "fvCFD.H"
 
-#ifdef FOAMEXTEND
-
-// The mechanical constitutive law framework is not part of the foam-extend
-// build: its sources are absent from src/solids4FoamModels/Make/files.foamextend
-// and its headers do not compile there. There is nothing to test on this fork
-int main(int argc, char *argv[])
-{
-    Info<< nl
-        << "The mechanical constitutive law framework is not built for "
-        << "foam-extend, so there is nothing to test." << nl << nl
-        << "End" << nl << endl;
-
-    return 0;
-}
-
-#else
-
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
@@ -936,8 +919,17 @@ int main(int argc, char *argv[])
         );
 
         // Cross a time step, which commits the current-time fields to history,
-        // then evaluate the same strain again
-        runTime++;
+        // then evaluate the same strain again.
+        // setTime rather than operator++: this application is not the solver,
+        // so running a time step would execute the case's function objects,
+        // and those generally expect a registered solidModel. Only the time
+        // index matters here, since that is what the manager keys its
+        // old-time rollover on
+        runTime.setTime
+        (
+            runTime.value() + runTime.deltaTValue(),
+            runTime.timeIndex() + 1
+        );
 
         manager.updateStressSmallStrain
         (
@@ -1137,6 +1129,5 @@ int main(int argc, char *argv[])
 }
 
 
-#endif // FOAMEXTEND
 
 // ************************************************************************* //

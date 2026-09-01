@@ -49,6 +49,8 @@ SourceFiles
 #include "uniformDimensionedFields.H"
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
+#include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
 #include "twoDPointCorrector.H"
 #ifdef OPENFOAM_COM
@@ -91,6 +93,21 @@ private:
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
+
+        //- Take the Jacobian material tangent from the mechanical
+        //  constitutive law framework rather than from dualMechanicalModel.
+        //  Opt-in, read once from the solid model coefficients dictionary.
+        //  Only the Jacobian moves: the residual stress at dual faces still
+        //  comes from dualMechanicalModel, so the converged answer is
+        //  unchanged and only the convergence path can differ
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- Mechanical constitutive law manager, when the above is set
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
+        //- Integration-point topology for the internal dual mesh faces,
+        //  owned by the manager
+        mutable const integrationPointTopology* dualFaceTopologyPtr_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -203,6 +220,13 @@ private:
             return fixedDofRowsISPtr_;
         }
 #endif
+
+        //- Return the mechanical constitutive law manager, constructing it
+        //  and registering the dual-face topology on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Return the integration-point topology for the internal dual faces
+        const integrationPointTopology& dualFaceTopology() const;
 
         //- Make dualImpKf field
         void makeDualImpKf() const;

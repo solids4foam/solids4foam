@@ -58,10 +58,17 @@ class compactCellIntegrationPointTopology
 :
     public integrationPointTopology
 {
-    //- Mapping from cells to integration-point indices.
-    //  The integration-point indices refer to positions in the packed
-    //  constitutive working set (e.g. CompactListList<Type>::values()).
-    CompactListList<label> cellToIntegrationPointIDs_;
+    //- Integration-point indices for every cell, concatenated.
+    //  The indices refer to positions in the packed constitutive working set
+    //  (e.g. CompactListList<Type>::values())
+    labelList integrationPointIDs_;
+
+    //- Start of each cell's entries in integrationPointIDs_, of size
+    //  nCells + 1.
+    //  Held flat rather than as a CompactListList because that container's
+    //  const operator[] does not compile on foam-extend, and because the two
+    //  forks disagree on whether an offset marks the start or the end of a row
+    labelList startOffsets_;
 
 public:
 
@@ -76,18 +83,32 @@ public:
     )
     :
         integrationPointTopology(mesh),
-        cellToIntegrationPointIDs_(std::move(cellToIntegrationPointIDs))
+        integrationPointIDs_(),
+        startOffsets_()
     {
         // Basic consistency check: one entry per mesh cell
-        if (cellToIntegrationPointIDs_.size() != mesh_.nCells())
+        if (cellToIntegrationPointIDs.size() != mesh_.nCells())
         {
             FatalErrorInFunction
                 << "Size of cellToIntegrationPointIDs ("
-                << cellToIntegrationPointIDs_.size()
+                << cellToIntegrationPointIDs.size()
                 << ") does not match number of mesh cells ("
                 << mesh_.nCells() << ")."
                 << exit(FatalError);
         }
+
+        // Flatten. sizes() and m() mean the same thing on every supported
+        // fork, which const operator[] does not
+        const labelList rowSizes(cellToIntegrationPointIDs.sizes());
+
+        startOffsets_.setSize(rowSizes.size() + 1);
+        startOffsets_[0] = 0;
+        forAll(rowSizes, cellI)
+        {
+            startOffsets_[cellI + 1] = startOffsets_[cellI] + rowSizes[cellI];
+        }
+
+        integrationPointIDs_ = cellToIntegrationPointIDs.m();
     }
 
     //- Destructor
@@ -96,7 +117,7 @@ public:
     //- Total number of integration points
     virtual label nIntegrationPoints() const override
     {
-        return cellToIntegrationPointIDs_.m().size();
+        return integrationPointIDs_.size();
     }
 
     //- Integration-point indices associated with a given cell
@@ -105,7 +126,12 @@ public:
         const label cellI
     ) const override
     {
-        return cellToIntegrationPointIDs_[cellI];
+        return labelUList
+        (
+            const_cast<label*>(integrationPointIDs_.begin())
+          + startOffsets_[cellI],
+            startOffsets_[cellI + 1] - startOffsets_[cellI]
+        );
     }
 
     //- Does this topology store boundary integration points per patch

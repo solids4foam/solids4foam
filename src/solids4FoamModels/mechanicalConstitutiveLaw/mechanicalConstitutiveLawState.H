@@ -183,6 +183,15 @@ public:
             shadowedPtr_(&parent)
         {}
 
+        //- A shadow of a temporary would dangle as soon as the statement
+        //  creating it ended, so make that a compile-time error rather than a
+        //  comment asking the caller to be careful
+        mechanicalConstitutiveLawState
+        (
+            const mechanicalConstitutiveLawState&&,
+            const shadowType
+        ) = delete;
+
 
     // Access
 

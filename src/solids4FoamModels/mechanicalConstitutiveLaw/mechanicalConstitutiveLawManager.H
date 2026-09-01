@@ -60,12 +60,15 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "CompactListList.H"
 #include "dictionary.H"
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
+
+#ifdef OPENFOAM_ORG
+#include "CompactListList.H"
+#endif
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -77,6 +80,13 @@ namespace Foam
 class integrationPointTopology;
 class CompactListListBase;
 struct mat66;
+
+//- OpenFOAM.org's CompactListList has two template parameters, so its header
+//  is included above. The other forks have one template parameter; forward
+//  declare it to avoid instantiating foam-extend's broken const operator[].
+#ifndef OPENFOAM_ORG
+template<class T> class CompactListList;
+#endif
 
 /*---------------------------------------------------------------------------* \
               Class mechanicalConstitutiveLawManager Declaration
@@ -213,38 +223,17 @@ class mechanicalConstitutiveLawManager
             }
         }
 
-        //- Check the provided compact list sizes are consistent
-        inline void checkCompactLayoutConsistency
+        //- Check the provided compact list sizes are consistent.
+        //  Defined in the .C so that this header does not need the complete
+        //  CompactListList type
+        void checkCompactLayoutConsistency
         (
             const CompactListList<tensor>& a,
             const CompactListList<tensor>& b,
             const CompactListList<symmTensor>& out,
             const List<scalar>* tangentPtr,
             const word& context
-        )
-        {
-            const label nIP = out.m().size();
-
-            if (a.m().size() != nIP || b.m().size() != nIP)
-            {
-                FatalError
-                    << "Inconsistent CompactListList sizes in " << context << nl
-                    << "Expected size = " << nIP << nl
-                    << "Got: grad = " << a.m().size()
-                    << ", grad0 = " << b.m().size()
-                    << exit(FatalError);
-            }
-
-            if (tangentPtr && tangentPtr->size() != nIP)
-            {
-                FatalError
-                    << "Scalar tangent list has incorrect size in " << context
-                    << nl
-                    << "Expected: " << nIP
-                    << ", got: " << tangentPtr->size()
-                    << exit(FatalError);
-            }
-        }
+        );
 
         //- Check that a flat integration-point list has the size the topology
         //  requires
@@ -549,7 +538,14 @@ public:
         //  intended migration path.
         //  Each law is evaluated against a shadow of its constitutive state,
         //  so a tangent query never disturbs history, whichever topology it is
-        //  made on
+        //  made on.
+        //  One qualification. Like every other update, this participates in
+        //  the once-per-time-step old-time rollover, so if it is the first
+        //  call of a new time step it is what commits the previous step's
+        //  converged state. That is bookkeeping the framework owes whoever
+        //  evaluates first, not something the query computed: shadows never
+        //  write current-time fields, so the values committed are the same
+        //  whichever call triggers the rollover
         void updateTangentSmallStrain
         (
             const integrationPointTopology& topo,
