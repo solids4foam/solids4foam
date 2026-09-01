@@ -919,8 +919,17 @@ int main(int argc, char *argv[])
         );
 
         // Cross a time step, which commits the current-time fields to history,
-        // then evaluate the same strain again
-        runTime++;
+        // then evaluate the same strain again.
+        // setTime rather than operator++: this application is not the solver,
+        // so running a time step would execute the case's function objects,
+        // and those generally expect a registered solidModel. Only the time
+        // index matters here, since that is what the manager keys its
+        // old-time rollover on
+        runTime.setTime
+        (
+            runTime.value() + runTime.deltaTValue(),
+            runTime.timeIndex() + 1
+        );
 
         manager.updateStressSmallStrain
         (
