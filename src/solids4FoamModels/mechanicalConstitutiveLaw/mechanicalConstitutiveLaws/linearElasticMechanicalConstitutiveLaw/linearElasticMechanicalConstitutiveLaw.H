@@ -77,10 +77,12 @@ class linearElasticMechanicalConstitutiveLaw
         const dimensionedScalar rho_;
 
         //- Young's modulus
-        const dimensionedScalar E_;
+        //  Set in the constructor body, since the material may be given as
+        //  mu and K instead
+        dimensionedScalar E_;
 
         //- Poisson's ration
-        const dimensionedScalar nu_;
+        dimensionedScalar nu_;
 
         //- First Lamé parameter
         dimensionedScalar lambda_;

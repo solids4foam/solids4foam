@@ -471,165 +471,99 @@ interface. Either material properties become a per-integration-point response,
 or the thermal correction is admitted to be law-specific rather than a general
 decorator.
 
-### 8a.2b A different answer: no decorator laws at all
+### 8a.2b Corrections around a pure law: what survives, and what does not
 
-§8a.2 assumed the legacy shape - a law owning a sub-law - and asked how to
-make its state work. Having costed that, the better question is whether the
-shape is right. It is not, and the two cases that motivated it are better
-served without it.
+This section proposed replacing decorator laws entirely: a material would
+declare an input correction (an eigenstrain subtracted from the strain) and an
+output correction (an additive stress), the manager would apply them, and
+§8a.2's child-state problem would evaporate.
 
-**What the two laws are actually doing.**
+**Review rejected it, and was right.** The taxonomy is worth keeping; the claim
+that it *replaces* composition is false. What follows is what stands, what
+fell, and why - the failures being the more useful half.
 
-`thermoMechanicalLaw` delegates, then subtracts `3 K alpha (T - T0) I`, using
-the *sub-law's* bulk modulus. That is a thermal eigenstrain expressed as a
-stress: the material responds to the mechanical part of the strain,
-`sigma = C : (eps - eps0)` with `eps0 = alpha (T - T0) I`.
+#### What stands
 
-`poroMechanicalLaw` delegates on an effective stress it seeds itself, then
-returns `sigmaEff - b (p + p0) I`. That is Terzaghi: the *material* responds to
-effective stress, and total stress is what the momentum equation needs.
+* **The thermal case really is an eigenstrain.** For three-dimensional
+  isotropic linear elasticity, `C : eps0 = 2 mu dev(eps0) + K tr(eps0) I`, and
+  `eps0 = alpha (T - T0) I` is spherical, so this is `3 K alpha (T - T0) I` -
+  identically the legacy stress correction. The framework and legacy laws build
+  `K = lambda + (2/3) mu` from the same plane-stress and plane-strain formulae,
+  so the equivalence holds under plane stress too.
+* **Applying it on the input is more correct than subtracting a stress.** The
+  legacy wrapper accepts *any* linear-geometry sub-law and subtracts
+  `3 K alpha dT I` regardless. For a nonlinear or history-dependent sub-law
+  that is not the same thing, and the eigenstrain form is the defensible one.
+* **The two directions are genuinely different.** An eigenstrain changes what
+  the material sees; an additive stress does not. That distinction is real and
+  the nested dictionary cannot express it.
 
-Both are corrections around a pure law. Neither is a new material.
+#### What fell
 
-**Proposal: the manager applies declared corrections around a pure law.**
+**1. "Poro needs nothing more" is false.** `checkSigmaEffReady` is not lazy
+allocation with a throwaway value: it seeds the effective stress as
+`sigma_total_incoming + b (p + p0) I`, and that seed is the *initial effective
+stress*.
 
-A material entry may declare, alongside its law, an input correction and an
-output correction. The manager applies them; the law is untouched and stays a
-pure function of the kinematics it is handed.
+`stripFooting` nests `linearElasticMohrCoulombPlastic` inside
+`poroMechanicalLaw`. That law is **pressure-sensitive**, yields on principal
+effective stresses, starts its trial stress from an accumulated increment plus
+`sigma0`, and warns explicitly that starting from zero stress is problematic.
+Replacing the wrapper with "law output minus pore pressure" starts the law from
+its own default state instead of the incoming total stress converted to
+effective stress, which changes the first return mapping and the restart path.
 
-<!-- markdownlint-disable MD013 -->
+The requirement does not vanish; it **moves** to the prescribed initial stress
+of §4 and §6, which is designed and not implemented. Poro cannot be migrated
+before that is.
 
-| Correction | Applied | Used for |
-|---|---|---|
-| Eigenstrain `eps0` | subtracted from the strain before the law sees it | thermal expansion, swelling |
-| Additive stress | added to the law's stress afterwards | pore pressure, active tension |
+**2. "Neither correction perturbs the Jacobian" is false in general.** The
+correct statement is narrower. An additive stress leaves the constitutive
+derivative alone only if it is deformation-independent. An eigenstrain adds no
+term, since `d eps0 / d eps = 0`, but the law's tangent is then evaluated at
+the *mechanical* strain, so it can change branch. A spherical thermal
+eigenstrain does not disturb a J2 yield test, which is deviatoric - that
+special case survives - but the Mohr-Coulomb law in this repository is
+pressure-sensitive, and there a spherical eigenstrain can turn yielding on and
+off.
 
-<!-- markdownlint-enable MD013 -->
+**3. `electroMechanicalLaw` does not fit the additive-stress correction.** Its
+active stress is `F (Ta f0 (x) f0) F^T / J`: a push-forward of a reference
+structural tensor, so it depends on the deformation gradient, carries its own
+tangent, and needs reference fibre data. `idealisedVentricle` nests it over
+`GuccioneElastic`. That is real nesting, in a real case, that one
+strain-independent eigenstrain plus one strain-independent additive stress
+cannot represent. Active tension is a *material contribution*, not a coupling
+correction.
 
-`thermoMechanicalLaw` becomes `linearElastic` plus a thermal eigenstrain.
-`poroMechanicalLaw` becomes any law plus an additive `-b (p + p0) I`. Neither
-needs a sub-law, a child state, a shadow tree, or prefixed state names, and the
-whole of §8a.2 evaporates.
+**4. The legacy shim cannot be generic.** The three wrappers do not even agree
+on the key holding the inner law: thermo uses `mechanicalLaw`, poro uses
+`effectiveStressMechanicalLaw`, electro uses `passiveMechanicalLaw`. Any
+translation is wrapper-specific, and for thermo over a nonlinear sub-law it
+would silently change the model. Conversion must be opt-in and only where
+equivalence is proven, not a blanket promise that old cases keep running.
 
-**Why this is not a dodge.**
+#### Where this leaves the design
 
-* It is exact for the case that exists. For isotropic linear elasticity,
-  `C : eps0 = 2 mu dev(eps0) + K tr(eps0) I`, and `eps0` is spherical, so
-  `dev(eps0) = 0` and `tr(eps0) = 3 alpha (T - T0)`, giving
-  `C : eps0 = 3 K alpha (T - T0) I` - identically the legacy correction. A
-  linear thermoelastic case reproduces its legacy result exactly.
-* It is *more* correct where the two differ. Subtracting a stress after the
-  fact is equivalent to an eigenstrain only for a linear law. For a plastic or
-  hyperelastic sub-law the legacy correction is wrong, because the yield
-  condition should see the mechanical strain. Applying the eigenstrain on the
-  input fixes that.
-* It satisfies poro's real requirement without special pleading. The law
-  computes the effective stress from the strain, so its own history is driven
-  by effective stress, which is exactly why the legacy law kept a separate
-  `sigmaEff` field. Here that field is just the law's output, and the hidden
-  initialisation contract of §8a.3 disappears.
-* Neither correction perturbs the Jacobian: both are strain-independent, so
-  the tangent is the law's own. That matters, because a decorator would have
-  had to decide what its tangent was.
+Both mechanisms are needed, and the boundary between them is the point:
 
-**Where the coefficients live.** With the manager applying the corrections,
-`alpha`, `b` and `p0` stay with the material, which is where they belong and
-where the legacy dictionary already puts them. The manager reads them from the
-material entry and forms the correction per integration point from the
-declared live input.
+* **Manager-applied corrections** for effects that are affine, stateless, and
+  small-strain - the thermal eigenstrain, and swelling. These need no sub-law
+  and no child state.
+* **Composite laws** for the rest, because two real cases need them: poro,
+  which needs an initial effective stress and a pressure-sensitive sub-law, and
+  electro, whose active stress is finite-strain and kinematics-dependent. So
+  §8a.2's child-state question is **not** avoided and must be answered.
 
-**The dictionary should change too, with the old one deprecated rather than
-broken.** The nested shape exists only because the decorator existed. Once the
-correction is not a material, writing it as one is actively misleading:
+A correction is therefore not "something the manager does"; it is a declared
+component with a contract: which strain measures it supports, which inputs it
+requires and their dimensions, whether it carries state, and whether it
+contributes to the tangent. Anything that needs more than that contract is a
+law, not a correction.
 
-```cpp
-    // Legacy: the material is a wrapper, and the actual material is buried
-    material0
-    {
-        type            thermoMechanicalLaw;
-        alpha           alpha [0 0 0 -1 0 0 0] 1e-5;
-        T0              T0 [0 0 0 1 0 0 0] 300;
-
-        mechanicalLaw
-        {
-            type        linearElastic;
-            rho         rho [1 -3 0 0 0 0 0] 7800;
-            E           E [1 -1 -2 0 0 0 0] 200e9;
-            nu          nu [0 0 0 0 0 0 0] 0.3;
-        }
-    }
-```
-
-```cpp
-    // Proposed: the material is the material, and the couplings are listed
-    material0
-    {
-        type            linearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7800;
-        E               E [1 -1 -2 0 0 0 0] 200e9;
-        nu              nu [0 0 0 0 0 0 0] 0.3;
-
-        eigenstrain
-        {
-            thermal
-            {
-                type    thermalExpansion;
-                alpha   alpha [0 0 0 -1 0 0 0] 1e-5;
-                T0      T0 [0 0 0 1 0 0 0] 300;
-                input   T;
-            }
-        }
-    }
-```
-
-and correspondingly for the pore pressure, as an output correction:
-
-```cpp
-        additiveStress
-        {
-            pore
-            {
-                type    porePressure;
-                b       0.9;
-                p0      p0 [1 -1 -2 0 0 0 0] 0;
-                input   p;
-            }
-        }
-```
-
-Four reasons the new form is better, not merely different:
-
-* `type` names the material again. `grep 'type linearElastic'` finds every
-  linear elastic material, which nesting currently hides.
-* Corrections compose. Thermal expansion *and* swelling is two entries; in the
-  nested form it is two levels of wrapper, and the nesting implies an ordering
-  that does not physically exist.
-* Each correction names the live input it reads, so what the solid model must
-  supply is declared rather than implied by the law's type.
-* It separates the two directions that §8a.2b showed are different: an
-  eigenstrain changes what the material sees, an additive stress does not.
-  The nested form cannot express that distinction at all.
-
-The legacy shape is still accepted and translated internally, with a
-deprecation warning naming the equivalent new entry, so existing cases keep
-running and their owners are told what to write instead.
-
-**Scope, honestly stated.** Both legacy laws are linear-geometry only, so an
-additive eigenstrain is the right formulation for every case that exists. It
-does not extend to finite strain, where a thermal deformation is
-multiplicative, `F = F_e F_theta`. If a finite-strain thermoelastic law is
-ever wanted, it needs the multiplicative form, and this section should be
-revisited rather than stretched.
-
-**What is given up.** Arbitrary nesting of decorators. The one case that might
-want genuine composition is `electroMechanicalLaw`, whose active tension is a
-stress the material generates rather than a coupling term - and even that fits
-the additive-stress correction if the activation and fibre direction are
-inputs. If something ever needs two materials evaluated over the same
-integration points and summed, that is *parallel* composition, and the manager
-can express it by giving each sub-law an ordinary law state slot, reusing the
-per-law machinery it already has. That is a much smaller thing than a
-decorator with child states, and it is not needed yet.
+The dictionary split of `eigenstrain` and `additiveStress` survives for the
+first category. The `inputs` object will also need tensor-valued views before
+electro can be expressed at all; today it offers scalars and vectors only.
 
 ### 8a.3 What is still unresolved
 
