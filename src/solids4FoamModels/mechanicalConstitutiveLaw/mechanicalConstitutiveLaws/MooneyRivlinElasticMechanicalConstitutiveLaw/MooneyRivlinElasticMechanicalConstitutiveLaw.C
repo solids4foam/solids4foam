@@ -70,16 +70,27 @@ MooneyRivlinElasticMechanicalConstitutiveLaw
     // Shear modulus, from the pure shear stress state, as in the legacy law
     mu_ = 2.0*(c10_ + c01_);
 
-    // The bulk modulus is given directly or derived from nu
+    // The bulk modulus is given directly or derived from nu.
+    //
+    // The legacy law takes K when it is present and ignores nu, so an existing
+    // case dictionary carrying both must keep working and keep the same
+    // meaning. Rejecting that combination here would be tidier but would break
+    // dictionaries the legacy law accepts, so it is warned about instead
     const bool haveK = dict.found("K");
     const bool haveNu = dict.found("nu");
 
-    if (haveK == haveNu)
+    if (!haveK && !haveNu)
     {
         FatalIOErrorInFunction(dict)
-            << "Specify either the bulk modulus 'K' or Poisson's ratio 'nu', "
-            << "and not both."
+            << "Specify either the bulk modulus 'K' or Poisson's ratio 'nu'."
             << exit(FatalIOError);
+    }
+
+    if (haveK && haveNu)
+    {
+        WarningInFunction
+            << "Both 'K' and 'nu' are given: K is used and nu is ignored, "
+            << "as in the legacy MooneyRivlinElastic law." << endl;
     }
 
     if (haveK)
@@ -142,6 +153,9 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
     const scalar c11 = c11_.value();
     const scalar kappaVal = kappa_.value();
 
+    // Not merely a positivity check: the stress divides by J and forms
+    // inv(isoB), so a J this close to zero is already meaningless
+    // numerically. The legacy law imposes no such floor
     const scalar Jmin = sqrt(SMALL);
 
     forAll(sigma, i)
@@ -152,8 +166,11 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
         if (Ji <= Jmin)
         {
             FatalErrorInFunction
-                << "Invalid deformation gradient determinant J = " << Ji
-                << " at index " << i << ". J must be positive."
+                << "Deformation gradient determinant J = " << Ji
+                << " at index " << i << " is not usable: J must be positive "
+                << "and greater than " << Jmin << ", since the stress divides "
+                << "by J. A J this small means the deformation has already "
+                << "degenerated."
                 << exit(FatalError);
         }
 
