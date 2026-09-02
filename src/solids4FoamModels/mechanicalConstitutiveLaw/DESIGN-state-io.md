@@ -368,6 +368,82 @@ and none of which depend on the restart question being settled.
 
 ---
 
+## 8a. Two categories this design does not yet cover
+
+Migrating the solid models one at a time has now surfaced two shapes of law
+that the sections above cannot express. Both were found the same way: by
+asking which law each remaining tutorial actually uses.
+
+### 8a.1 Live coupling fields
+
+`thermoMechanicalLaw` subtracts `3 K alpha (T - T0) I` from the stress its
+sub-law computed; `poroMechanicalLaw` subtracts `b (p + p0) I`. Neither `T` nor
+`p` is kinematics, and neither is prescribed state in the sense of §4: they are
+*solved every time step*, by another equation in the same solid model, and must
+be current at the moment the law is evaluated.
+
+So there is a third category alongside persistent (R1) and prescribed (R2, R3):
+
+**R4. A field the solid model owns and re-supplies each update, which a law
+reads but never writes.**
+
+Temperature and pore pressure are the two present cases;
+`electroMechanicalLaw` needs an activation field, and `viscousHookeanElastic`
+needs the time increment it already gets.
+
+**Proposal.** Do not change `evaluate`. A law declares a coupling field the
+same way it declares any other state field, and the solid model hands the
+manager the current values before each update:
+
+```c++
+    manager.setCouplingField("T", T);      // volScalarField on the primary mesh
+```
+
+The manager scatters cell values to the integration points of every law that
+declared `T`, using the same broadcast and the same shared-topology mapping
+policy §4 already defines for prescribed inputs. The law then reads `T` from
+its state exactly like anything else, and remains a pure function of
+(kinematics, state).
+
+**Alternative rejected.** Passing a dictionary of auxiliary fields into
+`evaluate`. That changes the signature every law implements in order to serve a
+minority of them, and it puts field-shaped objects back into the one interface
+this framework exists to keep free of them.
+
+**Open point.** A coupling field must be *stale-proof*: if a solid model
+forgets to set it, the law silently uses whatever was there last, which is the
+kind of error that produces plausible wrong answers. The manager should track
+whether each declared coupling field was set in the current update and fail
+loudly if not, rather than defaulting.
+
+### 8a.2 Composite laws
+
+`thermoMechanicalLaw` and `poroMechanicalLaw` are decorators: they construct a
+sub-law, delegate the stress to it, and then correct the result. So are
+`electroMechanicalLaw` and, in effect, the plastic laws' elastic predictors.
+Nothing in this framework yet says how a law owns another law.
+
+**Proposal.** A composite constructs its sub-law with
+`mechanicalConstitutiveLaw::New` on a sub-dictionary and owns it outright. The
+manager continues to see exactly one law per material, with one state. The
+composite forwards `declareState` to its sub-law, prefixing the names it
+declares so two laws in a stack cannot collide, and forwards `evaluate`, then
+modifies `response.stress()` in place, which is already a mutable view.
+
+Two consequences worth stating:
+
+* The finite-difference fourth-order tangent of the base class then measures
+  the *composite's* response, not the sub-law's, which is what a solver wants.
+* The scalar tangent must come from the composite, not be silently inherited:
+  a thermal correction that is a pure pressure shift does not change the
+  tangent, but a poro correction with a stress-dependent sub-law can.
+
+**Open point.** Whether the state should be namespaced by prefixing names, as
+proposed, or by giving each law in a stack its own state object. Prefixing is
+less machinery; separate objects are harder to get wrong. This is the same
+question the shadow state answered for tangent queries, and it should probably
+be answered the same way.
+
 ## 9. Open questions
 
 * **Q1. Answered, and it could not be deferred.** A `prescribed` field that is
