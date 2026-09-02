@@ -213,6 +213,7 @@ int main(int argc, char *argv[])
     bool allNeoHookean = true;
     bool allStVenantKirchhoff = true;
     bool allMooneyRivlin = true;
+    bool allNeoHookeanPlastic = true;
     forAll(lawEntries, lawI)
     {
         const word type(lawEntries[lawI].dict().lookup("type"));
@@ -236,12 +237,20 @@ int main(int argc, char *argv[])
         {
             allMooneyRivlin = false;
         }
+
+        if (type != "neoHookeanElasticMisesPlastic")
+        {
+            allNeoHookeanPlastic = false;
+        }
     }
 
     // Both are finite-strain-only laws: they implement no small-strain
     // evaluation, and both linearise to isotropic elasticity near F = I
     const bool allFiniteStrainOnly =
-        allNeoHookean || allStVenantKirchhoff || allMooneyRivlin;
+        allNeoHookean
+     || allStVenantKirchhoff
+     || allMooneyRivlin
+     || allNeoHookeanPlastic;
 
     forAll(lawEntries, lawI)
     {
@@ -432,12 +441,24 @@ int main(int argc, char *argv[])
         const scalarField J0(n, 1.0);
 
         // A uniform small deformation is enough: the check is on the tangent,
-        // not on any particular strain state
+        // not on any particular strain state.
+        //
+        // It must also stay below yield for an elasto-plastic law, since the
+        // target below is the elastic tangent. That sets the scale: the
+        // deviatoric trial stress is about 2*mu*strain, and cylinderExpansion
+        // yields at 0.5 MPa with mu = 3.8 GPa, so a 1e-4 strain would already
+        // be plastic and the elastic tangent would be the wrong target. 1e-6
+        // is elastic for any realistic material.
+        //
+        // It costs no accuracy in the difference: the perturbation is
+        // max(1e-8, 1e-6*mag(F - I)), which is at its 1e-8 floor for both
+        // strains, so the stress difference being measured is the same size
+        // either way
         const tensor gradDSmall
         (
-            1e-4,  0.5e-4, 0.0,
-            0.5e-4, -0.7e-4, 0.0,
-            0.0,    0.0,   0.3e-4
+            1e-6,  0.5e-6, 0.0,
+            0.5e-6, -0.7e-6, 0.0,
+            0.0,    0.0,   0.3e-6
         );
 
         forAll(F, ipI)
@@ -528,6 +549,98 @@ int main(int argc, char *argv[])
             maxRelErrorBoundary,
             1e-3
         );
+
+        // -----------------------------------------------------------------
+        // Plasticity: the return mapping must actually return
+        //
+        // The check above stays deliberately below yield, so it exercises the
+        // elastic predictor and nothing else. This one drives the material
+        // well past yield and asserts the property that distinguishes a
+        // working return map from a broken one: the deviatoric stress
+        // saturates. Doubling the strain in the elastic range doubles the
+        // deviatoric stress; once yielding, it must grow far more slowly,
+        // and for a perfectly plastic curve hardly at all.
+        //
+        // This is deliberately independent of the hardening curve, so it does
+        // not need to read the yield stress table the case supplies
+        // -----------------------------------------------------------------
+        if (allNeoHookeanPlastic)
+        {
+            Info<< nl << "Plastic return mapping" << endl;
+
+            const scalar strainA = 1e-2;
+            const scalar strainB = 2e-2;
+
+            scalar magDevA = 0.0;
+            scalar magDevB = 0.0;
+
+            for (label pass = 0; pass < 2; ++pass)
+            {
+                const scalar e = (pass == 0 ? strainA : strainB);
+
+                const tensor gradDLarge
+                (
+                    e,      0.5*e, 0.0,
+                    0.5*e, -0.7*e, 0.0,
+                    0.0,    0.0,   0.3*e
+                );
+
+                forAll(F, ipI)
+                {
+                    F[ipI] = I + gradDLarge;
+                    Finv[ipI] = inv(F[ipI]);
+                    J[ipI] = det(F[ipI]);
+                }
+
+                symmTensorField sigmaLarge(n, symmTensor::zero);
+
+                // A tangent-free stress update. Both passes start from the
+                // same old-time state, so this compares two trial states from
+                // one history rather than a load path
+                manager.updateStressFiniteStrain
+                (
+                    topo, F, F0, Finv, Finv0, J, J0, dt,
+                    sigmaLarge, nullptr, nullptr,
+                    tangentRequest::none
+                );
+
+                scalar acc = 0.0;
+                for (label ipI = 0; ipI < n; ++ipI)
+                {
+                    acc = max(acc, mag(dev(sigmaLarge[ipI])));
+                }
+
+                if (pass == 0)
+                {
+                    magDevA = acc;
+                }
+                else
+                {
+                    magDevB = acc;
+                }
+            }
+
+            // Elastic would give 2.0; a working return map gives close to 1
+            const scalar growth = magDevB/max(magDevA, SMALL);
+
+            reportError
+            (
+                "deviatoric stress saturates once yielding",
+                mag(growth - 1.0),
+                0.5
+            );
+
+            // And it must genuinely have yielded, or the check above is
+            // vacuous: the stress must be far below the elastic prediction
+            const scalar elasticPrediction = 2.0*refMu[0]*strainB;
+
+            reportError
+            (
+                "the large deformation is well past yield",
+                magDevB/elasticPrediction,
+                0.5
+            );
+        }
 
         Info<< nl
             << "============================================================"
