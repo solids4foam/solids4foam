@@ -179,7 +179,15 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
 
         const symmTensor bEbar = pow(Ji, -2.0/3.0)*symm(F[i] & F[i].T());
 
-        sigma[i] = (muVal/Ji)*dev(bEbar) + (kappaVal/Ji)*log(Ji)*I;
+        // Hydrostatic stress. The legacy neoHookeanElastic uses
+        // 0.5*K*(J^2 - 1), and this must match it: the two volumetric
+        // energies, 0.5*K*(J^2 - 1) and K*log(J), agree only to first order
+        // in (J - 1), so they are indistinguishable near the identity and
+        // diverge at finite strain. Using log(J) here made this law disagree
+        // with the legacy one by about 1e-3 on neckingBar
+        const scalar sigmaHyd = 0.5*kappaVal*(sqr(Ji) - 1.0);
+
+        sigma[i] = (muVal/Ji)*dev(bEbar) + (sigmaHyd/Ji)*I;
     }
 
     // Scalar tangent: only if explicitly requested

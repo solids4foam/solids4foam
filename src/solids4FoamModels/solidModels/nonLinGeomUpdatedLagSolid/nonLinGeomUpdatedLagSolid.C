@@ -602,11 +602,20 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
         return;
     }
 
-    // The framework needs the inverse of the total deformation gradient,
-    // which this solver does not otherwise keep. It is held as a field rather
-    // than formed per call, so the allocation happens once: its old time is
-    // then stored by the time loop alongside F's, and is the inverse of F at
-    // the previous time step, which is what the relative gradient needs
+    // The framework needs the inverse of the total deformation gradient at
+    // both the current and the previous time, and this solver keeps neither.
+    //
+    // Both are derived from F_ here rather than kept as a field with its own
+    // old time. That was the first approach and it is WRONG: this solver
+    // updates F_ again in updateTotalFields(), after the last stress
+    // evaluation of the step, so a derived field's stored old time is the
+    // inverse of a mid-iteration F_ rather than of the converged end-of-step
+    // one. The relative deformation gradient F & Finv0 was then slightly
+    // wrong, which no elastic law notices, because none of them reads Finv0,
+    // and which a history-dependent law gets wrong on every step.
+    //
+    // Deriving Finv0 from F_.oldTime() instead is correct by construction:
+    // F_'s own old time is maintained by the solver
     if (FinvPtr_.empty())
     {
         FinvPtr_.set
@@ -618,19 +627,18 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
                     "Finv",
                     mesh().time().timeName(),
                     mesh(),
-                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
                 inv(F_)
             )
         );
-
-        // Instantiate the old time so the time loop advances it
-        FinvPtr_().oldTime();
     }
 
     volTensorField& Finv = FinvPtr_();
     Finv = inv(F_);
+
+    const volTensorField Finv0(inv(F_.oldTime()));
 
     mechanicalManager().updateStressFiniteStrain
     (
@@ -639,7 +647,7 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
         J_,
         J_.oldTime(),
         Finv,
-        Finv.oldTime(),
+        Finv0,
         mesh().time().deltaTValue(),
         sigma()
     );

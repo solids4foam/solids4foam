@@ -2250,57 +2250,52 @@ extraction preferred the legacy yielding message, which in the framework arm is
 still emitted by the idle legacy law and truthfully reports zero, masking the
 framework's own count.
 
-### 8.22 OPEN DEFECT: the finite-strain plastic law does not reproduce legacy
+### 8.22 Two defects behind the finite-strain discrepancy, and how they hid
 
-`neckingBar` is the only tutorial that pairs `nonLinGeomUpdatedLagSolid` with
-`neoHookeanElasticMisesPlastic` *without* pressure smoothing, so it is the only
-place the finite-strain plastic path can be compared against legacy exactly.
-It does not agree.
+`neckingBar` is the only tutorial pairing `nonLinGeomUpdatedLagSolid` with
+`neoHookeanElasticMisesPlastic` and no pressure smoothing, so the only place
+the finite-strain plastic path can be compared against legacy exactly. It did
+not agree - legacy 63.64368, framework 63.61524, and the framework arm failed
+to converge. There turned out to be two independent defects.
 
-With everything else equal, over a shortened run:
+**Defect 1: the framework neo-Hookean used a different volumetric energy.**
+The legacy law's hydrostatic stress is `0.5*K*(J^2 - 1)`; the framework's was
+`K*log(J)`. The two agree to first order in `(J - 1)` and diverge after that.
+This is pre-existing framework code, not part of the migration.
 
-<!-- markdownlint-disable MD013 -->
+**Defect 2: the relative deformation gradient was built from a stale inverse.**
+The framework is given `Finv` and `Finv0` and forms the relative deformation
+gradient as `F & Finv0`. `nonLinGeomUpdatedLagSolid` keeps no inverse, so the
+migration added one as a field and relied on its old time. That is wrong: this
+solver updates `F_` again inside `updateTotalFields()`, *after* the last stress
+evaluation of the step, so the derived field's stored old time is the inverse
+of a mid-iteration `F_` rather than of the converged end-of-step one. `Finv0`
+is now formed as `inv(F_.oldTime())`, which is correct by construction because
+the solver maintains `F_`'s own old time.
 
-| Path | Final loading force | Converges? |
-|---|---|---|
-| legacy | 63.64368 | yes |
-| framework | 63.61524 | **no - hits the momentum corrector limit** |
+With both fixed, every comparison is exact: `neckingBar` 74.4649 on both paths,
+and 338.34384 on both paths in the elastic reductions used to bisect.
 
-<!-- markdownlint-enable MD013 -->
+**How they hid, which is the point.** Both defects are invisible to every check
+that existed:
 
-A relative difference of 4.5e-4, and the framework arm does not converge.
+- The near-identity finite-difference tangent test cannot separate
+  `0.5*K*(J^2 - 1)` from `K*log(J)`, because that is exactly where they agree.
+- No elastic law reads `Finv0` at all, so the stale inverse was silent in
+  `plateHole`, `rotatingCylinder` and `longWall`. Only a history-dependent law
+  in an updated Lagrangian solver touches it.
 
-**What has been ruled out**, each by direct experiment rather than reasoning:
+**How they were found.** By bisection on a real solve, not by reading code. The
+sequence was: confirm the difference survives tightening the solver tolerance,
+disabling the material-residual gate, and swapping `impK`; then swap the
+plastic law for an elastic one, which isolated defect 1; then suppress yielding
+in the plastic law, which isolated defect 2 to the elastic predictor; then
+substitute an explicitly computed `inv(F_.oldTime())`, which identified it
+exactly.
 
-- *Solver tolerance*: tightening `solutionTolerance` and `alternativeTolerance`
-  from 1e-6 to 1e-9 changes neither result, to ten significant figures.
-- *The material residual gate*: running legacy with `materialTolerance` set to
-  1e10, so the gate never binds, reproduces the legacy value exactly.
-- *The omitted `DEpsilonP.relax()`*: this case has an empty
-  `relaxationFactors` dictionary, so the legacy relaxation is a no-op.
-- *Newton parameters*: the loop tolerance, iteration cap and finite-difference
-  step are 1e-8, 200 and 0.25e-6 in both laws.
-- *`enforceLinear`*: never triggered in this case.
-- *`impK`*: running the framework stress with the legacy `impK` gives the
-  framework value, unchanged, and still fails to converge.
-
-So the difference is in the stress the law returns, and that difference is also
-what prevents convergence. The remaining suspects are the port of the return
-mapping itself - though a term-by-term review against the legacy found it
-faithful - and the relative deformation gradient the framework reconstructs as
-`F & Finv0`, where `Finv` is a field this solver does not otherwise keep and
-whose old time is snapshotted on first use.
-
-**Nothing is shipped on the strength of this path.** `neckingBar`'s regression
-test is left in its original single-arm form rather than committing a failing
-comparison, and no tutorial enables the framework for a finite-strain plastic
-case. The small-strain plastic path *is* verified end to end, by
-`perforatedPlate`, which agrees exactly.
-
-The general lesson from §8.21 applies again, more sharply: the unit checks pass
-on this law, a term-by-term review passed on this law, and it still does not
-reproduce the legacy result in a real solve. Only the end-to-end comparison
-finds this class of error.
+An independent line-by-line review of the two implementations had passed the
+plastic law as faithful, and was right to: defect 2 is not in the law at all,
+it is in what the solid model hands it.
 
 ### 8.15 Open questions still outstanding
 
