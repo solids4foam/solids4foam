@@ -129,6 +129,11 @@ class linGeomTotalDispSolid
         //- Return the reciprocal of the bulk modulus, from the same source
         tmp<volScalarField> makeRKappa() const;
 
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
         const List<mat66>& faceMaterialTangent() const;

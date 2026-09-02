@@ -60,7 +60,7 @@ void linGeomTotalDispSolid::predict()
     mechanical().grad(D(), gradD());
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 }
 
 
@@ -307,7 +307,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             const volScalarField DEqnA("DEqnA", DEqn.A());
 
             // Calculate the stress using run-time selectable mechanical law
-            mechanical().correct(sigma());
+            correctStress();
         }
         while
         (
@@ -416,7 +416,7 @@ bool linGeomTotalDispSolid::evolveSnes()
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
     else
@@ -517,8 +517,10 @@ bool linGeomTotalDispSolid::evolveExplicit()
     // Update gradient of displacement
     mechanical().grad(D, gradD);
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma);
+    // Calculate the stress using run-time selectable mechanical law.
+    // sigma here is a reference to solidModel::sigma(), so this is the same
+    // field correctStress() updates
+    correctStress();
 
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -541,6 +543,28 @@ bool linGeomTotalDispSolid::evolveExplicit()
        - dampingCoeff()*fvc::ddt(D);
 
     return true;
+}
+
+
+void Foam::solidModels::linGeomTotalDispSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate updateTotalFields() call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
 }
 
 
@@ -1098,7 +1122,15 @@ label linGeomTotalDispSolid::formResidual
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
 
-        // Calculate sigma at quadrature points
+        // Calculate sigma at quadrature points.
+        //
+        // This one stays on the legacy path. The framework has a
+        // CompactListList overload, but evaluating a law through it needs the
+        // OLD-TIME gradient at the quadrature points, and this solver keeps no
+        // such field: gradDQuad() is rebuilt each call and has no old time. A
+        // history-independent law would not notice, but a history-dependent
+        // one would silently read the wrong state, so this path is left alone
+        // until an old-time quadrature gradient exists
         mechanical().correct(gradDQuad(), sigmaQuad());
 
         // Integration over face quadrature points to get face traction
@@ -1115,7 +1147,7 @@ label linGeomTotalDispSolid::formResidual
         //D.correctBoundaryConditions();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     // Update velocity
