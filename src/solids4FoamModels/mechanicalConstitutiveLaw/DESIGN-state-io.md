@@ -410,7 +410,9 @@ needs the time increment, which it already receives.
 `mechanicalConstitutiveLawInputs` is immutable and per-call. It holds
 integration-point views, not `GeometricField`s: the manager scatters a
 `volScalarField` once and hands the law a `UIndirectList`-shaped view, so the
-law still never sees a mesh, a registry or a field type.
+law still never sees a mesh, a registry or a field type. It also carries the
+global scalars, `dt` among them - see §8a.5, which moves `dt` out of the
+kinematics object where it does not belong.
 
 This costs a one-time signature change on every law. It buys the property that
 matters: **every evaluation, including every shadow and every
@@ -482,6 +484,134 @@ decorator.
   does not establish that it was supplied *after* the equation that produces it
   was solved. The inputs object makes staleness impossible within an
   evaluation; it does not by itself order the coupling loop.
+
+### 8a.5 Why kinematics and inputs stay separate, and what goes in inputs
+
+`kin` and `inputs` look like the same thing: both immutable, both per-call,
+both integration-point views the law only reads. The question of whether to
+merge them is fair, and the answer is no, for two reasons and one caveat.
+
+**The formulation boundary lives in `kin`'s type.** There are two `evaluate`
+overloads, one taking small-strain kinematics and one taking finite-strain
+kinematics, and a finite-strain-only law such as `neoHookeanElastic` refuses a
+small-strain evaluation simply by not implementing that overload. That is a
+compile-time capability check with no runtime convention behind it. Merging
+would either lose it or force `smallStrainContext` and `finiteStrainContext`
+types that duplicate the input half in both - and temperature and pressure have
+no business participating in formulation selection.
+
+**The finite-difference tangent reconstructs the kinematics object.** It builds
+a fresh one per Voigt component, forwarding by hand everything that is not
+being perturbed:
+
+```c++
+    smallStrainMechanicalConstitutiveLawKinematics kinPert
+    (
+        gradDPertView, kin.gradD0(), kin.dt()
+    );
+```
+
+Anything inside `kin` must be forwarded at every reconstruction, and a
+forgotten one is silent. Every new input would add a term to that constructor
+and another way to drop a value without any test noticing. Passing the same
+`inputs` object straight through each perturbation cannot be got wrong:
+
+```c++
+    evaluate(kinPert, inputs, shadow, respPert);
+```
+
+**The caveat, which is the part the question gets right.** `dt` is in the wrong
+object today. It is not a deformation measure, and in the framework the only
+references to `kin.dt()` are the two FD reconstructions forwarding it. It is a
+per-call input, and a real one: the legacy `viscousHookeanElastic` needs the
+time increment for its Maxwell update. So `dt` moves into `inputs` as a fixed
+global scalar - not a one-element integration-point field - in the same
+signature change, and the FD reconstruction gets shorter rather than longer.
+
+The instinct that the boundary was arbitrary was therefore correct; it was the
+placement of `dt` that was wrong, not the existence of two objects.
+
+### 8a.6 What inputs will actually be needed
+
+Taken from what the legacy laws look up today, not from imagination.
+
+<!-- markdownlint-disable MD013 -->
+
+| Input | Wanted by | Category |
+|---|---|---|
+| Mixed-formulation pressure `p`, `pf` | `neoHookeanElastic`, `GuccioneElastic`, `HolzapfelGasserOgdenElastic` when `pressureDisplacement_` | live |
+| Temperature `T` | `thermoMechanicalLaw`, `viscousHookeanElastic` | live |
+| Pore pressure | `poroMechanicalLaw` | live |
+| Active tension `Ta` | `electroMechanicalLaw` | live, optional |
+| `dt` | `viscousHookeanElastic` | global scalar |
+| Reference stress via `sigmaf` | `neoHookeanElastic`, `linearElasticMisesPlastic` | prescribed - §4 covers it |
+| Fibre and sheet directions | `GuccioneElastic`, `HolzapfelGasserOgdenElastic` | prescribed - §4 covers it |
+| `DEqnA`, the momentum matrix diagonal | only `updateSigmaHyd` | solver internal - see below |
+
+<!-- markdownlint-enable MD013 -->
+
+Four things follow.
+
+**The mixed-formulation pressure is not a future requirement.** `solvePressure()`
+already exists in `linGeomTotalDispSolid` and both `nonLinGeom` solvers, and
+three laws already look `p` up. An `inputs` object is needed for the *next* law
+migrated, not for some later coupling.
+
+**Two different physical quantities are both called `p`.** The mixed-formulation
+pressure is the solid model's own unknown; the pore pressure is a fluid
+pressure that may come from another region entirely. They must be given
+distinct semantic names in the declaration, or a case will one day supply one
+where the law wanted the other and the answer will merely be wrong.
+
+**The smoothing decision removes the worst coupling rather than relocating it.**
+`DEqnA` is a law reaching into the linear system's diagonal, and it appears
+only inside `updateSigmaHyd`. Since that moves to the solid model, `DEqnA` does
+not need to become an input at all.
+
+**Do not design for contact and cohesive laws.** Face normals, gaps and
+characteristic lengths are wanted by contact and cohesive-zone models, but
+those are a separate hierarchy - cohesive laws live under `dynamicFvMesh`, and
+contact models take normals and gaps explicitly - and they are interface laws,
+not bulk constitutive laws. Pushing that data through every cell law's loop to
+serve them would be the obvious overreach here. They get their own interface
+kinematics if and when they are migrated.
+
+Plausible but not present in the repository, and therefore not to be designed
+for yet: concentration or chemical potential for swelling, a damage phase
+field, crystal orientation. Of these, only the phase field would be a live
+input; orientation is prescribed material data that §4 already covers, and a
+phase-field history variable is persistent state, not an input.
+
+### 8a.7 Shape of the inputs object, and the response side
+
+**Declared and name-keyed, not fixed members.** Fixed members would be pleasant
+for `dt` alone and would fail on the first new coupling, because the type is
+instantiated at every evaluation site and in every manager call path, internal
+and boundary. A law declares what it needs - semantic name, type, dimensions,
+entity, required or optional, and the mapping policy for shared and boundary
+points - and reads it with typed getters.
+
+**Absence must not read as zero.** `Ta` absent means "use the law's own
+prescribed activation"; `Ta = 0` means explicitly inactive. A required `T` or
+`p` that was never supplied must fail before evaluation rather than silently
+behave as zero. That argues for a strict `get` and a separate `find` for
+genuinely optional inputs, which is the distinction the state object already
+makes.
+
+**The response side needs the same treatment eventually, but not yet.** A
+phase-field law must return a driving energy; a dissipative law may need to
+report dissipated work. Those are outputs of the current evaluation and must
+not be pushed into the state, where they would inherit exactly the shadow and
+rollover hazards §8a.4 rejects. The response object is already the right
+container and is already passed to every law, so adding declared outputs later
+does not force a second signature migration - this can wait for a consuming
+solver.
+
+One rule is worth recording now, because it is the same trap in a new place:
+**a finite-difference perturbation must never write auxiliary outputs into the
+real coupled fields.** It evaluates the law repeatedly at perturbed kinematics,
+so any such output must go to disposable storage or be explicitly suppressed,
+exactly as the shadow state does for history.
 
 ### 8a.4 The rejected design, and why it is worth recording
 
