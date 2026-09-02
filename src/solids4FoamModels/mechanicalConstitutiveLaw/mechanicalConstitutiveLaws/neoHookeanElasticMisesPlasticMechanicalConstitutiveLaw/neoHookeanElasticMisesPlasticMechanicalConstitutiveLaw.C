@@ -170,8 +170,8 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
 :
     mechanicalConstitutiveLaw(dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
     mu_("mu", E_.dimensions(), 0.0),
     kappa_("kappa", E_.dimensions(), 0.0),
     stressPlasticStrainSeries_(dict),
@@ -185,6 +185,39 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
         dict.lookupOrDefault<Switch>("updateBEbarConsistent", true)
     )
 {
+    // The material may be given either as E and nu or as mu and K, matching
+    // the legacy law, so that an existing case dictionary needs no change.
+    // The legacy law tries E and nu first, so this does too
+    if (dict.found("E") && dict.found("nu"))
+    {
+        E_ = dimensionedScalar(dict.lookup("E"));
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        const dimensionedScalar muIn(dict.lookup("mu"));
+        const dimensionedScalar KIn(dict.lookup("K"));
+
+        if (muIn.dimensions() != dimPressure || KIn.dimensions() != dimPressure)
+        {
+            FatalIOErrorInFunction(dict)
+                << "The shear modulus mu and bulk modulus K must both have "
+                << "dimensions " << dimPressure
+                << exit(FatalIOError);
+        }
+
+        // Invert mu = E/(2*(1 + nu)) and K = E/(3*(1 - 2*nu))
+        E_ = 9.0*KIn*muIn/(3.0*KIn + muIn);
+        nu_ = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+    }
+    else
+    {
+        FatalIOErrorInFunction(dict)
+            << "Specify the elastic properties either as 'E' and 'nu' or as "
+            << "'mu' and 'K'."
+            << exit(FatalIOError);
+    }
+
     if (E_.dimensions() != dimPressure)
     {
         FatalIOErrorInFunction(dict)
