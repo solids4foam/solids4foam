@@ -300,6 +300,10 @@ public:
             ) const;
 
             //- Update total accumulated fields
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
             virtual void updateTotalFields();
 };
 

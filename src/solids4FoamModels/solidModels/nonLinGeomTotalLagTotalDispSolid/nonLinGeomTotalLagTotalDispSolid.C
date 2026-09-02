@@ -670,6 +670,27 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::mechanicalManager() const
 }
 
 
+Foam::scalar Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // A framework law is a pure function of the kinematics and the old-time
+    // state, and the framework deliberately does not under-relax the plastic
+    // strain increment as the legacy law does, so the constitutive update does
+    // not lag the displacement solution between outer iterations. There is
+    // therefore nothing for a material residual to measure, and convergence is
+    // governed by the displacement residuals alone.
+    //
+    // Querying the legacy law here instead would be worse than useless: its
+    // correct() is never called on this path, so its previous-iteration fields
+    // are never stored and asking for its residual aborts
+    return 0.0;
+}
+
+
 void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateTotalFields()
 {
     // The legacy path accumulates its per-step fields here

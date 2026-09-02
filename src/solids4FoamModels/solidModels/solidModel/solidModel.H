@@ -1038,6 +1038,18 @@ public:
             ) const = 0;
 
             //- Update total accumulated fields
+            //- Residual of the material update between outer iterations.
+            //  The legacy mechanicalModel under-relaxes its plastic strain
+            //  increment, so its constitutive update lags the displacement
+            //  solution and has to be checked for convergence. A solid model
+            //  taking its stress from the mechanicalConstitutiveLaw framework
+            //  overrides this, because a framework law is a pure function of
+            //  the kinematics and the old-time state and so does not lag
+            virtual scalar materialResidual()
+            {
+                return mechanical().residual();
+            }
+
             virtual void updateTotalFields();
 
             //- Write fields

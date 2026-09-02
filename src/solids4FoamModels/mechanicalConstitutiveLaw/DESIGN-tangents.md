@@ -2250,6 +2250,58 @@ extraction preferred the legacy yielding message, which in the framework arm is
 still emitted by the idle legacy law and truthfully reports zero, masking the
 framework's own count.
 
+### 8.22 OPEN DEFECT: the finite-strain plastic law does not reproduce legacy
+
+`neckingBar` is the only tutorial that pairs `nonLinGeomUpdatedLagSolid` with
+`neoHookeanElasticMisesPlastic` *without* pressure smoothing, so it is the only
+place the finite-strain plastic path can be compared against legacy exactly.
+It does not agree.
+
+With everything else equal, over a shortened run:
+
+<!-- markdownlint-disable MD013 -->
+
+| Path | Final loading force | Converges? |
+|---|---|---|
+| legacy | 63.64368 | yes |
+| framework | 63.61524 | **no - hits the momentum corrector limit** |
+
+<!-- markdownlint-enable MD013 -->
+
+A relative difference of 4.5e-4, and the framework arm does not converge.
+
+**What has been ruled out**, each by direct experiment rather than reasoning:
+
+- *Solver tolerance*: tightening `solutionTolerance` and `alternativeTolerance`
+  from 1e-6 to 1e-9 changes neither result, to ten significant figures.
+- *The material residual gate*: running legacy with `materialTolerance` set to
+  1e10, so the gate never binds, reproduces the legacy value exactly.
+- *The omitted `DEpsilonP.relax()`*: this case has an empty
+  `relaxationFactors` dictionary, so the legacy relaxation is a no-op.
+- *Newton parameters*: the loop tolerance, iteration cap and finite-difference
+  step are 1e-8, 200 and 0.25e-6 in both laws.
+- *`enforceLinear`*: never triggered in this case.
+- *`impK`*: running the framework stress with the legacy `impK` gives the
+  framework value, unchanged, and still fails to converge.
+
+So the difference is in the stress the law returns, and that difference is also
+what prevents convergence. The remaining suspects are the port of the return
+mapping itself - though a term-by-term review against the legacy found it
+faithful - and the relative deformation gradient the framework reconstructs as
+`F & Finv0`, where `Finv` is a field this solver does not otherwise keep and
+whose old time is snapshotted on first use.
+
+**Nothing is shipped on the strength of this path.** `neckingBar`'s regression
+test is left in its original single-arm form rather than committing a failing
+comparison, and no tutorial enables the framework for a finite-strain plastic
+case. The small-strain plastic path *is* verified end to end, by
+`perforatedPlate`, which agrees exactly.
+
+The general lesson from §8.21 applies again, more sharply: the unit checks pass
+on this law, a term-by-term review passed on this law, and it still does not
+reproduce the legacy result in a real solve. Only the end-to-end comparison
+finds this class of error.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

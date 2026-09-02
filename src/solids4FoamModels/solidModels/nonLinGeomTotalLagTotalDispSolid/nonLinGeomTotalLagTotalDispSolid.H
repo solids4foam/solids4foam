@@ -219,6 +219,10 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             //- Let the framework know the time step has ended, so a law
             //  can report or commit anything it keeps per step
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
             virtual void updateTotalFields() override;
 
             virtual bool evolve();
