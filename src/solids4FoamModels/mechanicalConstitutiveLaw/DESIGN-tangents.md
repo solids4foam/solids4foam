@@ -2370,6 +2370,49 @@ The remaining laws in the legacy library have no framework counterpart yet.
 When one is added, it needs a case in this table before it can be considered
 migrated.
 
+### 8.25 The high-order quadrature stress, and the topology it needed
+
+The high-order path evaluates the stress at face quadrature points, and was
+left on the legacy path in §8.19 because the framework's `CompactListList`
+overload needs an old-time gradient there and the solver keeps none. Adding
+that old-time copy turned out to be the smaller half of the problem.
+
+`solidModel` now takes a copy of `gradDQuad` at the end of each time step,
+since the current field is rebuilt on every evaluation and there is nothing
+else to take it from. With that in place the framework still refused the
+update:
+
+```text
+    Size of cellToIntegrationPointIDs (4070) does not match number of mesh
+    cells (1000)
+```
+
+The `CompactListList` overload assumed the rows are **cells**. High-order
+quadrature rows are **faces**. The framework had `compactCell` and no compact
+face topology at all, so this was a structural gap rather than a missing field.
+
+`compactFaceIntegrationPointTopology` fills it, and differs from the cell
+version in more than which entity indexes the rows. A face is shared by two
+cells, so the same quadrature point is reachable from both and would be
+aggregated twice when the manager gathers a material's points. It therefore
+reports `requiresUniqueIntegrationPointsPerMaterial()` true where the cell
+version reports false, which is also what restricts a flat-list update over it
+to a single material.
+
+The manager chooses between the two by row count, and checks: `nCells` gives
+the cell topology, `nFaces` the face one, and anything else is a fatal error
+naming both counts. A mesh never has as many cells as faces, so the two cannot
+be confused, and the failure mode is a message rather than a wrong answer.
+
+`plateHole` verifies it: `highOrder` and `highOrderFourthOrder` agree exactly,
+at 2.0061e-08, 4.81145e-08 and 54331.2. The topology error above is worth
+keeping in mind as evidence in its own right - it proves the framework branch
+is the one being taken, so the agreement is not a switch that does nothing.
+
+**Still on the legacy path**: the finite-strain quadrature stress in both
+`nonLinGeom` solvers. That needs a finite-strain `CompactListList` overload
+carrying F, J and Finv at quadrature points, which does not exist yet.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

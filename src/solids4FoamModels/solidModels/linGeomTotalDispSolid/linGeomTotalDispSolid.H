@@ -129,6 +129,13 @@ class linGeomTotalDispSolid
         //- Return the reciprocal of the bulk modulus, from the same source
         tmp<volScalarField> makeRKappa() const;
 
+        //- Update the stress at the face quadrature points of the high-order
+        //  discretisation, from the same source as correctStress().
+        //  The high-order discretisation does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+#endif
+
         //- Update the cell-centred stress, from the framework when
         //  useMechanicalConstitutiveLawManager_ is set and from the legacy
         //  mechanicalModel otherwise

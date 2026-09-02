@@ -149,9 +149,25 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     const CompactListList<tensor>& layout
 ) const
 {
+    // Which entity indexes the rows is decided by the row count, and checked.
+    // A mesh never has as many cells as faces, so the two cases cannot be
+    // confused, and anything else is an error rather than a guess
+    const bool cellBased = (layout.size() == mesh_.nCells());
+    const bool faceBased = (layout.size() == mesh_.nFaces());
+
+    if (!cellBased && !faceBased)
+    {
+        FatalErrorInFunction
+            << "A compact integration-point layout must have one row per cell "
+            << "or one row per face." << nl
+            << "This one has " << layout.size() << " rows, while the mesh has "
+            << mesh_.nCells() << " cells and " << mesh_.nFaces() << " faces."
+            << exit(FatalError);
+    }
+
     // Unique key per layout instance
     const word key =
-        "compactCell:" + Foam::name
+        (cellBased ? "compactCell:" : "compactFace:") + Foam::name
         (
             static_cast<std::uint64_t>
             (
@@ -187,10 +203,22 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
         }
     }
 
-    autoPtr<integrationPointTopology> topoPtr
-    (
-        new compactCellIntegrationPointTopology(mesh_, std::move(cellToIP))
-    );
+    autoPtr<integrationPointTopology> topoPtr;
+
+    if (cellBased)
+    {
+        topoPtr.set
+        (
+            new compactCellIntegrationPointTopology(mesh_, std::move(cellToIP))
+        );
+    }
+    else
+    {
+        topoPtr.set
+        (
+            new compactFaceIntegrationPointTopology(mesh_, std::move(cellToIP))
+        );
+    }
 
     // Cache and return
     topologyCache_.insert(key, topoPtr);

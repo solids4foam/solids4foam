@@ -186,6 +186,13 @@ private:
         //  In use by high-order discretisation
         mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
 
+        //- Gradient of total displacement at face quadrature points, at the
+        //  previous time step.
+        //  A history-dependent law evaluated at quadrature points needs this,
+        //  and the current field is rebuilt each call, so it is copied here at
+        //  the end of every time step
+        mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -739,6 +746,22 @@ public:
             }
 
             //- Return const reference to gradD at face quadrature points
+            //- Gradient of total displacement at face quadrature points at
+            //  the previous time step. Equal to the current field until the
+            //  first time step has been completed
+            virtual const CompactListList<tensor>& gradDQuad0() const
+            {
+                if (gradDQuad0Ptr_.empty())
+                {
+                    gradDQuad0Ptr_.set
+                    (
+                        new CompactListList<tensor>(gradDQuad())
+                    );
+                }
+
+                return autoPtrRef(gradDQuad0Ptr_);
+            }
+
             virtual const CompactListList<tensor>& gradDQuad() const
             {
                 if (gradDQuadPtr_.empty())

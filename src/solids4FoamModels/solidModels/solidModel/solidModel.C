@@ -1736,6 +1736,25 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 void Foam::solidModel::updateTotalFields()
 {
     mechanical().updateTotalFields();
+
+    // Take the old-time copy of the quadrature gradient now, at the end of the
+    // step, while the current field holds the converged value. It is rebuilt
+    // on each evaluation, so there is nothing else to take it from.
+    // The high-order discretisation, and hence gradDQuad(), does not exist on
+    // foam-extend
+#ifndef FOAMEXTEND
+    if (gradDQuadPtr_.valid())
+    {
+        if (gradDQuad0Ptr_.empty())
+        {
+            gradDQuad0Ptr_.set(new CompactListList<tensor>(gradDQuad()));
+        }
+        else
+        {
+            gradDQuad0Ptr_() = gradDQuad();
+        }
+    }
+#endif
 }
 
 

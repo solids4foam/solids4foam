@@ -582,6 +582,33 @@ void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
 }
 
 
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDQuad(), sigmaQuad());
+        return;
+    }
+
+    // The quadrature points carry their own constitutive state, distinct from
+    // the cell-centred one, because they are a different set of integration
+    // points. The old-time gradient comes from solidModel, which takes a copy
+    // at the end of each time step: the current field is rebuilt on every
+    // evaluation, so a history-dependent law would otherwise have nothing to
+    // read
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradDQuad(),
+        gradDQuad0(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
 void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 {
     if (!useMechanicalConstitutiveLawManager_)
@@ -1158,16 +1185,8 @@ label linGeomTotalDispSolid::formResidual
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
 
-        // Calculate sigma at quadrature points.
-        //
-        // This one stays on the legacy path. The framework has a
-        // CompactListList overload, but evaluating a law through it needs the
-        // OLD-TIME gradient at the quadrature points, and this solver keeps no
-        // such field: gradDQuad() is rebuilt each call and has no old time. A
-        // history-independent law would not notice, but a history-dependent
-        // one would silently read the wrong state, so this path is left alone
-        // until an old-time quadrature gradient exists
-        mechanical().correct(gradDQuad(), sigmaQuad());
+        // Calculate sigma at quadrature points
+        correctStressQuad();
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
