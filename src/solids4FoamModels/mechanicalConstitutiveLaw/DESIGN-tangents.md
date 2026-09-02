@@ -2191,6 +2191,65 @@ whose TypeName it shares.** All seven pairs were checked; only that one
 differed. Worth re-checking whenever a law is added, because the symptom is a
 total, unrelated-looking CI failure on one fork only.
 
+### 8.21 The plastic law was wrong, and only a real solve found it
+
+Running `perforatedPlate` through both paths - the first end-to-end comparison
+of a *plastic* framework law against its legacy counterpart - showed the
+framework giving about 5% more equivalent strain and 2.6% more stress.
+
+Isolating the cause mattered, because two things had changed at once. Forcing
+the legacy `impK` while keeping the framework stress reproduced the discrepancy
+exactly, so it was not a Jacobian or convergence artefact: the stress itself
+was wrong.
+
+**The defect.** `linearElasticMisesPlastic` disagreed with itself about what
+its plastic multiplier meant. It set
+
+```text
+    DEpsilonP = 1.5 dLambda n      so  |DEpsilonP| = 1.5 dLambda
+```
+
+whose equivalent plastic strain increment is
+`sqrt(2/3) |DEpsilonP| = sqrt(3/2) dLambda`, but then accumulated
+`epsilonPEq += sqrt(2/3) dLambda` - short by a factor of 3/2 - and the
+closed-form hardening denominator carried the same error.
+
+**Why every existing check missed it.** Under perfect plasticity the *stress*
+is still right: the multiplier and the stress update are consistent with each
+other, and only the accumulated equivalent strain is wrong. It goes wrong when
+hardening is active, because the yield stress is then evaluated at the wrong
+accumulated strain. The closed-form tangent check, the finite-difference
+tangent check and the saturation check are all blind to that.
+
+**The fix** is the standard convention in which `dLambda` *is* the equivalent
+plastic strain increment:
+
+```text
+    q           = qTrial - 3 mu dLambda
+    DEpsilonP   = sqrt(3/2) dLambda n
+    DEpsilonPEq = dLambda
+    dLambda     = (qTrial - sigmaY0) / (3 mu + Hp)
+```
+
+which is self-consistent. The framework then reproduces the legacy result
+exactly: epsilonEq 0.00507147, sigmaEq 1.79161e+08, and 30 yielding
+integration points against 30 yielding cells.
+
+**The lesson.** Unit checks on a constitutive law verify the parts of it you
+thought to check. A history-dependent law compared against a trusted
+implementation over a real load path checks the parts you did not. This is the
+argument for migrating the stress rather than stopping at `impK`: an `impK`
+migration cannot change results, and therefore cannot detect this class of
+error at all.
+
+Two supporting gaps were fixed alongside it.
+`mechanicalConstitutiveLawManager::endTimeStep()` existed but nothing called
+it, so framework laws had no end-of-step hook and no diagnostic; it is now
+called from all three migrated solid models. And the regression test's
+extraction preferred the legacy yielding message, which in the framework arm is
+still emitted by the idle legacy law and truthfully reports zero, masking the
+framework's own count.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

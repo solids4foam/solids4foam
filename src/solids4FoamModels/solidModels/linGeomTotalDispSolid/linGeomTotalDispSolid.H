@@ -219,6 +219,10 @@ public:
             virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
+            virtual void updateTotalFields() override;
+
             virtual bool evolve();
 
 #ifdef USE_PETSC

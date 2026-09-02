@@ -60,10 +60,13 @@ Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::yieldFunction
     // q = sqrt(3/2) |s|
     // For radial return: q = qTrial - 3*muBar*DLambda
     // with epsilonPEq = epsilonPEq0 + sqrt(2/3)*DLambda
-    const scalar sigmaY =
-        yieldStress(epsilonPEq0 + sqrt(2.0/3.0)*DLambda);
+    // DLambda is the equivalent plastic strain increment itself, so the
+    // hardening curve is evaluated at epsilonPEq0 + DLambda and the return
+    // mapping reduces q by 3*mu*DLambda. See the derivation at the closed-form
+    // branch in evaluate()
+    const scalar sigmaY = yieldStress(epsilonPEq0 + DLambda);
 
-    return qTrial - 3.0*muBar*sqrt(3.0/2.0)*DLambda - sigmaY;
+    return qTrial - 3.0*muBar*DLambda - sigmaY;
 }
 
 
@@ -405,44 +408,52 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             // For associative J2 plasticity with plastic multiplier increment
             // Δλ, the radial return mapping gives:
             //
-            //     q = qTrial - 3 μ sqrt(3/2) Δλ
+            //     q = qTrial - 3 μ Δλ
             //
             // The equivalent plastic strain evolves as:
             //
-            //     εp_eq = εp_eq0 + sqrt(2/3) Δλ
+            //     εp_eq = εp_eq0 + Δλ
             //
             // For linear isotropic hardening:
             //
-            //     σY = σY0 + Hp * (sqrt(2/3) Δλ)
+            //     σY = σY0 + Hp Δλ
             //
             // Substituting into the consistency condition f = q − σY = 0:
             //
             //     qTrial
-            //   − 3 μ sqrt(3/2) Δλ
-            //   − (σY0 + Hp sqrt(2/3) Δλ) = 0
+            //   − 3 μ Δλ
+            //   − (σY0 + Hp Δλ) = 0
             //
             // which gives the closed-form solution:
             //
-            //     Δλ = (qTrial − σY0)
-            //           / (3 μ sqrt(3/2) + Hp sqrt(2/3))
+            //     Δλ = (qTrial − σY0) / (3 μ + Hp)
             //
             // Perfect plasticity is recovered by setting Hp = 0.
-            const scalar denom = 3.0*mu*sqrt(3.0/2.0) + Hp_*sqrt(2.0/3.0);
+            const scalar denom = 3.0*mu + Hp_;
             dLambda = fTrial/max(denom, SMALL);
-            curSigmaY = sigmaYTrial + Hp_*sqrt(2.0/3.0)*dLambda;
+            curSigmaY = sigmaYTrial + Hp_*dLambda;
         }
 
-        // Plastic strain increment = (3/2)*dLambda*n  (standard J2 small-strain)
-        const symmTensor DEpsilonP = 1.5*dLambda*n;
+        // Plastic flow, with dLambda the equivalent plastic strain increment:
+        //
+        //     DEpsilonP  = (3/2) dLambda s/q = sqrt(3/2) dLambda n
+        //     |DEpsilonP| = sqrt(3/2) dLambda
+        //     DEpsilonPEq = sqrt(2/3) |DEpsilonP| = dLambda
+        //
+        // which is self-consistent, unlike the previous form that combined
+        // DEpsilonP = (3/2) dLambda n with DEpsilonPEq = sqrt(2/3) dLambda and
+        // so disagreed with itself by a factor of 3/2
+        const symmTensor DEpsilonP = sqrt(3.0/2.0)*dLambda*n;
 
         epsilonP[i] = epsilonP0[i] + DEpsilonP;
-        epsilonPEq[i] = epsilonPEq0[i] + sqrt(2.0/3.0)*dLambda;
+        epsilonPEq[i] = epsilonPEq0[i] + dLambda;
         sigmaY[i] = curSigmaY;
 
         // Returned deviatoric stress:
-        // s = sTrial - 2 mu DEpsilonP
-        // with DEpsilonP = 3/2 dLambda n => s = sTrial - 3 mu dLambda n
-        const symmTensor s = sTrial - (3.0*mu*dLambda)*n;
+        //     s = sTrial - 2 mu DEpsilonP = sTrial - 2 mu sqrt(3/2) dLambda n
+        // so that |s| = |sTrial| - 2 mu sqrt(3/2) dLambda and hence
+        //     q = qTrial - 3 mu dLambda
+        const symmTensor s = sTrial - (2.0*mu*sqrt(3.0/2.0)*dLambda)*n;
 
         // Total small strain stress
         sigma[i] = s + kappa*trEps*I;
@@ -453,7 +464,7 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             scalar theta = 1.0;
             if (magSTrial > SMALL)
             {
-                theta = 1.0 - (3.0*mu*dLambda)/magSTrial;
+                theta = 1.0 - (2.0*mu*sqrt(3.0/2.0)*dLambda)/magSTrial;
                 theta = max(theta, 0.0);
             }
 

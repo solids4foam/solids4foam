@@ -4,7 +4,15 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-CASE_DIR="${REGRESSION_ROOT}/main"
+# Run twice: the legacy mechanicalModel, and the mechanicalConstitutiveLaw
+# framework. This is the only regression case whose material is history
+# dependent AND which runs the framework end to end in a solver, so it is the
+# only place a plastic history error in the framework would show up in a real
+# solve rather than in a unit check
+APPROACHES=(
+    legacy
+    framework
+)
 
 # ============================================================
 # Elastoplastic perforated plate regression test
@@ -34,6 +42,9 @@ echo "============================================================"
 echo
 
 prepare_case() {
+    local approach="$1"
+    CASE_DIR="${REGRESSION_ROOT}/${approach}"
+
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
 
@@ -44,15 +55,23 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    if [[ "${approach}" == "framework" ]]; then
+        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
+        # it is silently ignored and this arm would quietly repeat the legacy run
+        sed -i.bak \
+            's/^    predictor yes;/    useMechanicalConstitutiveLawManager yes;\n    predictor yes;/' \
+            "${CASE_DIR}/constant/solidProperties"
+        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+
+        if ! grep -q 'useMechanicalConstitutiveLawManager' \
+            "${CASE_DIR}/constant/solidProperties"
+        then
+            echo "FAIL: could not enable the framework in solidProperties"
+            exit 1
+        fi
+    fi
 }
-
-prepare_case
-
-# Clean case
-( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-
-# Run case
-( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
 # ------------------------------------------------------------
 # Extract helpers
@@ -71,58 +90,27 @@ extract_max_sigma() {
 }
 
 extract_yielding_cells() {
-    grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
-        | tail -n 101 \
-        | head -n 1 \
-        | awk '{print $1}'
+    # The legacy law counts cells; the framework law counts integration points,
+    # which is the honest description for a law that may be evaluated on faces
+    # or points. Accept either wording rather than making one law lie
+    # Prefer the framework's message: in the framework arm the legacy law is
+    # still constructed but never called, so it truthfully reports zero and
+    # would mask the framework's own count
+    if grep -q "yielding integration points" "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        grep "Number of yielding integration points" \
+            "${CASE_DIR}/${SOLVER_LOGFILE}" \
+            | tail -n 101 \
+            | head -n 1 \
+            | sed 's|.*= *||; s|/.*||'
+    elif grep -q "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+            | tail -n 101 \
+            | head -n 1 \
+            | awk '{print $1}'
+    fi
 }
-
-# ------------------------------------------------------------
-# Extract values
-# ------------------------------------------------------------
-
-epsilon=$(extract_max_epsilon)
-sigma=$(extract_max_sigma)
-yielding_cells=$(extract_yielding_cells)
-
-if [[ -z "${epsilon}" || -z "${sigma}" || -z "${yielding_cells}" ]]
-then
-    echo "FAIL: Could not extract one or more regression quantities"
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Checks
-# ------------------------------------------------------------
-
-failures=0
-
-# --- epsilonEq ---
-if awk "BEGIN {exit !(${epsilon} >= ${EPSILON_MIN} && ${epsilon} <= ${EPSILON_MAX})}"
-then
-    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
-else
-    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
-    failures=$((failures + 1))
-fi
-
-# --- sigmaEq ---
-if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"
-then
-    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
-else
-    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
-    failures=$((failures + 1))
-fi
-
-# --- yielding cells ---
-if (( yielding_cells >= YIELD_MIN && yielding_cells <= YIELD_MAX ))
-then
-    printf "PASS: Yielding cells = %d\n" "${yielding_cells}"
-else
-    printf "FAIL: Yielding cells = %d\n" "${yielding_cells}"
-    failures=$((failures + 1))
-fi
 
 # Exercise the mechanicalConstitutiveLawManager on this case. It is the only
 # tutorial in the regression set whose material is history dependent, so it is
@@ -159,12 +147,113 @@ run_constitutive_test() {
     return 1
 }
 
-if ! run_constitutive_test; then
-    failures=$((failures + 1))
-fi
+# ------------------------------------------------------------
+# Run and check each approach
+# ------------------------------------------------------------
 
-# Clean case again
-( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+failures=0
+declare -A RESULT_EPS
+declare -A RESULT_SIG
+
+for approach in "${APPROACHES[@]}"; do
+    echo
+    echo "------------------------------------------------------------"
+    echo "Testing approach: ${approach}"
+    echo "------------------------------------------------------------"
+
+    prepare_case "${approach}"
+
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    # Assert the run took the path this approach names
+    if grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        used_framework=true
+    else
+        used_framework=false
+    fi
+
+    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
+        echo "FAIL: framework approach did not construct the framework"
+        failures=$((failures + 1))
+    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
+        echo "FAIL: legacy approach unexpectedly constructed the framework"
+        failures=$((failures + 1))
+    else
+        echo "PASS: ${approach} took the expected path"
+    fi
+
+    epsilon=$(extract_max_epsilon)
+    sigma=$(extract_max_sigma)
+    yielding_cells=$(extract_yielding_cells)
+
+    if [[ -z "${epsilon}" || -z "${sigma}" || -z "${yielding_cells}" ]]; then
+        echo "FAIL: ${approach} could not extract one or more quantities"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    RESULT_EPS["${approach}"]="${epsilon}"
+    RESULT_SIG["${approach}"]="${sigma}"
+
+    if awk "BEGIN {exit !(${epsilon} >= ${EPSILON_MIN} && ${epsilon} <= ${EPSILON_MAX})}"
+    then
+        printf "PASS: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+    else
+        printf "FAIL: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"
+    then
+        printf "PASS: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+    else
+        printf "FAIL: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        failures=$((failures + 1))
+    fi
+
+    if (( yielding_cells >= YIELD_MIN && yielding_cells <= YIELD_MAX )); then
+        printf "PASS: %s yielding = %d\n" "${approach}" "${yielding_cells}"
+    else
+        printf "FAIL: %s yielding = %d\n" "${approach}" "${yielding_cells}"
+        failures=$((failures + 1))
+    fi
+
+    if [[ "${approach}" == "legacy" ]]; then
+        if ! run_constitutive_test; then
+            failures=$((failures + 1))
+        fi
+    fi
+
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+done
+
+# The framework must reproduce the legacy result. This case has no pressure
+# smoothing, so unlike longWall there is nothing the framework omits: the two
+# should agree to solver tolerance, and a plastic history error would show
+# here as a difference that the unit checks cannot see
+if [[ -n "${RESULT_EPS[legacy]:-}" && -n "${RESULT_EPS[framework]:-}" ]]; then
+    for q in eps sig; do
+        if [[ "${q}" == "eps" ]]; then
+            a="${RESULT_EPS[legacy]}"; b="${RESULT_EPS[framework]}"; n="epsilonEq"
+        else
+            a="${RESULT_SIG[legacy]}"; b="${RESULT_SIG[framework]}"; n="sigmaEq"
+        fi
+
+        if awk "BEGIN {exit !(($a - $b)^2 <= (1e-8*$a)^2)}"; then
+            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" \
+                "$n" "$a" "$b"
+        else
+            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" \
+                "$n" "$a" "$b"
+            failures=$((failures + 1))
+        fi
+    done
+else
+    echo "SKIP: cross-check needs both approaches to have run"
+fi
 
 echo
 if (( failures == 0 ))

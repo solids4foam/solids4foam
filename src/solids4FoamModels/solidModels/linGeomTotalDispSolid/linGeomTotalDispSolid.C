@@ -546,6 +546,21 @@ bool linGeomTotalDispSolid::evolveExplicit()
 }
 
 
+void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
+{
+    // The legacy path accumulates its per-step fields here
+    solidModel::updateTotalFields();
+
+    // The framework keeps its own state, and its laws may have end-of-step
+    // work or diagnostics. Nothing called this before, so those hooks were
+    // dead code
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
+}
+
+
 void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 {
     if (!useMechanicalConstitutiveLawManager_)
