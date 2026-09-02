@@ -42,6 +42,7 @@ namespace Foam
 void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -128,7 +129,7 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 
         smallStrainMechanicalConstitutiveLawKinematics kinPert
         (
-            gradDPertView, kin.gradD0(), kin.dt()
+            gradDPertView, kin.gradD0()
         );
 
         mechanicalConstitutiveLawResponse respPert
@@ -136,7 +137,7 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
             sigmaPertView, tangentRequest::none
         );
 
-        evaluate(kinPert, shadow, respPert);
+        evaluate(kinPert, inputs, shadow, respPert);
 
         // Column j of the tangent
         forAll(Cfield, ipI)
@@ -156,6 +157,7 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 (
     const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -245,8 +247,7 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
             JPertView,
             kin.J0(),
             FinvPertView,
-            kin.Finv0(),
-            kin.dt()
+            kin.Finv0()
         );
 
         mechanicalConstitutiveLawResponse respPert
@@ -254,7 +255,7 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
             sigmaPertView, tangentRequest::none
         );
 
-        evaluate(kinPert, shadow, respPert);
+        evaluate(kinPert, inputs, shadow, respPert);
 
         forAll(Cfield, ipI)
         {

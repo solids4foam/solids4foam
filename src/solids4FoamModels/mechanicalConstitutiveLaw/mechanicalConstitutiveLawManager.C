@@ -978,6 +978,11 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     topologyEntry& tp = topology(topo);
 
     // Loop over mechanical constitutive laws
@@ -1017,7 +1022,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         // Kinematics wrapper
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
         // Constitutive response
@@ -1030,7 +1035,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
         else if (needsFourthOrderTangent(tangentReq))
         {
@@ -1041,13 +1046,13 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
         else
         {
             mechanicalConstitutiveLawResponse response(stressView, tangentReq);
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
     }
 
@@ -1175,7 +1180,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
 
                 smallStrainMechanicalConstitutiveLawKinematics kin
                 (
-                    gradDView, gradD0View, dt
+                    gradDView, gradD0View
                 );
 
                 if (needsScalarTangent(tangentReq))
@@ -1187,7 +1192,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                         stressView, tanView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
                 else if (needsFourthOrderTangent(tangentReq))
                 {
@@ -1201,7 +1206,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                         stressView, tanView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
                 else
                 {
@@ -1210,7 +1215,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                         stressView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
             }
         }
@@ -1286,6 +1291,11 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     topologyEntry& tp = topology(topo);
 
     // Loop over mechanical constitutive laws
@@ -1334,8 +1344,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
             JView,
             J0View,
             FinvView,
-            Finv0View,
-            dt
+            Finv0View
         );
 
         // Constitutive response
@@ -1348,7 +1357,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
         else if (needsFourthOrderTangent(tangentReq))
         {
@@ -1359,13 +1368,13 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
         else
         {
             mechanicalConstitutiveLawResponse response(stressView, tangentReq);
 
-            laws_[lawI].evaluate(kin, lawState, response);
+            laws_[lawI].evaluate(kin, inputs, lawState, response);
         }
     }
 
@@ -1497,7 +1506,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
 
                 finiteStrainMechanicalConstitutiveLawKinematics kin
                 (
-                    FView, F0View, JView, J0View, FinvView, Finv0View, dt
+                    FView, F0View, JView, J0View, FinvView, Finv0View
                 );
 
                 if (needsScalarTangent(tangentReq))
@@ -1509,7 +1518,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                         stressView, tanView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
                 else if (needsFourthOrderTangent(tangentReq))
                 {
@@ -1523,7 +1532,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                         stressView, tanView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
                 else
                 {
@@ -1532,7 +1541,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                         stressView, tangentReq
                     );
 
-                    laws_[lawI].evaluate(kin, bState, response);
+                    laws_[lawI].evaluate(kin, inputs, bState, response);
                 }
             }
         }
@@ -1839,6 +1848,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
@@ -1903,7 +1917,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     // This does not copy data
                     smallStrainMechanicalConstitutiveLawKinematics kin
                     (
-                        gradDView, gradD0View, dt
+                        gradDView, gradD0View
                     );
 
                     // Create wrapper for output
@@ -1927,7 +1941,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         // Update the material response, e.g. update the stress
                         laws_[lawI].evaluate
                         (
-                            kin, tp.boundaryStates_[lawI][patchI], response
+                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
                         );
                     }
                     else
@@ -1942,7 +1956,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         // Update the material response, e.g. update the stress
                         laws_[lawI].evaluate
                         (
-                            kin, tp.boundaryStates_[lawI][patchI], response
+                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
                         );
                     }
                 }
@@ -2006,6 +2020,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
 
@@ -2045,7 +2064,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
         if (scalarTangentPtr && needsScalarTangent(tangentReq))
@@ -2060,7 +2079,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
         }
         else if
         (
@@ -2074,7 +2093,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
         }
         else
         {
@@ -2083,7 +2102,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
         }
 
         // Update stress accumulation fields used for stress collapse
@@ -2162,7 +2181,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     // This does not copy data
                     smallStrainMechanicalConstitutiveLawKinematics kin
                     (
-                        gradDView, gradD0View, dt
+                        gradDView, gradD0View
                     );
 
                     // Create wrapper for output
@@ -2186,7 +2205,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         // Update the material response, e.g. update the stress
                         laws_[lawI].evaluate
                         (
-                            kin, tp.boundaryStates_[lawI][patchI], response
+                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
                         );
                     }
                     else // Note: fourth order tangents not needed on the boundary
@@ -2201,7 +2220,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         // Update the material response, e.g. update the stress
                         laws_[lawI].evaluate
                         (
-                            kin, tp.boundaryStates_[lawI][patchI], response
+                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
                         );
                     }
                 }
@@ -2297,6 +2316,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation, passed through unchanged
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     // Accumulation fields
 
     pointSymmTensorField& stressSum = pointStressSum();
@@ -2337,7 +2359,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
         if (scalarTangentPtr && needsScalarTangent(tangentReq))
@@ -2352,7 +2374,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
         }
         else
         {
@@ -2361,7 +2383,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 stressView, tangentReq
             );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
         }
 
         // Accumulate per point
@@ -2507,6 +2529,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs(dt);
+
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
@@ -2591,7 +2618,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 // This does not copy data
                 finiteStrainMechanicalConstitutiveLawKinematics kin
                 (
-                    FView, F0View, JView, J0View, FinvView, Finv0View, dt
+                    FView, F0View, JView, J0View, FinvView, Finv0View
                 );
 
                 // Create wrapper for output
@@ -2615,7 +2642,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     // Update the material response, e.g. update the stress
                     laws_[lawI].evaluate
                     (
-                        kin, tp.boundaryStates_[lawI][patchI], response
+                        kin, inputs, tp.boundaryStates_[lawI][patchI], response
                     );
                 }
                 else
@@ -2630,7 +2657,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     // Update the material response, e.g. update the stress
                     laws_[lawI].evaluate
                     (
-                        kin, tp.boundaryStates_[lawI][patchI], response
+                        kin, inputs, tp.boundaryStates_[lawI][patchI], response
                     );
                 }
             }

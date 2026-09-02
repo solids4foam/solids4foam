@@ -306,6 +306,7 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::initialiseSta
 void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 (
     const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -481,7 +482,7 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     // finite-strain laws. There is no analytical spatial tangent here
     if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
     {
-        finiteDifferenceFourthOrder(kin, state, response);
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
     }
     else if (response.tangentReq() == tangentRequest::fourthOrder)
     {

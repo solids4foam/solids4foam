@@ -67,6 +67,7 @@ Author
 #include "fvCFD.H"
 
 #include "mechanicalConstitutiveLawManager.H"
+#include "mechanicalConstitutiveLawInputs.H"
 #include "integrationPointTopologies.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
 #include "mat66.H"
@@ -1414,6 +1415,54 @@ int main(int argc, char *argv[])
                     !threw
                 );
             }
+        }
+
+        // The inputs object's own contract. No law reads a live input yet,
+        // so without this the class would ship unexercised
+        {
+            const scalar dtIn = 0.125;
+            mechanicalConstitutiveLawInputs inputs(dtIn);
+
+            report
+            (
+                "inputs carries the time increment",
+                mag(inputs.dt() - dtIn) < SMALL
+            );
+
+            report
+            (
+                "an unsupplied scalar input is absent, not zero",
+                !inputs.foundScalar("T") && inputs.findScalar("T") == nullptr
+            );
+
+            const scalarField T(3, 300.0);
+            inputs.setScalar("T", T);
+
+            report
+            (
+                "a supplied scalar input is found and readable",
+                inputs.foundScalar("T")
+             && inputs.findScalar("T") != nullptr
+             && mag(inputs.getScalar("T")[1] - 300.0) < SMALL
+            );
+
+            // A required input that was never supplied must fail rather than
+            // read as zero, which would be a plausible wrong answer
+            bool threw = false;
+            try
+            {
+                inputs.getScalar("thisWasNeverSupplied");
+            }
+            catch (const Foam::error&)
+            {
+                threw = true;
+            }
+
+            report
+            (
+                "a missing required input is rejected, not defaulted",
+                threw
+            );
         }
 
         // A tangent request with no storage to put it in

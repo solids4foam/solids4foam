@@ -65,6 +65,7 @@ Author
 #include "smallStrainMechanicalConstitutiveLawKinematics.H"
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "mechanicalConstitutiveLawState.H"
+#include "mechanicalConstitutiveLawInputs.H"
 #include "mechanicalConstitutiveLawResponse.H"
 #include "dimensionedScalar.H"
 #include "dimensionSets.H"
@@ -98,6 +99,7 @@ protected:
     void finiteDifferenceFourthOrder
     (
         const smallStrainMechanicalConstitutiveLawKinematics& kin,
+        const mechanicalConstitutiveLawInputs& inputs,
         mechanicalConstitutiveLawState& state,
         mechanicalConstitutiveLawResponse& response
     ) const;
@@ -113,6 +115,7 @@ protected:
         void finiteDifferenceFourthOrder
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const;
@@ -209,6 +212,7 @@ public:
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const
@@ -223,6 +227,7 @@ public:
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics&,
+            const mechanicalConstitutiveLawInputs&,
             mechanicalConstitutiveLawState&,
             mechanicalConstitutiveLawResponse&
         ) const

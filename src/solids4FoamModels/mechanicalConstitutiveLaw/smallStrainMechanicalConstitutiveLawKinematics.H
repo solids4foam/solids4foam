@@ -90,8 +90,6 @@ class smallStrainMechanicalConstitutiveLawKinematics
         //  This may be unused for some laws, e.g. purely elastic laws
         const UIndirectList<tensor>& gradD0_;
 
-        //- Time step
-        const scalar dt_;
 
 
     // Private Member Functions
@@ -118,13 +116,11 @@ public:
         smallStrainMechanicalConstitutiveLawKinematics
         (
             const UIndirectList<tensor>& gradD,
-            const UIndirectList<tensor>& gradD0,
-            const scalar dt
+            const UIndirectList<tensor>& gradD0
         )
         :
             gradD_(gradD),
-            gradD0_(gradD0),
-            dt_(dt)
+            gradD0_(gradD0)
         {}
 
 
@@ -149,11 +145,6 @@ public:
             return gradD0_;
         }
 
-        //- Time increment
-        scalar dt() const
-        {
-            return dt_;
-        }
 
     // Edit
 

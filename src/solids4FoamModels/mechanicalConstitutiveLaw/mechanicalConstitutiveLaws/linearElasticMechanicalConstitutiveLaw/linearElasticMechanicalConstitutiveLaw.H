@@ -147,6 +147,7 @@ public:
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const override;

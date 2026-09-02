@@ -139,6 +139,7 @@ MooneyRivlinElasticMechanicalConstitutiveLaw
 void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
 (
     const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -235,7 +236,7 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
     // neither the stress just computed nor the history it started from
     if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
     {
-        finiteDifferenceFourthOrder(kin, state, response);
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
     }
     else if (response.tangentReq() == tangentRequest::fourthOrder)
     {

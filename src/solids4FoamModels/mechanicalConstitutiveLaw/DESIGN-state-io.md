@@ -395,7 +395,7 @@ reads and never writes.**
 `electroMechanicalLaw` needs an activation field, and `viscousHookeanElastic`
 needs the time increment, which it already receives.
 
-**Decision: an inputs object, passed to `evaluate`.**
+**Decision: an inputs object, passed to `evaluate`. Implemented.**
 
 ```c++
     virtual void evaluate
@@ -419,6 +419,20 @@ matters: **every evaluation, including every shadow and every
 finite-difference perturbation, receives the live values by construction.**
 There is no setter, no ordering protocol, no epoch counter, and no way to be
 stale.
+
+**What is implemented, and what is not.** The object exists, carries `dt`, and
+is threaded through every `evaluate`, every manager call path and every
+finite-difference perturbation. `dt` has moved out of both kinematics classes,
+which are now purely geometric. Laws ask for a live field by name, with
+`findScalar` for an optional input and `getScalar` for a required one, the
+latter failing rather than reading zero.
+
+What is *not* implemented is the manager side: nothing yet scatters a
+`volField` into a per-law input, because no law reads one yet and the mapping
+policy for shared and boundary points, §8a.3, is still open. The first
+consumer, `thermoMechanicalLaw` or `poroMechanicalLaw`, settles that. Until
+then the `dt` path through the manager is compiled but unexercised, since no
+law reads it either - `viscousHookeanElastic` will be the first.
 
 ### 8a.2 Composite laws
 

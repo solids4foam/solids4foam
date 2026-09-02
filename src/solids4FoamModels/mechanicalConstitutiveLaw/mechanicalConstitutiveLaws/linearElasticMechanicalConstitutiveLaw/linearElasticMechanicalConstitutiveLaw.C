@@ -112,6 +112,7 @@ linearElasticMechanicalConstitutiveLaw
 void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -174,7 +175,7 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         }
 
         // Base-class finite difference implementation
-        finiteDifferenceFourthOrder(kin, state, response);
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
     }
     else if (response.tangentReq() == tangentRequest::fourthOrder)
     {
