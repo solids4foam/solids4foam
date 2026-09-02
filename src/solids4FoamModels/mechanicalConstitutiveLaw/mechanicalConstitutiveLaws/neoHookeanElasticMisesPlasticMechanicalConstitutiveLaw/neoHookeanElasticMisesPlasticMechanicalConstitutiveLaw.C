@@ -25,9 +25,16 @@ License
 
 namespace Foam
 {
+    // The debug default must match the legacy law of the same TypeName.
+    // Debug switches are registered globally by name, and this law shares its
+    // name with the legacy neoHookeanElasticMisesPlastic so that a case
+    // dictionary needs no change. OpenFOAM.org makes two different defaults
+    // for one name a fatal error at start-up - "Multiple defaults set for
+    // debug switch" - which takes down every case in the run, while
+    // OpenFOAM.com tolerates it silently
     defineTypeNameAndDebug
     (
-        neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw, 1
+        neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw, 0
     );
     addToRunTimeSelectionTable
     (

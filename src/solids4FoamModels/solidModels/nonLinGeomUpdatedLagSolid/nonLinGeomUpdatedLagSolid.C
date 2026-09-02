@@ -82,7 +82,7 @@ void nonLinGeomUpdatedLagSolid::predict()
     J_ = relJ_*J_.oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 }
 
 
@@ -412,7 +412,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         const volScalarField DEqnA("DEqnA", DDEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -526,7 +526,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
 
@@ -572,6 +572,58 @@ Foam::solidModels::nonLinGeomUpdatedLagSolid::mechanicalManager() const
     }
 
     return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework needs the inverse of the total deformation gradient,
+    // which this solver does not otherwise keep. It is held as a field rather
+    // than formed per call, so the allocation happens once: its old time is
+    // then stored by the time loop alongside F's, and is the inverse of F at
+    // the previous time step, which is what the relative gradient needs
+    if (FinvPtr_.empty())
+    {
+        FinvPtr_.set
+        (
+            new volTensorField
+            (
+                IOobject
+                (
+                    "Finv",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                inv(F_)
+            )
+        );
+
+        // Instantiate the old time so the time loop advances it
+        FinvPtr_().oldTime();
+    }
+
+    volTensorField& Finv = FinvPtr_();
+    Finv = inv(F_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        J_,
+        J_.oldTime(),
+        Finv,
+        Finv.oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
 }
 
 
@@ -803,7 +855,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     {
         // It is important to call the stress calculation procedure during the
         // constructor to allow it to correctly initialise fields
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())
@@ -1103,13 +1155,13 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // mechanical law
         // The residual uses the quadrature point stress, but the cell-centre
         // stress is still required by tractionBoundarySnGrad
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
     else
     {
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())

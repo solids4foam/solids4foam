@@ -119,6 +119,11 @@ class nonLinGeomTotalLagTotalDispSolid
         //- The mechanicalConstitutiveLaw framework, built on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
         //- Construct impK from the framework when
         //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
         //  mechanicalModel otherwise

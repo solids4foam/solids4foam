@@ -30,7 +30,14 @@ UY_MAX=0.407
 SYY_MIN=9.99e7
 SYY_MAX=1.001e8
 
-# Both runs solve the same problem to the same tolerance
+# The two runs are NOT expected to be bit-identical here, unlike
+# rotatingCylinder. This case sets solvePressureEqn, so the legacy
+# MooneyRivlinElastic solves a Laplacian equation for its hydrostatic stress,
+# which the framework law deliberately omits: that smoothing stabilises the
+# discretisation rather than describing the material, and belongs to the solid
+# model. The converged answers agree to about 2e-6 relative, which is the
+# evidence that it is indeed a stabilisation, so the tolerance is set to
+# accommodate that rather than to hide it
 CROSS_TOL=1e-4
 
 SOLVER_LOGFILE="log.solids4Foam"

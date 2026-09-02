@@ -156,7 +156,7 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     J_ = det(F_);
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 
     if (solvePressure())
     {
@@ -495,7 +495,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         const volScalarField DEqnA("DEqnA", DEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -618,7 +618,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
 
@@ -667,6 +667,32 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::mechanicalManager() const
     }
 
     return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework takes the finite-strain kinematics explicitly rather than
+    // looking them up, and rolls the constitutive history over itself. F, J
+    // and their inverses are already members, updated immediately before every
+    // call site, and their old times are instantiated by makeImpK()
+    mechanicalManager().updateStressFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        J_,
+        J_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
 }
 
 
@@ -861,7 +887,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     // constructor to allow it to correctly initialise fields
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     Info<< "solvePressure = " << solvePressure() << endl;
@@ -1163,13 +1189,16 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Calculate sigma at the face quadrature points
+        // Stays on the legacy path: the framework's CompactListList overload
+        // needs the old-time gradient at the quadrature points, and this
+        // solver keeps no such field
         mechanical().correct(gradDQuad(), sigmaQuad());
 #endif
     }
     else
     {
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())

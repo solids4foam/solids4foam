@@ -160,6 +160,15 @@ class nonLinGeomUpdatedLagSolid
         //- The mechanicalConstitutiveLaw framework, built on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
+        //- Inverse of the total deformation gradient, needed by the
+        //  framework and not otherwise kept by this solver. Built on first use
+        mutable autoPtr<volTensorField> FinvPtr_;
+
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
         //- Construct impK from the framework when
         //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
         //  mechanicalModel otherwise

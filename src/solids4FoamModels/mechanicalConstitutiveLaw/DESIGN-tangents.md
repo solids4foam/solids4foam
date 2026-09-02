@@ -2122,6 +2122,75 @@ target, and where the legacy values disagree among themselves it is better to
 pick the defensible one and say so than to reproduce an arbitrary choice per
 solver.
 
+### 8.19 The stress comes from the framework, and what that cost
+
+Every migration before this took only `impK`, which cannot change results, so
+the framework's central path had never been driven by a solver. All three
+cell-centred solid models now take their stress from it behind the same
+switch: `linGeomTotalDispSolid`, `nonLinGeomTotalLagTotalDispSolid` and
+`nonLinGeomUpdatedLagSolid`.
+
+Three results, in increasing order of interest:
+
+* `plateHole`, small strain, `linearElastic`: the legacy and framework arms
+  agree to **every digit**.
+* `rotatingCylinder`, finite strain, `StVenantKirchhoffElastic`: likewise
+  exact, sigmaEq 3700.73 both ways.
+* `longWall`, finite strain, `MooneyRivlinElastic`: agree to about **2e-6
+  relative**, not exactly. This case sets `solvePressureEqn`, so the legacy law
+  solves a Laplacian for its hydrostatic stress and the framework law does not.
+
+That last one is the useful one. The difference is the pressure smoothing whose
+removal §8.17 justified on the grounds that it stabilises the discretisation
+rather than describing the material. A 2e-6 change in the converged answer is
+what that claim predicts, and is the first evidence for it. One case is not a
+proof - a nearly incompressible material could be far more sensitive - so the
+claim stays provisional until the solid model owns the smoothing and the two
+can be compared with it present.
+
+**Identical numbers are not evidence on their own.** They are equally what a
+switch that does nothing produces, which has already happened once in this
+work. So the framework path was confirmed independently: the solver log shows
+the manager constructed, and perturbing the framework stress by 0.1% moves
+`plateHole`'s converged result from 2.22246e+06 to 2.22248e+06, which a dead
+branch cannot do.
+
+**What is not migrated.** The high-order quadrature stress stays on the legacy
+path in both cell-centred solvers that have it. The framework's
+`CompactListList` overload exists, but evaluating a law through it needs the
+old-time gradient at the quadrature points, and neither solver keeps one:
+`gradDQuad()` is rebuilt each call. A history-independent law would not notice;
+a history-dependent one would silently read the wrong state. Closing that needs
+an old-time quadrature gradient, which is a solver change, not a framework one.
+
+### 8.20 Sharing a TypeName with a legacy law has a portability trap
+
+Every framework law deliberately takes the same `TypeName` as the legacy law
+it replaces, so that a case dictionary needs no change. That is the right
+choice, and it has one consequence that is invisible on OpenFOAM.com.
+
+Debug switches are registered **globally by name**, not per runtime-selection
+table. Two classes sharing a name therefore register the same switch, and if
+they declare *different* defaults, OpenFOAM.org fails at start-up with
+
+```text
+    Multiple defaults set for debug switch neoHookeanElasticMisesPlastic
+```
+
+before any case runs. Every tutorial in the CI job failed, including ones that
+never touch the framework, because the error is thrown during static
+initialisation. OpenFOAM.com tolerates the same mismatch silently, so the whole
+thing is invisible locally.
+
+It happened because `neoHookeanElasticMisesPlastic` was scaffolded from
+`linearElasticMisesPlastic`, which legitimately uses a debug default of 1,
+while its own legacy counterpart uses 0.
+
+**Rule: a framework law's debug default must equal that of the legacy law
+whose TypeName it shares.** All seven pairs were checked; only that one
+differed. Worth re-checking whenever a law is added, because the symptom is a
+total, unrelated-looking CI failure on one fork only.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
