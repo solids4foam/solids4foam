@@ -4,7 +4,14 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-CASE_DIR="${REGRESSION_ROOT}/main"
+# Run twice: the legacy mechanicalModel and the mechanicalConstitutiveLaw
+# framework. viscousHookeanElastic is history dependent through its Maxwell
+# arms, and this is the only end-to-end comparison of that law against the
+# legacy one. There is no pressure smoothing here, so the two must agree
+APPROACHES=(
+    legacy
+    framework
+)
 
 # ============================================================
 # viscoTube regression test
@@ -65,6 +72,9 @@ run_constitutive_test() {
 }
 
 prepare_case() {
+    local approach="$1"
+    CASE_DIR="${REGRESSION_ROOT}/${approach}"
+
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
 
@@ -75,15 +85,23 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    if [[ "${approach}" == "framework" ]]; then
+        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
+        # it is silently ignored and this arm would repeat the legacy run
+        sed -i.bak \
+            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    nCorrectors     1000;/' \
+            "${CASE_DIR}/constant/solidProperties"
+        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+
+        if ! grep -q 'useMechanicalConstitutiveLawManager' \
+            "${CASE_DIR}/constant/solidProperties"
+        then
+            echo "FAIL: could not enable the framework in solidProperties"
+            exit 1
+        fi
+    fi
 }
-
-prepare_case
-
-# Clean case
-( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-
-# Run case
-( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
 # ------------------------------------------------------------
 # Extract helpers
@@ -104,46 +122,97 @@ extract_max_sigma() {
 }
 
 # ------------------------------------------------------------
-# Extract values
-# ------------------------------------------------------------
-
-epsilon=$(extract_max_epsilon)
-sigma=$(extract_max_sigma)
-
-if [[ -z "${epsilon}" || -z "${sigma}" ]]
-then
-    echo "FAIL: Could not extract epsilonEq or sigmaEq"
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Checks
+# Run and check each approach
 # ------------------------------------------------------------
 
 failures=0
+declare -A RESULT_E
+declare -A RESULT_S
 
-if awk "BEGIN {exit !(${epsilon} > ${EPS_MIN} && ${epsilon} < ${EPS_MAX})}"
-then
-    printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
+for approach in "${APPROACHES[@]}"; do
+    echo
+    echo "------------------------------------------------------------"
+    echo "Testing approach: ${approach}"
+    echo "------------------------------------------------------------"
+
+    prepare_case "${approach}"
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        used_framework=true
+    else
+        used_framework=false
+    fi
+
+    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
+        echo "FAIL: framework approach did not construct the framework"
+        failures=$((failures + 1))
+    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
+        echo "FAIL: legacy approach unexpectedly constructed the framework"
+        failures=$((failures + 1))
+    else
+        echo "PASS: ${approach} took the expected path"
+    fi
+
+    epsilon=$(extract_max_epsilon)
+    sigma=$(extract_max_sigma)
+
+    if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
+        echo "FAIL: ${approach} could not extract epsilonEq or sigmaEq"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    RESULT_E["${approach}"]="${epsilon}"
+    RESULT_S["${approach}"]="${sigma}"
+
+    if awk "BEGIN {exit !(${epsilon} > ${EPS_MIN} && ${epsilon} < ${EPS_MAX})}"; then
+        printf "PASS: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+    else
+        printf "FAIL: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${sigma} > ${SIGMA_MIN} && ${sigma} < ${SIGMA_MAX})}"; then
+        printf "PASS: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+    else
+        printf "FAIL: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        failures=$((failures + 1))
+    fi
+
+    if [[ "${approach}" == "legacy" ]]; then
+        if ! run_constitutive_test; then
+            failures=$((failures + 1))
+        fi
+    fi
+
+    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+done
+
+# The Maxwell arms are history, so a relaxation error accumulates over the run
+# and shows here in a way the unit checks, which compare two trial states from
+# one rest state, cannot see
+if [[ -n "${RESULT_E[legacy]:-}" && -n "${RESULT_E[framework]:-}" ]]; then
+    for q in eps sig; do
+        if [[ "${q}" == "eps" ]]; then
+            a="${RESULT_E[legacy]}"; b="${RESULT_E[framework]}"; n="epsilonEq"
+        else
+            a="${RESULT_S[legacy]}"; b="${RESULT_S[framework]}"; n="sigmaEq"
+        fi
+
+        if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
+            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" "$n" "$a" "$b"
+        else
+            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" "$n" "$a" "$b"
+            failures=$((failures + 1))
+        fi
+    done
 else
-    printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
-    failures=$((failures + 1))
+    echo "SKIP: cross-check needs both approaches to have run"
 fi
-
-if awk "BEGIN {exit !(${sigma} > ${SIGMA_MIN} && ${sigma} < ${SIGMA_MAX})}"
-then
-    printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
-else
-    printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
-    failures=$((failures + 1))
-fi
-
-# Clean case again
-if ! run_constitutive_test; then
-    failures=$((failures + 1))
-fi
-
-( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 echo
 if (( failures == 0 ))

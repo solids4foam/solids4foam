@@ -2327,6 +2327,49 @@ looks similar - which is how the finite-strain tangent added during this work
 inherited it. A guard that names its reason, as this one now does, does not
 spread.
 
+### 8.24 Every law is now compared against its legacy counterpart
+
+Each framework law now has a regression case that runs the legacy and framework
+paths side by side and requires them to agree. That closes the gap this work
+kept falling into: a law that passes every unit check and an independent
+line-by-line review, and still does not reproduce the legacy result.
+
+<!-- markdownlint-disable MD013 -->
+
+| Law | Case | Agreement | Defects this found |
+|---|---|---|---|
+| `linearElastic` | `plateHole` | exact | - |
+| `linearElasticMisesPlastic` | `perforatedPlate` | exact | plastic multiplier convention, §8.21 |
+| `neoHookeanElastic` | `blockPunch` | exact | volumetric energy, §8.22 |
+| `StVenantKirchhoffElastic` | `rotatingCylinder` | exact | - |
+| `MooneyRivlinElastic` | `longWall` | 2e-6 | - (the pressure smoothing, §8.19) |
+| `neoHookeanElasticMisesPlastic` | `neckingBar` | exact | stale relative deformation gradient, §8.22 |
+| `viscousHookeanElastic` | `viscoTube` | exact | - |
+
+<!-- markdownlint-enable MD013 -->
+
+Four defects across seven laws. None was found by the unit checks, the
+closed-form comparisons, the finite-difference tangent tests, or review; three
+of the four were in code written before this migration. The fourth, §8.23, was
+visible on one fork only and needed the comparison to be run on that fork.
+
+**What made these cases work as checks**, and what to preserve when adding a
+law:
+
+- The two arms must differ in *nothing* but the switch. Where a case had no
+  suitable second arm, the properties file was duplicated and the switch added,
+  rather than any setting being adjusted to help it pass.
+- Each arm asserts from the solver log which path it actually took. Identical
+  results are equally what a switch that does nothing produces, and that has
+  happened here.
+- The case must not enable pressure smoothing, or the framework legitimately
+  differs and the comparison can only be approximate. `longWall` is the one
+  case in that position, and its tolerance says so explicitly.
+
+The remaining laws in the legacy library have no framework counterpart yet.
+When one is added, it needs a case in this table before it can be considered
+migrated.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),
