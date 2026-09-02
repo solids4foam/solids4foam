@@ -93,6 +93,14 @@ class linearElasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar kappa_;
 
+        //- Uniform initial stress, taken from the law's dictionary. A sigma0
+        //  field, if the case supplies one, overrides this point by point,
+        //  unless the dictionary gave a value, which is final
+        symmTensor sigma0_;
+
+        //- Whether the dictionary gave sigma0 explicitly
+        bool sigma0FromDict_;
+
 
     // Private Member Functions
 
@@ -144,6 +152,13 @@ public:
         }
 
     // Edit
+
+        //- Declare the initial stress, which is added to every evaluation and
+        //  is zero unless a sigma0 field is supplied
+        virtual void declareState
+        (
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
 
         //- Small-strain constitutive evaluation
         virtual void evaluate

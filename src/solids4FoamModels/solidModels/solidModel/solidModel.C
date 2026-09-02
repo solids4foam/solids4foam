@@ -1747,12 +1747,10 @@ void Foam::solidModel::updateTotalFields()
     {
         if (gradDQuad0Ptr_.empty())
         {
-            gradDQuad0Ptr_.set(new CompactListList<tensor>(gradDQuad()));
+            gradDQuad0Ptr_.set(new CompactListList<tensor>());
         }
-        else
-        {
-            gradDQuad0Ptr_() = gradDQuad();
-        }
+
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
     }
 #endif
 }

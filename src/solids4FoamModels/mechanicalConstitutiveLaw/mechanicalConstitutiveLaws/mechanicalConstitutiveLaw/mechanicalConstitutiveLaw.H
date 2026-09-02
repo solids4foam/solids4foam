@@ -66,6 +66,7 @@ Author
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawInputs.H"
+#include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawResponse.H"
 #include "dimensionedScalar.H"
 #include "dimensionSets.H"
@@ -195,6 +196,21 @@ public:
         }
 
     // Edit
+
+        //- Declare the state fields this law uses.
+        //  Called once, before any evaluation. The manager allocates them at
+        //  the size of the topology, applies the declared defaults, and for a
+        //  prescribed field looks for a volField of the same name on the mesh
+        //  and broadcasts it to this law's integration points.
+        //
+        //  A law that declares nothing keeps working exactly as before: this
+        //  is additive, and a prescribed field that no case supplies takes its
+        //  declared default
+        virtual void declareState
+        (
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const
+        {}
 
         //- Initialise constitutive state variables
         //  Called once after state allocation.

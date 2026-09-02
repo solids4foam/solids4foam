@@ -167,6 +167,24 @@ public:
     //  return true to ensure that each integration point is evaluated exactly
     //  once per material law.
     virtual bool requiresUniqueIntegrationPointsPerMaterial() const = 0;
+
+    //- Whether an integration point is a mesh face, with the integration
+    //  point index being the global face index.
+    //
+    //  A value the user gives per cell reaches a face by interpolation, not
+    //  by taking one of the two adjacent cell values, and a topology that
+    //  answers true is asking to be filled that way. Answering false means
+    //  a cell's value is broadcast to the integration points of that cell,
+    //  which is right for a topology whose points sit inside one cell.
+    //
+    //  Note the index requirement: this is only true of a topology whose
+    //  integration point index *is* the face index. A topology holding
+    //  several points per face, as the compact face one does, indexes into a
+    //  per-face block instead and must answer false
+    virtual bool integrationPointsAreFaces() const
+    {
+        return false;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

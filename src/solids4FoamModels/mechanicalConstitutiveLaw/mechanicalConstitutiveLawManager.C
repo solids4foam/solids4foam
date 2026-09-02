@@ -333,8 +333,15 @@ Foam::mechanicalConstitutiveLawManager::topology
             )
         );
 
-        // Law-specific state initialisation
-        laws_[lawI].initialiseState(entry.states_[lawI]);
+        // Apply whatever the law declared and let it initialise its own
+        // state, in that order. See applyStateSpec
+        applyStateSpec
+        (
+            lawI,
+            topo,
+            entry.lawIntegrationPointIDs_[lawI],
+            entry.states_[lawI]
+        );
     }
 
     // ---------------------------------------------------------------------
@@ -365,9 +372,14 @@ Foam::mechanicalConstitutiveLawManager::topology
                     new mechanicalConstitutiveLawState(nFaces)
                 );
 
-                laws_[lawI].initialiseState
+                applyStateSpecPatch
                 (
-                    entry.boundaryStates_[lawI][patchI]
+                    lawI, patchI, entry.boundaryStates_[lawI][patchI]
+                );
+
+                applyStateSpecPatch
+                (
+                    lawI, patchI, entry.boundaryStates_[lawI][patchI]
                 );
             }
         }
@@ -413,6 +425,193 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
             << "tangent: interface continuity is a normal-direction traction "
             << "and displacement matching problem, not an average."
             << exit(FatalError);
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
+(
+    const mechanicalConstitutiveLawStateSpec& spec,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.typeName == "scalar")
+        {
+            state.scalarField(e.name) = e.scalarDefault;
+            state.scalarField0(e.name) = e.scalarDefault;
+        }
+        else if (e.typeName == "vector")
+        {
+            state.vectorField(e.name) = e.vectorDefault;
+            state.vectorField0(e.name) = e.vectorDefault;
+        }
+        else if (e.typeName == "tensor")
+        {
+            state.tensorField(e.name) = e.tensorDefault;
+            state.tensorField0(e.name) = e.tensorDefault;
+        }
+        else if (e.typeName == "symmTensor")
+        {
+            state.symmTensorField(e.name) = e.symmTensorDefault;
+            state.symmTensorField0(e.name) = e.symmTensorDefault;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "State field '" << e.name << "' has unsupported type '"
+                << e.typeName << "'." << exit(FatalError);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpec
+(
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    // Order matters. The declared default goes down first, then the law is
+    // given the chance to initialise state of its own over it, and only then
+    // is a prescribed field read. A law that both declares a field and fills
+    // it in initialiseState would otherwise have its work overwritten
+    mechanicalConstitutiveLawStateSpec spec;
+    laws_[lawI].declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    laws_[lawI].initialiseState(state);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
+        {
+            continue;
+        }
+
+        // A prescribed field is read from a volField the user supplied. Its
+        // absence is not an error: the declared default stands, which is what
+        // lets a law declare one without changing any existing case
+        if (e.typeName == "scalar")
+        {
+            readPrescribed<scalar>
+            (
+                e.name, lawI, topo, ipIDs, state.scalarField(e.name)
+            );
+            state.scalarField0(e.name) = state.scalarField(e.name);
+        }
+        else if (e.typeName == "vector")
+        {
+            readPrescribed<vector>
+            (
+                e.name, lawI, topo, ipIDs, state.vectorField(e.name)
+            );
+            state.vectorField0(e.name) = state.vectorField(e.name);
+        }
+        else if (e.typeName == "tensor")
+        {
+            readPrescribed<tensor>
+            (
+                e.name, lawI, topo, ipIDs, state.tensorField(e.name)
+            );
+            state.tensorField0(e.name) = state.tensorField(e.name);
+        }
+        else
+        {
+            readPrescribed<symmTensor>
+            (
+                e.name, lawI, topo, ipIDs, state.symmTensorField(e.name)
+            );
+            state.symmTensorField0(e.name) = state.symmTensorField(e.name);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecScratch
+(
+    const label lawI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    laws_[lawI].declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    laws_[lawI].initialiseState(state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
+(
+    const label lawI,
+    const label patchI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    laws_[lawI].declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    laws_[lawI].initialiseState(state);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
+        {
+            continue;
+        }
+
+        if (e.typeName == "scalar")
+        {
+            readPrescribedPatch<scalar>
+            (
+                e.name, lawI, patchI, state.scalarField(e.name)
+            );
+            state.scalarField0(e.name) = state.scalarField(e.name);
+        }
+        else if (e.typeName == "vector")
+        {
+            readPrescribedPatch<vector>
+            (
+                e.name, lawI, patchI, state.vectorField(e.name)
+            );
+            state.vectorField0(e.name) = state.vectorField(e.name);
+        }
+        else if (e.typeName == "tensor")
+        {
+            readPrescribedPatch<tensor>
+            (
+                e.name, lawI, patchI, state.tensorField(e.name)
+            );
+            state.tensorField0(e.name) = state.tensorField(e.name);
+        }
+        else
+        {
+            readPrescribedPatch<symmTensor>
+            (
+                e.name, lawI, patchI, state.symmTensorField(e.name)
+            );
+            state.symmTensorField0(e.name) = state.symmTensorField(e.name);
+        }
     }
 }
 
@@ -1180,8 +1379,15 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     // The law must be given the chance to register the state
                     // fields it reads, exactly as for a real state. Without
                     // this a history-dependent law fails looking up its own
-                    // history, e.g. epsilonP for the plastic law
-                    laws_[lawI].initialiseState(bScratchPtr());
+                    // history, e.g. epsilonP for the plastic law, and a
+                    // declared field would be created empty on first access.
+                    //
+                    // A prescribed field keeps its declared default here. The
+                    // faces are addressed through the polyPatch because the
+                    // fvPatch has none, so there is no patch field to read
+                    // them from; they take no part in the discretisation, so
+                    // nothing downstream depends on the difference
+                    applyStateSpecScratch(lawI, bScratchPtr());
                 }
                 else if (preserveState)
                 {
@@ -1502,8 +1708,15 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     // The law must be given the chance to register the state
                     // fields it reads, exactly as for a real state. Without
                     // this a history-dependent law fails looking up its own
-                    // history, e.g. epsilonP for the plastic law
-                    laws_[lawI].initialiseState(bScratchPtr());
+                    // history, e.g. epsilonP for the plastic law, and a
+                    // declared field would be created empty on first access.
+                    //
+                    // A prescribed field keeps its declared default here. The
+                    // faces are addressed through the polyPatch because the
+                    // fvPatch has none, so there is no patch field to read
+                    // them from; they take no part in the discretisation, so
+                    // nothing downstream depends on the difference
+                    applyStateSpecScratch(lawI, bScratchPtr());
                 }
                 else if (preserveState)
                 {

@@ -64,6 +64,7 @@ Author
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
+#include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
 
 #ifdef OPENFOAM_ORG
@@ -301,6 +302,232 @@ class mechanicalConstitutiveLawManager
         ) const;
 
         //- Commit old-time state for all topology entries if needed
+        //- Allocate each declared field and set it to its declared default
+        void applyStateDefaults
+        (
+            const mechanicalConstitutiveLawStateSpec& spec,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- Apply what a law declared in declareState: allocate each field,
+        //  set its default, and read any prescribed field from the mesh
+        void applyStateSpec
+        (
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- As applyStateSpec, for a scratch state that no field addresses:
+        //  declared defaults and the law's own initialisation, no
+        //  prescribed read
+        void applyStateSpecScratch
+        (
+            const label lawI,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- As applyStateSpec, for a law's state on one boundary patch
+        void applyStateSpecPatch
+        (
+            const label lawI,
+            const label patchI,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- The volField a prescribed state is to be read from, if there is
+        //  one. It may be a field another model has already registered, or it
+        //  may exist only as a file in the current time directory, which is
+        //  how a user supplies one. If it is neither then nothing was
+        //  prescribed and the caller leaves the declared default in place
+        template<class Type>
+        tmp<GeometricField<Type, fvPatchField, volMesh>>
+        prescribedField(const word& name) const
+        {
+            typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+            if (mesh_.foundObject<VolFieldType>(name))
+            {
+                return tmp<VolFieldType>
+                (
+                    mesh_.lookupObject<VolFieldType>(name)
+                );
+            }
+
+            IOobject io
+            (
+                name,
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            );
+
+            // The file has to exist and hold this field's type. foam-extend
+            // has no typed header check, so the class name is compared after
+            // reading the header, which is what the typed check does anyway
+#ifdef FOAMEXTEND
+            const bool present =
+                io.headerOk()
+             && io.headerClassName() == VolFieldType::typeName;
+#else
+            const bool present = io.typeHeaderOk<VolFieldType>(true);
+#endif
+
+            if (!present)
+            {
+                return tmp<VolFieldType>();
+            }
+
+            return tmp<VolFieldType>(new VolFieldType(io, mesh_));
+        }
+
+        //- Fill a law's internal integration points from a prescribed field
+        //
+        //  The value is specified per cell, which is how a user prepares one
+        //  and the only form setFields can write. How it reaches a point
+        //  depends on where the point is. A point inside a cell takes that
+        //  cell's value. A point that is a mesh face takes the interpolated
+        //  value, because that is what legacy does and because a face lies
+        //  between two cells rather than in one.
+        //
+        //  A topology that shares a point between cells without being able to
+        //  say it is a face still broadcasts, and there the last cell to
+        //  reach the point wins: exact where the field is continuous across
+        //  the interface, ambiguous where it is not. That is the mapping
+        //  policy question recorded in DESIGN-state-io.md section 4
+        template<class Type>
+        void readPrescribed
+        (
+            const word& name,
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            Field<Type>& fld
+        ) const
+        {
+            typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+            const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
+
+            if (!tsrc.valid())
+            {
+                return;
+            }
+
+            const VolFieldType& src = tsrc();
+
+            Info<< "    Prescribed state '" << name
+                << "' read from the field of the same name" << endl;
+
+            if (topo.integrationPointsAreFaces())
+            {
+                // Legacy forms its face initial stress as
+                // linearInterpolate(sigma0), so a face takes a weighted
+                // average of the two cells either side and not the value of
+                // whichever one happens to be visited last. The integration
+                // point index is the face index here, which is what lets the
+                // interpolated field be read straight off
+                const GeometricField<Type, fvsPatchField, surfaceMesh> srcf
+                (
+                    linearInterpolate(src)
+                );
+
+                const label nInternal = mesh_.nInternalFaces();
+
+                forAll(ipIDs, localI)
+                {
+                    const label faceI = ipIDs[localI];
+
+                    if (faceI < nInternal)
+                    {
+                        fld[localI] = srcf[faceI];
+                    }
+                    else
+                    {
+                        const label patchI =
+                            mesh_.boundaryMesh().whichPatch(faceI);
+
+                        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+
+                        fld[localI] =
+                            srcf.boundaryField()[patchI][faceI - pp.start()];
+                    }
+                }
+
+                return;
+            }
+
+            // A state field is indexed by the law's own integration points,
+            // 0 to n-1, while the topology hands out global indices, so the
+            // two have to be related before anything can be written
+            labelList globalToLocal(topo.nIntegrationPoints(), -1);
+            forAll(ipIDs, localI)
+            {
+                globalToLocal[ipIDs[localI]] = localI;
+            }
+
+            const labelList& cells = lawCells_[lawI];
+
+            forAll(cells, i)
+            {
+                const label cellI = cells[i];
+                const labelUList ips = topo.cellIntegrationPointIDs(cellI);
+
+                forAll(ips, j)
+                {
+                    const label localI = globalToLocal[ips[j]];
+
+                    // A point of this cell that is not one of this law's own
+                    // points cannot happen while materials are assigned per
+                    // cell, but the guard costs nothing and the alternative is
+                    // writing outside the field
+                    if (localI >= 0)
+                    {
+                        fld[localI] = src[cellI];
+                    }
+                }
+            }
+        }
+
+        //- Read a prescribed field into a law's state on one boundary patch.
+        //  A boundary state is evaluated exactly as the internal points are,
+        //  so it needs the prescribed value too; without this the law would
+        //  see a silently zero field on every patch
+        template<class Type>
+        void readPrescribedPatch
+        (
+            const word& name,
+            const label lawI,
+            const label patchI,
+            Field<Type>& fld
+        ) const
+        {
+            typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+            const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
+
+            if (!tsrc.valid())
+            {
+                return;
+            }
+
+            const VolFieldType& src = tsrc();
+
+            // The patch values of the supplied field, which for the uniform
+            // and zero-gradient cases a user writes are the owner cell values
+            const fvPatchField<Type>& psrc = src.boundaryField()[patchI];
+
+            // This law's faces on this patch, indexing into the patch
+            const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+            forAll(faces, i)
+            {
+                fld[i] = psrc[faces[i]];
+            }
+        }
+
         void updateOldTimeIfNeeded();
 
         //- Check if the provided tangent request is scalar or scalarDeviatoric

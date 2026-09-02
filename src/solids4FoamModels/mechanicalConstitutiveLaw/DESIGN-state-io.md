@@ -593,6 +593,89 @@ electro can be expressed at all; today it offers scalars and vectors only.
   was solved. The inputs object makes staleness impossible within an
   evaluation; it does not by itself order the coupling loop.
 
+### 8a.8 Prescribed state: what is implemented
+
+A law declares the state it needs by overriding `declareState`, which is handed
+a `mechanicalConstitutiveLawStateSpec`. Each declaration gives a name, a type,
+a default, and a role. Two roles exist: `persistent` for history the law writes
+and reads back, and `prescribed` for a value supplied from outside that the law
+only reads. Only `prescribed` is implemented; `persistent` is declared and
+defaulted but its restart IO is still the open item of §5.
+
+The manager applies a declaration in `applyStateSpec`. Every declared field is
+allocated and set to its default at both current and old time. A `prescribed`
+field is then looked for as a `volField` of the same name, first in the
+registry and then as a file in the current time directory, and broadcast to the
+law's integration points. Absence is not an error: the default stands, which is
+what lets a law declare a prescribed field without changing a single existing
+case.
+
+Two consequences are worth stating because neither is obvious.
+
+**The default is the dictionary value.** `linearElastic` reads a uniform
+`sigma0` from its own dictionary and declares *that* as the default. The
+supplied-field route and the dictionary route are therefore the same mechanism
+seen at two points: the dictionary sets the value everywhere, and a field, if
+there is one, overrides it point by point. This is what makes the legacy
+dictionary work unchanged while a spatially varying initial stress becomes
+available to any law that declares one.
+
+**Boundary states need the same treatment, and by a different route.** The
+manager keeps a separate state per law per patch, evaluated exactly as the
+internal points are. Those states were initially left out of the state spec,
+and the result was not an error but silence: `mechanicalConstitutiveLawState`
+creates a field on first access, so a law asking for `sigma0` on a patch got a
+zero field and the initial stress was quietly dropped on every boundary. The
+symptom was small - a fraction of a percent in the displacement - and it was
+only visible against a legacy run over a real load path. A boundary state is
+now filled by `applyStateSpecPatch`, which takes the field's *patch* values
+rather than broadcasting cell values, per §8a.3.
+
+That silent creation on access is worth revisiting. It is convenient for a law
+initialising its own history, and it turns a mistyped state name into a field
+of zeros rather than an error. The state spec is the beginning of the answer,
+because a declared field no longer relies on it.
+
+Four further points, each of which was a way to get a different answer from
+legacy:
+
+* **The dictionary wins over the field, because that is what legacy does.**
+  `mechanicalLaw::makeSigma0` reads a `sigma0` field `READ_IF_PRESENT`, and the
+  `linearElastic` constructor then assigns any dictionary `sigma0` over the
+  whole of it. A case carrying both therefore runs on the dictionary value.
+  The framework says this with a third role, `fixed`: the law declares `sigma0`
+  as `fixed` when its dictionary supplied one and as `prescribed` when it did
+  not, so the field is consulted only in the second case.
+* **A face integration point takes the interpolated value, not a cell's.**
+  Legacy forms its face initial stress as `linearInterpolate(sigma0)`. A
+  broadcast would instead hand a face the value of whichever adjacent cell was
+  visited last, which differs wherever the field is not uniform and depends on
+  cell ordering and on the decomposition. A topology answers
+  `integrationPointsAreFaces()` when its integration point index is the face
+  index, and is then filled by interpolation. A topology holding several points
+  per face - the compact face one - cannot answer that, and still broadcasts;
+  §4's mapping question stands for it. Note that no solid model currently
+  evaluates through the face-centred topology - `linGeomTotalDispSolid` uses
+  the cell-centred and quadrature paths - so this rule is written to match
+  legacy but is not yet exercised end to end by a tutorial.
+* **A prescribed field is read at old time.** A shadow state aliases its
+  parent's old-time fields and owns current-time fields that begin empty, on
+  the premise that a law reads history and writes current values. A prescribed
+  input breaks that premise: it is read, not written. Holding it at both times
+  and reading the old one puts it back inside the premise, so a tangent query
+  evaluated into a shadow sees the prescribed value rather than a silently
+  zero field.
+* **A scratch state gets defaults but no prescribed read.** The faces of an
+  `empty` patch are addressed through the `polyPatch`, because the `fvPatch`
+  has none, so there is no patch field to read a prescribed value from. They
+  take their declared default. Those faces take no part in the discretisation,
+  so nothing downstream sees the difference.
+
+What is deliberately *not* reproduced: legacy's point-field `correct` aborts
+outright when `sigma0` is non-zero. The framework evaluates points like any
+other integration point, so that case now runs. That is a capability legacy
+lacked rather than a behaviour change to a case that worked before.
+
 ### 8a.5 Why kinematics and inputs stay separate, and what goes in inputs
 
 `kin` and `inputs` look like the same thing: both immutable, both per-call,

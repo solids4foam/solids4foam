@@ -62,6 +62,229 @@ prepare_case() {
 
 }
 
+# Run this case twice with an initial stress, once through the legacy
+# mechanical law and once through the constitutive framework, and require the
+# two to agree exactly.
+#
+# sigma0 is the first prescribed state the framework declares. It reaches the
+# law by two routes - a uniform value in the law's dictionary, and a field the
+# case supplies - and both are checked here because they are read by different
+# code. A non-uniform field is used for the second so that a wrong
+# cell-to-integration-point map changes the answer, which a uniform field
+# would hide.
+#
+# This case is the host because it converges tightly enough for the two arms
+# to agree to the last bit, which makes the check a statement about the model
+# rather than about a solver tolerance
+run_sigma0_comparison() {
+    local mode="$1"
+    local legacy_dir="${REGRESSION_ROOT}/sigma0Legacy-${mode}"
+    local framework_dir="${REGRESSION_ROOT}/sigma0Framework-${mode}"
+    local d
+
+    for d in "${legacy_dir}" "${framework_dir}"; do
+        rm -rf "${d}"
+        mkdir -p "${d}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${d}/"
+        done
+
+        if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
+            # A uniform initial stress given where the material is given
+            sed -i \
+                's|^\( *\)nu  *nu .*|&\n\1sigma0 sigma0 [1 -1 -2 0 0 0 0] (10e6 2e6 -3e6 15e6 0 -5e6);|' \
+                "${d}/constant/mechanicalProperties"
+        fi
+    done
+
+    # The two arms differ in this one entry and nothing else. It goes inside
+    # the model's coeffs block, which is where the solid model looks for it;
+    # at the top level it is read by nothing and silently ignored
+    sed -i \
+        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+        "${framework_dir}/constant/solidProperties"
+
+    for d in "${legacy_dir}" "${framework_dir}"; do
+        (
+            cd "${d}" || exit 1
+
+            solids4Foam::convertCaseFormat . > log.convert 2>&1
+
+            blockMesh > log.blockMesh 2>&1 || exit 1
+
+            if [[ "${mode}" == "field" || "${mode}" == "both" ]]; then
+                local nCells
+                nCells=$(grep -h "nCells:" log.blockMesh | tail -n 1 \
+                    | awk '{print $2}')
+
+                if [[ -z "${nCells}" ]]; then
+                    exit 1
+                fi
+
+                {
+                    echo "FoamFile"
+                    echo "{"
+                    echo "    version     2.0;"
+                    echo "    format      ascii;"
+                    echo "    class       volSymmTensorField;"
+                    echo "    location    \"0\";"
+                    echo "    object      sigma0;"
+                    echo "}"
+                    echo
+                    echo "dimensions      [1 -1 -2 0 0 0 0];"
+                    echo
+                    echo "internalField   nonuniform List<symmTensor>"
+                    echo "${nCells}"
+                    echo "("
+                    awk -v n="${nCells}" 'BEGIN {
+                        for (i = 0; i < n; i++)
+                        {
+                            f = 1e7*sin(0.01*i)
+                            printf "(%g %g %g %g %g %g)\n", \
+                                f, 0.3*f, -0.2*f, 0.5*f, 0.1*f, -0.4*f
+                        }
+                    }'
+                    echo ")"
+                    echo ";"
+                    echo
+                    echo "boundaryField"
+                    echo "{"
+
+                    # A constraint patch - symmetry, empty, wedge - only takes
+                    # the patch field of its own kind, so these entries come
+                    # from the mesh rather than from a catch-all
+                    awk '
+                        /^\(/ { inList = 1; next }
+                        /^\)/ { inList = 0 }
+                        inList && /^[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*$/ {
+                            name = $1
+                            next
+                        }
+                        inList && /^[ \t]*type[ \t]/ {
+                            t = $2
+                            sub(";", "", t)
+                            if (name == "") next
+                            if (t == "patch" || t == "wall")
+                            {
+                                t = "zeroGradient"
+                            }
+                            printf "    %s\n    {\n        type            %s;\n    }\n", \
+                                name, t
+                            name = ""
+                        }
+                    ' constant/polyMesh/boundary
+
+                    echo "}"
+                } > 0/sigma0
+            fi
+
+            solids4Foam > log.solids4Foam 2>&1 || exit 1
+        ) || { echo "FAIL: sigma0 ${mode} arm could not run"; return 1; }
+    done
+
+    # Each arm must have taken the path it was set up for, or the comparison
+    # is between two copies of the same thing and proves nothing
+    if grep -q "mechanicalConstitutiveLawManager" \
+        "${legacy_dir}/log.solids4Foam"
+    then
+        echo "FAIL: the legacy sigma0 ${mode} arm used the framework"
+        return 1
+    fi
+
+    if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
+        if ! grep -q "Uniform initial stress sigma0" \
+            "${framework_dir}/log.solids4Foam"
+        then
+            echo "FAIL: the framework arm did not read sigma0 from the dict"
+            return 1
+        fi
+    else
+        if ! grep -q "Prescribed state 'sigma0'" \
+            "${framework_dir}/log.solids4Foam"
+        then
+            echo "FAIL: the framework arm did not read the sigma0 field"
+            return 1
+        fi
+    fi
+
+    local t
+    t=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
+
+    if [[ -z "${t}" ]]; then
+        echo "FAIL: sigma0 ${mode} arms produced no result"
+        return 1
+    fi
+
+    if [[ ! -f "${legacy_dir}/${t}/D" || ! -f "${framework_dir}/${t}/D" ]]; then
+        echo "FAIL: sigma0 ${mode} arms produced no D field"
+        return 1
+    fi
+
+    # sigma0 must actually have changed the answer, or agreement is vacuous
+    if diff -q "${legacy_dir}/${t}/D" "${SIGMA0_BASELINE_D}" > /dev/null 2>&1
+    then
+        echo "FAIL: sigma0 ${mode} left the solution unchanged"
+        return 1
+    fi
+
+    if ! diff -q "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D" > /dev/null
+    then
+        echo "FAIL: sigma0 ${mode} legacy and framework differ"
+        return 1
+    fi
+
+    # Legacy reads a sigma0 field and then assigns any dictionary sigma0 over
+    # the whole of it, so when a case carries both, the dictionary is what
+    # takes effect. Checking that here is the only way to see that the
+    # framework resolves the two the same way round
+    if [[ "${mode}" == "dict" ]]; then
+        SIGMA0_DICT_D="${legacy_dir}/${t}/D"
+    elif [[ "${mode}" == "both" ]]; then
+        if ! diff -q "${legacy_dir}/${t}/D" "${SIGMA0_DICT_D}" > /dev/null
+        then
+            echo "FAIL: sigma0 both: the field was not overridden by the dict"
+            return 1
+        fi
+    fi
+
+    echo "PASS: sigma0 ${mode} legacy and framework agree exactly"
+    return 0
+}
+
+# A run with no initial stress, to show that the ones with it are different
+make_sigma0_baseline() {
+    local d="${REGRESSION_ROOT}/sigma0Baseline"
+    local item base_item
+
+    rm -rf "${d}"
+    mkdir -p "${d}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${d}/"
+    done
+
+    (
+        cd "${d}" || exit 1
+        solids4Foam::convertCaseFormat . > log.convert 2>&1
+        blockMesh > log.blockMesh 2>&1 || exit 1
+        solids4Foam > log.solids4Foam 2>&1 || exit 1
+    ) || return 1
+
+    local t
+    t=$(foamListTimes -case "${d}" -latestTime 2>/dev/null | tail -n 1)
+    SIGMA0_BASELINE_D="${d}/${t}/D"
+}
+
 CHECK_ONLY=false
 
 for arg in "$@"; do
@@ -190,6 +413,19 @@ else
 
     if grep -q "highOrderResidual true" "${CASE_DIR}/constant/solidProperties" \
         && ! check_high_order_errors; then
+        failures=$((failures + 1))
+    fi
+fi
+
+if [ "$CHECK_ONLY" = false ]; then
+    if make_sigma0_baseline; then
+        for sigma0_mode in dict field both; do
+            if ! run_sigma0_comparison "${sigma0_mode}"; then
+                failures=$((failures + 1))
+            fi
+        done
+    else
+        echo "FAIL: could not run the sigma0 baseline"
         failures=$((failures + 1))
     fi
 fi

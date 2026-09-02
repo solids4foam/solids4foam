@@ -193,6 +193,20 @@ private:
         //  the end of every time step
         mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
 
+        //- Copy one compact list-list onto another.
+        //  OpenFOAM.org gives CompactListList no copy constructor and no copy
+        //  assignment, so the two pieces of storage are copied by hand. The
+        //  row offsets and the flat values are the whole of it
+        static void copyQuadGradient
+        (
+            const CompactListList<tensor>& src,
+            CompactListList<tensor>& dst
+        )
+        {
+            dst.offsets() = src.offsets();
+            dst.m() = src.m();
+        }
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -753,10 +767,9 @@ public:
             {
                 if (gradDQuad0Ptr_.empty())
                 {
-                    gradDQuad0Ptr_.set
-                    (
-                        new CompactListList<tensor>(gradDQuad())
-                    );
+                    gradDQuad0Ptr_.set(new CompactListList<tensor>());
+
+                    copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
                 }
 
                 return autoPtrRef(gradDQuad0Ptr_);
