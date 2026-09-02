@@ -538,12 +538,81 @@ where the legacy dictionary already puts them. The manager reads them from the
 material entry and forms the correction per integration point from the
 declared live input.
 
-**Existing dictionaries keep working.** The constraint is no change to case
-dictionaries, so the manager should accept the legacy nested shape - a
-`thermoMechanicalLaw` with its `alpha`, `T0` and inner `mechanicalLaw`
-sub-dictionary - and translate it internally into the inner law plus a
-declared thermal eigenstrain. Users write what they always wrote; the
-framework stops pretending it is a material.
+**The dictionary should change too, with the old one deprecated rather than
+broken.** The nested shape exists only because the decorator existed. Once the
+correction is not a material, writing it as one is actively misleading:
+
+```cpp
+    // Legacy: the material is a wrapper, and the actual material is buried
+    material0
+    {
+        type            thermoMechanicalLaw;
+        alpha           alpha [0 0 0 -1 0 0 0] 1e-5;
+        T0              T0 [0 0 0 1 0 0 0] 300;
+
+        mechanicalLaw
+        {
+            type        linearElastic;
+            rho         rho [1 -3 0 0 0 0 0] 7800;
+            E           E [1 -1 -2 0 0 0 0] 200e9;
+            nu          nu [0 0 0 0 0 0 0] 0.3;
+        }
+    }
+```
+
+```cpp
+    // Proposed: the material is the material, and the couplings are listed
+    material0
+    {
+        type            linearElastic;
+        rho             rho [1 -3 0 0 0 0 0] 7800;
+        E               E [1 -1 -2 0 0 0 0] 200e9;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+
+        eigenstrain
+        {
+            thermal
+            {
+                type    thermalExpansion;
+                alpha   alpha [0 0 0 -1 0 0 0] 1e-5;
+                T0      T0 [0 0 0 1 0 0 0] 300;
+                input   T;
+            }
+        }
+    }
+```
+
+and correspondingly for the pore pressure, as an output correction:
+
+```cpp
+        additiveStress
+        {
+            pore
+            {
+                type    porePressure;
+                b       0.9;
+                p0      p0 [1 -1 -2 0 0 0 0] 0;
+                input   p;
+            }
+        }
+```
+
+Four reasons the new form is better, not merely different:
+
+* `type` names the material again. `grep 'type linearElastic'` finds every
+  linear elastic material, which nesting currently hides.
+* Corrections compose. Thermal expansion *and* swelling is two entries; in the
+  nested form it is two levels of wrapper, and the nesting implies an ordering
+  that does not physically exist.
+* Each correction names the live input it reads, so what the solid model must
+  supply is declared rather than implied by the law's type.
+* It separates the two directions that §8a.2b showed are different: an
+  eigenstrain changes what the material sees, an additive stress does not.
+  The nested form cannot express that distinction at all.
+
+The legacy shape is still accepted and translated internally, with a
+deprecation warning naming the equivalent new entry, so existing cases keep
+running and their owners are told what to write instead.
 
 **Scope, honestly stated.** Both legacy laws are linear-geometry only, so an
 additive eigenstrain is the right formulation for every case that exists. It
