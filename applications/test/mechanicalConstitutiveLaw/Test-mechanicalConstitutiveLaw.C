@@ -215,6 +215,7 @@ int main(int argc, char *argv[])
     bool allStVenantKirchhoff = true;
     bool allMooneyRivlin = true;
     bool allNeoHookeanPlastic = true;
+    bool allViscoelastic = true;
     forAll(lawEntries, lawI)
     {
         const word type(lawEntries[lawI].dict().lookup("type"));
@@ -242,6 +243,11 @@ int main(int argc, char *argv[])
         if (type != "neoHookeanElasticMisesPlastic")
         {
             allNeoHookeanPlastic = false;
+        }
+
+        if (type != "viscousHookeanElastic")
+        {
+            allViscoelastic = false;
         }
     }
 
@@ -663,6 +669,110 @@ int main(int argc, char *argv[])
     }
 
     // ---------------------------------------------------------------------
+    // 0b. Viscoelastic relaxation, and the time increment reaching the law
+    //
+    // This is the first law whose response depends on the time increment, so
+    // it is the first end-to-end check that dt travels through the inputs
+    // object. Two evaluations are made from the same rest state:
+    //
+    //   dt -> 0   no relaxation, so every Maxwell arm carries the full
+    //             deviatoric stress and the response is the instantaneous
+    //             elastic one
+    //   dt -> inf every arm has relaxed to nothing and only the equilibrium
+    //             branch remains
+    //
+    // The ratio of the two deviatoric stresses is therefore exactly
+    // gammaInf = EInfinity/(EInfinity + sum(E)), which the case dictionary
+    // gives, so this is an exact target rather than a bound.
+    //
+    // This must run before any other section, because both evaluations have
+    // to start from the same rest state, and a later section commits a time
+    // step after which the old-time state is no longer rest
+    // ---------------------------------------------------------------------
+
+    if (allViscoelastic)
+    {
+        Info<< nl << "0b. Viscoelastic relaxation" << endl;
+
+        const dictionary& lawDict = lawEntries[0].dict();
+
+        const scalar EInf =
+            dimensionedScalar(lawDict.lookup("EInfinity")).value();
+        const scalarList EArms(lawDict.lookup("E"));
+
+        scalar E0 = EInf;
+        forAll(EArms, i)
+        {
+            E0 += EArms[i];
+        }
+
+        const scalar gammaInf = EInf/E0;
+
+        // A uniform deviatoric deformation
+        forAll(gradD, cellI)
+        {
+            gradD[cellI] = tensor(1e-5, 0, 0, 0, -1e-5, 0, 0, 0, 0);
+        }
+        gradD.correctBoundaryConditions();
+
+        volSymmTensorField sigmaInst
+        (
+            IOobject
+            (
+                "sigmaInst",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+        );
+
+        volSymmTensorField sigmaLong("sigmaLong", sigmaInst);
+
+        const scalar tauMin = min(scalarList(lawDict.lookup("relaxationTimes")));
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, 1e-8*tauMin, sigmaInst
+        );
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, 1e8*tauMin, sigmaLong
+        );
+
+        scalar maxErr = 0.0;
+        scalar maxInst = 0.0;
+        forAll(sigmaInst, cellI)
+        {
+            const scalar mInst = mag(dev(sigmaInst[cellI]));
+            const scalar mLong = mag(dev(sigmaLong[cellI]));
+
+            maxInst = max(maxInst, mInst);
+
+            if (mInst > SMALL)
+            {
+                maxErr = max(maxErr, mag(mLong/mInst - gammaInf));
+            }
+        }
+
+        reportError
+        (
+            "relaxes from the instantaneous to the long-term modulus",
+            maxErr,
+            1e-6
+        );
+
+        // And it must actually have relaxed, or the ratio check is vacuous
+        report
+        (
+            "the instantaneous and long-term responses differ",
+            maxInst > SMALL && gammaInf < 0.99
+        );
+    }
+
     // 1. Closed-form stress and scalar tangent through the volField overload
     // ---------------------------------------------------------------------
 
@@ -1276,6 +1386,11 @@ int main(int argc, char *argv[])
             dualTopo, dualGradD, dualGradD0, dt, sigmaB
         );
 
+        // A viscoelastic law relaxes, so its stress at a given strain is a
+        // function of how much time has passed. Time-independence is the
+        // wrong property to demand of it
+        if (!allViscoelastic)
+        {
         reportError
         (
             "the same strain gives the same stress across a committed "
@@ -1283,6 +1398,7 @@ int main(int argc, char *argv[])
             relativeDifference(sigmaA, sigmaB),
             1e-12
         );
+        }
     }
 
     // ---------------------------------------------------------------------

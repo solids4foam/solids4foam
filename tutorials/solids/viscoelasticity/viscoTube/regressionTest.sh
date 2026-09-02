@@ -21,6 +21,7 @@ SIGMA_MAX=1e8
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 
 echo "============================================================"
 echo "viscoTube regression test"
@@ -28,6 +29,40 @@ echo "epsilonEq expected: ${EPS_MIN} < eps < ${EPS_MAX}"
 echo "sigmaEq expected  : ${SIGMA_MIN} < sigma < ${SIGMA_MAX}"
 echo "============================================================"
 echo
+
+# Exercise the framework's own checks on this case. Its law is
+# viscousHookeanElastic, the first law whose response depends on the time
+# increment, so this is the runtime coverage of the inputs object carrying dt
+run_constitutive_test() {
+    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
+        return 0
+    fi
+
+    if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
+        echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
+        return 0
+    fi
+
+    if ( cd "${CASE_DIR}" && Test-mechanicalConstitutiveLaw \
+            > "${CONSTITUTIVE_LOGFILE}" 2>&1 )
+    then
+        local n_passed
+        n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
+
+        if (( n_passed == 0 )); then
+            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
+            return 0
+        fi
+
+        echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
+        return 0
+    fi
+
+    echo "FAIL: mechanicalConstitutiveLaw checks"
+    grep 'FAIL:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true
+    return 1
+}
 
 prepare_case() {
     rm -rf "${CASE_DIR}"
@@ -104,6 +139,10 @@ else
 fi
 
 # Clean case again
+if ! run_constitutive_test; then
+    failures=$((failures + 1))
+fi
+
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 echo
