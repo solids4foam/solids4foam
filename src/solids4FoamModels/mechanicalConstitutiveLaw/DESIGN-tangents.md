@@ -2297,6 +2297,36 @@ An independent line-by-line review of the two implementations had passed the
 plastic law as faithful, and was right to: defect 2 is not in the law at all,
 it is in what the solid model hands it.
 
+### 8.23 An over-broad fork guard left boundary values uncorrected on .org
+
+With the two defects of §8.22 fixed, `perforatedPlate` agreed exactly on
+OpenFOAM.com and still differed by 1.8e-3 on OpenFOAM.org. A difference that
+appears on one fork only is not a model difference, so the search was over the
+fork-guarded code, of which the manager had exactly five sites:
+
+```text
+    #ifndef OPENFOAM_ORG
+        stress.correctBoundaryConditions();
+    #endif
+```
+
+Removing all five and compiling on OpenFOAM-9 shows what the guard is really
+for: that fork's `fvsPatchField` has no `evaluate()`, so
+`correctBoundaryConditions()` does not compile for a **surface** field. It
+compiles perfectly well for a volField.
+
+Four of the five sites were volFields - two scalar tangents and two cell-centred
+stresses - and were guarded needlessly, so on OpenFOAM.org the framework simply
+never corrected its boundary values. The one surface-field site keeps the guard,
+now with a comment saying why. With that, `perforatedPlate` agrees exactly on
+OpenFOAM.org too, at the same values as OpenFOAM.com.
+
+The lesson is about the shape of the guard rather than the bug. A guard written
+as "not on this fork" hides *why*, so it gets copied to the next site that
+looks similar - which is how the finite-strain tangent added during this work
+inherited it. A guard that names its reason, as this one now does, does not
+spread.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

@@ -1745,10 +1745,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
         }
     }
 
-#ifndef OPENFOAM_ORG
     // Sync the coupled patches
     scalarTangent.correctBoundaryConditions();
-#endif
 }
 
 
@@ -1816,10 +1814,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
         }
     }
 
-#ifndef OPENFOAM_ORG
     // Sync the coupled patches
     scalarTangent.correctBoundaryConditions();
-#endif
 }
 
 
@@ -1965,14 +1961,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     }
 
     // Update boundaries including syncing coupled boundaries
-#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
-#endif
 }
 
 
@@ -2271,6 +2265,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
+// This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
+// has no evaluate(), so correctBoundaryConditions() does not compile for a
+// SURFACE field there. It compiles and is needed for volFields, where the
+// guard was previously applied too and silently left the boundary values
+// uncorrected on that fork
 #ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
@@ -2665,14 +2664,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     }
 
     // Update boundaries including syncing coupled boundaries
-#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
-#endif
 }
 
 
