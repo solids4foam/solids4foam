@@ -471,6 +471,97 @@ interface. Either material properties become a per-integration-point response,
 or the thermal correction is admitted to be law-specific rather than a general
 decorator.
 
+### 8a.2b A different answer: no decorator laws at all
+
+§8a.2 assumed the legacy shape - a law owning a sub-law - and asked how to
+make its state work. Having costed that, the better question is whether the
+shape is right. It is not, and the two cases that motivated it are better
+served without it.
+
+**What the two laws are actually doing.**
+
+`thermoMechanicalLaw` delegates, then subtracts `3 K alpha (T - T0) I`, using
+the *sub-law's* bulk modulus. That is a thermal eigenstrain expressed as a
+stress: the material responds to the mechanical part of the strain,
+`sigma = C : (eps - eps0)` with `eps0 = alpha (T - T0) I`.
+
+`poroMechanicalLaw` delegates on an effective stress it seeds itself, then
+returns `sigmaEff - b (p + p0) I`. That is Terzaghi: the *material* responds to
+effective stress, and total stress is what the momentum equation needs.
+
+Both are corrections around a pure law. Neither is a new material.
+
+**Proposal: the manager applies declared corrections around a pure law.**
+
+A material entry may declare, alongside its law, an input correction and an
+output correction. The manager applies them; the law is untouched and stays a
+pure function of the kinematics it is handed.
+
+<!-- markdownlint-disable MD013 -->
+
+| Correction | Applied | Used for |
+|---|---|---|
+| Eigenstrain `eps0` | subtracted from the strain before the law sees it | thermal expansion, swelling |
+| Additive stress | added to the law's stress afterwards | pore pressure, active tension |
+
+<!-- markdownlint-enable MD013 -->
+
+`thermoMechanicalLaw` becomes `linearElastic` plus a thermal eigenstrain.
+`poroMechanicalLaw` becomes any law plus an additive `-b (p + p0) I`. Neither
+needs a sub-law, a child state, a shadow tree, or prefixed state names, and the
+whole of §8a.2 evaporates.
+
+**Why this is not a dodge.**
+
+* It is exact for the case that exists. For isotropic linear elasticity,
+  `C : eps0 = 2 mu dev(eps0) + K tr(eps0) I`, and `eps0` is spherical, so
+  `dev(eps0) = 0` and `tr(eps0) = 3 alpha (T - T0)`, giving
+  `C : eps0 = 3 K alpha (T - T0) I` - identically the legacy correction. A
+  linear thermoelastic case reproduces its legacy result exactly.
+* It is *more* correct where the two differ. Subtracting a stress after the
+  fact is equivalent to an eigenstrain only for a linear law. For a plastic or
+  hyperelastic sub-law the legacy correction is wrong, because the yield
+  condition should see the mechanical strain. Applying the eigenstrain on the
+  input fixes that.
+* It satisfies poro's real requirement without special pleading. The law
+  computes the effective stress from the strain, so its own history is driven
+  by effective stress, which is exactly why the legacy law kept a separate
+  `sigmaEff` field. Here that field is just the law's output, and the hidden
+  initialisation contract of §8a.3 disappears.
+* Neither correction perturbs the Jacobian: both are strain-independent, so
+  the tangent is the law's own. That matters, because a decorator would have
+  had to decide what its tangent was.
+
+**Where the coefficients live.** With the manager applying the corrections,
+`alpha`, `b` and `p0` stay with the material, which is where they belong and
+where the legacy dictionary already puts them. The manager reads them from the
+material entry and forms the correction per integration point from the
+declared live input.
+
+**Existing dictionaries keep working.** The constraint is no change to case
+dictionaries, so the manager should accept the legacy nested shape - a
+`thermoMechanicalLaw` with its `alpha`, `T0` and inner `mechanicalLaw`
+sub-dictionary - and translate it internally into the inner law plus a
+declared thermal eigenstrain. Users write what they always wrote; the
+framework stops pretending it is a material.
+
+**Scope, honestly stated.** Both legacy laws are linear-geometry only, so an
+additive eigenstrain is the right formulation for every case that exists. It
+does not extend to finite strain, where a thermal deformation is
+multiplicative, `F = F_e F_theta`. If a finite-strain thermoelastic law is
+ever wanted, it needs the multiplicative form, and this section should be
+revisited rather than stretched.
+
+**What is given up.** Arbitrary nesting of decorators. The one case that might
+want genuine composition is `electroMechanicalLaw`, whose active tension is a
+stress the material generates rather than a coupling term - and even that fits
+the additive-stress correction if the activation and fibre direction are
+inputs. If something ever needs two materials evaluated over the same
+integration points and summed, that is *parallel* composition, and the manager
+can express it by giving each sub-law an ordinary law state slot, reusing the
+per-law machinery it already has. That is a much smaller thing than a
+decorator with child states, and it is not needed yet.
+
 ### 8a.3 What is still unresolved
 
 * **Coupling on a shared topology is not an input policy, it is physics.** §4
