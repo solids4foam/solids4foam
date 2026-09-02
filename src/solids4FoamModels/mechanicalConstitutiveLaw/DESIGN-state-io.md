@@ -370,79 +370,141 @@ and none of which depend on the restart question being settled.
 
 ## 8a. Two categories this design does not yet cover
 
-Migrating the solid models one at a time has now surfaced two shapes of law
-that the sections above cannot express. Both were found the same way: by
-asking which law each remaining tutorial actually uses.
+Migrating the solid models one at a time surfaced two shapes of law that the
+sections above cannot express. Both were found the same way: by asking which
+law each remaining tutorial actually uses.
 
-### 8a.1 Live coupling fields
+The first draft of this section proposed carrying live inputs in the state
+object. **That was wrong**, and review killed it on a concrete point rather
+than a stylistic one. It is rewritten below, with the refuted version kept in
+§8a.4 because the reason it fails is the most useful thing here.
+
+### 8a.1 Live coupling inputs
 
 `thermoMechanicalLaw` subtracts `3 K alpha (T - T0) I` from the stress its
 sub-law computed; `poroMechanicalLaw` subtracts `b (p + p0) I`. Neither `T` nor
 `p` is kinematics, and neither is prescribed state in the sense of §4: they are
-*solved every time step*, by another equation in the same solid model, and must
-be current at the moment the law is evaluated.
+*solved every time step*, by another equation, and must be current at the
+moment the law is evaluated.
 
 So there is a third category alongside persistent (R1) and prescribed (R2, R3):
 
-**R4. A field the solid model owns and re-supplies each update, which a law
-reads but never writes.**
+**R4. A value the solid model owns and re-supplies each evaluation, which a law
+reads and never writes.**
 
-Temperature and pore pressure are the two present cases;
 `electroMechanicalLaw` needs an activation field, and `viscousHookeanElastic`
-needs the time increment it already gets.
+needs the time increment, which it already receives.
 
-**Proposal.** Do not change `evaluate`. A law declares a coupling field the
-same way it declares any other state field, and the solid model hands the
-manager the current values before each update:
+**Decision: an inputs object, passed to `evaluate`.**
 
 ```c++
-    manager.setCouplingField("T", T);      // volScalarField on the primary mesh
+    virtual void evaluate
+    (
+        const smallStrainMechanicalConstitutiveLawKinematics& kin,
+        const mechanicalConstitutiveLawInputs& inputs,
+        mechanicalConstitutiveLawState& state,
+        mechanicalConstitutiveLawResponse& response
+    ) const;
 ```
 
-The manager scatters cell values to the integration points of every law that
-declared `T`, using the same broadcast and the same shared-topology mapping
-policy §4 already defines for prescribed inputs. The law then reads `T` from
-its state exactly like anything else, and remains a pure function of
-(kinematics, state).
+`mechanicalConstitutiveLawInputs` is immutable and per-call. It holds
+integration-point views, not `GeometricField`s: the manager scatters a
+`volScalarField` once and hands the law a `UIndirectList`-shaped view, so the
+law still never sees a mesh, a registry or a field type.
 
-**Alternative rejected.** Passing a dictionary of auxiliary fields into
-`evaluate`. That changes the signature every law implements in order to serve a
-minority of them, and it puts field-shaped objects back into the one interface
-this framework exists to keep free of them.
-
-**Open point.** A coupling field must be *stale-proof*: if a solid model
-forgets to set it, the law silently uses whatever was there last, which is the
-kind of error that produces plausible wrong answers. The manager should track
-whether each declared coupling field was set in the current update and fail
-loudly if not, rather than defaulting.
+This costs a one-time signature change on every law. It buys the property that
+matters: **every evaluation, including every shadow and every
+finite-difference perturbation, receives the live values by construction.**
+There is no setter, no ordering protocol, no epoch counter, and no way to be
+stale.
 
 ### 8a.2 Composite laws
 
 `thermoMechanicalLaw` and `poroMechanicalLaw` are decorators: they construct a
-sub-law, delegate the stress to it, and then correct the result. So are
-`electroMechanicalLaw` and, in effect, the plastic laws' elastic predictors.
-Nothing in this framework yet says how a law owns another law.
+sub-law, delegate, and correct the result. So is `electroMechanicalLaw`.
+Nothing in this framework says how a law owns another law.
 
-**Proposal.** A composite constructs its sub-law with
-`mechanicalConstitutiveLaw::New` on a sub-dictionary and owns it outright. The
-manager continues to see exactly one law per material, with one state. The
-composite forwards `declareState` to its sub-law, prefixing the names it
-declares so two laws in a stack cannot collide, and forwards `evaluate`, then
-modifies `response.stress()` in place, which is already a mutable view.
+A composite constructs its sub-law with `mechanicalConstitutiveLaw::New` on a
+sub-dictionary and owns it. The manager continues to see one law per material.
+Modifying `response.stress()` after delegating works as intended: it is a
+non-const view over the caller's storage, so there is no copy to lose.
 
-Two consequences worth stating:
+Three things the first draft got wrong or missed.
 
-* The finite-difference fourth-order tangent of the base class then measures
-  the *composite's* response, not the sub-law's, which is what a solver wants.
-* The scalar tangent must come from the composite, not be silently inherited:
-  a thermal correction that is a pure pressure shift does not change the
-  tangent, but a poro correction with a stress-dependent sub-law can.
+**Prefixed state names do not work.** Declaring `sub.epsilonP` on the parent's
+behalf does not make the sub-law's own `state.getSymmTensorField("epsilonP")`
+lookups qualified. A declaration-only prefix allocates fields nobody reads.
+What is needed is either a scoped facade that prefixes every *lookup*, or a
+child state object per layer.
 
-**Open point.** Whether the state should be namespaced by prefixing names, as
-proposed, or by giving each law in a stack its own state object. Prefixing is
-less machinery; separate objects are harder to get wrong. This is the same
-question the shadow state answered for tangent queries, and it should probably
-be answered the same way.
+**Child states need recursive lifecycle support.** They are the safer model,
+but the manager currently shadows exactly one flat state per law, plus its
+separately stored boundary states. Child states must be allocated, restarted,
+written, rolled over to old time, and shadowed *as a tree*. Without that,
+either the rollover leaks across layers or a tangent query evaluates the
+sub-law against the wrong state. This is the real cost of composites and should
+be paid deliberately.
+
+**The sub-law's material properties are not reachable.** `kappa()` does exist
+on the interface, so the first draft was wrong to say no properties are
+exposed, but it returns a single `dimensionedScalar`. The legacy thermal
+correction uses a sub-law bulk modulus that may be field-valued, and
+interpolates it to faces. A general decorator therefore cannot express a
+state-, point- or material-dependent thermal stiffness through today's
+interface. Either material properties become a per-integration-point response,
+or the thermal correction is admitted to be law-specific rather than a general
+decorator.
+
+### 8a.3 What is still unresolved
+
+* **Coupling on a shared topology is not an input policy, it is physics.** §4
+  lets a prescribed value on a `faceCentred` or `pointCentred` point be taken
+  from the owner cell when two materials disagree. For a temperature or a pore
+  pressure that choice changes the constitutive response on one side of a
+  material interface. It needs its own answer, not a reused one.
+* **Boundary states are not covered.** The manager keeps per-patch states, and
+  a coupling input must reach them with the field's *patch* values. Broadcasting
+  internal cell values to a boundary is wrong for exactly the thermal and
+  pressure cases this is for. §5a already flags boundary state as a blocker.
+* **Not every source is a field on the primary mesh.** The legacy poro law
+  looks its pressure up in a configured registry or region, and the legacy
+  thermal law can read and map a field from another mesh entirely. Assuming
+  "a `volField` on the solid mesh" silently removes those capabilities unless
+  the solid model owns the inter-region mapping and hands over the result.
+* **`poroMechanicalLaw` has hidden state.** It is not "sub-law stress minus
+  pressure": it owns a separate effective-stress field, seeds it once from the
+  incoming *total* stress as `sigmaEff = sigma + b (p + p0) I`, and passes the
+  effective stress to the sub-law, precisely so that a stress-dependent
+  strength sees effective and not total stress. A coupling input alone does not
+  reproduce that initialisation contract, and migrating it naively would change
+  the behaviour of any stress-dependent sub-law.
+* **Restart and iteration ordering.** Knowing an input was supplied this update
+  does not establish that it was supplied *after* the equation that produces it
+  was solved. The inputs object makes staleness impossible within an
+  evaluation; it does not by itself order the coupling loop.
+
+### 8a.4 The rejected design, and why it is worth recording
+
+The first draft proposed carrying `T` and `p` in the state object: the solid
+model would push them in through `manager.setCouplingField("T", T)` before each
+update, the law would read them like any other state field, and `evaluate`
+would keep its signature. A "was this set during this update?" flag would catch
+a solid model that forgot.
+
+It cannot work, for a reason that is specific and checkable rather than
+aesthetic. **A shadow state aliases the parent's old-time fields and owns its
+own, fresh, current-time fields.** That is what makes a tangent query safe. But
+it means a coupling value written into current-time state is simply *not there*
+inside the shadow: every tangent query, and every finite-difference
+perturbation, would evaluate with a missing input. Putting it in old-time state
+instead is worse - it disguises a current input as history, and `storeOldTime()`
+would then commit it.
+
+The staleness flag was the tell. It was compensating for the wrong ownership
+model: the design needed a protocol enforced by convention, outside the type
+system, to keep a mutable manager-held copy correct. The inputs object removes
+the need for the protocol instead of policing it. **Where a design needs a rule
+that says "remember to call this first", the ownership is usually wrong.**
 
 ## 9. Open questions
 
