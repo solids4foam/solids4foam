@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
@@ -1811,6 +1812,53 @@ void Foam::solidModel::quadInverseAndJacobian
     }
 }
 #endif
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
+(
+    mechanicalConstitutiveLawManager& manager,
+    const tangentRequest req
+) const
+{
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the current gradient, which is zero on a cold start and the
+    // restart value otherwise - the same state dependence the legacy impK()
+    // has, since it is likewise frozen at construction
+    manager.updateScalarTangent
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        req
+    );
+
+    return tImpK;
+}
 
 
 void Foam::solidModel::end()

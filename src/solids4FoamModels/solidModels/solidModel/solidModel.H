@@ -54,6 +54,7 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
@@ -72,6 +73,9 @@ SourceFiles
 
 namespace Foam
 {
+
+// Forward declaration
+class mechanicalConstitutiveLawManager;
 
 /*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
@@ -388,6 +392,19 @@ private:
 
 
 protected:
+
+        //- The implicit stiffness taken from the mechanicalConstitutiveLaw
+        //  framework.
+        //
+        //  Shared by the solid models that offer the framework, because the
+        //  field has to match the legacy one exactly: it is registered under
+        //  "impK" and looked up by that name by the contact and cohesive zone
+        //  models, so its name, dimensions and boundary types are not free
+        tmp<volScalarField> frameworkImpK
+        (
+            mechanicalConstitutiveLawManager& manager,
+            const tangentRequest req
+        ) const;
 
         //- Deformation gradient at the quadrature points, F = I + gradD.T(),
         //  from a total displacement gradient there. Sized and offset to

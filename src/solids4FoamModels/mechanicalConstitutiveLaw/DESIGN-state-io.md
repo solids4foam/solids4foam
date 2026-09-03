@@ -535,6 +535,41 @@ read a zero it cannot tell from a real value, they build their inputs through
 found a real gap during this work: the volField path gathered for its internal
 points but not for its boundary faces.
 
+### 8a.2d Wiring thermalLinGeomSolid, and what the two arms agree to
+
+`thermalLinGeomSolid` now offers the framework, which is what lets the thermal
+tutorials carry the comparison themselves rather than it being done by hand on
+a substituted solid model.
+
+The implicit stiffness is the one piece worth noting. `solidModel` grew a
+shared `frameworkImpK`, because the field is not free to differ: it is
+registered under `impK` and looked up by that name by the contact and cohesive
+zone models, so its name, dimensions and boundary types have to match the
+legacy one exactly. Both solid models that offer the framework now build it
+there rather than each keeping a copy.
+
+The face value differs in how it is reached. The framework has no separate face
+tangent, so `impKf` is the interpolate of the cell field, where the legacy
+model forms a face value directly. For a law whose stiffness does not vary
+within a material these agree; what they do not do is steer the iteration
+identically.
+
+That shows up in what the two arms agree to, and it is worth being precise
+because two of the three thermal tutorials behave differently:
+
+* `slabCooling` runs a single time step and the two arms agree exactly.
+* `hotSphere` runs five, and they agree to about 1.8e-7 of the displacement -
+  the solution tolerance, not the model. Tightening `solutionTolerance` from
+  1e-6 to 1e-10 takes the difference from 8.6e-8 to 1e-8 of the displacement,
+  which is what a convergence-path difference looks like and not what a
+  constitutive difference looks like.
+
+Both tutorials now carry the comparison. `hotSphere` is the one that matters
+for state, being the only one that runs enough steps to roll it over, and it
+writes 14 significant figures while doing so: at the default six the two arms
+differ by 3e-6 simply because that is the last digit written, and the check
+would be measuring the file format.
+
 ### 8a.2b Corrections around a pure law: what survives, and what does not
 
 This section proposed replacing decorator laws entirely: a material would
