@@ -110,7 +110,7 @@ bool poroLinGeomSolid::converged
         );
 
     // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
+    const scalar materialResidual = this->materialResidual();
 
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
@@ -192,8 +192,16 @@ poroLinGeomSolid::poroLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     p_
     (
@@ -238,6 +246,95 @@ poroLinGeomSolid::poroLinGeomSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+Foam::mechanicalConstitutiveLawManager&
+poroLinGeomSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+void poroLinGeomSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impK();
+    }
+
+    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+}
+
+
+Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impKf();
+    }
+
+    // The framework has no separate face tangent: the face value is the
+    // interpolate of the cell one
+    return fvc::interpolate(makeImpK()());
+}
+
+
+Foam::scalar poroLinGeomSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // The framework keeps its own state and rolls it over itself, so it has no
+    // residual of its own to report and contributes nothing to convergence
+    return 0.0;
+}
+
+
+void poroLinGeomSolid::updateTotalFields()
+{
+    solidModel::updateTotalFields();
+
+    // The framework keeps its own state, and its laws may have end-of-step
+    // work or diagnostics
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
+}
 
 
 bool poroLinGeomSolid::evolve()
@@ -336,14 +433,14 @@ bool poroLinGeomSolid::evolve()
         U() = fvc::ddt(D());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
         if (iCorr % 10 == 0)
         {
-            impKf_ = mechanical().impKf();
+            impKf_ = makeImpKf();
         }
     }
     while

@@ -55,6 +55,7 @@ SourceFiles
 #define poroLinGeomSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
@@ -82,6 +83,15 @@ class poroLinGeomSolid
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
+        //- Take the stress from the mechanicalConstitutiveLaw framework
+        //  rather than from the legacy mechanicalModel.
+        //  Declared before impK_ so that the manager exists by the time the
+        //  implicit stiffness is built from it
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
@@ -119,6 +129,27 @@ class poroLinGeomSolid
         dimensionedScalar rKprime_;
 
     // Private Member Functions
+
+        //- The framework, built on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Update the stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
+        //- Construct impK from whichever of the two is in use
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf from whichever of the two is in use
+        tmp<surfaceScalarField> makeImpKf() const;
+
+        //- The material residual. The framework rolls its own state over and
+        //  reports no residual of its own, so it contributes nothing here
+        virtual scalar materialResidual() override;
+
+        //- End-of-step bookkeeping, including the framework's own
+        virtual void updateTotalFields() override;
 
         //- Check if the momentum and pressure equations are converged
         bool converged

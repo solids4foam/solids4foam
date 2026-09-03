@@ -99,6 +99,154 @@ fi
 # Checks
 # ------------------------------------------------------------
 
+# Check the poroMechanicalLaw composite against the legacy law.
+#
+# Both arms replace the shipped effective-stress law with linearElastic. That
+# is deliberate: anisotropicBiotElastic, which this tutorial ships with, has no
+# framework counterpart yet, and its 2-D behaviour is derived from the mesh
+# rather than from its dictionary, so migrating it needs the manager to supply
+# that the way it already supplies planeStress. Substituting a law that exists
+# on both sides puts the poro composite itself under test - the effective
+# stress it carries, its seeding, the pore pressure it gathers - which is the
+# new code here. The shipped configuration is covered by the checks above.
+run_poro_framework_comparison() {
+    local legacy_dir="${REGRESSION_ROOT}/poroLegacy"
+    local framework_dir="${REGRESSION_ROOT}/poroFramework"
+    local dir
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        rm -rf "${dir}"
+        mkdir -p "${dir}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${dir}/"
+        done
+
+        # A sub-law both frameworks have
+        python3 - "${dir}/constant/mechanicalProperties" << 'PYEOF_INNER'
+import io, sys
+p = sys.argv[1]
+s = io.open(p, encoding="utf-8").read()
+i = s.index("effectiveStressMechanicalLaw")
+j = s.index("{", i)
+depth = 0
+k = j
+while True:
+    if s[k] == "{":
+        depth += 1
+    elif s[k] == "}":
+        depth -= 1
+    if depth == 0:
+        break
+    k += 1
+new = ("effectiveStressMechanicalLaw\n        {\n"
+       "            type            linearElastic;\n"
+       "            E               E [1 -1 -2 0 0 0 0] 1.2e7;\n"
+       "            nu              nu [0 0 0 0 0 0 0] 0.2;\n"
+       "        }")
+io.open(p, "w", encoding="utf-8").write(s[:i] + new + s[k+1:])
+PYEOF_INNER
+
+        # Enough digits that the comparison is about the solution and not
+        # about the last figure written
+        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+                "${dir}/system/controlDict"
+        else
+            echo "writePrecision  14;" >> "${dir}/system/controlDict"
+        fi
+    done
+
+    # The two arms differ in this one entry and nothing else
+    sed -i \
+        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+        "${framework_dir}/constant/solidProperties"
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+            echo "FAIL: the poro comparison could not run ${dir}"
+            return 1
+        }
+    done
+
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${framework_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${legacy_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        return 1
+    fi
+
+    local tL tF
+    tL=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
+    tF=$(foamListTimes -case "${framework_dir}" -latestTime 2>/dev/null \
+        | tail -n 1)
+
+    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
+        echo "FAIL: the poro arms reached different times ('${tL}' vs '${tF}')"
+        return 1
+    fi
+
+    if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
+    then
+        echo "FAIL: the poro comparison produced no D field"
+        return 1
+    fi
+
+    if diff -q "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D" > /dev/null
+    then
+        echo "PASS: poro framework and legacy agree exactly"
+        return 0
+    fi
+
+    # Not bit-identical in the file, so measure it
+    local rel
+    rel=$(awk '
+        function abs(x) { return x < 0 ? -x : x }
+        FNR == NR {
+            if ($0 ~ /^\(/)
+            {
+                gsub(/[()]/, ""); n++
+                for (i = 1; i <= NF; i++) a[n, i] = $i
+            }
+            next
+        }
+        {
+            if ($0 ~ /^\(/)
+            {
+                gsub(/[()]/, ""); k++
+                for (i = 1; i <= NF; i++)
+                {
+                    d = abs($i - a[k, i]); if (d > maxd) maxd = d
+                    v = abs(a[k, i]);      if (v > maxv) maxv = v
+                }
+            }
+        }
+        END { printf "%.10g\n", (maxv > 0 ? maxd/maxv : maxd) }
+    ' "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D")
+
+    if awk "BEGIN {exit !(${rel} < 1e-11)}"; then
+        printf "PASS: poro framework and legacy agree to round-off, %.3g\n" \
+            "${rel}"
+        return 0
+    fi
+
+    printf "FAIL: poro framework and legacy differ, relative D diff = %.4g\n" \
+        "${rel}"
+    return 1
+}
+
 failures=0
 
 # --- epsilonEq ---
@@ -120,6 +268,10 @@ else
 fi
 
 echo
+if ! run_poro_framework_comparison; then
+    failures=$((failures + 1))
+fi
+
 if (( failures == 0 ))
 then
     echo "============================================================"

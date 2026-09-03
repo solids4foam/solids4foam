@@ -570,6 +570,51 @@ writes 14 significant figures while doing so: at the default six the two arms
 differ by 3e-6 simply because that is the last digit written, and the check
 would be measuring the file format.
 
+### 8a.2e The second composite: poroMechanicalLaw
+
+`poroMechanicalLaw` is migrated and reproduces the legacy law to round-off on
+`rodAndSeabed`. `poroLinGeomSolid` is wired the same way as the thermal one.
+
+The note in §8a.2 said this law "is not sub-law stress minus pressure", and
+that is right, but it is worth being exact about when it matters. Legacy seeds
+an effective stress once, `sigmaEff = sigma + b(p + p0)I`, and gives the
+sub-law that field to work in. Whether that differs from subtracting the
+pressure from whatever the sub-law writes depends on one thing: whether the
+sub-law reads its incoming stress. No framework law does - every one of them
+computes its stress from the kinematics and its own history - so for the laws
+that exist today the two are numerically identical and the seeding is
+unobservable.
+
+It stops being identical for a sub-law whose strength depends on the stress
+state, which is the Mohr-Coulomb case the legacy comment calls out. So the
+seeding is reproduced rather than simplified away: `sigmaEff` is declared as
+persistent state, seeded per point on first evaluation, and the sub-law is
+given it to work in. "Identical until someone migrates Mohr-Coulomb, then
+silently wrong" is not a trade worth taking.
+
+The sub-law is handed the effective stress through the caller's storage rather
+than through a list of its own - copy in, evaluate, copy out - because the
+response wraps an indirect list and building an identity-indexed view over the
+state field would cost an allocation per evaluation to save two passes.
+
+Two things this does not do.
+
+**The shipped `rodAndSeabed` cannot run on the framework yet.** Its
+effective-stress law is `anisotropicBiotElastic`, which has no framework
+counterpart, and migrating it needs one new thing: its two-dimensional
+behaviour comes from `mesh.solutionD()`, and a framework law is constructed
+from a dictionary with no mesh. The manager already injects `planeStress` into
+each law's dictionary for the same reason, so the mechanism exists; it just has
+to be extended. The tutorial's comparison therefore substitutes `linearElastic`
+in both arms, which puts the composite itself under test - the effective stress
+it carries, the seeding, the pressure gather - and says so where it does it.
+
+**`sigmaEff` is no longer written for post-processing.** The legacy law
+registers it `AUTO_WRITE`, so a case could look at the effective stress
+directly. In the framework it is per-integration-point state and is not a
+registered field, so nothing is written. That is a real capability difference
+rather than an oversight, and it is what §5's state IO would restore.
+
 ### 8a.2b Corrections around a pure law: what survives, and what does not
 
 This section proposed replacing decorator laws entirely: a material would
