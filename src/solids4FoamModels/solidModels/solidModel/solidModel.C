@@ -450,46 +450,37 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
     return hoDict.subDict("pressure");
 }
 
-#ifndef FOAMEXTEND
-void Foam::solidModel::makeDisplacementMLS() const
-{
-    if (!displacementMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
 
+#ifndef FOAMEXTEND
+const Foam::leastSquaresScheme&
+Foam::solidModel::displacementLeastSquares() const
+{
     // Note: the mask is taken from the primary solution field: for incremental
     // solid models this is DD, as it is that field which carries the boundary
     // conditions
-    displacementMLSPtr_.set
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
+
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(incremental() ? DD_ : D_),
-            displacementHighOrderCoeffs()
-        )
+        "displacement",
+        fixedValuePatchMask(incremental() ? DD_ : D_),
+        displacementHighOrderCoeffs()
     );
 }
 
 
-void Foam::solidModel::makePressureMLS() const
+const Foam::leastSquaresScheme&
+Foam::solidModel::pressureLeastSquares() const
 {
-    if (!pressureMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
 
-    pressureMLSPtr_.set
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(p()),
-            pressureHighOrderCoeffs()
-        )
+        "pressure",
+        fixedValuePatchMask(p()),
+        pressureHighOrderCoeffs()
     );
 }
 
@@ -503,7 +494,7 @@ void Foam::solidModel::makeSigmaQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -535,7 +526,7 @@ void Foam::solidModel::makeGradDQuad() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -933,10 +924,6 @@ Foam::solidModel::solidModel
     ),
     thermalPtr_(),
     mechanicalPtr_(),
-#ifndef FOAMEXTEND
-    displacementMLSPtr_(),
-    pressureMLSPtr_(),
-#endif
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -1173,6 +1160,17 @@ Foam::solidModel::solidModel
     fvOptions_(fv::options::New(*meshPtr_))
 #endif
 {
+    // As far as the finite volume discretisation is concerned, the solid mesh
+    // is not a "moving mesh": the solid models which do update the mesh, e.g.
+    // the updated Lagrangian ones, explicitly clear the moving flag after each
+    // mesh motion, as the mesh motion is not a flow of material through the
+    // faces.
+    // On a restart, however, the fvMesh constructor marks the mesh as moving if
+    // it finds a 'meshPhi' or 'V0' field in the start time directory, and then,
+    // for example, backwardD2dt2Scheme stops with a "not implemented for a
+    // moving mesh" error (issue #184). So the flag is cleared here
+    mesh().moving(false);
+
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
     {
@@ -1362,23 +1360,6 @@ Foam::solidModel::solidModel
         stabDict.add("pressure", defaultStabSubDict);
     }
 
-    // Only alpha stabilisation is allowed with high-order residual calculation
-    if (stabDict.found("momentum"))
-    {
-        const dictionary& momentumDict = stabDict.subDict("momentum");
-
-        const word stabType =
-            momentumDict.lookupOrDefault<word>("type", "default");
-
-        if (stabType != "alpha" && highOrderResidual())
-        {
-            FatalErrorInFunction
-                << "Only alpha stabilisation is supported with high-order "
-                << "residual calculation"
-                << abort(FatalError);
-        }
-    }
-
     momentumStabilisationPtr_ =
         stabilisationModel::New
         (
@@ -1386,6 +1367,21 @@ Foam::solidModel::solidModel
             stabDict.subDict("momentum"),
             dimless
         );
+
+    // Only stabilisation models that support high-order residual/Jacobian
+    // calculation are allowed when high-order is enabled
+    if
+    (
+        (highOrderResidual() || highOrderJacobian())
+     && !momentumStabilisationPtr_->supportsHighOrderResidual()
+    )
+    {
+        FatalErrorInFunction
+            << "Momentum stabilisation type "
+            << momentumStabilisationPtr_->type()
+            << " does not support high-order residual or Jacobian "
+            << "calculation" << abort(FatalError);
+    }
 
     pressureStabilisationPtr_ =
         stabilisationModel::New
@@ -1417,9 +1413,6 @@ Foam::solidModel::~solidModel()
     thermalPtr_.clear();
     mechanicalPtr_.clear();
 
-#ifndef FOAMEXTEND
-    clearMovingLeastSquaresData();
-#endif
 }
 
 
@@ -1546,97 +1539,53 @@ void Foam::solidModel::makeGlobalPatches
                 << abort(FatalError);
         }
 
+        // Lookup patch index
+        if (mesh().boundaryMesh().findPatchID(patchNames[i]) == -1)
+        {
+            FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
+                << "Patch " << patchNames[i] << " not found!"
+                << abort(FatalError);
+        }
+
+        // Create the global patch based on the undeformed mesh
+        globalPatchesPtrList_.set
+        (
+            i,
+            new globalPolyPatch(patchNames[i], mesh())
+        );
+
         if (currentConfiguration)
         {
-            // The global patch will create a standAlone zone based on the
-            // current point positions. So we will temporarily move the mesh to
-            // the deformed position, then create the globalPatch, then move the
-            // mesh back
-            const pointField pointsBackup = mesh().points();
-
-            // Lookup patch index
-            const label patchID =
-                mesh().boundaryMesh().findPatchID(patchNames[i]);
-            if (patchID == -1)
-            {
-                FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
-                    << "Patch not found!" << abort(FatalError);
-            }
-
-            // Patch point displacement
-            const vectorField pointDisplacement
-            (
-                pointDorPointDD().internalField(),
-                mesh().boundaryMesh()[patchID].meshPoints()
-            );
-
-            // Calculate deformation point positions
-            const pointField newPoints
-            (
-                mesh().points() + pointDorPointDD().internalField()
-            );
-
-            // Move the mesh to deformed position
-            // const_cast is justified as it is not our intention to permanently
-            // move the mesh; however, it would be better if we did not need it
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-
-            // Create global patch based on deformed mesh
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-
-            // Force creation of standAlonePatch
+            // Force creation of standAlonePatch, so that its points can be set
+            // to the current configuration by syncGlobalPatches() below
             globalPatchesPtrList_[i].globalPatch();
+        }
+    }
 
-            // Move the mesh back
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-        }
-        else
-        {
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-        }
+    if (currentConfiguration)
+    {
+        // The global patches are required in the current (deformed)
+        // configuration, so displace their points by pointD/pointDD
+        // Note: the global patches are always constructed on the undeformed
+        // mesh above and then moved here; previously, the mesh itself was
+        // temporarily moved to the deformed configuration while the global
+        // patches were constructed, and then moved back. That approach had two
+        // undesirable side-effects (issue #184):
+        //   - fvMesh::movePoints() creates the mesh motion flux field (meshPhi)
+        //     and marks the mesh points as AUTO_WRITE; consequently, meshPhi
+        //     and polyMesh/points were written to every time directory, even
+        //     though the solid mesh is not moved for linear geometry and total
+        //     Lagrangian approaches. On restart, the presence of meshPhi makes
+        //     OpenFOAM consider the solid mesh to be moving, e.g. causing
+        //     backwardD2dt2Scheme to stop with a "not implemented for a moving
+        //     mesh" error, and the reduced-precision points written to the time
+        //     directory can break the processor patch face matching checks in
+        //     parallel.
+        //   - globalPolyPatch merges coincident points across processor
+        //     boundaries using exact point coordinate comparisons; the
+        //     undeformed point coordinates are bit-identical on either side of
+        //     a processor boundary, whereas the deformed ones need not be.
+        syncGlobalPatches();
     }
 }
 
@@ -1659,6 +1608,27 @@ Foam::solidModel::globalPatches() const
 void Foam::solidModel::clearGlobalPatches() const
 {
     globalPatchesPtrList_.clear();
+}
+
+
+void Foam::solidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        const polyPatch& ppatch = globalPatchesPtrList_[i].patch();
+
+        const vectorField patchPointDisplacement
+        (
+            pointDorPointDD().internalField(), ppatch.meshPoints()
+        );
+
+        const pointField patchPoints
+        (
+            ppatch.localPoints() + patchPointDisplacement
+        );
+
+        globalPatchesPtrList_[i].syncPoints(patchPoints);
+    }
 }
 
 
@@ -2006,7 +1976,7 @@ void Foam::solidModel::setTraction
         solidTractionFvPatchVectorField& patchD =
             refCast<solidTractionFvPatchVectorField>(tractionPatch);
 
-        patchD.traction() = traction;
+        patchD.setTraction(traction);
     }
 #ifdef FOAMEXTEND
     else if
@@ -2041,6 +2011,30 @@ void Foam::solidModel::setTraction
             << abort(FatalError);
     }
 }
+
+#ifndef FOAMEXTEND
+void Foam::solidModel::setTractionQuadrature
+(
+    fvPatchVectorField& tractionPatch,
+    const CompactListList<vector>& traction
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.setTractionQuadrature(traction);
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Boundary condition " << tractionPatch.type() << " for patch "
+            << tractionPatch.patch().name() << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName << abort(FatalError);
+    }
+}
+#endif
 
 
 void Foam::solidModel::setTraction
@@ -2130,13 +2124,12 @@ void Foam::solidModel::recalculateRho()
 }
 
 
-void Foam::solidModel::clearMovingLeastSquaresData()
+void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
 #ifndef FOAMEXTEND
-    displacementMLSPtr_.clear();
-    pressureMLSPtr_.clear();
+    leastSquaresReconstruction::New(mesh()).clear();
 #endif
 }
 

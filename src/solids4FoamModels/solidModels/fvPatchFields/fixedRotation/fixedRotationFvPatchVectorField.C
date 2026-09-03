@@ -424,7 +424,7 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
 
     // faceQuadPoints is a list for the whole mesh
     const CompactListList<point>& faceQuadPoints =
-        solMod.displacementMLS().quadrature().faceQuadPoints();
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList nQpPerFace(this->size(), 0);
     const label start = this->patch().start();

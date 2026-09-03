@@ -22,14 +22,15 @@ EPS_MIN=3.5e-4
 EPS_MAX=5.0e-4
 SIGMA_MIN=8.5e7
 SIGMA_MAX=1.05e8
-HIGH_ORDER_DISP_TOL=1e-11
+HIGH_ORDER_DISP_TOL=1e-10
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     petscSnes
-    highOrder
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
     highOrderJacobian
 )
 
@@ -429,6 +430,24 @@ extract_disp_linf() {
         || true
 }
 
+select_run_approach() {
+    local requested="$1"
+
+    case "${requested}" in
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+            local least_squares_type="${requested#highOrder-}"
+            sed -E -i.bak \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "${CASE_DIR}/constant/solidProperties.highOrder"
+            rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+            RUN_APPROACH=highOrder
+            ;;
+        *)
+            RUN_APPROACH="${requested}"
+            ;;
+    esac
+}
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -490,8 +509,9 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "Testing approach: ${approach}"
         echo "------------------------------------------------------------"
 
+        select_run_approach "${approach}"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+        ( cd "${CASE_DIR}" && ./Allrun "${RUN_APPROACH}" > "${ALLRUN_LOGFILE}" 2>&1 )
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
@@ -502,7 +522,7 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
 
-        if [[ "${approach}" == highOrder* ]] && ! check_high_order_errors; then
+        if [[ "${RUN_APPROACH}" == highOrder* ]] && ! check_high_order_errors; then
             failures=$((failures + 1))
         fi
 

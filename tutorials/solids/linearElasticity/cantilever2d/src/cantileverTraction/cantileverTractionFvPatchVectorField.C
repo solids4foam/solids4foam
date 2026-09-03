@@ -176,7 +176,7 @@ Foam::cantileverTractionFvPatchVectorField::evaluateQuadrature
 
     // faceQuadPoints is list for the  whole mesh
     const CompactListList<point>& faceQuadPoints =
-        solMod.displacementMLS().quadrature().faceQuadPoints();
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
 
     // faceQuadPoints is list for whole mesh.
     labelList nQpPerFace(this->size(), 0);

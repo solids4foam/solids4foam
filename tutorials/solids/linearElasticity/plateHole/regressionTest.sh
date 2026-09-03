@@ -14,14 +14,15 @@ fi
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# (segregated/petscSnes/petscSnesPressure/highOrder) and pressure-displacement
-# solution options.
+# (segregated/segregatedManager/petscSnes/petscSnesPressure/high-order
+# variants) and pressure-displacement
 #
 # Note that petscSnesPressure and pressureDisplacement* are different things:
 # petscSnesPressure is the mixed displacement-pressure form of
 # linearGeometryTotalDisplacement (solvePressure yes), whereas
 # pressureDisplacement* selects coupledPressureDisplacementSolid, which runs
 # on foam-extend only.
+# solution options.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -39,13 +40,17 @@ PD_P_TOL=9.0e4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+PARALLEL_N_PROCS=2
 
 APPROACHES=(
     segregated
     segregatedManager
     petscSnes
     petscSnesPressure
-    highOrder
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
+    highOrder-movingLeastSquares-parallel
+    highOrder-kExactLeastSquares-parallel
     highOrderFourthOrder
 )
 
@@ -92,6 +97,11 @@ prepare_case() {
             "${case_dir}/src/Make/options"
     fi
 
+    sed -E -i.bak \
+        "s/^[[:space:]]*numberOfSubdomains[[:space:]]+[0-9]+;/numberOfSubdomains ${PARALLEL_N_PROCS};/" \
+        "${case_dir}/system/decomposeParDict"
+    rm -f "${case_dir}/system/decomposeParDict.bak"
+
 }
 
 run_case() {
@@ -99,8 +109,31 @@ run_case() {
     shift
 
     local case_dir="${REGRESSION_ROOT}/${case_name}"
+    local requested="$1"
 
     prepare_case "${case_dir}"
+
+    case "${requested}" in
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+            local least_squares_type="${requested#highOrder-}"
+            sed -E -i.bak \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "${case_dir}/constant/solidProperties.highOrder"
+            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
+            set -- highOrder "${@:2}"
+            ;;
+        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel)
+            local least_squares_type="${requested#highOrder-}"
+            least_squares_type="${least_squares_type%-parallel}"
+            sed -E -i.bak \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
+                "${case_dir}/constant/solidProperties.highOrder"
+            rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
+            set -- highOrder parallel
+            ;;
+    esac
+
     ( cd "${case_dir}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${case_dir}" && ./Allrun "$@" > "${ALLRUN_LOGFILE}" 2>&1 )
 

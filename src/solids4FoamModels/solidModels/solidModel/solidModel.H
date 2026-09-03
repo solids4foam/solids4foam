@@ -66,7 +66,7 @@ SourceFiles
 #endif
 
 #ifndef FOAMEXTEND
-    #include "movingLeastSquares.H"
+    #include "leastSquaresReconstruction.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -133,14 +133,6 @@ private:
 
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
-
-#ifndef FOAMEXTEND
-        //- Moving Least Square operator for the displacement field
-        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
-
-        //- Moving Least Square operator for the pressure field
-        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
-#endif
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
@@ -354,11 +346,6 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Make the displacement Moving Least Squares object
-        void makeDisplacementMLS() const;
-
-        //- Make the pressure Moving Least Squares object
-        void makePressureMLS() const;
 #endif
 
         //- Return root high-order coefficients dictionary
@@ -902,25 +889,13 @@ public:
                 return twoD_;
             }
 #ifndef FOAMEXTEND
-            //- Return displacement moving least squares interpolation
-            const movingLeastSquares& displacementMLS() const
-            {
-                if (displacementMLSPtr_.empty())
-                {
-                    makeDisplacementMLS();
-                }
-                return autoPtrRef(displacementMLSPtr_);
-            }
+            //- Return the displacement least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& displacementLeastSquares() const;
 
-            //- Return pressure moving least squares interpolation
-            const movingLeastSquares& pressureMLS() const
-            {
-                if (pressureMLSPtr_.empty())
-                {
-                    makePressureMLS();
-                }
-                return autoPtrRef(pressureMLSPtr_);
-            }
+            //- Return the pressure least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& pressureLeastSquares() const;
 #endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -1024,6 +999,27 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise global patches with the deformed solid points
+            //  The deformed patch points are the mesh patch points displaced
+            //  by pointDorPointDD(), which is the displacement increment for
+            //  moving mesh (updated Lagrangian) approaches and the total
+            //  displacement for the others.  This is the same expression
+            //  makeGlobalPatches() uses to build the zone in the first place
+            //
+            //  For a moving mesh this is only correct while the mesh still
+            //  holds the points that pointDD is measured from, that is before
+            //  moveMesh() is called for the current time step.  Calling it
+            //  after the mesh has been moved, but before pointDD is reset,
+            //  would add the same increment a second time
+            //
+            //  All current callers satisfy this: the only caller is
+            //  fluidSolidInterface::updateResidual(), and every coupling
+            //  scheme calls that before solid().updateTotalFields(), which is
+            //  where the mesh is moved
+            //
+            //  Note: this is a collective operation in parallel
+            void syncGlobalPatches() const;
+
         // Edit
 
             //- Set traction at specified patch
@@ -1032,6 +1028,15 @@ public:
                 fvPatchVectorField& tractionPatch,
                 const vectorField& traction
             );
+
+#ifndef FOAMEXTEND
+            //- Set traction component at specified patch quadrature points
+            virtual void setTractionQuadrature
+            (
+                fvPatchVectorField& tractionPatch,
+                const CompactListList<vector>& traction
+            );
+#endif
 
             //- Set traction at specified patch
             virtual void setTraction
@@ -1082,8 +1087,8 @@ public:
             //- Let the material model recalculate the density
             virtual void recalculateRho();
 
-            //- Clear Moving Least Squares interpolator
-            virtual void clearMovingLeastSquaresData();
+            //- Clear least-squares reconstruction data
+            virtual void clearLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);
@@ -1132,6 +1137,12 @@ public:
             virtual scalar newDeltaT();
 
             //- Move the mesh by the provided point displacement field
+            //  Note: any global patches must be synchronised before this is
+            //  called.  syncGlobalPatches() displaces the mesh points by
+            //  pointDD, so once the mesh itself has been moved by pointDD the
+            //  same increment would be counted twice.  In fluid-solid
+            //  interaction this is reached from updateTotalFields(), after
+            //  the coupling loop has finished
             virtual void moveMesh
             (
                 const pointField& oldPoints,

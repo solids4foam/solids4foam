@@ -95,7 +95,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -412,7 +412,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND
-        gradD() = displacementMLS().grad(D());
+        gradD() = displacementLeastSquares().grad(D());
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
@@ -1066,7 +1066,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             D(),
             blockSize_
         );
@@ -1140,7 +1140,7 @@ label linGeomTotalDispSolid::formResidual
 #ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
         // Consider switching to mechanical().grad() interface
-        gradD() = displacementMLS().grad(D);
+        gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
@@ -1389,7 +1389,7 @@ label linGeomTotalDispSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction = displacementLeastSquares();
 
         if (jacobianTangent(tangentRequest::scalar) == tangentRequest::fourthOrder)
         {
@@ -1398,7 +1398,7 @@ label linGeomTotalDispSolid::formJacobian
             (
                 jac,
                 *this,
-                mls,
+                reconstruction,
                 D,
                 faceMaterialTangent()
             );
@@ -1436,11 +1436,24 @@ label linGeomTotalDispSolid::formJacobian
             tmp<volScalarField> tLambda = impK_ - 2.0*mu;
             const volScalarField& lambda = tLambda();
 
-            hofvm::laplacianIntoPETScMatrix(jac, *this, mls, D, mu);
+            hofvm::laplacianIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, mls, D, mu);
+            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, mls, D, lambda);
+            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, reconstruction, D, lambda);
+        }
+
+        if (momentumStabilisation().supportsHighOrderResidual())
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
         }
 
         fvVectorMatrix transientJ

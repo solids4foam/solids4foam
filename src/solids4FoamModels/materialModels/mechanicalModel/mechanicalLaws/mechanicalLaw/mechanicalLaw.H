@@ -484,6 +484,12 @@ public:
 
     // Member Functions
 
+        //- Return the total deformation gradient stored by this law
+        const volTensorField& F() const;
+
+        //- Return the total face deformation gradient stored by this law
+        const surfaceTensorField& Ff() const;
+
         //- Return name
         const word& name() const
         {
