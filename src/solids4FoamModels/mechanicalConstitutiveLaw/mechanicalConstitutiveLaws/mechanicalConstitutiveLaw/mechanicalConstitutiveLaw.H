@@ -212,6 +212,47 @@ public:
         ) const
         {}
 
+        //- Names of the live coupling inputs this law reads, such as "T" for a
+        //  temperature. The manager gathers each from the field of that name
+        //  and hands it over in the inputs object, as a view of this law's own
+        //  integration points.
+        //
+        //  These are not state. A coupling input is solved for by something
+        //  else and changes every iteration, so it is gathered afresh on every
+        //  evaluation: never stored, never rolled over to old time, and never
+        //  read from a file that could shadow the live field
+        virtual wordList requiredScalarInputs() const
+        {
+            return wordList();
+        }
+
+        //- Names of the child states this law owns, one per sub-law.
+        //
+        //  A composite law delegates to laws of its own, and each of those has
+        //  history it looks up by its own unqualified name. Naming the
+        //  children here is what lets the manager reach them: it applies each
+        //  sub-law's declared state to the matching child, recursively, so a
+        //  sub-law's prescribed fields and defaults work exactly as they would
+        //  if it were the top-level law
+        virtual wordList childStateNames() const
+        {
+            return wordList();
+        }
+
+        //- The sub-law that uses the named child state
+        virtual const mechanicalConstitutiveLaw& childLaw
+        (
+            const word& name
+        ) const
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << type()
+                << "' has no child law '" << name << "'."
+                << exit(FatalError);
+
+            return *this;
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.

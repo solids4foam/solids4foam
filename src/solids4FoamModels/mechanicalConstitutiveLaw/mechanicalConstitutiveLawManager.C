@@ -429,6 +429,203 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
 }
 
 
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::lawInputsPatch
+(
+    const label lawI,
+    const label patchI,
+    const labelList& faces,
+    const scalar dt,
+    topologyEntry& tp
+) const
+{
+    mechanicalConstitutiveLawInputs inputs(dt);
+
+    const wordList names(laws_[lawI].requiredScalarInputs());
+
+    if (names.empty())
+    {
+        return inputs;
+    }
+
+    if (tp.lawScalarInputs_.empty())
+    {
+        tp.lawScalarInputs_.setSize(laws_.size());
+    }
+
+    HashTable<autoPtr<scalarField>>& store = tp.lawScalarInputs_[lawI];
+
+    forAll(names, i)
+    {
+        const word& name = names[i];
+
+        // The boundary values are a different set from the internal ones, so
+        // they get storage of their own rather than sharing it and being
+        // overwritten by whichever was gathered last
+        const word key(name + "@patch");
+
+        if (!store.found(key))
+        {
+            store.insert(key, autoPtr<scalarField>(new scalarField()));
+        }
+
+        scalarField& fld = store[key]();
+        fld.setSize(faces.size(), 0.0);
+
+        tmp<volScalarField> tsrc;
+
+        if (mesh_.foundObject<volScalarField>(name))
+        {
+            tsrc = tmp<volScalarField>
+            (
+                mesh_.lookupObject<volScalarField>(name)
+            );
+        }
+        else
+        {
+            tsrc = prescribedField<scalar>(name);
+        }
+
+        if (!tsrc.valid())
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << laws_[lawI].type()
+                << "' reads the coupling input '" << name
+                << "', which is neither registered nor present as a field in "
+                << "the current or initial time directory."
+                << exit(FatalError);
+        }
+
+        const fvPatchField<scalar>& psrc = tsrc().boundaryField()[patchI];
+
+        forAll(faces, faceI)
+        {
+            fld[faceI] = psrc[faces[faceI]];
+        }
+
+        inputs.setScalar(name, fld);
+    }
+
+    return inputs;
+}
+
+
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::inputsWithoutCoupling
+(
+    const scalar dt,
+    const word& path
+) const
+{
+    forAll(laws_, lawI)
+    {
+        const wordList names(laws_[lawI].requiredScalarInputs());
+
+        if (!names.empty())
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << laws_[lawI].type()
+                << "' reads the coupling input(s) " << names
+                << ", but the evaluation path '" << path
+                << "' does not gather them yet." << nl
+                << "Use a solid model that evaluates through a path which "
+                << "does, or add the gather to this one."
+                << exit(FatalError);
+        }
+    }
+
+    return mechanicalConstitutiveLawInputs(dt);
+}
+
+
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::lawInputs
+(
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    const scalar dt,
+    topologyEntry& tp
+) const
+{
+    mechanicalConstitutiveLawInputs inputs(dt);
+
+    const wordList names(laws_[lawI].requiredScalarInputs());
+
+    if (names.empty())
+    {
+        // Which is every law that does not couple to another field, so this
+        // costs them nothing
+        return inputs;
+    }
+
+    if (tp.lawScalarInputs_.empty())
+    {
+        tp.lawScalarInputs_.setSize(laws_.size());
+    }
+
+    HashTable<autoPtr<scalarField>>& store = tp.lawScalarInputs_[lawI];
+
+    forAll(names, i)
+    {
+        const word& name = names[i];
+
+        if (!store.found(name))
+        {
+            store.insert(name, autoPtr<scalarField>(new scalarField()));
+        }
+
+        scalarField& fld = store[name]();
+        fld.setSize(ipIDs.size(), 0.0);
+
+        // The registry first, and only then the file. This is the opposite
+        // order from a prescribed field, and deliberately so: a coupling input
+        // is solved for, so the live field must always win and a file must
+        // never shadow it.
+        //
+        // The file is still needed, because of when the first evaluation
+        // happens. A solid model builds its implicit stiffness while it is
+        // being constructed, and a derived model that solves for the coupling
+        // field has not reached its own members yet - the base class runs
+        // first. At that moment the field exists only as the initial condition
+        // on disk, which is the right value to evaluate against anyway
+        if (mesh_.foundObject<volScalarField>(name))
+        {
+            gatherToIntegrationPoints
+            (
+                mesh_.lookupObject<volScalarField>(name),
+                lawI,
+                topo,
+                ipIDs,
+                fld
+            );
+        }
+        else
+        {
+            const tmp<volScalarField> tsrc(prescribedField<scalar>(name));
+
+            if (!tsrc.valid())
+            {
+                FatalErrorInFunction
+                    << "Mechanical constitutive law '" << laws_[lawI].type()
+                    << "' reads the coupling input '" << name
+                    << "', which is neither registered nor present as a field "
+                    << "in the current or initial time directory." << nl
+                    << "It is produced by another model, so the solid model "
+                    << "has to solve for it, or the case has to supply it."
+                    << exit(FatalError);
+            }
+
+            gatherToIntegrationPoints(tsrc(), lawI, topo, ipIDs, fld);
+        }
+
+        inputs.setScalar(name, fld);
+    }
+
+    return inputs;
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
 (
     const mechanicalConstitutiveLawStateSpec& spec,
@@ -479,16 +676,46 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpec
     mechanicalConstitutiveLawState& state
 ) const
 {
+    applyStateSpec(laws_[lawI], lawI, topo, ipIDs, state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpec
+(
+    const mechanicalConstitutiveLaw& law,
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    mechanicalConstitutiveLawState& state
+) const
+{
     // Order matters. The declared default goes down first, then the law is
     // given the chance to initialise state of its own over it, and only then
     // is a prescribed field read. A law that both declares a field and fills
     // it in initialiseState would otherwise have its work overwritten
     mechanicalConstitutiveLawStateSpec spec;
-    laws_[lawI].declareState(spec);
+    law.declareState(spec);
 
     applyStateDefaults(spec, state);
 
-    laws_[lawI].initialiseState(state);
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpec
+        (
+            law.childLaw(childNames[i]),
+            lawI,
+            topo,
+            ipIDs,
+            state.child(childNames[i])
+        );
+    }
 
     const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
 
@@ -546,12 +773,36 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecScratch
     mechanicalConstitutiveLawState& state
 ) const
 {
+    applyStateSpecScratch(laws_[lawI], state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecScratch
+(
+    const mechanicalConstitutiveLaw& law,
+    mechanicalConstitutiveLawState& state
+) const
+{
     mechanicalConstitutiveLawStateSpec spec;
-    laws_[lawI].declareState(spec);
+    law.declareState(spec);
 
     applyStateDefaults(spec, state);
 
-    laws_[lawI].initialiseState(state);
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpecScratch
+        (
+            law.childLaw(childNames[i]),
+            state.child(childNames[i])
+        );
+    }
 }
 
 
@@ -562,12 +813,40 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
     mechanicalConstitutiveLawState& state
 ) const
 {
+    applyStateSpecPatch(laws_[lawI], lawI, patchI, state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
+(
+    const mechanicalConstitutiveLaw& law,
+    const label lawI,
+    const label patchI,
+    mechanicalConstitutiveLawState& state
+) const
+{
     mechanicalConstitutiveLawStateSpec spec;
-    laws_[lawI].declareState(spec);
+    law.declareState(spec);
 
     applyStateDefaults(spec, state);
 
-    laws_[lawI].initialiseState(state);
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpecPatch
+        (
+            law.childLaw(childNames[i]),
+            lawI,
+            patchI,
+            state.child(childNames[i])
+        );
+    }
 
     const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
 
@@ -1205,11 +1484,6 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation. Built once and passed through
-    // every evaluation, including each finite-difference perturbation,
-    // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs(dt);
-
     topologyEntry& tp = topology(topo);
 
     // Loop over mechanical constitutive laws
@@ -1221,6 +1495,16 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         {
             continue;
         }
+
+        // Live inputs for this law's evaluation. Built per law, because a
+        // coupling input is handed over as a view of that law's own
+        // integration points, and built here so that it is passed through
+        // every evaluation below, including each finite-difference
+        // perturbation, with no per-call forwarding to get wrong
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
 
         // A tangent query evaluates against a shadow of the law's state: the
         // shadow aliases the old-time fields, so history is read but never
@@ -1360,6 +1644,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                 {
                     continue;
                 }
+
+                // Live inputs for this law on this patch. The boundary points
+                // are a different set from the internal ones, so the coupling
+                // input has to be gathered for them rather than reused
+                const mechanicalConstitutiveLawInputs inputs
+                (
+                    lawInputs(lawI, topo, ipIDs, dt, tp)
+                );
 
                 // An empty patch has no per-patch state: boundaryStates_ is
                 // sized to the fvPatch, which has no faces there. Its faces
@@ -1528,7 +1820,10 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     // Live inputs for this evaluation. Built once and passed through
     // every evaluation, including each finite-difference perturbation,
     // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs(dt);
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "evaluateFiniteStrain")
+    );
 
     topologyEntry& tp = topology(topo);
 
@@ -2085,11 +2380,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation. Built once and passed through
-    // every evaluation, including each finite-difference perturbation,
-    // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs(dt);
-
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
@@ -2134,6 +2424,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     {
                         continue;
                     }
+
+                    // Live inputs for this law on this patch. The patch
+                    // values are what a boundary face sees, not the values
+                    // in the cells behind it
+                    const mechanicalConstitutiveLawInputs inputs
+                    (
+                        lawInputsPatch(lawI, patchI, faces, dt, tp)
+                    );
 
                     // "View" into the kinematic and stress fields for this
                     // material => does not copy data
@@ -2258,7 +2556,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Live inputs for this evaluation. Built once and passed through
     // every evaluation, including each finite-difference perturbation,
     // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs(dt);
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressSmallStrain")
+    );
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -2557,7 +2858,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     updateOldTimeIfNeeded();
 
     // Live inputs for this evaluation, passed through unchanged
-    const mechanicalConstitutiveLawInputs inputs(dt);
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressSmallStrain")
+    );
 
     // Accumulation fields
 
@@ -2772,7 +3076,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Live inputs for this evaluation. Built once and passed through
     // every evaluation, including each finite-difference perturbation,
     // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs(dt);
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressFiniteStrain")
+    );
 
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =

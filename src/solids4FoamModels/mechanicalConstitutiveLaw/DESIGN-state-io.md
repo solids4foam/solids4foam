@@ -488,6 +488,53 @@ interface. Either material properties become a per-integration-point response,
 or the thermal correction is admitted to be law-specific rather than a general
 decorator.
 
+### 8a.2c The first composite: thermoMechanicalLaw
+
+`thermoMechanicalLaw` is migrated and reproduces the legacy law bit for bit on
+`hotSphere`. It is worth recording what the composite actually needed, because
+only one of the three costs listed above turned out to bite.
+
+**Child states, as designed.** The sub-law is handed `state.child("mechanicalLaw")`
+and goes on looking its history up by its own names. `applyStateSpec` recurses
+through `childStateNames()` and `childLaw()`, so a sub-law's declared defaults
+and prescribed fields are applied to its child exactly as they would be if it
+were the top-level law. Without that recursion a sub-law's `sigma0` would be
+silently absent.
+
+**The bulk modulus did not bite, but only here.** The thermal term uses the
+sub-law's bulk modulus as a single value. Every tutorial that uses this law
+has `linearElastic` underneath, whose bulk modulus is uniform, so `kappa()` is
+exact. A sub-law whose bulk modulus varies point to point still cannot be
+expressed through this interface; that limitation is unchanged and is noted at
+the point of use.
+
+**The temperature is an input, not state, and that distinction earned its
+keep.** `T` is declared through `requiredScalarInputs()` and gathered by the
+manager on every evaluation, per law, as a view of that law's own integration
+points. It is never stored and never rolled over.
+
+Two things about the gather were not obvious.
+
+The registry comes first and the file second - the opposite order from a
+prescribed field. A coupling input is solved for, so a live field must never be
+shadowed by a file. But the file is still needed, because of *when* the first
+evaluation happens: a solid model builds its implicit stiffness while it is
+being constructed, and a derived model that solves for the coupling field has
+not reached its own members yet, since the base class constructor runs first.
+At that moment `T` exists only as the initial condition on disk, which is the
+right value to evaluate against anyway.
+
+Boundary faces gather from the field's *patch* values, into storage of their
+own. Sharing storage with the internal gather would have left whichever ran
+last in place for both.
+
+**Paths that do not gather say so.** Five evaluation paths do not gather
+coupling inputs yet. Rather than hand a law an empty inputs object and let it
+read a zero it cannot tell from a real value, they build their inputs through
+`inputsWithoutCoupling`, which is fatal if any law asks for one. That guard
+found a real gap during this work: the volField path gathered for its internal
+points but not for its boundary faces.
+
 ### 8a.2b Corrections around a pure law: what survives, and what does not
 
 This section proposed replacing decorator laws entirely: a material would

@@ -191,6 +191,12 @@ class mechanicalConstitutiveLawManager
             //- True if this topology supports boundary integration points
             bool boundaryAware_;
 
+            //- Scratch storage for live coupling inputs, per law, keyed by
+            //  field name. A law that asks for one is handed a view of its own
+            //  integration points, and the storage is kept here rather than
+            //  allocated per evaluation
+            List<HashTable<autoPtr<scalarField>>> lawScalarInputs_;
+
             //- Constructor
             topologyEntry(const integrationPointTopology& topo)
             :
@@ -198,7 +204,8 @@ class mechanicalConstitutiveLawManager
                 lawIntegrationPointIDs_(),
                 states_(),
                 boundaryStates_(),
-                boundaryAware_(false)
+                boundaryAware_(false),
+                lawScalarInputs_()
             {}
         };
 
@@ -302,6 +309,40 @@ class mechanicalConstitutiveLawManager
         ) const;
 
         //- Commit old-time state for all topology entries if needed
+        //- Gather the live coupling inputs a law asked for, as views over its
+        //  own integration points, and hand back an inputs object carrying
+        //  them. A law that asks for nothing gets an inputs object holding
+        //  only the time step, which is what every law had before
+        mechanicalConstitutiveLawInputs lawInputs
+        (
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            const scalar dt,
+            topologyEntry& tp
+        ) const;
+
+        //- As lawInputs, for a law's faces on one boundary patch. The values
+        //  come from the field's patch values, not from the cells behind it
+        mechanicalConstitutiveLawInputs lawInputsPatch
+        (
+            const label lawI,
+            const label patchI,
+            const labelList& faces,
+            const scalar dt,
+            topologyEntry& tp
+        ) const;
+
+        //- An inputs object for an evaluation path that does not gather
+        //  coupling inputs yet. Fatal if any law asks for one, because the
+        //  alternative is handing that law an empty inputs object and letting
+        //  it read a zero it cannot distinguish from a real value
+        mechanicalConstitutiveLawInputs inputsWithoutCoupling
+        (
+            const scalar dt,
+            const word& path
+        ) const;
+
         //- Allocate each declared field and set it to its declared default
         void applyStateDefaults
         (
@@ -316,6 +357,33 @@ class mechanicalConstitutiveLawManager
             const label lawI,
             const integrationPointTopology& topo,
             const labelList& ipIDs,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- As applyStateSpec, for a named law, which is how a composite's
+        //  sub-laws are reached
+        void applyStateSpec
+        (
+            const mechanicalConstitutiveLaw& law,
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- As applyStateSpecPatch, for a named law
+        void applyStateSpecPatch
+        (
+            const mechanicalConstitutiveLaw& law,
+            const label lawI,
+            const label patchI,
+            mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- As applyStateSpecScratch, for a named law
+        void applyStateSpecScratch
+        (
+            const mechanicalConstitutiveLaw& law,
             mechanicalConstitutiveLawState& state
         ) const;
 
@@ -444,14 +512,37 @@ class mechanicalConstitutiveLawManager
             Info<< "    Prescribed state '" << name
                 << "' read from the field of the same name" << endl;
 
+            gatherToIntegrationPoints(src, lawI, topo, ipIDs, fld);
+        }
+
+        //- Fill a law's integration points from a volField on the mesh.
+        //
+        //  The value is specified per cell, which is how a user prepares one
+        //  and how another model produces one. How it reaches a point depends
+        //  on where the point is. A point inside a cell takes that cell's
+        //  value. A point that is a mesh face takes the interpolated value,
+        //  because a face lies between two cells rather than in one, and
+        //  because that is what the legacy code does.
+        //
+        //  A topology that shares a point between cells without being able to
+        //  say it is a face still broadcasts, and there the last cell to reach
+        //  the point wins: exact where the field is continuous across the
+        //  interface, ambiguous where it is not. That is the mapping policy
+        //  question recorded in DESIGN-state-io.md section 4
+        template<class Type>
+        void gatherToIntegrationPoints
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& src,
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            Field<Type>& fld
+        ) const
+        {
             if (topo.integrationPointsAreFaces())
             {
-                // Legacy forms its face initial stress as
-                // linearInterpolate(sigma0), so a face takes a weighted
-                // average of the two cells either side and not the value of
-                // whichever one happens to be visited last. The integration
-                // point index is the face index here, which is what lets the
-                // interpolated field be read straight off
+                // The integration point index is the face index here, which is
+                // what lets the interpolated field be read straight off
                 const GeometricField<Type, fvsPatchField, surfaceMesh> srcf
                 (
                     linearInterpolate(src)
