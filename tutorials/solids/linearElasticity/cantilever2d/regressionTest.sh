@@ -62,6 +62,79 @@ prepare_case() {
 
 }
 
+# Write a spatially varying initial stress into a case's 0 directory.
+#
+# Anything varying will do; the point is that a wrong cell-to-integration-point
+# map changes the answer, which a uniform field would hide
+write_sigma0_field() {
+    local case_dir="$1"
+    local nCells
+
+    nCells=$(grep -h "nCells:" "${case_dir}/log.blockMesh" | tail -n 1 \
+        | awk '{print $2}')
+
+    if [[ -z "${nCells}" ]]; then
+        echo "FAIL: could not read the cell count for the sigma0 field"
+        return 1
+    fi
+
+    {
+        echo "FoamFile"
+        echo "{"
+        echo "    version     2.0;"
+        echo "    format      ascii;"
+        echo "    class       volSymmTensorField;"
+        echo "    location    \"0\";"
+        echo "    object      sigma0;"
+        echo "}"
+        echo
+        echo "dimensions      [1 -1 -2 0 0 0 0];"
+        echo
+        echo "internalField   nonuniform List<symmTensor>"
+        echo "${nCells}"
+        echo "("
+        awk -v n="${nCells}" 'BEGIN {
+            for (i = 0; i < n; i++)
+            {
+                f = 1e7*sin(0.01*i)
+                printf "(%g %g %g %g %g %g)\n", \
+                    f, 0.3*f, -0.2*f, 0.5*f, 0.1*f, -0.4*f
+            }
+        }'
+        echo ")"
+        echo ";"
+        echo
+        echo "boundaryField"
+        echo "{"
+
+        # A constraint patch - symmetry, empty, wedge - only takes the patch
+        # field of its own kind, so these entries come from the mesh rather
+        # than from a catch-all
+        awk '
+            /^\(/ { inList = 1; next }
+            /^\)/ { inList = 0 }
+            inList && /^[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*$/ {
+                name = $1
+                next
+            }
+            inList && /^[ \t]*type[ \t]/ {
+                t = $2
+                sub(";", "", t)
+                if (name == "") next
+                if (t == "patch" || t == "wall")
+                {
+                    t = "zeroGradient"
+                }
+                printf "    %s\n    {\n        type            %s;\n    }\n", \
+                    name, t
+                name = ""
+            }
+        ' "${case_dir}/constant/polyMesh/boundary"
+
+        echo "}"
+    } > "${case_dir}/0/sigma0"
+}
+
 # Run this case twice with an initial stress, once through the legacy
 # mechanical law and once through the constitutive framework, and require the
 # two to agree exactly.
@@ -119,69 +192,7 @@ run_sigma0_comparison() {
             blockMesh > log.blockMesh 2>&1 || exit 1
 
             if [[ "${mode}" == "field" || "${mode}" == "both" ]]; then
-                local nCells
-                nCells=$(grep -h "nCells:" log.blockMesh | tail -n 1 \
-                    | awk '{print $2}')
-
-                if [[ -z "${nCells}" ]]; then
-                    exit 1
-                fi
-
-                {
-                    echo "FoamFile"
-                    echo "{"
-                    echo "    version     2.0;"
-                    echo "    format      ascii;"
-                    echo "    class       volSymmTensorField;"
-                    echo "    location    \"0\";"
-                    echo "    object      sigma0;"
-                    echo "}"
-                    echo
-                    echo "dimensions      [1 -1 -2 0 0 0 0];"
-                    echo
-                    echo "internalField   nonuniform List<symmTensor>"
-                    echo "${nCells}"
-                    echo "("
-                    awk -v n="${nCells}" 'BEGIN {
-                        for (i = 0; i < n; i++)
-                        {
-                            f = 1e7*sin(0.01*i)
-                            printf "(%g %g %g %g %g %g)\n", \
-                                f, 0.3*f, -0.2*f, 0.5*f, 0.1*f, -0.4*f
-                        }
-                    }'
-                    echo ")"
-                    echo ";"
-                    echo
-                    echo "boundaryField"
-                    echo "{"
-
-                    # A constraint patch - symmetry, empty, wedge - only takes
-                    # the patch field of its own kind, so these entries come
-                    # from the mesh rather than from a catch-all
-                    awk '
-                        /^\(/ { inList = 1; next }
-                        /^\)/ { inList = 0 }
-                        inList && /^[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*$/ {
-                            name = $1
-                            next
-                        }
-                        inList && /^[ \t]*type[ \t]/ {
-                            t = $2
-                            sub(";", "", t)
-                            if (name == "") next
-                            if (t == "patch" || t == "wall")
-                            {
-                                t = "zeroGradient"
-                            }
-                            printf "    %s\n    {\n        type            %s;\n    }\n", \
-                                name, t
-                            name = ""
-                        }
-                    ' constant/polyMesh/boundary
-
-                    echo "}"
-                } > 0/sigma0
+                write_sigma0_field . || exit 1
             fi
 
             solids4Foam > log.solids4Foam 2>&1 || exit 1
@@ -255,6 +266,101 @@ run_sigma0_comparison() {
 
     echo "PASS: sigma0 ${mode} legacy and framework agree exactly"
     return 0
+}
+
+# A prescribed field has to survive a restart. It is written into 0 and the
+# case then restarts from a later time whose directory does not contain it, so
+# this is the check that the field is looked for where it actually lives.
+#
+# It compares the framework against itself, restarted against continuous,
+# rather than against legacy. Legacy looks for sigma0 only beside the fields
+# it restarts from and so loses it, keeping it only when an earlier run had
+# already written it forward. That is a hole rather than a behaviour worth
+# reproducing, so the framework diverges here deliberately
+run_sigma0_restart_check() {
+    local root="${REGRESSION_ROOT}"
+    local d
+
+    for d in restartContinuous restartRestarted restartNone; do
+        rm -rf "${root}/${d}"
+        mkdir -p "${root}/${d}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${root}/${d}/"
+        done
+
+        sed -i \
+            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+            "${root}/${d}/constant/solidProperties"
+    done
+
+    for d in restartContinuous restartRestarted restartNone; do
+        (
+            cd "${root}/${d}" || exit 1
+            solids4Foam::convertCaseFormat . > log.convert 2>&1
+            blockMesh > log.blockMesh 2>&1 || exit 1
+        ) || { echo "FAIL: sigma0 restart check could not mesh ${d}"; return 1; }
+    done
+
+    # The two that carry an initial stress get it in 0, and only in 0
+    for d in restartContinuous restartRestarted; do
+        write_sigma0_field "${root}/${d}" || return 1
+    done
+
+    (
+        cd "${root}/restartContinuous" || exit 1
+        sed -i 's|^endTime .*|endTime         2;|' system/controlDict
+        solids4Foam > log.solids4Foam 2>&1
+    ) || { echo "FAIL: sigma0 restart check could not run continuous"; return 1; }
+
+    (
+        cd "${root}/restartNone" || exit 1
+        sed -i 's|^endTime .*|endTime         2;|' system/controlDict
+        solids4Foam > log.solids4Foam 2>&1
+    ) || { echo "FAIL: sigma0 restart check could not run the control"; return 1; }
+
+    (
+        cd "${root}/restartRestarted" || exit 1
+        solids4Foam > log.first 2>&1 || exit 1
+        sed -i \
+            's|^endTime .*|endTime         2;|;s|^startFrom .*|startFrom       latestTime;|' \
+            system/controlDict
+        solids4Foam > log.solids4Foam 2>&1
+    ) || { echo "FAIL: sigma0 restart check could not restart"; return 1; }
+
+    # The restart has to be a real one: the time it resumes from must not
+    # itself contain sigma0, or the fallback is never exercised
+    if [[ -f "${root}/restartRestarted/1/sigma0" ]]; then
+        echo "FAIL: sigma0 restart check did not test a restart"
+        return 1
+    fi
+
+    local cont="${root}/restartContinuous/2/D"
+    local rest="${root}/restartRestarted/2/D"
+    local none="${root}/restartNone/2/D"
+
+    if [[ ! -f "${cont}" || ! -f "${rest}" || ! -f "${none}" ]]; then
+        echo "FAIL: sigma0 restart check produced no D field"
+        return 1
+    fi
+
+    if diff -q "${cont}" "${none}" > /dev/null; then
+        echo "FAIL: sigma0 restart check: sigma0 changed nothing"
+        return 1
+    fi
+
+    if diff -q "${cont}" "${rest}" > /dev/null; then
+        echo "PASS: sigma0 survives a restart"
+        return 0
+    fi
+
+    echo "FAIL: sigma0 was lost on restart"
+    return 1
 }
 
 # A run with no initial stress, to show that the ones with it are different
@@ -424,6 +530,10 @@ if [ "$CHECK_ONLY" = false ]; then
                 failures=$((failures + 1))
             fi
         done
+
+        if ! run_sigma0_restart_check; then
+            failures=$((failures + 1))
+        fi
     else
         echo "FAIL: could not run the sigma0 baseline"
         failures=$((failures + 1))

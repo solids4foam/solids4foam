@@ -671,6 +671,35 @@ legacy:
   take their declared default. Those faces take no part in the discretisation,
   so nothing downstream sees the difference.
 
+**Where a prescribed field is looked for, and in what order.** The file comes
+first and the object registry only after it. The other way round reads more
+naturally and is wrong: the legacy mechanical law registers a `sigma0` of its
+own, read from the current time directory alone, so on a restart there is a
+registered field of zeros standing in front of the file the case actually
+wrote. Reading the file first means what the case says on disk is what the law
+gets, and leaves the registry to serve fields that only ever exist in memory
+because another model computes them.
+
+File-first is right *for prescribed state* and would be wrong for a live
+coupling input. A temperature or a pore pressure is solved for and changes
+every iteration, so a stale file of the same name must never stand in front of
+the computed field. That is the distinction between this mechanism and §8a.1:
+prescribed state is supplied and then fixed, a coupling input is produced by
+another equation. They travel by different routes for that reason, and a
+future coupling input must not be routed through `prescribed` merely because
+the plumbing looks similar.
+
+The file is looked for in the current time directory and then in `0`. A
+prescribed field describes the case rather than the state at a particular
+time: it is written once, into `0`, and a restart from a later time would
+otherwise not find it. The legacy Guccione law already does this for its fibre
+directions, so the framework follows it rather than inventing a rule. This is
+a deliberate divergence from legacy's `sigma0`, which looks only beside the
+fields it restarts from and so loses the initial stress unless an earlier run
+had already written it forward - a hole rather than a behaviour worth
+reproducing. `cantilever2d` checks it by restarting and requiring the result
+to match the continuous run exactly.
+
 What is deliberately *not* reproduced: legacy's point-field `correct` aborts
 outright when `sigma0` is non-zero. The framework evaluates points like any
 other integration point, so that case now runs. That is a capability legacy

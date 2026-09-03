@@ -336,6 +336,20 @@ class mechanicalConstitutiveLawManager
             mechanicalConstitutiveLawState& state
         ) const;
 
+        //- Whether a file for this IOobject exists and holds this type.
+        //  foam-extend has no typed header check, so the class name is
+        //  compared after reading the header, which is what the typed check
+        //  does anyway
+        template<class FieldType>
+        static bool headerIsA(IOobject& io)
+        {
+#ifdef FOAMEXTEND
+            return io.headerOk() && io.headerClassName() == FieldType::typeName;
+#else
+            return io.typeHeaderOk<FieldType>(true);
+#endif
+        }
+
         //- The volField a prescribed state is to be read from, if there is
         //  one. It may be a field another model has already registered, or it
         //  may exist only as a file in the current time directory, which is
@@ -347,14 +361,16 @@ class mechanicalConstitutiveLawManager
         {
             typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
 
-            if (mesh_.foundObject<VolFieldType>(name))
-            {
-                return tmp<VolFieldType>
-                (
-                    mesh_.lookupObject<VolFieldType>(name)
-                );
-            }
-
+            // The file comes first, and the registry only after it.
+            //
+            // The other way round looks more natural and is wrong: the legacy
+            // mechanical law registers its own sigma0, read from the current
+            // time directory alone, so on a restart there is a registered
+            // field of zeros sitting in front of the file the user actually
+            // wrote. Reading the file first means what the case says on disk
+            // is what the law gets, and the registry is left to serve the
+            // fields that only ever exist in memory because another model
+            // computes them
             IOobject io
             (
                 name,
@@ -364,23 +380,30 @@ class mechanicalConstitutiveLawManager
                 IOobject::NO_WRITE
             );
 
-            // The file has to exist and hold this field's type. foam-extend
-            // has no typed header check, so the class name is compared after
-            // reading the header, which is what the typed check does anyway
-#ifdef FOAMEXTEND
-            const bool present =
-                io.headerOk()
-             && io.headerClassName() == VolFieldType::typeName;
-#else
-            const bool present = io.typeHeaderOk<VolFieldType>(true);
-#endif
-
-            if (!present)
+            if (!headerIsA<VolFieldType>(io))
             {
-                return tmp<VolFieldType>();
+                // A prescribed field describes the case, not the state at a
+                // particular time, so it is written once into 0 and a restart
+                // will not find it beside the fields it restarts from. Look
+                // there before giving up, which is what the legacy Guccione
+                // law does for its fibre directions
+                io.instance() = "0";
             }
 
-            return tmp<VolFieldType>(new VolFieldType(io, mesh_));
+            if (headerIsA<VolFieldType>(io))
+            {
+                return tmp<VolFieldType>(new VolFieldType(io, mesh_));
+            }
+
+            if (mesh_.foundObject<VolFieldType>(name))
+            {
+                return tmp<VolFieldType>
+                (
+                    mesh_.lookupObject<VolFieldType>(name)
+                );
+            }
+
+            return tmp<VolFieldType>();
         }
 
         //- Fill a law's internal integration points from a prescribed field
