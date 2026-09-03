@@ -376,11 +376,6 @@ Foam::mechanicalConstitutiveLawManager::topology
                 (
                     lawI, patchI, entry.boundaryStates_[lawI][patchI]
                 );
-
-                applyStateSpecPatch
-                (
-                    lawI, patchI, entry.boundaryStates_[lawI][patchI]
-                );
             }
         }
     }
