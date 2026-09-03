@@ -32,6 +32,29 @@ Author
 #include "transform.H"
 #include "unitConversion.H"
 
+// Rotation tensor for a rotation of omega about the axis a, by Rodrigues'
+// formula. OpenFOAM.com and .org provide this as rotationAboutAxis() in transform.H;
+// foam-extend does not, so it is spelled out here rather than the utility
+// being excluded from that build
+namespace Foam
+{
+    static inline tensor rotationAboutAxis
+    (
+        const vector& a,
+        const scalar omega
+    )
+    {
+        const vector n = a/(mag(a) + VSMALL);
+        const scalar c = cos(omega);
+        const scalar s = sin(omega);
+
+        return
+            c*tensor::I
+          + s*tensor(0, -n.z(), n.y(), n.z(), 0, -n.x(), -n.y(), n.x(), 0)
+          + (1 - c)*(n*n);
+    }
+}
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -106,19 +129,27 @@ int main(int argc, char *argv[])
     volVectorField f0("f0", el);
     forAll(et, cellI)
     {
-        const tensor rotT = Ra(et[cellI], alphaRadians[cellI]);
+        const tensor rotT = rotationAboutAxis(et[cellI], alphaRadians[cellI]);
         f0[cellI] = transform(-rotT, f0[cellI]);
     }
+    // foam-extend writes through boundaryField(); the others require
+    // boundaryFieldRef()
+#ifdef OPENFOAM_NOT_EXTEND
+    auto& f0BoundaryRef = f0.boundaryFieldRef();
+#else
+    auto& f0BoundaryRef = f0.boundaryField();
+#endif
+
     forAll(et.boundaryField(), patchI)
     {
         forAll(et.boundaryField()[patchI], faceI)
         {
-            const tensor rotT = Ra
+            const tensor rotT = rotationAboutAxis
             (
                 et.boundaryField()[patchI][faceI],
                 alphaRadians.boundaryField()[patchI][faceI]
             );
-            f0.boundaryFieldRef()[patchI][faceI] = transform
+            f0BoundaryRef[patchI][faceI] = transform
             (
                 -rotT,
                 f0.boundaryField()[patchI][faceI]
@@ -163,19 +194,27 @@ int main(int argc, char *argv[])
     surfaceVectorField f0f("f0f", elf);
     forAll(etf, faceI)
     {
-        const tensor rotT = Ra(etf[faceI], alphaRadiansf[faceI]);
+        const tensor rotT = rotationAboutAxis(etf[faceI], alphaRadiansf[faceI]);
         f0f[faceI] = transform(-rotT, f0f[faceI]);
     }
+    // foam-extend writes through boundaryField(); the others require
+    // boundaryFieldRef()
+#ifdef OPENFOAM_NOT_EXTEND
+    auto& f0fBoundaryRef = f0f.boundaryFieldRef();
+#else
+    auto& f0fBoundaryRef = f0f.boundaryField();
+#endif
+
     forAll(etf.boundaryField(), patchI)
     {
         forAll(etf.boundaryField()[patchI], faceI)
         {
-            const tensor rotT = Ra
+            const tensor rotT = rotationAboutAxis
             (
                 etf.boundaryField()[patchI][faceI],
                 alphaRadiansf.boundaryField()[patchI][faceI]
             );
-            f0f.boundaryFieldRef()[patchI][faceI] = transform
+            f0fBoundaryRef[patchI][faceI] = transform
             (
                 -rotT,
                 f0f.boundaryField()[patchI][faceI]
