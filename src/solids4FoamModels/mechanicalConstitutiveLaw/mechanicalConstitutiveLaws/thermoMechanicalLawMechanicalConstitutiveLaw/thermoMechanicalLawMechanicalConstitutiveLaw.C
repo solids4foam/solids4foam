@@ -34,40 +34,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-Foam::dictionary
-Foam::thermoMechanicalLawMechanicalConstitutiveLaw::subLawDict
-(
-    const dictionary& dict
-)
-{
-    dictionary subDict(dict.subDict("mechanicalLaw"));
-
-    // Entries a case gives once, on the composite, and expects to apply to the
-    // material underneath it. The legacy law gets away with not doing this
-    // because it reads rho only when asked, and nothing asks the sub-law; a
-    // framework law reads its material properties when it is constructed.
-    //
-    // planeStress matters for the same reason and is easier to get wrong: the
-    // manager injects it into each top-level law's dictionary, so without this
-    // a plane-stress case would quietly give the sub-law plane strain
-    const wordList inherited({"rho", "planeStress"});
-
-    forAll(inherited, i)
-    {
-        const word& name = inherited[i];
-
-        if (!subDict.found(name) && dict.found(name))
-        {
-            subDict.add(dict.lookupEntry(name, false, false).clone().ptr());
-        }
-    }
-
-    return subDict;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::thermoMechanicalLawMechanicalConstitutiveLaw::
@@ -79,7 +45,7 @@ thermoMechanicalLawMechanicalConstitutiveLaw
     mechanicalConstitutiveLaw(dict),
     subLawPtr_
     (
-        mechanicalConstitutiveLaw::New(subLawDict(dict))
+        mechanicalConstitutiveLaw::New(subLawDict(dict, "mechanicalLaw"))
     ),
     subStateName_("mechanicalLaw"),
     alpha_(dict.lookup("alpha")),

@@ -87,9 +87,6 @@ class poroMechanicalLawMechanicalConstitutiveLaw
 
     // Private Member Functions
 
-        //- The sub-law's dictionary, with the entries a case gives once on the
-        //  composite and expects to reach the material underneath
-        static dictionary subLawDict(const dictionary& dict);
 
         //- No copy construct
         poroMechanicalLawMechanicalConstitutiveLaw

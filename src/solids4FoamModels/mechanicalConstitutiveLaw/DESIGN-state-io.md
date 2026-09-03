@@ -597,17 +597,22 @@ than through a list of its own - copy in, evaluate, copy out - because the
 response wraps an indirect list and building an identity-indexed view over the
 state field would cost an allocation per evaluation to save two passes.
 
-Two things this does not do.
+The shipped `rodAndSeabed` now runs both ways and agrees bit for bit, which
+took one more thing: `anisotropicBiotElastic`, its effective-stress law,
+selects its two-dimensional form from `mesh.solutionD()`, and a framework law
+is constructed from a dictionary with no mesh. The manager now injects
+`solutionD` alongside `planeStress`, for the same reason and by the same route.
 
-**The shipped `rodAndSeabed` cannot run on the framework yet.** Its
-effective-stress law is `anisotropicBiotElastic`, which has no framework
-counterpart, and migrating it needs one new thing: its two-dimensional
-behaviour comes from `mesh.solutionD()`, and a framework law is constructed
-from a dictionary with no mesh. The manager already injects `planeStress` into
-each law's dictionary for the same reason, so the mechanism exists; it just has
-to be extended. The tutorial's comparison therefore substitutes `linearElastic`
-in both arms, which puts the composite itself under test - the effective stress
-it carries, the seeding, the pressure gather - and says so where it does it.
+That case is also the one that shows why the effective stress is carried rather
+than recomputed. `anisotropicBiotElastic` does not write the zz, yz and xz
+components of the stress in the branch this case takes, so they are whatever
+was in the storage it was handed. Give it the caller's total stress and those
+three components are wrong; give it the effective stress and they are right.
+The composite was written that way on the strength of an argument about
+Mohr-Coulomb, and it turned out to be load-bearing for the very first sub-law
+tried.
+
+One thing this does not do.
 
 **`sigmaEff` is no longer written for post-processing.** The legacy law
 registers it `AUTO_WRITE`, so a case could look at the effective stress

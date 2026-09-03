@@ -1190,6 +1190,21 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 
         lawDict.add("planeStress", planeStress);
 
+        // Which directions the mesh actually solves in. A law that behaves
+        // differently in two dimensions needs this and cannot ask the mesh
+        // itself: a mechanical constitutive law is constructed from a
+        // dictionary and nothing else. Injected for the same reason as
+        // planeStress, and named as the mesh names it
+        if (lawDict.found("solutionD"))
+        {
+            FatalIOErrorInFunction(lawDict)
+                << "'solutionD' is supplied by the mesh and must not be given "
+                << "inside the '" << lawName << "' sub-dictionary."
+                << exit(FatalIOError);
+        }
+
+        lawDict.add("solutionD", mesh_.solutionD());
+
         // Construct law
         laws_.set
         (

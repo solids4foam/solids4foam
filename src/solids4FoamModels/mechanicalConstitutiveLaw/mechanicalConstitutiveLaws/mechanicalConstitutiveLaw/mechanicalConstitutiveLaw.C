@@ -39,6 +39,35 @@ namespace Foam
 
 // * * * * * * * * * Protected Member Functions  * * * * * * * * * * * * * * //
 
+Foam::dictionary Foam::mechanicalConstitutiveLaw::subLawDict
+(
+    const dictionary& dict,
+    const word& subDictName
+)
+{
+    dictionary subDict(dict.subDict(subDictName));
+
+    // Built element by element: foam-extend's List has no initialiser-list
+    // constructor
+    wordList inherited(3);
+    inherited[0] = "rho";
+    inherited[1] = "planeStress";
+    inherited[2] = "solutionD";
+
+    forAll(inherited, i)
+    {
+        const word& name = inherited[i];
+
+        if (!subDict.found(name) && dict.found(name))
+        {
+            subDict.add(dict.lookupEntry(name, false, false).clone().ptr());
+        }
+    }
+
+    return subDict;
+}
+
+
 void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,

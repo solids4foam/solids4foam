@@ -226,6 +226,25 @@ public:
             return wordList();
         }
 
+        //- A sub-law's dictionary, carrying the entries it needs from the
+        //  composite's own.
+        //
+        //  Two kinds of entry live on the parent and have to reach the child.
+        //  A case gives rho once, on the composite, because it describes one
+        //  material; the legacy laws get away with not passing it down because
+        //  they read it only when asked and nothing asks a sub-law, where a
+        //  framework law reads its material properties when it is constructed.
+        //  And the manager injects planeStress and solutionD into each
+        //  top-level law's dictionary, which is not where a sub-law looks.
+        //
+        //  Shared so that the composites cannot drift apart on which entries
+        //  those are
+        static dictionary subLawDict
+        (
+            const dictionary& dict,
+            const word& subDictName
+        );
+
         //- Names of the child states this law owns, one per sub-law.
         //
         //  A composite law delegates to laws of its own, and each of those has
