@@ -700,6 +700,32 @@ had already written it forward - a hole rather than a behaviour worth
 reproducing. `cantilever2d` checks it by restarting and requiring the result
 to match the continuous run exactly.
 
+**Fibre fields: the mechanism is here, the verification is not.** A fibre
+direction is the same shape of thing as an initial stress - a uniform value in
+the law's dictionary when `uniformFibreField` is set, and a field of the same
+name otherwise - so `prescribed` covers it as declared, with vector and tensor
+types already supported and the `0` fallback matching what the legacy Guccione
+law does for exactly these fields.
+
+What is missing is a way to check a migrated fibre law against its legacy
+counterpart over a real load path, which is the only check that has caught
+anything. Every tutorial that uses one - `heartTissueBeam`, `ratCarotid`,
+`idealisedVentricle` - runs through `coupledPressureDisplacementSolid`, which
+is not one of the solid models wired to the framework and is foam-extend only,
+and none of them carries a regression test. Migrating a fibre law before that
+is settled would mean writing several hundred lines of anisotropic
+constitutive code with no way to tell whether it reproduces the law it
+replaces.
+
+Two ways out, and the choice is open: port `coupledPressureDisplacementSolid`
+to the framework, which is the direct route and inherits its foam-extend-only
+restriction; or wait for a case that exercises a fibre law through a solid
+model already on the framework. One further thing a fibre law will need that
+`sigma0` did not: legacy *fatals* when a non-uniform fibre field is missing,
+where a missing `sigma0` is simply zero, so the spec will need a way for a
+declaration to say it is required. That is deliberately not added yet, because
+adding it without a law that uses it would leave it untested.
+
 What is deliberately *not* reproduced: legacy's point-field `correct` aborts
 outright when `sigma0` is non-zero. The framework evaluates points like any
 other integration point, so that case now runs. That is a capability legacy

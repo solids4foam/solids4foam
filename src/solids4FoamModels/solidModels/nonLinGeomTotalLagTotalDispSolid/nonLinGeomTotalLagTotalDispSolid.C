@@ -732,6 +732,43 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
 }
 
 
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDQuad(), sigmaQuad());
+        return;
+    }
+
+    // The quadrature points carry their own constitutive state, distinct from
+    // the cell-centred one, because they are a different set of integration
+    // points. The old-time gradient comes from solidModel, which takes a copy
+    // at the end of each time step: the current field is rebuilt on every
+    // evaluation, so a history-dependent law would otherwise have nothing to
+    // read
+    quadDeformationGradient(gradDQuad(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadDeformationGradient(gradDQuad0(), FQuad0Ptr_);
+    quadInverseAndJacobian(FQuad0Ptr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuad0Ptr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
@@ -1225,10 +1262,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Calculate sigma at the face quadrature points
-        // Stays on the legacy path: the framework's CompactListList overload
-        // needs the old-time gradient at the quadrature points, and this
-        // solver keeps no such field
-        mechanical().correct(gradDQuad(), sigmaQuad());
+        correctStressQuad();
 #endif
     }
     else

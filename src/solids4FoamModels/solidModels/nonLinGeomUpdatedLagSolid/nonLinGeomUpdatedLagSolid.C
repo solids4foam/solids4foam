@@ -594,6 +594,45 @@ Foam::scalar Foam::solidModels::nonLinGeomUpdatedLagSolid::materialResidual()
 }
 
 
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDTotalQuadPtr_(), sigmaQuad());
+        return;
+    }
+
+    // The caller has just accumulated the total displacement gradient at the
+    // quadrature points, so the current kinematics follow from it.
+    //
+    // The old time is FQuadOldPtr_ itself, which the solver stores at the end
+    // of each step from the converged total gradient. It is deliberately not
+    // derived from anything here: this solver keeps updating its kinematics
+    // after the last stress evaluation of a step, so anything derived
+    // mid-iteration would give a history-dependent law the wrong reference,
+    // which is the same trap as Finv0 at the cell centres
+    quadDeformationGradient(gradDTotalQuadPtr_(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadInverseAndJacobian(FQuadOldPtr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuadOldPtr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
 void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 {
     if (!useMechanicalConstitutiveLawManager_)
@@ -1176,7 +1215,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
         updateQuadratureKinematics();
 
         // Calculate sigma at the face quadrature points
-        mechanical().correct(gradDTotalQuadPtr_(), sigmaQuad());
+        correctStressQuad();
 
         // Calculate the cell-centre stress using run-time selectable
         // mechanical law

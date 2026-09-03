@@ -2155,13 +2155,14 @@ the manager constructed, and perturbing the framework stress by 0.1% moves
 `plateHole`'s converged result from 2.22246e+06 to 2.22248e+06, which a dead
 branch cannot do.
 
-**What is not migrated.** The high-order quadrature stress stays on the legacy
-path in both cell-centred solvers that have it. The framework's
-`CompactListList` overload exists, but evaluating a law through it needs the
-old-time gradient at the quadrature points, and neither solver keeps one:
-`gradDQuad()` is rebuilt each call. A history-independent law would not notice;
-a history-dependent one would silently read the wrong state. Closing that needs
-an old-time quadrature gradient, which is a solver change, not a framework one.
+**What was not migrated at the time, and since has been.** The high-order
+quadrature stress stayed on the legacy path because evaluating a law through
+the `CompactListList` overload needs the old-time gradient at the quadrature
+points, and no solver kept one: `gradDQuad()` is rebuilt each call. A
+history-independent law would not notice; a history-dependent one would
+silently read the wrong state. `solidModel` now takes a copy of the quadrature
+gradient at the end of each step, `gradDQuad0()`, which closed it for the
+small-strain solver and then for the two finite-strain ones. See §8.26.
 
 ### 8.20 Sharing a TypeName with a legacy law has a portability trap
 
@@ -2409,9 +2410,46 @@ at 2.0061e-08, 4.81145e-08 and 54331.2. The topology error above is worth
 keeping in mind as evidence in its own right - it proves the framework branch
 is the one being taken, so the agreement is not a switch that does nothing.
 
-**Still on the legacy path**: the finite-strain quadrature stress in both
-`nonLinGeom` solvers. That needs a finite-strain `CompactListList` overload
-carrying F, J and Finv at quadrature points, which does not exist yet.
+**Since migrated**: the finite-strain quadrature stress in both `nonLinGeom`
+solvers. See §8.26.
+
+### 8.26 The finite-strain quadrature stress
+
+Both `nonLinGeom` solvers now take their high-order quadrature stress from the
+framework. Two things that looked like blockers were not.
+
+The `CompactListList` finite-strain overload was already there and already
+implemented; the note above said it did not exist, and by the time anyone read
+it again that had stopped being true. The other was the old-time kinematics,
+and each solver turned out to have what it needed. The total-Lagrangian solver
+uses `gradDQuad0()`, added to `solidModel` for the small-strain migration; a
+comment at its call site still said "this solver keeps no such field", which
+had also gone stale. The updated-Lagrangian solver already keeps `FQuadOld`,
+stored from the converged total gradient at the end of each step.
+
+`F`, `Finv` and `J` at the quadrature points are built by two helpers on
+`solidModel`, shared rather than written twice, and held in members rather than
+rebuilt per call: they are each as large as the quadrature stress itself. They
+take their offsets from the gradient, so every list handed to the manager
+shares one row structure, which is what it requires.
+
+The updated-Lagrangian old time is `FQuadOld` directly and is deliberately not
+derived from anything at the point of use. That solver keeps updating its
+kinematics after the last stress evaluation of a step, so a derived old time
+would be taken from a mid-iteration state - the same trap as `Finv0` at the
+cell centres, recorded in §8.13.
+
+Verified on `rotatingBlock`, which already had both a `highOrder` and a
+`highOrderUpdatedLagrangian` arm. Each gained a `Manager` counterpart that
+links the base arm's own files and puts one `solidProperties` over the top, so
+the pair differs in the constitutive path and in nothing else. Both pairs agree
+bit for bit, and each arm asserts from the solver log which path it took.
+
+The cell-centre stress differs between the arms by about 2e-3 Pa on a material
+of 200 GPa, which is round-off on a rigid rotation whose true stress is zero,
+and it does not reach the solution: with `highOrderResidual` the momentum
+residual is built from the quadrature stress, and the displacement agrees
+exactly.
 
 ### 8.15 Open questions still outstanding
 

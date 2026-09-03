@@ -389,6 +389,26 @@ private:
 
 protected:
 
+        //- Deformation gradient at the quadrature points, F = I + gradD.T(),
+        //  from a total displacement gradient there. Sized and offset to
+        //  match the gradient, so every list handed to the constitutive
+        //  framework shares one row structure, as it requires
+        static void quadDeformationGradient
+        (
+            const CompactListList<tensor>& gradD,
+            autoPtr<CompactListList<tensor>>& FPtr
+        );
+
+        //- Inverse and determinant of a deformation gradient at the
+        //  quadrature points
+        static void quadInverseAndJacobian
+        (
+            const CompactListList<tensor>& F,
+            autoPtr<CompactListList<tensor>>& FinvPtr,
+            autoPtr<CompactListList<scalar>>& JPtr
+        );
+
+
     // Protected member functions
 
         //- Make the dual mesh from the mesh

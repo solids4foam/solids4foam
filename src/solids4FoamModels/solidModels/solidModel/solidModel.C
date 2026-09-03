@@ -1756,6 +1756,63 @@ void Foam::solidModel::updateTotalFields()
 }
 
 
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModel::quadDeformationGradient
+(
+    const CompactListList<tensor>& gradD,
+    autoPtr<CompactListList<tensor>>& FPtr
+)
+{
+    if (FPtr.empty())
+    {
+        FPtr.set(new CompactListList<tensor>());
+    }
+
+    FPtr().offsets() = gradD.offsets();
+    FPtr().m().setSize(gradD.m().size());
+
+    const List<tensor>& gradDv = gradD.m();
+    List<tensor>& F = FPtr().m();
+
+    forAll(gradDv, i)
+    {
+        F[i] = I + gradDv[i].T();
+    }
+}
+
+
+void Foam::solidModel::quadInverseAndJacobian
+(
+    const CompactListList<tensor>& F,
+    autoPtr<CompactListList<tensor>>& FinvPtr,
+    autoPtr<CompactListList<scalar>>& JPtr
+)
+{
+    if (FinvPtr.empty())
+    {
+        FinvPtr.set(new CompactListList<tensor>());
+        JPtr.set(new CompactListList<scalar>());
+    }
+
+    FinvPtr().offsets() = F.offsets();
+    JPtr().offsets() = F.offsets();
+    FinvPtr().m().setSize(F.m().size());
+    JPtr().m().setSize(F.m().size());
+
+    const List<tensor>& Fv = F.m();
+    List<tensor>& Finv = FinvPtr().m();
+    List<scalar>& J = JPtr().m();
+
+    forAll(Fv, i)
+    {
+        Finv[i] = inv(Fv[i]);
+        J[i] = det(Fv[i]);
+    }
+}
+#endif
+
+
 void Foam::solidModel::end()
 {
     solidProperties_.IOobject::rename
