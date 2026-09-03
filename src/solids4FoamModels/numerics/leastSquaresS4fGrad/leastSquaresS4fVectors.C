@@ -157,6 +157,11 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
     const Field<bool> interface(cellZoneInterface(mesh));
 
+    // A material interface that runs along a processor boundary is an internal
+    // face on neither side, so it has to be skipped here as well or the
+    // stencil would reach across it in parallel and not in serial
+    const List<boolList> interfaceCoupled(cellZoneInterfaceCoupled(mesh));
+
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh.nCells(), symmTensor::zero);
     forAll(owner, facei)
@@ -201,6 +206,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
             forAll(pd, patchFacei)
             {
+                if (interfaceCoupled[patchi][patchFacei])
+                {
+                    // Skip contributions across interfaces
+                    continue;
+                }
+
                 const vector& d = pd[patchFacei];
 
                 dd[faceCells[patchFacei]] +=
@@ -305,6 +316,13 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
             forAll(pd, patchFacei)
             {
+                if (interfaceCoupled[patchi][patchFacei])
+                {
+                    // Set face contribution to zero across interfaces
+                    patchLsP[patchFacei] = vector::zero;
+                    continue;
+                }
+
                 const vector& d = pd[patchFacei];
 
                 patchLsP[patchFacei] =
@@ -484,10 +502,21 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     const labelListList& cellPoints = mesh.cellPoints();
     const labelListList& pointCells = mesh.pointCells();
 
+    // A point neighbour of a different material is no more admissible than a
+    // face neighbour of one: either way the gradient would be built from two
+    // materials at once. Every cell is -1 when the case has a single material,
+    // so this costs nothing there
+    const labelList materialID(cellMaterialID(mesh));
+
+    // As for the face stencil, an interface running along a processor
+    // boundary has to be skipped explicitly
+    const List<boolList> interfaceCoupled(cellZoneInterfaceCoupled(mesh));
+
     forAll(wideCells_, wcI)
     {
         const label cellI = wideCells_[wcI];
         const labelList& curCellPoints = cellPoints[cellI];
+        const label cellMaterial = materialID[cellI];
 
         labelHashSet stencil;
         forAll(curCellPoints, cpI)
@@ -496,7 +525,10 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
             forAll(curPointCells, pcI)
             {
-                stencil.insert(curPointCells[pcI]);
+                if (materialID[curPointCells[pcI]] == cellMaterial)
+                {
+                    stencil.insert(curPointCells[pcI]);
+                }
             }
         }
         stencil.erase(cellI);
@@ -540,7 +572,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             {
                 const label wcI = cellToWide[faceCells[patchFacei]];
 
-                if (wcI != -1)
+                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
                 {
                     const vector& d = pd[patchFacei];
 
@@ -593,29 +625,58 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     // Warn if any cell is still rank-deficient after widening: in parallel the
     // point-cell stencil is truncated at processor boundaries
     label nStillSingular = 0;
+    label worstCell = -1;
+    scalar worstRatio = GREAT;
+
     forAll(wideDd, wcI)
     {
         const symmTensor ddc(wideDd[wcI] + (tr(wideDd[wcI])/3.0)*emptyDirs);
         const vector eVals = eigenValues(ddc);
 
-        if
-        (
-            eVals[vector::Z] < VSMALL
-         || eVals[vector::X] <= minEigenRatio*eVals[vector::Z]
-        )
+        const scalar lambdaMin = eVals[vector::X];
+        const scalar lambdaMax = eVals[vector::Z];
+
+        if (lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax)
         {
             nStillSingular++;
+
+            const scalar ratio =
+                lambdaMax < VSMALL ? 0.0 : lambdaMin/lambdaMax;
+
+            if (ratio < worstRatio)
+            {
+                worstRatio = ratio;
+                worstCell = wideCells_[wcI];
+            }
         }
     }
 
     if (returnReduce(nStillSingular, sumOp<label>()) > 0)
     {
-        WarningInFunction
+        // A cell whose stencil cannot span the mesh's directions has no
+        // gradient that can be reconstructed from it, and there is no sound
+        // fallback: widening again would not help, and falling back on an
+        // unfiltered stencil would build the gradient from two materials at
+        // once, which is what the filtering exists to prevent.
+        //
+        // Two geometries produce this. Where the case has several materials,
+        // the cell's own material does not surround it - a material one cell
+        // thick, or a cell at a material corner or tip. Where it has one, the
+        // point-cell stencil has been truncated at a processor boundary. Both
+        // mean the same thing about the answer, so both are fatal
+        FatalErrorInFunction
             << returnReduce(nStillSingular, sumOp<label>())
             << " cells remain rank-deficient after widening the gradient"
-            << " stencil to point neighbours." << nl
-            << "    In parallel this indicates the point-cell stencil is"
-            << " truncated at a processor boundary." << endl;
+            << " stencil to point neighbours of the same material." << nl
+            << "    Worst on this processor: cell " << worstCell
+            << ", material " << (worstCell >= 0 ? materialID[worstCell] : -1)
+            << ", smallest eigenvalue ratio " << worstRatio << nl
+            << "    Either the cell's own material does not surround it in"
+            << " every direction, in which case refine so that at least two"
+            << " cells span the material everywhere; or the stencil is"
+            << " truncated at a processor boundary, in which case decompose"
+            << " so that it is not."
+            << exit(FatalError);
     }
 
     const symmTensorField wideInvDd(inv(wideDd));
@@ -671,7 +732,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             {
                 const label wcI = cellToWide[faceCells[patchFacei]];
 
-                if (wcI != -1)
+                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
                 {
                     const vector& d = pd[patchFacei];
 
