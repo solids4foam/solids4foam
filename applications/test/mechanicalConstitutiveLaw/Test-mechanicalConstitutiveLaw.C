@@ -1632,6 +1632,108 @@ int main(int argc, char *argv[])
     }
 
     // ---------------------------------------------------------------------
+    // Child states
+    //
+    // A composite law gives each sub-law a state of its own. These check the
+    // three things that make that safe: a child is sized like its parent, the
+    // old-time rollover reaches it, and a shadow of a parent presents shadows
+    // of the children rather than the children themselves
+    // ---------------------------------------------------------------------
+    {
+        Info<< nl << "Child states" << nl;
+
+        mechanicalConstitutiveLawState parent(4);
+
+        report
+        (
+            "child is absent until asked for",
+            !parent.foundChild("sub")
+        );
+
+        mechanicalConstitutiveLawState& sub = parent.child("sub");
+
+        report("child is created on first use", parent.foundChild("sub"));
+        report
+        (
+            "child is sized like its parent",
+            sub.size() == parent.size(),
+            "got " + Foam::name(sub.size())
+        );
+        report
+        (
+            "the same child comes back each time",
+            &parent.child("sub") == &sub
+        );
+
+        // A child's own history must roll over with its parent's. Both times
+        // are created up front, as a law's own initialisation does: the
+        // rollover walks the old-time table, so a field with no old-time entry
+        // is deliberately not history
+        sub.scalarField("h") = 1.0;
+        sub.scalarField0("h") = 0.0;
+        parent.storeOldTime();
+        sub.scalarField("h") = 2.0;
+
+        const mechanicalConstitutiveLawState& csub = sub;
+
+        report
+        (
+            "storeOldTime reaches the child",
+            mag(csub.scalarField0("h")[0] - 1.0) < SMALL
+         && mag(csub.scalarField("h")[0] - 2.0) < SMALL,
+            "old " + Foam::name(csub.scalarField0("h")[0])
+          + ", current " + Foam::name(csub.scalarField("h")[0])
+        );
+
+        parent.setSize(6);
+
+        report
+        (
+            "setSize reaches the child",
+            sub.size() == 6,
+            "got " + Foam::name(sub.size())
+        );
+
+        // A shadow must shadow all the way down. Writing through the shadow's
+        // child must leave the real child alone, and reading history through
+        // it must give the real child's history
+        {
+            mechanicalConstitutiveLawState shadow
+            (
+                parent, mechanicalConstitutiveLawState::SHADOW
+            );
+
+            mechanicalConstitutiveLawState& shadowSub = shadow.child("sub");
+
+            report
+            (
+                "a shadow's child is not the parent's child",
+                &shadowSub != &sub
+            );
+
+            report("a shadow's child is itself a shadow", shadowSub.isShadow());
+
+            const mechanicalConstitutiveLawState& cShadowSub = shadowSub;
+
+            report
+            (
+                "a shadow's child reads the real child's history",
+                mag(cShadowSub.scalarField0("h")[0] - 1.0) < SMALL,
+                "got " + Foam::name(cShadowSub.scalarField0("h")[0])
+            );
+
+            shadowSub.scalarField("h") = 99.0;
+
+            report
+            (
+                "writing through a shadow's child leaves the child alone",
+                mag(csub.scalarField("h")[0] - 2.0) < SMALL,
+                "got " + Foam::name(csub.scalarField("h")[0])
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
 
     Info<< nl << "============================================================"
         << nl;

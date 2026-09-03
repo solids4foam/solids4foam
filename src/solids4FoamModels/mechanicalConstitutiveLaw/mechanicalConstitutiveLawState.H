@@ -88,6 +88,15 @@ class mechanicalConstitutiveLawState
         //  through it, and owns its own current-time fields
         const mechanicalConstitutiveLawState* shadowedPtr_;
 
+        //- States owned by this one, keyed by name.
+        //
+        //  A composite law gives each sub-law a state of its own rather than
+        //  sharing one and hoping the names do not collide. A sub-law then
+        //  looks its history up by its own unqualified name, which is the
+        //  point: prefixing a declaration does not prefix the lookups the
+        //  sub-law already makes
+        mutable HashTable<autoPtr<mechanicalConstitutiveLawState>> children_;
+
 
     // Private helper interface
 
@@ -208,6 +217,18 @@ public:
 
 
     // Edit
+
+        //- A state owned by this one, created on first use at this state's
+        //  size. On a shadow it returns a shadow of the parent's child, so a
+        //  tangent query evaluated into a shadow reaches shadowed history all
+        //  the way down rather than only at the top level
+        mechanicalConstitutiveLawState& child(const word& name) const;
+
+        //- Whether a child of this name exists, without creating one
+        bool foundChild(const word& name) const;
+
+        //- Names of the children, in no particular order
+        wordList childNames() const;
 
         void setSize(const label newSize);
 

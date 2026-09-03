@@ -215,11 +215,78 @@ mechanicalConstitutiveLawState::readableFields0() const
 
 // * * * * * * * * * * * * Public interface * * * * * * * * * * * * * * * //
 
+mechanicalConstitutiveLawState& mechanicalConstitutiveLawState::child
+(
+    const word& name
+) const
+{
+    HashTable<autoPtr<mechanicalConstitutiveLawState>>::iterator iter =
+        children_.find(name);
+
+    if (iter != children_.end())
+    {
+        return iter()();
+    }
+
+    if (isShadow())
+    {
+        // A shadow of this state must present shadows of the children, or a
+        // sub-law evaluated through it would read and write the parent's own
+        // history, which is exactly what shadowing exists to prevent
+        children_.insert
+        (
+            name,
+            autoPtr<mechanicalConstitutiveLawState>
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    shadowedPtr_->child(name),
+                    SHADOW
+                )
+            )
+        );
+    }
+    else
+    {
+        children_.insert
+        (
+            name,
+            autoPtr<mechanicalConstitutiveLawState>
+            (
+                new mechanicalConstitutiveLawState(size_)
+            )
+        );
+    }
+
+    return children_[name]();
+}
+
+
+bool mechanicalConstitutiveLawState::foundChild(const word& name) const
+{
+    return children_.found(name);
+}
+
+
+wordList mechanicalConstitutiveLawState::childNames() const
+{
+    return children_.toc();
+}
+
+
 void mechanicalConstitutiveLawState::setSize(const label newSize)
 {
     checkNotShadow("setSize");
 
     size_ = newSize;
+
+    forAllIter
+    (
+        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
+    )
+    {
+        citer()->setSize(newSize);
+    }
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
     {
@@ -260,6 +327,17 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 void mechanicalConstitutiveLawState::storeOldTime()
 {
     checkNotShadow("storeOldTime");
+
+    // A composite's history lives in its children, so the rollover has to
+    // reach them; otherwise a sub-law would read this step's values as though
+    // they were last step's
+    forAllIter
+    (
+        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
+    )
+    {
+        citer()->storeOldTime();
+    }
 
     // Scalars
 #ifdef OPENFOAM_COM

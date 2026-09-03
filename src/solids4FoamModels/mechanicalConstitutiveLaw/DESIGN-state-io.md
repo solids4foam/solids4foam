@@ -454,12 +454,29 @@ What is needed is either a scoped facade that prefixes every *lookup*, or a
 child state object per layer.
 
 **Child states need recursive lifecycle support.** They are the safer model,
-but the manager currently shadows exactly one flat state per law, plus its
-separately stored boundary states. Child states must be allocated, restarted,
-written, rolled over to old time, and shadowed *as a tree*. Without that,
-either the rollover leaks across layers or a tangent query evaluates the
-sub-law against the wrong state. This is the real cost of composites and should
-be paid deliberately.
+and they are now implemented. `mechanicalConstitutiveLawState::child(name)`
+returns a state owned by this one, created on first use at the parent's size.
+A composite hands its sub-law that child, so the sub-law looks its history up
+by its own unqualified name and nothing collides. Prefixing was the alternative
+and does not work, for the reason above.
+
+Two lifecycle operations recurse. `setSize` resizes the children, and
+`storeOldTime` rolls them over - without which a sub-law would read this step's
+values as though they were last step's. Restart IO does not recurse yet,
+because it does not exist at all; that is §5.
+
+Shadowing recurses too, and this is the part worth stating plainly: `child()`
+on a shadow returns *a shadow of the parent's corresponding child*, created
+lazily. Anything else and a tangent query evaluated into a shadow would reach
+shadowed history at the top level and the sub-law's real history underneath -
+writing to it, and committing perturbed values. `Test-mechanicalConstitutiveLaw`
+checks exactly that: a shadow's child is not the parent's child, is itself a
+shadow, reads the real child's history, and writing through it leaves the real
+child untouched.
+
+One deliberate asymmetry: the rollover walks the old-time table, so a field
+that has a current entry and no old-time one is not history and is not rolled
+over. That is how a law says a field is scratch rather than state.
 
 **The sub-law's material properties are not reachable.** `kappa()` does exist
 on the interface, so the first draft was wrong to say no properties are
@@ -730,6 +747,49 @@ What is deliberately *not* reproduced: legacy's point-field `correct` aborts
 outright when `sigma0` is non-zero. The framework evaluates points like any
 other integration point, so that case now runs. That is a capability legacy
 lacked rather than a behaviour change to a case that worked before.
+
+### 8a.9 The bi-material interface: a difference we accept
+
+`layeredPipe` is the only multi-material tutorial, and legacy and framework
+disagree there by 6.25e-10 in a displacement field of 1.6e-7, about 0.4%. The
+difference is confined to the four cells immediately against the material
+interface, all on the inner side; the case's own discretisation error against
+the analytical solution is 1.9%, some five times larger.
+
+Three candidate causes were tested and ruled out:
+
+* Switching `grad(D)` to a material-aware least-squares scheme changed the
+  disagreement by nothing at all - 6.252e-10 either way. Both arms take their
+  `gradD` from the same `mechanical().grad()` call, which computes it per
+  material on sub-meshes, so the two share a gradient by construction and no
+  gradient scheme can separate them.
+* Tightening `rTol` from 1e-6 to 1e-12, which takes the solve from 57 to 402
+  iterations, left it at 6.15e-10. It is not an artefact of stopping early.
+  Note in passing that `rTol` is the entry that governs this criterion;
+  `solutionTolerance`, which appears in these dictionaries, does not.
+* Making the two materials identical collapses it to 1.1e-12, which is
+  round-off. The material contrast is the whole of it.
+
+What remains is the interface treatment itself. Legacy carries a sub-mesh per
+material and iteratively corrects the displacement at the interface faces
+between them. That machinery is what the sub-meshes exist for, and it is not
+being reproduced: the intended replacement is a material-aware least-squares
+gradient, where a cell's stencil draws only on cells of its own material. That
+is simpler, it is consistent, and it will not agree to the last bit with the
+iterative correction it replaces.
+
+So this difference is expected rather than a defect, and it is recorded here
+rather than chased. What would be a defect is it appearing somewhere with no
+material interface, or growing.
+
+Two notes for whoever writes the material-aware scheme. It does not exist yet:
+an earlier `cellZoneInterface` helper in `leastSquaresS4fGrad` skipped face
+contributions across cell-zone interfaces, and it was removed by the change
+that added the rank-deficient and simplex stencil widening, so nothing on
+`development` is material aware today. And that widening is itself a second
+reason a migrated case may not reproduce a legacy number exactly, independent
+of anything here. Whether the new scheme keys on cell zones or looks up the
+materials is open; cell zones were what the removed helper used.
 
 ### 8a.5 Why kinematics and inputs stay separate, and what goes in inputs
 
