@@ -381,6 +381,100 @@ if ! run_restart_test; then
     failures=$((failures + 1))
 fi
 
+# ------------------------------------------------------------
+# Restart on a different decomposition
+# ------------------------------------------------------------
+# decomposePar does not copy the constitutive state into the processor
+# directories - it has no idea what these files are, and there is no hook by
+# which a library can teach it. So a decomposed run goes back to the
+# undecomposed case for the state and distributes it itself, using the
+# cellProcAddressing that decomposePar already writes.
+#
+# This runs serially to t = 10, decomposes onto four processors, and continues
+# there. The answer has to be the uninterrupted serial one, because a change of
+# decomposition is not supposed to be a change of problem
+run_parallel_restart_test() {
+    if ! command -v mpirun > /dev/null 2>&1; then
+        echo "SKIP: parallel restart (no mpirun)"
+        return 0
+    fi
+
+    local d="${REGRESSION_ROOT}/frameworkParallel"
+
+    prepare_case "frameworkParallel"
+    CASE_DIR="${d}"
+
+    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    cat > "${d}/system/decomposeParDict" << 'EOD'
+FoamFile { version 2.0; format ascii; class dictionary; object decomposeParDict; }
+numberOfSubdomains 4;
+method scotch;
+EOD
+
+    sed -i.bak \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    if ! ( cd "${d}" && decomposePar -time 10 > log.decomposePar 2>&1 ); then
+        echo "SKIP: parallel restart (decomposePar failed)"
+        return 0
+    fi
+
+    # The premise of the whole test: decomposePar leaves the state behind. If
+    # some future version starts copying it, this test would quietly become a
+    # test of something else
+    if ls "${d}"/processor0/10/*:*:epsilonP > /dev/null 2>&1; then
+        echo "FAIL: parallel restart: decomposePar copied the state, so this"
+        echo "      test is no longer exercising the mapping it was written for"
+        return 1
+    fi
+    echo "PASS: parallel restart: state is not in the processor directories"
+
+    if ! ( cd "${d}" && mpirun -np 4 solids4Foam -parallel > log.par 2>&1 ); then
+        echo "FAIL: parallel restart did not run"
+        grep -m2 "FOAM FATAL" -A3 "${d}/log.par" || true
+        return 1
+    fi
+
+    if grep -q "Mapped .* from the undecomposed case" "${d}/log.par"; then
+        echo "PASS: parallel restart mapped the state from the serial case"
+    else
+        echo "FAIL: parallel restart ran without mapping any state"
+        return 1
+    fi
+
+    local eps
+    eps=$(grep "Max epsilonEq" "${d}/log.par" | awk '{print $NF}' | tail -n 1)
+
+    if [[ -z "${eps}" || -z "${RESULT_EPS[framework]:-}" ]]; then
+        echo "SKIP: parallel restart needs the framework arm to have run"
+        return 0
+    fi
+
+    local a="${RESULT_EPS[framework]}"
+
+    if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
+        printf "PASS: restart on four processors matches the serial run (%.8g vs %.8g)\n" \
+            "$a" "$eps"
+    else
+        printf "FAIL: restart on four processors differs (%.8g vs %.8g)\n" \
+            "$a" "$eps"
+        return 1
+    fi
+
+    return 0
+}
+
+if ! run_parallel_restart_test; then
+    failures=$((failures + 1))
+fi
+
 echo
 if (( failures == 0 ))
 then

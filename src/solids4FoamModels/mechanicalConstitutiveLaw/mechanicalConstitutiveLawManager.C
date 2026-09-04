@@ -19,6 +19,8 @@ License
 
 #include "mechanicalConstitutiveLawManager.H"
 #include "mechanicalConstitutiveLawStateIO.H"
+#include "IFstream.H"
+#include "labelIOList.H"
 #include "compatibilityFunctions.H"
 #include "integrationPointTopologies.H"
 #include "emptyFvPatch.H"
@@ -120,6 +122,176 @@ void evaluateResponse
 }
 
 
+
+//- Read a list written by a serial run, from the undecomposed case.
+//  decomposePar does not copy these files into the processor directories, so
+//  a decomposed restart goes back to the serial one and maps it. Read by hand
+//  rather than through the registry because the object wanted is in another
+//  case directory entirely
+template<class ListType>
+bool readSerialList
+(
+    const fvMesh& mesh,
+    const word& name,
+    ListType& data,
+    string& note
+)
+{
+    const fileName path
+    (
+        mechanicalConstitutiveLawStateIO::globalCasePath(mesh)
+      / mesh.time().timeName()
+      / name
+    );
+
+    IFstream is(path);
+
+    if (!is.good())
+    {
+        return false;
+    }
+
+    // Not registered: this is a file from another case directory being read
+    // for its contents, and it must not appear in this run's registry
+    IOobject io
+    (
+        name,
+        mesh.time().timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+
+    if (!io.readHeader(is))
+    {
+        return false;
+    }
+
+    is >> data;
+    note = io.note();
+
+    return is.good() || is.eof();
+}
+
+
+//- Where each of this processor's state entries sat in the serial run.
+//  The serial file lists, for every entry it holds, the piece of mesh that
+//  entry belongs to. This processor knows the same thing about its own
+//  entries, in its own numbering, and decomposePar's addressing translates
+//  between the two - so the two lists are matched on mesh entity rather than
+//  on position, and the order either was written in stops mattering
+Foam::labelList serialPositions
+(
+    const fvMesh& mesh,
+    const labelUList& localEntities,
+    const labelUList& serialEntities,
+    const label serialNCells,
+    const word& name
+)
+{
+    const labelList cellAddr
+    (
+        mechanicalConstitutiveLawStateIO::cellProcAddressing(mesh)
+    );
+    const labelList faceAddr
+    (
+        mechanicalConstitutiveLawStateIO::faceProcAddressing(mesh)
+    );
+
+    if (cellAddr.empty() || faceAddr.empty())
+    {
+        FatalErrorInFunction
+            << "Restarting '" << name << "' from the undecomposed case needs "
+            << "cellProcAddressing and faceProcAddressing, which decomposePar "
+            << "writes into each processor's mesh directory." << nl
+            << "They are not there, so this decomposition cannot be related "
+            << "to the serial one."
+            << exit(FatalError);
+    }
+
+    // Serial entity to its position in the serial file
+    HashTable<label, label, Hash<label>> positionOf(2*serialEntities.size());
+
+    forAll(serialEntities, i)
+    {
+        positionOf.insert(serialEntities[i], i);
+    }
+
+    labelList positions(localEntities.size(), -1);
+
+    forAll(localEntities, i)
+    {
+        const label local = localEntities[i];
+
+        // Translate this processor's entity into the serial one
+        label serial = -1;
+
+        if (local < mesh.nCells())
+        {
+            serial =
+                mechanicalConstitutiveLawStateIO::cellEntity(cellAddr[local]);
+        }
+        else
+        {
+            const label localFace = local - mesh.nCells();
+
+            // Offset by one and signed, so that face zero can carry a sign
+            const label serialFace = mag(faceAddr[localFace]) - 1;
+
+            serial = mechanicalConstitutiveLawStateIO::faceEntity
+            (
+                serialNCells, serialFace
+            );
+        }
+
+        HashTable<label, label, Hash<label>>::const_iterator iter =
+            positionOf.find(serial);
+
+        if (iter == positionOf.end() && local >= mesh.nCells())
+        {
+            // A face this processor calls a boundary that the serial mesh
+            // called interior: decomposition made it one, by cutting the mesh
+            // there. The serial run kept no history on it, because a
+            // cell-centred topology keeps none on interior faces, so there is
+            // nothing to look up and nothing has been lost.
+            //
+            // Its owner cell is the nearest thing that does have history, and
+            // is what the face's own state grew from, so that is what it gets.
+            // A decomposed run continued from a serial one is therefore not
+            // identical to a decomposed run continued from a decomposed one at
+            // these faces, and cannot be: the history it would need was never
+            // written because it never existed
+            const label localFace = local - mesh.nCells();
+            const label ownerCell = mesh.faceOwner()[localFace];
+
+            iter = positionOf.find
+            (
+                mechanicalConstitutiveLawStateIO::cellEntity
+                (
+                    cellAddr[ownerCell]
+                )
+            );
+        }
+
+        if (iter == positionOf.end())
+        {
+            FatalErrorInFunction
+                << "Restarting '" << name << "': this processor holds a "
+                << "point on mesh entity " << serial << " of the serial mesh, "
+                << "and the serial state does not have one there." << nl
+                << "The serial state and this mesh do not describe the same "
+                << "case, or the material a cell belongs to has changed."
+                << exit(FatalError);
+        }
+
+        positions[i] = iter();
+    }
+
+    return positions;
+}
+
+
 //- Register one state variable for writing, and read it back on a restart.
 //
 //  The state is written as it is held, a flat list, so that the value read is
@@ -133,6 +305,8 @@ void restartStateField
 (
     const fvMesh& mesh,
     const word& name,
+    const word& entityName,
+    const labelUList& entities,
     const mechanicalConstitutiveLawStateIO::stateParts& parts,
     const word& variableName,
     const bool isRestart,
@@ -160,10 +334,85 @@ void restartStateField
         // Both OpenFOAM.com and OpenFOAM.org spell this typeHeaderOk;
         // foam-extend has only the untyped headerOk
 #ifdef OPENFOAM_NOT_EXTEND
-        const bool present = readIO.typeHeaderOk<IOField<Type>>(false);
+        bool present = readIO.typeHeaderOk<IOField<Type>>(false);
 #else
-        const bool present = readIO.headerOk();
+        bool present = readIO.headerOk();
 #endif
+
+        // Set when the values came from the undecomposed case rather than
+        // from this processor's own directory
+        bool mapped = false;
+
+        if (!present && Pstream::parRun())
+        {
+            // Nothing in this processor's directory. decomposePar does not
+            // copy these files, so a case decomposed after it was run has its
+            // state sitting in the undecomposed directory - which is readable,
+            // and which decomposePar's own addressing says how to distribute
+            Field<Type> serialData;
+            labelList serialEntities;
+            string dataNote, entityNote;
+
+            const bool haveData =
+                readSerialList(mesh, name, serialData, dataNote);
+            const bool haveEntities =
+                readSerialList(mesh, entityName, serialEntities, entityNote);
+
+            if (haveData && haveEntities)
+            {
+                const label serialNCells =
+                    mechanicalConstitutiveLawStateIO::serialCellCount(dataNote);
+
+                if (serialNCells < 0)
+                {
+                    FatalErrorInFunction
+                        << "The state file '" << name << "' in the "
+                        << "undecomposed case was not written by a serial run."
+                        << nl << "  its header says: " << dataNote
+                        << exit(FatalError);
+                }
+
+                if (serialData.size() != serialEntities.size())
+                {
+                    FatalErrorInFunction
+                        << "The serial state '" << name << "' holds "
+                        << serialData.size() << " values and "
+                        << serialEntities.size() << " integration point "
+                        << "locations. They are written together and must "
+                        << "agree." << exit(FatalError);
+                }
+
+                const labelList positions
+                (
+                    serialPositions
+                    (
+                        mesh, entities, serialEntities, serialNCells, name
+                    )
+                );
+
+                label k = 0;
+                forAll(parts, partI)
+                {
+                    Field<Type>& f =
+                        stateFieldAccess<Type>::ref(*parts[partI], variableName);
+                    Field<Type>& f0 =
+                        stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+
+                    forAll(f, i)
+                    {
+                        f[i] = serialData[positions[k]];
+                        f0[i] = serialData[positions[k]];
+                        k++;
+                    }
+                }
+
+                Info<< "    Mapped '" << name << "' from the undecomposed case"
+                    << endl;
+
+                present = true;
+                mapped = true;
+            }
+        }
 
         if (!present)
         {
@@ -174,24 +423,44 @@ void restartStateField
                 << "A history dependent material cannot continue without it."
                 << nl
                 << "It is written from the first time step of a run that uses "
-                << "the mechanical constitutive law framework, so a run "
-                << "started before this was available has to be started again "
-                << "from the beginning."
+                << "the mechanical constitutive law framework. A case "
+                << "decomposed after it was run keeps its state in the "
+                << "undecomposed directory, and that is looked for too, so "
+                << "this means neither is present."
                 << exit(FatalError);
         }
 
+        if (!mapped)
+        {
         const IOField<Type> stored(readIO);
+
+        // The header says which decomposition wrote this. A file of the right
+        // length from the wrong one reads as plausible values in the wrong
+        // cells, which is the single way this could still be silently wrong
+        const string expected
+        (
+            mechanicalConstitutiveLawStateIO::decompositionIdentity(mesh)
+        );
+
+        if (stored.note() != expected)
+        {
+            FatalErrorInFunction
+                << "Constitutive state field '" << name << "' was written for "
+                << "a different decomposition." << nl
+                << "  the file says: " << stored.note() << nl
+                << "  this run is:   " << expected << nl
+                << "This usually means processor directories were left behind "
+                << "by an earlier decomposePar. The values would be the right "
+                << "count and the wrong cells, so they are refused rather "
+                << "than read."
+                << exit(FatalError);
+        }
 
         if (stored.size() != n)
         {
             FatalErrorInFunction
                 << "Constitutive state field '" << name << "' holds "
                 << stored.size() << " values but this run needs " << n << '.'
-                << nl
-                << "The state is written per integration point in the order "
-                << "the mesh gives them, so it can only be read back on the "
-                << "decomposition that wrote it. Neither decomposePar nor "
-                << "reconstructPar maps it."
                 << exit(FatalError);
         }
 
@@ -213,6 +482,7 @@ void restartStateField
                 f0[i] = stored[k];
                 k++;
             }
+        }
         }
     }
 
@@ -237,7 +507,8 @@ void restartStateField
                 IOobject::AUTO_WRITE
             ),
             parts,
-            variableName
+            variableName,
+            mesh
         )
     );
 }
@@ -1019,12 +1290,107 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
             }
         }
 
+        // Where each of this law's points sits on the mesh, in the order the
+        // state is written. Written alongside the state so that a run on a
+        // different decomposition can match entry to entry by mesh entity
+        // instead of by position - the state's own order comes from a hash set
+        // for the boundary part and means nothing across decompositions.
+        //
+        // Only the cell-centred topology for now: a cell maps through
+        // decomposePar's addressing directly, whereas a point- or dual-based
+        // one needs its own translation that is not written yet. The others
+        // write no locations, and a restart on a changed decomposition then
+        // refuses rather than guessing
+        labelList entities;
+
+        if (topo.type() == cellCentredIntegrationPointTopology::typeName)
+        {
+            const labelList& ipIDs = entry.lawIntegrationPointIDs_[lawI];
+
+            label nEntities = ipIDs.size();
+
+            if (entry.boundaryAware_)
+            {
+                forAll(mesh_.boundary(), patchI)
+                {
+                    nEntities += lawBoundaryFaces_[lawI][patchI].size();
+                }
+            }
+
+            entities.setSize(nEntities);
+
+            label k = 0;
+
+            forAll(ipIDs, i)
+            {
+                entities[k++] =
+                    mechanicalConstitutiveLawStateIO::cellEntity(ipIDs[i]);
+            }
+
+            if (entry.boundaryAware_)
+            {
+                forAll(mesh_.boundary(), patchI)
+                {
+                    const labelList& pf = lawBoundaryFaces_[lawI][patchI];
+                    const label start = mesh_.boundaryMesh()[patchI].start();
+
+                    forAll(pf, i)
+                    {
+                        entities[k++] =
+                            mechanicalConstitutiveLawStateIO::faceEntity
+                            (
+                                mesh_.nCells(), start + pf[i]
+                            );
+                    }
+                }
+            }
+        }
+
+        const word entityName
+        (
+            mechanicalConstitutiveLawStateIO::fieldName
+            (
+                lawNames_[lawI], topo.type(), wordList(), "integrationPoints"
+            )
+        );
+
+        if (!entities.empty() && !Pstream::parRun())
+        {
+            // Written by a serial run only: it is a serial run's locations
+            // that a decomposed one needs, and a processor writing its own
+            // would only describe a decomposition that already has its state
+            const label proxyI = stateWriteProxies_.size();
+            stateWriteProxies_.setSize(proxyI + 1);
+
+            stateWriteProxies_.set
+            (
+                proxyI,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        entityName,
+                        mesh_.time().timeName(),
+                        mesh_,
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    entities
+                )
+            );
+
+            stateWriteProxies_[proxyI].note() =
+                mechanicalConstitutiveLawStateIO::decompositionIdentity(mesh_);
+        }
+
         setupStateRestartLaw
         (
             laws_[lawI],
             lawNames_[lawI],
             topo.type(),
             wordList(),
+            entityName,
+            entities,
             parts,
             isRestart
         );
@@ -1038,6 +1404,8 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestartLaw
     const word& lawName,
     const word& topologyName,
     const wordList& childPath,
+    const word& entityName,
+    const labelUList& entities,
     const List<mechanicalConstitutiveLawState*>& parts,
     const bool isRestart
 ) const
@@ -1070,28 +1438,32 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestartLaw
         {
             restartStateField<scalar>
             (
-                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
             );
         }
         else if (e.typeName == "vector")
         {
             restartStateField<vector>
             (
-                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
             );
         }
         else if (e.typeName == "tensor")
         {
             restartStateField<tensor>
             (
-                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
             );
         }
         else if (e.typeName == "symmTensor")
         {
             restartStateField<symmTensor>
             (
-                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
             );
         }
         else
@@ -1132,6 +1504,8 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestartLaw
             lawName,
             topologyName,
             path,
+            entityName,
+            entities,
             childParts,
             isRestart
         );

@@ -105,6 +105,50 @@ public:
 
         //- Total number of entries across the parts
         static label totalSize(const stateParts& parts);
+
+        //- Which decomposition this state belongs to, as a short string
+        //  carried in the file's header note.
+        //
+        //  A flat list means something only against the mesh it was written
+        //  for. Two decompositions of the same case into the same number of
+        //  processors can give a rank the same *number* of cells and a
+        //  different set of them, and then a stale processor directory left
+        //  behind by an earlier decomposition holds a file of exactly the
+        //  right length and entirely the wrong values. A length check cannot
+        //  see that; this can
+        static string decompositionIdentity(const fvMesh& mesh);
+
+        //- The cell each of this processor's cells was in the serial mesh,
+        //  or an empty list when the case was not decomposed
+        static labelList cellProcAddressing(const fvMesh& mesh);
+
+        //- The face each of this processor's faces was in the serial mesh.
+        //  decomposePar stores these offset by one and signed, so that face
+        //  zero can carry a sign and a reversed face can be told from a
+        //  forward one; only the magnitude matters here, since state belongs
+        //  to a face rather than to a direction across it
+        static labelList faceProcAddressing(const fvMesh& mesh);
+
+        //- Path of the undecomposed case, which is where the serial state
+        //  sits when a decomposed run has to go looking for it
+        static fileName globalCasePath(const fvMesh& mesh);
+
+        //- The serial cell count recorded in a serial file's header note
+        static label serialCellCount(const string& note);
+
+        //- How an integration point says which piece of mesh it belongs to.
+        //  Cells and faces share one numbering so that a single list can carry
+        //  a law's own points and its boundary points together: a cell is
+        //  itself, a face is offset past every cell
+        static inline label cellEntity(const label cellI)
+        {
+            return cellI;
+        }
+
+        static inline label faceEntity(const label nCells, const label faceI)
+        {
+            return nCells + faceI;
+        }
 };
 
 
@@ -262,13 +306,20 @@ public:
         (
             const IOobject& io,
             const mechanicalConstitutiveLawStateIO::stateParts& parts,
-            const word& variableName
+            const word& variableName,
+            const fvMesh& mesh
         )
         :
             regIOobject(io),
             parts_(parts),
             variableName_(variableName)
-        {}
+        {
+            // Stamped into the header so that a restart can tell this file
+            // apart from one of the same length written for a different
+            // decomposition
+            note() =
+                mechanicalConstitutiveLawStateIO::decompositionIdentity(mesh);
+        }
 
 
     //- Destructor

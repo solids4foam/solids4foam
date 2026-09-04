@@ -422,6 +422,8 @@ class mechanicalConstitutiveLawManager
             const word& lawName,
             const word& topologyName,
             const wordList& childPath,
+            const word& entityName,
+            const labelUList& entities,
             const List<mechanicalConstitutiveLawState*>& parts,
             const bool isRestart
         ) const;
