@@ -700,6 +700,111 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
 }
 
 
+void Foam::mechanicalConstitutiveLawManager::readPrescribedFields
+(
+    const mechanicalConstitutiveLawStateSpec& spec,
+    mechanicalConstitutiveLawState& state,
+    const prescribedSource source,
+    const label lawI,
+    const integrationPointTopology* topoPtr,
+    const labelList* ipIDsPtr,
+    const label patchI
+) const
+{
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
+        {
+            continue;
+        }
+
+        // A prescribed field is read from a field the case supplied. Its
+        // absence is not an error: the declared default stands, which is what
+        // lets a law declare one without changing any existing case.
+        //
+        // The old time is set to match, because a prescribed field is never
+        // written and a law reads it at old time so that a tangent query
+        // evaluated into a shadow state sees it
+        if (e.typeName == "scalar")
+        {
+            Field<scalar>& f = state.scalarField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<scalar>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<scalar>(e.name, lawI, patchI, f);
+            }
+
+            state.scalarField0(e.name) = f;
+        }
+        else if (e.typeName == "vector")
+        {
+            Field<vector>& f = state.vectorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<vector>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<vector>(e.name, lawI, patchI, f);
+            }
+
+            state.vectorField0(e.name) = f;
+        }
+        else if (e.typeName == "tensor")
+        {
+            Field<tensor>& f = state.tensorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<tensor>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<tensor>(e.name, lawI, patchI, f);
+            }
+
+            state.tensorField0(e.name) = f;
+        }
+        else
+        {
+            Field<symmTensor>& f = state.symmTensorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<symmTensor>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<symmTensor>(e.name, lawI, patchI, f);
+            }
+
+            state.symmTensorField0(e.name) = f;
+        }
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
 (
     const mechanicalConstitutiveLawStateSpec& spec,
@@ -791,53 +896,16 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpec
         );
     }
 
-    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
-
-    forAll(es, i)
-    {
-        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
-
-        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
-        {
-            continue;
-        }
-
-        // A prescribed field is read from a volField the user supplied. Its
-        // absence is not an error: the declared default stands, which is what
-        // lets a law declare one without changing any existing case
-        if (e.typeName == "scalar")
-        {
-            readPrescribed<scalar>
-            (
-                e.name, lawI, topo, ipIDs, state.scalarField(e.name)
-            );
-            state.scalarField0(e.name) = state.scalarField(e.name);
-        }
-        else if (e.typeName == "vector")
-        {
-            readPrescribed<vector>
-            (
-                e.name, lawI, topo, ipIDs, state.vectorField(e.name)
-            );
-            state.vectorField0(e.name) = state.vectorField(e.name);
-        }
-        else if (e.typeName == "tensor")
-        {
-            readPrescribed<tensor>
-            (
-                e.name, lawI, topo, ipIDs, state.tensorField(e.name)
-            );
-            state.tensorField0(e.name) = state.tensorField(e.name);
-        }
-        else
-        {
-            readPrescribed<symmTensor>
-            (
-                e.name, lawI, topo, ipIDs, state.symmTensorField(e.name)
-            );
-            state.symmTensorField0(e.name) = state.symmTensorField(e.name);
-        }
-    }
+    readPrescribedFields
+    (
+        spec,
+        state,
+        prescribedSource::internalPoints,
+        lawI,
+        &topo,
+        &ipIDs,
+        -1
+    );
 }
 
 
@@ -922,50 +990,16 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
         );
     }
 
-    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
-
-    forAll(es, i)
-    {
-        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
-
-        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
-        {
-            continue;
-        }
-
-        if (e.typeName == "scalar")
-        {
-            readPrescribedPatch<scalar>
-            (
-                e.name, lawI, patchI, state.scalarField(e.name)
-            );
-            state.scalarField0(e.name) = state.scalarField(e.name);
-        }
-        else if (e.typeName == "vector")
-        {
-            readPrescribedPatch<vector>
-            (
-                e.name, lawI, patchI, state.vectorField(e.name)
-            );
-            state.vectorField0(e.name) = state.vectorField(e.name);
-        }
-        else if (e.typeName == "tensor")
-        {
-            readPrescribedPatch<tensor>
-            (
-                e.name, lawI, patchI, state.tensorField(e.name)
-            );
-            state.tensorField0(e.name) = state.tensorField(e.name);
-        }
-        else
-        {
-            readPrescribedPatch<symmTensor>
-            (
-                e.name, lawI, patchI, state.symmTensorField(e.name)
-            );
-            state.symmTensorField0(e.name) = state.symmTensorField(e.name);
-        }
-    }
+    readPrescribedFields
+    (
+        spec,
+        state,
+        prescribedSource::patchFaces,
+        lawI,
+        nullptr,
+        nullptr,
+        patchI
+    );
 }
 
 
@@ -2425,44 +2459,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     );
 
                     // Create wrapper for output
-                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                    {
-                        // "View" into the tangent for this material => does not copy
-                        // data
-                        UIndirectList<scalar> tangentView
-                        (
-                            scalarTangentPtr->boundaryField()[patchI],
-                            faces
-                        );
-
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
-                    else
-                    {
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
+                    // This path computes no fourth-order tangent, so none is
+                    // offered
+                    evaluateResponse
+                    (
+                        laws_[lawI],
+                        kin,
+                        inputs,
+                        tp.boundaryStates_[lawI][patchI],
+                        stressView,
+                        faces,
+                        scalarTangentPtr
+                      ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                      : nullptr,
+                        static_cast<UList<mat66>*>(nullptr),
+                        tangentReq
+                    );
                 }
             }
         }
@@ -2572,43 +2584,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             gradDView, gradD0View
         );
 
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                *scalarTangentPtr, ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
-        }
-        else if
+        evaluateResponse
         (
-            fourthOrderTangentPtr && needsFourthOrderTangent(tangentReq)
-        )
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
-        }
+            laws_[lawI],
+            kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq
+        );
 
         // Update stress accumulation fields used for stress collapse
         forAll(ipIDs, i)
@@ -2689,45 +2676,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         gradDView, gradD0View
                     );
 
-                    // Create wrapper for output
-                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                    {
-                        // "View" into the tangent for this material => does not copy
-                        // data
-                        UIndirectList<scalar> tangentView
-                        (
-                            scalarTangentPtr->boundaryField()[patchI],
-                            faces
-                        );
+                    // No fourth-order tangent is computed on this boundary,
+                    // so a request for one becomes a request for nothing. The
+                    // law must not be told a fourth-order tangent is wanted
+                    // when there is nowhere to put it
+                    const tangentRequest boundaryReq =
+                        scalarTangentPtr && needsScalarTangent(tangentReq)
+                      ? tangentReq
+                      : tangentRequest::none;
 
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
-                    else // Note: fourth order tangents not needed on the boundary
-                    {
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentRequest::none
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
+                    evaluateResponse
+                    (
+                        laws_[lawI],
+                        kin,
+                        inputs,
+                        tp.boundaryStates_[lawI][patchI],
+                        stressView,
+                        faces,
+                        scalarTangentPtr
+                      ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                      : nullptr,
+                        static_cast<UList<mat66>*>(nullptr),
+                        boundaryReq
+                    );
                 }
             }
         }
@@ -2875,29 +2846,21 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             gradDView, gradD0View
         );
 
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                scalarTangentPtr->internalField(), ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, tp.states_[lawI], response);
-        }
+        // This path computes no fourth-order tangent, so none is offered
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            scalarTangentPtr
+          ? &Foam::primitiveFieldRef(*scalarTangentPtr)
+          : nullptr,
+            static_cast<UList<mat66>*>(nullptr),
+            tangentReq
+        );
 
         // Accumulate per point
 
@@ -3137,45 +3100,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     FView, F0View, JView, J0View, FinvView, Finv0View
                 );
 
-                // Create wrapper for output
-                if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                {
-                    // "View" into the tangent for this material => does not copy
-                    // data
-                    UIndirectList<scalar> tangentView
-                    (
-                        scalarTangentPtr->boundaryField()[patchI],
-                        faces
-                    );
-
-                    // Create wrapper for material: output from material law
-                    // This does not copy data
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tangentView, tangentReq
-                    );
-
-                    // Update the material response, e.g. update the stress
-                    laws_[lawI].evaluate
-                    (
-                        kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                    );
-                }
-                else
-                {
-                    // Create wrapper for material: output from material law
-                    // This does not copy data
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tangentReq
-                    );
-
-                    // Update the material response, e.g. update the stress
-                    laws_[lawI].evaluate
-                    (
-                        kin, inputs, tp.boundaryStates_[lawI][patchI], response
-                    );
-                }
+                // This path computes no fourth-order tangent, so none is
+                // offered
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    tp.boundaryStates_[lawI][patchI],
+                    stressView,
+                    faces,
+                    scalarTangentPtr
+                  ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                  : nullptr,
+                    static_cast<UList<mat66>*>(nullptr),
+                    tangentReq
+                );
             }
         }
     }

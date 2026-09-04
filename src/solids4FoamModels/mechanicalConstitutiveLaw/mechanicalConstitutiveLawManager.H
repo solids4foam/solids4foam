@@ -309,6 +309,35 @@ class mechanicalConstitutiveLawManager
         ) const;
 
         //- Commit old-time state for all topology entries if needed
+        //- Where a prescribed field is read from.
+        //
+        //  The internal points of a law and its faces on one patch are read
+        //  by different functions but through the same per-type dispatch, so
+        //  the dispatch is written once and told which to use. A third kind -
+        //  writing state back out for a restart - is what section 5 of
+        //  DESIGN-state-io.md still needs, and it belongs here rather than in
+        //  a third copy of the chain
+        enum class prescribedSource
+        {
+            //- The law's own integration points, from a volField
+            internalPoints,
+
+            //- The law's faces on one boundary patch, from its patch values
+            patchFaces
+        };
+
+        //- Read every prescribed field a law declared, from one source
+        void readPrescribedFields
+        (
+            const mechanicalConstitutiveLawStateSpec& spec,
+            mechanicalConstitutiveLawState& state,
+            const prescribedSource source,
+            const label lawI,
+            const integrationPointTopology* topoPtr,
+            const labelList* ipIDsPtr,
+            const label patchI
+        ) const;
+
         //- Work out what to evaluate for one law on one boundary patch:
         //  which integration points, and which state.
         //
