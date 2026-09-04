@@ -53,7 +53,11 @@ Author
 
 #include "triangle.H"
 #include "quadrature.H"
-#include "barycentric2D.H"
+#ifdef FOAMEXTEND
+    #include "foamExtendBarycentric2D.H"
+#else
+    #include "barycentric2D.H"
+#endif
 #include "Map.H"
 #include "Field.H"
 #include "tmp.H"

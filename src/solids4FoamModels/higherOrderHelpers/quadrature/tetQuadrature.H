@@ -52,7 +52,11 @@ Author
 #define tetQuadrature_H
 
 #include "tetrahedron.H"
-#include "barycentric.H"
+#ifdef FOAMEXTEND
+    #include "foamExtendBarycentric.H"
+#else
+    #include "barycentric.H"
+#endif
 #include "quadrature.H"
 #include "Map.H"
 #include "Field.H"
