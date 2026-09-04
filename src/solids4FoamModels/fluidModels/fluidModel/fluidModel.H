@@ -201,6 +201,17 @@ class fluidModel
         uniformDimensionedVectorField readG() const;
 #endif
 
+        //- Restore the fluxCorrectedVelocity boundary values of U and of its
+        //  old-time levels
+        //  The fluxCorrectedVelocity condition is derived from zeroGradient
+        //  and so does not read the "value" entry that it writes: on restart,
+        //  the normal component of the patch value is replaced by the
+        //  zero-gradient extrapolation, and a restarted run then differs from
+        //  a continuous one. The current time level is re-derived from phi,
+        //  which does persist its boundary values, whereas the old-time
+        //  levels, for which phi is not written, are read back from disk
+        void correctFluxCorrectedVelocityBoundaries();
+
         //- Disallow default bitwise copy construct
         fluidModel(const fluidModel&);
 
