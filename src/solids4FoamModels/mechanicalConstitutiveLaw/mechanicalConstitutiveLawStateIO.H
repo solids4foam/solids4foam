@@ -69,6 +69,8 @@ Author
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "fvMesh.H"
 #include "IOField.H"
+#include "PtrList.H"
+#include "labelList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -149,6 +151,41 @@ public:
         {
             return nCells + faceI;
         }
+
+        //- Read a list written by a serial run, from the undecomposed case
+        template<class ListType>
+        static bool readSerialList
+        (
+            const fvMesh& mesh,
+            const word& name,
+            ListType& data,
+            string& note
+        );
+
+        //- Where each of this processor's state entries sat in the serial run
+        static labelList serialPositions
+        (
+            const fvMesh& mesh,
+            const labelUList& localEntities,
+            const labelUList& serialEntities,
+            const label serialNCells,
+            const word& name
+        );
+
+        //- Register one state variable for writing, and read it back on a
+        //  restart
+        template<class Type>
+        static void restartField
+        (
+            const fvMesh& mesh,
+            const word& name,
+            const word& entityName,
+            const labelUList& entities,
+            const stateParts& parts,
+            const word& variableName,
+            const bool isRestart,
+            PtrList<regIOobject>& proxies
+        );
 };
 
 
