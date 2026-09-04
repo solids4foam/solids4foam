@@ -229,10 +229,10 @@ public:
     // Edit
 
         //- Initialise constitutive state variables
-        virtual void initialiseState
+        virtual void declareState
         (
-            mechanicalConstitutiveLawState& state
-        ) const;
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
 
         //- Finite-strain constitutive evaluation.
         //  There is deliberately no small-strain overload: this law is

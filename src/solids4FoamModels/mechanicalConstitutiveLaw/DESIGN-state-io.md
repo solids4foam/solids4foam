@@ -1182,11 +1182,11 @@ mesh entity.
 
 So the fallback is total, and there is no topology this design cannot restart.
 
-But where the integration points *do* correspond one-to-one with a mesh entity,
-the natural `GeometricField` is worth preferring, for one concrete reason:
-`decomposePar` and `reconstructPar` know how to map it, and an `IOField` they
-will not touch. Writing the natural field buys restart on a different number of
-processors for free. Counting points against mesh entities:
+It was worth asking whether, where the integration points *do* correspond
+one-to-one with a mesh entity, the natural `GeometricField` should be preferred
+instead, for one concrete reason: `decomposePar` and `reconstructPar` know how
+to map it, and an `IOField` they will not touch. Counting points against mesh
+entities:
 
 | topology    | points          | exact field  | ParaView | decomposes |
 |-------------|-----------------|--------------|----------|------------|
@@ -1197,14 +1197,47 @@ processors for free. Counting points against mesh entities:
 | compactFace | per-face count  | none         | no       | no         |
 | dualFace    | internal duals  | none         | no       | no         |
 
-Hence the rule: **the natural geometric field where the correspondence is exact,
-an `IOField` otherwise.** Not two designs, one rule with two branches, and the
-branch is a property of the topology rather than of the law.
+The first draft of this section made a rule of that - the natural geometric
+field where the correspondence is exact, an `IOField` otherwise - and what is
+built is **not** that. Every topology, `cellCentred` included, is written as an
+`IOField`. The reasons are in 11.1a, and the rule above is left standing only as
+the question it answered.
 
-The `IOField` branch restarts only on the processor count it was written with.
-That is a real limitation and it should fail loudly on a mismatch rather than
-read a wrong-length list, but it is not a reason to prefer an inexact field: a
-restart that silently differs is worse than one that refuses.
+What the one path costs is that state reads back only on the decomposition that
+wrote it, for every topology rather than the three that would have mapped. That
+is a real limitation. It fails loudly on a mismatch rather than reading a
+wrong-length list, because a restart that silently differs is worse than one
+that refuses, and 13 is about removing it.
+
+### 11.1a Why one path, and not the geometric field where it fits
+
+Three things, the first of which is decisive and was not known when the rule
+above was written.
+
+**A `calculated` boundary patch does not write its values.** It writes its type
+and nothing else, so boundary state parked there would be lost on the way out,
+before decomposition is ever reached. `zeroGradient` is worse: it re-extrapolates
+from the internal cells on every evaluation. Carrying boundary state in a
+`GeometricField` boundary therefore needs a value-bearing patch type chosen and
+justified per state variable, which is a decision the law would have to make and
+no law has any business making.
+
+**Per-law boundary state is a subset of a patch, not a patch.**
+`lawBoundaryFaces_[lawI][patchI]` holds only the faces whose owner cell belongs
+to that law. A `GeometricField`'s boundary is dense - one entry per patch face -
+so a multi-material case would have to pad every patch with values belonging to
+no law and then be careful never to read them. The same padding problem recurs
+in the interior, where a per-law volField means something in that law's cells
+and nothing in the rest, in a field any generic tool is free to average.
+
+**No law declares a dimensionSet.** A `GeometricField` needs one. Adding it to
+every declaration to satisfy a storage format is the format dictating the
+interface.
+
+Against that, the gain would have been a redecomposition path for three
+topologies out of six, of which one is in use. It is not worth two read paths,
+two failure modes, and a boundary convention per variable - especially as 13
+gets the redecomposition for all six without any of it.
 
 ### 11.2 Visualisation: a projection, written, never read
 
@@ -1294,3 +1327,72 @@ test asserts the yielding rather than assuming it.
 The negative control is that deleting one state file makes the run refuse.
 Without it the test would only show that two runs agree, not that they agree
 *because* the history came back.
+
+## 13. Changing the decomposition
+
+State reads back only on the decomposition that wrote it. `decomposePar` will
+not copy these files into the processor directories, so the continued run finds
+nothing and refuses. Honest, and not good enough: a user who redecomposes a
+history-dependent case has to start it again.
+
+### 13.1 The routes that do not work, and why
+
+**Registering with the stock utilities.** There is no hook. The list of classes
+`decomposePar` and `reconstructPar` map is hard-coded in the utilities, and the
+processor `Time` databases they open are deliberately created with no function
+objects and no extra libraries, so nothing this library does can be reached from
+inside them. Ruled out as a fact about OpenFOAM rather than as a preference.
+
+**Storing the state in a `GeometricField` so the utilities map it.** Covered in
+11.1a. The boundary half does not survive its own write, and the per-law subset
+does not fit a dense patch.
+
+**Becoming a Lagrangian cloud.** This is the one thing in OpenFOAM that already
+survives redecomposition, and it survives because a particle carries its own
+identity: a position and a cell, from which `decomposePar` recomputes ownership
+without any ordering convention. That is the right idea and the wrong vehicle -
+using it means every integration point becomes a real particle with a valid
+position and tet-location that this library then has to keep valid, and
+foam-extend's cloud IO supports fewer field types than the others. The idea is
+worth stealing; the machinery is not worth inheriting.
+
+### 13.2 The route that does work
+
+`decomposePar` writes `cellProcAddressing` into every processor directory, and
+it is exactly the map wanted:
+
+    localState[procCelli] = serialState[cellProcAddressing[procCelli]]
+
+which is the same direction the official field reconstructor uses. So a
+processor restarting can read the *serial* state file and permute it itself.
+Nothing about `decomposePar` changes; the work happens in this library's read
+path, which is where it belongs, and the case is decomposed with the stock
+utility exactly as it is today.
+
+This reaches further than the `GeometricField` route would have. A cell-centred
+state maps directly. So does any topology whose points are grouped by cell,
+which includes the compact ones, provided the per-cell counts are known - and
+the topology knows them, since it built the offsets. Faces need the sign and
+offset convention of `faceProcAddressing` decoded rather than used raw, points
+map like cells.
+
+What has to be true, and has to be checked rather than assumed:
+
+  - the serial state must still be there, and reachable from every processor;
+  - the serial numbering must be the numbering the addressing file was written
+    against, so a renumbered or refined mesh invalidates it;
+  - the per-cell offsets must be reconstructible on the processor mesh, which
+    is a stronger requirement than the flat length check that guards the
+    same-decomposition case today.
+
+Each of these should refuse rather than guess. The failure this removes is one
+that currently refuses too, so nothing gets quieter: it gets possible.
+
+### 13.3 One case that would be quiet, and should not be
+
+If a case is redecomposed but stale processor time directories are left in
+place, a processor can find a state file that exists, has the right header, and
+happens to have the right length, and read another decomposition's values. The
+length check cannot see it. That is the one path in this design where a wrong
+restart would not announce itself, and it wants an identity in the file - the
+decomposition it was written for - rather than a warning in a README.

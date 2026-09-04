@@ -291,22 +291,43 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::initialiseState
+void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 (
-    mechanicalConstitutiveLawState& state
+    mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
+    // Declared rather than created in initialiseState, so that the manager
+    // knows this history exists and can write it. A plastic law resumed
+    // without it starts again from an unyielded, undeformed state.
+    //
+    // The defaults are the values initialiseState assigned, so a cold start is
+    // unchanged
+
     // Isochoric elastic left Cauchy-Green tensor. The undeformed value is the
-    // identity, not zero, so both times must be set explicitly
-    state.symmTensorField("bEbar") = symmTensor(I);
-    state.symmTensorField0("bEbar") = symmTensor(I);
+    // identity rather than zero, which is exactly why it has to be declared:
+    // a field defaulted to zero here would be a degenerate deformation
+    spec.addSymmTensor
+    (
+        "bEbar",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        symmTensor(I)
+    );
 
     // Equivalent plastic strain
-    state.scalarField("epsilonPEq") = 0.0;
-    state.scalarField0("epsilonPEq") = 0.0;
+    spec.addScalar
+    (
+        "epsilonPEq",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        0.0
+    );
 
     // Yield stress, kept for post-processing
-    state.scalarField("sigmaY") = stressPlasticStrainSeries_(0.0);
+    spec.addScalar
+    (
+        "sigmaY",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        stressPlasticStrainSeries_(0.0)
+    );
 }
 
 

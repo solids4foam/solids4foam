@@ -186,20 +186,38 @@ viscousHookeanElasticMechanicalConstitutiveLaw
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-void Foam::viscousHookeanElasticMechanicalConstitutiveLaw::initialiseState
+void Foam::viscousHookeanElasticMechanicalConstitutiveLaw::declareState
 (
-    mechanicalConstitutiveLawState& state
+    mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
-    // Relaxing deviatoric stress, and one internal stress per Maxwell arm.
-    // All start from an unstressed state, at both times
-    state.symmTensorField("s") = symmTensor::zero;
-    state.symmTensorField0("s") = symmTensor::zero;
+    // Declared rather than created in initialiseState, so that the manager
+    // knows this history exists and can write it. A viscous law resumed
+    // without it forgets how far each arm had relaxed and starts again from an
+    // unstressed state.
+    //
+    // Everything starts unstressed, which is what initialiseState assigned, so
+    // a cold start is unchanged
 
+    // Relaxing deviatoric stress
+    spec.addSymmTensor
+    (
+        "s",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        symmTensor::zero
+    );
+
+    // One internal stress per Maxwell arm. The number of them is a property of
+    // this material's dictionary, so the declaration is a loop rather than a
+    // list: a law declares the state it actually keeps
     forAll(gamma_, i)
     {
-        state.symmTensorField(arm(i)) = symmTensor::zero;
-        state.symmTensorField0(arm(i)) = symmTensor::zero;
+        spec.addSymmTensor
+        (
+            arm(i),
+            mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+            symmTensor::zero
+        );
     }
 }
 

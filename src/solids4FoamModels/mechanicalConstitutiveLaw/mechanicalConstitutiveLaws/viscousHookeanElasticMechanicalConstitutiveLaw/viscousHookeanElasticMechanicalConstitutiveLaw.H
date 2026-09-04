@@ -175,10 +175,10 @@ public:
 
         //- Small-strain constitutive evaluation
         //- Initialise the relaxing stress state
-        virtual void initialiseState
+        virtual void declareState
         (
-            mechanicalConstitutiveLawState& state
-        ) const;
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
 
         virtual void evaluate
         (
