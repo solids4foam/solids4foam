@@ -1164,12 +1164,19 @@ quadrature stops being a special case that has to be excluded.
 State is stored as a flat `Field<T>`, one entry per integration point. That is
 already exactly what an `IOField<T>` holds, so for any topology whatsoever the
 state can be written verbatim and read back in the same order, entry for
-entry. Not bit-for-bit, and it is worth being accurate about that: written as
-ASCII the value is rounded to `writePrecision`, so a run continued from a text
-file continues from a rounded state. That is a property of the format rather
-than of this design - `writeFormat binary` round trips exactly - but a restart
-comparison run at the default precision is measuring the file format as much as
-the state. Quadrature points are
+entry, and to full precision.
+
+Not bit-for-bit by default, which is worth being accurate about: written as
+ASCII a value is rounded to `writePrecision`, and at the default of 6 that
+rounding alone moved a continued run by 6e-6, a thousand times the 1e-8 the
+restart otherwise reaches. So the state is written at 17 significant digits
+whatever the case asks of its other output. `writePrecision` is a choice about
+numbers a person is going to read, and nobody reads this file.
+
+What is left at the default is the ordinary fields, `D` among them, still
+written at the case's precision - and that is shared with the legacy model,
+which lands on the same figure to the same last digit. It is a property of
+OpenFOAM's ASCII output rather than of either model. Quadrature points are
 not awkward here; nothing in an `IOField` needs the entries to correspond to a
 mesh entity.
 

@@ -41,7 +41,17 @@ bool Foam::stateIOFieldProxy<Type>::writeData(Ostream& os) const
         }
     }
 
+    // Written at full round-trip precision, whatever the case asks of its
+    // other output. writePrecision is a choice about reading numbers and
+    // looking at them; nobody reads this file, and at the default of 6 the
+    // rounding alone moves a continued run by 6e-6 - a thousand times the
+    // 1e-8 the restart otherwise achieves. 17 significant digits is what an
+    // IEEE double survives a decimal round trip with
+    const int oldPrecision = os.precision(17);
+
     os << all;
+
+    os.precision(oldPrecision);
 
     return os.good();
 }
