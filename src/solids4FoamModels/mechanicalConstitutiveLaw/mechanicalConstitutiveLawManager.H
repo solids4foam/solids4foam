@@ -109,6 +109,17 @@ class mechanicalConstitutiveLawManager
         //- Constitutive laws
         PtrList<mechanicalConstitutiveLaw> laws_;
 
+        //- Name of each law, as the mechanicalProperties dictionary names it.
+        //  This is the material name, and it qualifies the state written for
+        //  restart: two materials may each declare epsilonP and mean something
+        //  different by it
+        wordList lawNames_;
+
+        //- Registered objects that write the persistent state.
+        //  Held here because a registered object must outlive the writes it
+        //  serves, and the registry does not own these
+        mutable PtrList<regIOobject> stateWriteProxies_;
+
         //- Cell indices defining the material support for each mechanical
         //  constitutive law.
         //  Materials in solids4foam are always defined per cell (via cellZones),
@@ -394,6 +405,25 @@ class mechanicalConstitutiveLawManager
         (
             const scalar dt,
             const word& path
+        ) const;
+
+        //- Register the persistent state of every law on this topology for
+        //  writing, and on a restart read it back
+        void setupStateRestart
+        (
+            topologyEntry& entry,
+            const integrationPointTopology& topo
+        ) const;
+
+        //- One law's persistent state, recursing into any child states
+        void setupStateRestartLaw
+        (
+            const mechanicalConstitutiveLaw& law,
+            const word& lawName,
+            const word& topologyName,
+            const wordList& childPath,
+            const List<mechanicalConstitutiveLawState*>& parts,
+            const bool isRestart
         ) const;
 
         //- Allocate each declared field and set it to its declared default
@@ -743,7 +773,8 @@ public:
             UList<scalar>* scalarTangentPtr,
             UList<mat66>* fourthOrderTangentPtr,
             const tangentRequest tangentReq,
-            const bool preserveState
+            const bool preserveState,
+            const bool coldState = false
         );
 
         //- Finite-strain counterpart of evaluateSmallStrain
@@ -932,7 +963,8 @@ public:
             const volTensorField& gradD0,
             const scalar dt,
             volScalarField& scalarTangent,
-            const tangentRequest tangentReq = tangentRequest::scalar
+            const tangentRequest tangentReq = tangentRequest::scalar,
+            const bool coldState = false
         );
 
         //- Finite-strain counterpart of updateScalarTangent.
@@ -979,7 +1011,8 @@ public:
             const scalar dt,
             UList<scalar>* scalarTangentPtr,
             UList<mat66>* fourthOrderTangentPtr,
-            const tangentRequest tangentReq
+            const tangentRequest tangentReq,
+            const bool coldState = false
         );
 
         //- Finite-strain counterpart of updateTangentSmallStrain

@@ -56,7 +56,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    if [[ "${approach}" == "framework" ]]; then
+    if [[ "${approach}" == framework* ]]; then
         # The switch lives in the <type>Coeffs sub-dictionary; at the top level
         # it is silently ignored and this arm would quietly repeat the legacy run
         sed -i.bak \
@@ -253,6 +253,132 @@ if [[ -n "${RESULT_EPS[legacy]:-}" && -n "${RESULT_EPS[framework]:-}" ]]; then
     done
 else
     echo "SKIP: cross-check needs both approaches to have run"
+fi
+
+# ------------------------------------------------------------
+# Restart
+# ------------------------------------------------------------
+# Three things are checked here, and the second is the one that gives the
+# first its meaning.
+#
+#   1. A run stopped and continued reaches the same answer as one that ran
+#      straight through. Without the state IO this case is wrong by 2e-2 in
+#      max epsilonEq, and wrong *quietly*: it runs to completion and prints a
+#      plausible number. That is the failure being guarded against.
+#
+#   2. Deleting one state file makes the continuation stop with an error. A
+#      restart that cannot find the history it needs must refuse, because
+#      falling back to the cold start defaults is exactly the silent wrongness
+#      of point 1 wearing a different hat.
+#
+#   3. The state is actually written. A test of reading proves nothing if
+#      nothing was written and both arms are reading the same absence.
+#
+# The material must have yielded before the restart point or none of this is
+# being tested: restarting an elastic case is exact even with no state IO at
+# all, since the history being restored is zero either way. t = 10 is chosen
+# for that reason, and check 3 asserts the yielding rather than assuming it
+run_restart_test() {
+    local base="${REGRESSION_ROOT}/frameworkRestart"
+
+    prepare_case "frameworkRestart"
+    CASE_DIR="${base}"
+
+    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
+        "${CASE_DIR}/system/controlDict"
+    sed -i.bak 's/^endTime         20;/endTime         10;/' \
+        "${CASE_DIR}/system/controlDict"
+    rm -f "${CASE_DIR}/system/controlDict.bak"
+
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    # 3. the state must be on disk, and the material must have yielded
+    local state_file
+    state_file=$(ls "${CASE_DIR}"/10/*:*:epsilonPEq 2>/dev/null | head -n 1)
+
+    if [[ -z "${state_file}" ]]; then
+        echo "FAIL: restart: no constitutive state was written at t = 10"
+        return 1
+    fi
+    echo "PASS: restart: constitutive state written"
+
+    if awk 'NR > 20 && $1 + 0 > 1e-12 {found = 1} END {exit !found}' \
+        "${state_file}"
+    then
+        echo "PASS: restart: material has yielded before the restart point"
+    else
+        echo "FAIL: restart: no plastic history at t = 10, so this test is"
+        echo "      vacuous - an elastic restart is exact without any state IO"
+        return 1
+    fi
+
+    # 2. the negative control: without the history, refuse
+    local guard_dir="${REGRESSION_ROOT}/frameworkRestartMissing"
+    rm -rf "${guard_dir}"
+    cp -a "${CASE_DIR}" "${guard_dir}"
+    rm -f "${guard_dir}"/10/*:*:epsilonP
+    sed -i.bak \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
+        "${guard_dir}/system/controlDict"
+    rm -f "${guard_dir}/system/controlDict.bak"
+
+    if ( cd "${guard_dir}" && solids4Foam > log.solids4Foam 2>&1 ); then
+        echo "FAIL: restart: continued without its history instead of refusing"
+        return 1
+    fi
+
+    if grep -q "is not there" "${guard_dir}/log.solids4Foam"; then
+        echo "PASS: restart: refuses when the history is missing"
+    else
+        echo "FAIL: restart: stopped, but not for the missing state"
+        return 1
+    fi
+
+    # 1. the restart itself
+    sed -i.bak \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
+        "${CASE_DIR}/system/controlDict"
+    rm -f "${CASE_DIR}/system/controlDict.bak"
+
+    mv "${CASE_DIR}/${SOLVER_LOGFILE}" "${CASE_DIR}/log.solids4Foam.firstLeg"
+
+    if ! ( cd "${CASE_DIR}" && solids4Foam > "${SOLVER_LOGFILE}" 2>&1 ); then
+        echo "FAIL: restart: the continued run did not finish"
+        return 1
+    fi
+
+    local eps sig
+    eps=$(extract_max_epsilon)
+    sig=$(extract_max_sigma)
+
+    if [[ -z "${eps}" || -z "${sig}" || -z "${RESULT_EPS[framework]:-}" ]]; then
+        echo "SKIP: restart: needs the framework arm to have run"
+        return 0
+    fi
+
+    # The tolerance sits between the two things it has to tell apart: a
+    # correct restart, which lands within 1e-8 here, and one that lost its
+    # history, which is wrong by 2e-2. The remaining 1e-8 is not this
+    # framework's: the legacy model restarts to the same 1e-8 on this case,
+    # because the solver stops on a residual measured relative to its first
+    # one and a restarted step does not start from the same guess
+    local a b
+    a="${RESULT_EPS[framework]}"; b="${eps}"
+
+    if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
+        printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \
+            "$a" "$b"
+    else
+        printf "FAIL: restart differs from the uninterrupted run (%.8g vs %.8g)\n" \
+            "$a" "$b"
+        return 1
+    fi
+
+    return 0
+}
+
+if ! run_restart_test; then
+    failures=$((failures + 1))
 fi
 
 echo

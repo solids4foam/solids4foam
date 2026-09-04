@@ -1815,16 +1815,47 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
 #endif
 
     // A tangent query, so it neither writes a stress nor disturbs history.
-    // Evaluated at the current gradient, which is zero on a cold start and the
-    // restart value otherwise - the same state dependence the legacy impK()
-    // has, since it is likewise frozen at construction
+    //
+    // Evaluated at zero gradient against a state with no history, which makes
+    // this the elastic tangent. Two reasons, and the first is a correctness
+    // one. impK is formed once and kept, so on a cold start it is formed
+    // before anything has happened, while on a restart it would be formed
+    // against restored history and come out different - and since the solver
+    // stops on a residual measured relative to its first one, a different impK
+    // moves where the step stops and the run no longer reproduces the
+    // uninterrupted one. Evaluating it cold makes it the same either way.
+    //
+    // The legacy impK() reaches the same value by a longer road: it scales by
+    // 1 - 2*mu*DLambda/magSTrial, but DLambda is NO_READ and starts at zero,
+    // so the factor is exactly one and the result is elastic whether the run
+    // was restarted or not. What looks like a state dependence there is not
+    // one, which is worth saying because the comment here used to claim the
+    // opposite.
+    //
+    // Nothing is lost. This is a scalar preconditioner for an approximate
+    // Jacobian, and the elastic value is in practice as good as a scaled one
+    const volTensorField zeroGradD
+    (
+        IOobject
+        (
+            "zeroGradD",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("zero", gradD().dimensions(), tensor::zero)
+    );
+
     manager.updateScalarTangent
     (
-        gradD(),
-        gradD().oldTime(),
+        zeroGradD,
+        zeroGradD,
         mesh().time().deltaTValue(),
         impK,
-        req
+        req,
+        true        // evaluate against a state with no history
     );
 
     return tImpK;

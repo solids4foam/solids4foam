@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "mechanicalConstitutiveLawManager.H"
+#include "mechanicalConstitutiveLawStateIO.H"
 #include "compatibilityFunctions.H"
 #include "integrationPointTopologies.H"
 #include "emptyFvPatch.H"
@@ -117,6 +118,130 @@ void evaluateResponse
         law.evaluate(kin, inputs, state, response);
     }
 }
+
+
+//- Register one state variable for writing, and read it back on a restart.
+//
+//  The state is written as it is held, a flat list, so that the value read is
+//  the value written. A geometric field would have been viewable and would
+//  have survived a change of decomposition, and would also have needed a
+//  dimensionSet no law declares and a boundary field whose evaluation would
+//  overwrite the history being restored. Visualisation is a separate,
+//  write-only projection; this path is for restarting, and it is exact
+template<class Type>
+void restartStateField
+(
+    const fvMesh& mesh,
+    const word& name,
+    const mechanicalConstitutiveLawStateIO::stateParts& parts,
+    const word& variableName,
+    const bool isRestart,
+    PtrList<regIOobject>& proxies
+)
+{
+    const label n = mechanicalConstitutiveLawStateIO::totalSize(parts);
+
+    if (isRestart)
+    {
+        IOobject readIO
+        (
+            name,
+            mesh.time().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        );
+
+        // A run continuing from a time directory has history to restore. If it
+        // is not there then the state would silently fall back to its cold
+        // start defaults and the run would continue a different calculation
+        // that looks plausible, which is the failure this whole path exists to
+        // remove. Refuse instead
+        // Both OpenFOAM.com and OpenFOAM.org spell this typeHeaderOk;
+        // foam-extend has only the untyped headerOk
+#ifdef OPENFOAM_NOT_EXTEND
+        const bool present = readIO.typeHeaderOk<IOField<Type>>(false);
+#else
+        const bool present = readIO.headerOk();
+#endif
+
+        if (!present)
+        {
+            FatalErrorInFunction
+                << "Restarting from time " << mesh.time().timeName()
+                << " but the constitutive state field '" << name
+                << "' is not there." << nl
+                << "A history dependent material cannot continue without it."
+                << nl
+                << "It is written from the first time step of a run that uses "
+                << "the mechanical constitutive law framework, so a run "
+                << "started before this was available has to be started again "
+                << "from the beginning."
+                << exit(FatalError);
+        }
+
+        const IOField<Type> stored(readIO);
+
+        if (stored.size() != n)
+        {
+            FatalErrorInFunction
+                << "Constitutive state field '" << name << "' holds "
+                << stored.size() << " values but this run needs " << n << '.'
+                << nl
+                << "The state is written per integration point in the order "
+                << "the mesh gives them, so it can only be read back on the "
+                << "decomposition that wrote it. Neither decomposePar nor "
+                << "reconstructPar maps it."
+                << exit(FatalError);
+        }
+
+        // Scatter back in write order, and set the old time to match. The old
+        // time is deliberately not written: at the instant a time directory is
+        // written the two are equal, so copying is what reading a second file
+        // would have produced anyway
+        label k = 0;
+        forAll(parts, partI)
+        {
+            Field<Type>& f =
+                stateFieldAccess<Type>::ref(*parts[partI], variableName);
+            Field<Type>& f0 =
+                stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+
+            forAll(f, i)
+            {
+                f[i] = stored[k];
+                f0[i] = stored[k];
+                k++;
+            }
+        }
+    }
+
+    // Registered so that the state is written whenever the run writes, by
+    // whatever triggered it. The proxy gathers from the state at write time
+    // rather than holding a copy that could be stale
+    // set() rather than append(): foam-extend's PtrList has no append
+    const label proxyI = proxies.size();
+    proxies.setSize(proxyI + 1);
+
+    proxies.set
+    (
+        proxyI,
+        new stateIOFieldProxy<Type>
+        (
+            IOobject
+            (
+                name,
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            parts,
+            variableName
+        )
+    );
+}
+
 
 } // End namespace Foam
 
@@ -466,6 +591,10 @@ Foam::mechanicalConstitutiveLawManager::topology
             }
         }
     }
+
+    // Last, so that a restart overwrites the cold start defaults applied above
+    // rather than the other way round
+    setupStateRestart(entry, topo);
 
     return entry;
 }
@@ -851,6 +980,161 @@ void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
                 << "State field '" << e.name << "' has unsupported type '"
                 << e.typeName << "'." << exit(FatalError);
         }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::setupStateRestart
+(
+    topologyEntry& entry,
+    const integrationPointTopology& topo
+) const
+{
+    // A run that begins at a time other than the first is continuing, and a
+    // history dependent law must pick its history back up. A run beginning at
+    // the start has none to pick up and writes from its first output.
+    //
+    // Asked of the time the run *started* at, not the time it has reached. A
+    // topology is created the first time something asks for it, which can be
+    // well after the run has advanced, and judging by the current index would
+    // call an ordinary run a restart the moment it took a step and then refuse
+    // to find files it never wrote
+    const bool isRestart = mesh_.time().startTimeIndex() > 0;
+
+    forAll(laws_, lawI)
+    {
+        // The pieces of this law's state, in the order they are written: the
+        // law's own integration points, then its points on each patch. A
+        // topology with no boundary points contributes the first alone
+        List<mechanicalConstitutiveLawState*> parts(1);
+        parts[0] = &entry.states_[lawI];
+
+        if (entry.boundaryAware_)
+        {
+            parts.setSize(1 + entry.boundaryStates_[lawI].size());
+
+            forAll(entry.boundaryStates_[lawI], patchI)
+            {
+                parts[1 + patchI] = &entry.boundaryStates_[lawI][patchI];
+            }
+        }
+
+        setupStateRestartLaw
+        (
+            laws_[lawI],
+            lawNames_[lawI],
+            topo.type(),
+            wordList(),
+            parts,
+            isRestart
+        );
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::setupStateRestartLaw
+(
+    const mechanicalConstitutiveLaw& law,
+    const word& lawName,
+    const word& topologyName,
+    const wordList& childPath,
+    const List<mechanicalConstitutiveLawState*>& parts,
+    const bool isRestart
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        // Only history is written. A prescribed field is the user's input and
+        // is read again from where it came; a fixed one cannot change
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::persistent)
+        {
+            continue;
+        }
+
+        const word name
+        (
+            mechanicalConstitutiveLawStateIO::fieldName
+            (
+                lawName, topologyName, childPath, e.name
+            )
+        );
+
+        if (e.typeName == "scalar")
+        {
+            restartStateField<scalar>
+            (
+                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "vector")
+        {
+            restartStateField<vector>
+            (
+                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "tensor")
+        {
+            restartStateField<tensor>
+            (
+                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "symmTensor")
+        {
+            restartStateField<symmTensor>
+            (
+                mesh_, name, parts, e.name, isRestart, stateWriteProxies_
+            );
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "State field '" << e.name << "' has unsupported type '"
+                << e.typeName << "'." << exit(FatalError);
+        }
+    }
+
+    // A composite keeps its sub-laws' history in child states. Without this
+    // the composite would restart and its sub-laws would not, which is the
+    // failure that is hardest to see: the run continues and only the part of
+    // the answer the sub-law owns is wrong
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        wordList path(childPath.size() + 1);
+
+        forAll(childPath, j)
+        {
+            path[j] = childPath[j];
+        }
+
+        path[childPath.size()] = childNames[i];
+
+        List<mechanicalConstitutiveLawState*> childParts(parts.size());
+
+        forAll(parts, partI)
+        {
+            childParts[partI] = &parts[partI]->child(childNames[i]);
+        }
+
+        setupStateRestartLaw
+        (
+            law.childLaw(childNames[i]),
+            lawName,
+            topologyName,
+            path,
+            childParts,
+            isRestart
+        );
     }
 }
 
@@ -1275,6 +1559,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         lawNames[lawI] = lawEntries[lawI].keyword();
     }
 
+    // Kept, because the state written for restart is named after the material
+    lawNames_ = lawNames;
+
     // Create a map for each cell to its mechanical law
     cellToLaw_.setSize(mesh_.nCells(), -1);
     labelList& cellToLaw = cellToLaw_;
@@ -1685,7 +1972,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
     const tangentRequest tangentReq,
-    const bool preserveState
+    const bool preserveState,
+    const bool coldState
 )
 {
     const word context = "updateStressSmallStrain (flat list)";
@@ -1763,7 +2051,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         // shadow aliases the old-time fields, so history is read but never
         // written, and the law's outputs land where they are discarded
         autoPtr<mechanicalConstitutiveLawState> shadowPtr;
-        if (preserveState)
+        if (preserveState && !coldState)
         {
             shadowPtr.set
             (
@@ -1775,8 +2063,26 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             );
         }
 
+        // A caller that wants a tangent independent of history gets a state
+        // prepared exactly as a fresh run prepares one: declared defaults, the
+        // law's own initialisation, and any prescribed field. That is what the
+        // material looked like before it was loaded, so the tangent is the
+        // same whether the run started here or was continued
+        autoPtr<mechanicalConstitutiveLawState> coldPtr;
+        if (coldState)
+        {
+            coldPtr.set
+            (
+                new mechanicalConstitutiveLawState(tp.states_[lawI].size())
+            );
+
+            applyStateSpec(lawI, topo, ipIDs, coldPtr());
+        }
+
         mechanicalConstitutiveLawState& lawState =
-            preserveState ? shadowPtr() : tp.states_[lawI];
+            coldState
+          ? coldPtr()
+          : (preserveState ? shadowPtr() : tp.states_[lawI]);
 
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> gradDView(gradD, ipIDs);
@@ -2166,7 +2472,8 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
     const scalar dt,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool coldState
 )
 {
     if (tangentReq == tangentRequest::none)
@@ -2189,7 +2496,8 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
         scalarTangentPtr,
         fourthOrderTangentPtr,
         tangentReq,
-        true            // preserve the constitutive state
+        true,           // preserve the constitutive state
+        coldState
     );
 }
 
@@ -2244,7 +2552,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
     const volTensorField& gradD0,
     const scalar dt,
     volScalarField& scalarTangent,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool coldState
 )
 {
     checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
@@ -2274,7 +2583,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
         dt,
         &tangent,
         nullptr,
-        tangentReq
+        tangentReq,
+        coldState
     );
 
     // The flat-list primitive fills internal integration points only, so give

@@ -1140,3 +1140,150 @@ own IO, on the condition that the descriptor carries dimensions, persistence,
 scope, mapping policy and validation. It also suggested keeping immutable
 orientation inputs conceptually distinct from evolving state even where they
 share a loading service, which is worth doing.
+
+## 11. Writing state: two purposes that are not the same purpose
+
+The first draft of section 9 treated writing state as one problem and, when
+quadrature-point topologies would not fit, proposed refusing them. That was
+wrong, and refusing is at best an interim. There are two reasons to write a
+state field and they want different things:
+
+1. **Restart.** The value read back must be the value written, exactly. An
+   interpolated field restarts a *different* calculation that happens to look
+   similar.
+2. **Visualisation.** ParaView can display a cell field and a point field. It
+   cannot display a surface field, and it certainly cannot display a value at a
+   quadrature point. Here an approximation is not merely acceptable, it is the
+   only thing on offer.
+
+Conflating them is what produced the refusal. Separated, both are solvable, and
+quadrature stops being a special case that has to be excluded.
+
+### 11.1 Restart: write the state in the shape the state is already in
+
+State is stored as a flat `Field<T>`, one entry per integration point. That is
+already exactly what an `IOField<T>` holds, so for any topology whatsoever the
+state can be written verbatim and read back in the same order, entry for
+entry. Not bit-for-bit, and it is worth being accurate about that: written as
+ASCII the value is rounded to `writePrecision`, so a run continued from a text
+file continues from a rounded state. That is a property of the format rather
+than of this design - `writeFormat binary` round trips exactly - but a restart
+comparison run at the default precision is measuring the file format as much as
+the state. Quadrature points are
+not awkward here; nothing in an `IOField` needs the entries to correspond to a
+mesh entity.
+
+So the fallback is total, and there is no topology this design cannot restart.
+
+But where the integration points *do* correspond one-to-one with a mesh entity,
+the natural `GeometricField` is worth preferring, for one concrete reason:
+`decomposePar` and `reconstructPar` know how to map it, and an `IOField` they
+will not touch. Writing the natural field buys restart on a different number of
+processors for free. Counting points against mesh entities:
+
+| topology    | points          | exact field  | ParaView | decomposes |
+|-------------|-----------------|--------------|----------|------------|
+| cellCentred | `nCells`        | vol          | yes      | yes        |
+| pointCentred| `nPoints`       | point        | yes      | yes        |
+| faceCentred | `nFaces`        | surface      | **no**   | yes        |
+| compactCell | per-cell count  | none         | no       | no         |
+| compactFace | per-face count  | none         | no       | no         |
+| dualFace    | internal duals  | none         | no       | no         |
+
+Hence the rule: **the natural geometric field where the correspondence is exact,
+an `IOField` otherwise.** Not two designs, one rule with two branches, and the
+branch is a property of the topology rather than of the law.
+
+The `IOField` branch restarts only on the processor count it was written with.
+That is a real limitation and it should fail loudly on a mismatch rather than
+read a wrong-length list, but it is not a reason to prefer an inexact field: a
+restart that silently differs is worse than one that refuses.
+
+### 11.2 Visualisation: a projection, written, never read
+
+Four of the six topologies produce nothing a user can look at. For those, and
+only for looking at, project the state onto a `volField` - cell average of the
+points belonging to each cell - and write that under a name that says what it
+is, so nobody mistakes it for the state itself.
+
+Two rules keep this honest. It is **written and never read**: the restart path
+must not fall back to it, or the exactness above is lost at the first
+inconvenience. And it is **opt-in**, because for a law with several state
+variables on a fine mesh it is a lot of output that most runs do not want.
+
+This also covers `faceCentred`, which restarts exactly through a surface field
+but still cannot be viewed through one.
+
+### 11.3 What this changes about the staging
+
+Section 9 staged cell-centred first because it was the easy one. That still
+holds - it is the default topology and the one every current tutorial uses - but
+it is now the first case of a general rule rather than the only case that works,
+and the quadrature topologies are scheduled rather than excluded.
+
+## 12. What building it changed
+
+### 12.1 Legacy restart does work, at least here
+
+The plan was written on the understanding that restart was never properly
+considered in the legacy approach and could be assumed not to work, and that
+this freed the design from having to reproduce it. Measured on
+`perforatedPlate`, stopping at t = 10 and continuing, the legacy mechanical
+model reproduces the uninterrupted run to 1e-12. It works.
+
+So the freedom was not there to take, and it is as well that nothing was
+built on it. The framework has to restart at least as well as legacy does,
+which is a stricter target than "better than nothing", and it is what the
+comparison in the regression test now asserts.
+
+### 12.2 The last error was not a state error at all
+
+With the state written and read back, the restart still differed by 3e-4 in
+max epsilonEq while every state field was byte-identical after the first
+restarted step. The state was never the problem.
+
+`impK` is formed once and kept. On a cold start it is formed before anything
+has happened; on a restart it was being formed against the restored history,
+and came out different. The solver stops on a residual measured relative to
+its first one, so a different `impK` moves where the step stops - the run
+converges to a slightly different point and, the material being path
+dependent, keeps the difference.
+
+The legacy `impK()` looks like it has the same dependence, and its comment
+here used to say so. It does not: it scales by `1 - 2*mu*DLambda/magSTrial`,
+and `DLambda` is `NO_READ`, so on a restart it is zero, the factor is exactly
+one, and the result is the elastic tangent either way.
+
+`frameworkImpK` now evaluates at zero gradient against a state built the way a
+fresh run builds one, which is the elastic tangent and is the same whether the
+run was continued or not. A cold start is unaffected, because there the state
+already is that state, and no tutorial moves. Nothing is lost: this is a
+scalar preconditioner for an approximate Jacobian, and the elastic value is in
+practice as good as a scaled one.
+
+The general point is worth keeping. Restoring state exactly is necessary and
+was not sufficient: anything else frozen at construction is also part of the
+restart, and a quantity that is *derived* from state inherits the state's
+restart problem without ever appearing in the state.
+
+### 12.3 Restart is a property of where a run started
+
+The first version asked `timeIndex() > 0`. A topology is created the first
+time something asks for it, which can be long after the run has advanced, so
+an ordinary run became a "restart" the moment it took a step, and then refused
+to find files it had never written. The unit tests caught it by advancing a
+time step, which no amount of reading the code had.
+
+It asks `startTimeIndex()` now, which is where the run began rather than where
+it has got to.
+
+### 12.4 What the tests assert, and why the middle one matters
+
+An elastic restart is exact to 1e-13 with no state IO whatsoever, because the
+history being restored is zero either way. A restart test that does not
+establish that the material has yielded first is therefore vacuous, and the
+test asserts the yielding rather than assuming it.
+
+The negative control is that deleting one state file makes the run refuse.
+Without it the test would only show that two runs agree, not that they agree
+*because* the history came back.
