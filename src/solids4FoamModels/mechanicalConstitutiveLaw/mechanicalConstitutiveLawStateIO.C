@@ -113,7 +113,13 @@ Foam::string Foam::mechanicalConstitutiveLawStateIO::decompositionIdentity
 
     if (!Pstream::parRun())
     {
-        os << "serial nCells=" << mesh.nCells();
+        // Cells, faces and points rather than cells alone. A cell count is a
+        // weak thing to identify a mesh by - two unrelated meshes can share
+        // one - and the entity numbering this file is written in means
+        // nothing except against the mesh that produced it
+        os  << "serial nCells=" << mesh.nCells()
+            << " nFaces=" << mesh.nFaces()
+            << " nPoints=" << mesh.nPoints();
 
         return os.str();
     }
@@ -123,19 +129,32 @@ Foam::string Foam::mechanicalConstitutiveLawStateIO::decompositionIdentity
     // on everything else, and it is the disagreement that has to be caught
     const labelList addr(cellProcAddressing(mesh));
 
-    label hash = 0;
+    // Order matters as much as membership: the state is written in cell
+    // order, so a permutation is as wrong as a different set.
+    //
+    // Two hashes rather than one, mixed differently and reported side by side.
+    // This is the only check standing between a stale processor directory and
+    // a silently wrong restart, so the cost of a collision is a wrong answer
+    // that looks right, and one 31-bit checksum is a thin thing to hang that
+    // on
+    unsigned long hashA = 5381;
+    unsigned long hashB = 0;
 
     forAll(addr, i)
     {
-        // Order matters as much as membership: the state is written in cell
-        // order, so a permutation is as wrong as a different set
-        hash = (hash*31 + addr[i] + i) & 0x7FFFFFFF;
+        const unsigned long v = (unsigned long)(addr[i]);
+
+        hashA = ((hashA << 5) + hashA) + v;
+        hashB = hashB*1000003UL + (v ^ (unsigned long)(i));
     }
+
+    const label hash = label(hashA & 0x7FFFFFFF);
+    const label hash2 = label((hashB >> 7) & 0x7FFFFFFF);
 
     os  << "procs=" << Pstream::nProcs()
         << " rank=" << Pstream::myProcNo()
         << " nCells=" << mesh.nCells()
-        << " addr=" << hash;
+        << " addr=" << hash << ',' << hash2;
 
     return os.str();
 }
@@ -199,6 +218,8 @@ Foam::label Foam::mechanicalConstitutiveLawStateIO::serialCellCount
         return -1;
     }
 
+    // The count runs to the next space; the rest of the note is the other
+    // half of the mesh's fingerprint and is compared as a whole elsewhere
     return readLabel(IStringStream(s.substr(key.size()))());
 }
 

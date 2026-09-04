@@ -199,6 +199,25 @@ Foam::labelList serialPositions
         mechanicalConstitutiveLawStateIO::faceProcAddressing(mesh)
     );
 
+    if
+    (
+        !cellAddr.empty()
+     && !faceAddr.empty()
+     && (cellAddr.size() != mesh.nCells() || faceAddr.size() != mesh.nFaces())
+    )
+    {
+        FatalErrorInFunction
+            << "Restarting '" << name << "': the processor addressing does "
+            << "not describe this mesh." << nl
+            << "  cellProcAddressing holds " << cellAddr.size()
+            << " entries for " << mesh.nCells() << " cells" << nl
+            << "  faceProcAddressing holds " << faceAddr.size()
+            << " entries for " << mesh.nFaces() << " faces" << nl
+            << "This mesh was not the one decomposePar wrote that addressing "
+            << "for."
+            << exit(FatalError);
+    }
+
     if (cellAddr.empty() || faceAddr.empty())
     {
         FatalErrorInFunction
@@ -248,7 +267,23 @@ Foam::labelList serialPositions
         HashTable<label, label, Hash<label>>::const_iterator iter =
             positionOf.find(serial);
 
-        if (iter == positionOf.end() && local >= mesh.nCells())
+        // Only a face decomposition itself created may fall back. The
+        // fallback is right for those and wrong for every other face: on a
+        // real boundary a miss means the serial state and this mesh disagree
+        // about something, and quietly substituting a nearby value would hide
+        // exactly the mistake this mapping is supposed to refuse
+        bool decompositionFace = false;
+
+        if (local >= mesh.nCells())
+        {
+            const label patchI =
+                mesh.boundaryMesh().whichPatch(local - mesh.nCells());
+
+            decompositionFace =
+                patchI >= 0 && mesh.boundary()[patchI].coupled();
+        }
+
+        if (iter == positionOf.end() && decompositionFace)
         {
             // A face this processor calls a boundary that the serial mesh
             // called interior: decomposition made it one, by cutting the mesh
@@ -343,6 +378,19 @@ void restartStateField
         // from this processor's own directory
         bool mapped = false;
 
+        // Every rank takes the same route. They should agree already - the
+        // state is written by all of them at once - but if a directory were
+        // half deleted they would not, and then some would go on to read the
+        // processor addressing while others did not. Under a collated file
+        // handler that read can be collective, and a collective some ranks
+        // skip is a hang rather than an error
+        if (Pstream::parRun())
+        {
+            bool allPresent = present;
+            reduce(allPresent, andOp<bool>());
+            present = allPresent;
+        }
+
         if (!present && Pstream::parRun())
         {
             // Nothing in this processor's directory. decomposePar does not
@@ -360,6 +408,24 @@ void restartStateField
 
             if (haveData && haveEntities)
             {
+                // The values and the locations they belong to are two files,
+                // and they only mean anything as a pair. One of them left over
+                // from an earlier run would map real values through the wrong
+                // locations, which is a silent wrong answer rather than a
+                // missing one, so they have to agree on which run wrote them
+                if (dataNote != entityNote)
+                {
+                    FatalErrorInFunction
+                        << "The serial state '" << name << "' and the "
+                        << "integration point locations it is read with were "
+                        << "written by different runs." << nl
+                        << "  the state says:     " << dataNote << nl
+                        << "  the locations say:  " << entityNote << nl
+                        << "They are written together and are only meaningful "
+                        << "together."
+                        << exit(FatalError);
+                }
+
                 const label serialNCells =
                     mechanicalConstitutiveLawStateIO::serialCellCount(dataNote);
 

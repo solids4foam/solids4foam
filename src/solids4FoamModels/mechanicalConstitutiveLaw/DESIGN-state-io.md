@@ -1369,12 +1369,15 @@ Nothing about `decomposePar` changes; the work happens in this library's read
 path, which is where it belongs, and the case is decomposed with the stock
 utility exactly as it is today.
 
-This reaches further than the `GeometricField` route would have. A cell-centred
-state maps directly. So does any topology whose points are grouped by cell,
-which includes the compact ones, provided the per-cell counts are known - and
-the topology knows them, since it built the offsets. Faces need the sign and
-offset convention of `faceProcAddressing` decoded rather than used raw, points
-map like cells.
+This reaches further than the `GeometricField` route would have - but only
+`cellCentred` is built. A cell maps through the addressing directly, and that
+covers every tutorial there is. The rest is scoped and not written: a topology
+whose points are grouped by cell, the compact ones included, can map the same
+way once the per-cell counts are carried alongside, and the topology knows them
+because it built the offsets; a point-based one needs `pointProcAddressing`
+read and decoded. Those topologies write no locations at all today, so a
+changed decomposition refuses rather than guessing, which is the right way for
+an unbuilt thing to behave.
 
 What has to be true, and has to be checked rather than assumed:
 
