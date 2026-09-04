@@ -1060,6 +1060,15 @@ bool IQNILSCouplingInterface::evolve()
     }
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
+    if (residualNorm > outerCorrTolerance())
+    {
+        FatalErrorInFunction
+            << "FSI coupling did not converge after " << outerCorr()
+            << " outer corrections. Final residual: " << residualNorm
+            << ", tolerance: " << outerCorrTolerance()
+            << abort(FatalError);
+    }
+
     cacheCurrentStepModes();
 
     solid().updateTotalFields();
