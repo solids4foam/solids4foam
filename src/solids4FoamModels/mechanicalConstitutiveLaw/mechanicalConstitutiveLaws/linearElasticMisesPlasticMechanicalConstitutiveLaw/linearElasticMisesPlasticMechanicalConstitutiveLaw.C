@@ -239,25 +239,39 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::initialiseState
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 (
-    mechanicalConstitutiveLawState& state
+    mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
-    // Total plastic strain
-    state.symmTensorField("epsilonP") = symmTensor::zero;
+    // This law's history, declared rather than created in initialiseState so
+    // that the manager knows it exists. Nothing can be written for a restart
+    // that has not been declared, and these are exactly the fields a restart
+    // has to carry: a plastic law resumed without them starts again from an
+    // unyielded state.
+    //
+    // The defaults are the values initialiseState used to assign, so a cold
+    // start is unchanged
+    spec.addSymmTensor
+    (
+        "epsilonP",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        symmTensor::zero
+    );
 
-    // Total plastic strain (old time)
-    state.symmTensorField0("epsilonP") = symmTensor::zero;
+    spec.addScalar
+    (
+        "epsilonPEq",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        0.0
+    );
 
-    // Equivalent plastic strain
-    state.scalarField("epsilonPEq") = 0.0;
-
-    // Equivalent plastic strain (old time)
-    state.scalarField0("epsilonPEq") = 0.0;
-
-    // Yield stress
-    state.scalarField("sigmaY") = stressPlasticStrainSeries_(0.0);
+    spec.addScalar
+    (
+        "sigmaY",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        stressPlasticStrainSeries_(0.0)
+    );
 }
 
 

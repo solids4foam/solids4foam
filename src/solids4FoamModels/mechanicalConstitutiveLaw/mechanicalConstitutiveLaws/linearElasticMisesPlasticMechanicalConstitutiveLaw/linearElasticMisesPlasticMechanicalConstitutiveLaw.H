@@ -185,11 +185,12 @@ public:
 
     // Edit
 
-        //- Initialise constitutive state variables
-        virtual void initialiseState
+        //- Declare this law's history, so that the manager can carry it
+        //  across a restart
+        virtual void declareState
         (
-            mechanicalConstitutiveLawState& state
-        ) const;
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
 
         //- Small-strain constitutive evaluation
         virtual void evaluate
