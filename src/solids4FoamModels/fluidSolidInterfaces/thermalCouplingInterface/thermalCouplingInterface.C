@@ -210,11 +210,11 @@ bool thermalCouplingInterface::evolve()
      && outerCorr() < nOuterCorr()
     );
 
-    const bool couplingConverged =
-        residualNormTherm <= outerCorrTolerance()
-     && residualNormMech <= outerCorrTolerance();
-
-    if (!couplingConverged)
+    if
+    (
+        residualNormTherm > outerCorrTolerance()
+     || residualNormMech > outerCorrTolerance()
+    )
     {
         FatalErrorInFunction
             << "Thermal coupling did not converge after " << outerCorr()
