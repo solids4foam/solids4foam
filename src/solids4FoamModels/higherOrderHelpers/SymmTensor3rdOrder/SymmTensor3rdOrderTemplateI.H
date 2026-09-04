@@ -17,8 +17,13 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "SymmTensor.H"
-#include "Tensor.H"
+#ifdef FOAMEXTEND
+    #include "symmTensor.H"
+    #include "tensor.H"
+#else
+    #include "SymmTensor.H"
+    #include "Tensor.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
