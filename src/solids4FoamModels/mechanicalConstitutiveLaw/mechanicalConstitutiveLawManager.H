@@ -644,8 +644,23 @@ class mechanicalConstitutiveLawManager
 
         void updateOldTimeIfNeeded();
 
+
+        //- No copy construct
+        mechanicalConstitutiveLawManager
+        (
+            const mechanicalConstitutiveLawManager&
+        ) = delete;
+
+        //- No copy assignment
+        void operator=(const mechanicalConstitutiveLawManager&) = delete;
+
+
+public:
+
+    // Public static predicates on a tangent request
+
         //- Check if the provided tangent request is scalar or scalarDeviatoric
-        inline bool needsScalarTangent(const tangentRequest req)
+        inline static bool needsScalarTangent(const tangentRequest req)
         {
             return
                 req == tangentRequest::scalar
@@ -654,7 +669,7 @@ class mechanicalConstitutiveLawManager
 
         //- Check if the provided tangent request is fourthOrder or
         //  fourthOrderFiniteDifference
-        inline bool needsFourthOrderTangent(const tangentRequest req)
+        inline static bool needsFourthOrderTangent(const tangentRequest req)
         {
             return
                 req == tangentRequest::fourthOrder
@@ -729,18 +744,6 @@ class mechanicalConstitutiveLawManager
 
             scratchStress_.clear();
         }
-
-        //- No copy construct
-        mechanicalConstitutiveLawManager
-        (
-            const mechanicalConstitutiveLawManager&
-        ) = delete;
-
-        //- No copy assignment
-        void operator=(const mechanicalConstitutiveLawManager&) = delete;
-
-
-public:
 
     //- Runtime type information
     TypeName("mechanicalConstitutiveLawManager");

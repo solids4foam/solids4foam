@@ -33,6 +33,85 @@ namespace Foam
     defineTypeNameAndDebug(mechanicalConstitutiveLawManager, 0);
 }
 
+
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+//- Build the response a law writes into, and evaluate the law.
+//
+//  Every evaluation in this file ends in the same three lines: work out which
+//  tangent storage was supplied, wrap it and the stress in a response, and
+//  call the law. That was written out at each of the twenty-odd places a law
+//  is evaluated, which is why the file is as long as it is.
+//
+//  What the caller keeps is everything that actually differs between those
+//  places: which state to evaluate against - real, shadow or scratch - which
+//  points to address, whether to evaluate at all, and what happens to the
+//  stress afterwards. Those are not incidental, and folding any of them in
+//  here would change results.
+//
+//  Two things are deliberate. The tangent storage is passed rather than a
+//  view, so that a view is built only when one is wanted and a null pointer is
+//  never dereferenced: some callers guard on the pointer and some on the
+//  request, and both stay correct. And the request passed is the *effective*
+//  one, which is not always the caller's own: the surface boundary path asks
+//  for no tangent whatever was requested elsewhere, because it computes none.
+template<class KinematicsType>
+void evaluateResponse
+(
+    const mechanicalConstitutiveLaw& law,
+    const KinematicsType& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    UIndirectList<symmTensor>& stressView,
+    const labelUList& tangentIDs,
+    UList<scalar>* scalarTangentStore,
+    UList<mat66>* fourthOrderTangentStore,
+    const tangentRequest tangentReq
+)
+{
+    if
+    (
+        scalarTangentStore
+     && mechanicalConstitutiveLawManager::needsScalarTangent(tangentReq)
+    )
+    {
+        UIndirectList<scalar> tangentView(*scalarTangentStore, tangentIDs);
+
+        mechanicalConstitutiveLawResponse response
+        (
+            stressView, tangentView, tangentReq
+        );
+
+        law.evaluate(kin, inputs, state, response);
+    }
+    else if
+    (
+        fourthOrderTangentStore
+     && mechanicalConstitutiveLawManager::needsFourthOrderTangent(tangentReq)
+    )
+    {
+        UIndirectList<mat66> tangentView(*fourthOrderTangentStore, tangentIDs);
+
+        mechanicalConstitutiveLawResponse response
+        (
+            stressView, tangentView, tangentReq
+        );
+
+        law.evaluate(kin, inputs, state, response);
+    }
+    else
+    {
+        mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+
+        law.evaluate(kin, inputs, state, response);
+    }
+}
+
+} // End namespace Foam
+
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
 
@@ -1547,34 +1626,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         );
 
         // Constitutive response
-        if (needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
-        else if (needsFourthOrderTangent(tangentReq))
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            lawState,
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq
+        );
     }
 
     // Boundary integration points.
@@ -1719,40 +1782,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     gradDView, gradD0View
                 );
 
-                if (needsScalarTangent(tangentReq))
-                {
-                    UIndirectList<scalar> tanView(*scalarTangentPtr, ipIDs);
-
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tanView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
-                else if (needsFourthOrderTangent(tangentReq))
-                {
-                    UIndirectList<mat66> tanView
-                    (
-                        *fourthOrderTangentPtr, ipIDs
-                    );
-
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tanView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
-                else
-                {
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    bState,
+                    stressView,
+                    ipIDs,
+                    scalarTangentPtr,
+                    fourthOrderTangentPtr,
+                    tangentReq
+                );
             }
         }
     }
@@ -1887,34 +1928,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         );
 
         // Constitutive response
-        if (needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
-        else if (needsFourthOrderTangent(tangentReq))
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
-
-            laws_[lawI].evaluate(kin, inputs, lawState, response);
-        }
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            lawState,
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq
+        );
     }
 
     // Boundary integration points.
@@ -2055,40 +2080,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     FView, F0View, JView, J0View, FinvView, Finv0View
                 );
 
-                if (needsScalarTangent(tangentReq))
-                {
-                    UIndirectList<scalar> tanView(*scalarTangentPtr, ipIDs);
-
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tanView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
-                else if (needsFourthOrderTangent(tangentReq))
-                {
-                    UIndirectList<mat66> tanView
-                    (
-                        *fourthOrderTangentPtr, ipIDs
-                    );
-
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tanView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
-                else
-                {
-                    mechanicalConstitutiveLawResponse response
-                    (
-                        stressView, tangentReq
-                    );
-
-                    laws_[lawI].evaluate(kin, inputs, bState, response);
-                }
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    bState,
+                    stressView,
+                    ipIDs,
+                    scalarTangentPtr,
+                    fourthOrderTangentPtr,
+                    tangentReq
+                );
             }
         }
     }
