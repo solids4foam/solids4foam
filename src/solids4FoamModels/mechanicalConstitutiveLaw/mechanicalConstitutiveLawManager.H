@@ -309,6 +309,27 @@ class mechanicalConstitutiveLawManager
         ) const;
 
         //- Commit old-time state for all topology entries if needed
+        //- Work out what to evaluate for one law on one boundary patch:
+        //  which integration points, and which state.
+        //
+        //  Returns false when there is nothing to evaluate there. The state
+        //  may be the law's real boundary state, a shadow of it when the
+        //  caller is preserving state, or a scratch state for an empty patch
+        //  addressed through its polyPatch; the two autoPtrs own the latter
+        //  two and must outlive the evaluation
+        bool resolveBoundaryEvaluation
+        (
+            const integrationPointTopology& topo,
+            topologyEntry& tp,
+            const label lawI,
+            const label patchI,
+            const bool preserveState,
+            labelList& ipIDs,
+            autoPtr<mechanicalConstitutiveLawState>& bScratchPtr,
+            autoPtr<mechanicalConstitutiveLawState>& bShadowPtr,
+            mechanicalConstitutiveLawState*& bState
+        ) const;
+
         //- Gather the live coupling inputs a law asked for, as views over its
         //  own integration points, and hand back an inputs object carrying
         //  them. A law that asks for nothing gets an inputs object holding
