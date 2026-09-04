@@ -52,12 +52,20 @@ namespace Foam
 //  stress afterwards. Those are not incidental, and folding any of them in
 //  here would change results.
 //
-//  Two things are deliberate. The tangent storage is passed rather than a
+//  Three things are deliberate. The tangent storage is passed rather than a
 //  view, so that a view is built only when one is wanted and a null pointer is
 //  never dereferenced: some callers guard on the pointer and some on the
-//  request, and both stay correct. And the request passed is the *effective*
-//  one, which is not always the caller's own: the surface boundary path asks
-//  for no tangent whatever was requested elsewhere, because it computes none.
+//  request, and both stay correct. The request passed is the *effective* one,
+//  which is not always the caller's own: the surface boundary path asks for no
+//  tangent whatever was requested elsewhere, because it computes none.
+//
+//  And the storage is const, which looks wrong for something a law writes
+//  into. UIndirectList takes a const reference and casts it away itself, so
+//  this is what the callers were already doing when they built the view
+//  inline. Taking non-const here would push callers onto boundaryFieldRef and
+//  primitiveFieldRef, and those are not the same thing: they call
+//  setUpToDate() and storeOldTimes(), so merely reaching for the pointer would
+//  snapshot an old time that nothing asked for.
 template<class KinematicsType>
 void evaluateResponse
 (
@@ -67,8 +75,8 @@ void evaluateResponse
     mechanicalConstitutiveLawState& state,
     UIndirectList<symmTensor>& stressView,
     const labelUList& tangentIDs,
-    UList<scalar>* scalarTangentStore,
-    UList<mat66>* fourthOrderTangentStore,
+    const UList<scalar>* scalarTangentStore,
+    const UList<mat66>* fourthOrderTangentStore,
     const tangentRequest tangentReq
 )
 {
@@ -2470,9 +2478,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         stressView,
                         faces,
                         scalarTangentPtr
-                      ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                      ? &scalarTangentPtr->boundaryField()[patchI]
                       : nullptr,
-                        static_cast<UList<mat66>*>(nullptr),
+                        static_cast<const UList<mat66>*>(nullptr),
                         tangentReq
                     );
                 }
@@ -2694,9 +2702,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         stressView,
                         faces,
                         scalarTangentPtr
-                      ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                      ? &scalarTangentPtr->boundaryField()[patchI]
                       : nullptr,
-                        static_cast<UList<mat66>*>(nullptr),
+                        static_cast<const UList<mat66>*>(nullptr),
                         boundaryReq
                     );
                 }
@@ -2856,9 +2864,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             stressView,
             ipIDs,
             scalarTangentPtr
-          ? &Foam::primitiveFieldRef(*scalarTangentPtr)
+          ? &scalarTangentPtr->internalField()
           : nullptr,
-            static_cast<UList<mat66>*>(nullptr),
+            static_cast<const UList<mat66>*>(nullptr),
             tangentReq
         );
 
@@ -3111,9 +3119,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     stressView,
                     faces,
                     scalarTangentPtr
-                  ? &Foam::boundaryFieldRef(*scalarTangentPtr)[patchI]
+                  ? &scalarTangentPtr->boundaryField()[patchI]
                   : nullptr,
-                    static_cast<UList<mat66>*>(nullptr),
+                    static_cast<const UList<mat66>*>(nullptr),
                     tangentReq
                 );
             }

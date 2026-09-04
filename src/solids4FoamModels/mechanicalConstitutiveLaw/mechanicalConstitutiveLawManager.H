@@ -313,10 +313,13 @@ class mechanicalConstitutiveLawManager
         //
         //  The internal points of a law and its faces on one patch are read
         //  by different functions but through the same per-type dispatch, so
-        //  the dispatch is written once and told which to use. A third kind -
-        //  writing state back out for a restart - is what section 5 of
-        //  DESIGN-state-io.md still needs, and it belongs here rather than in
-        //  a third copy of the chain
+        //  the dispatch is written once and told which to use.
+        //
+        //  Note that the restart writing of section 5 of DESIGN-state-io.md is
+        //  not a third source. This reads into a field that already exists, at
+        //  addresses it is given; writing state out has to register an
+        //  IOobject and scatter per-integration-point state into a geometric
+        //  field, which is the other direction and a different shape
         enum class prescribedSource
         {
             //- The law's own integration points, from a volField
