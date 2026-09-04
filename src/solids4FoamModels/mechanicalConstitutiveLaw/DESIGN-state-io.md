@@ -1399,3 +1399,52 @@ happens to have the right length, and read another decomposition's values. The
 length check cannot see it. That is the one path in this design where a wrong
 restart would not announce itself, and it wants an identity in the file - the
 decomposition it was written for - rather than a warning in a README.
+
+## 14. The half restart
+
+Restoring the constitutive state is not the whole of a restart, and the part
+that is missing does not announce itself.
+
+`stripFooting` - poroMechanicalLaw over linearElasticMohrCoulombPlastic, the
+only shipped case where a composite's child keeps history of its own - came
+back 46% wrong. Every state file was written and read correctly. The state was
+never the problem.
+
+The Mohr-Coulomb law is incremental: it builds this step's stress on the last
+step's, over the strain increment `symm(gradD) - symm(gradD0)`. The solid model
+writes `grad(D)` at old time only when asked, through a `restart` switch that
+defaults to off, so `gradD0` came back as zero and one step's increment became
+the whole run's strain - seventy-six times too large. The restored history was
+then added to a trial stress that had already counted it, which is why
+restoring the correct history looked *worse* than restoring none at all, and
+why the bisection pointed at the state when the state was innocent.
+
+Two reviews looked at this and both diagnosed it wrongly, one as an old-time
+aliasing bug and one as a contaminated write, before an instrumented print of
+what the law actually read settled it in one run. The lesson is not about the
+reviewers. It is that a plausible mechanism is not evidence, and the cheap
+measurement was available the whole time.
+
+### 14.1 What guards it now
+
+A restart that would restore constitutive history without the kinematic history
+that history is measured against is refused, by name, with the switch to set.
+The framework knows when it is doing the first half of a restart, so it is the
+right place to notice that the second half is missing.
+
+The solid model warns in the general case, where it cannot know whether the
+material is incremental. A law written in total strain genuinely does not care,
+and `perforatedPlate` restarted correctly for years' worth of steps without the
+switch for exactly that reason, so refusing outright would stop runs that are
+fine.
+
+### 14.2 The switch itself
+
+It is worth saying plainly that the switch is the problem, not the fix. It
+guards nine fields, which is a real cost on a large case, so something like it
+has to exist. But it defaults to off, twenty-four of a hundred and sixty-eight
+tutorials set it, and getting it wrong costs tens of percent in silence. A
+default of on, with an opt-out for cases that will never be restarted, would
+put the cost where the choice is rather than the correctness.
+
+That is a library-wide change and not this work's to make.

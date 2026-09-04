@@ -407,6 +407,16 @@ class mechanicalConstitutiveLawManager
             const word& path
         ) const;
 
+        //- True if this law, or any law below it, keeps history
+        bool declaresPersistentState
+        (
+            const mechanicalConstitutiveLaw& law
+        ) const;
+
+        //- Refuse a restart that would restore constitutive history without
+        //  the kinematic history it is measured against
+        void checkRestartKinematics() const;
+
         //- Register the persistent state of every law on this topology for
         //  writing, and on a restart read it back
         void setupStateRestart

@@ -198,6 +198,101 @@ if [ "$CHECK_ONLY" = false ] && ! run_framework_comparison; then
     failures=$((failures + 1))
 fi
 
+# Restart, through a composite law
+#
+# This is the only case where restarting exercises a law that owns history AND
+# hands a child state to a sub-law that owns its own. poroMechanicalLaw keeps
+# the effective stress; the Mohr-Coulomb law beneath it keeps the stress
+# variation its trial stress is built on. A restart that walked only the top
+# level would restore the first and quietly lose the second, and the run would
+# continue and be wrong rather than stop.
+#
+# The third check is what makes the other two mean something: deleting the
+# CHILD's file alone has to stop the run. Without it this would only show that
+# two runs agree, not that they agree because the child's history came back
+run_restart_test() {
+    local d="${REGRESSION_ROOT}/frameworkRestart"
+    local g="${REGRESSION_ROOT}/frameworkRestartMissingChild"
+
+    prepare_case "${d}"
+    sed -i \
+        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1restart yes;\n\1nCorrectors|' \
+        "${d}/constant/solidProperties"
+    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+    sed -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+        echo "FAIL: restart: the first leg did not run"
+        return 1
+    }
+
+    # The child's history must actually be on disk, under a name that says
+    # which sub-law owns it
+    if ! ls "${d}"/0.2/*:effectiveStressMechanicalLaw:deltaSigma > /dev/null 2>&1
+    then
+        echo "FAIL: restart: the sub-law's history was not written"
+        return 1
+    fi
+    echo "PASS: restart: the sub-law's history is written under its own name"
+
+    # Negative control, on the child specifically
+    rm -rf "${g}"; cp -a "${d}" "${g}"
+    rm -f "${g}"/0.2/*:effectiveStressMechanicalLaw:*
+    sed -i \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
+        "${g}/system/controlDict"
+
+    if ( cd "${g}" && solids4Foam > log.solids4Foam 2>&1 ); then
+        echo "FAIL: restart: continued without the sub-law's history"
+        return 1
+    fi
+
+    if grep -q "effectiveStressMechanicalLaw.*is not there" \
+        "${g}/log.solids4Foam"
+    then
+        echo "PASS: restart: refuses when the sub-law's history is missing"
+    else
+        echo "FAIL: restart: stopped, but not for the missing child history"
+        return 1
+    fi
+
+    # The restart itself
+    sed -i \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
+        "${d}/system/controlDict"
+    mv "${d}/${SOLVER_LOGFILE}" "${d}/log.solids4Foam.firstLeg"
+
+    if ! ( cd "${d}" && solids4Foam > "${SOLVER_LOGFILE}" 2>&1 ); then
+        echo "FAIL: restart: the continued run did not finish"
+        grep -m1 "FOAM FATAL" -A4 "${d}/${SOLVER_LOGFILE}" || true
+        return 1
+    fi
+
+    local eps
+    eps=$(grep "Max epsilonEq" "${d}/${SOLVER_LOGFILE}" | tail -n 1 \
+        | awk '{print $NF}')
+
+    if [[ -z "${eps}" || -z "${epsilon}" ]]; then
+        echo "SKIP: restart: could not extract the comparison quantities"
+        return 0
+    fi
+
+    if awk "BEGIN {exit !(($epsilon - $eps)^2 <= (1e-6*$epsilon)^2)}"; then
+        printf "PASS: restart through the composite reproduces the run (%.8g vs %.8g)\n" \
+            "$epsilon" "$eps"
+    else
+        printf "FAIL: restart through the composite differs (%.8g vs %.8g)\n" \
+            "$epsilon" "$eps"
+        return 1
+    fi
+
+    return 0
+}
+
+if [ "$CHECK_ONLY" = false ] && ! run_restart_test; then
+    failures=$((failures + 1))
+fi
+
 echo
 if (( failures == 0 )); then
     echo "============================================================"

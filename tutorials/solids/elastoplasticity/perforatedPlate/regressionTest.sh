@@ -59,8 +59,13 @@ prepare_case() {
     if [[ "${approach}" == framework* ]]; then
         # The switch lives in the <type>Coeffs sub-dictionary; at the top level
         # it is silently ignored and this arm would quietly repeat the legacy run
+        # restart yes makes the solid model write the kinematic history - the
+        # displacement gradient at old time, among others - which a
+        # constitutive history is measured against. This law happens not to
+        # need it, being written in total strain, but an incremental one does,
+        # and a restart arm that does not ask for it is testing a half restart
         sed -i.bak \
-            's/^    predictor yes;/    useMechanicalConstitutiveLawManager yes;\n    predictor yes;/' \
+            's/^    predictor yes;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    predictor yes;/' \
             "${CASE_DIR}/constant/solidProperties"
         rm -f "${CASE_DIR}/constant/solidProperties.bak"
 

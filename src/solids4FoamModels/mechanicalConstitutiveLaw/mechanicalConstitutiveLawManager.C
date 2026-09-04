@@ -1321,6 +1321,103 @@ void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::declaresPersistentState
+(
+    const mechanicalConstitutiveLaw& law
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        if
+        (
+            es[i].role
+         == mechanicalConstitutiveLawStateSpec::stateRole::persistent
+        )
+        {
+            return true;
+        }
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        if (declaresPersistentState(law.childLaw(childNames[i])))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::checkRestartKinematics() const
+{
+    bool anyPersistent = false;
+
+    forAll(laws_, lawI)
+    {
+        if (declaresPersistentState(laws_[lawI]))
+        {
+            anyPersistent = true;
+            break;
+        }
+    }
+
+    if (!anyPersistent)
+    {
+        return;
+    }
+
+    // History is measured against the displacement gradient of the step it
+    // began in, so restoring one without the other is half a restart. An
+    // incremental law then takes the strain accumulated since the beginning of
+    // the run as though it happened in one step, which is not a small error
+    // and does not announce itself: the run continues and the answer is wrong.
+    //
+    // The solid model writes the kinematic history only when asked, so the
+    // presence of grad(D) at old time is what says whether it was
+    IOobject gradD0IO
+    (
+        "grad(D)_0",
+        mesh_.time().timeName(),
+        mesh_,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+    const bool present = gradD0IO.headerOk();
+#endif
+
+    if (!present)
+    {
+        FatalErrorInFunction
+            << "Restarting from time " << mesh_.time().timeName()
+            << " with a material that keeps history, but the displacement "
+            << "gradient at old time was never written." << nl << nl
+            << "Set" << nl << nl
+            << "    restart yes;" << nl << nl
+            << "in the solidModel's coefficients dictionary and run the case "
+            << "again from the start. It makes the solid model write the "
+            << "kinematic history a constitutive history is measured against."
+            << nl << nl
+            << "Without it the constitutive state would come back and the "
+            << "strain it is measured against would not, and an incremental "
+            << "law would read the whole run's strain as one step's."
+            << exit(FatalError);
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::setupStateRestart
 (
     topologyEntry& entry,
@@ -1337,6 +1434,11 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
     // call an ordinary run a restart the moment it took a step and then refuse
     // to find files it never wrote
     const bool isRestart = mesh_.time().startTimeIndex() > 0;
+
+    if (isRestart)
+    {
+        checkRestartKinematics();
+    }
 
     forAll(laws_, lawI)
     {

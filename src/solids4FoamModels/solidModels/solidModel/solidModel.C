@@ -1251,6 +1251,35 @@ Foam::solidModel::solidModel
     }
     else
     {
+        // Starting from a time that is not the first, without having been
+        // asked to write what a restart needs. The fields below are switched
+        // off in this branch, so the run is about to continue from a state it
+        // only partly has: the displacement comes back, the increment and the
+        // gradient it is measured against do not.
+        //
+        // Whether that matters depends on the material. A law written in total
+        // strain will not notice; an incremental one reads the whole run's
+        // strain as a single step's and is wrong by tens of percent while
+        // running happily to the end. That is too quiet a way to be wrong to
+        // leave unsaid, and too common a mistake to assume: the flag defaults
+        // to off and most cases never set it
+        if (runTime.timeIndex() > 0)
+        {
+            WarningInFunction
+                << "Continuing from time " << runTime.timeName()
+                << " but 'restart' is not set in "
+                << solidModelDict().dictName() << '.' << nl
+                << "    The fields a consistent restart needs - the "
+                << "displacement increment, the old-time displacement "
+                << "gradient and the point fields - were not written." << nl
+                << "    A material written in total strain will not notice. "
+                << "An incremental one will continue from the wrong strain "
+                << "and give a wrong answer without stopping." << nl
+                << "    Set 'restart yes;' and run from the start if the "
+                << "answer has to be right."
+                << endl;
+        }
+
         D_.oldTime().writeOpt() = IOobject::NO_WRITE;
         D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
         DD_.writeOpt() = IOobject::NO_WRITE;
