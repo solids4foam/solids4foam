@@ -1050,7 +1050,7 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
                         entities[k++] =
                             mechanicalConstitutiveLawStateIO::faceEntity
                             (
-                                mesh_.nCells(), start + pf[i]
+                                start + pf[i]
                             );
                     }
                 }
@@ -1065,11 +1065,21 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
             )
         );
 
-        if (!entities.empty() && !Pstream::parRun())
+        if (!entities.empty())
         {
-            // Written by a serial run only: it is a serial run's locations
-            // that a decomposed one needs, and a processor writing its own
-            // would only describe a decomposition that already has its state
+            // Written in the numbering of the undecomposed mesh, whichever way
+            // this run is being run. A serial run's locations are what a
+            // decomposed one needs to distribute the state; a decomposed run's
+            // are what a reconstructed one needs to put it back together. Said
+            // in the same numbering, one list serves both
+            const labelList written
+            (
+                mechanicalConstitutiveLawStateIO::toSerialEntities
+                (
+                    mesh_, entities, entityName
+                )
+            );
+
             const label proxyI = stateWriteProxies_.size();
             stateWriteProxies_.setSize(proxyI + 1);
 
@@ -1086,7 +1096,7 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
                         IOobject::NO_READ,
                         IOobject::AUTO_WRITE
                     ),
-                    entities
+                    written
                 )
             );
 

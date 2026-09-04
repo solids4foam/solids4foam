@@ -141,16 +141,64 @@ public:
         //- How an integration point says which piece of mesh it belongs to.
         //  Cells and faces share one numbering so that a single list can carry
         //  a law's own points and its boundary points together: a cell is
-        //  itself, a face is offset past every cell
+        //  itself, a face is its index made negative and offset by one so that
+        //  face zero is still negative.
+        //
+        //  Signed rather than offset past the cell count, because a processor
+        //  writing where its points sat in the serial mesh does not know how
+        //  many cells that mesh had - it holds a piece of it - and an encoding
+        //  that needs a number nobody has cannot be written from both ends
         static inline label cellEntity(const label cellI)
         {
             return cellI;
         }
 
-        static inline label faceEntity(const label nCells, const label faceI)
+        static inline label faceEntity(const label faceI)
         {
-            return nCells + faceI;
+            return -(faceI + 1);
         }
+
+        static inline bool isFaceEntity(const label entity)
+        {
+            return entity < 0;
+        }
+
+        static inline label entityFace(const label entity)
+        {
+            return -entity - 1;
+        }
+
+        //- The same points, said in the numbering of the undecomposed mesh
+        static labelList toSerialEntities
+        (
+            const fvMesh& mesh,
+            const labelUList& localEntities,
+            const word& name
+        );
+
+        //- Fill this run's values from the files each processor wrote, for a
+        //  case that was run in parallel and reconstructed
+        template<class Type>
+        static bool gatherFromProcessors
+        (
+            const fvMesh& mesh,
+            const word& name,
+            const word& entityName,
+            const labelUList& serialEntities,
+            const stateParts& parts,
+            const word& variableName
+        );
+
+        //- Read a list from a named directory
+        template<class ListType>
+        static bool readListFrom
+        (
+            const fileName& dir,
+            const fvMesh& mesh,
+            const word& name,
+            ListType& data,
+            string& note
+        );
 
         //- Read a list written by a serial run, from the undecomposed case
         template<class ListType>
@@ -168,7 +216,6 @@ public:
             const fvMesh& mesh,
             const labelUList& localEntities,
             const labelUList& serialEntities,
-            const label serialNCells,
             const word& name
         );
 

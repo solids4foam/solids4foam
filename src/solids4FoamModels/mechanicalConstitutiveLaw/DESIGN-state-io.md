@@ -1448,3 +1448,54 @@ default of on, with an opt-out for cases that will never be restarted, would
 put the cost where the choice is rather than the correctness.
 
 That is a library-wide change and not this work's to make.
+
+## 15. The other direction, and one numbering for both
+
+13.2 solved half the problem: a case run in serial and then decomposed. The
+commoner half is the reverse - run in parallel, `reconstructPar`, continue in
+serial - and it was left refusing, because `reconstructPar` gathers these files
+no more than `decomposePar` distributes them.
+
+Both halves turn out to be the same problem said twice, and they are now the
+same code. A run that finds no state of its own looks where the other shape of
+the run would have left it: a decomposed run reads the undecomposed case and
+distributes, a serial run reads the processor directories and gathers. Each
+entry is matched by the piece of mesh it belongs to, so neither has to know how
+the mesh was cut.
+
+### 15.1 What made it one problem instead of two
+
+The locations are written in the numbering of the *undecomposed* mesh, whichever
+way the run that writes them is being run. A processor translates its own
+through the addressing `decomposePar` left it, before writing. So a serial run's
+locations are what a decomposed run needs to distribute the state, a decomposed
+run's are what a reconstructed run needs to put it back together, and one list
+serves both.
+
+That forced a change to how a location is said. It used to be a cell index, or
+a face index offset past every cell - and a processor holds a piece of the mesh,
+so it does not know how many cells the whole one had. An encoding that needs a
+number nobody has cannot be written from both ends. A face is now its index made
+negative and offset by one, so that face zero is still negative, and nothing
+needs a total.
+
+### 15.2 The face that two processors both hold
+
+A face `decomposePar` cut is a boundary on two processors and interior in the
+undecomposed mesh. Both write a value for it; neither is ever asked for one,
+because a cell-centred topology keeps no history on an interior face. So the
+gather sets rather than inserts, and the duplicate is harmless by construction
+rather than by luck.
+
+Going the other way the same face is the one case with no answer, and it takes
+its owner cell's history - 14.1 covers why, and why only a coupled patch may.
+
+### 15.3 What it costs
+
+Both directions reproduce the uninterrupted run to about 1e-8 on
+`perforatedPlate`, which is where the solver's own restart sits. Neither
+`decomposePar` nor `reconstructPar` is modified, and neither needs to be.
+
+What is still missing is the same as before: only the cell-centred topology
+writes locations, so only it can change shape. The others refuse, which remains
+the right behaviour for something unbuilt.

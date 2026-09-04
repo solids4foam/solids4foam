@@ -231,34 +231,37 @@ Foam::label Foam::mechanicalConstitutiveLawStateIO::serialCellCount
 //  entries, in its own numbering, and decomposePar's addressing translates
 //  between the two - so the two lists are matched on mesh entity rather than
 //  on position, and the order either was written in stops mattering
-Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
+Foam::labelList Foam::mechanicalConstitutiveLawStateIO::toSerialEntities
 (
     const fvMesh& mesh,
     const labelUList& localEntities,
-    const labelUList& serialEntities,
-    const label serialNCells,
     const word& name
 )
 {
-    const labelList cellAddr
-    (
-        cellProcAddressing(mesh)
-    );
-    const labelList faceAddr
-    (
-        faceProcAddressing(mesh)
-    );
+    if (!Pstream::parRun())
+    {
+        return labelList(localEntities);
+    }
 
-    if
-    (
-        !cellAddr.empty()
-     && !faceAddr.empty()
-     && (cellAddr.size() != mesh.nCells() || faceAddr.size() != mesh.nFaces())
-    )
+    const labelList cellAddr(cellProcAddressing(mesh));
+    const labelList faceAddr(faceProcAddressing(mesh));
+
+    if (cellAddr.empty() || faceAddr.empty())
     {
         FatalErrorInFunction
-            << "Restarting '" << name << "': the processor addressing does "
-            << "not describe this mesh." << nl
+            << "Relating '" << name << "' to the undecomposed mesh needs "
+            << "cellProcAddressing and faceProcAddressing, which decomposePar "
+            << "writes into each processor's mesh directory." << nl
+            << "They are not there, so this decomposition cannot be related "
+            << "to the serial one."
+            << exit(FatalError);
+    }
+
+    if (cellAddr.size() != mesh.nCells() || faceAddr.size() != mesh.nFaces())
+    {
+        FatalErrorInFunction
+            << "Relating '" << name << "': the processor addressing does not "
+            << "describe this mesh." << nl
             << "  cellProcAddressing holds " << cellAddr.size()
             << " entries for " << mesh.nCells() << " cells" << nl
             << "  faceProcAddressing holds " << faceAddr.size()
@@ -268,105 +271,90 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
             << exit(FatalError);
     }
 
-    if (cellAddr.empty() || faceAddr.empty())
+    labelList serial(localEntities.size());
+
+    forAll(localEntities, i)
     {
-        FatalErrorInFunction
-            << "Restarting '" << name << "' from the undecomposed case needs "
-            << "cellProcAddressing and faceProcAddressing, which decomposePar "
-            << "writes into each processor's mesh directory." << nl
-            << "They are not there, so this decomposition cannot be related "
-            << "to the serial one."
-            << exit(FatalError);
+        const label e = localEntities[i];
+
+        if (isFaceEntity(e))
+        {
+            // Stored offset by one and signed, so that face zero can carry a
+            // sign; only the magnitude matters, since state belongs to a face
+            // rather than to a direction across it
+            serial[i] = faceEntity(mag(faceAddr[entityFace(e)]) - 1);
+        }
+        else
+        {
+            serial[i] = cellEntity(cellAddr[e]);
+        }
     }
 
-    // Serial entity to its position in the serial file
+    return serial;
+}
+
+
+Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
+(
+    const fvMesh& mesh,
+    const labelUList& localEntities,
+    const labelUList& serialEntities,
+    const word& name
+)
+{
+    const labelList mine(toSerialEntities(mesh, localEntities, name));
+
     HashTable<label, label, Hash<label>> positionOf(2*serialEntities.size());
 
     forAll(serialEntities, i)
     {
-        positionOf.insert(serialEntities[i], i);
+        positionOf.set(serialEntities[i], i);
     }
 
-    labelList positions(localEntities.size(), -1);
+    labelList positions(mine.size(), -1);
 
-    forAll(localEntities, i)
+    forAll(mine, i)
     {
-        const label local = localEntities[i];
-
-        // Translate this processor's entity into the serial one
-        label serial = -1;
-
-        if (local < mesh.nCells())
-        {
-            serial =
-                cellEntity(cellAddr[local]);
-        }
-        else
-        {
-            const label localFace = local - mesh.nCells();
-
-            // Offset by one and signed, so that face zero can carry a sign
-            const label serialFace = mag(faceAddr[localFace]) - 1;
-
-            serial = faceEntity
-            (
-                serialNCells, serialFace
-            );
-        }
-
         HashTable<label, label, Hash<label>>::const_iterator iter =
-            positionOf.find(serial);
+            positionOf.find(mine[i]);
 
-        // Only a face decomposition itself created may fall back. The
-        // fallback is right for those and wrong for every other face: on a
-        // real boundary a miss means the serial state and this mesh disagree
-        // about something, and quietly substituting a nearby value would hide
+        // Only a face decomposition itself created may fall back. The fallback
+        // is right for those and wrong for every other face: on a real
+        // boundary a miss means the serial state and this mesh disagree about
+        // something, and quietly substituting a nearby value would hide
         // exactly the mistake this mapping is supposed to refuse
-        bool decompositionFace = false;
-
-        if (local >= mesh.nCells())
+        if (iter == positionOf.end() && isFaceEntity(localEntities[i]))
         {
-            const label patchI =
-                mesh.boundaryMesh().whichPatch(local - mesh.nCells());
+            const label localFace = entityFace(localEntities[i]);
+            const label patchI = mesh.boundaryMesh().whichPatch(localFace);
 
-            decompositionFace =
-                patchI >= 0 && mesh.boundary()[patchI].coupled();
-        }
+            if (patchI >= 0 && mesh.boundary()[patchI].coupled())
+            {
+                // A face this processor calls a boundary that the serial mesh
+                // called interior: decomposition made it one, by cutting the
+                // mesh there. The serial run kept no history on it, because a
+                // cell-centred topology keeps none on interior faces, so there
+                // is nothing to look up and nothing has been lost.
+                //
+                // Its owner cell is the nearest thing that does have history,
+                // and is what the face's own state grew from
+                const labelList cellAddr(cellProcAddressing(mesh));
 
-        if (iter == positionOf.end() && decompositionFace)
-        {
-            // A face this processor calls a boundary that the serial mesh
-            // called interior: decomposition made it one, by cutting the mesh
-            // there. The serial run kept no history on it, because a
-            // cell-centred topology keeps none on interior faces, so there is
-            // nothing to look up and nothing has been lost.
-            //
-            // Its owner cell is the nearest thing that does have history, and
-            // is what the face's own state grew from, so that is what it gets.
-            // A decomposed run continued from a serial one is therefore not
-            // identical to a decomposed run continued from a decomposed one at
-            // these faces, and cannot be: the history it would need was never
-            // written because it never existed
-            const label localFace = local - mesh.nCells();
-            const label ownerCell = mesh.faceOwner()[localFace];
-
-            iter = positionOf.find
-            (
-                cellEntity
+                iter = positionOf.find
                 (
-                    cellAddr[ownerCell]
-                )
-            );
+                    cellEntity(cellAddr[mesh.faceOwner()[localFace]])
+                );
+            }
         }
 
         if (iter == positionOf.end())
         {
             FatalErrorInFunction
-                << "Restarting '" << name << "': this processor holds a "
-                << "point on mesh entity " << serial << " of the serial mesh, "
-                << "and the serial state does not have one there." << nl
-                << "The serial state and this mesh do not describe the same "
-                << "case, or the material a cell belongs to has changed."
+                << "Restarting '" << name << "': this run holds a point on "
+                << "mesh entity " << mine[i] << " of the undecomposed mesh, "
+                << "and the state being read does not have one there." << nl
+                << "The state and this mesh do not describe the same case, or "
+                << "the material a cell belongs to has changed."
                 << exit(FatalError);
         }
 

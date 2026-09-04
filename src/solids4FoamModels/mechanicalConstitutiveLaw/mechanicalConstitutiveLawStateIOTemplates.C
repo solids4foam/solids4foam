@@ -21,6 +21,7 @@ License
 #include "IFstream.H"
 #include "Pstream.H"
 #include "labelIOList.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
@@ -74,12 +75,28 @@ bool Foam::mechanicalConstitutiveLawStateIO::readSerialList
     string& note
 )
 {
-    const fileName path
+    return readListFrom
     (
-        mechanicalConstitutiveLawStateIO::globalCasePath(mesh)
-      / mesh.time().timeName()
-      / name
+        globalCasePath(mesh)/mesh.time().timeName(),
+        mesh,
+        name,
+        data,
+        note
     );
+}
+
+
+template<class ListType>
+bool Foam::mechanicalConstitutiveLawStateIO::readListFrom
+(
+    const fileName& dir,
+    const fvMesh& mesh,
+    const word& name,
+    ListType& data,
+    string& note
+)
+{
+    const fileName path(dir/name);
 
     IFstream is(path);
 
@@ -211,18 +228,6 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
                         << exit(FatalError);
                 }
 
-                const label serialNCells =
-                    serialCellCount(dataNote);
-
-                if (serialNCells < 0)
-                {
-                    FatalErrorInFunction
-                        << "The state file '" << name << "' in the "
-                        << "undecomposed case was not written by a serial run."
-                        << nl << "  its header says: " << dataNote
-                        << exit(FatalError);
-                }
-
                 if (serialData.size() != serialEntities.size())
                 {
                     FatalErrorInFunction
@@ -235,10 +240,7 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
 
                 const labelList positions
                 (
-                    serialPositions
-                    (
-                        mesh, entities, serialEntities, serialNCells, name
-                    )
+                    serialPositions(mesh, entities, serialEntities, name)
                 );
 
                 label k = 0;
@@ -260,6 +262,24 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
                 Info<< "    Mapped '" << name << "' from the undecomposed case"
                     << endl;
 
+                present = true;
+                mapped = true;
+            }
+        }
+
+        if (!present && !Pstream::parRun())
+        {
+            // Nothing here, and this is not a decomposed run. The case may
+            // have been run in parallel and reconstructed, which leaves the
+            // state where the processors wrote it
+            if
+            (
+                gatherFromProcessors<Type>
+                (
+                    mesh, name, entityName, entities, parts, variableName
+                )
+            )
+            {
                 present = true;
                 mapped = true;
             }
@@ -362,6 +382,146 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
             mesh
         )
     );
+}
+
+
+template<class Type>
+bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
+(
+    const fvMesh& mesh,
+    const word& name,
+    const word& entityName,
+    const labelUList& serialEntities,
+    const stateParts& parts,
+    const word& variableName
+)
+{
+    // A case run in parallel and then reconstructed. reconstructPar knows no
+    // more about these files than decomposePar did, so the state is still
+    // sitting in the processor directories, in as many pieces as there were
+    // processors. Each piece says where its points were in the undecomposed
+    // mesh, so the pieces can be put back together without knowing how the
+    // mesh was cut
+    const fileName casePath(globalCasePath(mesh));
+    const word timeName(mesh.time().timeName());
+
+    // What a value at each undecomposed mesh entity is
+    HashTable<Type, label, Hash<label>> valueOf(4*serialEntities.size());
+
+    label nProcs = 0;
+
+    while (true)
+    {
+        const fileName procDir
+        (
+            casePath/("processor" + Foam::name(nProcs))/timeName
+        );
+
+        if (!isDir(casePath/("processor" + Foam::name(nProcs))))
+        {
+            break;
+        }
+
+        Field<Type> procData;
+        labelList procEntities;
+        string dataNote, entityNote;
+
+        const bool haveData =
+            readListFrom(procDir, mesh, name, procData, dataNote);
+        const bool haveEntities =
+            readListFrom(procDir, mesh, entityName, procEntities, entityNote);
+
+        if (!haveData || !haveEntities)
+        {
+            if (nProcs == 0)
+            {
+                return false;
+            }
+
+            FatalErrorInFunction
+                << "Restarting '" << name << "' from the processor "
+                << "directories, but processor" << nProcs << " has no state "
+                << "at time " << timeName << '.' << nl
+                << "The pieces of a decomposed state are only meaningful "
+                << "together, so a missing one is refused rather than filled "
+                << "in."
+                << exit(FatalError);
+        }
+
+        if (dataNote != entityNote)
+        {
+            FatalErrorInFunction
+                << "In processor" << nProcs << ", the state '" << name
+                << "' and the integration point locations it is read with "
+                << "were written by different runs." << nl
+                << "  the state says:     " << dataNote << nl
+                << "  the locations say:  " << entityNote
+                << exit(FatalError);
+        }
+
+        if (procData.size() != procEntities.size())
+        {
+            FatalErrorInFunction
+                << "In processor" << nProcs << ", the state '" << name
+                << "' holds " << procData.size() << " values and "
+                << procEntities.size() << " locations. They are written "
+                << "together and must agree."
+                << exit(FatalError);
+        }
+
+        forAll(procEntities, i)
+        {
+            // set rather than insert: a face that decomposition cut is a
+            // boundary on two processors and interior in the undecomposed
+            // mesh, so both offer a value for it and neither is ever asked
+            // for one
+            valueOf.set(procEntities[i], procData[i]);
+        }
+
+        nProcs++;
+    }
+
+    if (nProcs == 0)
+    {
+        return false;
+    }
+
+    label k = 0;
+
+    forAll(parts, partI)
+    {
+        Field<Type>& f =
+            stateFieldAccess<Type>::ref(*parts[partI], variableName);
+        Field<Type>& f0 =
+            stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+
+        forAll(f, i)
+        {
+            typename HashTable<Type, label, Hash<label>>::const_iterator iter =
+                valueOf.find(serialEntities[k]);
+
+            if (iter == valueOf.end())
+            {
+                FatalErrorInFunction
+                    << "Restarting '" << name << "' from " << nProcs
+                    << " processor directories: this mesh holds a point on "
+                    << "entity " << serialEntities[k] << " that none of them "
+                    << "wrote." << nl
+                    << "The processor directories and this mesh do not "
+                    << "describe the same case."
+                    << exit(FatalError);
+            }
+
+            f[i] = iter();
+            f0[i] = iter();
+            k++;
+        }
+    }
+
+    Info<< "    Mapped '" << name << "' from " << nProcs
+        << " processor directories" << endl;
+
+    return true;
 }
 
 

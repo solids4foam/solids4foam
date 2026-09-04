@@ -480,6 +480,110 @@ if ! run_parallel_restart_test; then
     failures=$((failures + 1))
 fi
 
+# ------------------------------------------------------------
+# Restart after reconstructPar
+# ------------------------------------------------------------
+# The other direction, and the commoner workflow: run in parallel, reconstruct,
+# continue in serial. reconstructPar knows no more about the constitutive state
+# than decomposePar did, so it stays in the processor directories and the
+# serial run puts it back together from there, guided by the locations each
+# processor wrote in the undecomposed mesh's numbering
+run_reconstructed_restart_test() {
+    if ! command -v mpirun > /dev/null 2>&1; then
+        echo "SKIP: reconstructed restart (no mpirun)"
+        return 0
+    fi
+
+    local d="${REGRESSION_ROOT}/frameworkReconstructed"
+
+    prepare_case "frameworkReconstructed"
+    CASE_DIR="${d}"
+
+    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    cat > "${d}/system/decomposeParDict" << 'EOD'
+FoamFile { version 2.0; format ascii; class dictionary; object decomposeParDict; }
+numberOfSubdomains 4;
+method scotch;
+EOD
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+    rm -rf "${d}"/processor* "${d}"/[1-9]*
+
+    if ! ( cd "${d}" && blockMesh > log.blockMesh 2>&1 \
+        && decomposePar > log.decomposePar 2>&1 )
+    then
+        echo "SKIP: reconstructed restart (decomposePar failed)"
+        return 0
+    fi
+
+    if ! ( cd "${d}" && mpirun -np 4 solids4Foam -parallel > log.par1 2>&1 )
+    then
+        echo "FAIL: reconstructed restart: the parallel leg did not run"
+        return 1
+    fi
+
+    if ! ( cd "${d}" && reconstructPar -latestTime > log.recon 2>&1 ); then
+        echo "FAIL: reconstructed restart: reconstructPar did not run"
+        return 1
+    fi
+
+    # The premise: reconstructPar leaves the state in the processor
+    # directories. If it ever starts gathering it, this stops testing the
+    # gather and nobody would notice
+    if ls "${d}"/10/*:*:epsilonP > /dev/null 2>&1; then
+        echo "FAIL: reconstructed restart: reconstructPar gathered the state,"
+        echo "      so this test no longer exercises what it was written for"
+        return 1
+    fi
+    echo "PASS: reconstructed restart: state stays in the processor directories"
+
+    sed -i.bak \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    if ! ( cd "${d}" && solids4Foam > "${SOLVER_LOGFILE}" 2>&1 ); then
+        echo "FAIL: reconstructed restart did not run"
+        grep -m1 "FOAM FATAL" -A4 "${d}/${SOLVER_LOGFILE}" || true
+        return 1
+    fi
+
+    if grep -q "processor directories" "${d}/${SOLVER_LOGFILE}"; then
+        echo "PASS: reconstructed restart gathered the state from the pieces"
+    else
+        echo "FAIL: reconstructed restart ran without gathering any state"
+        return 1
+    fi
+
+    local eps
+    eps=$(extract_max_epsilon)
+
+    if [[ -z "${eps}" || -z "${RESULT_EPS[framework]:-}" ]]; then
+        echo "SKIP: reconstructed restart needs the framework arm"
+        return 0
+    fi
+
+    local a="${RESULT_EPS[framework]}"
+
+    if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
+        printf "PASS: restart after reconstructPar matches the serial run (%.8g vs %.8g)\n" \
+            "$a" "$eps"
+    else
+        printf "FAIL: restart after reconstructPar differs (%.8g vs %.8g)\n" \
+            "$a" "$eps"
+        return 1
+    fi
+
+    return 0
+}
+
+if ! run_reconstructed_restart_test; then
+    failures=$((failures + 1))
+fi
+
 echo
 if (( failures == 0 ))
 then
