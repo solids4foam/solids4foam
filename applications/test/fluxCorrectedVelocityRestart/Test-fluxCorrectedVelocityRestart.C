@@ -24,12 +24,8 @@ Description
 
 \*---------------------------------------------------------------------------*/
 
-#include "argList.H"
-#include "Time.H"
-#include "fvMesh.H"
+#include "fvCFD.H"
 #include "physicsModel.H"
-#include "surfaceFields.H"
-#include "volFields.H"
 #include "fluxCorrectedVelocityFvPatchVectorField.H"
 #include "compatibilityFunctions.H"
 
