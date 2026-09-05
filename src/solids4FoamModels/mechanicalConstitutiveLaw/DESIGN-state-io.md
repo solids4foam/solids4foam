@@ -1807,3 +1807,59 @@ any law that gains a mixed one, as the oracle.
 is an effective shear modulus computed by a dedicated routine, because the law
 is anisotropic. Which is a further reason to do 18.4's smaller thing: port the
 displacement formulation, leave the mixed one on the legacy law.
+
+## 19. Where the mixed formulation actually belongs
+
+18 asked whether the solid model or the law should own the assembly. The
+answer is the solid model, for a reason 18 did not give: if the law chooses
+whether to use the pressure, then a solid model can solve a pressure equation
+and a law can quietly not use it, and nothing says so. The law should not have
+the choice.
+
+And it already works that way in one solid model. `linGeomTotalDispSolid`, when
+its `solvePressure` switch is on, does
+
+    sigma() = dev(sigma()) - p*I;
+
+which takes whatever the law produced, discards its volumetric part and
+substitutes the solved pressure. The law is not consulted, cannot opt out, and
+needs no switch of its own. It also asks for `tangentRequest::scalarDeviatoric`
+in that case, which is what that enum was declared for.
+
+So the framework needs nothing. The two fibre laws just ported carry no mixed
+branch and do not need one. The `dev()` disposes of the question of whether
+what a law returns is trace-free, because the solid model makes it so.
+
+### 19.1 What harmonising costs, which is not nothing
+
+The two solid models do not solve for the same variable, and this is the part
+that has to be got right rather than assumed.
+
+Both solve for something that is approximately `-kappa*div(u)` rather than the
+physical Cauchy pressure. `coupledPressureDisplacementSolid` then carries a
+coefficient `alpha = lambda/kappa = 3*nu/(1 + nu)` into the momentum coupling,
+as `nuCoeff_`, and `neoHookeanElastic`'s mixed branch scales the pressure by
+the same `alpha`. They are a matched pair, not two laws disagreeing.
+`GuccioneElastic` needs no coefficient because its mixed branch forces the bulk
+modulus to `GREAT`, so `nu` is one half and `alpha` is one - which is also why
+that branch can omit a `/J` that the ordinary branch keeps.
+
+Converting `coupledPressureDisplacementSolid` to the replacement form is
+therefore a change of variable, from `q` to `P = alpha*q`, and it has to be
+carried through consistently: the pressure equation becomes `P/(alpha*kappa) +
+div(u) = 0`, the momentum coupling loses its `alpha`, and the Rhie-Chow
+coefficient transforms with it. Pressure values and pressure boundary
+conditions change meaning. It is not a refactor.
+
+### 19.2 And it is not a finite-strain formulation yet
+
+`linGeomTotalDispSolid`'s constraint is `tr(gradD())`, the small-strain volume
+change. That is right for what it is used for and wrong for finite strain,
+where the constraint is on `J - 1` or `log(J)`. Putting a finite-strain law
+such as `GuccioneElastic` behind the existing switch would produce a
+formulation that is mixed in name only.
+
+So the order is: the design is settled and needs nothing from the laws; making
+`solvePressure` a finite-strain formulation is the first piece of work; and
+converting the coupled solver onto it is the second, with the change of
+variable done deliberately rather than discovered.
