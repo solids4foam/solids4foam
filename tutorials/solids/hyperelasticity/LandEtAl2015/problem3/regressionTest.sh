@@ -20,10 +20,10 @@ fi
 # direction: the fibre field is built by setFibreField before the solver runs,
 # and the constitutive law reads it.
 #
-# It is a legacy-only test for now. electroMechanicalLaw and the GuccioneElastic
-# law it wraps have not been ported to the mechanicalConstitutiveLaw framework,
-# and this case is here so that the port has something to be checked against
-# rather than being written and hoped over.
+# Both arms run: the legacy mechanicalModel and the mechanicalConstitutiveLaw
+# framework, which must agree. This is the only case that exercises a fibre
+# direction as prescribed state, and the only one where a composite law adds an
+# active stress to a passive one.
 # ============================================================
 
 MAG_D_MIN=8.0e-4
@@ -53,6 +53,7 @@ prepare_case() {
 }
 
 prepare_case
+sed -i 's/^writePrecision.*/writePrecision  14;/' "${CASE_DIR}/system/controlDict"
 ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
@@ -96,6 +97,86 @@ elif awk "BEGIN {exit !(${magD} >= ${MAG_D_MIN} && ${magD} <= ${MAG_D_MAX})}"; t
     printf "PASS: final probe |D| = %.6g\n" "${magD}"
 else
     printf "FAIL: final probe |D| = %.6g\n" "${magD}"
+    failures=$((failures + 1))
+fi
+
+
+# ------------------------------------------------------------
+# The framework arm
+# ------------------------------------------------------------
+# The same case with the stress taken from the mechanicalConstitutiveLaw
+# framework rather than the legacy mechanicalModel. The displacement
+# formulation only: the mixed one is not ported, for the reasons in
+# DESIGN-state-io.md section 18
+run_framework_comparison() {
+    local d="${REGRESSION_ROOT}/framework"
+
+    rm -rf "${d}"; mkdir -p "${d}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${d}/"
+    done
+    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+
+    # The switch lives in the solid model's Coeffs sub-dictionary, and Allrun
+    # symlinks solidProperties.displacement into place, so the variant is what
+    # has to be edited. At the top level it would be silently ignored and this
+    # arm would quietly repeat the legacy run
+    sed -i.bak \
+        's|^    // Solution algorithm|    useMechanicalConstitutiveLawManager yes;\n    // Solution algorithm|' \
+        "${d}/constant/solidProperties.displacement"
+    rm -f "${d}/constant/solidProperties.displacement.bak"
+
+    if ! grep -q 'useMechanicalConstitutiveLawManager' \
+        "${d}/constant/solidProperties.displacement"
+    then
+        echo "FAIL: could not enable the framework"
+        return 1
+    fi
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: framework arm (the tutorial skipped here)"
+        return 0
+    fi
+
+    # Each arm must have taken the path it was set up for
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${d}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        return 1
+    fi
+    echo "PASS: each arm took the path it was set up for"
+
+    local b
+    b=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
+
+    if [[ -z "${b}" ]]; then
+        echo "FAIL: the framework arm produced no displacement history"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !((${magD} - ${b})^2 <= (1e-8*${magD})^2)}"; then
+        printf "PASS: framework and legacy agree (%.10g vs %.10g)\n" \
+            "${magD}" "${b}"
+        return 0
+    fi
+
+    printf "FAIL: framework and legacy differ (%.10g vs %.10g)\n" \
+        "${magD}" "${b}"
+    return 1
+}
+
+if ! run_framework_comparison; then
     failures=$((failures + 1))
 fi
 

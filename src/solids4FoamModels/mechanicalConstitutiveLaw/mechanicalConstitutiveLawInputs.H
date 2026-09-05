@@ -90,6 +90,14 @@ class mechanicalConstitutiveLawInputs
         //- Time increment
         const scalar dt_;
 
+        //- The time the run has reached.
+        //  Carried beside the increment because a material can depend on
+        //  where in the loading it is and not only on how far the last step
+        //  moved - a tension ramped over a fixed duration, say. A law that
+        //  asked the mesh for this would be reaching for the registry, which
+        //  is the coupling this framework removes
+        const scalar time_;
+
         //- Scalar fields, one value per integration point of the law being
         //  evaluated. Not owned: the supplier outlives the evaluation
         HashTable<const scalarField*> scalarFields_;
@@ -108,10 +116,15 @@ public:
 
     // Constructors
 
-        //- Construct from the time increment
-        explicit mechanicalConstitutiveLawInputs(const scalar dt)
+        //- Construct from the time increment and the time reached
+        explicit mechanicalConstitutiveLawInputs
+        (
+            const scalar dt,
+            const scalar time = 0
+        )
         :
             dt_(dt),
+            time_(time),
             scalarFields_(),
             vectorFields_()
         {}
@@ -129,6 +142,12 @@ public:
             scalar dt() const
             {
                 return dt_;
+            }
+
+            //- The time the run has reached
+            scalar time() const
+            {
+                return time_;
             }
 
             //- Is a scalar input available under this name?

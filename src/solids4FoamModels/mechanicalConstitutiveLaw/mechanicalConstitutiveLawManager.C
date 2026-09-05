@@ -530,7 +530,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
     topologyEntry& tp
 ) const
 {
-    mechanicalConstitutiveLawInputs inputs(dt);
+    mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
 
     const wordList names(laws_[lawI].requiredScalarInputs());
 
@@ -625,7 +625,7 @@ Foam::mechanicalConstitutiveLawManager::inputsWithoutCoupling
         }
     }
 
-    return mechanicalConstitutiveLawInputs(dt);
+    return mechanicalConstitutiveLawInputs(dt, mesh_.time().value());
 }
 
 
@@ -639,7 +639,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
     topologyEntry& tp
 ) const
 {
-    mechanicalConstitutiveLawInputs inputs(dt);
+    mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
 
     const wordList names(laws_[lawI].requiredScalarInputs());
 
