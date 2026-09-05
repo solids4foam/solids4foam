@@ -34,6 +34,16 @@ APPROACHES=(
     updatedLagrangianPetscSnes
     highOrder
     highOrderUpdatedLagrangian
+    highOrderManager
+    highOrderUpdatedLagrangianManager
+)
+
+# Each of these takes its stress at the face quadrature points from the
+# mechanicalConstitutiveLaw framework; the arm it is paired with takes it from
+# the legacy mechanicalModel. The two must agree exactly
+declare -A MANAGER_ARM_OF=(
+    [highOrderManager]=highOrder
+    [highOrderUpdatedLagrangianManager]=highOrderUpdatedLagrangian
 )
 
 failures=0
@@ -95,6 +105,52 @@ for approach in "${APPROACHES[@]}"; do
     else
         printf "FAIL: final sigmaEq = %.6g exceeds threshold %.6g\n" \
             "${sigma}" "${SIGMA_TOL}"
+        failures=$((failures + 1))
+    fi
+
+    # Keep the displacement so the framework arms can be compared against the
+    # legacy ones after the loop; the case directory is reused and cleaned
+    latest_time=$(foamListTimes -case "${CASE_DIR}" -latestTime 2>/dev/null \
+        | tail -n 1)
+
+    if [[ -n "${latest_time}" && -f "${CASE_DIR}/${latest_time}/D" ]]; then
+        cp "${CASE_DIR}/${latest_time}/D" "${REGRESSION_ROOT}/D.${approach}"
+    fi
+
+    # Each arm must have taken the constitutive path it was set up for, or the
+    # comparison below is between two copies of the same thing
+    if grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        took_framework=yes
+    else
+        took_framework=no
+    fi
+
+    if [[ "${approach}" == *Manager && "${took_framework}" == no ]]; then
+        echo "FAIL: ${approach} did not use the constitutive framework"
+        failures=$((failures + 1))
+    elif [[ "${approach}" != *Manager && "${took_framework}" == yes ]]; then
+        echo "FAIL: ${approach} unexpectedly used the constitutive framework"
+        failures=$((failures + 1))
+    fi
+done
+
+for manager_arm in "${!MANAGER_ARM_OF[@]}"; do
+    legacy_arm="${MANAGER_ARM_OF[${manager_arm}]}"
+
+    manager_D="${REGRESSION_ROOT}/D.${manager_arm}"
+    legacy_D="${REGRESSION_ROOT}/D.${legacy_arm}"
+
+    if [[ ! -f "${manager_D}" || ! -f "${legacy_D}" ]]; then
+        echo "Skipping ${manager_arm} comparison: one of the arms did not run"
+        continue
+    fi
+
+    if diff -q "${legacy_D}" "${manager_D}" > /dev/null; then
+        echo "PASS: ${manager_arm} matches ${legacy_arm} exactly"
+    else
+        echo "FAIL: ${manager_arm} differs from ${legacy_arm}"
         failures=$((failures + 1))
     fi
 done

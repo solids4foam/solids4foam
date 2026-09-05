@@ -18,6 +18,9 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "cellZoneInterface.H"
+#include "fvMesh.H"
+#include "IOdictionary.H"
+#include "volFields.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -25,91 +28,193 @@ License
 namespace Foam
 {
 
-    //- Return a boolList indicating, for each internal face, if it
-    //  straddles two cell zones (true) or not (false)
-    tmp<Field<bool>> cellZoneInterface(const fvMesh& mesh, const bool debug)
+    labelList cellMaterialID(const fvMesh& mesh)
     {
-        // Create a field indicating internal faces on bi-material interfaces; that
-        // is, they straddle two contiguous cell zones
+        labelList materialID(mesh.nCells(), -1);
 
-        // Set local references to mesh data
-        const labelUList& owner = mesh.owner();
-        const labelUList& neighbour = mesh.neighbour();
-
-        // Prepare result field
-        tmp<Field<bool>> tinterface(new Field<bool>(owner.size(), false));
-        Field<bool>& interface = tmpRef(tinterface);
-
-        if (mesh.cellZones().size() > 1)
+        // The materials are the entries of the "mechanical" list in
+        // mechanicalProperties, each named after the cell zone it occupies.
+        // Looked up rather than read, because the mechanical model registers
+        // it and reading it again on every gradient would be wasteful
+        if (!mesh.foundObject<IOdictionary>("mechanicalProperties"))
         {
-            labelList cellZoneID(mesh.nCells(), -1);
-            forAll(mesh.cellZones(), czI)
-            {
-                const labelList& curCellZone = mesh.cellZones()[czI];
+            // Nothing says otherwise, so treat the mesh as one material
+            return materialID;
+        }
 
-                forAll(curCellZone, cI)
-                {
-                    const label cellID = curCellZone[cI];
+        const IOdictionary& mechProps =
+            mesh.lookupObject<IOdictionary>("mechanicalProperties");
 
-                    if (cellZoneID[cellID] != -1)
-                    {
-                        FatalErrorInFunction
-                            << "Cell " << cellID << " is in more than on cell zone!"
-                            << nl << "It is in cells zones " << cellZoneID[cellID]
-                            << " and " << cI << exit(FatalError);
-                    }
+        if (!mechProps.found("mechanical"))
+        {
+            return materialID;
+        }
 
-                    cellZoneID[cellID] = czI;
-                }
-            }
+        const PtrList<entry> lawEntries(mechProps.lookup("mechanical"));
 
-            // Check all cells are in at least one cell zone
-            if (gMin(cellZoneID) == -1)
+        if (lawEntries.size() < 2)
+        {
+            // A single material fills the mesh whatever zones it carries, so
+            // there is no interface anywhere and every cell stays -1
+            return materialID;
+        }
+
+        forAll(lawEntries, lawI)
+        {
+            const word& materialName = lawEntries[lawI].keyword();
+
+            const label zoneI = mesh.cellZones().findZoneID(materialName);
+
+            if (zoneI == -1)
             {
                 FatalErrorInFunction
-                    << "There is at least one cell not in a cell zone!"
+                    << "Material '" << materialName << "' in "
+                    << "mechanicalProperties has no cell zone of that name."
+                    << nl
+                    << "With more than one material, each must occupy the "
+                    << "cell zone it is named after."
                     << exit(FatalError);
             }
 
-            // Set the interface field
-            label nInterfaceFaces = 0;
-            forAll(interface, faceI)
-            {
-                const label own = owner[faceI];
-                const label nei = neighbour[faceI];
+            const labelList& zoneCells = mesh.cellZones()[zoneI];
 
-                if (cellZoneID[own] != cellZoneID[nei])
+            forAll(zoneCells, i)
+            {
+                const label cellI = zoneCells[i];
+
+                if (materialID[cellI] != -1)
                 {
-                    interface[faceI] = true;
-                    nInterfaceFaces++;
+                    FatalErrorInFunction
+                        << "Cell " << cellI << " is in more than one material "
+                        << "zone: " << materialID[cellI] << " and " << lawI
+                        << exit(FatalError);
                 }
-            }
 
-            if (debug)
-            {
-                InfoInFunction
-                    << nl << "There are " << nInterfaceFaces << " faces on an interface"
-                    << nl << endl;
+                materialID[cellI] = lawI;
             }
+        }
 
-            if (Pstream::parRun())
+        return materialID;
+    }
+
+
+    tmp<Field<bool>> cellZoneInterface(const fvMesh& mesh, const bool debug)
+    {
+        const labelUList& owner = mesh.owner();
+        const labelUList& neighbour = mesh.neighbour();
+
+        tmp<Field<bool>> tinterface(new Field<bool>(owner.size(), false));
+        Field<bool>& interface = tmpRef(tinterface);
+
+        const labelList materialID(cellMaterialID(mesh));
+
+        label nInterfaceFaces = 0;
+
+        forAll(interface, faceI)
+        {
+            const label ownID = materialID[owner[faceI]];
+            const label neiID = materialID[neighbour[faceI]];
+
+            // -1 on both sides is the single-material case, where nothing is
+            // an interface
+            if (ownID != neiID)
             {
-                notImplemented
-                (
-                    "Multiple cell-zone gradient calculation not yet implemented"
-                    " for parallel"
-                )
+                interface[faceI] = true;
+                nInterfaceFaces++;
             }
+        }
+
+        if (debug && nInterfaceFaces > 0)
+        {
+            InfoInFunction
+                << nl << "There are " << nInterfaceFaces
+                << " faces on a material interface" << nl << endl;
         }
 
         return tinterface;
     }
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+    List<boolList> cellZoneInterfaceCoupled(const fvMesh& mesh)
+    {
+        List<boolList> interface(mesh.boundary().size());
+
+        forAll(mesh.boundary(), patchI)
+        {
+            interface[patchI].setSize(mesh.boundary()[patchI].size(), false);
+        }
+
+        const labelList materialID(cellMaterialID(mesh));
+
+        // Nothing to do for a single material: every cell is -1, so no face
+        // can lie between two different materials
+        if (min(materialID) == -1 && max(materialID) == -1)
+        {
+            return interface;
+        }
+
+        // The material of the cell on the other side of each coupled face.
+        // Carried across as a field so that the exchange is the one the mesh
+        // already knows how to do, rather than a hand-rolled swap
+        volScalarField materialIDField
+        (
+            IOobject
+            (
+                "materialID",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("minusOne", dimless, -1.0),
+            "zeroGradient"
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        scalarField& materialIDI = materialIDField.primitiveFieldRef();
+#else
+        scalarField& materialIDI = materialIDField.internalField();
+#endif
+
+        forAll(materialIDI, cellI)
+        {
+            materialIDI[cellI] = materialID[cellI];
+        }
+
+        materialIDField.correctBoundaryConditions();
+
+        forAll(mesh.boundary(), patchI)
+        {
+            if (!mesh.boundary()[patchI].coupled())
+            {
+                continue;
+            }
+
+            const labelUList& faceCells =
+                mesh.boundary()[patchI].faceCells();
+
+            const scalarField nbrMaterialID
+            (
+                materialIDField.boundaryField()[patchI].patchNeighbourField()
+            );
+
+            forAll(nbrMaterialID, faceI)
+            {
+                const label ownID = materialID[faceCells[faceI]];
+                const label neiID = label(nbrMaterialID[faceI]);
+
+                if (ownID != neiID)
+                {
+                    interface[patchI][faceI] = true;
+                }
+            }
+        }
+
+        return interface;
+    }
 
 } // End namespace Foam
 
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // ************************************************************************* //

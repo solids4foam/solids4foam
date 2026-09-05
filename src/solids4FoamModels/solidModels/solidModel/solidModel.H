@@ -54,6 +54,7 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
@@ -65,13 +66,16 @@ SourceFiles
 #endif
 
 #ifndef FOAMEXTEND
-    #include "movingLeastSquares.H"
+    #include "leastSquaresReconstruction.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// Forward declaration
+class mechanicalConstitutiveLawManager;
 
 /*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
@@ -130,14 +134,6 @@ private:
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
-#ifndef FOAMEXTEND
-        //- Moving Least Square operator for the displacement field
-        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
-
-        //- Moving Least Square operator for the pressure field
-        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
-#endif
-
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
         boolIOList useBoundaryFaceValuesD_;
@@ -185,6 +181,27 @@ private:
         //- Gradient of total displacement at face quadrature points
         //  In use by high-order discretisation
         mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
+
+        //- Gradient of total displacement at face quadrature points, at the
+        //  previous time step.
+        //  A history-dependent law evaluated at quadrature points needs this,
+        //  and the current field is rebuilt each call, so it is copied here at
+        //  the end of every time step
+        mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
+
+        //- Copy one compact list-list onto another.
+        //  OpenFOAM.org gives CompactListList no copy constructor and no copy
+        //  assignment, so the two pieces of storage are copied by hand. The
+        //  row offsets and the flat values are the whole of it
+        static void copyQuadGradient
+        (
+            const CompactListList<tensor>& src,
+            CompactListList<tensor>& dst
+        )
+        {
+            dst.offsets() = src.offsets();
+            dst.m() = src.m();
+        }
 
         //- Gradient of the displacement increment
         volTensorField gradDD_;
@@ -270,6 +287,13 @@ private:
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
+        //- Whether the case said anything about restart at all.
+        //  Read before restart_ below, because looking that up adds it to the
+        //  dictionary and the silence cannot be recovered afterwards. Silence
+        //  and a deliberate 'no' are different things: one is a user who has
+        //  not thought about restarting, and the other is one who has
+        const Switch restartSpecified_;
+
         //- Optional: restart flag
         //  Write out all fields required for a consistent restart
         const Switch restart_;
@@ -329,11 +353,6 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Make the displacement Moving Least Squares object
-        void makeDisplacementMLS() const;
-
-        //- Make the pressure Moving Least Squares object
-        void makePressureMLS() const;
 #endif
 
         //- Return root high-order coefficients dictionary
@@ -367,6 +386,39 @@ private:
 
 
 protected:
+
+        //- The implicit stiffness taken from the mechanicalConstitutiveLaw
+        //  framework.
+        //
+        //  Shared by the solid models that offer the framework, because the
+        //  field has to match the legacy one exactly: it is registered under
+        //  "impK" and looked up by that name by the contact and cohesive zone
+        //  models, so its name, dimensions and boundary types are not free
+        tmp<volScalarField> frameworkImpK
+        (
+            mechanicalConstitutiveLawManager& manager,
+            const tangentRequest req
+        ) const;
+
+        //- Deformation gradient at the quadrature points, F = I + gradD.T(),
+        //  from a total displacement gradient there. Sized and offset to
+        //  match the gradient, so every list handed to the constitutive
+        //  framework shares one row structure, as it requires
+        static void quadDeformationGradient
+        (
+            const CompactListList<tensor>& gradD,
+            autoPtr<CompactListList<tensor>>& FPtr
+        );
+
+        //- Inverse and determinant of a deformation gradient at the
+        //  quadrature points
+        static void quadInverseAndJacobian
+        (
+            const CompactListList<tensor>& F,
+            autoPtr<CompactListList<tensor>>& FinvPtr,
+            autoPtr<CompactListList<scalar>>& JPtr
+        );
+
 
     // Protected member functions
 
@@ -739,6 +791,21 @@ public:
             }
 
             //- Return const reference to gradD at face quadrature points
+            //- Gradient of total displacement at face quadrature points at
+            //  the previous time step. Equal to the current field until the
+            //  first time step has been completed
+            virtual const CompactListList<tensor>& gradDQuad0() const
+            {
+                if (gradDQuad0Ptr_.empty())
+                {
+                    gradDQuad0Ptr_.set(new CompactListList<tensor>());
+
+                    copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+                }
+
+                return autoPtrRef(gradDQuad0Ptr_);
+            }
+
             virtual const CompactListList<tensor>& gradDQuad() const
             {
                 if (gradDQuadPtr_.empty())
@@ -829,25 +896,13 @@ public:
                 return twoD_;
             }
 #ifndef FOAMEXTEND
-            //- Return displacement moving least squares interpolation
-            const movingLeastSquares& displacementMLS() const
-            {
-                if (displacementMLSPtr_.empty())
-                {
-                    makeDisplacementMLS();
-                }
-                return autoPtrRef(displacementMLSPtr_);
-            }
+            //- Return the displacement least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& displacementLeastSquares() const;
 
-            //- Return pressure moving least squares interpolation
-            const movingLeastSquares& pressureMLS() const
-            {
-                if (pressureMLSPtr_.empty())
-                {
-                    makePressureMLS();
-                }
-                return autoPtrRef(pressureMLSPtr_);
-            }
+            //- Return the pressure least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& pressureLeastSquares() const;
 #endif
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -951,6 +1006,27 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise global patches with the deformed solid points
+            //  The deformed patch points are the mesh patch points displaced
+            //  by pointDorPointDD(), which is the displacement increment for
+            //  moving mesh (updated Lagrangian) approaches and the total
+            //  displacement for the others.  This is the same expression
+            //  makeGlobalPatches() uses to build the zone in the first place
+            //
+            //  For a moving mesh this is only correct while the mesh still
+            //  holds the points that pointDD is measured from, that is before
+            //  moveMesh() is called for the current time step.  Calling it
+            //  after the mesh has been moved, but before pointDD is reset,
+            //  would add the same increment a second time
+            //
+            //  All current callers satisfy this: the only caller is
+            //  fluidSolidInterface::updateResidual(), and every coupling
+            //  scheme calls that before solid().updateTotalFields(), which is
+            //  where the mesh is moved
+            //
+            //  Note: this is a collective operation in parallel
+            void syncGlobalPatches() const;
+
         // Edit
 
             //- Set traction at specified patch
@@ -959,6 +1035,15 @@ public:
                 fvPatchVectorField& tractionPatch,
                 const vectorField& traction
             );
+
+#ifndef FOAMEXTEND
+            //- Set traction component at specified patch quadrature points
+            virtual void setTractionQuadrature
+            (
+                fvPatchVectorField& tractionPatch,
+                const CompactListList<vector>& traction
+            );
+#endif
 
             //- Set traction at specified patch
             virtual void setTraction
@@ -1009,8 +1094,8 @@ public:
             //- Let the material model recalculate the density
             virtual void recalculateRho();
 
-            //- Clear Moving Least Squares interpolator
-            virtual void clearMovingLeastSquaresData();
+            //- Clear least-squares reconstruction data
+            virtual void clearLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);
@@ -1038,6 +1123,18 @@ public:
             ) const = 0;
 
             //- Update total accumulated fields
+            //- Residual of the material update between outer iterations.
+            //  The legacy mechanicalModel under-relaxes its plastic strain
+            //  increment, so its constitutive update lags the displacement
+            //  solution and has to be checked for convergence. A solid model
+            //  taking its stress from the mechanicalConstitutiveLaw framework
+            //  overrides this, because a framework law is a pure function of
+            //  the kinematics and the old-time state and so does not lag
+            virtual scalar materialResidual()
+            {
+                return mechanical().residual();
+            }
+
             virtual void updateTotalFields();
 
             //- Write fields
@@ -1047,6 +1144,12 @@ public:
             virtual scalar newDeltaT();
 
             //- Move the mesh by the provided point displacement field
+            //  Note: any global patches must be synchronised before this is
+            //  called.  syncGlobalPatches() displaces the mesh points by
+            //  pointDD, so once the mesh itself has been moved by pointDD the
+            //  same increment would be counted twice.  In fluid-solid
+            //  interaction this is reached from updateTotalFields(), after
+            //  the coupling loop has finished
             virtual void moveMesh
             (
                 const pointField& oldPoints,

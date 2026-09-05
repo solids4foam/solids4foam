@@ -157,6 +157,11 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
     const Field<bool> interface(cellZoneInterface(mesh));
 
+    // A material interface that runs along a processor boundary is an internal
+    // face on neither side, so it has to be skipped here as well or the
+    // stencil would reach across it in parallel and not in serial
+    const List<boolList> interfaceCoupled(cellZoneInterfaceCoupled(mesh));
+
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh.nCells(), symmTensor::zero);
     forAll(owner, facei)
@@ -201,6 +206,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
             forAll(pd, patchFacei)
             {
+                if (interfaceCoupled[patchi][patchFacei])
+                {
+                    // Skip contributions across interfaces
+                    continue;
+                }
+
                 const vector& d = pd[patchFacei];
 
                 dd[faceCells[patchFacei]] +=
@@ -305,6 +316,13 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
 
             forAll(pd, patchFacei)
             {
+                if (interfaceCoupled[patchi][patchFacei])
+                {
+                    // Set face contribution to zero across interfaces
+                    patchLsP[patchFacei] = vector::zero;
+                    continue;
+                }
+
                 const vector& d = pd[patchFacei];
 
                 patchLsP[patchFacei] =
@@ -363,8 +381,412 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
         }
     }
 
+    // Replace the face stencil where it is rank-deficient
+    calcWideStencilVectors(dd);
+
     DebugInfo
         << "Finished calculating least square gradient vectors" << nl;
+}
+
+
+void Foam::leastSquaresS4fVectors::calcWideStencilVectors
+(
+    const symmTensorField& dd
+) const
+{
+    const fvMesh& mesh = this->mesh();
+
+    // Set local references to mesh data
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+
+    const volVectorField& C = mesh.C();
+    const surfaceScalarField& w = mesh.weights();
+
+    // Flag cells whose face stencil does not span three directions.
+    // dd is symmetric positive semi-definite, so its eigenvalues are real and
+    // non-negative, and the smallest one vanishes exactly when the stencil is
+    // confined to a plane or a line. Healthy and degenerate cells are separated
+    // by many orders of magnitude, so this ratio is not sensitive: any value
+    // between 1e-4 and 1e-12 selects the same cells
+    const scalar minEigenRatio = 1e-4;
+
+    // A 2-D or axisymmetric mesh carries no information in its empty
+    // direction, and that is not a degeneracy. Fill the empty directions
+    // before testing, as inv(symmTensorField) does through safeInv()
+    const Vector<label> geometricD = mesh.geometricD();
+    symmTensor emptyDirs(symmTensor::zero);
+    emptyDirs.xx() = (geometricD.x() == -1 ? 1.0 : 0.0);
+    emptyDirs.yy() = (geometricD.y() == -1 ? 1.0 : 0.0);
+    emptyDirs.zz() = (geometricD.z() == -1 ? 1.0 : 0.0);
+
+    // A simplex cell carries the smallest face stencil a mesh can offer: only
+    // nDim + 1 face neighbours, i.e. one more equation than unknowns. Such a
+    // stencil is formally full rank, so the eigenvalue test above sees nothing
+    // wrong with it, but it is far too small to reconstruct a cell-centred
+    // gradient accurately. Widen it in every simplex cell, independently of the
+    // eigenvalue test. Faces on empty patches carry no neighbour and so are
+    // discounted: a tetrahedron has 4 faces, and a triangular prism in a
+    // one-cell-thick 2-D mesh has 3 + 2 = 5
+    const label nEmptyDirs = 3 - mesh.nGeometricD();
+    const label maxSimplexFaces = mesh.nGeometricD() + 1 + 2*nEmptyDirs;
+
+    const cellList& cells = mesh.cells();
+
+    labelList cellToWide(mesh.nCells(), -1);
+    label nWide = 0;
+    label nSimplex = 0;
+    scalar maxCond = 0.0;
+
+    forAll(dd, cellI)
+    {
+        const symmTensor ddc(dd[cellI] + (tr(dd[cellI])/3.0)*emptyDirs);
+        const vector eVals = eigenValues(ddc);
+        const scalar lambdaMin = eVals[vector::X];
+        const scalar lambdaMax = eVals[vector::Z];
+
+        const bool rankDeficient =
+        (
+            lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax
+        );
+
+        const bool simplex = (cells[cellI].size() <= maxSimplexFaces);
+
+        if (rankDeficient || simplex)
+        {
+            cellToWide[cellI] = nWide++;
+
+            if (simplex && !rankDeficient)
+            {
+                nSimplex++;
+            }
+        }
+        else
+        {
+            maxCond = max(maxCond, lambdaMax/lambdaMin);
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "    leastSquaresS4fVectors: "
+            << returnReduce(nWide, sumOp<label>()) << " of "
+            << returnReduce(mesh.nCells(), sumOp<label>())
+            << " cells use the wide stencil, of which "
+            << returnReduce(nSimplex, sumOp<label>())
+            << " are simplex cells with a full-rank face stencil,"
+            << " max cond(dd) = "
+            << returnReduce(maxCond, maxOp<scalar>()) << endl;
+    }
+
+    wideCells_.setSize(nWide);
+    wideStencil_.setSize(nWide);
+    wideVectors_.setSize(nWide);
+
+    if (nWide == 0)
+    {
+        return;
+    }
+
+    forAll(cellToWide, cellI)
+    {
+        if (cellToWide[cellI] != -1)
+        {
+            wideCells_[cellToWide[cellI]] = cellI;
+        }
+    }
+
+    // Collect the cells sharing at least one point with each flagged cell.
+    // Unlike a face neighbour, a point neighbour is not removed by the
+    // traction rule, as it is not reached across a boundary face
+    const labelListList& cellPoints = mesh.cellPoints();
+    const labelListList& pointCells = mesh.pointCells();
+
+    // A point neighbour of a different material is no more admissible than a
+    // face neighbour of one: either way the gradient would be built from two
+    // materials at once. Every cell is -1 when the case has a single material,
+    // so this costs nothing there
+    const labelList materialID(cellMaterialID(mesh));
+
+    // As for the face stencil, an interface running along a processor
+    // boundary has to be skipped explicitly
+    const List<boolList> interfaceCoupled(cellZoneInterfaceCoupled(mesh));
+
+    forAll(wideCells_, wcI)
+    {
+        const label cellI = wideCells_[wcI];
+        const labelList& curCellPoints = cellPoints[cellI];
+        const label cellMaterial = materialID[cellI];
+
+        labelHashSet stencil;
+        forAll(curCellPoints, cpI)
+        {
+            const labelList& curPointCells = pointCells[curCellPoints[cpI]];
+
+            forAll(curPointCells, pcI)
+            {
+                if (materialID[curPointCells[pcI]] == cellMaterial)
+                {
+                    stencil.insert(curPointCells[pcI]);
+                }
+            }
+        }
+        stencil.erase(cellI);
+
+        wideStencil_[wcI] = stencil.toc();
+    }
+
+    // Assemble the wide moment tensor. All contributions use an inverse
+    // distance squared weight: the face-area weight used by the face stencil
+    // has no meaning for a point neighbour, which shares no face
+    symmTensorField wideDd(nWide, symmTensor::zero);
+
+    forAll(wideCells_, wcI)
+    {
+        const label cellI = wideCells_[wcI];
+        const labelList& stencil = wideStencil_[wcI];
+
+        forAll(stencil, i)
+        {
+            const vector d = C[stencil[i]] - C[cellI];
+
+            wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
+        }
+    }
+
+    // Boundary faces of the flagged cells contribute as they do for the face
+    // stencil: coupled and known-value patches give the face, symmetry planes
+    // give the mirrored cell, and traction patches give nothing
+    forAll(mesh.boundary(), patchi)
+    {
+        const fvsPatchScalarField& pw = w.boundaryField()[patchi];
+        const fvPatch& p = pw.patch();
+        const labelUList& faceCells = p.faceCells();
+        const vectorField& Cf = p.Cf();
+
+        if (pw.coupled())
+        {
+            const vectorField pd(p.delta());
+
+            forAll(pd, patchFacei)
+            {
+                const label wcI = cellToWide[faceCells[patchFacei]];
+
+                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
+                {
+                    const vector& d = pd[patchFacei];
+
+                    wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
+                }
+            }
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+#ifdef OPENFOAM_NOT_EXTEND
+         || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+#endif
+        )
+        {
+            const vectorField nHat(p.nf());
+
+            forAll(nHat, patchFacei)
+            {
+                const label cellI = faceCells[patchFacei];
+                const label wcI = cellToWide[cellI];
+
+                if (wcI != -1)
+                {
+                    const vector d =
+                        transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
+                      - C[cellI];
+
+                    wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
+                }
+            }
+        }
+        else if (useBoundaryFaceValues_[patchi])
+        {
+            forAll(faceCells, patchFacei)
+            {
+                const label cellI = faceCells[patchFacei];
+                const label wcI = cellToWide[cellI];
+
+                if (wcI != -1)
+                {
+                    const vector d = Cf[patchFacei] - C[cellI];
+
+                    wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
+                }
+            }
+        }
+    }
+
+    // Warn if any cell is still rank-deficient after widening: in parallel the
+    // point-cell stencil is truncated at processor boundaries
+    label nStillSingular = 0;
+    label worstCell = -1;
+    scalar worstRatio = GREAT;
+
+    forAll(wideDd, wcI)
+    {
+        const symmTensor ddc(wideDd[wcI] + (tr(wideDd[wcI])/3.0)*emptyDirs);
+        const vector eVals = eigenValues(ddc);
+
+        const scalar lambdaMin = eVals[vector::X];
+        const scalar lambdaMax = eVals[vector::Z];
+
+        if (lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax)
+        {
+            nStillSingular++;
+
+            const scalar ratio =
+                lambdaMax < VSMALL ? 0.0 : lambdaMin/lambdaMax;
+
+            if (ratio < worstRatio)
+            {
+                worstRatio = ratio;
+                worstCell = wideCells_[wcI];
+            }
+        }
+    }
+
+    if (returnReduce(nStillSingular, sumOp<label>()) > 0)
+    {
+        // A cell whose stencil cannot span the mesh's directions has no
+        // gradient that can be reconstructed from it, and there is no sound
+        // fallback: widening again would not help, and falling back on an
+        // unfiltered stencil would build the gradient from two materials at
+        // once, which is what the filtering exists to prevent.
+        //
+        // Two geometries produce this. Where the case has several materials,
+        // the cell's own material does not surround it - a material one cell
+        // thick, or a cell at a material corner or tip. Where it has one, the
+        // point-cell stencil has been truncated at a processor boundary. Both
+        // mean the same thing about the answer, so both are fatal
+        FatalErrorInFunction
+            << returnReduce(nStillSingular, sumOp<label>())
+            << " cells remain rank-deficient after widening the gradient"
+            << " stencil to point neighbours of the same material." << nl
+            << "    Worst on this processor: cell " << worstCell
+            << ", material " << (worstCell >= 0 ? materialID[worstCell] : -1)
+            << ", smallest eigenvalue ratio " << worstRatio << nl
+            << "    Either the cell's own material does not surround it in"
+            << " every direction, in which case refine so that at least two"
+            << " cells span the material everywhere; or the stencil is"
+            << " truncated at a processor boundary, in which case decompose"
+            << " so that it is not."
+            << exit(FatalError);
+    }
+
+    const symmTensorField wideInvDd(inv(wideDd));
+
+    forAll(wideCells_, wcI)
+    {
+        const label cellI = wideCells_[wcI];
+        const labelList& stencil = wideStencil_[wcI];
+        vectorList& lsVecs = wideVectors_[wcI];
+        lsVecs.setSize(stencil.size(), vector::zero);
+
+        forAll(stencil, i)
+        {
+            const vector d = C[stencil[i]] - C[cellI];
+
+            lsVecs[i] = (1.0/magSqr(d))*(wideInvDd[wcI] & d);
+        }
+    }
+
+    // Switch off the face-stencil contribution in the flagged cells. The
+    // vectors are stored per side, so silencing one cell leaves the cell across
+    // the face untouched
+    forAll(owner, facei)
+    {
+        if (cellToWide[owner[facei]] != -1)
+        {
+            pVectors_[facei] = vector::zero;
+        }
+
+        if (cellToWide[neighbour[facei]] != -1)
+        {
+            nVectors_[facei] = vector::zero;
+        }
+    }
+
+    // Rebuild the boundary vectors of the flagged cells with the wide tensor
+    auto& pVectorsBf = boundaryFieldRef(pVectors_);
+
+    forAll(pVectorsBf, patchi)
+    {
+        fvsPatchVectorField& patchLsP = pVectorsBf[patchi];
+
+        const fvsPatchScalarField& pw = w.boundaryField()[patchi];
+        const fvPatch& p = pw.patch();
+        const labelUList& faceCells = p.faceCells();
+        const vectorField& Cf = p.Cf();
+
+        if (pw.coupled())
+        {
+            const vectorField pd(p.delta());
+
+            forAll(pd, patchFacei)
+            {
+                const label wcI = cellToWide[faceCells[patchFacei]];
+
+                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
+                {
+                    const vector& d = pd[patchFacei];
+
+                    patchLsP[patchFacei] =
+                        (1.0/magSqr(d))*(wideInvDd[wcI] & d);
+                }
+            }
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+#ifdef OPENFOAM_NOT_EXTEND
+         || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+#endif
+        )
+        {
+            const vectorField nHat(p.nf());
+
+            forAll(nHat, patchFacei)
+            {
+                const label cellI = faceCells[patchFacei];
+                const label wcI = cellToWide[cellI];
+
+                if (wcI != -1)
+                {
+                    const vector d =
+                        transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
+                      - C[cellI];
+
+                    patchLsP[patchFacei] =
+                        (1.0/magSqr(d))*(wideInvDd[wcI] & d);
+                }
+            }
+        }
+        else if (useBoundaryFaceValues_[patchi])
+        {
+            forAll(faceCells, patchFacei)
+            {
+                const label cellI = faceCells[patchFacei];
+                const label wcI = cellToWide[cellI];
+
+                if (wcI != -1)
+                {
+                    const vector d = Cf[patchFacei] - C[cellI];
+
+                    patchLsP[patchFacei] =
+                        (1.0/magSqr(d))*(wideInvDd[wcI] & d);
+                }
+            }
+        }
+    }
+
+    DebugInfo
+        << "    wide point-cell stencil applied" << nl;
 }
 
 

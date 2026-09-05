@@ -123,6 +123,12 @@ public:
         return ids;
     }
 
+    //- One integration point per mesh face, indexed by face
+    virtual bool integrationPointsAreFaces() const override
+    {
+        return true;
+    }
+
     //- Faces are shared between cells → uniqueness required
     virtual bool requiresUniqueIntegrationPointsPerMaterial() const override
     {

@@ -150,8 +150,9 @@ void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
     // Calculate passive stress
     passiveMechLawPtr_->correct(sigma);
 
-    // Take a reference to the deformation gradient
-    const volTensorField& F = this->F();
+    // Take a reference to the deformation gradient maintained by the passive law
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const volTensorField& F = passiveLaw.F();
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F));
@@ -203,8 +204,10 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     // Calculate passive stress
     passiveMechLawPtr_->correct(sigma);
 
-    // Take a reference to the deformation gradient
-    const surfaceTensorField& F = this->Ff();
+    // Take a reference to the face deformation gradient maintained by the
+    // passive law
+    const mechanicalLaw& passiveLaw = passiveMechLawPtr_();
+    const surfaceTensorField& F = passiveLaw.Ff();
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(F));

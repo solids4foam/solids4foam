@@ -1,0 +1,141 @@
+#!/bin/bash
+
+set -Eeo pipefail
+set +u
+IFS=$'\n\t'
+
+caseDir="$(cd "$(dirname "$0")" && pwd)"
+cd "$caseDir"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun
+# ./Allrun parallel
+
+runParallel=no
+
+print_usage()
+{
+    cat <<'EOF'
+Usage:
+  ./Allrun           # run the case in serial
+  ./Allrun parallel  # run the case using the configured subdomains
+EOF
+}
+
+for arg in "$@"
+do
+    case "$arg" in
+        parallel)
+            runParallel=yes
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            print_usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+# The mesh-generation workflow is not supported on foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+# Allrun only builds and runs.  Cleanup is deliberately handled by Allclean.
+for generatedMesh in \
+    constant/polyMesh \
+    constant/fluid/polyMesh \
+    constant/solid/polyMesh
+do
+    if [ -e "$generatedMesh" ]
+    then
+        echo "Generated mesh already exists: $generatedMesh" >&2
+        echo "Run ./Allclean before ./Allrun." >&2
+        exit 1
+    fi
+done
+
+# cartesianMesh writes an unregioned mesh. Move it into the fluid region.
+runApplication -o cartesianMesh
+mkdir -p constant/fluid
+mv constant/polyMesh constant/fluid/polyMesh
+
+# Stage a disposable copy for the standard extrudeMesh utility. Its
+# exposedPatchName must already exist, so add an empty innerWall patch only to
+# this staging mesh. The actual fluid-region mesh remains unchanged.
+cp -R constant/fluid/polyMesh constant/polyMesh
+
+boundaryFile=constant/polyMesh/boundary
+boundaryTmp="$(mktemp "${TMPDIR:-/tmp}/aneurysm-boundary.XXXXXX")"
+awk '
+    !countDone && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]*$/ {
+        print $1 + 1
+        countDone = 1
+        next
+    }
+    countDone && !patchDone && $0 ~ /^[[:space:]]*\([[:space:]]*$/ {
+        print
+        print "innerWall"
+        print "{"
+        print "    type wall;"
+        print "    nFaces 0;"
+        print "    startFace 0;"
+        print "}"
+        print ""
+        patchDone = 1
+        next
+    }
+    { print }
+    END { if (!countDone || !patchDone) exit 2 }
+' "$boundaryFile" > "$boundaryTmp"
+mv "$boundaryTmp" "$boundaryFile"
+
+runApplication -o extrudeMesh
+
+# Standard extrudeMesh retains wall for the exposed outer face. Rename it to
+# the solid boundary-condition name and install the result as the solid region.
+runApplication -o createPatch -dict system/createPatchDict.solid -overwrite
+mkdir -p constant/solid
+mv constant/polyMesh constant/solid/polyMesh
+
+runApplication -o -s fluid checkMesh -region fluid
+runApplication -o -s solid checkMesh -region solid
+
+# Run the coupled fluid-solid case.
+if [[ "$runParallel" == "yes" ]]
+then
+    solids4Foam::runApplication -o -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -o -s solid decomposePar -region solid
+    solids4Foam::runParallel -o solids4Foam
+    solids4Foam::runApplication -o -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -o -s solid reconstructPar -region solid
+else
+    solids4Foam::runApplication -o solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating fsiIterations.pdf and fsiIterations.png using gnuplot"
+    gnuplot fsiIterations.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

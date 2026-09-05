@@ -77,10 +77,12 @@ class linearElasticMisesPlasticMechanicalConstitutiveLaw
         const dimensionedScalar rho_;
 
         //- Young's modulus
-        const dimensionedScalar E_;
+        //  Set in the constructor body, since the material may be given as
+        //  mu and K instead
+        dimensionedScalar E_;
 
         //- Poisson's ration
-        const dimensionedScalar nu_;
+        dimensionedScalar nu_;
 
         //- Second Lamé parameter (shear modulus)
         dimensionedScalar mu_;
@@ -183,16 +185,18 @@ public:
 
     // Edit
 
-        //- Initialise constitutive state variables
-        virtual void initialiseState
+        //- Declare this law's history, so that the manager can carry it
+        //  across a restart
+        virtual void declareState
         (
-            mechanicalConstitutiveLawState& state
-        ) const;
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
 
         //- Small-strain constitutive evaluation
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const override;

@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomUpdatedLagSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
 #include "hofvc.H"
 
@@ -85,6 +86,14 @@ class nonLinGeomUpdatedLagSolid
 
         //- Acceleration
         volVectorField A_;
+
+        //- Take the implicit stiffness from the mechanicalConstitutiveLaw
+        //  framework rather than from the legacy mechanicalModel.
+        //  Declared before impK_ because makeImpK() consults it
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- The mechanicalConstitutiveLaw framework, built on demand
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -148,6 +157,43 @@ class nonLinGeomUpdatedLagSolid
         void makeRKappa() const;
 
         //- Return const access to the reciprocal of the bulk modulus
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Inverse of the total deformation gradient, needed by the
+        //  framework and not otherwise kept by this solver. Built on first use
+        mutable autoPtr<volTensorField> FinvPtr_;
+
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
+        //- Update the stress at the face quadrature points, from the framework
+        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  legacy mechanicalModel otherwise.
+        //  The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+
+        //- Finite-strain kinematics at the face quadrature points. The old
+        //  time needs no store of its own: FQuadOldPtr_ already holds the
+        //  converged total deformation gradient of the previous step
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+#endif
+
+        //- Construct impK from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
+        //  mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf to match whichever impK was built
+        tmp<surfaceScalarField> makeImpKf() const;
+
         const volScalarField& rKappa() const;
 
         //- Enforce traction boundary conditions on the provided traction field
@@ -271,6 +317,10 @@ public:
             ) const;
 
             //- Update total accumulated fields
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
             virtual void updateTotalFields();
 };
 

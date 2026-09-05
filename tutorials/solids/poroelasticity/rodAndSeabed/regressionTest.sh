@@ -12,11 +12,19 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ============================================================
 
 # Reference ranges (order-of-magnitude + robustness)
-EPSILON_MIN=6e-5
-EPSILON_MAX=1.1e-4
+#
+# These moved when the anisotropic Biot law stopped selecting its reduced
+# plane model on this three-dimensional mesh. The old values were not
+# self-consistent with the declared material: 80 kPa against a strain of
+# 9.3e-5 implies a stiffness near 9e8 Pa, where the moduli here are 1.2e7 to
+# 2e7 Pa. Forcing the out-of-plane stress to zero while xx and yy were not
+# manufactured a large deviator, so von Mises read high against a small
+# strain. The values below sit on the declared moduli
+EPSILON_MIN=1.4e-3
+EPSILON_MAX=2.2e-3
 
-SIGMA_MIN=70e3
-SIGMA_MAX=90e3
+SIGMA_MIN=40e3
+SIGMA_MAX=58e3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -99,6 +107,95 @@ fi
 # Checks
 # ------------------------------------------------------------
 
+# Check the poroMechanicalLaw composite against the legacy law, on the case as
+# it ships: poroMechanicalLaw over anisotropicBiotElastic. The two arms differ
+# in one dictionary entry and nothing else, and must agree exactly.
+#
+# This is the case that exercises the effective stress the composite carries.
+# anisotropicBiotElastic leaves the zz, yz and xz components of the stress
+# unwritten in the branch this case takes, so they come from whatever the
+# sub-law was given to work in - which is the whole reason the composite hands
+# it the effective stress rather than the caller's total stress
+run_poro_framework_comparison() {
+    local legacy_dir="${REGRESSION_ROOT}/poroLegacy"
+    local framework_dir="${REGRESSION_ROOT}/poroFramework"
+    local dir
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        rm -rf "${dir}"
+        mkdir -p "${dir}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${dir}/"
+        done
+
+        # Enough digits that the comparison is about the solution and not
+        # about the last figure written
+        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+                "${dir}/system/controlDict"
+        else
+            echo "writePrecision  14;" >> "${dir}/system/controlDict"
+        fi
+    done
+
+    sed -i \
+        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+        "${framework_dir}/constant/solidProperties"
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+            echo "FAIL: the poro comparison could not run ${dir}"
+            return 1
+        }
+    done
+
+    # Each arm must have taken the path it was set up for
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${framework_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${legacy_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        return 1
+    fi
+
+    local tL tF
+    tL=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
+    tF=$(foamListTimes -case "${framework_dir}" -latestTime 2>/dev/null \
+        | tail -n 1)
+
+    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
+        echo "FAIL: the poro arms reached different times ('${tL}' vs '${tF}')"
+        return 1
+    fi
+
+    if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
+    then
+        echo "FAIL: the poro comparison produced no D field"
+        return 1
+    fi
+
+    if diff -q "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D" > /dev/null
+    then
+        echo "PASS: poro framework and legacy agree exactly"
+        return 0
+    fi
+
+    echo "FAIL: poro framework and legacy differ"
+    return 1
+}
+
 failures=0
 
 # --- epsilonEq ---
@@ -120,6 +217,10 @@ else
 fi
 
 echo
+if ! run_poro_framework_comparison; then
+    failures=$((failures + 1))
+fi
+
 if (( failures == 0 ))
 then
     echo "============================================================"

@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
 #include "hofvc.H"
 
@@ -77,6 +78,14 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Acceleration
         volVectorField A_;
 
+        //- Take the implicit stiffness from the mechanicalConstitutiveLaw
+        //  framework rather than from the legacy mechanicalModel.
+        //  Declared before impK_ because makeImpK() consults it
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- The mechanicalConstitutiveLaw framework, built on demand
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -106,6 +115,37 @@ class nonLinGeomTotalLagTotalDispSolid
 
 
     // Private Member Functions
+
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
+        //- Update the stress at the face quadrature points, from the framework
+        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  legacy mechanicalModel otherwise.
+        //  The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+
+        //- Finite-strain kinematics at the face quadrature points, held here
+        //  rather than rebuilt per call because they are as large as the
+        //  quadrature stress itself
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuad0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+#endif
+
+        //- Construct impK from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
+        //  mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
 
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;
@@ -195,6 +235,14 @@ public:
         // Edit
 
             //- Evolve the solid solver and solve the mathematical model
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
+            virtual void updateTotalFields() override;
+
             virtual bool evolve();
 
 #ifdef USE_PETSC

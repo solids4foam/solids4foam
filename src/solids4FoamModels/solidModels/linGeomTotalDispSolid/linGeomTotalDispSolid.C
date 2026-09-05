@@ -60,7 +60,7 @@ void linGeomTotalDispSolid::predict()
     mechanical().grad(D(), gradD());
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 }
 
 
@@ -95,7 +95,7 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -307,7 +307,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             const volScalarField DEqnA("DEqnA", DEqn.A());
 
             // Calculate the stress using run-time selectable mechanical law
-            mechanical().correct(sigma());
+            correctStress();
         }
         while
         (
@@ -412,11 +412,11 @@ bool linGeomTotalDispSolid::evolveSnes()
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND
-        gradD() = displacementMLS().grad(D());
+        gradD() = displacementLeastSquares().grad(D());
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
     else
@@ -517,8 +517,10 @@ bool linGeomTotalDispSolid::evolveExplicit()
     // Update gradient of displacement
     mechanical().grad(D, gradD);
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma);
+    // Calculate the stress using run-time selectable mechanical law.
+    // sigma here is a reference to solidModel::sigma(), so this is the same
+    // field correctStress() updates
+    correctStress();
 
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -541,6 +543,91 @@ bool linGeomTotalDispSolid::evolveExplicit()
        - dampingCoeff()*fvc::ddt(D);
 
     return true;
+}
+
+
+Foam::scalar Foam::solidModels::linGeomTotalDispSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // A framework law is a pure function of the kinematics and the old-time
+    // state, and the framework deliberately does not under-relax the plastic
+    // strain increment as the legacy law does, so the constitutive update does
+    // not lag the displacement solution between outer iterations. There is
+    // therefore nothing for a material residual to measure, and convergence is
+    // governed by the displacement residuals alone.
+    //
+    // Querying the legacy law here instead would be worse than useless: its
+    // correct() is never called on this path, so its previous-iteration fields
+    // are never stored and asking for its residual aborts
+    return 0.0;
+}
+
+
+void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
+{
+    // The legacy path accumulates its per-step fields here
+    solidModel::updateTotalFields();
+
+    // The framework keeps its own state, and its laws may have end-of-step
+    // work or diagnostics. Nothing called this before, so those hooks were
+    // dead code
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDQuad(), sigmaQuad());
+        return;
+    }
+
+    // The quadrature points carry their own constitutive state, distinct from
+    // the cell-centred one, because they are a different set of integration
+    // points. The old-time gradient comes from solidModel, which takes a copy
+    // at the end of each time step: the current field is rebuilt on every
+    // evaluation, so a history-dependent law would otherwise have nothing to
+    // read
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradDQuad(),
+        gradDQuad0(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
+void Foam::solidModels::linGeomTotalDispSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate updateTotalFields() call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
 }
 
 
@@ -585,47 +672,7 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
         return mechanical().impK();
     }
 
-    // Match the legacy field exactly in name, dimensions and boundary types:
-    // it is registered under "impK" and looked up by that name by the contact
-    // and cohesive zone models
-    tmp<volScalarField> tImpK
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "impK",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zero", dimForce/dimArea, 0),
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    volScalarField& impK = tImpK.ref();
-#else
-    volScalarField& impK = tImpK();
-#endif
-
-    // A tangent query, so it neither writes a stress nor disturbs history.
-    // Evaluated at the current gradient, which is zero on a cold start and the
-    // restart value otherwise - the same state dependence the legacy impK()
-    // has, since it is likewise frozen at construction
-    mechanicalManager().updateScalarTangent
-    (
-        gradD(),
-        gradD().oldTime(),
-        mesh().time().deltaTValue(),
-        impK,
-        req
-    );
-
-    return tImpK;
+    return frameworkImpK(mechanicalManager(), req);
 }
 
 
@@ -1019,7 +1066,7 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             D(),
             blockSize_
         );
@@ -1093,13 +1140,13 @@ label linGeomTotalDispSolid::formResidual
 #ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
         // Consider switching to mechanical().grad() interface
-        gradD() = displacementMLS().grad(D);
+        gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
 
         // Calculate sigma at quadrature points
-        mechanical().correct(gradDQuad(), sigmaQuad());
+        correctStressQuad();
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
@@ -1115,7 +1162,7 @@ label linGeomTotalDispSolid::formResidual
         //D.correctBoundaryConditions();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     // Update velocity
@@ -1342,7 +1389,7 @@ label linGeomTotalDispSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction = displacementLeastSquares();
 
         if (jacobianTangent(tangentRequest::scalar) == tangentRequest::fourthOrder)
         {
@@ -1351,7 +1398,7 @@ label linGeomTotalDispSolid::formJacobian
             (
                 jac,
                 *this,
-                mls,
+                reconstruction,
                 D,
                 faceMaterialTangent()
             );
@@ -1389,11 +1436,24 @@ label linGeomTotalDispSolid::formJacobian
             tmp<volScalarField> tLambda = impK_ - 2.0*mu;
             const volScalarField& lambda = tLambda();
 
-            hofvm::laplacianIntoPETScMatrix(jac, *this, mls, D, mu);
+            hofvm::laplacianIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, mls, D, mu);
+            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, mls, D, lambda);
+            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, reconstruction, D, lambda);
+        }
+
+        if (momentumStabilisation().supportsHighOrderResidual())
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
         }
 
         fvVectorMatrix transientJ

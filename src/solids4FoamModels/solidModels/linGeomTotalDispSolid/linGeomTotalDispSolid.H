@@ -129,6 +129,18 @@ class linGeomTotalDispSolid
         //- Return the reciprocal of the bulk modulus, from the same source
         tmp<volScalarField> makeRKappa() const;
 
+        //- Update the stress at the face quadrature points of the high-order
+        //  discretisation, from the same source as correctStress().
+        //  The high-order discretisation does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+#endif
+
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
         const List<mat66>& faceMaterialTangent() const;
@@ -214,6 +226,14 @@ public:
             virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
+            virtual void updateTotalFields() override;
+
             virtual bool evolve();
 
 #ifdef USE_PETSC

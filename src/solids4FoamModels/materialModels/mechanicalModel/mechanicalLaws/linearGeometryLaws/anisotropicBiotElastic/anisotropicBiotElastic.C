@@ -46,7 +46,13 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    model2d_(bool(mesh.solutionD()[vector::Z] > 0)),
+    // A mesh is two-dimensional when z is the empty direction, so the test is
+    // that z is NOT solved. It read the other way round for as long as this
+    // law has been here, which selected the reduced plane model on precisely
+    // the three-dimensional meshes it should not have, and the full model on
+    // two-dimensional ones - where it would then ask for the out-of-plane
+    // constants that a 2-D setup has no reason to supply
+    model2d_(bool(mesh.solutionD()[vector::Z] < 0)),
     A11_(0.0),
     A22_(0.0),
     A33_(0.0),
@@ -71,16 +77,36 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     )
 {
+    // A mesh empty in x or y is two-dimensional too, and this law has no
+    // reduction for that orientation. Without this it would quietly fall
+    // through to the three-dimensional branch and solve a model the mesh
+    // cannot represent
+    if (mesh.solutionD()[vector::X] < 0 || mesh.solutionD()[vector::Y] < 0)
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "This law supports 3-D meshes and 2-D meshes empty in z. "
+            << "This mesh is empty in x or y, which it has no reduction for."
+            << abort(FatalError);
+    }
+
     // Set elastic stiffness parameters
     if (model2d_)
     {
-        // Only the z direction is allow for 2-D models
-        if (mesh.solutionD()[vector::X] < 0 || mesh.solutionD()[vector::Y] < 0)
+
+        // The reduced constants below are the plane stress ones: they come
+        // from eliminating a zero out-of-plane stress, not a zero out-of-plane
+        // strain. This law has no plane strain form, so a case that asked for
+        // one is told rather than quietly given the other
+        if (!planeStress())
         {
             FatalErrorIn(type() + "::" + type())
-                << "For 2-D models, z must be the empty direction"
+                << "This law's two-dimensional reduction is plane stress, but "
+                << "planeStress is not set in mechanicalProperties." << nl
+                << "Set 'planeStress yes;', or use a law that offers a plane "
+                << "strain reduction."
                 << abort(FatalError);
         }
+
 
         const scalar Ex = readScalar(dict.lookup("Ex"));
         const scalar Ey = readScalar(dict.lookup("Ey"));
@@ -239,6 +265,17 @@ void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
             sigmaI[celli][symmTensor::XX] = A11_*e11 + A12_*e22;
             sigmaI[celli][symmTensor::YY] = A21_*e11 + A22_*e22;
             sigmaI[celli][symmTensor::XY] = A44_*e12;
+
+            // The reduced constants above are the plane stress ones, so the
+            // out-of-plane stress is zero by construction. Said rather than
+            // left: what was standing in these components was not
+            // necessarily zero. Under poroMechanicalLaw it is the seeded
+            // effective stress, which for this case's initial pore pressure
+            // of 79.29 kPa made a von Mises stress of that size appear at
+            // zero strain
+            sigmaI[celli][symmTensor::ZZ] = 0.0;
+            sigmaI[celli][symmTensor::YZ] = 0.0;
+            sigmaI[celli][symmTensor::XZ] = 0.0;
         }
         else
         {
@@ -276,6 +313,9 @@ void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
                 sigmaP[faceI][symmTensor::XX] = A11_*e11 + A12_*e22;
                 sigmaP[faceI][symmTensor::YY] = A21_*e11 + A22_*e22;
                 sigmaP[faceI][symmTensor::XY] = A44_*e12;
+                sigmaP[faceI][symmTensor::ZZ] = 0.0;
+                sigmaP[faceI][symmTensor::YZ] = 0.0;
+                sigmaP[faceI][symmTensor::XZ] = 0.0;
             }
             else
             {

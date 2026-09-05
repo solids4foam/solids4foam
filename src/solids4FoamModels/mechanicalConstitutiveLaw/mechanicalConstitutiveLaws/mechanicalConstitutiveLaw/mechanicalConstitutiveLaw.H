@@ -65,6 +65,8 @@ Author
 #include "smallStrainMechanicalConstitutiveLawKinematics.H"
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "mechanicalConstitutiveLawState.H"
+#include "mechanicalConstitutiveLawInputs.H"
+#include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawResponse.H"
 #include "dimensionedScalar.H"
 #include "dimensionSets.H"
@@ -98,6 +100,7 @@ protected:
     void finiteDifferenceFourthOrder
     (
         const smallStrainMechanicalConstitutiveLawKinematics& kin,
+        const mechanicalConstitutiveLawInputs& inputs,
         mechanicalConstitutiveLawState& state,
         mechanicalConstitutiveLawResponse& response
     ) const;
@@ -113,6 +116,7 @@ protected:
         void finiteDifferenceFourthOrder
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const;
@@ -193,6 +197,113 @@ public:
 
     // Edit
 
+        //- Declare the state fields this law uses.
+        //  Called once, before any evaluation. The manager allocates them at
+        //  the size of the topology, applies the declared defaults, and for a
+        //  prescribed field looks for a volField of the same name on the mesh
+        //  and broadcasts it to this law's integration points.
+        //
+        //  A law that declares nothing keeps working exactly as before: this
+        //  is additive, and a prescribed field that no case supplies takes its
+        //  declared default
+        virtual void declareState
+        (
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const
+        {}
+
+        //- Names of the live coupling inputs this law reads, such as "T" for a
+        //  temperature. The manager gathers each from the field of that name
+        //  and hands it over in the inputs object, as a view of this law's own
+        //  integration points.
+        //
+        //  These are not state. A coupling input is solved for by something
+        //  else and changes every iteration, so it is gathered afresh on every
+        //  evaluation: never stored, never rolled over to old time, and never
+        //  read from a file that could shadow the live field
+        virtual wordList requiredScalarInputs() const
+        {
+            return wordList();
+        }
+
+        //- A sub-law's dictionary, carrying the entries it needs from the
+        //  composite's own.
+        //
+        //  Two kinds of entry live on the parent and have to reach the child.
+        //  A case gives rho once, on the composite, because it describes one
+        //  material; the legacy laws get away with not passing it down because
+        //  they read it only when asked and nothing asks a sub-law, where a
+        //  framework law reads its material properties when it is constructed.
+        //  And the manager injects planeStress and solutionD into each
+        //  top-level law's dictionary, which is not where a sub-law looks.
+        //
+        //  Shared so that the composites cannot drift apart on which entries
+        //  those are
+        static dictionary subLawDict
+        (
+            const dictionary& dict,
+            const word& subDictName
+        );
+
+        //- Names of the child states this law owns, one per sub-law.
+        //
+        //  A composite law delegates to laws of its own, and each of those has
+        //  history it looks up by its own unqualified name. Naming the
+        //  children here is what lets the manager reach them: it applies each
+        //  sub-law's declared state to the matching child, recursively, so a
+        //  sub-law's prescribed fields and defaults work exactly as they would
+        //  if it were the top-level law
+        virtual wordList childStateNames() const
+        {
+            return wordList();
+        }
+
+        //- The sub-law that uses the named child state
+        virtual const mechanicalConstitutiveLaw& childLaw
+        (
+            const word& name
+        ) const
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << type()
+                << "' has no child law '" << name << "'."
+                << exit(FatalError);
+
+            return *this;
+        }
+
+        //- Does this law need the stress already standing at its points?
+        //
+        //  Almost none do. A law that says yes is handed it through the
+        //  inputs; a law that says no cannot reach it at all, because the
+        //  response it writes into is cleared before it runs. That is the
+        //  point: reading an output buffer makes a law's answer depend on what
+        //  the caller last left there, which is not something the framework
+        //  can restart, perturb for a tangent, or reason about
+        virtual bool requiresIncomingStress() const
+        {
+            return false;
+        }
+
+        //- Can this law separate its isochoric and volumetric responses?
+        //
+        //  A mixed displacement-pressure formulation replaces the volumetric
+        //  part of the stress with a solved pressure, and to do that correctly
+        //  it needs the law's isochoric stress rather than the trace-free part
+        //  of its total. The two coincide only when the law's energy is
+        //  written on an isochoric measure; for a law written on the full
+        //  deformation they differ, and the difference is a different material
+        //  rather than a visible error.
+        //
+        //  False by default, which is the safe direction: a law that has not
+        //  considered the question does not silently qualify. A solid model
+        //  running a mixed formulation refuses to start with a law that
+        //  answers false, naming it, rather than taking a trace and hoping
+        virtual bool providesVolumetricSplit() const
+        {
+            return false;
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.
@@ -209,6 +320,7 @@ public:
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const
@@ -223,6 +335,7 @@ public:
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics&,
+            const mechanicalConstitutiveLawInputs&,
             mechanicalConstitutiveLawState&,
             mechanicalConstitutiveLawResponse&
         ) const

@@ -22,32 +22,30 @@ mechanical
 (
     heartTissue
     {
-        type            electroMechanicalLaw;
+        // GuccioneElastic directly rather than wrapped in
+        // electroMechanicalLaw: this case's active tension is zero, so the
+        // wrapper added a term that was always zero and a layer that had to be
+        // read past to see what the material is
+        type            GuccioneElastic;
         rho             rho [1 -3 0 0 0 0 0] 3000;
-        activeTension   activeTension [1 -1 -2 0 0 0 0] 0.0;
-        rampTime        0.0;
-        passiveMechanicalLaw
-        {
-            type            GuccioneElastic;
-            calculateStressInLocalCoordinateSystem no;
-            k               k [1 -1 -2 0 0 0 0] 10e3;
-            cf              1.0;
-            ct              1.0;
-            cfs             1.0;
+        calculateStressInLocalCoordinateSystem no;
+        k               k [1 -1 -2 0 0 0 0] 10e3;
+        cf              1.0;
+        ct              1.0;
+        cfs             1.0;
 
-            // Specify uniform fibre field, otherwise it is read from a time
-            // directory
-            // In this case, the properties are isotropic so the fibre direction
-            // does not matter; we pick the z direction for symmetry but it
-            // should not matter
-            uniformFibreField yes;
-            f0              (0 0 1);
+        // Specify uniform fibre field, otherwise it is read from a time
+        // directory
+        // In this case, the properties are isotropic so the fibre direction
+        // does not matter; we pick the z direction for symmetry but it
+        // should not matter
+        uniformFibreField yes;
+        f0              (0 0 1);
 
-            // The bulk modulus acts as a penalty factor to enforce
-            // incompressiblity
-            // Aim for 100 x shear modulus
-            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
-        }
+        // The bulk modulus acts as a penalty factor to enforce
+        // incompressiblity
+        // Aim for 100 x shear modulus
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
     }
 );
 

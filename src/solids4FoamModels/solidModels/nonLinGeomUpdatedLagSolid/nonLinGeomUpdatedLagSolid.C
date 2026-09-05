@@ -82,7 +82,7 @@ void nonLinGeomUpdatedLagSolid::predict()
     J_ = relJ_*J_.oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 }
 
 
@@ -96,7 +96,7 @@ void nonLinGeomUpdatedLagSolid::makeQuadratureKinematics() const
     }
 
     const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+        displacementLeastSquares().quadrature().faceQuadPoints();
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -219,7 +219,7 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature points weights
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -412,7 +412,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         const volScalarField DEqnA("DEqnA", DDEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -512,7 +512,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     {
 #ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
-        gradDD() = displacementMLS().grad(DD());
+        gradDD() = displacementLeastSquares().grad(DD());
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);
         relJ_ = det(relF_);
@@ -526,7 +526,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
 
@@ -553,6 +553,231 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 #endif
 
     return true;
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModels::nonLinGeomUpdatedLagSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+Foam::scalar Foam::solidModels::nonLinGeomUpdatedLagSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // A framework law is a pure function of the kinematics and the old-time
+    // state, and the framework deliberately does not under-relax the plastic
+    // strain increment as the legacy law does, so the constitutive update does
+    // not lag the displacement solution between outer iterations.
+    //
+    // Querying the legacy law here instead would be worse than useless: its
+    // correct() is never called on this path, so its previous-iteration fields
+    // are never stored and asking for its residual aborts
+    return 0.0;
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDTotalQuadPtr_(), sigmaQuad());
+        return;
+    }
+
+    // The caller has just accumulated the total displacement gradient at the
+    // quadrature points, so the current kinematics follow from it.
+    //
+    // The old time is FQuadOldPtr_ itself, which the solver stores at the end
+    // of each step from the converged total gradient. It is deliberately not
+    // derived from anything here: this solver keeps updating its kinematics
+    // after the last stress evaluation of a step, so anything derived
+    // mid-iteration would give a history-dependent law the wrong reference,
+    // which is the same trap as Finv0 at the cell centres
+    quadDeformationGradient(gradDTotalQuadPtr_(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadInverseAndJacobian(FQuadOldPtr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuadOldPtr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework needs the inverse of the total deformation gradient at
+    // both the current and the previous time, and this solver keeps neither.
+    //
+    // Both are derived from F_ here rather than kept as a field with its own
+    // old time. That was the first approach and it is WRONG: this solver
+    // updates F_ again in updateTotalFields(), after the last stress
+    // evaluation of the step, so a derived field's stored old time is the
+    // inverse of a mid-iteration F_ rather than of the converged end-of-step
+    // one. The relative deformation gradient F & Finv0 was then slightly
+    // wrong, which no elastic law notices, because none of them reads Finv0,
+    // and which a history-dependent law gets wrong on every step.
+    //
+    // Deriving Finv0 from F_.oldTime() instead is correct by construction:
+    // F_'s own old time is maintained by the solver
+    if (FinvPtr_.empty())
+    {
+        FinvPtr_.set
+        (
+            new volTensorField
+            (
+                IOobject
+                (
+                    "Finv",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                inv(F_)
+            )
+        );
+    }
+
+    volTensorField& Finv = FinvPtr_();
+    Finv = inv(F_);
+
+    const volTensorField Finv0(inv(F_.oldTime()));
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        J_,
+        J_.oldTime(),
+        Finv,
+        Finv0,
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impK();
+    }
+
+    // Match the legacy field exactly in name, dimensions and boundary types:
+    // it is registered under "impK" and looked up by that name by the contact
+    // and cohesive zone models
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the total deformation gradient, which is the identity on a
+    // cold start and the restart value otherwise, the same state dependence
+    // the legacy impK() has since it is likewise frozen at construction.
+    //
+    // The total F is used rather than the relative one even though this is an
+    // updated Lagrangian solver. impK is a material stiffness scale, not an
+    // increment, and it is the total configuration that the material is in.
+    // This is a construction-time call, so the temporary inverse below is
+    // formed once and then released.
+    //
+    // Finv.oldTime() is a snapshot of inv(F_) rather than inv(F_.oldTime()).
+    // At construction the two are the same field - F_ is either the identity
+    // or the restart value, and its old time is initialised from it - so this
+    // is correct here, and this function is only ever called from the
+    // constructor
+    const volTensorField Finv(inv(F_));
+
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv,
+        Finv.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        tangentRequest::scalar
+    );
+
+    Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
+        << endl;
+
+    return tImpK;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpKf() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().impKf();
+    }
+
+    // Interpolate the framework impK rather than asking the legacy
+    // mechanicalModel for a second, independently built field: the two must
+    // describe the same material for the Laplacian term to telescope
+    return fvc::interpolate(impK_);
 }
 
 
@@ -666,8 +891,16 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         mesh(),
         dimensionedVector("zero", dimVelocity/dimTime, vector::zero)
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
@@ -688,7 +921,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     {
         // It is important to call the stress calculation procedure during the
         // constructor to allow it to correctly initialise fields
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())
@@ -886,7 +1119,7 @@ label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             DD(),
             blockSize_
         );
@@ -942,7 +1175,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Update cell-centre displacement increment gradient
-        gradDD() = displacementMLS().grad(DD);
+        gradDD() = displacementLeastSquares().grad(DD);
 
         // Update displacement increment gradient at the face quadrature points
         mechanical().grad(DD, gradDQuad());
@@ -982,19 +1215,19 @@ label nonLinGeomUpdatedLagSolid::formResidual
         updateQuadratureKinematics();
 
         // Calculate sigma at the face quadrature points
-        mechanical().correct(gradDTotalQuadPtr_(), sigmaQuad());
+        correctStressQuad();
 
         // Calculate the cell-centre stress using run-time selectable
         // mechanical law
         // The residual uses the quadrature point stress, but the cell-centre
         // stress is still required by tractionBoundarySnGrad
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
     else
     {
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())
@@ -1255,13 +1488,14 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         tmp<volScalarField> tLambda = impK_ - 2.0*mu;
         const volScalarField& lambda = tLambda();
 
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction =
+            displacementLeastSquares();
 
         hofvm::laplacianIntoPETScMatrix
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             mu
         );
@@ -1270,7 +1504,7 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             mu
         );
@@ -1279,10 +1513,23 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             DD,
             lambda
         );
+
+        if (momentumStabilisation().supportsHighOrderResidual())
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                DD,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
+        }
 
         fvVectorMatrix transientJ
         (
@@ -1439,9 +1686,9 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #ifndef FOAMEXTEND
     if (highOrderResidual() || highOrderJacobian())
     {
-        // The moving least squares stencils, quadrature points and
-        // interpolation coefficients are all geometric, so they are
-        // re-calculated here on the moved mesh
+        // The least-squares stencils, quadrature points and reconstruction
+        // coefficients are all geometric, so they are re-calculated here on
+        // the moved mesh
         //
         // This is the first solid model with a moving mesh to use the
         // high-order approach, so it is the first to face the choice between:
@@ -1464,11 +1711,19 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
         //
         // Note: FQuadOldPtr_ and gradDTotalQuadPtr_ are deliberately not
         // cleared, as the quadrature points move with the material
-        clearMovingLeastSquaresData();
+        clearLeastSquaresData();
     }
 #endif
 
     solidModel::updateTotalFields();
+
+    // The framework keeps its own state, and its laws may have end-of-step
+    // work or diagnostics. Nothing called this before, so those hooks were
+    // dead code
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
 }
 
 

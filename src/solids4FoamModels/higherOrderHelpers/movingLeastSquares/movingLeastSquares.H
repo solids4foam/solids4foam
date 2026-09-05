@@ -53,6 +53,7 @@ SourceFiles
 #ifndef movingLeastSquares_H
 #define movingLeastSquares_H
 
+#include "leastSquaresScheme.H"
 #include "fvMesh.H"
 #include "CompactListList.H"
 #include "globalIndex.H"
@@ -62,7 +63,7 @@ SourceFiles
 #include "weightFunction.H"
 #include "fvMeshQuadrature.H"
 #include "compatibilityFunctions.H"
-#include "movingLeastSquaresStencil.H"
+#include "leastSquaresStencil.H"
 #include "volFields.H"
 
 #include "fixedDisplacementFvPatchVectorField.H"
@@ -79,15 +80,14 @@ namespace Foam
 \*---------------------------------------------------------------------------*/
 
 class movingLeastSquares
+:
+    public leastSquaresScheme
 {
 private:
     // Private data
 
-        //- Const reference to the mesh
-        const fvMesh& mesh_;
-
         //- Cell and face stencil pointer
-        mutable autoPtr<movingLeastSquaresStencil> stencilPtr_;
+        mutable autoPtr<leastSquaresStencil> stencilPtr_;
 
         //- Quadrature points and weights pointer
         mutable autoPtr<fvMeshQuadrature> quadraturePtr_;
@@ -232,15 +232,21 @@ private:
         //- Calculate interpolation coefficients for the faces quadrature points
         void calcFaceCoeffs() const;
 
+        //- Calculate value coefficients for one cell at a specified point
+        //  Stencil-cell coefficients are followed by the owner coefficient
+        virtual void cellValueCoeffsAtPoint
+        (
+            const label cellI,
+            const point& x,
+            UList<scalar>& coeffs
+        ) const;
+
         //- Solve using QR decomposition (Householder Method)
         QRSolution QRSolve
         (
             const Eigen::MatrixXd& Q,
             const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& W
         ) const;
-
-        //- Return the cell and face stencil
-        const movingLeastSquaresStencil& stencil() const;
 
         //- Return the cell centre interpolation coefficients
         const CompactListList<scalar>& cellInterpCoeffs() const;
@@ -254,9 +260,6 @@ private:
         //- Return the cell centre  third derivative coefficients
         const CompactListList<symmTensor3rdOrder>& cellThirdGradCoeffs() const;
 
-        //- Return the face quadrature points  gradient coefficients
-        const List<CompactListList<vector>>& faceGradCoeffs() const;
-
         //- For global index return field value. Index can refer either to local
         //  or remote field.
         template<class Type, class GlobalCells>
@@ -267,6 +270,15 @@ private:
             const Map<FixedList<label, 2>>& remoteLocation,
             const UList<Type>& localField,
             const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Evaluate a field using the reconstruction associated with one cell
+        template<class Type>
+        Type evaluateAtPoint
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const label cellID,
+            const point& x
         ) const;
 
         //- Disallow default bitwise copy construct
@@ -290,21 +302,14 @@ private:
             const dictionary& dict
         );
 
-    // Destructor
-
-        virtual ~movingLeastSquares();
+    //- Destructor
+    virtual ~movingLeastSquares();
 
 
     // Member Functions
 
-        //- Return reference to mesh
-        const fvMesh& mesh() const
-        {
-            return mesh_;
-        }
-
         //- Return polynomial order of the local reconstruction
-        label polynomialOrder() const
+        virtual label polynomialOrder() const
         {
             return polynomialOrder_;
         };
@@ -321,7 +326,7 @@ private:
         }
 
         //- Const access to the quadrature data
-        const fvMeshQuadrature& quadrature() const
+        virtual const fvMeshQuadrature& quadrature() const
         {
             if (quadraturePtr_.empty())
             {
@@ -331,22 +336,61 @@ private:
             return *quadraturePtr_;
         }
 
-        //- Read-only access to the MLS stencil data
-        const movingLeastSquaresStencil& stencilData() const
+        //- Return the cell and face stencil
+        virtual const leastSquaresStencil& stencil() const;
+
+        //- Return addressing associated with face-gradient coefficients
+        virtual const CompactListList<label>& faceGradStencil() const;
+
+        //- Return the face quadrature points gradient coefficients
+        virtual const List<CompactListList<vector>>& faceGradCoeffs() const;
+
+        // Read-only access to the cell-centre coefficient tables. These allow
+        // a solver to assemble its own high-order operators directly, rather
+        // than going through the evaluation functions below. Row cellI is
+        // indexed by stencil().cellsStencil()[cellI], and carries one
+        // extra trailing entry, at index cellsStencil()[cellI].size(),
+        // holding the coefficient of the cell itself.
+
+        //- Read-only access to cell-centre gradient coefficients
+        const CompactListList<vector>& cellGradCoeffsData() const
         {
-            return stencil();
+            return cellGradCoeffs();
         }
 
-        //- Read-only access to face-gradient interpolation coefficients
-        const List<CompactListList<vector>>& faceGradCoeffsData() const
+        //- Read-only access to cell-centre second derivative coefficients
+        const CompactListList<symmTensor>& cellSecondGradCoeffsData() const
         {
-            return faceGradCoeffs();
+            return cellSecondGradCoeffs();
+        }
+
+        //- Read-only access to cell-centre third derivative coefficients
+        const CompactListList<symmTensor3rdOrder>&
+        cellThirdGradCoeffsData() const
+        {
+            return cellThirdGradCoeffs();
         }
 
         //- Clear owned MLS data and cached coefficient data
-        void clear() const;
+        virtual void clear() const;
 
     // Evaluation
+
+        //- Evaluate a scalar field reconstructed from a cell at a point
+        virtual scalar valueAtPoint
+        (
+            const volScalarField& vf,
+            const label cellID,
+            const point& x
+        ) const;
+
+        //- Evaluate a vector field reconstructed from a cell at a point
+        virtual vector valueAtPoint
+        (
+            const volVectorField& vf,
+            const label cellID,
+            const point& x
+        ) const;
 
         //- Gradient of field at face quadrature points
         template<class Type>
@@ -364,6 +408,20 @@ private:
             CompactListList<typename outerProduct<vector, Type>::type>& result
         ) const;
 
+        //- Gradient of scalar field at face quadrature points
+        virtual void fGrad
+        (
+            const volScalarField& vf,
+            CompactListList<vector>& result
+        ) const;
+
+        //- Gradient of vector field at face quadrature points
+        virtual void fGrad
+        (
+            const volVectorField& vf,
+            CompactListList<tensor>& result
+        ) const;
+
         //- Get patch face quadrature values
         template<class Type>
         autoPtr<CompactListList<Type>> patchFaceQuadValues
@@ -372,8 +430,15 @@ private:
             const label patchI
         ) const;
 
+        //- Get patch face quadrature values for scalar field
+        virtual autoPtr<CompactListList<scalar>> patchFaceQuadValues
+        (
+            const volScalarField& vf,
+            const label patchI
+        ) const;
+
         //- Get patch face quadrature values for vector field
-        autoPtr<CompactListList<vector>> patchFaceQuadValues
+        virtual autoPtr<CompactListList<vector>> patchFaceQuadValues
         (
             const GeometricField<vector, fvPatchField, volMesh>& vf,
             const label patchI
@@ -390,13 +455,22 @@ private:
             const GeometricField<Type, fvPatchField, volMesh>& vf
         ) const;
 
+        //- Cell centre gradient of scalar field
+        virtual tmp<volVectorField> grad(const volScalarField& vf) const;
+
+        //- Cell centre gradient of vector field
+        virtual tmp<volTensorField> grad(const volVectorField& vf) const;
+
         //- Calculate the second grad at the cell centres for the given scalar
         //  field. For vector fields we apply this per component.
-        tmp<volSymmTensorField> secondGrad(const volScalarField& s) const;
+        virtual tmp<volSymmTensorField> secondGrad
+        (
+            const volScalarField& s
+        ) const;
 
         //- Calculate the third grad at the cell centres for the given scalar
         //  field. For vector fields we apply this per component.
-        autoPtr<List<symmTensor3rdOrder>>
+        virtual autoPtr<List<symmTensor3rdOrder>>
         thirdGrad(const volScalarField& s) const;
 };
 

@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "mat66.H"
 #include "Switch.H"
+#include "dimensionedSymmTensor.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -46,12 +47,47 @@ linearElasticMechanicalConstitutiveLaw
 :
     mechanicalConstitutiveLaw(dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
     lambda_("lambda", E_.dimensions(), 0.0),
     mu_("mu", E_.dimensions(), 0.0),
-    kappa_("kappa", E_.dimensions(), 0.0)
+    kappa_("kappa", E_.dimensions(), 0.0),
+    sigma0_(symmTensor::zero),
+    sigma0FromDict_(false)
 {
+    // The material may be given either as E and nu or as mu and K, matching
+    // the legacy linearElastic law, so an existing case dictionary needs no
+    // change. The legacy law tries E and nu first, so this does too
+    if (dict.found("E") && dict.found("nu"))
+    {
+        E_ = dimensionedScalar(dict.lookup("E"));
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        const dimensionedScalar muIn(dict.lookup("mu"));
+        const dimensionedScalar KIn(dict.lookup("K"));
+
+        if (muIn.dimensions() != dimPressure || KIn.dimensions() != dimPressure)
+        {
+            FatalIOErrorInFunction(dict)
+                << "The shear modulus mu and bulk modulus K must both have "
+                << "dimensions " << dimPressure
+                << exit(FatalIOError);
+        }
+
+        // Invert mu = E/(2*(1 + nu)) and K = E/(3*(1 - 2*nu))
+        E_ = 9.0*KIn*muIn/(3.0*KIn + muIn);
+        nu_ = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+    }
+    else
+    {
+        FatalIOErrorInFunction(dict)
+            << "Specify the elastic properties either as 'E' and 'nu' or as "
+            << "'mu' and 'K'."
+            << exit(FatalIOError);
+    }
+
     if (E_.dimensions() != dimPressure)
     {
         FatalIOErrorInFunction(dict)
@@ -105,13 +141,45 @@ linearElasticMechanicalConstitutiveLaw
     // Note: for the three-dimensional case, this is equivalent to
     // E/(3*(1 - 2*nu))
     kappa_ = lambda_ + (2.0/3.0)*mu_;
+
+    // A uniform initial stress may be given here; a case that needs one that
+    // varies in space supplies a sigma0 field instead, which the manager reads
+    // and which overrides this
+    if (dict.found("sigma0"))
+    {
+        sigma0_ = dimensionedSymmTensor(dict.lookup("sigma0")).value();
+        sigma0FromDict_ = true;
+
+        Info<< "    Uniform initial stress sigma0 = " << sigma0_ << endl;
+    }
 }
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
+void Foam::linearElasticMechanicalConstitutiveLaw::declareState
+(
+    mechanicalConstitutiveLawStateSpec& spec
+) const
+{
+    // Legacy reads a sigma0 field if the case has one and then, if the law's
+    // dictionary also gives sigma0, assigns that over the whole field. The
+    // dictionary therefore wins, and saying so here is what keeps a case with
+    // both giving the same answer as before
+    spec.addSymmTensor
+    (
+        "sigma0",
+        sigma0FromDict_
+      ? mechanicalConstitutiveLawStateSpec::stateRole::fixed
+      : mechanicalConstitutiveLawStateSpec::stateRole::prescribed,
+        sigma0_
+    );
+}
+
+
 void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -126,9 +194,23 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     // Element-by-element approach: faster as it avoid intermediate fields
     const scalar muVal = mu_.value();
     const scalar lambdaVal = lambda_.value();
+
+    // The initial stress is zero in all but the cases that supply one, and
+    // adding a zero costs less than branching on it inside the loop.
+    //
+    // It is read at old time, and through a const reference so that the const
+    // accessor is the one selected. A prescribed field is never written, so
+    // its two times always hold the same value; taking the old one is what
+    // makes this work inside a shadow state, which aliases its parent's
+    // old-time fields but owns current-time fields that start empty. Reading
+    // the current field would hand a tangent query a silent field of zeros
+    const mechanicalConstitutiveLawState& cState = state;
+    const Field<symmTensor>& sigma0 = cState.symmTensorField0("sigma0");
+
     forAll(sigma, i)
     {
-        sigma[i] = muVal*twoSymm(gradD[i]) + lambdaVal*tr(gradD[i])*I;
+        sigma[i] =
+            muVal*twoSymm(gradD[i]) + lambdaVal*tr(gradD[i])*I + sigma0[i];
     }
 
     // Scalar tangent: only if explicitly requested
@@ -174,7 +256,7 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         }
 
         // Base-class finite difference implementation
-        finiteDifferenceFourthOrder(kin, state, response);
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
     }
     else if (response.tangentReq() == tangentRequest::fourthOrder)
     {

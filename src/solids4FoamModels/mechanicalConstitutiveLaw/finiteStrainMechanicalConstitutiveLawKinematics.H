@@ -105,8 +105,6 @@ class finiteStrainMechanicalConstitutiveLawKinematics
         //- Inverse deformation gradient at previous time
         const UIndirectList<tensor>& Finv0_;
 
-        //- Time step
-        const scalar dt_;
 
 
     // Private Member Functions
@@ -137,8 +135,7 @@ public:
             const UIndirectList<scalar>& J,
             const UIndirectList<scalar>& J0,
             const UIndirectList<tensor>& Finv,
-            const UIndirectList<tensor>& Finv0,
-            const scalar dt
+            const UIndirectList<tensor>& Finv0
         )
         :
             F_(F),
@@ -146,8 +143,7 @@ public:
             J_(J),
             J0_(J0),
             Finv_(Finv),
-            Finv0_(Finv0),
-            dt_(dt)
+            Finv0_(Finv0)
         {}
 
 
@@ -196,11 +192,6 @@ public:
             return Finv0_;
         }
 
-        //- Time increment
-        scalar dt() const
-        {
-            return dt_;
-        }
 
     // Edit
 

@@ -21,6 +21,8 @@ Where [approach] is one of:
   updatedLagrangianPetscSnes
   highOrder
   highOrderUpdatedLagrangian
+  highOrderManager
+  highOrderUpdatedLagrangianManager
 
 Examples:
   ./Allrun
@@ -58,6 +60,7 @@ APPROACH="${1:-totalLagrangian}"
 # Validate approach name
 case "$APPROACH" in
     totalLagrangian|updatedLagrangian|totalLagrangianPetscSnes|updatedLagrangianPetscSnes|highOrder|highOrderUpdatedLagrangian) ;;
+    highOrderManager|highOrderUpdatedLagrangianManager) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -68,6 +71,20 @@ esac
 # -------------------------------------------------------------------------
 # Functions
 # -------------------------------------------------------------------------
+
+# A Manager arm is its base arm with one entry changed. It links the base
+# arm's files and then puts its own solidProperties over the top, so the two
+# differ in the constitutive path and in nothing else - which is the whole
+# point of comparing them
+base_approach() {
+    echo "${APPROACH%Manager}"
+}
+
+link_manager_solid_properties() {
+    if [[ "$APPROACH" == *Manager ]]; then
+        ln -vnsf "solidProperties.${APPROACH}" constant/solidProperties
+    fi
+}
 
 link_files_for_suffix() {
     # $1 = suffix (e.g. totalLagrangian)
@@ -87,7 +104,7 @@ link_default_control_dict() {
     # link_files_for_suffix links system/controlDict.<approach> when the approach
     # provides one; otherwise the controlDict symlink may still point at the
     # variant used by a previous run, so reset it to the default here
-    if [[ ! -f "system/controlDict.${APPROACH}" ]]; then
+    if [[ ! -f "system/controlDict.$(base_approach)" ]]; then
         ln -vnsf controlDict.default system/controlDict
     fi
 }
@@ -99,24 +116,26 @@ require_petsc_or_exit_silently() {
 select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
-        totalLagrangian|totalLagrangianPetscSnes|highOrder)
+        totalLagrangian|totalLagrangianPetscSnes|highOrder|highOrderManager)
             if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == "highOrder" ]]; then
                 require_petsc_or_exit_silently
             fi
             if [[ "$APPROACH" == highOrder* ]]; then
                 solids4Foam::caseDoesNotRunWithFoamExtend
             fi
-            link_files_for_suffix "$APPROACH"
+            link_files_for_suffix "$(base_approach)"
+            link_manager_solid_properties
             (cd 0 && rm -f D* && ln -s org/D .)
             ;;
-        updatedLagrangian|updatedLagrangianPetscSnes|highOrderUpdatedLagrangian)
+        updatedLagrangian|updatedLagrangianPetscSnes|highOrderUpdatedLagrangian|highOrderUpdatedLagrangianManager)
             if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == highOrder* ]]; then
                 require_petsc_or_exit_silently
             fi
             if [[ "$APPROACH" == highOrder* ]]; then
                 solids4Foam::caseDoesNotRunWithFoamExtend
             fi
-            link_files_for_suffix "$APPROACH"
+            link_files_for_suffix "$(base_approach)"
+            link_manager_solid_properties
             (cd 0 && rm -f D* && ln -s org/DD .)
             ;;
     esac

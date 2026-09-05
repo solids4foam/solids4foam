@@ -38,7 +38,7 @@ void hofvc::fGrad
 #ifndef FOAMEXTEND
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
-    solMod.displacementMLS().fGrad(D, gradDQuad);
+    solMod.displacementLeastSquares().fGrad(D, gradDQuad);
 #else
     notImplemented("Not implemented for foam extend");
 #endif
@@ -76,7 +76,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     // Reference to integration weights
     const solidModel& solMod = lookupSolidModel(mesh);
     const CompactListList<scalar>& quadW =
-        solMod.displacementMLS().quadrature().faceQuadWeights();
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights();
 
     forAll(tf, faceI)
     {
@@ -159,7 +159,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     // Reference to integration weights
     const solidModel& solMod = lookupSolidModel(mesh);
     const CompactListList<scalar>& quadW =
-        solMod.displacementMLS().quadrature().faceQuadWeights();
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights();
 
     // The transpose of the first Piola-Kirchhoff stress is
     // P^T = J*(Finv & sigma), such that the nominal traction is (n0 & P^T),
