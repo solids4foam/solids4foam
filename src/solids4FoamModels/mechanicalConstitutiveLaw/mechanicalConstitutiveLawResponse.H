@@ -100,6 +100,18 @@ class mechanicalConstitutiveLawResponse
         //- What type, if any, material tangent is requested
         tangentRequest tangentRequest_;
 
+        //- Optional volumetric response view, one value per integration point.
+        //
+        //  When this is present the law is being asked to split its answer: to
+        //  put the isochoric Cauchy stress in stress_ and the volumetric
+        //  response, dU/dJ, here. A mixed displacement-pressure formulation
+        //  needs the two apart, and it needs them from the law: taking the
+        //  trace of a total stress cannot tell a volumetric response the
+        //  formulation may replace from one it must keep, because by then
+        //  there is only a number. poroMechanicalLaw's pore pressure is the
+        //  case that makes that concrete
+        UIndirectList<scalar>* volumetricPtr_;
+
 
     // Private Member Functions
 
@@ -127,7 +139,8 @@ public:
             stress_(stress),
             scalarTangentPtr_(nullptr),
             fourthOrderTangentPtr_(nullptr),
-            tangentRequest_(tangentReq)
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
         {}
 
         //- Construct with stress view and scalar tangent view
@@ -141,7 +154,8 @@ public:
             stress_(stress),
             scalarTangentPtr_(&scalarTangent),
             fourthOrderTangentPtr_(nullptr),
-            tangentRequest_(tangentReq)
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
         {
             if
             (
@@ -225,6 +239,31 @@ public:
         }
 
         //- Does this reponse want a scalar tangent calculated
+        //- Is the law being asked to split its answer?
+        bool wantsVolumetricSplit() const
+        {
+            return volumetricPtr_ != nullptr;
+        }
+
+        //- The volumetric response view, dU/dJ per integration point
+        UIndirectList<scalar>& volumetric()
+        {
+            if (!wantsVolumetricSplit())
+            {
+                FatalErrorInFunction
+                    << "The volumetric response was not requested, so there "
+                    << "is nowhere to put it." << exit(FatalError);
+            }
+
+            return *volumetricPtr_;
+        }
+
+        //- Ask this response for a split answer
+        void requestVolumetricSplit(UIndirectList<scalar>& volumetric)
+        {
+            volumetricPtr_ = &volumetric;
+        }
+
         bool wantsScalarTangent() const
         {
             return

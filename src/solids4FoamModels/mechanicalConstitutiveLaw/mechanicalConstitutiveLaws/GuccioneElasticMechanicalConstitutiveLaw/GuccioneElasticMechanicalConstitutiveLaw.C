@@ -111,6 +111,12 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     const mechanicalConstitutiveLawState& cState = state;
     const Field<vector>& f0 = cState.vectorField0("f0");
 
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
     const scalar kVal = k_.value();
     const scalar bulkVal = bulkModulus_.value();
 
@@ -148,8 +154,19 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
         // normalised here rather than demanded normalised of the case
         const symmTensor f0f0(sqr(f0[i]/magF0));
 
-        // Green-Lagrange strain
-        const symmTensor E(0.5*(symm(F[i].T() & F[i]) - I));
+        // Green-Lagrange strain of the isochoric deformation, not of the
+        // whole of it. Fbar = J^(-1/3)*F carries the shape change and none of
+        // the volume change, so Q depends on shape alone and the volumetric
+        // response below is the only place volume enters.
+        //
+        // The legacy law builds Q from the full strain, which makes its energy
+        // coupled: its deviatoric stress then varies with J, and a mixed
+        // formulation replacing the volumetric part gives a different material
+        // rather than the same one solved differently. Written this way the
+        // two formulations describe one material, and both reduce to the
+        // published model in the incompressible limit it was defined for
+        const tensor Fbar(pow(Ji, -1.0/3.0)*F[i]);
+        const symmTensor E(0.5*(symm(Fbar.T() & Fbar) - I));
         const symmTensor sqrE(symm(E & E));
 
         // Invariants: the first two of E, and the two formed with the fibre
@@ -171,13 +188,34 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
         // Second Piola-Kirchhoff stress, without the volumetric term
         const symmTensor S(dQdE*0.5*kVal*exp(Q));
 
-        // Push forward to Cauchy, and keep the deviatoric part. The volumetric
-        // response is the penalty term below rather than anything in Q
-        const symmTensor s(dev(symm(F[i] & S & F[i].T()))/Ji);
+        // Push forward through the isochoric deformation and take the
+        // deviatoric part:
+        //
+        //     sigma_iso = dev(Fbar & S & Fbar^T)/J
+        //
+        // The dev() is not tidying up. Fbar & S & Fbar^T is not trace-free on
+        // its own, and making Q depend on the isochoric strain does not make
+        // it so: the projection dev() performs is the spatial form of the
+        // chain rule through Cbar = J^(-2/3)*C, which is also why dQdE, derived
+        // for the algebraic Q, can be reused unchanged when it is evaluated at
+        // the isochoric strain. Without the dev() this would not be the stress
+        // of the energy above - it would be some other constitutive response
+        const symmTensor s(dev(symm(Fbar & S & Fbar.T()))/Ji);
 
-        const scalar sigmaHyd = 0.5*bulkVal*(sqr(Ji) - 1.0)/Ji;
+        // The volumetric response, dU/dJ, from the penalty that keeps this
+        // material near incompressible: U(J) = 0.25*K*(J^2 - 1 - 2*log(J))
+        const scalar dUdJ = 0.5*bulkVal*(sqr(Ji) - 1.0)/Ji;
 
-        sigma[i] = s + sigmaHyd*I;
+        sigma[i] = s + dUdJ*I;
+
+        // A caller that asked for the two apart gets them apart: the stress
+        // above is already the isochoric part plus the volumetric one, so the
+        // split costs a subtraction rather than a second evaluation
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = dUdJ;
+            sigma[i] = s;
+        }
     }
 
     // Scalar tangent: only if explicitly requested

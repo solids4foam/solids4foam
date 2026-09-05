@@ -272,6 +272,25 @@ public:
             return *this;
         }
 
+        //- Can this law separate its isochoric and volumetric responses?
+        //
+        //  A mixed displacement-pressure formulation replaces the volumetric
+        //  part of the stress with a solved pressure, and to do that correctly
+        //  it needs the law's isochoric stress rather than the trace-free part
+        //  of its total. The two coincide only when the law's energy is
+        //  written on an isochoric measure; for a law written on the full
+        //  deformation they differ, and the difference is a different material
+        //  rather than a visible error.
+        //
+        //  False by default, which is the safe direction: a law that has not
+        //  considered the question does not silently qualify. A solid model
+        //  running a mixed formulation refuses to start with a law that
+        //  answers false, naming it, rather than taking a trace and hoping
+        virtual bool providesVolumetricSplit() const
+        {
+            return false;
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.

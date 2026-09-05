@@ -34,6 +34,20 @@ Description
     f0 (x) f0. Setting cf = cfs = ct makes Q isotropic and the fibre direction
     stops mattering.
 
+    The exponent is taken on the isochoric strain, so that the energy splits,
+
+        W = 0.5*k*(exp(Q(Ebar)) - 1) + U(J)
+
+    with Ebar built from Fbar = J^(-1/3)*F. That is what lets a mixed
+    displacement-pressure formulation replace the volumetric part with a solved
+    pressure and still describe this material rather than a neighbouring one.
+
+    It is not the legacy law away from the incompressible limit. The legacy
+    GuccioneElastic puts the full Green-Lagrange strain into Q, which couples
+    shape to volume; the two agree as J approaches one, which is the limit the
+    published model was written for, and differ by about 4e-4 on the
+    LandEtAl2015 problem3 tutorial.
+
     The fibre direction is prescribed state: a case supplies an f0 field, as
     setFibreField writes, and a case whose fibres are the same everywhere may
     give a single vector in this dictionary instead. It is normalised here, so
@@ -152,6 +166,15 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return bulkModulus_;
+        }
+
+        //- This law separates its isochoric and volumetric responses.
+        //  Q is written on the isochoric strain, so the deviatoric stress it
+        //  produces depends on shape alone and the volumetric response is the
+        //  penalty term and nothing else
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
         }
 
         //- Declare the fibre direction this law is given
