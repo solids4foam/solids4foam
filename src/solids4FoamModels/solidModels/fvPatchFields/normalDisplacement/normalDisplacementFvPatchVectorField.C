@@ -262,10 +262,14 @@ void normalDisplacementFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+        // The same keyword it is read with. It was written as 'normalDisp',
+        // which nothing reads, so a case using this condition wrote a time
+        // directory it could not start again from: the field came back and the
+        // condition it carried did not
 #ifdef OPENFOAM_ORG
-        writeEntry(os, "normalDisp", normalDisp_);
+        writeEntry(os, "normalDisplacement", normalDisp_);
 #else
-        normalDisp_.writeEntry("normalDisp", os);
+        normalDisp_.writeEntry("normalDisplacement", os);
 #endif
     }
 

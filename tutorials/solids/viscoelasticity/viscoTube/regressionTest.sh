@@ -86,11 +86,18 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    if [[ "${approach}" == "framework" ]]; then
+    # Every arm at the same precision. Comparing a value logged at six
+    # significant figures against one logged at fourteen measures the log
+    # format and calls the difference a regression
+    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
+        "${CASE_DIR}/system/controlDict"
+    rm -f "${CASE_DIR}/system/controlDict.bak"
+
+    if [[ "${approach}" == framework* ]]; then
         # The switch lives in the <type>Coeffs sub-dictionary; at the top level
         # it is silently ignored and this arm would repeat the legacy run
         sed -i.bak \
-            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    nCorrectors     1000;/' \
+            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    nCorrectors     1000;/' \
             "${CASE_DIR}/constant/solidProperties"
         rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
@@ -212,6 +219,83 @@ if [[ -n "${RESULT_E[legacy]:-}" && -n "${RESULT_E[framework]:-}" ]]; then
     done
 else
     echo "SKIP: cross-check needs both approaches to have run"
+fi
+
+
+# ------------------------------------------------------------
+# Restart
+# ------------------------------------------------------------
+# This law's history is one internal stress per Maxwell arm, and how many arms
+# there are comes from the material's own dictionary - so it is the case that
+# checks a law can declare a variable number of state fields and get all of
+# them back. A viscous material is also the clearest possible test of whether
+# history survived: relaxation is the whole behaviour, and a run that forgot
+# how far each arm had relaxed starts again from an unstressed state
+run_restart_test() {
+    local d="${REGRESSION_ROOT}/frameworkRestart"
+
+    prepare_case "frameworkRestart"
+    CASE_DIR="${d}"
+
+    sed -i.bak 's/^endTime         7000;/endTime         3500;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+        echo "FAIL: restart: the first leg did not run"
+        return 1
+    }
+
+    # One file per arm, plus the relaxing deviatoric stress
+    local nArms
+    nArms=$(ls "${d}"/3500/*:*:h[0-9]* 2>/dev/null | wc -l)
+
+    if ! ls "${d}"/3500/*:*:s > /dev/null 2>&1 || (( nArms == 0 )); then
+        echo "FAIL: restart: the viscous history was not written"
+        return 1
+    fi
+    echo "PASS: restart: the viscous history is written (${nArms} arm(s))"
+
+    sed -i.bak \
+        's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         3500;/endTime         7000;/' \
+        "${d}/system/controlDict"
+    rm -f "${d}/system/controlDict.bak"
+
+    mv "${d}/${SOLVER_LOGFILE}" "${d}/log.solids4Foam.firstLeg"
+
+    if ! ( cd "${d}" && solids4Foam > "${SOLVER_LOGFILE}" 2>&1 ); then
+        echo "FAIL: restart: the continued run did not finish"
+        grep -m1 "FOAM FATAL" -A4 "${d}/${SOLVER_LOGFILE}" || true
+        return 1
+    fi
+
+    local eps sig
+    eps=$(extract_max_epsilon)
+    sig=$(extract_max_sigma)
+
+    if [[ -z "${eps}" || -z "${RESULT_S[framework]:-}" ]]; then
+        echo "SKIP: restart needs the framework arm to have run"
+        return 0
+    fi
+
+    # Stress, not strain: strain is driven by the load and comes back whatever
+    # the history did, while the stress is what the relaxation determines
+    local a="${RESULT_S[framework]}"
+
+    if awk "BEGIN {exit !(($a - $sig)^2 <= (1e-6*$a)^2)}"; then
+        printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \
+            "$a" "$sig"
+    else
+        printf "FAIL: restart differs from the uninterrupted run (%.8g vs %.8g)\n" \
+            "$a" "$sig"
+        return 1
+    fi
+
+    return 0
+}
+
+if ! run_restart_test; then
+    failures=$((failures + 1))
 fi
 
 echo
