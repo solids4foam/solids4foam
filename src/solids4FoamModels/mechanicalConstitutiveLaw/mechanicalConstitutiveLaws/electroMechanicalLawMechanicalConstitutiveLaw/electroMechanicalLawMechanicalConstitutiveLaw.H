@@ -48,6 +48,7 @@ Author
 #include "mechanicalConstitutiveLaw.H"
 #include "dimensionedScalar.H"
 #include "autoPtr.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -78,6 +79,13 @@ class electroMechanicalLawMechanicalConstitutiveLaw
 
         //- Name of the active tension field, when one is supplied
         const word TaName_;
+
+        //- Whether the active tension is to come from a field.
+        //  Asked for explicitly rather than detected, because a law that
+        //  quietly looks for a field it was never given the chance to receive
+        //  reports nothing and uses the constant instead - which is a wrong
+        //  answer that runs to completion
+        const Switch TaFromField_;
 
         //- The fibre direction to use where a case supplies no f0 field
         const vector f0Default_;
@@ -130,6 +138,24 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return subLawPtr_->kappa();
+        }
+
+        //- The coupling inputs this law reads.
+        //
+        //  Declared only when the case asks for a field-based tension. The
+        //  manager gathers these on the paths that support them and refuses on
+        //  the paths that do not, which is why this is conditional: a law that
+        //  declared it unconditionally would stop every finite-strain case
+        //  from running, and one that never declared it would silently ignore
+        //  the field it was given
+        virtual wordList requiredScalarInputs() const override
+        {
+            if (TaFromField_)
+            {
+                return wordList(1, TaName_);
+            }
+
+            return wordList();
         }
 
         //- Whether the two parts can be separated, which is the passive

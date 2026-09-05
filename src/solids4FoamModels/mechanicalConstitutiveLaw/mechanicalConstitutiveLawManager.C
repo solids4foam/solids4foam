@@ -1893,7 +1893,10 @@ Foam::mechanicalConstitutiveLawManager::kappa() const
                     IOobject::NO_WRITE
                 ),
                 mesh_,
-                dimensionedScalar("kappa", dimDensity, 0.0),
+                // A bulk modulus, not a density. This was dimDensity,
+                // copied from rho() directly above, and every consumer then
+                // used it as a pressure
+                dimensionedScalar("kappa", dimPressure, 0.0),
                 "zeroGradient"
             )
         );

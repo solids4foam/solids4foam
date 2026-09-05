@@ -55,6 +55,10 @@ electroMechanicalLawMechanicalConstitutiveLaw
     Ta_(dict.lookup("activeTension")),
     rampTime_(readScalar(dict.lookup("rampTime"))),
     TaName_(dict.lookupOrDefault<word>("activeTensionFieldName", "Ta")),
+    TaFromField_
+    (
+        dict.lookupOrDefault<Switch>("activeTensionFromField", false)
+    ),
     f0Default_
     (
         dict.lookupOrDefault<Switch>("uniformFibreField", false)
@@ -69,7 +73,8 @@ electroMechanicalLawMechanicalConstitutiveLaw
     }
 
     Info<< "    Active tension law over " << subLawPtr_->type()
-        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_ << endl;
+        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_
+        << (TaFromField_ ? ", from field " + TaName_ : word("")) << endl;
 }
 
 
@@ -131,10 +136,21 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     const mechanicalConstitutiveLawState& cState = state;
     const Field<vector>& f0 = cState.vectorField0("f0");
 
-    // A field of active tension if the run has one, otherwise the constant,
-    // ramped. The field wins, which is how a coupled electrophysiology model
-    // overrides the standalone ramp without either knowing about the other
-    const bool haveTaField = inputs.foundScalar(TaName_);
+    // A field of active tension if the case asked for one, otherwise the
+    // constant, ramped. Asked for rather than detected: the manager only
+    // gathers a coupling input a law declares, so a law that merely looked
+    // would never find one and would use the constant without saying so
+    const bool haveTaField = TaFromField_ && inputs.foundScalar(TaName_);
+
+    if (TaFromField_ && !haveTaField)
+    {
+        FatalErrorInFunction
+            << "This law was asked for a field-based active tension, '"
+            << TaName_ << "', and none was gathered for it." << nl
+            << "The manager gathers a law's declared coupling inputs on the "
+            << "evaluation paths that support them; this one did not."
+            << exit(FatalError);
+    }
 
     scalar TaUniform = Ta_.value();
 

@@ -332,10 +332,33 @@ bool Foam::mechanicalConstitutiveLawStateIO::distributeFromSerial
                 << exit(FatalError);
         }
 
+        if (entities.empty())
+        {
+            FatalErrorInFunction
+                << "Restarting '" << name << "' from the undecomposed case, "
+                << "but this topology records no integration point locations, "
+                << "so its entries cannot be matched to the ones in that file."
+                << nl
+                << "Only the cell-centred topology writes locations, so a case "
+                << "on any other cannot change its decomposition between runs."
+                << exit(FatalError);
+        }
+
         const labelList positions
         (
             serialPositions(mesh, entities, serialEntities, name)
         );
+
+        if (positions.size() != totalSize(parts))
+        {
+            FatalErrorInFunction
+                << "Restarting '" << name << "': " << positions.size()
+                << " locations were matched for " << totalSize(parts)
+                << " values." << nl
+                << "These have to agree; a mismatch means the locations do not "
+                << "describe this run's state."
+                << exit(FatalError);
+        }
 
         label k = 0;
         forAll(parts, partI)
@@ -595,6 +618,18 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
         }
 
         return false;
+    }
+
+    if (serialEntities.size() != totalSize(parts))
+    {
+        FatalErrorInFunction
+            << "Restarting '" << name << "' from the processor directories, "
+            << "but this run records " << serialEntities.size()
+            << " integration point locations for " << totalSize(parts)
+            << " values." << nl
+            << "Only the cell-centred topology records locations, so a case on "
+            << "any other cannot be reassembled from a decomposed run."
+            << exit(FatalError);
     }
 
     label k = 0;

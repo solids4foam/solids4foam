@@ -114,8 +114,13 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
             << "Plasticity Newton loop not converging" << nl;
     }
 
-    curSigmaY =
-        yieldStress(epsilonPEq0 + sqrt(2.0/3.0)*DLambda);
+    // At the same equivalent plastic strain the yield function was solved
+    // with, and that the strain update below uses. This law's DLambda is the
+    // equivalent plastic strain increment itself, where the legacy law's is
+    // the plastic multiplier and increments it by sqrt(2/3)*DLambda; this line
+    // kept the legacy form and so applied that factor a second time, storing a
+    // yield stress from a plastic strain the solve never visited
+    curSigmaY = yieldStress(epsilonPEq0 + DLambda);
 }
 
 
