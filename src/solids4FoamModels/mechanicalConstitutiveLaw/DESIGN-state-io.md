@@ -1851,15 +1851,65 @@ div(u) = 0`, the momentum coupling loses its `alpha`, and the Rhie-Chow
 coefficient transforms with it. Pressure values and pressure boundary
 conditions change meaning. It is not a refactor.
 
-### 19.2 And it is not a finite-strain formulation yet
+### 19.2 It is already a finite-strain formulation
 
-`linGeomTotalDispSolid`'s constraint is `tr(gradD())`, the small-strain volume
-change. That is right for what it is used for and wrong for finite strain,
-where the constraint is on `J - 1` or `log(J)`. Putting a finite-strain law
-such as `GuccioneElastic` behind the existing switch would produce a
-formulation that is mixed in name only.
+An earlier draft of this section said `solvePressure` was small strain only,
+because `linGeomTotalDispSolid`'s constraint is `tr(gradD())`. That is true of
+that model and it is not a limitation: it is the linear geometry model, and the
+small-strain volume change is the right constraint there.
 
-So the order is: the design is settled and needs nothing from the laws; making
-`solvePressure` a finite-strain formulation is the first piece of work; and
-converting the coupled solver onto it is the second, with the change of
-variable done deliberately rather than discovered.
+`nonLinGeomTotalLagTotalDispSolid` implements the same switch at finite strain,
+with the same replacement and the constraint written on `J`:
+
+    sigma() = dev(sigma()) - p()*I;
+    ...
+    - p*rKappa() + ... - 0.5*(J^2 - 1)/J
+
+So both halves exist and agree, and putting a finite-strain law behind the
+switch is a matter of using the model that already does it. There is no piece
+of work here that has not been done.
+
+### 19.3 The coefficient is not a per-material problem after all
+
+18.2a worried that assembling at the solid model needs `alpha` plumbed through
+per material, because it is computed from the material's own `K` and `mu`.
+`coupledPressureDisplacementSolid` already answers that: it computes
+`nuCoeff_ = 3*nu/(1 + nu)` itself, as a field, from the generic modulus
+quantities every law already exposes through `impK()` and `rKappa()`. Nothing
+is plumbed and multiple materials are handled by it being a field rather than a
+number.
+
+That removes the main objection to the solid model owning the assembly, and it
+is worth noting that the objection was answered by code that already existed
+rather than by an argument.
+
+### 19.4 Two things that are actually wrong today
+
+**The formulation pressure and the pore pressure are the same field.**
+`solidModel::makeP()` registers its pressure as `"p"`, and
+`poroMechanicalLaw`'s `pressureFieldName` defaults to `"p"` in both the legacy
+and the ported law. A solid model with `solvePressure` on, running a material
+that uses `poroMechanicalLaw` without overriding that name, has one field
+serving as two different pressures: either the Biot term counts the formulation
+pressure or the replacement counts the pore pressure. Renaming the solid
+model's own field is the cheap fix, since the two concepts should not be able
+to collide by accident.
+
+**`dev()` is not the volumetric-deviatoric split for an anisotropic law.**
+Removing the trace of the Cauchy stress is not the same operation as taking the
+part of the strain energy that is independent of volume change, and for a fibre
+law the two differ. That is why the legacy `GuccioneElastic` needed a dedicated
+effective shear modulus for its mixed tangent rather than a scalar. The
+solid-model-owned replacement is blind to this by construction: it deliberately
+does not ask the law anything, so it cannot know when the split it performs is
+the wrong one.
+
+This is the real cost of the design, and it is worth stating plainly rather
+than discovering later. It is not specific to finite strain - it would show up
+at small strain too, with an anisotropic law. No shipped case exercises
+`solvePressure` with an anisotropic law, so it is latent rather than observed.
+
+So the order is: the design is settled and needs nothing from the laws; the
+formulation pressure wants its own name; and converting the coupled solver is
+the one real piece of work, with the change of variable in 19.1 done
+deliberately rather than discovered.
