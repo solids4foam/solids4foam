@@ -68,15 +68,20 @@ anisotropicBiotElasticMechanicalConstitutiveLaw
     // they supplied. Fixed in both places together, so the two still agree
     model2d_ = (solutionD[vector::Z] < 0);
 
+    // A mesh empty in x or y is two-dimensional too, and this law has no
+    // reduction for that orientation. Without this it would quietly fall
+    // through to the three-dimensional branch and solve a model the mesh
+    // cannot represent
+    if (solutionD[vector::X] < 0 || solutionD[vector::Y] < 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "This law supports 3-D meshes and 2-D meshes empty in z. "
+            << "This mesh is empty in x or y, which it has no reduction for."
+            << exit(FatalIOError);
+    }
+
     if (model2d_)
     {
-        if (solutionD[vector::X] < 0 || solutionD[vector::Y] < 0)
-        {
-            FatalIOErrorInFunction(dict)
-                << "For 2-D models, z must be the empty direction"
-                << exit(FatalIOError);
-        }
-
         // The reduced constants below are the plane stress ones: they come
         // from eliminating a zero out-of-plane stress, not a zero out-of-plane
         // strain. This law has no plane strain form, so a case that asked for
@@ -181,10 +186,9 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
 
             // The reduced constants above are the plane stress ones, so the
             // out-of-plane components are zero by construction. The legacy law
-            // left them untouched instead, which came to the same thing only
-            // because its stress field starts at zero and nothing else writes
-            // them; here it is stated, so the result does not depend on what
-            // storage the law was handed
+            // left them untouched instead, which did not come to the same
+            // thing: under poroMechanicalLaw the value standing there is the
+            // seeded effective stress, not zero
             sigma[i][symmTensor::ZZ] = 0.0;
             sigma[i][symmTensor::YZ] = 0.0;
             sigma[i][symmTensor::XZ] = 0.0;

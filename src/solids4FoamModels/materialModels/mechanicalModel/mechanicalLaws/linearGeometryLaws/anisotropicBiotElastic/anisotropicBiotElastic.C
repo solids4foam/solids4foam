@@ -77,16 +77,21 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     )
 {
+    // A mesh empty in x or y is two-dimensional too, and this law has no
+    // reduction for that orientation. Without this it would quietly fall
+    // through to the three-dimensional branch and solve a model the mesh
+    // cannot represent
+    if (mesh.solutionD()[vector::X] < 0 || mesh.solutionD()[vector::Y] < 0)
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "This law supports 3-D meshes and 2-D meshes empty in z. "
+            << "This mesh is empty in x or y, which it has no reduction for."
+            << abort(FatalError);
+    }
+
     // Set elastic stiffness parameters
     if (model2d_)
     {
-        // Only the z direction is allow for 2-D models
-        if (mesh.solutionD()[vector::X] < 0 || mesh.solutionD()[vector::Y] < 0)
-        {
-            FatalErrorIn(type() + "::" + type())
-                << "For 2-D models, z must be the empty direction"
-                << abort(FatalError);
-        }
 
         // The reduced constants below are the plane stress ones: they come
         // from eliminating a zero out-of-plane stress, not a zero out-of-plane
@@ -263,8 +268,11 @@ void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
 
             // The reduced constants above are the plane stress ones, so the
             // out-of-plane stress is zero by construction. Said rather than
-            // left, which happened to give zero here only because the field
-            // starts at zero and nothing else writes these
+            // left: what was standing in these components was not
+            // necessarily zero. Under poroMechanicalLaw it is the seeded
+            // effective stress, which for this case's initial pore pressure
+            // of 79.29 kPa made a von Mises stress of that size appear at
+            // zero strain
             sigmaI[celli][symmTensor::ZZ] = 0.0;
             sigmaI[celli][symmTensor::YZ] = 0.0;
             sigmaI[celli][symmTensor::XZ] = 0.0;

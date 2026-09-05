@@ -170,25 +170,25 @@ void Foam::poroMechanicalLawMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Hand the sub-law the effective stress to work in. It is passed through
-    // the caller's storage rather than through a list of its own: the response
-    // wraps an indirect list, and copying in and out costs two passes where
-    // building an identity-indexed view would cost an allocation. The sub-law
-    // sees the effective stress it left behind, which is what the legacy law
-    // gives it
-    forAll(sigma, i)
-    {
-        sigma[i] = sigmaEff[i];
-    }
+    // What the sub-law finds already standing at these points is the effective
+    // stress, not the total. It used to learn that by reading the caller's
+    // storage, which this law had first written sigmaEff into; it is now said
+    // explicitly, because a law reading its own output buffer is the thing
+    // being removed. The buffer is deliberately left as the manager cleared
+    // it, so a sub-law that fails to write every component is a bug that shows
+    // up rather than one masked by a helpful pre-seed
+    //
+    // The parent's own incoming stress is put back afterwards. It means
+    // something different from the child's - total rather than effective - and
+    // leaving the child's in place would hand that different quantity to
+    // whatever ran next under the same inputs
+    const UList<symmTensor>& parentIncoming = inputs.incomingStress();
 
-    // What the sub-law finds already standing at these points is the
-    // effective stress, not the total. It used to learn that by reading the
-    // caller's storage, which this law had just written sigmaEff into; now it
-    // is said explicitly, because a law reading its own output buffer is the
-    // thing being removed
     inputs.setIncomingStress(sigmaEff);
 
     subLawPtr_->evaluate(kin, inputs, state.child(subStateName_), response);
+
+    inputs.setIncomingStress(parentIncoming);
 
     // What the sub-law wrote is the new effective stress. Keep it, and hand
     // the caller the total stress
