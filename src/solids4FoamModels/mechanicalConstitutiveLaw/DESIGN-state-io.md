@@ -1913,3 +1913,93 @@ So the order is: the design is settled and needs nothing from the laws; the
 formulation pressure wants its own name; and converting the coupled solver is
 the one real piece of work, with the change of variable in 19.1 done
 deliberately rather than discovered.
+
+## 20. What `dev()` needs from a law, and why it is not about anisotropy
+
+19.4 said the solid-model replacement is blind to whether the split it performs
+is the right one, and put that down to anisotropy. That is not quite the
+criterion, and getting it right decides what the law has to provide.
+
+### 20.1 The criterion is how the energy is written
+
+For a law whose energy is written with the split,
+
+    W = W_iso(Cbar) + U(J),      Cbar = J^(-2/3) C
+
+the isochoric contribution to the Cauchy stress is trace-free by construction,
+so `tr(sigma) = 3*U'(J)` and `dev(sigma)` recovers the isochoric stress
+*exactly*. Replacing the rest with `-p*I` is then not an approximation at all.
+
+For a law whose energy is written on the full deformation, `dev(sigma)` still
+removes the spherical part - nothing is counted twice, and the first draft of
+this section was wrong to say so. What happens instead is subtler and worse to
+find: what is left is a deviatoric response that still depends on `J`, and
+replacing the spherical part with an independent `p` gives *a different
+material model* from the one the law describes. Not obviously wrong, not
+double-counted, simply not the law that was asked for.
+
+The sign is worth writing down, since the two conventions differ by one:
+with `sigma = dev(sigma) - p*I`, the pressure is `p = -U'(J)`.
+
+So the question is not isotropy. It is whether the energy was parameterised on
+`Cbar` or on `C`. An anisotropic law written on `Cbar` is reproduced exactly;
+an isotropic law written on `C` is replaced by a neighbouring model.
+
+Among the ported laws, `neoHookeanElastic`, `MooneyRivlinElastic` and
+`neoHookeanElasticMisesPlastic` are written on an isochoric measure and are
+reproduced exactly. `StVenantKirchhoffElastic`, `OgdenElastic` and the
+`GuccioneElastic` just ported are written on the full strain and are not -
+Guccione's `Q` takes the whole Green-Lagrange strain, with the volumetric
+response added separately as a penalty, and Ogden decomposes the full `C` and
+applies `dev` only afterwards.
+
+That last one is worth noticing: the legacy Guccione's mixed branch avoids the
+problem by forcing the bulk modulus to `GREAT`, which is the incompressible
+limit where `J` is one and the distinction vanishes. It does not solve the
+problem; it stands in the formal incompressible limit, where the problem is
+not. `GREAT` is a penalty rather than an identity, so `J` is near one rather
+than one, and the distinction is small rather than absent.
+
+### 20.2 So the law does have to say something - but not choose
+
+The thing to avoid, and the reason the solid model owns the assembly, is a law
+deciding whether to use a pressure the solid model solved for. That stays. What
+the law has to provide is different in kind: not a choice, but a fact about how
+it is written.
+
+A law declares whether its energy is split. A solid model running a mixed
+formulation asks the manager for a deviatoric stress, exactly as now, and a law
+that has not declared the split is refused - by name, at construction, before
+anything runs. It cannot opt out of the pressure, and it cannot silently be
+used where `dev()` means something other than what the formulation needs.
+
+A boolean is not the whole of it, though, and this is the part that needs
+thought rather than a switch. The pressure equation carries its own
+compressibility - `rKappa()` in the solvers - and that has to correspond to the
+law's `U(J)`. A law can be perfectly split and still be paired with a pressure
+equation assuming a different volumetric response, and nothing in a boolean
+would notice. So what the law has to declare is not only *that* it is split but
+*what its volumetric response is*, in a form the pressure equation can be built
+from.
+
+The mechanism for the request already exists: `planeStress` and `solutionD` are
+injected into every law and a law that sets either itself is refused. A
+`mixedFormulation` entry belongs there. The declaration is a new virtual on the
+law, defaulting to false, which is the safe direction: a law that has not
+thought about it does not silently qualify.
+
+### 20.3 What that costs
+
+`GuccioneElastic` would refuse to run under `solvePressure` until its `Q` is
+written on the isochoric strain. That is a real reformulation and a change in
+what the law computes, so it is the project's call rather than this work's -
+but a refusal is the right behaviour meanwhile, because the alternative is the
+quiet mis-split that 19.4 describes, in the one case anybody would actually
+want it for.
+
+The eventual and better answer is that a law provides its isochoric stress
+directly, evaluated on `Cbar`, *and* the volumetric response that goes with it,
+rather than the solid model taking `dev()` of a full stress and building a
+pressure equation from a compressibility that may not match. Then nothing is
+inferred and nothing has to be declared, because the interface says it. That is
+more work and it is where this should end up.
