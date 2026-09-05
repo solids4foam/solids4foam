@@ -135,8 +135,12 @@ public:
         //  sits when a decomposed run has to go looking for it
         static fileName globalCasePath(const fvMesh& mesh);
 
-        //- The serial cell count recorded in a serial file's header note
+        //- The serial cell count recorded in a serial file's header note,
+        //  or -1 if the note was not written by a serial run
         static label serialCellCount(const string& note);
+
+        //- The cell count recorded in any file's header note
+        static label cellCountFromNote(const string& note);
 
         //- How an integration point says which piece of mesh it belongs to.
         //  Cells and faces share one numbering so that a single list can carry

@@ -23,6 +23,7 @@ License
 #include "Pstream.H"
 #include "OStringStream.H"
 #include "HashTable.H"
+#include "processorPolyPatch.H"
 #include "IStringStream.H"
 
 // * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
@@ -212,16 +213,36 @@ Foam::label Foam::mechanicalConstitutiveLawStateIO::serialCellCount
 {
     // The note reads "serial nCells=<n>". Anything else is not a serial file
     const std::string s(note);
-    const std::string key("serial nCells=");
 
-    if (s.compare(0, key.size(), key) != 0)
+    if (s.compare(0, 7, std::string("serial ")) != 0)
     {
         return -1;
     }
 
-    // The count runs to the next space; the rest of the note is the other
-    // half of the mesh's fingerprint and is compared as a whole elsewhere
-    return readLabel(IStringStream(s.substr(key.size()))());
+    return cellCountFromNote(note);
+}
+
+
+Foam::label Foam::mechanicalConstitutiveLawStateIO::cellCountFromNote
+(
+    const string& note
+)
+{
+    // Every note records the cells its writer held, serial or not, and the
+    // counts are what say whether a set of files describes this mesh: a
+    // decomposition preserves cells, so the pieces have to add up
+    const std::string s(note);
+    const std::string key("nCells=");
+
+    const std::string::size_type pos = s.find(key);
+
+    if (pos == std::string::npos)
+    {
+        return -1;
+    }
+
+    // The count runs to the next space, and IStringStream stops there
+    return readLabel(IStringStream(s.substr(pos + key.size()))());
 }
 
 
@@ -328,7 +349,15 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
             const label localFace = entityFace(localEntities[i]);
             const label patchI = mesh.boundaryMesh().whichPatch(localFace);
 
-            if (patchI >= 0 && mesh.boundary()[patchI].coupled())
+            // A processor patch, specifically, and not merely a coupled one.
+            // A cyclic is coupled too and exists in the undecomposed mesh just
+            // as it does here, so a miss on one is a real disagreement and has
+            // to be reported rather than smoothed over with a nearby value
+            if
+            (
+                patchI >= 0
+             && isA<processorPolyPatch>(mesh.boundaryMesh()[patchI])
+            )
             {
                 // A face this processor calls a boundary that the serial mesh
                 // called interior: decomposition made it one, by cutting the

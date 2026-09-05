@@ -22,6 +22,7 @@ License
 #include "Pstream.H"
 #include "labelIOList.H"
 #include "OSspecific.H"
+#include "fileName.H"
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
@@ -203,10 +204,20 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
             labelList serialEntities;
             string dataNote, entityNote;
 
-            const bool haveData =
+            bool haveData =
                 readSerialList(mesh, name, serialData, dataNote);
-            const bool haveEntities =
+            bool haveEntities =
                 readSerialList(mesh, entityName, serialEntities, entityNote);
+
+            // Agreed across the ranks before any of them acts on it. These are
+            // direct reads that do not go through the file handler, so a rank
+            // can fail one on its own; the next step reads the processor
+            // addressing through the registry, which the handler may make
+            // collective, and a collective some ranks skip is a hang
+            bool haveBoth = haveData && haveEntities;
+            reduce(haveBoth, andOp<bool>());
+            haveData = haveBoth;
+            haveEntities = haveBoth;
 
             if (haveData && haveEntities)
             {
@@ -236,6 +247,37 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
                         << serialEntities.size() << " integration point "
                         << "locations. They are written together and must "
                         << "agree." << exit(FatalError);
+                }
+
+                // The pair is self-consistent; that does not make it this
+                // case. decomposePar preserves cells, so the undecomposed cell
+                // count the file records has to be the number of cells this
+                // run holds between them - a collective, but one every rank
+                // reaches, having just agreed to be here
+                const label serialNCells = serialCellCount(dataNote);
+
+                if (serialNCells < 0)
+                {
+                    FatalErrorInFunction
+                        << "The state file '" << name << "' in the "
+                        << "undecomposed case was not written by a serial run."
+                        << nl << "  its header says: " << dataNote
+                        << exit(FatalError);
+                }
+
+                const label totalCells =
+                    returnReduce(mesh.nCells(), sumOp<label>());
+
+                if (serialNCells != totalCells)
+                {
+                    FatalErrorInFunction
+                        << "The state in the undecomposed case was written for "
+                        << "a mesh of " << serialNCells << " cells, and this "
+                        << "run holds " << totalCells << " between its ranks."
+                        << nl
+                        << "It is not the same mesh, so its integration point "
+                        << "locations mean nothing here."
+                        << exit(FatalError);
                 }
 
                 const labelList positions
@@ -409,6 +451,7 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
     HashTable<Type, label, Hash<label>> valueOf(4*serialEntities.size());
 
     label nProcs = 0;
+    label totalProcCells = 0;
 
     while (true)
     {
@@ -469,6 +512,12 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
                 << exit(FatalError);
         }
 
+        // Each piece says how many cells it held. decomposePar preserves
+        // cells, so they have to add up to this mesh, and if they do not then
+        // these directories belong to some other case
+        const label procCells = cellCountFromNote(dataNote);
+        totalProcCells += (procCells > 0 ? procCells : 0);
+
         forAll(procEntities, i)
         {
             // set rather than insert: a face that decomposition cut is a
@@ -481,8 +530,47 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
         nProcs++;
     }
 
+    if (nProcs > 0 && totalProcCells != mesh.nCells())
+    {
+        FatalErrorInFunction
+            << "The state in " << nProcs << " processor directories was "
+            << "written for a mesh of " << totalProcCells << " cells, and "
+            << "this one has " << mesh.nCells() << '.' << nl
+            << "Those directories belong to a different case, or to a "
+            << "different mesh of the same case."
+            << exit(FatalError);
+    }
+
     if (nProcs == 0)
     {
+        // Collated output puts every rank's data in one processors<N>
+        // directory instead of a processorN each, and this reads neither the
+        // layout nor the format. Saying nothing here would look exactly like a
+        // case that was never run in parallel
+        // OpenFOAM.org spells the file type as a scoped enumeration where
+        // the others use a member constant
+#ifdef OPENFOAM_ORG
+        fileNameList dirs(readDir(casePath, fileType::directory));
+#else
+        fileNameList dirs(readDir(casePath, fileName::DIRECTORY));
+#endif
+
+        forAll(dirs, i)
+        {
+            if (dirs[i].find("processors") == 0)
+            {
+                FatalErrorInFunction
+                    << "The constitutive state was written with collated file "
+                    << "handling, into " << dirs[i] << '.' << nl
+                    << "This reads the state from a processorN directory per "
+                    << "rank, which is what the uncollated handler writes." << nl
+                    << "Re-run the parallel leg with"
+                    << " -fileHandler uncollated, or reconstruct it with a "
+                    << "handler that writes the state where this can find it."
+                    << exit(FatalError);
+            }
+        }
+
         return false;
     }
 

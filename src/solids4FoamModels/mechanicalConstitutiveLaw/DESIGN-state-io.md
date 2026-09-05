@@ -1488,7 +1488,9 @@ gather sets rather than inserts, and the duplicate is harmless by construction
 rather than by luck.
 
 Going the other way the same face is the one case with no answer, and it takes
-its owner cell's history - 14.1 covers why, and why only a coupled patch may.
+its owner cell's history. Only a *processor* patch may: a cyclic is coupled too
+and exists in the undecomposed mesh exactly as it does here, so a miss on one
+is a real disagreement and has to be reported rather than smoothed over.
 
 ### 15.3 What it costs
 
@@ -1499,3 +1501,23 @@ Both directions reproduce the uninterrupted run to about 1e-8 on
 What is still missing is the same as before: only the cell-centred topology
 writes locations, so only it can change shape. The others refuse, which remains
 the right behaviour for something unbuilt.
+
+
+### 15.4 What each direction refuses
+
+A source being self-consistent does not make it this case, so both directions
+check that it describes this mesh before believing it. A decomposition
+preserves cells, which gives a count that has to agree either way: the
+undecomposed file records the cells its mesh had, and a decomposed run holds
+that many between its ranks; a set of processor directories records what each
+rank held, and those have to add up to a reconstructed run's mesh.
+
+Collated output is refused by name. It puts every rank's data in one
+`processors<N>` directory rather than a `processorN` each, in a format this
+does not read, and a run that simply found nothing there would look exactly
+like one that had never been run in parallel.
+
+Going from N processors straight to M, without reconstructing on the way, is
+not supported and says so: the decomposed branch looks for an undecomposed
+state that a never-serial case never wrote. Reconstruct and decompose again,
+both of which now work.
