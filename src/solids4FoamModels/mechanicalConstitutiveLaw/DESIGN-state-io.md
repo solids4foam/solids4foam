@@ -1740,3 +1740,70 @@ The alternative is to port the displacement formulation only, leave the mixed
 one to the legacy law until the above is built, and have `problem3`'s
 regression test cover the displacement arm alone for now. That is the smaller
 step and it does not foreclose anything.
+
+### 18.5 What the reviews changed, and one thing they found in the code
+
+**The convention error is not hypothetical. It is in the tree.**
+`GuccioneElastic` computes, in its ordinary path,
+
+    s = dev(symm(F & S & FT))/J          // Cauchy
+
+and in its mixed path,
+
+    s = dev(symm(F & S & FT))            // no /J, so Kirchhoff
+
+under a comment that says "convert the second Piola-Kirchhoff stress to the
+deviatoric Cauchy stress", and then forms `sigma = s - p*I`. That is a Cauchy
+pressure subtracted from a Kirchhoff deviatoric stress: the very thing 18.2
+described as the mistake that would be small, smooth and plausible, written
+down and shipped, with a comment asserting the opposite.
+
+How much it matters is a separate question from whether it is right. The error
+is a factor of `J` on the deviatoric part, and a mixed formulation exists to
+drive `J` to one, so for the nearly incompressible tissue this law is used on it
+is small - which is exactly why it would survive. `neoHookeanElastic`'s mixed
+branch keeps its `/J`, so the two laws do not agree.
+
+**The two laws do not agree on the coefficient either.** `neoHookeanElastic`
+scales the pressure by `3*nu/(1 + nu)`; `GuccioneElastic` has no coefficient at
+all and subtracts `p` bare. So the "one meaning" a new contract has to fix does
+not exist to be copied - it has to be chosen, and one of the two laws will
+change when it is.
+
+**The mechanism already exists, and it is not the one proposed.** The manager
+injects `planeStress` and `solutionD` into every law's dictionary at
+construction and refuses to start if a law's own sub-dictionary sets either.
+That is precisely "the request comes from the solid model, not the material,
+and a case cannot be half mixed", already built and already tested. A mixed
+formulation flag belongs there, injected the same way, rather than in new
+machinery.
+
+And `tangentRequest::scalarDeviatoric` already exists, with a comment naming
+mixed displacement-pressure formulations as its purpose. The tangent half of
+this needs wiring, not designing.
+
+**Keep the two signals apart.** Whether a law is in mixed mode is fixed for the
+run; whether a tangent is wanted is decided per evaluation. Collapsing the first
+into `tangentRequest` would make "deviatoric stress, no tangent" - an ordinary
+residual iteration - inexpressible.
+
+**Composites need the contract stated more carefully than "deviatoric".**
+`poroMechanicalLaw` hands its sub-law a stress, gets a full one back, and
+subtracts a pore pressure. Wrapping a mixed-formulation law would produce
+something that is deviatoric except for a pore pressure it has already netted
+out and a formulation pressure it has not, which is not a thing the word
+"deviatoric" describes. And both default their field name to `p`, so a
+poro-wrapped mixed law would find one field and count it twice.
+
+**A trace check is not enough to catch it.** Scaling a traceless tensor by
+`1/J` leaves it traceless, so asserting `tr(s) == 0` catches
+`neoHookeanElastic`'s non-trace-free term and misses the `J` error entirely.
+What would catch it is comparing a law's deviatoric evaluation against
+`dev()` of its own ordinary evaluation, at a state deliberately away from
+`J = 1`, as a unit test per law. That argues for keeping the ordinary path in
+any law that gains a mixed one, as the oracle.
+
+**The tangent is not `mu` outside isotropy.** `GuccioneElastic`'s mixed tangent
+is an effective shear modulus computed by a dedicated routine, because the law
+is anisotropic. Which is a further reason to do 18.4's smaller thing: port the
+displacement formulation, leave the mixed one on the legacy law.
