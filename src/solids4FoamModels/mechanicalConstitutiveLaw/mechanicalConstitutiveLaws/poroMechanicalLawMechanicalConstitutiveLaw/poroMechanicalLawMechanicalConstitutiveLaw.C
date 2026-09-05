@@ -65,7 +65,7 @@ poroMechanicalLawMechanicalConstitutiveLaw
             "p0", dimensionedScalar("p0", dimPressure, 0.0)
         )
     ),
-    pName_(dict.lookupOrDefault<word>("pressureFieldName", "p"))
+    pName_(dict.lookupOrDefault<word>("pressureFieldName", "porePressure"))
 {
     if (b_.dimensions() != dimless)
     {

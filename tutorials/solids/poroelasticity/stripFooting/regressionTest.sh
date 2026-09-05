@@ -174,7 +174,7 @@ if [[ -z "${epsilon}" || -z "${latest}" ]]; then
     exit 1
 fi
 
-pressure=$(max_abs_field "${CASE_DIR}/${latest}/p")
+pressure=$(max_abs_field "${CASE_DIR}/${latest}/porePressure")
 
 failures=0
 

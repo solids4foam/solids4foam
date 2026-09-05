@@ -207,7 +207,11 @@ poroLinGeomSolid::poroLinGeomSolid
     (
         IOobject
         (
-            "p",
+            // porePressure, not p: a solid model solving a mixed
+            // displacement-pressure formulation registers its own pressure as
+            // "p", and one field cannot be both. They are different pressures
+            // and they now have different names
+            "porePressure",
             runTime.timeName(),
             mesh(),
             IOobject::MUST_READ,

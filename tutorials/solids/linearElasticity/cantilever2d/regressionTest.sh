@@ -295,8 +295,15 @@ run_sigma0_restart_check() {
             cp -a "${item}" "${root}/${d}/"
         done
 
+        # restart no, deliberately. These arms restart, and a case that
+        # restarts without saying anything about it is refused - but this law
+        # is written in total strain and genuinely does not need the kinematic
+        # history, so saying no is the honest answer rather than a way round
+        # the check. 'restart yes' would also make legacy's sigma0 be written
+        # into the time this resumes from, which is the very thing the check
+        # below requires to be absent
         sed -i \
-            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1restart no;\n\1nCorrectors|' \
             "${root}/${d}/constant/solidProperties"
     done
 
