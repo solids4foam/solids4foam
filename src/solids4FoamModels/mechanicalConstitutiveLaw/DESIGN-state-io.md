@@ -1885,15 +1885,13 @@ rather than by an argument.
 
 ### 19.4 Two things that are actually wrong today
 
-**The formulation pressure and the pore pressure are the same field.**
+**The formulation pressure and the pore pressure were the same field.** Fixed,
+and this paragraph is kept because the design below refers to it.
 `solidModel::makeP()` registers its pressure as `"p"`, and
-`poroMechanicalLaw`'s `pressureFieldName` defaults to `"p"` in both the legacy
-and the ported law. A solid model with `solvePressure` on, running a material
-that uses `poroMechanicalLaw` without overriding that name, has one field
-serving as two different pressures: either the Biot term counts the formulation
-pressure or the replacement counts the pore pressure. Renaming the solid
-model's own field is the cheap fix, since the two concepts should not be able
-to collide by accident.
+`poroMechanicalLaw`'s `pressureFieldName` used to default to `"p"` in both the
+legacy and the ported law, so a solid model with `solvePressure` on, running a
+poro material that did not override the name, had one field serving as two
+different pressures. The pore pressure is `"porePressure"` now.
 
 **`dev()` is not the volumetric-deviatoric split for an anisotropic law.**
 Removing the trace of the Cauchy stress is not the same operation as taking the
@@ -2003,3 +2001,60 @@ rather than the solid model taking `dev()` of a full stress and building a
 pressure equation from a compressibility that may not match. Then nothing is
 inferred and nothing has to be declared, because the interface says it. That is
 more work and it is where this should end up.
+
+
+### 20.4 Composites need more than a boolean, for two different reasons
+
+A review of 20 found both, and the first is in a law this work just ported.
+
+**A composite can break the split even when its sub-law does not.**
+`electroMechanicalLaw` adds `symm(F & (Ta*f0f0) & F^T)/J` after its passive law
+has returned. `f0f0` is the square of a unit vector, so that term's trace is
+`Ta*|F.f0|^2`, which is not zero whenever there is any active tension. So a
+composite whose sub-law is impeccably split can still hand up a stress with a
+volumetric part of its own, and `dev()` would take part of the active tension
+away with the pressure. Its honest declaration is not "split" but "split, apart
+from what I add", which a boolean cannot say.
+
+**And `poroMechanicalLaw` is worse, in an interesting way.** Its Biot term,
+`sigma -= b*(p + p0)*I`, lives *entirely* in the trace. Under a mixed
+formulation `dev()` strips the whole trace and the solved pressure replaces it,
+so the pore pressure is not merely disturbed, it is deleted. Nothing in the
+stress distinguishes a volumetric response the formulation is entitled to
+overwrite from one it must keep, because by the time the solid model sees it
+there is only a number.
+
+That is the sharpest argument in this section for a law providing its isochoric
+stress and volumetric response separately rather than a solid model taking
+`dev()` of a total: the information needed to tell those two apart exists in the
+law and nowhere else, and taking a trace throws it away.
+
+### 20.5 What the declaration does and does not protect against
+
+Refusal at construction catches a law that never declared itself. It cannot
+catch one that declares wrongly - a law returning `true` while being written on
+the full `C` is accepted, and the error is the quiet one this section is about.
+
+The only thing that catches that is per-law: compare the law's deviatoric
+evaluation against `dev()` of its own ordinary evaluation, at a state
+deliberately away from `J = 1`. 18.5 proposed this for the Kirchhoff-Cauchy
+error and it answers this one too, which is a reason to build it once.
+
+And the declaration has to be a property of the constructed law, not of its
+type. The legacy `GuccioneElastic` is "split" only because its dictionary
+forces the bulk modulus to `GREAT`; a per-class answer could not express that,
+and would be wrong for the same class given a finite one.
+
+### 20.6 What the reformulation would cost
+
+Smaller than 20.3 implies, and the same shape as something already in the tree.
+`neoHookeanElasticMisesPlastic` builds `relFbar = relJ^(-1/3)*relF` before
+forming its trial quantities. Guccione's equivalent is `Fbar = J^(-1/3)*F`,
+`Ebar` from `Fbar`, `Q` and `dQdE` on `Ebar`, and the push-forward through
+`Fbar`. Bounded and mechanical rather than a rewrite of the material model -
+moderate, not cheap, and there is no honest shortcut.
+
+The interface cost is smaller still. A law needs no second `evaluate()`: the
+formulation flag is injected into its dictionary exactly as `planeStress` is,
+read once into a member, and the single existing evaluation branches on it -
+which is the pattern a law already uses for plane stress.
