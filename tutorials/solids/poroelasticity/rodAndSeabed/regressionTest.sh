@@ -12,11 +12,19 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ============================================================
 
 # Reference ranges (order-of-magnitude + robustness)
-EPSILON_MIN=6e-5
-EPSILON_MAX=1.1e-4
+#
+# These moved when the anisotropic Biot law stopped selecting its reduced
+# plane model on this three-dimensional mesh. The old values were not
+# self-consistent with the declared material: 80 kPa against a strain of
+# 9.3e-5 implies a stiffness near 9e8 Pa, where the moduli here are 1.2e7 to
+# 2e7 Pa. Forcing the out-of-plane stress to zero while xx and yy were not
+# manufactured a large deviator, so von Mises read high against a small
+# strain. The values below sit on the declared moduli
+EPSILON_MIN=1.4e-3
+EPSILON_MAX=2.2e-3
 
-SIGMA_MIN=70e3
-SIGMA_MAX=90e3
+SIGMA_MIN=40e3
+SIGMA_MAX=58e3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"

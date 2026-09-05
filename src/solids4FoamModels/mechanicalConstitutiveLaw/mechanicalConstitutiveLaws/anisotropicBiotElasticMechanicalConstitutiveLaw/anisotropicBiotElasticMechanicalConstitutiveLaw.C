@@ -20,6 +20,7 @@ License
 #include "anisotropicBiotElasticMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
 #include "labelVector.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -61,10 +62,11 @@ anisotropicBiotElasticMechanicalConstitutiveLaw
     // law is constructed from a dictionary and cannot ask the mesh
     const labelVector solutionD(dict.lookup("solutionD"));
 
-    // Named as the legacy law names it. Note that it is true when z IS
-    // solved, which is the opposite of what the name suggests; it is kept
-    // this way because the point here is to reproduce that law
-    model2d_ = (solutionD[vector::Z] > 0);
+    // A mesh is two-dimensional when z is the empty direction. The legacy law
+    // tested this the other way round, so it ran the reduced plane model on
+    // three-dimensional meshes and quietly ignored the out-of-plane constants
+    // they supplied. Fixed in both places together, so the two still agree
+    model2d_ = (solutionD[vector::Z] < 0);
 
     if (model2d_)
     {
@@ -74,6 +76,21 @@ anisotropicBiotElasticMechanicalConstitutiveLaw
                 << "For 2-D models, z must be the empty direction"
                 << exit(FatalIOError);
         }
+
+        // The reduced constants below are the plane stress ones: they come
+        // from eliminating a zero out-of-plane stress, not a zero out-of-plane
+        // strain. This law has no plane strain form, so a case that asked for
+        // one is told rather than quietly given the other
+        if (!dict.lookupOrDefault<Switch>("planeStress", false))
+        {
+            FatalIOErrorInFunction(dict)
+                << "This law's two-dimensional reduction is plane stress, but "
+                << "planeStress is not set in mechanicalProperties." << nl
+                << "Set 'planeStress yes;', or use a law that offers a plane "
+                << "strain reduction."
+                << exit(FatalIOError);
+        }
+
 
         const scalar Ex = readScalar(dict.lookup("Ex"));
         const scalar Ey = readScalar(dict.lookup("Ey"));
@@ -158,11 +175,19 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
 
         if (model2d_)
         {
-            // zz, yz and xz are deliberately not written, exactly as in the
-            // legacy law: they keep whatever the caller's storage held
             sigma[i][symmTensor::XX] = A11_*e11 + A12_*e22;
             sigma[i][symmTensor::YY] = A21_*e11 + A22_*e22;
             sigma[i][symmTensor::XY] = A44_*e12;
+
+            // The reduced constants above are the plane stress ones, so the
+            // out-of-plane components are zero by construction. The legacy law
+            // left them untouched instead, which came to the same thing only
+            // because its stress field starts at zero and nothing else writes
+            // them; here it is stated, so the result does not depend on what
+            // storage the law was handed
+            sigma[i][symmTensor::ZZ] = 0.0;
+            sigma[i][symmTensor::YZ] = 0.0;
+            sigma[i][symmTensor::XZ] = 0.0;
         }
         else
         {
