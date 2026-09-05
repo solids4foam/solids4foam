@@ -1561,3 +1561,55 @@ zero returns as -0.041 in both. That is the updated Lagrangian solid model's,
 not this framework's, and it is left alone and written down rather than tuned
 around. It is why that arm holds to 1e-4 where the small-strain arms hold to
 1e-6, and why a negative control carries the weight there instead.
+
+## 17. The fibre laws, and what porting them needs decided
+
+`problem3` is now in the tree with a check of its own, and it is the only
+tutorial whose material is anisotropic about a direction. It runs
+`electroMechanicalLaw` over `GuccioneElastic`, neither of which is ported. This
+records what the port needs decided, so the decisions are made rather than
+discovered halfway through.
+
+### 17.1 What the law holds
+
+`GuccioneElastic` keeps four fields that are not history and are not read from
+a dictionary: `f0`, `s0`, `n0` - the fibre, sheet and normal directions - and
+`R_`, the rotation built from them. `f0` is produced by `setFibreField` before
+the solver runs and read from the `0` directory.
+
+That makes them **prescribed** state in this framework's terms, and the first
+prescribed *vector* state anywhere: everything prescribed so far has been a
+scalar or a symmetric tensor. The path exists and is untested for vectors,
+which is a reason to port this law rather than an obstacle to it.
+
+`R_` is the awkward one. It is derived from the three directions and constant
+in time, so it is neither history nor input, and the choices are to recompute
+it per evaluation, to hold it as a fourth prescribed field, or to give the
+framework somewhere to put a per-material derived constant. The third is new
+machinery and should not be invented for one law; the first is arithmetic in the
+inner loop. It is probably the second, but it is a decision and not an obvious
+one.
+
+### 17.2 What the composite holds
+
+`electroMechanicalLaw` wraps a passive law and adds an active tension along the
+fibre direction, ramped over `rampTime`, or read from a `Ta` field on the
+registry if one is there. The registry lookup is exactly the coupling input the
+framework already has a path for, and the ramp is a function of time, which
+`mechanicalConstitutiveLawInputs` already carries.
+
+So it is the same shape as `poroMechanicalLaw`: a law with its own parameters
+holding a child state for its sub-law. That one is ported and tested, including
+its restart, so this has a worked example to follow rather than a blank page.
+
+### 17.3 What has to be decided first
+
+  - Whether `calculateStressInLocalCoordinateSystem` is ported at all. It
+    doubles the law's evaluation path, and `problem3` sets it to `no`. A port
+    that carries both has twice the surface and half the coverage.
+  - Whether the mixed displacement-pressure variant is in scope. The tutorial
+    ships both formulations and the legacy law branches on which is active.
+  - Whether `R_` is prescribed state, recomputed, or something else.
+
+None of these is a question the tests can answer, which is why they are written
+down here rather than guessed at.
