@@ -72,6 +72,7 @@ SourceFiles
 #include "scalarField.H"
 #include "vectorField.H"
 #include "HashTable.H"
+#include "symmTensor.H"
 #include "word.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -105,6 +106,17 @@ class mechanicalConstitutiveLawInputs
         //- Vector fields, likewise
         HashTable<const vectorField*> vectorFields_;
 
+        //- The stress already standing at these integration points, for the
+        //  few laws that legitimately need it.
+        //
+        //  Given here rather than left to be read out of the response, which
+        //  is where it used to come from. A law that reads its own output
+        //  buffer depends on what the caller last left there, which is not an
+        //  input the framework can reason about, restart, or perturb for a
+        //  tangent. Singular and always a symmTensor, so it is a member rather
+        //  than another name-keyed table
+        mutable const UList<symmTensor>* incomingStressPtr_;
+
 
     // Private Member Functions
 
@@ -126,7 +138,8 @@ public:
             dt_(dt),
             time_(time),
             scalarFields_(),
-            vectorFields_()
+            vectorFields_(),
+            incomingStressPtr_(nullptr)
         {}
 
 
@@ -148,6 +161,48 @@ public:
             scalar time() const
             {
                 return time_;
+            }
+
+            //- Is the standing stress available?
+            bool foundIncomingStress() const
+            {
+                return incomingStressPtr_ != nullptr;
+            }
+
+            //- The stress already standing at these integration points
+            const UList<symmTensor>& incomingStress() const
+            {
+                if (!incomingStressPtr_)
+                {
+                    FatalErrorInFunction
+                        << "This law asked for the stress already standing at "
+                        << "its integration points, and the evaluation path "
+                        << "did not supply it." << nl
+                        << "A law that needs it must say so through "
+                        << "requiresIncomingStress()."
+                        << exit(FatalError);
+                }
+
+                return *incomingStressPtr_;
+            }
+
+            //- Supply the standing stress
+            //  Attached by the manager just before the law runs, which is
+            //  why it is settable through a const handle: the inputs object is
+            //  otherwise immutable and is passed to the law as const
+            //- Detach the standing stress. The pointer refers to storage the
+            //  caller owns for the duration of one evaluation, so it is
+            //  dropped as soon as that evaluation is over; a later law then
+            //  fails at the point of use rather than reading a dead sibling's
+            //  buffer that happens to still be mapped
+            void clearIncomingStress() const
+            {
+                incomingStressPtr_ = nullptr;
+            }
+
+            void setIncomingStress(const UList<symmTensor>& incoming) const
+            {
+                incomingStressPtr_ = &incoming;
             }
 
             //- Is a scalar input available under this name?

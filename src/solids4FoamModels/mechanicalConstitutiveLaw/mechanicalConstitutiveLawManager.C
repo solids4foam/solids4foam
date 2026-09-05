@@ -84,6 +84,33 @@ void evaluateResponse
     const UList<scalar>* volumetricStore = nullptr
 )
 {
+    // One place, because every law is reached through here.
+    //
+    // A law that needs the stress already standing at its points is handed it
+    // as a declared input. Every other law has its output cleared first, so
+    // reading it yields zero rather than whatever the last caller left - which
+    // turns a silent dependence on buffer contents into an obvious one
+    List<symmTensor> incoming;
+
+    if (law.requiresIncomingStress())
+    {
+        // Copied in the law's own loop order, so that it indexes the same way
+        // as the stress it is writing
+        incoming.setSize(stressView.size());
+
+        forAll(stressView, i)
+        {
+            incoming[i] = stressView[i];
+        }
+
+        inputs.setIncomingStress(incoming);
+    }
+
+    forAll(stressView, i)
+    {
+        stressView[i] = symmTensor::zero;
+    }
+
     if
     (
         scalarTangentStore
@@ -152,6 +179,10 @@ void evaluateResponse
 
         law.evaluate(kin, inputs, state, response);
     }
+
+    // The standing stress lived only for this evaluation, so it is detached
+    // before the next law is reached
+    inputs.clearIncomingStress();
 }
 
 

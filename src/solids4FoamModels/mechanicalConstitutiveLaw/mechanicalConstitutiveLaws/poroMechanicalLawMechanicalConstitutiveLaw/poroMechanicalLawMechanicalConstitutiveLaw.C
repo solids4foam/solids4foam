@@ -153,14 +153,19 @@ void Foam::poroMechanicalLawMechanicalConstitutiveLaw::evaluate
     const scalar b = b_.value();
     const scalar p0 = p0_.value();
 
-    // Seed the effective stress from the total stress the caller is holding,
-    // once per point. This is what makes the sub-law's first evaluation see an
+    // Seed the effective stress from the total stress standing at these
+    // points, once per point. That stress arrives as a declared input rather
+    // than being read back out of the response: a law that reads its own
+    // output buffer depends on whatever the caller last left there, which is
+    // not something that can be restarted, perturbed for a tangent, or
+    // reasoned about. This is what makes the sub-law's first evaluation see an
     // effective stress rather than whatever happened to be in the field
     forAll(sigma, i)
     {
         if (seeded[i] < 0.5)
         {
-            sigmaEff[i] = sigma[i] + (b*(p[i] + p0))*symmTensor(I);
+            sigmaEff[i] =
+                inputs.incomingStress()[i] + (b*(p[i] + p0))*symmTensor(I);
             seeded[i] = 1.0;
         }
     }
@@ -175,6 +180,13 @@ void Foam::poroMechanicalLawMechanicalConstitutiveLaw::evaluate
     {
         sigma[i] = sigmaEff[i];
     }
+
+    // What the sub-law finds already standing at these points is the
+    // effective stress, not the total. It used to learn that by reading the
+    // caller's storage, which this law had just written sigmaEff into; now it
+    // is said explicitly, because a law reading its own output buffer is the
+    // thing being removed
+    inputs.setIncomingStress(sigmaEff);
 
     subLawPtr_->evaluate(kin, inputs, state.child(subStateName_), response);
 

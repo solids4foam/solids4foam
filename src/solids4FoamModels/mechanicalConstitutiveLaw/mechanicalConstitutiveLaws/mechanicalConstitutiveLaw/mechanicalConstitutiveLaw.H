@@ -272,6 +272,19 @@ public:
             return *this;
         }
 
+        //- Does this law need the stress already standing at its points?
+        //
+        //  Almost none do. A law that says yes is handed it through the
+        //  inputs; a law that says no cannot reach it at all, because the
+        //  response it writes into is cleared before it runs. That is the
+        //  point: reading an output buffer makes a law's answer depend on what
+        //  the caller last left there, which is not something the framework
+        //  can restart, perturb for a tangent, or reason about
+        virtual bool requiresIncomingStress() const
+        {
+            return false;
+        }
+
         //- Can this law separate its isochoric and volumetric responses?
         //
         //  A mixed displacement-pressure formulation replaces the volumetric

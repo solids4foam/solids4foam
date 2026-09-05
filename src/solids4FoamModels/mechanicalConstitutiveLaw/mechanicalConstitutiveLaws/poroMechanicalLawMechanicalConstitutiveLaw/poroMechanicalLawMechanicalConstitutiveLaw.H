@@ -137,6 +137,13 @@ public:
         }
 
         //- The pore pressure, gathered on every evaluation
+        //- This law seeds its effective stress from the stress already
+        //  standing at its points, so it needs that as an input
+        virtual bool requiresIncomingStress() const override
+        {
+            return true;
+        }
+
         virtual wordList requiredScalarInputs() const override
         {
             return wordList(1, pName_);

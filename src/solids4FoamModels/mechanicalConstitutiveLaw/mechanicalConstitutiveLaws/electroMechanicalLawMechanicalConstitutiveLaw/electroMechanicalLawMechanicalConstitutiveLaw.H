@@ -168,6 +168,14 @@ public:
         //  channel. It stays with the stress, which is the part a solved
         //  pressure must not overwrite, so this composite adds nothing to the
         //  volumetric response and its answer is the passive law's
+        //- A composite needs whatever its sub-law needs. Without this the
+        //  manager never attaches the standing stress for, say, a poro law
+        //  nested inside this one, and that law fails at the point of use
+        virtual bool requiresIncomingStress() const override
+        {
+            return subLawPtr_->requiresIncomingStress();
+        }
+
         virtual bool providesVolumetricSplit() const override
         {
             return subLawPtr_->providesVolumetricSplit();

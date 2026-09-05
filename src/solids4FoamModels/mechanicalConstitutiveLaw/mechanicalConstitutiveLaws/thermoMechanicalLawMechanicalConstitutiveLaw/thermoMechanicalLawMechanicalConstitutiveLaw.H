@@ -131,6 +131,14 @@ public:
             return subLawPtr_->kappa();
         }
 
+        //- A composite needs whatever its sub-law needs. Without this the
+        //  manager never attaches the standing stress for, say, a poro law
+        //  nested inside this one, and that law fails at the point of use
+        virtual bool requiresIncomingStress() const override
+        {
+            return subLawPtr_->requiresIncomingStress();
+        }
+
         //- The temperature, gathered by the manager on every evaluation
         virtual wordList requiredScalarInputs() const override
         {
