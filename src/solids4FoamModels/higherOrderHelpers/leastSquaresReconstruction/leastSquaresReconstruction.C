@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "leastSquaresReconstruction.H"
+#include "compatibilityFunctions.H"
 #include "mapPolyMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -34,12 +35,16 @@ defineTypeNameAndDebug(leastSquaresReconstruction, 0);
 
 leastSquaresReconstruction::leastSquaresReconstruction(const fvMesh& mesh)
 :
+#ifdef FOAMEXTEND
+    MeshObject<fvMesh, leastSquaresReconstruction>(mesh),
+#else
     MeshObject
     <
         fvMesh,
         UpdateableMeshObject,
         leastSquaresReconstruction
     >(mesh),
+#endif
     displacementSchemePtr_(),
     pressureSchemePtr_()
 {}
@@ -92,7 +97,7 @@ const leastSquaresScheme& leastSquaresReconstruction::scheme
         );
     }
 
-    return **schemePtr;
+    return autoPtrRef(*schemePtr);
 }
 
 
@@ -110,7 +115,11 @@ void leastSquaresReconstruction::clear() const
 }
 
 
+#ifdef FOAMEXTEND
+bool leastSquaresReconstruction::movePoints() const
+#else
 bool leastSquaresReconstruction::movePoints()
+#endif
 {
     clear();
 
@@ -118,10 +127,18 @@ bool leastSquaresReconstruction::movePoints()
 }
 
 
+#ifdef FOAMEXTEND
+bool leastSquaresReconstruction::updateMesh(const mapPolyMesh&) const
+#else
 void leastSquaresReconstruction::updateMesh(const mapPolyMesh&)
+#endif
 {
     displacementSchemePtr_.clear();
     pressureSchemePtr_.clear();
+
+#ifdef FOAMEXTEND
+    return true;
+#endif
 }
 
 
