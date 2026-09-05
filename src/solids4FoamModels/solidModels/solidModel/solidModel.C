@@ -1141,6 +1141,7 @@ Foam::solidModel::solidModel
     ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
+    restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
@@ -1263,21 +1264,66 @@ Foam::solidModel::solidModel
         // running happily to the end. That is too quiet a way to be wrong to
         // leave unsaid, and too common a mistake to assume: the flag defaults
         // to off and most cases never set it
-        if (runTime.timeIndex() > 0)
+        if (runTime.startTimeIndex() > 0)
         {
-            WarningInFunction
-                << "Continuing from time " << runTime.timeName()
-                << " but 'restart' is not set in "
-                << solidModelDict().dictName() << '.' << nl
-                << "    The fields a consistent restart needs - the "
-                << "displacement increment, the old-time displacement "
-                << "gradient and the point fields - were not written." << nl
-                << "    A material written in total strain will not notice. "
-                << "An incremental one will continue from the wrong strain "
-                << "and give a wrong answer without stopping." << nl
-                << "    Set 'restart yes;' and run from the start if the "
-                << "answer has to be right."
-                << endl;
+            // Continuing from a time that is not the first, without having
+            // been asked to write what a restart needs. Whether that matters
+            // depends on the material: one written in total strain will not
+            // notice, while an incremental one reads the whole run's strain as
+            // a single step's and is wrong by tens of percent while running
+            // happily to the end.
+            //
+            // The fields may still be there, if the run that produced this
+            // time directory did ask for them, so look before complaining
+            IOobject gradD0IO
+            (
+                "grad(D)_0",
+                runTime.timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            );
+
+#ifdef OPENFOAM_NOT_EXTEND
+            const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+            const bool present = gradD0IO.headerOk();
+#endif
+
+            if (!present && !restartSpecified_)
+            {
+                // The case has not said anything about restarting, and is
+                // restarting. Refuse: this is a mistake far more often than it
+                // is a choice, and the cost of being wrong is a plausible
+                // answer rather than an obvious failure
+                FatalErrorInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << ", but the fields a consistent restart needs were "
+                    << "never written." << nl << nl
+                    << "    The displacement increment, the old-time "
+                    << "displacement gradient and the point fields are only "
+                    << "written when the case asks for them." << nl << nl
+                    << "    Either" << nl << nl
+                    << "        restart yes;" << nl << nl
+                    << "    in the solidModel's coefficients dictionary, and "
+                    << "run again from the start; or" << nl << nl
+                    << "        restart no;" << nl << nl
+                    << "    to say that this material does not need them and "
+                    << "continue. A material written in total strain does not; "
+                    << "an incremental one does, and without them reads the "
+                    << "whole run's strain as one step's."
+                    << exit(FatalError);
+            }
+            else if (!present)
+            {
+                // Said 'no' deliberately. Their call, said once
+                WarningInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << " with 'restart no': the displacement increment and "
+                    << "old-time gradient were not written, so an incremental "
+                    << "material would continue from the wrong strain."
+                    << endl;
+            }
         }
 
         D_.oldTime().writeOpt() = IOobject::NO_WRITE;

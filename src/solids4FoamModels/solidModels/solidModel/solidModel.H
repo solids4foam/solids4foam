@@ -287,6 +287,13 @@ private:
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
+        //- Whether the case said anything about restart at all.
+        //  Read before restart_ below, because looking that up adds it to the
+        //  dictionary and the silence cannot be recovered afterwards. Silence
+        //  and a deliberate 'no' are different things: one is a user who has
+        //  not thought about restarting, and the other is one who has
+        const Switch restartSpecified_;
+
         //- Optional: restart flag
         //  Write out all fields required for a consistent restart
         const Switch restart_;
