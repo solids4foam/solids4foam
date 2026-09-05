@@ -180,6 +180,29 @@ public:
             const word& name
         );
 
+        //- Read the state this run wrote itself, if it is there
+        template<class Type>
+        static bool readOwnFile
+        (
+            const fvMesh& mesh,
+            const word& name,
+            const stateParts& parts,
+            const word& variableName
+        );
+
+        //- Fill this run's values from the undecomposed case, for a case that
+        //  was run in serial and then decomposed
+        template<class Type>
+        static bool distributeFromSerial
+        (
+            const fvMesh& mesh,
+            const word& name,
+            const word& entityName,
+            const labelUList& entities,
+            const stateParts& parts,
+            const word& variableName
+        );
+
         //- Fill this run's values from the files each processor wrote, for a
         //  case that was run in parallel and reconstructed
         template<class Type>

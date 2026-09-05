@@ -139,6 +139,233 @@ bool Foam::mechanicalConstitutiveLawStateIO::readListFrom
 //  overwrite the history being restored. Visualisation is a separate,
 //  write-only projection; this path is for restarting, and it is exact
 template<class Type>
+bool Foam::mechanicalConstitutiveLawStateIO::readOwnFile
+(
+    const fvMesh& mesh,
+    const word& name,
+    const stateParts& parts,
+    const word& variableName
+)
+{
+    IOobject readIO
+    (
+        name,
+        mesh.time().timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    );
+
+    // Both OpenFOAM.com and OpenFOAM.org spell this typeHeaderOk; foam-extend
+    // has only the untyped headerOk
+#ifdef OPENFOAM_NOT_EXTEND
+    bool present = readIO.typeHeaderOk<IOField<Type>>(false);
+#else
+    bool present = readIO.headerOk();
+#endif
+
+    // Every rank takes the same route. They should agree already - the state
+    // is written by all of them at once - but if a directory were half deleted
+    // they would not, and then some would go on to read the processor
+    // addressing while others did not. Under a collated file handler that read
+    // can be collective, and a collective some ranks skip is a hang rather
+    // than an error
+    if (Pstream::parRun())
+    {
+        bool allPresent = present;
+        reduce(allPresent, andOp<bool>());
+        present = allPresent;
+    }
+
+    if (!present)
+    {
+        return false;
+    }
+
+    const IOField<Type> stored(readIO);
+
+    // The header says which decomposition wrote this. A file of the right
+    // length from the wrong one reads as plausible values in the wrong cells,
+    // which is the single way this could still be silently wrong
+    const string expected(decompositionIdentity(mesh));
+
+    if (stored.note() != expected)
+    {
+        FatalErrorInFunction
+            << "Constitutive state field '" << name << "' was written for "
+            << "a different decomposition." << nl
+            << "  the file says: " << stored.note() << nl
+            << "  this run is:   " << expected << nl
+            << "This usually means processor directories were left behind "
+            << "by an earlier decomposePar. The values would be the right "
+            << "count and the wrong cells, so they are refused rather "
+            << "than read."
+            << exit(FatalError);
+    }
+
+    if (stored.size() != totalSize(parts))
+    {
+        FatalErrorInFunction
+            << "Constitutive state field '" << name << "' holds "
+            << stored.size() << " values but this run needs "
+            << totalSize(parts) << '.'
+            << exit(FatalError);
+    }
+
+    // Scatter back in write order, and set the old time to match. The old time
+    // is deliberately not written: at the instant a time directory is written
+    // the two are equal, so copying is what reading a second file would have
+    // produced anyway
+    label k = 0;
+
+    forAll(parts, partI)
+    {
+        Field<Type>& f =
+            stateFieldAccess<Type>::ref(*parts[partI], variableName);
+        Field<Type>& f0 =
+            stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+
+        forAll(f, i)
+        {
+            f[i] = stored[k];
+            f0[i] = stored[k];
+            k++;
+        }
+    }
+
+    return true;
+}
+
+
+template<class Type>
+bool Foam::mechanicalConstitutiveLawStateIO::distributeFromSerial
+(
+    const fvMesh& mesh,
+    const word& name,
+    const word& entityName,
+    const labelUList& entities,
+    const stateParts& parts,
+    const word& variableName
+)
+{
+    // Nothing in this processor's directory. decomposePar does not
+    // copy these files, so a case decomposed after it was run has its
+    // state sitting in the undecomposed directory - which is readable,
+    // and which decomposePar's own addressing says how to distribute
+    Field<Type> serialData;
+    labelList serialEntities;
+    string dataNote, entityNote;
+
+    bool haveData =
+        readSerialList(mesh, name, serialData, dataNote);
+    bool haveEntities =
+        readSerialList(mesh, entityName, serialEntities, entityNote);
+
+    // Agreed across the ranks before any of them acts on it. These are
+    // direct reads that do not go through the file handler, so a rank
+    // can fail one on its own; the next step reads the processor
+    // addressing through the registry, which the handler may make
+    // collective, and a collective some ranks skip is a hang
+    bool haveBoth = haveData && haveEntities;
+    reduce(haveBoth, andOp<bool>());
+    haveData = haveBoth;
+    haveEntities = haveBoth;
+
+    if (haveData && haveEntities)
+    {
+        // The values and the locations they belong to are two files,
+        // and they only mean anything as a pair. One of them left over
+        // from an earlier run would map real values through the wrong
+        // locations, which is a silent wrong answer rather than a
+        // missing one, so they have to agree on which run wrote them
+        if (dataNote != entityNote)
+        {
+            FatalErrorInFunction
+                << "The serial state '" << name << "' and the "
+                << "integration point locations it is read with were "
+                << "written by different runs." << nl
+                << "  the state says:     " << dataNote << nl
+                << "  the locations say:  " << entityNote << nl
+                << "They are written together and are only meaningful "
+                << "together."
+                << exit(FatalError);
+        }
+
+        if (serialData.size() != serialEntities.size())
+        {
+            FatalErrorInFunction
+                << "The serial state '" << name << "' holds "
+                << serialData.size() << " values and "
+                << serialEntities.size() << " integration point "
+                << "locations. They are written together and must "
+                << "agree." << exit(FatalError);
+        }
+
+        // The pair is self-consistent; that does not make it this
+        // case. decomposePar preserves cells, so the undecomposed cell
+        // count the file records has to be the number of cells this
+        // run holds between them - a collective, but one every rank
+        // reaches, having just agreed to be here
+        const label serialNCells = serialCellCount(dataNote);
+
+        if (serialNCells < 0)
+        {
+            FatalErrorInFunction
+                << "The state file '" << name << "' in the "
+                << "undecomposed case was not written by a serial run."
+                << nl << "  its header says: " << dataNote
+                << exit(FatalError);
+        }
+
+        const label totalCells =
+            returnReduce(mesh.nCells(), sumOp<label>());
+
+        if (serialNCells != totalCells)
+        {
+            FatalErrorInFunction
+                << "The state in the undecomposed case was written for "
+                << "a mesh of " << serialNCells << " cells, and this "
+                << "run holds " << totalCells << " between its ranks."
+                << nl
+                << "It is not the same mesh, so its integration point "
+                << "locations mean nothing here."
+                << exit(FatalError);
+        }
+
+        const labelList positions
+        (
+            serialPositions(mesh, entities, serialEntities, name)
+        );
+
+        label k = 0;
+        forAll(parts, partI)
+        {
+            Field<Type>& f =
+                stateFieldAccess<Type>::ref(*parts[partI], variableName);
+            Field<Type>& f0 =
+                stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+
+            forAll(f, i)
+            {
+                f[i] = serialData[positions[k]];
+                f0[i] = serialData[positions[k]];
+                k++;
+            }
+        }
+
+        Info<< "    Mapped '" << name << "' from the undecomposed case"
+            << endl;
+
+        return true;
+    }
+
+    return false;
+}
+
+
+
+
+template<class Type>
 void Foam::mechanicalConstitutiveLawStateIO::restartField
 (
     const fvMesh& mesh,
@@ -151,183 +378,34 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
     PtrList<regIOobject>& proxies
 )
 {
-    const label n = totalSize(parts);
-
     if (isRestart)
     {
-        IOobject readIO
-        (
-            name,
-            mesh.time().timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        );
+        // Three places the state can be, in the order they are worth looking.
+        // Its own directory, if this run has the shape the last one had; the
+        // undecomposed case, if this run is decomposed and that one was not;
+        // the processor directories, if the reverse. Each returns whether it
+        // found it, and none of them guesses
+        bool restored = readOwnFile<Type>(mesh, name, parts, variableName);
 
-        // A run continuing from a time directory has history to restore. If it
-        // is not there then the state would silently fall back to its cold
-        // start defaults and the run would continue a different calculation
-        // that looks plausible, which is the failure this whole path exists to
-        // remove. Refuse instead
-        // Both OpenFOAM.com and OpenFOAM.org spell this typeHeaderOk;
-        // foam-extend has only the untyped headerOk
-#ifdef OPENFOAM_NOT_EXTEND
-        bool present = readIO.typeHeaderOk<IOField<Type>>(false);
-#else
-        bool present = readIO.headerOk();
-#endif
-
-        // Set when the values came from the undecomposed case rather than
-        // from this processor's own directory
-        bool mapped = false;
-
-        // Every rank takes the same route. They should agree already - the
-        // state is written by all of them at once - but if a directory were
-        // half deleted they would not, and then some would go on to read the
-        // processor addressing while others did not. Under a collated file
-        // handler that read can be collective, and a collective some ranks
-        // skip is a hang rather than an error
-        if (Pstream::parRun())
+        if (!restored)
         {
-            bool allPresent = present;
-            reduce(allPresent, andOp<bool>());
-            present = allPresent;
-        }
-
-        if (!present && Pstream::parRun())
-        {
-            // Nothing in this processor's directory. decomposePar does not
-            // copy these files, so a case decomposed after it was run has its
-            // state sitting in the undecomposed directory - which is readable,
-            // and which decomposePar's own addressing says how to distribute
-            Field<Type> serialData;
-            labelList serialEntities;
-            string dataNote, entityNote;
-
-            bool haveData =
-                readSerialList(mesh, name, serialData, dataNote);
-            bool haveEntities =
-                readSerialList(mesh, entityName, serialEntities, entityNote);
-
-            // Agreed across the ranks before any of them acts on it. These are
-            // direct reads that do not go through the file handler, so a rank
-            // can fail one on its own; the next step reads the processor
-            // addressing through the registry, which the handler may make
-            // collective, and a collective some ranks skip is a hang
-            bool haveBoth = haveData && haveEntities;
-            reduce(haveBoth, andOp<bool>());
-            haveData = haveBoth;
-            haveEntities = haveBoth;
-
-            if (haveData && haveEntities)
+            if (Pstream::parRun())
             {
-                // The values and the locations they belong to are two files,
-                // and they only mean anything as a pair. One of them left over
-                // from an earlier run would map real values through the wrong
-                // locations, which is a silent wrong answer rather than a
-                // missing one, so they have to agree on which run wrote them
-                if (dataNote != entityNote)
-                {
-                    FatalErrorInFunction
-                        << "The serial state '" << name << "' and the "
-                        << "integration point locations it is read with were "
-                        << "written by different runs." << nl
-                        << "  the state says:     " << dataNote << nl
-                        << "  the locations say:  " << entityNote << nl
-                        << "They are written together and are only meaningful "
-                        << "together."
-                        << exit(FatalError);
-                }
-
-                if (serialData.size() != serialEntities.size())
-                {
-                    FatalErrorInFunction
-                        << "The serial state '" << name << "' holds "
-                        << serialData.size() << " values and "
-                        << serialEntities.size() << " integration point "
-                        << "locations. They are written together and must "
-                        << "agree." << exit(FatalError);
-                }
-
-                // The pair is self-consistent; that does not make it this
-                // case. decomposePar preserves cells, so the undecomposed cell
-                // count the file records has to be the number of cells this
-                // run holds between them - a collective, but one every rank
-                // reaches, having just agreed to be here
-                const label serialNCells = serialCellCount(dataNote);
-
-                if (serialNCells < 0)
-                {
-                    FatalErrorInFunction
-                        << "The state file '" << name << "' in the "
-                        << "undecomposed case was not written by a serial run."
-                        << nl << "  its header says: " << dataNote
-                        << exit(FatalError);
-                }
-
-                const label totalCells =
-                    returnReduce(mesh.nCells(), sumOp<label>());
-
-                if (serialNCells != totalCells)
-                {
-                    FatalErrorInFunction
-                        << "The state in the undecomposed case was written for "
-                        << "a mesh of " << serialNCells << " cells, and this "
-                        << "run holds " << totalCells << " between its ranks."
-                        << nl
-                        << "It is not the same mesh, so its integration point "
-                        << "locations mean nothing here."
-                        << exit(FatalError);
-                }
-
-                const labelList positions
-                (
-                    serialPositions(mesh, entities, serialEntities, name)
-                );
-
-                label k = 0;
-                forAll(parts, partI)
-                {
-                    Field<Type>& f =
-                        stateFieldAccess<Type>::ref(*parts[partI], variableName);
-                    Field<Type>& f0 =
-                        stateFieldAccess<Type>::ref0(*parts[partI], variableName);
-
-                    forAll(f, i)
-                    {
-                        f[i] = serialData[positions[k]];
-                        f0[i] = serialData[positions[k]];
-                        k++;
-                    }
-                }
-
-                Info<< "    Mapped '" << name << "' from the undecomposed case"
-                    << endl;
-
-                present = true;
-                mapped = true;
-            }
-        }
-
-        if (!present && !Pstream::parRun())
-        {
-            // Nothing here, and this is not a decomposed run. The case may
-            // have been run in parallel and reconstructed, which leaves the
-            // state where the processors wrote it
-            if
-            (
-                gatherFromProcessors<Type>
+                restored = distributeFromSerial<Type>
                 (
                     mesh, name, entityName, entities, parts, variableName
-                )
-            )
+                );
+            }
+            else
             {
-                present = true;
-                mapped = true;
+                restored = gatherFromProcessors<Type>
+                (
+                    mesh, name, entityName, entities, parts, variableName
+                );
             }
         }
 
-        if (!present)
+        if (!restored)
         {
             FatalErrorInFunction
                 << "Restarting from time " << mesh.time().timeName()
@@ -337,65 +415,10 @@ void Foam::mechanicalConstitutiveLawStateIO::restartField
                 << nl
                 << "It is written from the first time step of a run that uses "
                 << "the mechanical constitutive law framework. A case "
-                << "decomposed after it was run keeps its state in the "
-                << "undecomposed directory, and that is looked for too, so "
-                << "this means neither is present."
+                << "decomposed or reconstructed after it was run keeps its "
+                << "state where the run that produced it left it, and both "
+                << "are looked for, so this means none of them is present."
                 << exit(FatalError);
-        }
-
-        if (!mapped)
-        {
-        const IOField<Type> stored(readIO);
-
-        // The header says which decomposition wrote this. A file of the right
-        // length from the wrong one reads as plausible values in the wrong
-        // cells, which is the single way this could still be silently wrong
-        const string expected
-        (
-            decompositionIdentity(mesh)
-        );
-
-        if (stored.note() != expected)
-        {
-            FatalErrorInFunction
-                << "Constitutive state field '" << name << "' was written for "
-                << "a different decomposition." << nl
-                << "  the file says: " << stored.note() << nl
-                << "  this run is:   " << expected << nl
-                << "This usually means processor directories were left behind "
-                << "by an earlier decomposePar. The values would be the right "
-                << "count and the wrong cells, so they are refused rather "
-                << "than read."
-                << exit(FatalError);
-        }
-
-        if (stored.size() != n)
-        {
-            FatalErrorInFunction
-                << "Constitutive state field '" << name << "' holds "
-                << stored.size() << " values but this run needs " << n << '.'
-                << exit(FatalError);
-        }
-
-        // Scatter back in write order, and set the old time to match. The old
-        // time is deliberately not written: at the instant a time directory is
-        // written the two are equal, so copying is what reading a second file
-        // would have produced anyway
-        label k = 0;
-        forAll(parts, partI)
-        {
-            Field<Type>& f =
-                stateFieldAccess<Type>::ref(*parts[partI], variableName);
-            Field<Type>& f0 =
-                stateFieldAccess<Type>::ref0(*parts[partI], variableName);
-
-            forAll(f, i)
-            {
-                f[i] = stored[k];
-                f0[i] = stored[k];
-                k++;
-            }
-        }
         }
     }
 
