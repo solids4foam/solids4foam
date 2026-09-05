@@ -1613,3 +1613,130 @@ its restart, so this has a worked example to follow rather than a blank page.
 
 None of these is a question the tests can answer, which is why they are written
 down here rather than guessed at.
+
+## 18. The mixed displacement-pressure formulation
+
+A review, not a decision taken. Nothing here is implemented.
+
+### 18.1 What the legacy laws do
+
+`neoHookeanElastic` and `GuccioneElastic` each read a `pressureDisplacement`
+switch from their own dictionary, and when it is set three things change:
+
+  - the deviatoric stress is computed by a different formula,
+    `mu*(b - I)/J` rather than `mu*dev(bEbar)`;
+  - the volumetric part stops being computed and is taken from the solid
+    model's pressure instead, reached through
+    `mesh().lookupObject<volScalarField>("p")`;
+  - `impK()` returns `mu` instead of `(4/3)mu + K`.
+
+So a material dictionary entry changes which equations the law solves, where
+half its answer comes from, and what tangent the solver is given.
+
+### 18.2 Two things wrong with that, before any framework question
+
+**The switch is in the wrong place.** Whether the pressure is a solved variable
+is a property of the solution algorithm, not of the material. Steel does not
+become a different steel because the solver chose a mixed formulation. In a two
+material case the switch has to be set identically in every material's
+sub-dictionary, and setting it in one and not the other is accepted silently
+and produces a mixture of formulations.
+
+**The stress conventions differ between the two branches, and only work by
+accident of both being written the same way.** The ordinary path ends with
+
+    sigma = (1/J)*(sigmaHyd*I + s)
+
+so `s` is a Kirchhoff-like quantity and the division by `J` is what makes the
+result Cauchy. The mixed path ends with
+
+    sigma = -coeff*p*I + s        with s = mu*(b - I)/J
+
+where `s` already carries its own `1/J` and the pressure is applied with none.
+Both are Cauchy, so both are right, but nothing says so and the two lines do
+not look like they agree.
+
+That matters because of where the error would land. A law returning a Kirchhoff
+deviatoric stress to a solid model subtracting a Cauchy pressure is wrong by a
+factor of `J` - and a mixed formulation is used precisely when the material is
+nearly incompressible, which is precisely when `J` is nearly one. The mistake
+would be small, smooth, and entirely plausible. It is the kind that survives a
+review and a plot.
+
+### 18.2a Two things a fact-check changed
+
+Both were wrong in the first draft of this section and both matter.
+
+**What the mixed branch returns is not deviatoric.** `mu*(b - I)/J` has a
+non-zero trace at finite deformation, whatever the comment above it says. So
+"the law returns the deviatoric stress and the solid model adds the pressure"
+is not a description of what happens now, and if it were implemented literally
+the trace of that term would be counted twice - once by the law and once by the
+pressure. Whatever the law returns has to be named precisely, and if the name is
+"deviatoric" then something has to make it true.
+
+**The pressure is not the pressure.** `p` is the mixed solver's variable, and it
+enters the stress as `-pressureDisplacementCoeff*p*I`, where the coefficient
+defaults to `3*nu/(1 + nu)` computed from the material's own `K` and `mu`. It is
+one only in the incompressible limit; for `nu = 0.3` it is about 0.69.
+
+That second fact is the awkward one for assembling at the solid model, because
+the coefficient belongs to the material and the solid model would have to be
+told it per material. It does not sink the idea, but it does mean the solid
+model cannot simply subtract `p*I`.
+
+### 18.3 What is proposed
+
+There are two shapes this can take, and 18.2a is what decides between them.
+
+**A: the solid model assembles.**
+
+    sigma = s_dev(from the law) - alpha*p*I
+
+The law returns a genuinely deviatoric stress; the solid model owns the
+pressure and the assembly. It has to be given `alpha` per material, since that
+is material data, which means the manager supplying a per-material coefficient
+alongside the stress - new machinery, though small.
+
+**B: the pressure is a coupling input and the law assembles.**
+
+The solid model publishes `p`, the manager hands it to each law as a live
+coupling input, and the law returns the whole stress as it does now. This is
+exactly what `poroMechanicalLaw` already does with pore pressure, so it needs no
+new machinery at all, and `alpha` stays where it is computed from `K` and `mu`.
+
+B is the smaller change and fits what exists. A is the cleaner separation - the
+material stops knowing that a pressure equation is being solved - but it needs
+the coefficient plumbed and the deviatoric part made genuinely deviatoric.
+
+I lean to B for the port, and A as the eventual shape, on the grounds that B
+can be built and tested now while A needs the trace question in 18.2a settled
+first. Either way the following three hold.
+
+**The request comes from the solid model, not the material.** A solid model
+running a mixed formulation says so once, and the manager asks every law for a
+deviatoric stress. No material dictionary mentions it, and a case cannot be
+half mixed.
+
+**The convention is stated and not implied.** The framework's stress is Cauchy.
+That is true today and written down in one comment; it should be part of the
+law interface's contract, so that "deviatoric stress" has one meaning and a law
+returning a Kirchhoff quantity is a violation rather than a coincidence waiting
+to matter.
+
+**The tangent follows the same split.** A mixed solid model needs `mu`, not
+`(4/3)mu + K`, and that is the deviatoric tangent of the same request - not a
+second switch to be set consistently with the first.
+
+### 18.4 Why this has to be settled before the fibre port
+
+`GuccioneElastic` carries the branch, and `problem3` ships both formulations.
+Porting it as it stands means carrying `pressureDisplacement` into the
+framework and giving the first ported law a material-dictionary entry that
+selects a solution algorithm - which is the thing this framework exists to stop
+laws doing.
+
+The alternative is to port the displacement formulation only, leave the mixed
+one to the legacy law until the above is built, and have `problem3`'s
+regression test cover the displacement arm alone for now. That is the smaller
+step and it does not foreclose anything.
