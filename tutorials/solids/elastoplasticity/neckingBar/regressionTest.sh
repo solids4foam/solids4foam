@@ -205,8 +205,26 @@ run_restart_test() {
         return 1
     fi
 
-    if awk '/^\(/ {gsub(/[()]/,""); if (($1-1)^2 > 1e-20) {found=1; exit}} END {exit !found}' \
-        "${bfile}"
+    # Read as six numbers per point and compared against the identity, rather
+    # than by looking at one component of lines that start with a bracket: a
+    # uniform list is written as N{(...)} with no such line, and a deformation
+    # that left xx at one while moving another component would have been missed
+    if python3 - "${bfile}" << 'PYEOF'
+import re, sys
+s = open(sys.argv[1]).read()
+body = s.split('* * * * *')[-1]
+nums = [float(x) for x in re.findall(r'-?\d+\.?\d*(?:[eE][-+]?\d+)?', body)]
+# drop a leading count if present
+if nums and float(nums[0]).is_integer() and len(nums) % 6 == 1:
+    nums = nums[1:]
+identity = (1.0, 0.0, 0.0, 1.0, 0.0, 1.0)
+moved = any(
+    abs(nums[i + c] - identity[c]) > 1e-10
+    for i in range(0, len(nums) - 5, 6)
+    for c in range(6)
+)
+sys.exit(0 if moved else 1)
+PYEOF
     then
         echo "PASS: finite-strain restart: bEbar carries deformation"
     else

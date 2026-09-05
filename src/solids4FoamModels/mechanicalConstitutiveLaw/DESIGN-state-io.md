@@ -1521,3 +1521,43 @@ Going from N processors straight to M, without reconstructing on the way, is
 not supported and says so: the decomposed branch looks for an undecomposed
 state that a never-serial case never wrote. Reconstruct and decompose again,
 both of which now work.
+
+## 16. What every law that keeps history is now tested for
+
+Five laws keep history, and each has a restart test:
+
+| law                            | case            | what it exercises            |
+|--------------------------------|-----------------|------------------------------|
+| linearElasticMisesPlastic      | perforatedPlate | plastic history; both        |
+|                                |                 | decomposition directions     |
+| linearElasticMohrCoulombPlastic| stripFooting    | history inside a composite   |
+| poroMechanicalLaw              | stripFooting    | the composite's own history  |
+| viscousHookeanElastic          | viscoTube       | a variable number of fields  |
+| neoHookeanElasticMisesPlastic  | neckingBar      | finite strain, updated       |
+|                                |                 | Lagrangian                   |
+
+Every one of them checks three things and not one: that the state is written,
+that deleting it stops the run, and that the answer comes back. The middle
+check is what the other two rest on. Twice now a restart test has passed while
+proving nothing - once because the material had not yielded before the restart
+point, once because a viscous arm count was read with a glob that matched
+nothing - and in both cases the assertion caught it rather than the comparison.
+
+### 16.1 Two things these tests found that were not the framework's
+
+`viscoTube` could not restart at all. `normalDisplacement` read its value under
+that keyword and wrote it as `normalDisp`, so every time directory it produced
+was one the case could not be started from: the field came back and the
+condition it carried did not. Fixed, because a restart test cannot run on a
+case that cannot restart - and then `normalDisplacementZeroShear` turned out to
+have the identical defect, which a review found and this work's own search for
+other readers had missed by filtering out the very keyword it should have been
+looking for.
+
+`neckingBar` does not reproduce an uninterrupted run exactly across a restart,
+with or without the framework. On the axial force the legacy model differs by
+1.3e-5 and the framework by 4.3e-6, and a force component that is otherwise
+zero returns as -0.041 in both. That is the updated Lagrangian solid model's,
+not this framework's, and it is left alone and written down rather than tuned
+around. It is why that arm holds to 1e-4 where the small-strain arms hold to
+1e-6, and why a negative control carries the weight there instead.
