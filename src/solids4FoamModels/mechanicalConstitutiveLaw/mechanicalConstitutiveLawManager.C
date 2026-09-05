@@ -3655,6 +3655,21 @@ void Foam::mechanicalConstitutiveLawManager::checkVolumetricSplitSupported
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::allLawsProvideVolumetricSplit
+() const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesVolumetricSplit())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
 (
     const volTensorField& F,

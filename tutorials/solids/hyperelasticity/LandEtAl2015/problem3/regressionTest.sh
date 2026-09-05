@@ -157,6 +157,28 @@ run_framework_comparison() {
     fi
     echo "PASS: each arm took the path it was set up for"
 
+    # The framework laws' own checks, which include the one that matters for
+    # this case: a law declaring it can separate its isochoric stress from its
+    # volumetric response is taken at its word by any mixed formulation, and
+    # this is what tests the word. GuccioneElastic declares it
+    if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        if ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 ); then
+            if grep -q "isochoric stress ignores a superposed dilation" \
+                "${d}/log.unit"
+            then
+                echo "PASS: $(grep -c 'PASS:' "${d}/log.unit") law checks," \
+                     "including the isochoric split"
+            else
+                echo "FAIL: the isochoric split was not checked here"
+                return 1
+            fi
+        else
+            echo "FAIL: the law checks did not pass"
+            grep -m2 "FAIL:" "${d}/log.unit" || true
+            return 1
+        fi
+    fi
+
     local b
     b=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
 
