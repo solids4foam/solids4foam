@@ -127,7 +127,10 @@ class mechanicalConstitutiveLawResponse
         //  Biot term lives entirely in the trace and survives for the same
         //  reason. Both belong with the stress, and a pressure that replaced
         //  the whole trace would destroy them.
-        UIndirectList<scalar>* volumetricPtr_;
+        //  Defaulted here as well as in every constructor: left uninitialised
+        //  by one of them it reads as a non-null pointer, wantsVolumetricSplit
+        //  answers yes, and the first law that believes it writes through it
+        UIndirectList<scalar>* volumetricPtr_ = nullptr;
 
 
     // Private Member Functions
@@ -198,7 +201,8 @@ public:
             stress_(stress),
             scalarTangentPtr_(nullptr),
             fourthOrderTangentPtr_(&fourthOrderTangent),
-            tangentRequest_(tangentReq)
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
         {
             if
             (

@@ -411,6 +411,140 @@ int main(int argc, char *argv[])
 
     const scalar dt = runTime.deltaTValue();
 
+    // ------------------------------------------------------------------
+    Info<< nl << "A declared isochoric split is an honest one" << endl;
+
+    // A law that declares it can separate its isochoric stress from its
+    // volumetric response is taken at its word by every mixed formulation, and
+    // the declaration is a claim the framework cannot otherwise check: a law
+    // written on the full deformation can return dev() of its total stress and
+    // look exactly like one written on Cbar.
+    //
+    // What tells them apart is a superposed dilation. Under F -> c*F the
+    // isochoric deformation Fbar = J^(-1/3)*F is unchanged, so a law whose
+    // energy depends on Fbar alone returns the same Kirchhoff isochoric
+    // stress, J*sigma_iso. A law whose energy sees the whole deformation does
+    // not. The Cauchy stress itself does change, by 1/c^3, because it is per
+    // current area - so the comparison is on J*sigma_iso and not on sigma_iso
+    if (manager.allLawsProvideVolumetricSplit())
+    {
+        const label n = mesh.nCells();
+
+        volTensorField Fd
+        (
+            IOobject("Fd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedTensor("I", dimless, I)
+        );
+        volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
+        volScalarField Jd
+        (
+            IOobject("Jd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedScalar("one", dimless, 1.0)
+        );
+        volScalarField Jd0(Jd);
+
+        volSymmTensorField isoStress
+        (
+            IOobject("isoStress", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+        );
+        volScalarField volResponse
+        (
+            IOobject("volResponse", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        // A deformation with shear and stretch, so the isochoric part is not
+        // trivially zero, and the same one scaled by a pure dilation
+        const tensor gradDbase
+        (
+            0.03, 0.012, 0.0,
+            0.008, -0.02, 0.005,
+            0.0, 0.004, 0.017
+        );
+
+        symmTensorField kirchhoffA(n, symmTensor::zero);
+        symmTensorField kirchhoffB(n, symmTensor::zero);
+
+        for (label pass = 0; pass < 2; ++pass)
+        {
+            const scalar c = (pass == 0 ? 1.0 : 1.19);
+
+            forAll(Fd, cellI)
+            {
+                const tensor Fi = c*(I + gradDbase);
+                Foam::primitiveFieldRef(Fd)[cellI] = Fi;
+                Foam::primitiveFieldRef(Finvd)[cellI] = inv(Fi);
+                Foam::primitiveFieldRef(Jd)[cellI] = det(Fi);
+            }
+
+            manager.updateStressFiniteStrainSplit
+            (
+                Fd, Fd0, Finvd, Finvd0, Jd, Jd0, dt, isoStress, volResponse
+            );
+
+            forAll(isoStress, cellI)
+            {
+                const symmTensor tau =
+                    Foam::primitiveField(Jd)[cellI]
+                   *Foam::primitiveField(isoStress)[cellI];
+
+                if (pass == 0)
+                {
+                    kirchhoffA[cellI] = tau;
+                }
+                else
+                {
+                    kirchhoffB[cellI] = tau;
+                }
+            }
+        }
+
+        scalar maxDiff = 0.0;
+        scalar scale = SMALL;
+
+        forAll(kirchhoffA, cellI)
+        {
+            maxDiff = max(maxDiff, mag(kirchhoffA[cellI] - kirchhoffB[cellI]));
+            scale = max(scale, mag(kirchhoffA[cellI]));
+        }
+
+        const scalar relDiff = maxDiff/scale;
+
+        report
+        (
+            "the isochoric stress ignores a superposed dilation",
+            relDiff < 1e-10,
+            "relative change " + Foam::name(relDiff)
+        );
+
+        // And the isochoric stress must be trace-free for a law with no
+        // spherical stress of its own. A law that adds one - an active tension
+        // or a pore pressure - legitimately fails this, so it is only checked
+        // where the total and the split differ by the volumetric response
+        // alone
+        scalar maxTrace = 0.0;
+
+        forAll(isoStress, cellI)
+        {
+            maxTrace =
+                max(maxTrace, mag(tr(Foam::primitiveField(isoStress)[cellI])));
+        }
+
+        Info<< "        (max |tr(isochoric stress)| = " << maxTrace
+            << ", non-zero only if a law adds a spherical stress of its own)"
+            << endl;
+    }
+    else
+    {
+        Info<< "    SKIP: no law here separates its isochoric and volumetric"
+            << " responses" << endl;
+    }
+
     // ---------------------------------------------------------------------
     // Finite-strain finite-difference tangent
     //
@@ -808,139 +942,6 @@ int main(int argc, char *argv[])
         FatalError.dontThrowExceptions();
     }
 
-    // ------------------------------------------------------------------
-    Info<< nl << "11. A declared isochoric split is an honest one" << endl;
-
-    // A law that declares it can separate its isochoric stress from its
-    // volumetric response is taken at its word by every mixed formulation, and
-    // the declaration is a claim the framework cannot otherwise check: a law
-    // written on the full deformation can return dev() of its total stress and
-    // look exactly like one written on Cbar.
-    //
-    // What tells them apart is a superposed dilation. Under F -> c*F the
-    // isochoric deformation Fbar = J^(-1/3)*F is unchanged, so a law whose
-    // energy depends on Fbar alone returns the same Kirchhoff isochoric
-    // stress, J*sigma_iso. A law whose energy sees the whole deformation does
-    // not. The Cauchy stress itself does change, by 1/c^3, because it is per
-    // current area - so the comparison is on J*sigma_iso and not on sigma_iso
-    if (manager.allLawsProvideVolumetricSplit())
-    {
-        const label n = mesh.nCells();
-
-        volTensorField Fd
-        (
-            IOobject("Fd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
-            mesh,
-            dimensionedTensor("I", dimless, I)
-        );
-        volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
-        volScalarField Jd
-        (
-            IOobject("Jd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
-            mesh,
-            dimensionedScalar("one", dimless, 1.0)
-        );
-        volScalarField Jd0(Jd);
-
-        volSymmTensorField isoStress
-        (
-            IOobject("isoStress", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
-            mesh,
-            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
-        );
-        volScalarField volResponse
-        (
-            IOobject("volResponse", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
-            mesh,
-            dimensionedScalar("0", dimPressure, 0.0)
-        );
-
-        // A deformation with shear and stretch, so the isochoric part is not
-        // trivially zero, and the same one scaled by a pure dilation
-        const tensor gradDbase
-        (
-            0.03, 0.012, 0.0,
-            0.008, -0.02, 0.005,
-            0.0, 0.004, 0.017
-        );
-
-        symmTensorField kirchhoffA(n, symmTensor::zero);
-        symmTensorField kirchhoffB(n, symmTensor::zero);
-
-        for (label pass = 0; pass < 2; ++pass)
-        {
-            const scalar c = (pass == 0 ? 1.0 : 1.19);
-
-            forAll(Fd, cellI)
-            {
-                const tensor Fi = c*(I + gradDbase);
-                Foam::primitiveFieldRef(Fd)[cellI] = Fi;
-                Foam::primitiveFieldRef(Finvd)[cellI] = inv(Fi);
-                Foam::primitiveFieldRef(Jd)[cellI] = det(Fi);
-            }
-
-            manager.updateStressFiniteStrainSplit
-            (
-                Fd, Fd0, Finvd, Finvd0, Jd, Jd0, dt, isoStress, volResponse
-            );
-
-            forAll(isoStress, cellI)
-            {
-                const symmTensor tau =
-                    Foam::primitiveField(Jd)[cellI]
-                   *Foam::primitiveField(isoStress)[cellI];
-
-                if (pass == 0)
-                {
-                    kirchhoffA[cellI] = tau;
-                }
-                else
-                {
-                    kirchhoffB[cellI] = tau;
-                }
-            }
-        }
-
-        scalar maxDiff = 0.0;
-        scalar scale = SMALL;
-
-        forAll(kirchhoffA, cellI)
-        {
-            maxDiff = max(maxDiff, mag(kirchhoffA[cellI] - kirchhoffB[cellI]));
-            scale = max(scale, mag(kirchhoffA[cellI]));
-        }
-
-        const scalar relDiff = maxDiff/scale;
-
-        report
-        (
-            "the isochoric stress ignores a superposed dilation",
-            relDiff < 1e-10,
-            "relative change " + Foam::name(relDiff)
-        );
-
-        // And the isochoric stress must be trace-free for a law with no
-        // spherical stress of its own. A law that adds one - an active tension
-        // or a pore pressure - legitimately fails this, so it is only checked
-        // where the total and the split differ by the volumetric response
-        // alone
-        scalar maxTrace = 0.0;
-
-        forAll(isoStress, cellI)
-        {
-            maxTrace =
-                max(maxTrace, mag(tr(Foam::primitiveField(isoStress)[cellI])));
-        }
-
-        Info<< "        (max |tr(isochoric stress)| = " << maxTrace
-            << ", non-zero only if a law adds a spherical stress of its own)"
-            << endl;
-    }
-    else
-    {
-        Info<< "    SKIP: no law here separates its isochoric and volumetric"
-            << " responses" << endl;
-    }
 
     if (!smallStrainCapable)
     {

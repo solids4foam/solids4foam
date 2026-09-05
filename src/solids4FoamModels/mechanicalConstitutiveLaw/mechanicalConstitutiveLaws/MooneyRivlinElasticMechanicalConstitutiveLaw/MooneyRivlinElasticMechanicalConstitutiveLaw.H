@@ -180,6 +180,13 @@ public:
 
     // Edit
 
+        //- This law is written as an isochoric stress plus a volumetric
+        //  penalty, so it can hand the two back separately
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
         //- Small-strain constitutive evaluation
         virtual void evaluate
         (

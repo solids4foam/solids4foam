@@ -149,6 +149,12 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
     const scalar c10 = c10_.value();
     const scalar c01 = c01_.value();
     const scalar c11 = c11_.value();
@@ -195,6 +201,16 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
         const scalar p = 0.5*kappaVal*(sqr(Ji) - 1.0);
 
         sigma[i] = (1.0/Ji)*(dev(s) + p*I);
+
+        // A caller that asked for the two apart gets them apart. dev(s)/J is
+        // trace free, so for this law the split and a deviatoric projection of
+        // the total agree; that is not true of every law, which is why the
+        // caller asks rather than projecting
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = p/Ji;
+            sigma[i] = (1.0/Ji)*dev(s);
+        }
     }
 
     // Scalar tangent: only if explicitly requested
