@@ -804,7 +804,8 @@ public:
             UList<scalar>* scalarTangentPtr,
             UList<mat66>* fourthOrderTangentPtr,
             const tangentRequest tangentReq,
-            const bool preserveState
+            const bool preserveState,
+            UList<scalar>* volumetricPtr = nullptr
         );
 
         //- Check that the requested tangent can be provided at the integration
@@ -1198,6 +1199,30 @@ public:
             List<scalar>* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
+
+        //- Evaluate finite-strain stress, asking each law for its isochoric
+        //  stress and volumetric response separately.
+        //
+        //  For a mixed displacement-pressure formulation, which replaces the
+        //  volumetric part with a solved pressure and so needs the two apart.
+        //  A law that cannot separate them is refused by name: taking the
+        //  trace of a total stress cannot tell a volumetric response the
+        //  formulation may replace from one it must keep
+        void updateStressFiniteStrainSplit
+        (
+            const volTensorField& F,
+            const volTensorField& F0,
+            const volTensorField& Finv,
+            const volTensorField& Finv0,
+            const volScalarField& J,
+            const volScalarField& J0,
+            const scalar dt,
+            volSymmTensorField& isochoricStress,
+            volScalarField& volumetricResponse
+        );
+
+        //- Refuse if any law cannot separate the two, naming it
+        void checkVolumetricSplitSupported(const word& context) const;
 
         //- Let each material law know the end of each time step has been
         //  reached.

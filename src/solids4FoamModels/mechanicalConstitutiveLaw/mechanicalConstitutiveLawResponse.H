@@ -102,14 +102,31 @@ class mechanicalConstitutiveLawResponse
 
         //- Optional volumetric response view, one value per integration point.
         //
-        //  When this is present the law is being asked to split its answer: to
-        //  put the isochoric Cauchy stress in stress_ and the volumetric
-        //  response, dU/dJ, here. A mixed displacement-pressure formulation
-        //  needs the two apart, and it needs them from the law: taking the
-        //  trace of a total stress cannot tell a volumetric response the
-        //  formulation may replace from one it must keep, because by then
-        //  there is only a number. poroMechanicalLaw's pore pressure is the
-        //  case that makes that concrete
+        //  When this is present the law is being asked to split its answer.
+        //  The split is not deviatoric against spherical, and mistaking it for
+        //  that is the whole difficulty:
+        //
+        //    volumetric_  is dU/dJ, the volumetric response of the law's own
+        //                 energy, and only that. A mixed formulation replaces
+        //                 it with a solved pressure, so what goes here has to
+        //                 be a function of J that a pressure equation can be
+        //                 built from.
+        //
+        //    stress_      is everything the pressure must not overwrite. For a
+        //                 law split on Cbar that is exactly the isochoric
+        //                 stress, and trace-free. For a law that adds a
+        //                 spherical stress of its own it is not trace-free,
+        //                 and that is correct rather than a violation.
+        //
+        //  Two contributions make the second line concrete, and neither is
+        //  dU/dJ. An active tension along a fibre, Ta*f0(x)f0 pushed forward,
+        //  has mean stress Ta*|F.f0|^2/(3*J): a fibre carrying tension along
+        //  itself and nothing across it genuinely has a non-zero mean, which
+        //  is a property of that stress state rather than an artefact to
+        //  project away, and it is not a function of J. poroMechanicalLaw's
+        //  Biot term lives entirely in the trace and survives for the same
+        //  reason. Both belong with the stress, and a pressure that replaced
+        //  the whole trace would destroy them.
         UIndirectList<scalar>* volumetricPtr_;
 
 

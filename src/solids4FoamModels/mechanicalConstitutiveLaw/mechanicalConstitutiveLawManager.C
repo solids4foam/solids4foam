@@ -80,7 +80,8 @@ void evaluateResponse
     const labelUList& tangentIDs,
     const UList<scalar>* scalarTangentStore,
     const UList<mat66>* fourthOrderTangentStore,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const UList<scalar>* volumetricStore = nullptr
 )
 {
     if
@@ -95,6 +96,18 @@ void evaluateResponse
         (
             stressView, tangentView, tangentReq
         );
+
+        if (volumetricStore)
+        {
+            // Declared inside, so that the view outlives the evaluation using
+            // it and is not built when it is not wanted
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
 
         law.evaluate(kin, inputs, state, response);
     }
@@ -111,11 +124,31 @@ void evaluateResponse
             stressView, tangentView, tangentReq
         );
 
+        if (volumetricStore)
+        {
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
+
         law.evaluate(kin, inputs, state, response);
     }
     else
     {
         mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+
+        if (volumetricStore)
+        {
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
 
         law.evaluate(kin, inputs, state, response);
     }
@@ -2296,7 +2329,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
     const tangentRequest tangentReq,
-    const bool preserveState
+    const bool preserveState,
+    UList<scalar>* volumetricPtr
 )
 {
     const word context = "updateStressFiniteStrain (flat list)";
@@ -2420,7 +2454,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
             ipIDs,
             scalarTangentPtr,
             fourthOrderTangentPtr,
-            tangentReq
+            tangentReq,
+            volumetricPtr
         );
     }
 
@@ -3587,6 +3622,77 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         scalarTangentPtr,
         nullptr,
         tangentReq
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::checkVolumetricSplitSupported
+(
+    const word& context
+) const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesVolumetricSplit())
+        {
+            FatalErrorInFunction
+                << context << " asked for the isochoric stress and the "
+                << "volumetric response separately, and the law for material '"
+                << lawNames_[lawI] << "', of type " << laws_[lawI].type()
+                << ", cannot supply them." << nl << nl
+                << "    A mixed displacement-pressure formulation replaces the "
+                << "volumetric part of the stress with a solved pressure, so "
+                << "it needs the law's isochoric stress rather than the "
+                << "trace-free part of its total. The two are the same only "
+                << "when the law's energy is written on an isochoric measure; "
+                << "otherwise they differ, and the difference is a different "
+                << "material rather than a visible error." << nl << nl
+                << "    Either use a law that separates them, or solve this "
+                << "case in the displacement formulation."
+                << exit(FatalError);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
+(
+    const volTensorField& F,
+    const volTensorField& F0,
+    const volTensorField& Finv,
+    const volTensorField& Finv0,
+    const volScalarField& J,
+    const volScalarField& J0,
+    const scalar dt,
+    volSymmTensorField& isochoricStress,
+    volScalarField& volumetricResponse
+)
+{
+    checkMeshConsistency(mesh_, F.mesh(), F.name());
+
+    checkVolumetricSplitSupported("updateStressFiniteStrainSplit");
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    scalarField& volumetric = Foam::primitiveFieldRef(volumetricResponse);
+
+    evaluateFiniteStrain
+    (
+        topo,
+        Foam::primitiveField(F),
+        Foam::primitiveField(F0),
+        Foam::primitiveField(Finv),
+        Foam::primitiveField(Finv0),
+        Foam::primitiveField(J),
+        Foam::primitiveField(J0),
+        dt,
+        Foam::primitiveFieldRef(isochoricStress),
+        nullptr,
+        nullptr,
+        tangentRequest::none,
+        false,          // this is the real evaluation, not a query
+        &volumetric
     );
 }
 

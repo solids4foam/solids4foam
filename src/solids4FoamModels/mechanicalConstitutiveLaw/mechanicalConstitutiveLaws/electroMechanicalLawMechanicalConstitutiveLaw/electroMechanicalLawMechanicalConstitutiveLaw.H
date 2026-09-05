@@ -132,6 +132,21 @@ public:
             return subLawPtr_->kappa();
         }
 
+        //- Whether the two parts can be separated, which is the passive
+        //  law's answer.
+        //
+        //  This composite adds an active tension whose mean stress is not
+        //  zero, and that mean is physical: a fibre carrying tension along
+        //  itself and nothing across it has one. It is also not a function of
+        //  J, so it is not dU/dJ and does not belong in the volumetric
+        //  channel. It stays with the stress, which is the part a solved
+        //  pressure must not overwrite, so this composite adds nothing to the
+        //  volumetric response and its answer is the passive law's
+        virtual bool providesVolumetricSplit() const override
+        {
+            return subLawPtr_->providesVolumetricSplit();
+        }
+
         //- The child state the passive law owns
         virtual wordList childStateNames() const override
         {

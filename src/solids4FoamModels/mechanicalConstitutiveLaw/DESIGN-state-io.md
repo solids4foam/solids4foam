@@ -2058,3 +2058,59 @@ The interface cost is smaller still. A law needs no second `evaluate()`: the
 formulation flag is injected into its dictionary exactly as `planeStress` is,
 read once into a member, and the single existing evaluation branches on it -
 which is the pattern a law already uses for plane stress.
+
+## 21. Where the active tension's mean stress goes
+
+The two reviews disagreed on this, and the disagreement is worth keeping,
+because resolving it produced a better answer than either.
+
+The question: `electroMechanicalLaw` adds `symm(F & (Ta*f0f0) & F^T)/J`, whose
+trace is `Ta*|F.f0|^2/J` and is not zero. Under a mixed formulation, where does
+that mean stress go?
+
+**One review said: leave it whole with the stress.** For exact
+incompressibility the multiplier absorbs whatever is routed where, so it makes
+no difference; and for the penalty case, splitting it and putting `tr/3` into
+the volumetric channel would put something that is *not a function of J* into a
+channel a pressure equation is entitled to read as `dU/dJ`. That is the quiet
+mis-typing this design keeps trying to avoid.
+
+**The other said: that is wrong for the penalty case.** The mean of an active
+fibre stress is physical - a fibre carrying tension along itself and nothing
+across it has a non-zero mean, and that is a property of the stress state, not
+an artefact. Replacing the active term by its deviator is not a rearrangement
+but a different law: it adds transverse compressive stresses that the model
+does not have. So the spherical active contribution has to survive, separately
+from the passive `U(J)`.
+
+They are both right, and they converge once the channels are named for what
+they are rather than for deviatoric against spherical:
+
+  - `volumetric` is `dU/dJ` and only that. It is what the pressure replaces, so
+    it must be a function of `J` a pressure equation can be built from.
+  - `stress` is everything the pressure must not overwrite. For a law split on
+    `Cbar` that is exactly the isochoric stress and is trace-free. For a law
+    adding a spherical stress of its own it is not trace-free, and that is
+    correct.
+
+Then the active tension stays with the stress - which is what the code already
+did - and it survives the replacement, which is what the second review
+required. Nothing needs a third channel and nothing needs projecting.
+
+The same reading settles `poroMechanicalLaw`, whose Biot term lives entirely in
+the trace: it belongs with the stress and survives, for the same reason and
+without a special case. 20.4 asked how a composite could honestly declare the
+split; the answer is that it delegates to its sub-law, because what it adds is
+never `dU/dJ`.
+
+A composite that did add genuine volumetric content of its own - a swelling
+term with its own `U_swell(J)` - would have to route that piece into the
+volumetric channel and its declaration would then be a real conjunction. None
+exists here, and the delegation says so rather than assuming it.
+
+### 21.1 The thing to be careful about
+
+The stress channel is no longer "the deviatoric part", and calling it that in
+conversation will eventually mislead someone. It is "the part the pressure does
+not touch". The two coincide for a simple split law, which is exactly why the
+distinction is easy to lose.
