@@ -565,7 +565,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 {
     mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
 
-    const wordList names(laws_[lawI].requiredScalarInputs());
+    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
 
     if (names.empty())
     {
@@ -643,7 +643,7 @@ Foam::mechanicalConstitutiveLawManager::inputsWithoutCoupling
 {
     forAll(laws_, lawI)
     {
-        const wordList names(laws_[lawI].requiredScalarInputs());
+        const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
 
         if (!names.empty())
         {
@@ -674,7 +674,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
 {
     mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
 
-    const wordList names(laws_[lawI].requiredScalarInputs());
+    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
 
     if (names.empty())
     {
@@ -3715,6 +3715,60 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
 }
 
 
+Foam::wordList
+Foam::mechanicalConstitutiveLawManager::requiredScalarInputsRecursive
+(
+    const mechanicalConstitutiveLaw& law
+) const
+{
+    // Deduplicated, because the same field may be wanted at more than one
+    // level of the tree and is gathered once
+    HashSet<word> names(law.requiredScalarInputs());
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        const wordList childInputs
+        (
+            requiredScalarInputsRecursive(law.childLaw(childNames[i]))
+        );
+
+        forAll(childInputs, j)
+        {
+            names.insert(childInputs[j]);
+        }
+    }
+
+    return names.toc();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
+(
+    const mechanicalConstitutiveLaw& law,
+    mechanicalConstitutiveLawState& state,
+    const scalar time,
+    const label timeIndex
+) const
+{
+    law.endTimeStep(state, time, timeIndex);
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        endTimeStepLaw
+        (
+            law.childLaw(childNames[i]),
+            state.child(childNames[i]),
+            time,
+            timeIndex
+        );
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 {
     const scalar time = mesh_.time().value();
@@ -3730,8 +3784,25 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 
         forAll(laws_, lawI)
         {
-            // Call endTimeStep with each topo type for each law
-            laws_[lawI].endTimeStep(tp.states_[lawI], time, timeIndex);
+            // The law and every law below it. A composite's sub-law keeps its
+            // own history and was never told the step had ended
+            endTimeStepLaw(laws_[lawI], tp.states_[lawI], time, timeIndex);
+
+            // The boundary states are deliberately NOT visited, though they
+            // are equally unvisited today and it would be natural to add them
+            // here.
+            //
+            // endTimeStep is where a law reports what it did, and two of them
+            // reduce across ranks to do it. The number of patches is not the
+            // same on every rank - processor patches exist only where the mesh
+            // was cut - so calling it once per patch would call a collective a
+            // different number of times on different ranks, and the run would
+            // hang rather than fail.
+            //
+            // Visiting them needs the reductions moved out of the laws first,
+            // so that the manager performs one collective per step over
+            // contributions the laws merely return. Until then the diagnostics
+            // omit boundary points, which is a smaller wrong than a deadlock
         }
     }
 }

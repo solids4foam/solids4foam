@@ -407,6 +407,27 @@ class mechanicalConstitutiveLawManager
             const word& path
         ) const;
 
+        //- The coupling inputs this law needs, including every law below it.
+        //
+        //  A composite's sub-law reads its own inputs, and asking only the top
+        //  of the tree loses them. State already recurses this way; this makes
+        //  dependencies match, so that nesting one composite inside another
+        //  gathers what the inner law asked for instead of silently omitting
+        //  it
+        wordList requiredScalarInputsRecursive
+        (
+            const mechanicalConstitutiveLaw& law
+        ) const;
+
+        //- Tell a law and every law below it that the step has ended
+        void endTimeStepLaw
+        (
+            const mechanicalConstitutiveLaw& law,
+            mechanicalConstitutiveLawState& state,
+            const scalar time,
+            const label timeIndex
+        ) const;
+
         //- True if this law, or any law below it, keeps history
         bool declaresPersistentState
         (
