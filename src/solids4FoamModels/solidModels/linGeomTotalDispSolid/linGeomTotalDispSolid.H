@@ -102,6 +102,17 @@ class linGeomTotalDispSolid
         //  Used in the pressure Jacobian when solvePressure is enabled
         const volScalarField rKappa_;
 
+        //- The laws' own volumetric response, K*tr(epsilon)
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value is what checkVolumetricClosure compares against the
+        //  relation the pressure equation was written for
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
+        //- Set once that comparison has been made
+        mutable bool volumetricClosureChecked_ = false;
+
         //- Acceleration field
         //  Only used by the explicit solution scheme
         volVectorField A_;
@@ -139,6 +150,16 @@ class linGeomTotalDispSolid
         //- Update the cell-centred stress, from the framework when
         //  useMechanicalConstitutiveLawManager_ is set and from the legacy
         //  mechanicalModel otherwise
+        //- Somewhere for the laws to put their volumetric response
+        volScalarField& volumetricResponse() const;
+
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
+        //- Replace the volumetric part of the stress with the solved pressure
+        void replaceVolumetricStress(const volScalarField& p);
+
         void correctStress();
 
         //- Return the material tangent at mesh faces, indexed by face, for

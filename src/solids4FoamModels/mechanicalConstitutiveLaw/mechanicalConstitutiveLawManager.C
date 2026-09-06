@@ -2135,7 +2135,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     UList<mat66>* fourthOrderTangentPtr,
     const tangentRequest tangentReq,
     const bool preserveState,
-    const bool coldState
+    const bool coldState,
+    UList<scalar>* volumetricPtr
 )
 {
     const word context = "updateStressSmallStrain (flat list)";
@@ -2268,7 +2269,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             ipIDs,
             scalarTangentPtr,
             fourthOrderTangentPtr,
-            tangentReq
+            tangentReq,
+            volumetricPtr
         );
     }
 
@@ -2847,7 +2849,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
 )
 {
     // Check gradD is defined on the correct mesh
@@ -2862,6 +2865,19 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         );
     }
 
+    if (volumetricResponsePtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_,
+            volumetricResponsePtr->mesh(),
+            volumetricResponsePtr->name()
+        );
+
+        // Checked where the request is made, as on the finite-strain path
+        checkVolumetricSplitSupported("updateStressSmallStrain");
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -2872,7 +2888,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    updateStressSmallStrain
+    evaluateSmallStrain
     (
         topo,
         Foam::primitiveField(gradD),
@@ -2881,7 +2897,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         Foam::primitiveFieldRef(stress),
         scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
         nullptr,
-        tangentReq
+        tangentReq,
+        false,          // commit the constitutive state
+        false,          // not a cold-state query
+        volumetricResponsePtr
+      ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
+      : nullptr
     );
 
     topologyEntry& tp = topology(topo);
@@ -2968,6 +2989,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
+    }
+
+    // The volumetric response is corrected with the others. Coupled patches
+    // are skipped when it is evaluated, exactly as the stress is, so without
+    // this its processor values are whatever the field was constructed with.
+    // Only the internal field is read today, which makes that harmless rather
+    // than correct - and harmless-for-now is a poor thing to leave for
+    // whoever next reads a boundary value
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
     }
 }
 
@@ -3634,6 +3666,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
+
+    // The volumetric response is corrected with the others. Coupled patches
+    // are skipped when it is evaluated, exactly as the stress is, so without
+    // this its processor values are whatever the field was constructed with.
+    // Only the internal field is read today, which makes that harmless rather
+    // than correct - and harmless-for-now is a poor thing to leave for
+    // whoever next reads a boundary value
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
 }
 
 
@@ -3741,6 +3784,32 @@ allLawsHaveDilationInvariantIsochoricStress() const
     }
 
     return true;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrainSplit
+(
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    volSymmTensorField& deviatoricStress,
+    volScalarField& volumetricResponse
+)
+{
+    // The small-strain twin of updateStressFiniteStrainSplit, and the same
+    // path as the ordinary update with somewhere to put the volumetric
+    // response, so boundary faces are covered rather than left holding a
+    // total stress while the interior holds a deviatoric one
+    updateStressSmallStrain
+    (
+        gradD,
+        gradD0,
+        dt,
+        deviatoricStress,
+        nullptr,
+        tangentRequest::none,
+        &volumetricResponse
+    );
 }
 
 

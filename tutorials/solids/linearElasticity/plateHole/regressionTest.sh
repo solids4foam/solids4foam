@@ -47,6 +47,7 @@ APPROACHES=(
     segregatedManager
     petscSnes
     petscSnesPressure
+    petscSnesPressureManager
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrder-movingLeastSquares-parallel

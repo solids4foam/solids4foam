@@ -61,6 +61,123 @@ void linGeomTotalDispSolid::predict()
 
     // Calculate the stress using run-time selectable mechanical law
     correctStress();
+
+    // On the split path correctStress() leaves the stress without its
+    // volumetric part, so without this the predictor would hand the solver a
+    // stress that is missing a term rather than an approximate total one.
+    // The legacy path is left alone deliberately: it already has a total
+    // stress here, and this is only a starting point for the solve
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        replaceVolumetricStress(p());
+    }
+}
+
+
+volScalarField& linGeomTotalDispSolid::volumetricResponse() const
+{
+    if (volumetricResponsePtr_.empty())
+    {
+        volumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "volumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return volumetricResponsePtr_();
+}
+
+
+void linGeomTotalDispSolid::checkVolumetricClosure() const
+{
+    if (volumetricClosureChecked_)
+    {
+        return;
+    }
+
+    // The pressure equation hard-codes its half of the model: its residual is
+    // -p/K + stabilisation - tr(gradD), so it assumes the volumetric response
+    // is K*tr(epsilon) and takes K from the mechanical model.
+    // providesVolumetricSplit() promises that a law can separate its
+    // volumetric response, not that the response is this one. Since the law
+    // returns it, the assumption is checked rather than trusted
+    const volScalarField assumed(tr(gradD())/rKappa_);
+
+    const volScalarField& actual = volumetricResponse();
+
+    // Guarded on the size of the comparison rather than on a threshold in
+    // the kinematics. Both responses are zero in an undeformed material, and
+    // for a nearly incompressible case they stay small for ever - plateHole's
+    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
+    // either fires on nothing or never fires at all. What matters is only
+    // that there is something to compare: once either response is non-zero
+    // the comparison is relative and means something at any magnitude
+    const scalar scale =
+        max
+        (
+            gMax(mag(Foam::primitiveField(assumed))),
+            gMax(mag(Foam::primitiveField(actual)))
+        );
+
+    if (scale <= 0)
+    {
+        return;
+    }
+
+    volumetricClosureChecked_ = true;
+
+    const scalar err =
+        gMax
+        (
+            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
+        );
+
+    if (err > 1e-8*scale)
+    {
+        FatalErrorInFunction
+            << "The law's volumetric response is not the one the pressure "
+            << "equation was written for." << nl << nl
+            << "    The pressure equation assumes a volumetric response of "
+            << "K*tr(epsilon), with K taken from the mechanical model. The "
+            << "law returned something else: the largest difference is "
+            << err << " against a response of order " << scale << '.' << nl << nl
+            << "    Separating the volumetric response is not enough on its "
+            << "own - the pressure equation has to be solving for the same "
+            << "thing, or the two halves describe different materials."
+            << exit(FatalError);
+    }
+}
+
+
+void linGeomTotalDispSolid::replaceVolumetricStress(const volScalarField& p)
+{
+    // On the framework path correctStress() has already left the stress
+    // without its volumetric response, so the solved pressure is simply
+    // added. The legacy path has to project, because a law that cannot
+    // separate the two gives nothing else to work with - and the projection
+    // is right only where what remains is trace free.
+    //
+    // In one place because there is more than one caller
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        sigma() = sigma() - p*I;
+    }
+    else
+    {
+        sigma() = dev(sigma()) - p*I;
+    }
 }
 
 
@@ -621,6 +738,29 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
     // old-time state, so the gradient is passed explicitly rather than looked
     // up from the registry, and the old-time state is rolled over by the
     // manager rather than by a separate updateTotalFields() call
+    if (solvePressure())
+    {
+        // The pressure is an independent unknown and stands in for the law's
+        // volumetric response, so the law is asked for its stress without
+        // that response rather than being asked for the total and having a
+        // deviatoric projection taken of it. The two are the same only where
+        // what remains is trace free, which an isotropic law satisfies and an
+        // anisotropic one does not. Laws that cannot separate them are
+        // refused by name
+        mechanicalManager().updateStressSmallStrainSplit
+        (
+            gradD(),
+            gradD().oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            volumetricResponse()
+        );
+
+        checkVolumetricClosure();
+
+        return;
+    }
+
     mechanicalManager().updateStressSmallStrain
     (
         gradD(),
@@ -1182,7 +1322,7 @@ label linGeomTotalDispSolid::formResidual
         p.correctBoundaryConditions();
 
         // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        replaceVolumetricStress(p);
 
         // Calculate the pressure gradient (we should store this!)
         const volVectorField gradp(fvc::grad(p));

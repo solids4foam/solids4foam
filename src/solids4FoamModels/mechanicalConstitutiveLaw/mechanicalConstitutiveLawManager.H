@@ -807,7 +807,8 @@ public:
             UList<mat66>* fourthOrderTangentPtr,
             const tangentRequest tangentReq,
             const bool preserveState,
-            const bool coldState = false
+            const bool coldState = false,
+            UList<scalar>* volumetricPtr = nullptr
         );
 
         //- Finite-strain counterpart of evaluateSmallStrain
@@ -1081,7 +1082,8 @@ public:
             const scalar dt,
             volSymmTensorField& stress,
             volScalarField* scalarTangentPtr = nullptr,
-            const tangentRequest tangentReq = tangentRequest::none
+            const tangentRequest tangentReq = tangentRequest::none,
+            volScalarField* volumetricResponsePtr = nullptr
         );
 
         //- Update the engineering (small-strain) stress field stored on mesh
@@ -1220,6 +1222,24 @@ public:
             CompactListList<symmTensor>& stress,
             List<scalar>* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
+        );
+
+        //- Evaluate small-strain stress, asking each law for its deviatoric
+        //  stress and volumetric response separately.
+        //
+        //  The small-strain volumetric response is K*tr(epsilon), which is
+        //  what the mixed formulation's pressure equation solves for, exactly
+        //  as dU/dJ is at finite strain. A law that cannot separate the two is
+        //  refused by name: the trace of a total stress is K*tr(epsilon) only
+        //  for an isotropic law, and for an anisotropic one the difference is
+        //  a different material rather than a visible error
+        void updateStressSmallStrainSplit
+        (
+            const volTensorField& gradD,
+            const volTensorField& gradD0,
+            const scalar dt,
+            volSymmTensorField& deviatoricStress,
+            volScalarField& volumetricResponse
         );
 
         //- Evaluate finite-strain stress, asking each law for its isochoric

@@ -207,10 +207,30 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     const mechanicalConstitutiveLawState& cState = state;
     const Field<symmTensor>& sigma0 = cState.symmTensorField0("sigma0");
 
+    // Whether the caller wants the deviatoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
+    const scalar kappaVal = kappa_.value();
+
     forAll(sigma, i)
     {
         sigma[i] =
             muVal*twoSymm(gradD[i]) + lambdaVal*tr(gradD[i])*I + sigma0[i];
+
+        // A caller that asked for the two apart gets them apart. The
+        // volumetric response is K*tr(epsilon), which is what the pressure
+        // equation solves for; everything else stays, including the initial
+        // stress, whose own spherical part is not the pressure's to replace
+        if (wantsSplit)
+        {
+            const scalar trEps = tr(gradD[i]);
+
+            (*volumetricPtr)[i] = kappaVal*trEps;
+            sigma[i] -= (kappaVal*trEps)*symmTensor(I);
+        }
     }
 
     // Scalar tangent: only if explicitly requested

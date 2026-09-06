@@ -311,6 +311,15 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     Field<scalar>& sigmaY = state.scalarField("sigmaY");
 
     // Optional scalar tangent
+    // Whether the caller wants the deviatoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does.
+    // The return mapping only ever touches the deviatoric trial stress, and
+    // J2 plasticity has no plastic volume change, so the volumetric term is
+    // already a separate quantity here rather than something to extract
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
     const bool needScalarTan = response.wantsScalarTangent();
     UIndirectList<scalar>* scalarTanPtr = nullptr;
     if (needScalarTan)
@@ -359,6 +368,12 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
             // Full stress = hydro + deviatoric
             sigma[i] = sTrial + kappa*trEps*I;
+
+            if (wantsSplit)
+            {
+                (*volumetricPtr)[i] = kappa*trEps;
+                sigma[i] = sTrial;
+            }
 
             if (needScalarTan)
             {
@@ -476,6 +491,12 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         // Total small strain stress
         sigma[i] = s + kappa*trEps*I;
+
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = kappa*trEps;
+            sigma[i] = s;
+        }
 
         if (needScalarTan)
         {

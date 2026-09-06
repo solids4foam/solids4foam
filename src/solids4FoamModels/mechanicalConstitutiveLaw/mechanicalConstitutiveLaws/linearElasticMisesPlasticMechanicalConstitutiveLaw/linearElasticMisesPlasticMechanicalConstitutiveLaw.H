@@ -192,6 +192,14 @@ public:
             mechanicalConstitutiveLawStateSpec& spec
         ) const override;
 
+        //- The stress is a deviatoric part plus K*tr(epsilon), and the
+        //  return mapping only touches the deviatoric part, so the two can be
+        //  handed back separately
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
         //- Small-strain constitutive evaluation
         virtual void evaluate
         (

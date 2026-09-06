@@ -411,6 +411,41 @@ int main(int argc, char *argv[])
 
     const scalar dt = runTime.deltaTValue();
 
+    // Some laws are finite strain only, and asking them for a small-strain
+    // stress is a fatal error rather than a wrong answer. Ask once, quietly,
+    // so that the checks which need small strain can be skipped for such a law
+    // instead of taking the whole run down with them
+    bool smallStrainCapable = true;
+    {
+        symmTensorField probeSigma(mesh.nCells(), symmTensor::zero);
+
+        FatalError.throwExceptions();
+
+        try
+        {
+            manager.updateStressSmallStrain
+            (
+                manager.topologyFor
+                (
+                    cellCentredIntegrationPointTopology::typeName
+                ),
+                Foam::primitiveField(gradD),
+                Foam::primitiveField(gradD0),
+                dt,
+                probeSigma,
+                nullptr,
+                nullptr,
+                tangentRequest::none
+            );
+        }
+        catch (const Foam::error&)
+        {
+            smallStrainCapable = false;
+        }
+
+        FatalError.dontThrowExceptions();
+    }
+
     // ------------------------------------------------------------------
     Info<< nl << "A declared isochoric split is an honest one" << endl;
 
@@ -426,9 +461,14 @@ int main(int argc, char *argv[])
     // stress, J*sigma_iso. A law whose energy sees the whole deformation does
     // not. The Cauchy stress itself does change, by 1/c^3, because it is per
     // current area - so the comparison is on J*sigma_iso and not on sigma_iso
+    // Finite strain only: the check superposes a dilation on F, so it needs
+    // laws that evaluate a finite-strain kinematics. A small-strain law may
+    // separate its volumetric response perfectly well - linearElastic does -
+    // and still have no finite-strain evaluation to call
     if
     (
-        manager.allLawsProvideVolumetricSplit()
+        !smallStrainCapable
+     && manager.allLawsProvideVolumetricSplit()
      && manager.allLawsHaveDilationInvariantIsochoricStress()
     )
     {
@@ -569,7 +609,10 @@ int main(int argc, char *argv[])
     {
         Info<< "    SKIP: this check does not apply here - "
             << (
-                   manager.allLawsProvideVolumetricSplit()
+                   smallStrainCapable
+                 ? "these are small-strain laws, and this check superposes a "
+                   "dilation on the deformation gradient"
+                 : manager.allLawsProvideVolumetricSplit()
                  ? "a law adds a stress that is not derived from a potential, "
                    "so its split is not dilation invariant"
                  : "no law here separates its isochoric and volumetric "
@@ -940,40 +983,6 @@ int main(int argc, char *argv[])
         );
     }
 
-    // Some laws are finite strain only, and asking them for a small-strain
-    // stress is a fatal error rather than a wrong answer. Ask once, quietly,
-    // so that the checks which need small strain can be skipped for such a law
-    // instead of taking the whole run down with them
-    bool smallStrainCapable = true;
-    {
-        symmTensorField probeSigma(mesh.nCells(), symmTensor::zero);
-
-        FatalError.throwExceptions();
-
-        try
-        {
-            manager.updateStressSmallStrain
-            (
-                manager.topologyFor
-                (
-                    cellCentredIntegrationPointTopology::typeName
-                ),
-                Foam::primitiveField(gradD),
-                Foam::primitiveField(gradD0),
-                dt,
-                probeSigma,
-                nullptr,
-                nullptr,
-                tangentRequest::none
-            );
-        }
-        catch (const Foam::error&)
-        {
-            smallStrainCapable = false;
-        }
-
-        FatalError.dontThrowExceptions();
-    }
 
 
     if (!smallStrainCapable)

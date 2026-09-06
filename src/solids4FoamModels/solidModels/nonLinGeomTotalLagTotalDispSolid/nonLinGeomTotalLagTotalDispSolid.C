@@ -177,19 +177,6 @@ void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
         return;
     }
 
-    // Not on the first call. At that point the deformation gradient is the
-    // identity, so both the law's response and the assumed one are zero and
-    // the comparison holds for any law whatever - a check that cannot fail.
-    // Wait until the material has actually been deformed enough for the two
-    // to say something different, and only then record it as checked
-    const scalar maxDilation = gMax(mag(Foam::primitiveField(J_) - 1.0));
-
-    if (maxDilation < 1e-6)
-    {
-        return;
-    }
-
-    volumetricClosureChecked_ = true;
 
     // The pressure equation hard-codes its half of the constitutive model:
     // its residual is -p/K + stabilisation - 0.5*(J^2 - 1)/J, so it assumes
@@ -210,10 +197,26 @@ void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
 
     const volScalarField& actual = volumetricResponse();
 
-    // Scaled by the assumed response rather than the law's own, so that a
-    // law returning zero is caught rather than measured against its mistake
+    // Guarded on the size of the comparison rather than on a threshold in
+    // the kinematics. Both responses are zero in an undeformed material, and
+    // for a nearly incompressible case they stay small for ever - plateHole's
+    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
+    // either fires on nothing or never fires at all. What matters is only
+    // that there is something to compare: once either response is non-zero
+    // the comparison is relative and means something at any magnitude
     const scalar scale =
-        max(gMax(mag(Foam::primitiveField(assumed))), SMALL);
+        max
+        (
+            gMax(mag(Foam::primitiveField(assumed))),
+            gMax(mag(Foam::primitiveField(actual)))
+        );
+
+    if (scale <= 0)
+    {
+        return;
+    }
+
+    volumetricClosureChecked_ = true;
     const scalar err =
         gMax
         (
