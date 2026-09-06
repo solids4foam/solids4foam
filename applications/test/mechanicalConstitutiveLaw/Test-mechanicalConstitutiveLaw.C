@@ -426,7 +426,11 @@ int main(int argc, char *argv[])
     // stress, J*sigma_iso. A law whose energy sees the whole deformation does
     // not. The Cauchy stress itself does change, by 1/c^3, because it is per
     // current area - so the comparison is on J*sigma_iso and not on sigma_iso
-    if (manager.allLawsProvideVolumetricSplit())
+    if
+    (
+        manager.allLawsProvideVolumetricSplit()
+     && manager.allLawsHaveDilationInvariantIsochoricStress()
+    )
     {
         const label n = mesh.nCells();
 
@@ -541,8 +545,15 @@ int main(int argc, char *argv[])
     }
     else
     {
-        Info<< "    SKIP: no law here separates its isochoric and volumetric"
-            << " responses" << endl;
+        Info<< "    SKIP: this check does not apply here - "
+            << (
+                   manager.allLawsProvideVolumetricSplit()
+                 ? "a law adds a stress that is not derived from a potential, "
+                   "so its split is not dilation invariant"
+                 : "no law here separates its isochoric and volumetric "
+                   "responses"
+               )
+            << endl;
     }
 
     // ---------------------------------------------------------------------

@@ -1251,6 +1251,11 @@ public:
         //  wants to exercise the split without demanding it
         bool allLawsProvideVolumetricSplit() const;
 
+        //- True if every law's split stress is a function of the isochoric
+        //  deformation alone, so that J*sigma_iso is invariant under a
+        //  superposed dilation. Weaker than the above, and separate from it
+        bool allLawsHaveDilationInvariantIsochoricStress() const;
+
         //- Let each material law know the end of each time step has been
         //  reached.
         //  Can be used for diagnostics, logging, or state bookkeeping.

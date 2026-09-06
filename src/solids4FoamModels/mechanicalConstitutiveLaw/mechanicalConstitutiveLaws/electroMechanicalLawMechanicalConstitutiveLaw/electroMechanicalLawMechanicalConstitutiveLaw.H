@@ -181,6 +181,17 @@ public:
             return subLawPtr_->providesVolumetricSplit();
         }
 
+        //- The active tension is added as a Cauchy stress
+        //  symm(F & (Ta*f0f0) & F.T())/J, which is not derived from a
+        //  potential and scales with a superposed dilation. So the split this
+        //  law returns is honest but not dilation invariant, whatever the
+        //  passive law underneath does. It happens to be invariant while Ta
+        //  is zero, which is not a property worth claiming
+        virtual bool isochoricStressIsDilationInvariant() const override
+        {
+            return false;
+        }
+
         //- The child state the passive law owns
         virtual wordList childStateNames() const override
         {

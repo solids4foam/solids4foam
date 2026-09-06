@@ -162,13 +162,18 @@ run_framework_comparison() {
     # this is what tests the word. GuccioneElastic declares it
     if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
         if ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 ); then
-            if grep -q "isochoric stress ignores a superposed dilation" \
-                "${d}/log.unit"
+            # This law's split is honest but not dilation invariant: the
+            # active tension is a Cauchy stress that is not derived from any
+            # potential, and it scales with a superposed dilation. So the
+            # check that would otherwise apply is deliberately not applied,
+            # and what is asserted is that it said so for that reason rather
+            # than quietly not running. GuccioneElastic's own split is
+            # checked where it is used on its own
+            if grep -q "not derived from a potential" "${d}/log.unit"
             then
-                echo "PASS: $(grep -c 'PASS:' "${d}/log.unit") law checks," \
-                     "including the isochoric split"
+                echo "PASS: the split check correctly stood aside"
             else
-                echo "FAIL: the isochoric split was not checked here"
+                echo "FAIL: the split check did not report why it stood aside"
                 return 1
             fi
         else
@@ -287,15 +292,45 @@ run_mixed_framework() {
         echo "FAIL: the mixed arm did not ask for a deviatoric implicit stiffness"
         return 1
     fi
-    echo "PASS: the mixed arm solved a pressure on the framework"
+    # The run has to have finished. Checking only the last line of the
+    # displacement history does not: a solver that stopped early still leaves
+    # a last line, and the reference would be compared against whatever time
+    # it reached. So the end time is required explicitly, and the solver must
+    # not have reported a convergence failure
+    if ! grep -q "^End" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the mixed arm did not run to completion"
+        return 1
+    fi
 
-    local m
+    # The nonlinear outcome, not the linear one. A healthy run of this case
+    # still reports about fifty DIVERGED_ITS lines: those are linear solves
+    # reaching their iteration limit inside a Newton step that goes on to
+    # converge, and treating them as failures fails every passing run
+    if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
+        "${d}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the mixed arm did not converge"
+        grep -m2 -E "Nonlinear solve did not converge|SNES convergence error" \
+            "${d}/${SOLVER_LOGFILE}"
+        return 1
+    fi
+
+    local m t
     m=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
+    t=$(awk 'END {print $1}' "${d}/${DISP_FILE}" 2>/dev/null)
 
     if [[ -z "${m}" ]]; then
         echo "FAIL: the mixed arm produced no displacement history"
         return 1
     fi
+
+    if ! awk "BEGIN {exit !((${t} - 1.0)^2 <= 1e-12)}"; then
+        printf "FAIL: the mixed arm stopped at t = %s, not the end time\n" \
+            "${t}"
+        return 1
+    fi
+    echo "PASS: the mixed arm solved a pressure on the framework"
+
 
     local mref=1.15475e-3
 

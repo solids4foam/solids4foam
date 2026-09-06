@@ -304,6 +304,23 @@ public:
             return false;
         }
 
+        //- True if the stress this law returns from a split evaluation is a
+        //  function of the isochoric deformation alone.
+        //
+        //  That is the case when the stress comes from an energy written on
+        //  Cbar, and it is what makes J*sigma_iso invariant under a
+        //  superposed dilation - the one property of a declared split that
+        //  can be checked from outside. It is not implied by
+        //  providesVolumetricSplit(): a law may separate dU/dJ honestly and
+        //  still add a stress that is not derived from any potential, such as
+        //  an active tension along a fibre direction, which scales with the
+        //  dilation. Such a law says so here, and the check is not applied to
+        //  it rather than being applied and failing
+        virtual bool isochoricStressIsDilationInvariant() const
+        {
+            return providesVolumetricSplit();
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.

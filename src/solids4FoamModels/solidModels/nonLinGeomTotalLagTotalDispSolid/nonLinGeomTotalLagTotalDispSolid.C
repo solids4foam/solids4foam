@@ -1302,6 +1302,25 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             << abort(FatalError);
     }
 
+    // The high-order Jacobian recovers the shear modulus from the implicit
+    // stiffness by mu = (3/4)*(impK - K). That inverts impK = (4/3)*mu + K,
+    // which is the value a displacement formulation asks for. A mixed
+    // formulation asks for (4/3)*mu alone, so the same expression returns
+    // mu - (3/4)*K: negative, and for this branch's cases negative by
+    // megapascals. It would assemble a Jacobian for a material with negative
+    // stiffness rather than fail
+    if (solvePressure() && highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "solvePressure must be disabled when using the high order "
+            << "Jacobian." << nl
+            << "The high order Jacobian recovers the shear modulus from the "
+            << "implicit stiffness, assuming impK = (4/3)*mu + K. With a "
+            << "pressure solved separately impK is (4/3)*mu, and that "
+            << "assumption returns a negative shear modulus."
+            << abort(FatalError);
+    }
+
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND

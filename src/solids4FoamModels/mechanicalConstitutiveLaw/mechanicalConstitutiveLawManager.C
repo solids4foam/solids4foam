@@ -3485,6 +3485,23 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         );
     }
 
+    if (volumetricResponsePtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_,
+            volumetricResponsePtr->mesh(),
+            volumetricResponsePtr->name()
+        );
+
+        // The split is reachable through this overload as well as through
+        // updateStressFiniteStrainSplit, so the capability is checked where
+        // it is asked for rather than at one of the ways of asking. A law
+        // that cannot separate the two would otherwise ignore the request and
+        // hand back a total stress the caller would treat as isochoric
+        checkVolumetricSplitSupported("updateStressFiniteStrain");
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -3712,6 +3729,21 @@ bool Foam::mechanicalConstitutiveLawManager::allLawsProvideVolumetricSplit
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::
+allLawsHaveDilationInvariantIsochoricStress() const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].isochoricStressIsDilationInvariant())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
 (
     const volTensorField& F,
@@ -3725,8 +3757,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
     volScalarField& volumetricResponse
 )
 {
-    checkVolumetricSplitSupported("updateStressFiniteStrainSplit");
-
     // The same path as the ordinary finite-strain update, with somewhere to
     // put the volumetric response. Sharing it is the point: the boundary
     // faces carry their own constitutive state and their own stress, and a
