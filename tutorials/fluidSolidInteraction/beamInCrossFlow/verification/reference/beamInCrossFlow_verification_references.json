@@ -1,0 +1,38 @@
+{
+  "original": {
+    "description": "Richter/Tukovic small-deformation benchmark",
+    "pointA": [0.45, 0.15, -0.15],
+    "references": {
+      "ux": {"value": 5.95e-5, "tolerance": 0.05, "primary": true, "source": "Richter/Tukovic"},
+      "uy": {"value": 2.40e-5, "tolerance": 0.35, "primary": false, "source": "Tukovic OpenFOAM calculation"},
+      "fx": {"value": 1.33, "tolerance": 0.05, "primary": true, "source": "Richter/Tukovic"},
+      "fy": {"value": 0.1055, "tolerance": 0.35, "primary": false, "source": "Tukovic OpenFOAM calculation"}
+    },
+    "publishedReferences": {
+      "richterBenchmark": {
+        "ux": 5.95e-5,
+        "fx": 1.33
+      },
+      "tukovicOpenFOAM": {
+        "ux": 5.93e-5,
+        "uy": 2.40e-5,
+        "fx": 1.31,
+        "fy": 0.1055
+      }
+    }
+  },
+  "modified": {
+    "description": "Tukovic large-deformation form using St Venant-Kirchhoff elasticity",
+    "references": {
+      "ux": {"value": 0.01463, "tolerance": 0.10},
+      "uy": {"value": 0.005, "tolerance": 0.10},
+      "uz": {"value": -0.000447, "tolerance": 0.15}
+    }
+  },
+  "mesh": {
+    "refinementFactors": [1, 2, 4, 8],
+    "deltaTs": [0.05, 0.025, 0.0125, 0.00625],
+    "endTime": 8.0,
+    "minimumReferenceErrorOrder": 0.0
+  }
+}
