@@ -718,6 +718,36 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
     // looking them up, and rolls the constitutive history over itself. F, J
     // and their inverses are already members, updated immediately before every
     // call site, and their old times are instantiated by makeImpK()
+    if (solvePressure())
+    {
+        // The pressure is an independent unknown here, and it stands in for
+        // the law's volumetric response. So the law is asked for its stress
+        // without that response rather than being asked for the total and
+        // having a deviatoric projection taken of it afterwards.
+        //
+        // The two are not the same. A projection assumes everything the
+        // pressure must not replace is trace free, which holds for an
+        // isotropic hyperelastic law written on an isochoric measure and
+        // fails as soon as anything else is present - an active tension along
+        // a fibre direction, for instance, whose spherical part the
+        // projection would discard and the pressure would not put back. Laws
+        // that cannot separate the two are refused by name
+        mechanicalManager().updateStressFiniteStrainSplit
+        (
+            F_,
+            F_.oldTime(),
+            Finv_,
+            Finv_.oldTime(),
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            volumetricResponse()
+        );
+
+        return;
+    }
+
     mechanicalManager().updateStressFiniteStrain
     (
         F_,
@@ -1099,6 +1129,33 @@ void nonLinGeomTotalLagTotalDispSolid::makeRKappa() const
 }
 
 
+volScalarField&
+nonLinGeomTotalLagTotalDispSolid::volumetricResponse() const
+{
+    if (volumetricResponsePtr_.empty())
+    {
+        volumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "volumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return volumetricResponsePtr_();
+}
+
+
 const volScalarField& nonLinGeomTotalLagTotalDispSolid::rKappa() const
 {
     if (rKappaPtr_.empty())
@@ -1284,8 +1341,20 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        // Replace the pressure component of stress.
+        //
+        // On the framework path the stress already arrives without its
+        // volumetric response, so the pressure is simply added; the
+        // deviatoric projection is what the legacy path has to fall back on,
+        // and it is right only for a law whose remaining stress is trace free
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            sigma() = sigma() - p*I;
+        }
+        else
+        {
+            sigma() = dev(sigma()) - p*I;
+        }
 
         // Calculate the pressure gradient
         const volVectorField gradp(fvc::grad(p));

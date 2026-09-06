@@ -3465,7 +3465,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
 )
 {
     // Check F is defined on the correct mesh
@@ -3502,7 +3503,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    updateStressFiniteStrain
+    evaluateFiniteStrain
     (
         topo,
         Foam::primitiveField(F),
@@ -3515,7 +3516,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         Foam::primitiveFieldRef(stress),
         scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
         nullptr,
-        tangentReq
+        tangentReq,
+        false,          // commit the constitutive state
+        volumetricResponsePtr
+      ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
+      : nullptr
     );
 
     topologyEntry& tp = topology(topo);
@@ -3596,7 +3601,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                   ? &scalarTangentPtr->boundaryField()[patchI]
                   : nullptr,
                     static_cast<const UList<mat66>*>(nullptr),
-                    tangentReq
+                    tangentReq,
+                    volumetricResponsePtr
+                  ? &volumetricResponsePtr->boundaryField()[patchI]
+                  : nullptr
                 );
             }
         }
@@ -3717,31 +3725,28 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
     volScalarField& volumetricResponse
 )
 {
-    checkMeshConsistency(mesh_, F.mesh(), F.name());
-
     checkVolumetricSplitSupported("updateStressFiniteStrainSplit");
 
-    const integrationPointTopology& topo =
-        topologyFor(cellCentredIntegrationPointTopology::typeName);
-
-    scalarField& volumetric = Foam::primitiveFieldRef(volumetricResponse);
-
-    evaluateFiniteStrain
+    // The same path as the ordinary finite-strain update, with somewhere to
+    // put the volumetric response. Sharing it is the point: the boundary
+    // faces carry their own constitutive state and their own stress, and a
+    // split that filled only the internal field would leave the boundary
+    // holding a total stress while the interior held an isochoric one. The
+    // traction is built from the boundary values, so that would be wrong
+    // where it is least visible
+    updateStressFiniteStrain
     (
-        topo,
-        Foam::primitiveField(F),
-        Foam::primitiveField(F0),
-        Foam::primitiveField(Finv),
-        Foam::primitiveField(Finv0),
-        Foam::primitiveField(J),
-        Foam::primitiveField(J0),
+        F,
+        F0,
+        J,
+        J0,
+        Finv,
+        Finv0,
         dt,
-        Foam::primitiveFieldRef(isochoricStress),
-        nullptr,
+        isochoricStress,
         nullptr,
         tangentRequest::none,
-        false,          // this is the real evaluation, not a query
-        &volumetric
+        &volumetricResponse
     );
 }
 

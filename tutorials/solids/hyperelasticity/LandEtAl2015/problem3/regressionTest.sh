@@ -105,9 +105,8 @@ fi
 # The framework arm
 # ------------------------------------------------------------
 # The same case with the stress taken from the mechanicalConstitutiveLaw
-# framework rather than the legacy mechanicalModel. The displacement
-# formulation only: the mixed one is not ported, for the reasons in
-# DESIGN-state-io.md section 18
+# framework rather than the legacy mechanicalModel, in the displacement
+# formulation. The mixed formulation is the arm after this one
 run_framework_comparison() {
     local d="${REGRESSION_ROOT}/framework"
 
@@ -226,6 +225,94 @@ run_framework_comparison() {
 if ! run_framework_comparison; then
     failures=$((failures + 1))
 fi
+
+# ------------------------------------------------------------
+# The mixed displacement-pressure arm, on the framework
+# ------------------------------------------------------------
+# This is the arm the volumetric split exists for. The pressure is solved as
+# its own unknown and replaces the law's volumetric response, so the law is
+# asked for its stress without that response rather than being asked for the
+# total and having a deviatoric projection taken of it.
+#
+# The two are not the same here, and this case is why. Guccione's isochoric
+# stress is trace free, so a projection would recover it exactly; the active
+# tension along the fibre direction is not, and a projection discards its
+# spherical part while the pressure - which knows only about dU/dJ - does not
+# put it back. That is a 1.6% difference in the final displacement of this
+# case, and it is a different material rather than a visible error, which is
+# why the framework refuses a law that cannot separate the two
+run_mixed_framework() {
+    local d="${REGRESSION_ROOT}/frameworkPressure"
+
+    rm -rf "${d}"; mkdir -p "${d}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${d}/"
+    done
+    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+
+    # Allrun symlinks the ".pressure" variants into place, so that is the file
+    # the switch has to go in
+    sed -i.bak \
+        's|^    solvePressure true;|    solvePressure true;\n    useMechanicalConstitutiveLawManager yes;|' \
+        "${d}/constant/solidProperties.pressure"
+    rm -f "${d}/constant/solidProperties.pressure.bak"
+
+    if ! grep -q 'useMechanicalConstitutiveLawManager' \
+        "${d}/constant/solidProperties.pressure"
+    then
+        echo "FAIL: could not enable the framework on the mixed arm"
+        return 1
+    fi
+
+    ( cd "${d}" && ./Allrun pressure > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: mixed framework arm (the tutorial skipped here)"
+        return 0
+    fi
+
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${d}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the mixed arm did not use the framework"
+        return 1
+    fi
+
+    # The implicit stiffness must be the deviatoric surrogate. With the full
+    # one the bulk modulus - a near-incompressibility penalty two orders above
+    # the shear modulus here - makes the Laplacian surrogate so stiff that the
+    # linear solve does not converge at all, which is what used to happen
+    if ! grep -q "scalarDeviatoric" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the mixed arm did not ask for a deviatoric implicit stiffness"
+        return 1
+    fi
+    echo "PASS: the mixed arm solved a pressure on the framework"
+
+    local m
+    m=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
+
+    if [[ -z "${m}" ]]; then
+        echo "FAIL: the mixed arm produced no displacement history"
+        return 1
+    fi
+
+    local mref=1.15475e-3
+
+    if ! awk "BEGIN {exit !((${m} - ${mref})^2 <= (2e-3*${mref})^2)}"; then
+        printf "FAIL: mixed arm moved from its reference (%.10g vs %.10g)\n" \
+            "${mref}" "${m}"
+        return 1
+    fi
+    printf "PASS: mixed arm matches its reference (%.10g)\n" "${m}"
+
+    return 0
+}
+
+if ! run_mixed_framework; then
+    failures=$((failures + 1))
+fi
+
 
 echo
 if (( failures == 0 )); then

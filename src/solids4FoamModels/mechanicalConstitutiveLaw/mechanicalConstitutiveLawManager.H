@@ -1163,7 +1163,8 @@ public:
             const scalar dt,
             volSymmTensorField& stress,
             volScalarField* scalarTangentPtr = nullptr,
-            const tangentRequest tangentReq = tangentRequest::none
+            const tangentRequest tangentReq = tangentRequest::none,
+            volScalarField* volumetricResponsePtr = nullptr
         );
 
         //- Update the true (Cauchy) stress field stored on mesh faces using the

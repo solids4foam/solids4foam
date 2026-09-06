@@ -107,6 +107,13 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- The law's own volumetric response, dU/dJ
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. The value is not used: what matters is that asking for
+        //  it leaves the stress without its volumetric part, which is the
+        //  part the solved pressure goes on to supply
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
@@ -159,6 +166,9 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
+
+        //- Somewhere for the law to put its volumetric response
+        volScalarField& volumetricResponse() const;
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries

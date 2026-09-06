@@ -225,7 +225,28 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
 
         // The small-strain estimate the legacy law uses. It is a
         // preconditioner, not a tangent of this energy
-        const scalar Keff = (4.0/3.0)*mu_.value() + bulkModulus_.value();
+        scalar Keff = 0.0;
+
+        switch (response.tangentReq())
+        {
+            case tangentRequest::scalar:
+                Keff = (4.0/3.0)*mu_.value() + bulkModulus_.value();
+                break;
+
+            case tangentRequest::scalarDeviatoric:
+                // A mixed displacement-pressure formulation carries the
+                // volumetric response in its own equation, so the Laplacian
+                // surrogate here is the one for div(dev(sigma)) alone. The
+                // bulk modulus here is a near-incompressibility penalty, two
+                // orders above the shear modulus, so including it makes the
+                // surrogate stiff enough that the linear solve does not
+                // converge at all
+                Keff = (4.0/3.0)*mu_.value();
+                break;
+
+            default:
+                break;
+        }
 
         forAll(K, i)
         {

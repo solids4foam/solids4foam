@@ -1616,7 +1616,8 @@ down here rather than guessed at.
 
 ## 18. The mixed displacement-pressure formulation
 
-A review, not a decision taken. Nothing here is implemented.
+A review. Sections 19 to 21 settled the design and section 22 records what was
+built from it; what follows is the diagnosis that led there.
 
 ### 18.1 What the legacy laws do
 
@@ -2114,3 +2115,85 @@ The stress channel is no longer "the deviatoric part", and calling it that in
 conversation will eventually mislead someone. It is "the part the pressure does
 not touch". The two coincide for a simple split law, which is exactly why the
 distinction is easy to lose.
+
+
+## 22. The mixed formulation, as built
+
+Sections 18 to 21 argued that a mixed displacement-pressure formulation must
+ask the law for its stress without the volumetric response, rather than take
+the total stress and project out its trace. That is now what happens.
+
+### 22.1 The path
+
+`nonLinGeomTotalLagTotalDispSolid::correctStress()` branches on
+`solvePressure()`. When a pressure is being solved it calls
+`updateStressFiniteStrainSplit`, which refuses by name any law that cannot
+separate the two, and the replacement afterwards is
+
+    sigma() = sigma() - p*I
+
+with no `dev()`. The legacy path keeps the projection, because that is all a
+law which cannot answer the question can be given.
+
+The split entry point delegates to the ordinary finite-strain update with
+somewhere to put the volumetric response, rather than duplicating it. That
+matters: the boundary faces carry their own constitutive state and their own
+stress, and the traction is built from the boundary values. A split that
+filled only the internal field would leave the boundary holding a total stress
+while the interior held an isochoric one - wrong exactly where it is least
+visible.
+
+### 22.2 What it changes, measured
+
+`LandEtAl2015/problem3` is the case that separates the two. Guccione's
+isochoric stress is trace free, so a projection recovers it exactly; the
+active tension along the fibre direction is not, and a projection discards its
+spherical part while the pressure - which is defined by
+`p = -kappa*0.5*(J^2-1)/J`, i.e. `-dU/dJ`, and so knows only about the
+volumetric penalty - does not put it back.
+
+    legacy, mixed                        |D| = 0.00110209
+    framework, mixed, dev() projection   |D| = 0.00113675
+    framework, mixed, declared split     |D| = 0.00115475
+
+The last two differ by 1.6%, and that difference is entirely the active
+tension's mean stress. A regression arm now runs this, so the number is held.
+
+### 22.3 What had to be fixed to get there
+
+The mixed formulation had never run on the framework at all. Two things stood
+in the way, both found by trying it.
+
+`GuccioneElastic` ignored `tangentRequest::scalarDeviatoric` and always
+returned `(4/3)mu + K`. In a mixed formulation the volumetric response is
+carried by the pressure equation, so the Laplacian surrogate is the one for
+`div(dev(sigma))` alone. The bulk modulus here is a near-incompressibility
+penalty aimed at a hundred times the shear modulus, so including it made the
+surrogate about seventy times too stiff and the linear solve did not converge
+at any iteration. `MooneyRivlinElastic` already switched on the request; this
+law simply had not been given the same treatment.
+
+`MooneyRivlinElastic` had no split to give. It is the law behind every other
+finite-strain case that offers `solvePressure`, and it is already written as
+an isochoric stress plus a volumetric penalty, so declaring it cost a
+subtraction. Declaring it then exposed an uninitialised `volumetricPtr_` in
+one of the response's constructors - see section 22.4.
+
+### 22.4 The bug that was waiting
+
+`mechanicalConstitutiveLawResponse`'s fourth-order-tangent constructor never
+initialised `volumetricPtr_`. `wantsVolumetricSplit()` is a null test on that
+pointer, so on that path it answered whatever the stack held. Nothing had ever
+dereferenced it, because no law reached by that constructor called
+`volumetric()`. MooneyRivlin does, and segfaulted on the first evaluation.
+
+The member now defaults to `nullptr` where it is declared as well as in every
+constructor, so leaving it out of a future one cannot bring this back.
+
+### 22.5 Still open
+
+The small-strain path has no split. `linGeomTotalDispSolid` keeps
+`dev(sigma()) - p*I`, which is exact for isotropic linear elasticity and wrong
+for an anisotropic small-strain law under a solved pressure. No case exercises
+that combination. The finite-strain path was done first because the mixed
+hyperelastic laws are what the formulation is for.
