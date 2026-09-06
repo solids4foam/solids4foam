@@ -115,11 +115,20 @@ things, which is worth knowing before this stage is reviewed:
   precedence policy. No active tutorial reaches it.
 - A law's `endTimeStep` hook may call `reduce()`, so boundary states cannot be
   visited there without deadlocking on differing patch counts per rank.
-- Nine laws have no framework port and no tutorial to validate one against:
-  `diffusionElastic`, `diffusionHyperElastic`, `orthotropicLinearElastic`,
-  `StVenantKirchhoffOrthotropicElastic`, `GentElastic`, `isotropicFungElastic`,
-  `YeohElastic`, `viscoNeoHookeanElastic`, and `HolzapfelGasserOgdenElastic`
-  (which does have `ratCarotid`).
+- Nine laws have no framework port. Counted rather than remembered: there are
+  25 legacy laws and 15 ports, and of the ten unported, `linearElasticFromFile`
+  and `linearElasticCt` are being dropped rather than ported.
+
+  Eight of the nine have no tutorial at all, so a port could be written but not
+  validated against anything: `diffusionElastic`, `diffusionHyperElastic`,
+  `orthotropicLinearElastic`, `StVenantKirchhoffOrthotropicElastic`,
+  `GentElastic`, `isotropicFungElastic`, `YeohElastic`, `viscoNeoHookeanElastic`.
+
+  The ninth, `HolzapfelGasserOgdenElastic`, does have one - `ratCarotid` - but
+  that case only runs in foam-extend, so validating a port means running the
+  comparison there rather than on the fork everything else is checked on. Worth
+  knowing before it is scheduled: it is the only one of the nine where evidence
+  is available at all, and the evidence is somewhere awkward.
 
 ## Deprecating the legacy path
 
