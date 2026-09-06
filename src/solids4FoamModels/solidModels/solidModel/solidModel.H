@@ -63,9 +63,7 @@ SourceFiles
     #include "NamedEnum.H"
 #endif
 
-#ifndef FOAMEXTEND
-    #include "leastSquaresReconstruction.H"
-#endif
+#include "leastSquaresReconstruction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -798,7 +796,6 @@ public:
             {
                 return twoD_;
             }
-#ifndef FOAMEXTEND
             //- Return the displacement least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& displacementLeastSquares() const;
@@ -806,7 +803,7 @@ public:
             //- Return the pressure least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& pressureLeastSquares() const;
-#endif
+
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (

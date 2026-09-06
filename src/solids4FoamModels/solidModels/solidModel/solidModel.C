@@ -450,7 +450,6 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
 }
 
 
-#ifndef FOAMEXTEND
 const Foam::leastSquaresScheme&
 Foam::solidModel::displacementLeastSquares() const
 {
@@ -484,6 +483,7 @@ Foam::solidModel::pressureLeastSquares() const
 }
 
 
+#ifndef FOAMEXTEND
 void Foam::solidModel::makeSigmaQuad() const
 {
     if (!sigmaQuadPtr_.empty())
@@ -2006,9 +2006,7 @@ void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
-#ifndef FOAMEXTEND
     leastSquaresReconstruction::New(mesh()).clear();
-#endif
 }
 
 

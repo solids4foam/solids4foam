@@ -66,7 +66,9 @@ Author
 #include "leastSquaresScheme.H"
 #include "processorFvPatch.H"
 #include "symmetryPolyPatch.H"
-#include "symmetryPlanePolyPatch.H"
+#ifndef FOAMEXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 #include "weightFunction.H"
 #include <Eigen/Dense>
 
@@ -377,7 +379,7 @@ public:
                 makeWeightFunction();
             }
 
-            return *weightFuncPtr_;
+            return autoPtrRef(weightFuncPtr_);
         }
 
         //- Return quadrature data
@@ -388,7 +390,7 @@ public:
                 makeQuadrature();
             }
 
-            return *quadraturePtr_;
+            return autoPtrRef(quadraturePtr_);
         }
 
         //- Return the cell and face stencil

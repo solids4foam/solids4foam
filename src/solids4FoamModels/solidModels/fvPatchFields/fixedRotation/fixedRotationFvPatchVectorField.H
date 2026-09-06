@@ -173,14 +173,12 @@ public:
             //  evaluation of the gradient of this patchField
             virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
 
-#ifndef FOAMEXTEND
             //- Return face quadrature points values,
             //  used for high order solvers
             //  The rigid rotation displacement is evaluated exactly at each
             //  quadrature point rather than assumed constant over the face
             virtual autoPtr<CompactListList<vector>>
             evaluateQuadrature() const;
-#endif
 
         //- Write
         virtual void write(Ostream&) const;

@@ -142,6 +142,21 @@ void leastSquaresReconstruction::updateMesh(const mapPolyMesh&)
 }
 
 
+#ifdef FOAMEXTEND
+bool leastSquaresReconstruction::deleteObject() const
+{
+    // foam-extend calls MeshObject<fvMesh, Type>::deleteObject() from the
+    // polyMesh destructor, after the fvMesh lifetime has ended. Its generic
+    // implementation dispatches through fvMesh::thisDb(), which is invalid at
+    // that point with modern Clang. The regIOobject database is still valid.
+    return db().checkOut
+    (
+        const_cast<leastSquaresReconstruction&>(*this)
+    );
+}
+#endif
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam

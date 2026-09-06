@@ -949,12 +949,8 @@ void leastSquaresStencil::filterUnusedCandidates
     usedRemoteCells.reserve(totalRemote);
 #endif
 
-#ifdef FOAMEXTEND
-    this->facesStencil();
-    CompactListList<label>& facesStencil = autoPtrRef(facesStencilPtr_);
-#else
-    const CompactListList<label>& facesStencil = this->facesStencil();
-#endif
+    auto& facesStencil =
+        compactListListCRef(this->facesStencil());
 
     forAll(facesStencil, faceI)
     {
@@ -1130,12 +1126,8 @@ void leastSquaresStencil::calcFacesStencil() const
 void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
 {
     // Prerequisites
-#ifdef FOAMEXTEND
-    this->facesStencil();
-    CompactListList<label>& faceStencils = autoPtrRef(facesStencilPtr_);
-#else
-    const CompactListList<label>& faceStencils = this->facesStencil();
-#endif
+    auto& faceStencils =
+        compactListListCRef(this->facesStencil());
 
     const List<labelList>& remoteCellsPerProc = this->remoteCellsPerProc();
 
@@ -1335,12 +1327,8 @@ tmp<labelField> leastSquaresStencil::cellFacesStencilSize() const
     labelField& pnf = tmpRef(tpnf);
 
     // Get each face stencil
-#ifdef FOAMEXTEND
-    this->facesStencil();
-    CompactListList<label>& facesStencil = autoPtrRef(facesStencilPtr_);
-#else
-    const CompactListList<label>& facesStencil = this->facesStencil();
-#endif
+    auto& facesStencil =
+        compactListListCRef(this->facesStencil());
 
     // Loop over cell faces stencils and merge thems into one
     forAll(mesh.cells(), cellI)

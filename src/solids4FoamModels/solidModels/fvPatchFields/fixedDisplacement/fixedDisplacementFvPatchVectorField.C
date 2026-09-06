@@ -367,7 +367,6 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
     }
 }
 
-#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 fixedDisplacementFvPatchVectorField::evaluateQuadrature
 () const
@@ -376,12 +375,14 @@ fixedDisplacementFvPatchVectorField::evaluateQuadrature
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     // faceQuadPoints is list for whole mesh.
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
@@ -394,7 +395,7 @@ fixedDisplacementFvPatchVectorField::evaluateQuadrature
     );
 
     // Get a reference to the actual data for easier access
-    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+    CompactListList<vector>& quadPointsValue = autoPtrRef(tQuadPointsValue);
 
     forAll(*this, faceI)
     {
@@ -414,7 +415,6 @@ fixedDisplacementFvPatchVectorField::evaluateQuadrature
 
     return tQuadPointsValue;
 }
-#endif
 
 void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {
