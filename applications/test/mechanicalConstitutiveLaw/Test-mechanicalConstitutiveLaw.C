@@ -539,9 +539,31 @@ int main(int argc, char *argv[])
                 max(maxTrace, mag(tr(Foam::primitiveField(isoStress)[cellI])));
         }
 
-        Info<< "        (max |tr(isochoric stress)| = " << maxTrace
-            << ", non-zero only if a law adds a spherical stress of its own)"
-            << endl;
+        // Asserted, not merely reported. This is the condition under which
+        // a deviatoric projection of the total stress and the law's own
+        // isochoric stress are the same thing - which is what the solid
+        // models did before they could ask, and what they still do on the
+        // legacy path. A law that declares a dilation invariant split and
+        // then returns a stress with a trace has quietly made that
+        // substitution wrong wherever it is still used
+        scalar maxStress = 0.0;
+
+        forAll(isoStress, cellI)
+        {
+            maxStress =
+                max
+                (
+                    maxStress,
+                    mag(Foam::primitiveField(isoStress)[cellI])
+                );
+        }
+
+        reportError
+        (
+            "the isochoric stress is trace free",
+            maxTrace/max(maxStress, SMALL),
+            1e-10
+        );
     }
     else
     {
