@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The same material as constant/mechanicalProperties, expressed for the
+// mechanicalConstitutiveLaw framework.
+//
+// Two differences, both deliberate:
+//
+//   - the legacy law has no volumetric term. It is written for exact
+//     incompressibility and reads the solid model's pressure out of the
+//     object registry to supply the whole spherical part of its stress. The
+//     framework law carries the same penalty the other hyperelastic laws use,
+//     and the solid model replaces that response with what it solved. A large
+//     bulk modulus approaches the incompressible limit; the value here is
+//     about a thousand times the shear modulus.
+//
+//   - the local basis is given here as uniform vectors rather than read from
+//     Ec and Ea fields, so that this dictionary can be used for the law's own
+//     checks without running calcLocCoordinates first. A real case supplies
+//     the fields, and the law reads them as prescribed state.
+
+planeStress no;
+
+mechanical
+(
+    pipe
+    {
+        type            HolzapfelGasserOgdenElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1200;
+
+        // Ground substance. The legacy dictionary gives E and nu = 0.5, from
+        // which mu = E/(2*(1 + nu)) = 44.23e3
+        mu              mu [1 -1 -2 0 0 0 0] 44.23e3;
+
+        // Fibres, as the legacy dictionary gives them
+        fibreAngle      39.76;
+        k1              k1 [1 -1 -2 0 0 0 0] 0.206e3;
+        k2              1.465;
+
+        // Near incompressibility as a penalty, in place of the legacy law's
+        // exact incompressibility
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 44.23e6;
+
+        uniformLocalBasis yes;
+        Ec              (1 0 0);
+        Ea              (0 1 0);
+    }
+);
+
+// ************************************************************************* //
