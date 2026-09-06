@@ -115,46 +115,42 @@ things, which is worth knowing before this stage is reviewed:
   precedence policy. No active tutorial reaches it.
 - A law's `endTimeStep` hook may call `reduce()`, so boundary states cannot be
   visited there without deadlocking on differing patch counts per rank.
-- Nine laws have no framework port. Counted rather than remembered: there are
-  25 legacy laws and 15 ports, and of the ten unported, `linearElasticFromFile`
+- Eight laws have no framework port. Counted rather than remembered: there are
+  25 legacy laws and 16 ports, and of the nine unported, `linearElasticFromFile`
   and `linearElasticCt` are being dropped rather than ported.
 
-  Eight of the nine have no tutorial at all, so a port could be written but not
+  None of the eight has a tutorial, so a port could be written but not
   validated against anything: `diffusionElastic`, `diffusionHyperElastic`,
   `orthotropicLinearElastic`, `StVenantKirchhoffOrthotropicElastic`,
   `GentElastic`, `isotropicFungElastic`, `YeohElastic`, `viscoNeoHookeanElastic`.
+  They are flagged, not ported: writing a port that nothing can check is how a
+  wrong port gets merged looking right.
 
-  Decision: they are flagged, not ported. Writing a port that nothing can check
-  is how a wrong port gets merged looking right.
+  `HolzapfelGasserOgdenElastic` is ported. It needed a decision rather than a
+  transcription, because the legacy law has no volumetric term at all - it is
+  written for exact incompressibility and reads the solid model's pressure out
+  of the object registry. The port carries the same penalty the other
+  hyperelastic laws use, so the pressure replaces a response the law computes
+  rather than supplying one it does not. `coupledPressureDisplacementSolid`
+  already carries the matching term in its pressure equation, so no solid
+  model changed.
 
-  The ninth, `HolzapfelGasserOgdenElastic`, was to be ported and checked on a
-  foam-extend worktree. Looking at it, it is not a law port:
-
-  - It computes `sigma = -p*I + s`, reading `p` and `pf` straight out of the
-    object registry. It never computes a volumetric response at all, because
-    it is fully incompressible - the pressure is a Lagrange multiplier, not a
-    relaxed penalty. The framework's split contract promises `dU/dJ`, and this
-    law has no `U(J)` to give. Expressing it needs a third case alongside
-    "provides a split" and "does not": exact incompressibility.
-  - Its only consumer is `coupledPressureDisplacementSolid`, which is built for
-    foam-extend only and is not on the framework at all. So there is nothing
-    to call a ported law until that solid model is ported too - which is the
-    same harmonisation work that is already open.
-  - Its only tutorial, `ratCarotid`, does not currently run. It stalls at a
-    relative residual of 0.99 and dies of a floating point exception at
-    t = 0.68, on foam-extend 4.1. Checked against clean `origin/development`
-    at the same commit: identical failure, same time step, same residual. So
-    this is pre-existing and nothing to do with the framework - but it does
-    mean the reference the port would be validated against does not exist.
-
-  So the honest sequence is: fix `ratCarotid` first, or decide it is not worth
-  fixing; port `coupledPressureDisplacementSolid`; then port the law. Doing the
-  law alone would produce code that cannot be run, let alone checked.
+  Its tutorial still does not run: `ratCarotid` stalls at a relative residual
+  of 0.99 and dies at t = 0.68 on foam-extend 4.1, identically on
+  `origin/development`. So the port has the coverage that does not need the
+  solver - the mesh builds anywhere, and the law's own split checks need only
+  a mesh and a material - and no coverage that it reproduces the legacy law,
+  which would need the case to run.
 
 ## Deprecating the legacy path
 
 Not yet. The legacy `mechanicalLaw` hierarchy is still what every tutorial
 runs by default, and the framework is opt-in everywhere. A deprecation needs
 the switch defaulted on for at least one release with the regression arms
-demanding agreement, which is what stage D builds. The nine unported laws
-above are the actual blocker.
+demanding agreement, which is what stage D builds.
+
+The blocker is no longer a list of unported laws so much as a question about
+the eight that remain. None has a tutorial, so none can be shown to work.
+Either they are ported blind and marked as unvalidated, or they are dropped,
+or someone writes cases for them. That is a decision about what the library
+supports rather than a piece of work to schedule.
