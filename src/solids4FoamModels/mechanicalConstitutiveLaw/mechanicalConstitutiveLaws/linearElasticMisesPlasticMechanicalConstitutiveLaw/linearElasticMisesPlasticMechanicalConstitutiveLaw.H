@@ -214,7 +214,14 @@ public:
         (
             const mechanicalConstitutiveLawState& state,
             const scalar time,
-            const label timeIndex
+            const label timeIndex,
+            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+        ) const override;
+
+        //- Say what was found, once the manager has reduced it
+        virtual void reportDiagnostics
+        (
+            const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
         ) const override;
 };
 

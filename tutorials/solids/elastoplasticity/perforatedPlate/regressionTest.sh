@@ -29,6 +29,14 @@ SIGMA_MAX=2.2e8
 YIELD_MIN=28
 YIELD_MAX=32
 
+# The framework counts more, and should. The legacy law reduces over its cell
+# field only; the framework law reports per state and the manager gathers the
+# boundary states too, which were skipped entirely while the laws did their own
+# reducing. So the same material yielding in the same places is 30 cell-centred
+# points and 41 integration points once the boundary faces are included
+FRAMEWORK_YIELD_MIN=38
+FRAMEWORK_YIELD_MAX=44
+
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -37,7 +45,8 @@ echo "============================================================"
 echo "Elastoplastic perforated plate regression test"
 echo "Max epsilonEq           in [${EPSILON_MIN}, ${EPSILON_MAX}]"
 echo "Max sigmaEq (von Mises) in [${SIGMA_MIN}, ${SIGMA_MAX}]"
-echo "Yielding cells          in [${YIELD_MIN}, ${YIELD_MAX}]"
+echo "Yielding cells          in [${YIELD_MIN}, ${YIELD_MAX}] (legacy)"
+echo "Yielding points         in [${FRAMEWORK_YIELD_MIN}, ${FRAMEWORK_YIELD_MAX}] (framework)"
 echo "============================================================"
 echo
 
@@ -219,7 +228,15 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    if (( yielding_cells >= YIELD_MIN && yielding_cells <= YIELD_MAX )); then
+    yield_min="${YIELD_MIN}"
+    yield_max="${YIELD_MAX}"
+
+    if [[ "${approach}" != "legacy" ]]; then
+        yield_min="${FRAMEWORK_YIELD_MIN}"
+        yield_max="${FRAMEWORK_YIELD_MAX}"
+    fi
+
+    if (( yielding_cells >= yield_min && yielding_cells <= yield_max )); then
         printf "PASS: %s yielding = %d\n" "${approach}" "${yielding_cells}"
     else
         printf "FAIL: %s yielding = %d\n" "${approach}" "${yielding_cells}"

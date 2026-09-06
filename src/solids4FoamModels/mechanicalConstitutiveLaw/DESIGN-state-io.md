@@ -2288,16 +2288,28 @@ Reviewed twice. These are the agreed designs, not yet built.
 
 ### 24.1 Point-collapse accumulators are not synchronised
 
-For point-centred and dual-face topologies the manager accumulates
-contributions per point and divides by a weight. On a decomposed mesh a point
-on a processor boundary sees only its own rank's cells, so the collapsed value
-is wrong on every rank holding it. There is no `syncTools` call anywhere in
-the manager today, so this is live rather than latent.
+For point-centred topologies the manager accumulates contributions per point
+and divides by a weight. On a decomposed mesh a point on a processor boundary
+sees only its own rank's cells, so the collapsed value would be wrong on every
+rank holding it, and wrong differently for each decomposition.
 
-The fix is to sync the accumulators before dividing. Both collapse rules are
-plain sums - the harmonic rule sums reciprocals, so the harmonic-ness is in
-what is summed rather than in the reduction - so one `plusEqOp` sync per
-accumulator covers both.
+How live this is was overstated when it was first written here. The two
+collapse overloads - the point one and the surface one that takes a collapse
+rule - have no caller: not in any solid model, not in the unit test. The
+vertex-centred models were the obvious candidate and they do something else,
+evaluating on dual-mesh faces through the flat-list primitive with no collapse
+at all. So this is a trap for the first caller rather than a bug anything hits
+today, and it cannot be demonstrated by running a case, because there is no
+case that reaches it. The fix is still worth having in place before someone
+writes that caller, but it is unproven by anything except reading.
+
+Done. The accumulators are summed across ranks before being divided by. Both
+collapse rules are plain sums - the harmonic rule sums reciprocals, so the
+harmonic-ness is in what is summed rather than in the reduction - so one
+`plusEqOp` sync per accumulator covers both.
+
+The surface collapse needs none: an internal face belongs to exactly one rank,
+and both cells either side of it are on that rank, so nothing is missing.
 
 foam-extend 4.1 has `syncPointList` but not the signature OpenFOAM.com has:
 its only overload takes `applySeparation` as a required fifth argument, where

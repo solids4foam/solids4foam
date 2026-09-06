@@ -27,6 +27,7 @@ License
 #include "mat66.H"
 #include "Switch.H"
 #include "CompactListList.H"
+#include "syncTools.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -41,6 +42,54 @@ namespace Foam
 
 namespace Foam
 {
+
+// Combine one diagnostic into another, by the operation it carries
+void combineDiagnostic
+(
+    mechanicalConstitutiveLawDiagnostic& into,
+    const mechanicalConstitutiveLawDiagnostic& from
+)
+{
+    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
+
+    if (into.op() == diagnostic::combineOperation::sum)
+    {
+        into.value() += from.value();
+    }
+    else
+    {
+        into.value() = max(into.value(), from.value());
+    }
+}
+
+
+// Sum a point field across processor boundaries.
+//
+// A point on a processor boundary is held by every rank that touches it, and
+// each rank has accumulated only its own cells' contributions. Summing them
+// makes every copy agree, and agree with what a serial run would have built.
+//
+// The signature differs between forks: OpenFOAM.com and OpenFOAM.org offer a
+// four-argument convenience overload that defaults the transform, foam-extend
+// has only the five-argument form whose last argument says whether to apply
+// separation. Separation is for transformed cyclics, which these accumulators
+// are not, so it is false
+template<class Type>
+void syncPointSum(const polyMesh& mesh, Field<Type>& fld)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    syncTools::syncPointList
+    (
+        mesh, fld, plusEqOp<Type>(), pTraits<Type>::zero
+    );
+#else
+    syncTools::syncPointList
+    (
+        mesh, fld, plusEqOp<Type>(), pTraits<Type>::zero, false
+    );
+#endif
+}
+
 
 //- Build the response a law writes into, and evaluate the law.
 //
@@ -3407,7 +3456,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
+    // Make the accumulators whole before dividing by them.
+    //
+    // A point on a processor boundary belongs to every rank that touches it,
+    // and each rank has accumulated only the cells it owns. Dividing now would
+    // give each rank a different average over a different subset - wrong on
+    // all of them, and wrong in a way that changes with the decomposition.
+    // Summed first, every copy holds what a serial run would have built
+    if (Pstream::parRun())
+    {
+        syncPointSum(mesh_, Foam::primitiveFieldRef(stressSum));
+        syncPointSum(mesh_, Foam::primitiveFieldRef(weightSum));
+
+        if (tangentWeightPtr)
+        {
+            syncPointSum(mesh_, Foam::primitiveFieldRef(*tangentWeightPtr));
+        }
+    }
+
     // Collapse
+    //
+    // Both rules divide plain sums: the harmonic rule sums reciprocals, so
+    // what makes it harmonic is what was accumulated rather than how it is
+    // reduced. That is why one sum per accumulator serves both
 
     forAll(stress.internalField(), pointI)
     {
@@ -3884,10 +3955,11 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
     const mechanicalConstitutiveLaw& law,
     mechanicalConstitutiveLawState& state,
     const scalar time,
-    const label timeIndex
+    const label timeIndex,
+    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    law.endTimeStep(state, time, timeIndex);
+    law.endTimeStep(state, time, timeIndex, diagnostics);
 
     const wordList childNames(law.childStateNames());
 
@@ -3898,7 +3970,8 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
             law.childLaw(childNames[i]),
             state.child(childNames[i]),
             time,
-            timeIndex
+            timeIndex,
+            diagnostics
         );
     }
 }
@@ -3909,7 +3982,18 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     const scalar time = mesh_.time().value();
     const label timeIndex = mesh_.time().timeIndex();
 
-    // Loop over all topology entries
+    // Gather, then reduce. The laws report locally and communicate nothing,
+    // so this is where the collectives happen and where their count is made
+    // the same on every rank.
+    //
+    // The shape comes from the internal state, which every rank has for every
+    // law whether or not any of its integration points live here. A law
+    // appends the same quantities in the same order every time it is asked,
+    // so that first call fixes how many values there are and what they are
+    // called; the boundary states then combine into those same slots. The
+    // number of boundary states differs from rank to rank - processor patches
+    // exist only where the mesh was cut - and that is exactly why they cannot
+    // be allowed to influence how many collectives are called
     forAllIter
     (
         HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
@@ -3919,28 +4003,88 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 
         forAll(laws_, lawI)
         {
+            DynamicList<mechanicalConstitutiveLawDiagnostic> diagnostics;
+
             // The law and every law below it. A composite's sub-law keeps its
             // own history and was never told the step had ended
-            endTimeStepLaw(laws_[lawI], tp.states_[lawI], time, timeIndex);
+            endTimeStepLaw
+            (
+                laws_[lawI], tp.states_[lawI], time, timeIndex, diagnostics
+            );
 
-            // The boundary states are deliberately NOT visited, though they
-            // are equally unvisited today and it would be natural to add them
-            // here.
-            //
-            // endTimeStep is where a law reports what it did, and two of them
-            // reduce across ranks to do it. The number of patches is not the
-            // same on every rank - processor patches exist only where the mesh
-            // was cut - so calling it once per patch would call a collective a
-            // different number of times on different ranks, and the run would
-            // hang rather than fail.
-            //
-            // Visiting them needs the reductions moved out of the laws first,
-            // so that the manager performs one collective per step over
-            // contributions the laws merely return. Until then the diagnostics
-            // omit boundary points, which is a smaller wrong than a deadlock
+            if (diagnostics.empty())
+            {
+                continue;
+            }
+
+            // The boundary states, which used to be skipped entirely because
+            // the laws reduced for themselves and could not be called once
+            // per patch without hanging
+            if (tp.boundaryAware_ && lawI < tp.boundaryStates_.size())
+            {
+                forAll(tp.boundaryStates_[lawI], patchI)
+                {
+                    DynamicList<mechanicalConstitutiveLawDiagnostic> patchDiags;
+
+                    endTimeStepLaw
+                    (
+                        laws_[lawI],
+                        tp.boundaryStates_[lawI][patchI],
+                        time,
+                        timeIndex,
+                        patchDiags
+                    );
+
+                    if (patchDiags.size() != diagnostics.size())
+                    {
+                        FatalErrorInFunction
+                            << "The law for material '" << lawNames_[lawI]
+                            << "' reported " << patchDiags.size()
+                            << " quantities on patch " << patchI << " and "
+                            << diagnostics.size() << " on the internal points."
+                            << nl << nl
+                            << "    A law must report the same quantities in "
+                            << "the same order every time it is asked, "
+                            << "because the number of them fixes how many "
+                            << "collectives are called and that has to match "
+                            << "on every rank."
+                            << exit(FatalError);
+                    }
+
+                    forAll(diagnostics, d)
+                    {
+                        combineDiagnostic(diagnostics[d], patchDiags[d]);
+                    }
+                }
+            }
+
+            // One collective per quantity, in an order fixed by the law
+            forAll(diagnostics, d)
+            {
+                mechanicalConstitutiveLawDiagnostic& diag = diagnostics[d];
+
+                if
+                (
+                    diag.op()
+                 == mechanicalConstitutiveLawDiagnostic::combineOperation::sum
+                )
+                {
+                    reduce(diag.value(), sumOp<scalar>());
+                }
+                else
+                {
+                    reduce(diag.value(), maxOp<scalar>());
+                }
+            }
+
+            // The law says what it did. The manager knows how to combine the
+            // numbers but not what they mean, and the switch that decides
+            // whether anyone wants to hear it belongs to the law
+            laws_[lawI].reportDiagnostics(diagnostics);
         }
     }
 }
+
 
 
 // ************************************************************************* //

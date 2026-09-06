@@ -65,6 +65,8 @@ Author
 #include "smallStrainMechanicalConstitutiveLawKinematics.H"
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "mechanicalConstitutiveLawState.H"
+#include "mechanicalConstitutiveLawDiagnostic.H"
+#include "DynamicList.H"
 #include "mechanicalConstitutiveLawInputs.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawResponse.H"
@@ -365,11 +367,36 @@ public:
         //- Optional hook called once at the end of each time step.
         //  Default implementation does nothing.
         //  Can be used for diagnostics, logging, or state bookkeeping.
+        //- Report what this law did over the time step, for one state.
+        //
+        //  Append to the list; do not reduce. The manager calls this for the
+        //  internal state and for every boundary state the law owns, and does
+        //  the collectives itself - a law that reduced here would call one a
+        //  different number of times on each rank, because processor patches
+        //  exist only where the mesh was cut, and the run would hang.
+        //
+        //  Append the same quantities in the same order every time. The
+        //  manager takes the length and the names from the internal state,
+        //  which every rank has, and reduces exactly that many values
         virtual void endTimeStep
         (
             const mechanicalConstitutiveLawState& state,
             const scalar time,
-            const label timeIndex
+            const label timeIndex,
+            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+        ) const
+        {}
+
+        //- Report the diagnostics once the manager has reduced them.
+        //
+        //  Called on one rank's worth of nothing and every rank's worth of
+        //  everything: the values passed here are the totals over all states
+        //  and all ranks, in the order the law appended them. The law does the
+        //  saying, because the wording and the debug switch that gates it
+        //  belong to the law rather than to the manager
+        virtual void reportDiagnostics
+        (
+            const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
         ) const
         {}
 };

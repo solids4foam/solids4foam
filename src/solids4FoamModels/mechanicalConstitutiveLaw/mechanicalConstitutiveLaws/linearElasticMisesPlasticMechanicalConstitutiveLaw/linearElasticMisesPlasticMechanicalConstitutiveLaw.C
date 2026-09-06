@@ -543,7 +543,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
 (
     const mechanicalConstitutiveLawState& state,
     const scalar time,
-    const label timeIndex
+    const label timeIndex,
+    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
     const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
@@ -565,18 +566,63 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
         }
     }
 
-    reduce(nYielding, sumOp<label>());
-    reduce(maxDEpsilonPEq, maxOp<scalar>());
+    // Reported, not reduced. The manager gathers these from the internal
+    // state and from every boundary state this law owns, and reduces once per
+    // quantity - which is what makes the boundary points countable at all,
+    // and what stops a per-patch collective from hanging on a decomposed mesh
+    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
 
-    const int nTotalCells = returnReduce(epsilonPEq.size(), sumOp<int>());
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "yielding integration points",
+            scalar(nYielding),
+            diagnostic::combineOperation::sum
+        )
+    );
 
-    if (debug)
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "integration points",
+            scalar(epsilonPEq.size()),
+            diagnostic::combineOperation::sum
+        )
+    );
+
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "max DEpsilonPEq",
+            maxDEpsilonPEq,
+            diagnostic::combineOperation::maximum
+        )
+    );
+}
+
+
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::reportDiagnostics
+(
+    const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+) const
+{
+    if (!debug || diagnostics.size() != 3)
     {
-        Info<< nl << "Max DEpsilonPEq is " << maxDEpsilonPEq << nl
-            << "Number of yielding integration points = " << nYielding
-            << "/" << nTotalCells
-            << nl << endl;
+        return;
     }
+
+    // Same wording as before, and the same debug switch decides it. The
+    // numbers are larger than they used to be, because the boundary
+    // integration points are counted now: they were skipped entirely while
+    // the reducing happened in here
+    Info<< nl << "Max DEpsilonPEq is " << diagnostics[2].value() << nl
+        << "Number of yielding integration points = "
+        << label(diagnostics[0].value())
+        << "/" << label(diagnostics[1].value())
+        << nl << endl;
 }
 
 
