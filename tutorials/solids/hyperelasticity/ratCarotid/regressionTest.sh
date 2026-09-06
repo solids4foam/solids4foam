@@ -92,6 +92,16 @@ HolzapfelGasserOgdenElastic" "${d}/log.unit"
         return 1
     fi
 
+    # The two checks above would pass a law that had lost its fibre term
+    # entirely - it would still be dilation invariant and still trace free.
+    # This one pins the fibre contribution to a closed form, and fails if the
+    # term is removed, if the structure tensor is not pushed forward, or if
+    # the factor of two from S = 2 dW/dC is dropped
+    if ! grep -q "fibre stress matches the closed form" "${d}/log.unit"; then
+        echo "FAIL: the fibre term was not checked against its closed form"
+        return 1
+    fi
+
     echo "PASS: $(grep -c 'PASS:' "${d}/log.unit") law checks, including the" \
          "isochoric split"
 

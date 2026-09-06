@@ -44,7 +44,12 @@ mechanical
         mu              mu [1 -1 -2 0 0 0 0] 44.23e3;
 
         // Fibres, as the legacy dictionary gives them
-        fibreAngle      39.76;
+        // Zero here, not the tutorial's 39.76: with the fibres along the
+        // stretch direction the law's response has a closed form, which is
+        // what the regression test compares against. The angle changes which
+        // directions the fibres point in, not any of the code paths this
+        // exercises
+        fibreAngle      0.0;
         k1              k1 [1 -1 -2 0 0 0 0] 0.206e3;
         k2              1.465;
 

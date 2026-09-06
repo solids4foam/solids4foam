@@ -216,6 +216,7 @@ int main(int argc, char *argv[])
     bool allMooneyRivlin = true;
     bool allNeoHookeanPlastic = true;
     bool allViscoelastic = true;
+    bool allHGO = true;
     forAll(lawEntries, lawI)
     {
         const word type(lawEntries[lawI].dict().lookup("type"));
@@ -238,6 +239,11 @@ int main(int argc, char *argv[])
         if (type != "MooneyRivlinElastic")
         {
             allMooneyRivlin = false;
+        }
+
+        if (type != "HolzapfelGasserOgdenElastic")
+        {
+            allHGO = false;
         }
 
         if (type != "neoHookeanElasticMisesPlastic")
@@ -619,6 +625,127 @@ int main(int argc, char *argv[])
                    "responses"
                )
             << endl;
+    }
+
+    // ------------------------------------------------------------------
+    // The fibre term, against a closed form
+    //
+    // The two checks above are necessary and not sufficient: deleting the
+    // fibre term entirely leaves a law that is still dilation invariant and
+    // still trace free, so both would pass a law that had lost half its
+    // physics. This pins the fibre contribution to a number.
+    //
+    // Under a uniaxial isochoric stretch F = diag(l, 1/sqrt(l), 1/sqrt(l))
+    // with the fibres along x - fibreAngle zero, so both families coincide
+    // with the stretch direction - the deformation is already isochoric, so
+    // Fbar = F and J = 1. Then I4 = I6 = l^2, both families pull along x, and
+    // eliminating the pressure by requiring zero lateral stress leaves
+    //
+    //     sigma_xx - sigma_yy = mu*(l^2 - 1/l)
+    //                         + 4*k1*l^2*(l^2 - 1)*exp(k2*(l^2 - 1)^2)
+    //
+    // which is what the difference of the returned isochoric stresses must
+    // be, since the volumetric response is spherical and cancels from it
+    if (allHGO)
+    {
+        Info<< nl << "The fibre term against a closed form" << endl;
+
+        const dictionary& hgoDict = lawEntries[0].dict();
+
+        const scalar muVal =
+            dimensionedScalar(hgoDict.lookup("mu")).value();
+        const scalar k1Val =
+            dimensionedScalar(hgoDict.lookup("k1")).value();
+        const scalar k2Val = readScalar(hgoDict.lookup("k2"));
+        const scalar angle = readScalar(hgoDict.lookup("fibreAngle"));
+
+        if (mag(angle) > SMALL)
+        {
+            Info<< "    SKIP: this check needs fibreAngle 0, and this case "
+                << "sets " << angle << endl;
+        }
+        else
+        {
+            const label n = mesh.nCells();
+
+            volTensorField Fd
+            (
+                IOobject("Fu", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedTensor("I", dimless, I)
+            );
+            volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
+            volScalarField Jd
+            (
+                IOobject("Ju", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedScalar("one", dimless, 1.0)
+            );
+            volScalarField Jd0(Jd);
+
+            volSymmTensorField isoStress
+            (
+                IOobject("isoU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+            );
+            volScalarField volResponse
+            (
+                IOobject("volU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedScalar("0", dimPressure, 0.0)
+            );
+
+            // Well past the exponential's knee, so that a wrong coefficient
+            // or a missing push-forward shows up as a large error rather than
+            // a small one
+            const scalar lambda = 1.35;
+            const scalar s = 1.0/Foam::sqrt(lambda);
+
+            const tensor Fu(lambda, 0, 0, 0, s, 0, 0, 0, s);
+
+            forAll(Fd, cellI)
+            {
+                Foam::primitiveFieldRef(Fd)[cellI] = Fu;
+                Foam::primitiveFieldRef(Finvd)[cellI] = inv(Fu);
+                Foam::primitiveFieldRef(Jd)[cellI] = det(Fu);
+            }
+
+            manager.updateStressFiniteStrainSplit
+            (
+                Fd, Fd0, Finvd, Finvd0, Jd, Jd0, dt, isoStress, volResponse
+            );
+
+            const scalar l2 = sqr(lambda);
+
+            const scalar expected =
+                muVal*(l2 - 1.0/lambda)
+              + 4.0*k1Val*l2*(l2 - 1.0)*Foam::exp(k2Val*sqr(l2 - 1.0));
+
+            scalar maxErr = 0.0;
+
+            forAll(isoStress, cellI)
+            {
+                const symmTensor& sig =
+                    Foam::primitiveField(isoStress)[cellI];
+
+                const scalar got =
+                    sig[symmTensor::XX] - sig[symmTensor::YY];
+
+                maxErr = max(maxErr, mag(got - expected));
+            }
+
+            Info<< "        (uniaxial stretch " << lambda
+                << ", expected sigma_xx - sigma_yy = " << expected << ')'
+                << endl;
+
+            reportError
+            (
+                "the fibre stress matches the closed form",
+                maxErr/max(mag(expected), SMALL),
+                1e-10
+            );
+        }
     }
 
     // ---------------------------------------------------------------------
