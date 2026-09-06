@@ -3993,13 +3993,24 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     // called; the boundary states then combine into those same slots. The
     // number of boundary states differs from rank to rank - processor patches
     // exist only where the mesh was cut - and that is exactly why they cannot
-    // be allowed to influence how many collectives are called
-    forAllIter
-    (
-        HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
-    )
+    // be allowed to influence how many collectives are called.
+    //
+    // The topologies are visited by name, in sorted order.
+    //
+    // Not through topologyEntries_, which is keyed on the address of the
+    // topology object rendered as text: those differ between ranks, so its
+    // hash order can differ too, and sorting them would only make each rank's
+    // own order stable rather than making the orders agree. With more than
+    // one topology registered that would pair one rank's quantity against
+    // another rank's in a reduction that completes and returns nonsense.
+    // topologyCache_ is keyed by the name the caller registered, which every
+    // rank supplies identically, so sorting those does give one order
+    wordList topologyKeys(topologyCache_.toc());
+    Foam::sort(topologyKeys);
+
+    forAll(topologyKeys, keyI)
     {
-        topologyEntry& tp = topoIter()();
+        topologyEntry& tp = topology(topologyCache_[topologyKeys[keyI]]());
 
         forAll(laws_, lawI)
         {
