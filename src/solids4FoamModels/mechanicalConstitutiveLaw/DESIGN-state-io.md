@@ -2352,3 +2352,65 @@ Done. The field now gets `correctBoundaryConditions()` with the other outputs.
 Leaving it stale was harmless only because nothing reads the boundary values
 yet, which is a property of what happens to be implemented rather than a
 contract worth keeping.
+
+## 25. HolzapfelGasserOgdenElastic, and two claims that needed correcting
+
+The port is in. Its energy is written on the isochoric deformation and it
+carries the same volumetric penalty the other hyperelastic laws use, so the
+solid model replaces `dU/dJ` with the solved pressure exactly as it does for
+Guccione and Mooney-Rivlin. The legacy law instead reads `p` and `pf` out of
+the object registry and supplies the whole spherical stress from them, which
+is why it cannot be evaluated for a tangent, restarted, or perturbed.
+
+### 25.1 What it is checked against
+
+Not the tutorial: `ratCarotid` stalls at a relative residual of 0.99 and dies
+at t = 0.68 on foam-extend 4.1, identically on `origin/development`.
+
+What can be checked without a solver is checked. The mesh builds on any fork,
+and the law's own checks need only a mesh and a material, so the port carries
+three:
+
+  - the isochoric stress ignores a superposed dilation (5.7e-17)
+  - the isochoric stress is trace free (1.8e-15)
+  - the fibre term matches a closed form (2.6e-16)
+
+The third exists because the first two are not sufficient. Deleting the fibre
+term entirely leaves a law that passes both, which is to say they would accept
+a law that had lost half its physics. Under a uniaxial isochoric stretch with
+the fibres along it,
+
+    sigma_xx - sigma_yy = mu*(l^2 - 1/l)
+                        + 4*k1*l^2*(l^2 - 1)*exp(k2*(l^2 - 1)^2)
+
+and three deliberate breakages are each caught: the deleted fibre term (0.885),
+the reference structure tensor used instead of the pushed-forward one (0.399),
+and the factor of two from `S = 2 dW/dC` dropped (0.221).
+
+What is still unchecked is that this law reproduces the legacy one. That needs
+the case to run.
+
+### 25.2 Two claims that were wrong
+
+**"coupledPressureDisplacementSolid already carries the matching penalty, so
+the interface fits."** It carries a penalty - `fvm::Sp(rKappa_, Dp_)` with
+`rKappa_ = 1/K` - but it does not consume this port: it calls
+`mechanical().correct()` and has no `useMechanicalConstitutiveLawManager`
+switch at all. So nothing selects the ported law today. The penalty being
+there is a reason to expect the shapes to match when that solid model is
+ported; it is not evidence that they do.
+
+There is also a linearisation subtlety to check when it is ported. A constant
+`1/K` coefficient on the pressure increment is not the tangent of this
+penalty: `U''(J) = 0.5*K*(1 + J^-2)`, which equals `K` only at `J = 1`. Near
+incompressibility that is close, but "close at the limit" is not the same as
+consistent at finite `K`.
+
+**"The fibre stiffness is left out of the scalar tangent because a
+coefficient that swung with fibre stretch would help the solve less than a
+steady one."** No evidence was offered for that, and the legacy law does the
+opposite: it computes a deformation-dependent effective stiffness and uses it
+for `impK()`. The constant coefficient stays, because it is a preconditioner
+and a wrong one costs iterations rather than accuracy - but it is a provisional
+surrogate awaiting convergence evidence on a fibre-dominated case, not a
+considered improvement.

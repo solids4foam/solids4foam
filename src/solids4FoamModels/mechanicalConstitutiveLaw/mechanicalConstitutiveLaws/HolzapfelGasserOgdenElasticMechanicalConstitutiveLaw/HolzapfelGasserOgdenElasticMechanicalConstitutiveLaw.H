@@ -49,8 +49,15 @@ Description
     this framework: the solid model asks for the isochoric stress and the
     volumetric response separately and replaces the second with what it
     solved. A large bulk modulus approaches the incompressible limit the
-    legacy law assumes outright, and coupledPressureDisplacementSolid already
-    carries the matching penalty term in its pressure equation.
+    legacy law assumes outright.
+
+    Nothing selects this law yet. coupledPressureDisplacementSolid is the only
+    consumer of the legacy one, and it calls mechanical().correct() with no
+    framework switch, so it cannot reach this. It does already carry a penalty
+    term in its pressure equation - fvm::Sp(rKappa_, Dp_) with rKappa_ = 1/K -
+    which is a reason to expect the shapes to match when that solid model is
+    ported rather than evidence that they do. DESIGN-state-io.md section 25.2
+    records the linearisation question that comes with it.
 
     The local basis is prescribed state. A case supplies Ec and Ea fields -
     calcLocCoordinates writes them - and a case whose fibres are the same

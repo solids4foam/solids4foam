@@ -237,10 +237,14 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
     {
         UIndirectList<scalar>& K = response.scalarTangent();
 
-        // A preconditioner, not a tangent of this energy. The fibre stiffness
-        // is left out of it deliberately: it varies by orders of magnitude
-        // with the fibre stretch, and a Laplacian coefficient that swung with
-        // it would help the solve less than a steady one
+        // A preconditioner, not a tangent of this energy.
+        //
+        // The fibre stiffness is left out, and that is a provisional choice
+        // rather than a considered one: the legacy law does the opposite,
+        // computing a deformation-dependent effective stiffness for its
+        // impK(). A wrong preconditioner costs iterations rather than
+        // accuracy, so this is safe to start from, but it wants convergence
+        // evidence on a fibre-dominated case before it is called adequate
         scalar Keff = 0.0;
 
         switch (response.tangentReq())
