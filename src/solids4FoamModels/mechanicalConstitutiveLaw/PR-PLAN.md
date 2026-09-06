@@ -124,11 +124,32 @@ things, which is worth knowing before this stage is reviewed:
   `orthotropicLinearElastic`, `StVenantKirchhoffOrthotropicElastic`,
   `GentElastic`, `isotropicFungElastic`, `YeohElastic`, `viscoNeoHookeanElastic`.
 
-  The ninth, `HolzapfelGasserOgdenElastic`, does have one - `ratCarotid` - but
-  that case only runs in foam-extend, so validating a port means running the
-  comparison there rather than on the fork everything else is checked on. Worth
-  knowing before it is scheduled: it is the only one of the nine where evidence
-  is available at all, and the evidence is somewhere awkward.
+  Decision: they are flagged, not ported. Writing a port that nothing can check
+  is how a wrong port gets merged looking right.
+
+  The ninth, `HolzapfelGasserOgdenElastic`, was to be ported and checked on a
+  foam-extend worktree. Looking at it, it is not a law port:
+
+  - It computes `sigma = -p*I + s`, reading `p` and `pf` straight out of the
+    object registry. It never computes a volumetric response at all, because
+    it is fully incompressible - the pressure is a Lagrange multiplier, not a
+    relaxed penalty. The framework's split contract promises `dU/dJ`, and this
+    law has no `U(J)` to give. Expressing it needs a third case alongside
+    "provides a split" and "does not": exact incompressibility.
+  - Its only consumer is `coupledPressureDisplacementSolid`, which is built for
+    foam-extend only and is not on the framework at all. So there is nothing
+    to call a ported law until that solid model is ported too - which is the
+    same harmonisation work that is already open.
+  - Its only tutorial, `ratCarotid`, does not currently run. It stalls at a
+    relative residual of 0.99 and dies of a floating point exception at
+    t = 0.68, on foam-extend 4.1. Checked against clean `origin/development`
+    at the same commit: identical failure, same time step, same residual. So
+    this is pre-existing and nothing to do with the framework - but it does
+    mean the reference the port would be validated against does not exist.
+
+  So the honest sequence is: fix `ratCarotid` first, or decide it is not worth
+  fixing; port `coupledPressureDisplacementSolid`; then port the law. Doing the
+  law alone would produce code that cannot be run, let alone checked.
 
 ## Deprecating the legacy path
 

@@ -2239,3 +2239,104 @@ The small-strain path has no split. `linGeomTotalDispSolid` keeps
 for an anisotropic small-strain law under a solved pressure. No case exercises
 that combination. The finite-strain path was done first because the mixed
 hyperelastic laws are what the formulation is for.
+
+## 23. The small-strain mixed formulation
+
+Section 22 did finite strain. Small strain now works the same way, because it
+is the same thing: the pressure residual is
+`-p/K + stabilisation - tr(gradD)`, so the pressure stands in for
+`K*tr(epsilon)` exactly as it stands in for `dU/dJ`.
+
+`linGeomTotalDispSolid::correctStress()` asks for the split when a pressure is
+solved, `replaceVolumetricStress` holds the branch for both the residual and
+the predictor, and `checkVolumetricClosure` compares what the law returned
+against `K*tr(gradD)`.
+
+### 23.1 The control the finite-strain work did not have
+
+`plateHole`'s mixed arm now runs twice, legacy and framework. For isotropic
+linear elasticity the split and a deviatoric projection are the same
+operation, so the two arms must agree exactly, and they do - to every digit
+reported:
+
+    DDifference LInf        2.98896e-08   both arms
+    pointDDifference LInf   3.69696e-08   both arms
+    stress component-0      76310.4       both arms
+
+That is worth as much as `problem3`'s 1.6%. One case shows the split changing
+an answer where theory says it must; the other shows it changing nothing where
+theory says it must not.
+
+### 23.2 What the wiring taught
+
+The closure guard was a threshold on the kinematics, and that was the wrong
+shape. `plateHole`'s mixed arm runs at `tr(epsilon)` of order 1e-20, so an
+absolute cut-off never fires there at all, while the finite-strain version
+fired only well into the deformation. Both now guard on whether either
+response is non-zero: the comparison is relative, so it means the same thing
+at any magnitude. The small-strain control - a law returning `1.1*K*tr(eps)` -
+is caught at 6.5e-11 against 7.2e-10.
+
+The dilation-invariance check superposes a dilation on `F`, so it needs a law
+with a finite-strain evaluation. `linearElastic` now declares a split and has
+none, and the check was reaching it. The small-strain capability probe moved
+ahead of it and now guards it.
+
+## 24. The three remaining gaps, and what to do about them
+
+Reviewed twice. These are the agreed designs, not yet built.
+
+### 24.1 Point-collapse accumulators are not synchronised
+
+For point-centred and dual-face topologies the manager accumulates
+contributions per point and divides by a weight. On a decomposed mesh a point
+on a processor boundary sees only its own rank's cells, so the collapsed value
+is wrong on every rank holding it. There is no `syncTools` call anywhere in
+the manager today, so this is live rather than latent.
+
+The fix is to sync the accumulators before dividing. Both collapse rules are
+plain sums - the harmonic rule sums reciprocals, so the harmonic-ness is in
+what is summed rather than in the reduction - so one `plusEqOp` sync per
+accumulator covers both.
+
+foam-extend 4.1 has `syncPointList` but not the signature OpenFOAM.com has:
+its only overload takes `applySeparation` as a required fifth argument, where
+v2512 offers a four-argument form. So the call needs the usual guard, passing
+the argument explicitly on both sides rather than relying on a default.
+
+For a point where two materials meet, do not average and do not pick the
+stiffer: "stiffer" is direction-dependent under anisotropy and state-dependent
+under plasticity. Keep the material-side values for constitutive purposes and
+refuse a single collapsed constitutive stress where the assembly defines no
+interface treatment - which is what the manager already does when it refuses
+fourth-order collapse on a shared topology.
+
+### 24.2 Law `endTimeStep` hooks reduce, so boundary states go unvisited
+
+Two plastic laws call `reduce()` inside `endTimeStep` to report what they did.
+Patch counts differ per rank, so visiting boundary states would call a
+collective a different number of times on different ranks and hang.
+
+The contract should change: hooks become local and communicate nothing, and
+the manager runs a reduction phase afterwards whose operations and order match
+on every rank. It does not have to be a single collective - several
+predictable ones are equally safe - but it does have to be rank-independent.
+
+A bare list of scalars is not enough, because the three existing quantities do
+not reduce the same way: yielding-point count and evaluated-point count are
+sums, maximum plastic increment is a max. So each diagnostic carries its own
+reduction operation and identity, the law says which it needs, and the manager
+knows only how to apply `sum` and `max`.
+
+One thing to fix while there: the manager iterates topologies through a hash
+table whose keys derive from object addresses. That ordering is not guaranteed
+to match across ranks, which is a poor basis for anything collective. The
+diagnostics need stable identities - topology, material, child-law path, and
+internal-or-boundary scope - rather than relying on iteration order.
+
+### 24.3 Coupled patches and the volumetric response
+
+Done. The field now gets `correctBoundaryConditions()` with the other outputs.
+Leaving it stale was harmless only because nothing reads the boundary values
+yet, which is a property of what happens to be implemented rather than a
+contract worth keeping.
