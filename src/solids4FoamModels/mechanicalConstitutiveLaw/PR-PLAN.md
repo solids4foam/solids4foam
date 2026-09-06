@@ -104,43 +104,55 @@ things, which is worth knowing before this stage is reviewed:
     `providesVolumetricSplit()` does not promise. It is now checked against
     what the law returns.
 
-## What is not ready, and should not be in any of these
+## What is left before the initial port is done
 
-- The small-strain path has no isochoric/volumetric split, so
-  `linGeomTotalDispSolid` still projects with `dev()`. Exact for isotropic
-  linear elasticity, wrong for an anisotropic small-strain law under a solved
-  pressure. No case exercises it.
-- Point-collapse accumulators are not synchronised across processor
-  boundaries (`syncTools::syncPointList`), and there is no shared-point
-  precedence policy. No active tutorial reaches it.
-- A law's `endTimeStep` hook may call `reduce()`, so boundary states cannot be
-  visited there without deadlocking on differing patch counts per rank.
-- Eight laws have no framework port. Counted rather than remembered: there are
-  25 legacy laws and 16 ports, and of the nine unported, `linearElasticFromFile`
-  and `linearElasticCt` are being dropped rather than ported.
+Counted, not estimated. Solid models, by how many tutorial dictionaries select
+them:
 
-  None of the eight has a tutorial, so a port could be written but not
-  validated against anything: `diffusionElastic`, `diffusionHyperElastic`,
-  `orthotropicLinearElastic`, `StVenantKirchhoffOrthotropicElastic`,
-  `GentElastic`, `isotropicFungElastic`, `YeohElastic`, `viscoNeoHookeanElastic`.
-  They are flagged, not ported: writing a port that nothing can check is how a
-  wrong port gets merged looking right.
+| model | selections | on the framework |
+|---|---|---|
+| `linearGeometryTotalDisplacement` | 237 | yes |
+| `nonLinearGeometryTotalLagrangianTotalDisplacement` | 93 | yes |
+| `nonLinearGeometryUpdatedLagrangian` | 47 | yes |
+| `coupledPressureDisplacementSolid` | 38 | **no** |
+| `poroLinearGeometry` | 23 | yes |
+| `thermalLinearGeometry` | 14 | yes |
+| `coupledUnsLinearGeometryLinearElastic` | 14 | **no** |
+| `vertexCentredLinearGeometry` | 12 | yes |
+| `thermalSolid` | 2 | **no** |
+| `linearGeometry`, `kirchhoffPlate` | 1 each | **no** |
 
-  `HolzapfelGasserOgdenElastic` is ported. It needed a decision rather than a
-  transcription, because the legacy law has no volumetric term at all - it is
-  written for exact incompressibility and reads the solid model's pressure out
-  of the object registry. The port carries the same penalty the other
-  hyperelastic laws use, so the pressure replaces a response the law computes
-  rather than supplying one it does not. `coupledPressureDisplacementSolid`
-  already carries the matching term in its pressure equation, so no solid
-  model changed.
+So the framework reaches everything that matters except two, and the rest are
+selected by one or two cases each.
 
-  Its tutorial still does not run: `ratCarotid` stalls at a relative residual
-  of 0.99 and dies at t = 0.68 on foam-extend 4.1, identically on
-  `origin/development`. So the port has the coverage that does not need the
-  solver - the mesh builds anywhere, and the law's own split checks need only
-  a mesh and a material - and no coverage that it reproduces the legacy law,
-  which would need the case to run.
+**`coupledPressureDisplacementSolid`** is the substantial one: five tutorials -
+`cylindricalPressureVessel`, `heartTissueBeam`, `idealisedVentricle`,
+`ratCarotid`, `plateHole` - and foam-extend only. Its pressure equation already
+carries the matching penalty term, so the shapes should fit, but the
+linearisation needs checking: a constant `1/K` coefficient is not the tangent
+of the penalty, since `U''(J) = 0.5*K*(1 + J^-2)` equals `K` only at `J = 1`.
+
+**`coupledUnsLinearGeometryLinearElastic`** covers `cantilever2d`,
+`ellipticPlate` and `narrowTmember`. Linear elastic and block coupled, so it
+should be the easier of the two.
+
+The remaining six are either unused or nearly so.
+
+## What is deliberately left undone
+
+- Eight laws have no framework port and no tutorial: `diffusionElastic`,
+  `diffusionHyperElastic`, `orthotropicLinearElastic`,
+  `StVenantKirchhoffOrthotropicElastic`, `GentElastic`, `isotropicFungElastic`,
+  `YeohElastic`, `viscoNeoHookeanElastic`. Flagged rather than ported, since a
+  port nothing can check is how a wrong port gets merged looking right. A later
+  PR can take any of them when a case exists to validate it.
+- Point-centred stress collapse refuses on a decomposed mesh rather than
+  guessing. Nothing calls it - see section 24.1 of the design note for why the
+  obvious fix is wrong.
+- `ratCarotid` runs on the framework and does not run on the legacy path, so
+  the Holzapfel-Gasser-Ogden port has no like-for-like comparison. The two
+  differ by up to 25 per cent where the legacy arm survives, and the cause is
+  the solid model rather than the material - see section 25.
 
 ## Deprecating the legacy path
 
