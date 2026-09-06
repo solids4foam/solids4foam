@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "linearElastic.H"
+#include "compatibilityFunctions.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "fvm.H"
@@ -428,13 +429,14 @@ void Foam::linearElastic::correct
     }
 }
 
-#ifndef FOAMEXTEND
 void Foam::linearElastic::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
     const CompactListList<tensor>& gradDQuad
 )
 {
+    auto& gradDQuadRef = compactListListCRef(gradDQuad);
+
     // Initialise eps outside loop
     symmTensor epsilon = symmTensor::zero;
 
@@ -445,7 +447,7 @@ void Foam::linearElastic::correct
     forAll(sigmaQuad, faceI)
     {
         UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
-        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuadRef[faceI];
 
         forAll(faceSigmaQuad, qpI)
         {
@@ -455,7 +457,6 @@ void Foam::linearElastic::correct
         }
     }
 }
-#endif
 
 
 

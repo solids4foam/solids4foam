@@ -20,6 +20,7 @@ License
 #include "hofvc.H"
 #include "lookupSolidModel.H"
 #include "fvcD2dt2.H"
+#include "compatibilityFunctions.H"
 #ifdef OPENFOAM_ORG
     #include "fvSchemes.H"
 #endif
@@ -35,13 +36,9 @@ void hofvc::fGrad
     CompactListList<tensor>& gradDQuad
  )
 {
-#ifndef FOAMEXTEND
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
     solMod.displacementLeastSquares().fGrad(D, gradDQuad);
-#else
-    notImplemented("Not implemented for foam extend");
-#endif
 }
 
 
@@ -51,7 +48,6 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const fvMesh& mesh
 )
 {
-#ifndef FOAMEXTEND
     tmp<surfaceVectorField> tsf
     (
         new surfaceVectorField
@@ -69,19 +65,22 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         )
     );
 
-    surfaceVectorField& tf = tsf.ref();
+    surfaceVectorField& tf = tmpRef(tsf);
 
     const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
     const surfaceScalarField& magSf = mesh.magSf();
     // Reference to integration weights
     const solidModel& solMod = lookupSolidModel(mesh);
-    const CompactListList<scalar>& quadW =
-        solMod.displacementLeastSquares().quadrature().faceQuadWeights();
+    auto& quadW = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights()
+    );
+    auto& quadSigmaRef = compactListListCRef(quadSigma);
 
     forAll(tf, faceI)
     {
         // Sigma at the quadrature points on the face
-        const UList<symmTensor>& faceQuadStress = quadSigma[faceI];
+        const UList<symmTensor>& faceQuadStress = quadSigmaRef[faceI];
 
         const vector& faceNormal = normal[faceI];
 
@@ -97,14 +96,15 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     forAll(tf.boundaryField(), patchI)
     {
-        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        vectorField& tfPatch = boundaryFieldRef(tf)[patchI];
         forAll(tfPatch, faceI)
         {
             const label globalFaceID =
                 mesh.boundaryMesh()[patchI].start() + faceI;
 
             // Sigma at the Gauss quadrature points on the face
-            const UList<symmTensor>& faceQuadStress = quadSigma[globalFaceID];
+            const UList<symmTensor>& faceQuadStress =
+                quadSigmaRef[globalFaceID];
 
             const vector& faceNormal =  normal[globalFaceID];
 
@@ -120,10 +120,6 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     }
 
     return tsf;
-#else
-    notImplemented("Not implemented for foam extend");
-    return tmp<surfaceVectorField>();
-#endif
 };
 
 
@@ -134,7 +130,6 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const fvMesh& mesh
 )
 {
-#ifndef FOAMEXTEND
     tmp<surfaceVectorField> tsf
     (
         new surfaceVectorField
@@ -152,14 +147,18 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
         )
     );
 
-    surfaceVectorField& tf = tsf.ref();
+    surfaceVectorField& tf = tmpRef(tsf);
 
     const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
     const surfaceScalarField& magSf = mesh.magSf();
     // Reference to integration weights
     const solidModel& solMod = lookupSolidModel(mesh);
-    const CompactListList<scalar>& quadW =
-        solMod.displacementLeastSquares().quadrature().faceQuadWeights();
+    auto& quadW = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights()
+    );
+    auto& quadSigmaRef = compactListListCRef(quadSigma);
+    auto& quadGradDRef = compactListListCRef(quadGradD);
 
     // The transpose of the first Piola-Kirchhoff stress is
     // P^T = J*(Finv & sigma), such that the nominal traction is (n0 & P^T),
@@ -168,8 +167,8 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     forAll(tf, faceI)
     {
         // Sigma and gradD at the quadrature points on the face
-        const UList<symmTensor>& faceQuadStress = quadSigma[faceI];
-        const UList<tensor>& faceQuadGradD = quadGradD[faceI];
+        const UList<symmTensor>& faceQuadStress = quadSigmaRef[faceI];
+        const UList<tensor>& faceQuadGradD = quadGradDRef[faceI];
 
         const vector& faceNormal = normal[faceI];
 
@@ -188,15 +187,16 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     forAll(tf.boundaryField(), patchI)
     {
-        vectorField& tfPatch = tf.boundaryFieldRef()[patchI];
+        vectorField& tfPatch = boundaryFieldRef(tf)[patchI];
         forAll(tfPatch, faceI)
         {
             const label globalFaceID =
                 mesh.boundaryMesh()[patchI].start() + faceI;
 
             // Sigma and gradD at the Gauss quadrature points on the face
-            const UList<symmTensor>& faceQuadStress = quadSigma[globalFaceID];
-            const UList<tensor>& faceQuadGradD = quadGradD[globalFaceID];
+            const UList<symmTensor>& faceQuadStress =
+                quadSigmaRef[globalFaceID];
+            const UList<tensor>& faceQuadGradD = quadGradDRef[globalFaceID];
 
             const vector& faceNormal = normal[globalFaceID];
 
@@ -215,10 +215,6 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     }
 
     return tsf;
-#else
-    notImplemented("Not implemented for foam extend");
-    return tmp<surfaceVectorField>();
-#endif
 };
 
 

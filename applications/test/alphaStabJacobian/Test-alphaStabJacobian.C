@@ -46,7 +46,7 @@ Author
 
 #include "fvCFD.H"
 
-#if defined(FOAMEXTEND) || !defined(USE_PETSC)
+#ifndef USE_PETSC
 
 using namespace Foam;
 
