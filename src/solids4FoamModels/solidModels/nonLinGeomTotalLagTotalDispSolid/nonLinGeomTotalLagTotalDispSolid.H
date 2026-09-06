@@ -113,9 +113,10 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- The law's own volumetric response, dU/dJ
         //  Only built when solvePressure is enabled on the constitutive-law
-        //  framework. The value is not used: what matters is that asking for
-        //  it leaves the stress without its volumetric part, which is the
-        //  part the solved pressure goes on to supply
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value itself is what checkVolumetricClosure compares against
+        //  the volumetric energy the pressure equation was written for
         mutable autoPtr<volScalarField> volumetricResponsePtr_;
 
         //- Predict new time-step fields using the velocity field

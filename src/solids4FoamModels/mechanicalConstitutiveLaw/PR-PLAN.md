@@ -86,10 +86,23 @@ E1 is the one that changes an answer rather than reproducing one. On problem3,
 with `dev()` projection `|D|` is 0.00113675 and with the declared split it is
 0.00115475 - a 1.6% difference which is entirely the spherical part of the
 active tension that a projection discards and the pressure never restores.
-It also required fixing `GuccioneElastic`, which ignored
-`tangentRequest::scalarDeviatoric` and returned an implicit stiffness about
-seventy times too large for a mixed formulation, so that the linear solve
-never converged. Nothing had ever run that combination.
+Two independent reviews agreed the split is the correct reading for this
+formulation, on the grounds that the pressure residual ties `p` to `dU/dJ` and
+to nothing else, so a term with no potential behind it belongs in the stress.
+
+Nothing had ever run that combination, and getting it to run turned up four
+things, which is worth knowing before this stage is reviewed:
+
+  - `GuccioneElastic` ignored `tangentRequest::scalarDeviatoric` and returned
+    an implicit stiffness about seventy times too large for a mixed
+    formulation, so the linear solve never converged.
+  - the response's fourth-order-tangent constructor left `volumetricPtr_`
+    uninitialised, which nothing had dereferenced before.
+  - the high-order Jacobian recovers `mu` from `impK` assuming the
+    displacement form, and would have got a negative shear modulus.
+  - the pressure equation hard-codes the volumetric energy it assumes, which
+    `providesVolumetricSplit()` does not promise. It is now checked against
+    what the law returns.
 
 ## What is not ready, and should not be in any of these
 
