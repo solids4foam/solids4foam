@@ -73,7 +73,8 @@ Type kExactLeastSquares::evaluateAtPoint
 
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
-    const CompactListList<label>& stencils = stencil().cellsStencil();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
 
     // Construct all coefficient and moment tables collectively before
     // checking for the negative cell marker used by parallel point evaluation.
@@ -157,15 +158,29 @@ void kExactLeastSquares::fGrad
     const fvMesh& mesh = mesh_;
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc =  stencil().remoteCellLocation();
-    const CompactListList<label>& stencils = faceGradStencil();
-    const CompactListList<label>& cellStencils = stencil().cellsStencil();
+    auto& stencils = compactListListCRef(faceGradStencil());
+    auto& cellStencils =
+        compactListListCRef(stencil().cellsStencil());
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& coeffs =
+        const_cast<List<CompactListList<vector>>&>(faceGradCoeffs());
+#else
     const List<CompactListList<vector>>& coeffs = faceGradCoeffs();
+#endif
     const List<List<FixedList<label, 2>>>& boundaryDataStencil =
         faceBoundaryDataStencil();
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& boundaryDataCoeffs =
+        const_cast<List<CompactListList<vector>>&>
+        (
+            faceBoundaryDataCoeffs()
+        );
+#else
     const List<CompactListList<vector>>& boundaryDataCoeffs =
         faceBoundaryDataCoeffs();
-    const CompactListList<point>& faceQuadPoints =
-        quadrature().faceQuadPoints();
+#endif
+    auto& faceQuadPoints =
+        compactListListCRef(quadrature().faceQuadPoints());
 
     if (result.size() != faceQuadPoints.size())
     {
@@ -201,7 +216,7 @@ void kExactLeastSquares::fGrad
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
         const UList<label>& stencil = stencils[faceI];
-        const CompactListList<vector>& faceCoeffs = coeffs[faceI];
+        auto& faceCoeffs = coeffs[faceI];
 
         forAll(faceQuadPoints[faceI], qpI)
         {
@@ -233,7 +248,10 @@ void kExactLeastSquares::fGrad
         const polyPatch& pp = mesh.boundaryMesh()[patchI];
         const bool symmetryPatch =
             isA<symmetryPolyPatch>(pp)
-         || isA<symmetryPlanePolyPatch>(pp);
+#ifndef FOAMEXTEND
+         || isA<symmetryPlanePolyPatch>(pp)
+#endif
+        ;
 
         if
         (
@@ -251,7 +269,7 @@ void kExactLeastSquares::fGrad
         {
             const label faceI = patchStart + patchFaceI;
             const UList<label>& stencil = stencils[faceI];
-            const CompactListList<vector>& faceCoeffs = coeffs[faceI];
+            auto& faceCoeffs = coeffs[faceI];
 
             forAll(faceQuadPoints[faceI], qpI)
             {
@@ -288,7 +306,11 @@ void kExactLeastSquares::fGrad
         const processorFvPatch& procPatch =
             refCast<const processorFvPatch>(patch);
         const labelUList& faceCells = patch.faceCells();
+#ifdef FOAMEXTEND
+        const label patchStart = patch.patch().start();
+#else
         const label patchStart = patch.start();
+#endif
 
         label nValues = 0;
         forAll(patch, patchFaceI)
@@ -371,7 +393,9 @@ void kExactLeastSquares::fGrad
         if
         (
            !isA<symmetryPolyPatch>(pp)
+#ifndef FOAMEXTEND
          && !isA<symmetryPlanePolyPatch>(pp)
+#endif
         )
         {
             continue;
@@ -382,7 +406,11 @@ void kExactLeastSquares::fGrad
 
         forAll(patch, patchFaceI)
         {
+#ifdef FOAMEXTEND
+            const label faceI = patch.patch().start() + patchFaceI;
+#else
             const label faceI = patch.start() + patchFaceI;
+#endif
             const label ownCellI = faceCells[patchFaceI];
             const labelUList& cellStencil = cellStencils[ownCellI];
             const label Nn = cellStencil.size();
@@ -390,7 +418,7 @@ void kExactLeastSquares::fGrad
                 I - 2.0*sqr(patchNormals[patchFaceI]);
             const Type& ownerValue = vfI[ownCellI];
             const Type mirroredOwnerValue = transform(R, ownerValue);
-            const CompactListList<vector>& faceCoefficients =
+            auto& faceCoefficients =
                 coeffs[faceI];
 
             forAll(faceQuadPoints[faceI], qpI)
@@ -459,7 +487,11 @@ void kExactLeastSquares::fGrad
 
         autoPtr<CompactListList<Type>> patchValuesPtr =
             patchFaceQuadValues(vf, patchI);
+#ifdef FOAMEXTEND
+        CompactListList<Type>& patchValues = autoPtrRef(patchValuesPtr);
+#else
         const CompactListList<Type>& patchValues = patchValuesPtr();
+#endif
         const polyPatch& pp = mesh.boundaryMesh()[patchI];
 
         if (patchValues.size() != pp.size())
@@ -503,10 +535,10 @@ void kExactLeastSquares::fGrad
         {
             const label faceI = pp.start() + patchFaceI;
             const labelUList& faceStencil = stencils[faceI];
-            const CompactListList<vector>& faceCoefficients = coeffs[faceI];
+            auto& faceCoefficients = coeffs[faceI];
             const List<FixedList<label, 2>>& dataStencil =
                 boundaryDataStencil[faceI];
-            const CompactListList<vector>& dataCoefficients =
+            auto& dataCoefficients =
                 boundaryDataCoeffs[faceI];
 
             forAll(faceQuadPoints[faceI], qpI)
@@ -559,8 +591,10 @@ tmp<GeometricField<
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<vector>& gradCoeffs = this->cellGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& gradCoeffs =
+        compactListListCRef(this->cellGradCoeffs());
 
     const UList<Type>& vfI = vf.internalField();
     const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
@@ -588,7 +622,7 @@ tmp<GeometricField<
         )
     );
 
-    GeometricField<GradType, fvPatchField, volMesh>& grad = tGrad.ref();
+    GeometricField<GradType, fvPatchField, volMesh>& grad = tmpRef(tGrad);
 
     forAll(stencils, cellI)
     {

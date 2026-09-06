@@ -74,20 +74,7 @@ Author
 
 #include "fvCFD.H"
 
-#ifdef FOAMEXTEND
-
-using namespace Foam;
-
-int main(int argc, char *argv[])
-{
-    Info<< "Test-highOrderGrad: SKIPPED (not available with foam-extend)"
-        << nl << endl;
-
-    return 0;
-}
-
-#else
-
+#include "compatibilityFunctions.H"
 #include "fvMeshQuadrature.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "fixedGradientFvPatchFields.H"
@@ -251,7 +238,8 @@ processorBoundaryCoverage calculateProcessorBoundaryCoverage
         coverage.remoteValues += remoteCells[procI].size();
     }
 
-    const CompactListList<label>& cellStencils = stencil.cellsStencil();
+    auto& cellStencils =
+        compactListListCRef(stencil.cellsStencil());
     forAll(cellStencils, cellI)
     {
         forAll(cellStencils[cellI], stencilI)
@@ -264,8 +252,10 @@ processorBoundaryCoverage calculateProcessorBoundaryCoverage
         }
     }
 
-    const CompactListList<label>& faceStencils =
-        reconstruction.faceGradStencil();
+    auto& faceStencils = compactListListCRef
+    (
+        reconstruction.faceGradStencil()
+    );
 
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
@@ -334,8 +324,10 @@ label countPatchQuadraturePoints
     const leastSquaresScheme& reconstruction
 )
 {
-    const CompactListList<point>& faceQuadPoints =
-        reconstruction.quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadPoints()
+    );
     label nPoints = 0;
 
     forAll(patchMask, patchI)
@@ -420,10 +412,14 @@ scalar calculateFixedDisplacementBoundaryError
 )
 {
     const vector componentScales(1.0, -0.7, 1.3);
-    const CompactListList<point>& cellQuadPoints =
-        exactQuadrature.cellQuadPoints();
-    const CompactListList<scalar>& cellQuadWeights =
-        exactQuadrature.cellQuadWeights();
+    auto& cellQuadPoints = compactListListCRef
+    (
+        exactQuadrature.cellQuadPoints()
+    );
+    auto& cellQuadWeights = compactListListCRef
+    (
+        exactQuadrature.cellQuadWeights()
+    );
     const scalarField& volumes = mesh.V();
 
     forAll(displacement, cellI)
@@ -463,10 +459,12 @@ scalar calculateFixedDisplacementBoundaryError
     }
 
     fvPatchVectorField& fixedPatch =
-        displacement.boundaryFieldRef()[patchI];
+        boundaryFieldRef(displacement)[patchI];
     const polyPatch& pp = mesh.boundaryMesh()[patchI];
-    const CompactListList<point>& faceQuadPoints =
-        reconstruction.quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadPoints()
+    );
 
     forAll(fixedPatch, patchFaceI)
     {
@@ -539,7 +537,7 @@ scalar calculateConstantFixedDisplacementBoundaryError
         }
 
         fvPatchVectorField& fixedPatch =
-            displacement.boundaryFieldRef()[patchI];
+            boundaryFieldRef(displacement)[patchI];
 
         forAll(fixedPatch, patchFaceI)
         {
@@ -547,8 +545,10 @@ scalar calculateConstantFixedDisplacementBoundaryError
         }
     }
 
-    const CompactListList<point>& faceQuadPoints =
-        reconstruction.quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadPoints()
+    );
     CompactListList<tensor> faceGrad(faceQuadPoints.sizes());
     reconstruction.fGrad(displacement, faceGrad);
     scalar error = 0.0;
@@ -588,10 +588,14 @@ void setPolynomialFields
     volVectorField& vectorPhi
 )
 {
-    const CompactListList<point>& cellQuadPoints =
-        exactQuadrature.cellQuadPoints();
-    const CompactListList<scalar>& cellQuadWeights =
-        exactQuadrature.cellQuadWeights();
+    auto& cellQuadPoints = compactListListCRef
+    (
+        exactQuadrature.cellQuadPoints()
+    );
+    auto& cellQuadWeights = compactListListCRef
+    (
+        exactQuadrature.cellQuadWeights()
+    );
     const scalarField& volumes = mesh.V();
 
     const vector componentScales(1.0, -0.7, 1.3);
@@ -701,8 +705,10 @@ void calculateFaceGradErrors
 )
 {
     const vector componentScales(1.0, -0.7, 1.3);
-    const CompactListList<point>& faceQuadPoints =
-        reconstruction.quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadPoints()
+    );
     CompactListList<vector> faceGrad(faceQuadPoints.sizes());
     reconstruction.fGrad(phi, faceGrad);
     CompactListList<tensor> vectorFaceGrad(faceQuadPoints.sizes());
@@ -946,6 +952,31 @@ int main(int argc, char *argv[])
     #include "setRootCase.H"
     #include "createTime.H"
 
+#ifdef FOAMEXTEND
+    autoPtr<dynamicFvMesh> meshPtr = dynamicFvMesh::New
+    (
+        IOobject
+        (
+            dynamicFvMesh::defaultRegion,
+            runTime.timeName(),
+            runTime,
+            IOobject::MUST_READ
+        )
+    );
+    dynamicFvMesh& mesh = autoPtrRef(meshPtr);
+    volVectorField displacement
+    (
+        IOobject
+        (
+            "D",
+            runTime.timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh
+    );
+#else
     autoPtr<solidModel> solidPtr = solidModel::New
     (
         runTime,
@@ -953,6 +984,8 @@ int main(int argc, char *argv[])
     );
     solidModel& solid = solidPtr();
     dynamicFvMesh& mesh = solid.mesh();
+    volVectorField& displacement = solid.solutionD();
+#endif
 
     if (mesh.nGeometricD() != 2 && mesh.nGeometricD() != 3)
     {
@@ -1019,7 +1052,7 @@ int main(int argc, char *argv[])
         reconstruction.type() == "kExactLeastSquares";
 
     const boolList physicalNeumannPatches =
-        physicalNeumannPatchMask(mesh, solid.solutionD());
+        physicalNeumannPatchMask(mesh, displacement);
     const label nNeumannQuadraturePoints = countPatchQuadraturePoints
     (
         physicalNeumannPatches,
@@ -1169,8 +1202,6 @@ int main(int argc, char *argv[])
 
     if (!Pstream::parRun())
     {
-        volVectorField& displacement = solid.solutionD();
-
         label fixedPatchI = -1;
         boolList allFixedPatchMask(mesh.boundary().size(), false);
 
@@ -1236,8 +1267,10 @@ int main(int argc, char *argv[])
                 fixedReconstructionPtr();
             const polyPatch& fixedPatch =
                 mesh.boundaryMesh()[fixedPatchI];
-            const CompactListList<point>& fixedFaceQuadPoints =
-                fixedReconstruction.quadrature().faceQuadPoints();
+            auto& fixedFaceQuadPoints = compactListListCRef
+            (
+                fixedReconstruction.quadrature().faceQuadPoints()
+            );
             const point origin =
                 fixedFaceQuadPoints[fixedPatch.start()][0];
             vector normal = sum(fixedPatch.faceAreas());
@@ -1332,5 +1365,3 @@ int main(int argc, char *argv[])
 
 
 // ************************************************************************* //
-
-#endif // FOAMEXTEND

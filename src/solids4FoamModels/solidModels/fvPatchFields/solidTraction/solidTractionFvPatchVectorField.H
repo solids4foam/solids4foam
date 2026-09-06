@@ -69,10 +69,8 @@ class solidTractionFvPatchVectorField
         //- Traction
         mutable vectorField traction_;
 
-#ifndef FOAMEXTEND
         //- Traction component at the face quadrature points
         mutable autoPtr<CompactListList<vector>> tractionQuadraturePtr_;
-#endif
 
         //- Pressure
         mutable scalarField pressure_;
@@ -190,22 +188,18 @@ public:
 
             virtual vectorField& traction()
             {
-#ifndef FOAMEXTEND
                 tractionQuadraturePtr_.clear();
-#endif
                 return traction_;
             }
 
             //- Set face traction and use it as a constant quadrature value
             void setTraction(const vectorField& traction);
 
-#ifndef FOAMEXTEND
             //- Set traction component at the face quadrature points
             void setTractionQuadrature
             (
                 const CompactListList<vector>& tractionQuadrature
             );
-#endif
 
             virtual const scalarField& pressure() const
             {
@@ -258,10 +252,8 @@ public:
 #endif
         );
 
-#ifndef FOAMEXTEND
         //- Return face quadrature values, used for high order solvers
         virtual autoPtr<CompactListList<vector>> evaluateQuadrature() const;
-#endif
 
 
         //- Write

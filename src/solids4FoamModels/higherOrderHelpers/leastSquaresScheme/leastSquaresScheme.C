@@ -45,7 +45,8 @@ void leastSquaresScheme::makeFaceCentreValueCoeffs() const
             << "Pointer already set" << abort(FatalError);
     }
 
-    const CompactListList<label>& cellStencils = stencil().cellsStencil();
+    auto& cellStencils =
+        compactListListCRef(stencil().cellsStencil());
     const labelUList& owner = mesh_.owner();
     const labelUList& neighbour = mesh_.neighbour();
     const vectorField& faceCentres = mesh_.Cf();
@@ -80,9 +81,10 @@ void leastSquaresScheme::makeFaceCentreValueCoeffs() const
         new CompactListList<scalar>(neighbourRowSizes)
     );
 
-    CompactListList<scalar>& ownerCoeffs =  *ownerFaceCentreValueCoeffsPtr_;
+    CompactListList<scalar>& ownerCoeffs =
+        autoPtrRef(ownerFaceCentreValueCoeffsPtr_);
     CompactListList<scalar>& neighbourCoeffs =
-        *neighbourFaceCentreValueCoeffsPtr_;
+        autoPtrRef(neighbourFaceCentreValueCoeffsPtr_);
 
     for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
     {
@@ -132,7 +134,7 @@ leastSquaresScheme::ownerFaceCentreValueCoeffs() const
         makeFaceCentreValueCoeffs();
     }
 
-    return *ownerFaceCentreValueCoeffsPtr_;
+    return autoPtrRef(ownerFaceCentreValueCoeffsPtr_);
 }
 
 
@@ -144,7 +146,7 @@ leastSquaresScheme::neighbourFaceCentreValueCoeffs() const
         makeFaceCentreValueCoeffs();
     }
 
-    return *neighbourFaceCentreValueCoeffsPtr_;
+    return autoPtrRef(neighbourFaceCentreValueCoeffsPtr_);
 }
 
 
@@ -186,7 +188,9 @@ Type leastSquaresScheme::evaluateCellValueCoeffs
     const List<Field<Type>>& remoteField
 ) const
 {
-    const UList<label>& cellStencil = stencil().cellsStencil()[cellI];
+    auto& cellStencils =
+        compactListListCRef(stencil().cellsStencil());
+    const UList<label> cellStencil = cellStencils[cellI];
 
     if (coeffs.size() != cellStencil.size() + 1)
     {
@@ -247,10 +251,10 @@ void leastSquaresScheme::evaluateFaceCentreValues
 ) const
 {
     // Preliminaries
-    const CompactListList<scalar>& ownerCoeffs =
-        ownerFaceCentreValueCoeffs();
-    const CompactListList<scalar>& neighbourCoeffs =
-        neighbourFaceCentreValueCoeffs();
+    auto& ownerCoeffs =
+        compactListListCRef(ownerFaceCentreValueCoeffs());
+    auto& neighbourCoeffs =
+        compactListListCRef(neighbourFaceCentreValueCoeffs());
 
     const leastSquaresStencil& cellStencil = stencil();
     const globalIndex& globalCells = cellStencil.globalCells();
@@ -311,7 +315,11 @@ void leastSquaresScheme::evaluateFaceCentreValues
 
         forAll(patch, patchFaceI)
         {
+#ifdef FOAMEXTEND
+            const label faceI = patch.patch().start() + patchFaceI;
+#else
             const label faceI = patch.start() + patchFaceI;
+#endif
 
             patchOwnerValues[patchFaceI] = evaluateCellValueCoeffs
             (

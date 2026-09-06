@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#if defined(USE_PETSC) && !defined(FOAMEXTEND)
+#ifdef USE_PETSC
 
 #include <algorithm>
 
@@ -219,12 +219,24 @@ static label hofvmLaplacianPETSc
 
     // Face quadrature points weights, stencils and gradient interpolation
     // coefficients
-    const CompactListList<scalar>& faceQuadWeights =
-        reconstruction.quadrature().faceQuadWeights();
-    const CompactListList<label>& stencils =
-        reconstruction.faceGradStencil();
+    auto& faceQuadWeights = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadWeights()
+    );
+    auto& stencils = compactListListCRef
+    (
+        reconstruction.faceGradStencil()
+    );
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& gradCoeffs =
+        const_cast<List<CompactListList<vector>>&>
+        (
+            reconstruction.faceGradCoeffs()
+        );
+#else
     const List<CompactListList<vector>>& gradCoeffs =
         reconstruction.faceGradCoeffs();
+#endif
 
     // Get the blockSize
     label blockSize = -1;
@@ -547,10 +559,14 @@ label Foam::hofvm::initialiseJacobian
         AssertPETSc(MatSetFromOptions(jac));
     }
 
-    const CompactListList<label>& stencils =
-        reconstruction.faceGradStencil();
-    const CompactListList<label>& cellStencils =
-        reconstruction.stencil().cellsStencil();
+    auto& stencils = compactListListCRef
+    (
+        reconstruction.faceGradStencil()
+    );
+    auto& cellStencils = compactListListCRef
+    (
+        reconstruction.stencil().cellsStencil()
+    );
     const globalIndex& reconstructionGlobalCells =
         reconstruction.stencil().globalCells();
 
@@ -681,7 +697,7 @@ label Foam::hofvm::initialiseJacobian
         }
     }
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
     const label myProcNo = Pstream::myProcNo();
     const label gStart = petscSnesHelper.globalCells().offset(myProcNo);
     const label gEnd =
@@ -859,15 +875,21 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
     const scalarField& magSfI = mesh.magSf().internalField();
     const scalarField& diffusivityI = diffusivity.internalField();
 
-    const CompactListList<label>& cellStencils =
-        reconstruction.stencil().cellsStencil();
+    auto& cellStencils = compactListListCRef
+    (
+        reconstruction.stencil().cellsStencil()
+    );
     const globalIndex& globalCells = reconstruction.stencil().globalCells();
 
     // Get owner and neighbour side value reconstruction coefficients
-    const CompactListList<scalar>& ownerCoeffs =
-        reconstruction.ownerFaceCentreValueCoeffs();
-    const CompactListList<scalar>& neighbourCoeffs =
-        reconstruction.neighbourFaceCentreValueCoeffs();
+    auto& ownerCoeffs = compactListListCRef
+    (
+        reconstruction.ownerFaceCentreValueCoeffs()
+    );
+    auto& neighbourCoeffs = compactListListCRef
+    (
+        reconstruction.neighbourFaceCentreValueCoeffs()
+    );
 
     label blockSize = -1;
     AssertPETSc(MatGetBlockSize(jac, &blockSize));
@@ -982,7 +1004,11 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
 
         forAll(patch, patchFaceI)
         {
+#ifdef FOAMEXTEND
+            const label faceI = patch.patch().start() + patchFaceI;
+#else
             const label faceI = patch.start() + patchFaceI;
+#endif
             const label ownCellID = faceCells[patchFaceI];
             const PetscInt globalOwnRow =
                 petscSnesHelper.globalCells().toGlobal(ownCellID);

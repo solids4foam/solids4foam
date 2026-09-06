@@ -163,7 +163,6 @@ link_case_files_for_suffix() {
 
 
 run_parallel_case() {
-    solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     solids4Foam::requirePetscOrExitSilently
 
@@ -191,11 +190,6 @@ run_parallel_high_order_grad_test() {
     local least_squares_type="$1"
     local suffix="${least_squares_type}.parallel"
     local log_file="${CASE_DIR}/log.Test-highOrderGrad.${suffix}"
-
-    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-        echo "SKIP: Test-highOrderGrad is not available with foam-extend"
-        return 0
-    fi
 
     if ! command -v Test-highOrderGrad >/dev/null 2>&1; then
         echo "SKIP: Test-highOrderGrad is not available"

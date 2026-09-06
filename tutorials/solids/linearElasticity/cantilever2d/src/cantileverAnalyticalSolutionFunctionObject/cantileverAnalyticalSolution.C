@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -47,7 +48,6 @@ calculateAnalyticalCellDisplacement
     vectorField& analyticalD
 ) const
 {
-#ifndef FOAMEXTEND
     const solidModel& solMod = lookupSolidModel(mesh);
     bool useCellAverage = false;
 
@@ -70,10 +70,14 @@ calculateAnalyticalCellDisplacement
     {
         const fvMeshQuadrature& quadrature =
             solMod.displacementLeastSquares().quadrature();
-        const CompactListList<point>& cellQuadPoints =
-            quadrature.cellQuadPoints();
-        const CompactListList<scalar>& cellQuadWeights =
-            quadrature.cellQuadWeights();
+        auto& cellQuadPoints = compactListListCRef
+        (
+            quadrature.cellQuadPoints()
+        );
+        auto& cellQuadWeights = compactListListCRef
+        (
+            quadrature.cellQuadWeights()
+        );
         const scalarField& cellVolumes = mesh.V();
 
         Info<< "Using cell-average analytical displacement" << endl;
@@ -96,7 +100,6 @@ calculateAnalyticalCellDisplacement
         }
     }
     else
-#endif
     {
         Info<< "Using point-valued analytical displacement" << endl;
 

@@ -63,9 +63,7 @@ SourceFiles
     #include "NamedEnum.H"
 #endif
 
-#ifndef FOAMEXTEND
-    #include "leastSquaresReconstruction.H"
-#endif
+#include "leastSquaresReconstruction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -313,14 +311,11 @@ private:
         //- Make the p field
         void makeP() const;
 
-#ifndef FOAMEXTEND
         //- Make the sigma at face quadrature points field
         void makeSigmaQuad() const;
 
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
-
-#endif
 
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
@@ -696,7 +691,6 @@ public:
                 return gradD_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to gradD at face quadrature points
             virtual CompactListList<tensor>& gradDQuad()
             {
@@ -718,7 +712,6 @@ public:
 
                 return autoPtrRef(gradDQuadPtr_);
             }
-#endif
 
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
@@ -744,7 +737,6 @@ public:
                 return sigma_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to sigma at face quarature points
             virtual CompactListList<symmTensor>& sigmaQuad()
             {
@@ -766,7 +758,6 @@ public:
 
                 return autoPtrRef(sigmaQuadPtr_);
             }
-#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
@@ -798,7 +789,6 @@ public:
             {
                 return twoD_;
             }
-#ifndef FOAMEXTEND
             //- Return the displacement least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& displacementLeastSquares() const;
@@ -806,7 +796,7 @@ public:
             //- Return the pressure least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& pressureLeastSquares() const;
-#endif
+
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -939,14 +929,12 @@ public:
                 const vectorField& traction
             );
 
-#ifndef FOAMEXTEND
             //- Set traction component at specified patch quadrature points
             virtual void setTractionQuadrature
             (
                 fvPatchVectorField& tractionPatch,
                 const CompactListList<vector>& traction
             );
-#endif
 
             //- Set traction at specified patch
             virtual void setTraction

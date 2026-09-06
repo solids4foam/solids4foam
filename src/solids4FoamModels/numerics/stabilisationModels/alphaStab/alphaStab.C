@@ -104,7 +104,6 @@ void Foam::alphaStab::updateScalar
 
     if (solMod.highOrderResidual())
     {
-#ifndef FOAMEXTEND
         computeDiffStencilHighOrder
         (
             p,
@@ -112,9 +111,6 @@ void Foam::alphaStab::updateScalar
             scaleFactor_,
             solMod.pressureLeastSquares()
         );
-#else
-        computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
-#endif
     }
     else
     {
@@ -171,7 +167,6 @@ void Foam::alphaStab::updateVector
 
     if (solMod.highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update the high-order stabilisation
         computeDiffStencilHighOrder
         (
@@ -180,15 +175,6 @@ void Foam::alphaStab::updateVector
             scaleFactor_,
             solMod.displacementLeastSquares()
         );
-#else
-        computeDiffStencil
-        (
-            p,
-            gradP,
-            autoPtrRef(faceVectorPtr()),
-            scaleFactor_
-        );
-#endif
     }
     else
     {

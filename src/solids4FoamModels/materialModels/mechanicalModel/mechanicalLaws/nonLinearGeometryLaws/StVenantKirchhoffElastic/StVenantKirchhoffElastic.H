@@ -121,13 +121,11 @@ public:
 
         //- Calculate the stress at face quadrature points given the
         //  displacement gradient at quadrature points
-#ifndef FOAMEXTEND
         virtual void correct
         (
             CompactListList<symmTensor>& sigmaQuad,
             const CompactListList<tensor>& gradDQuad
         );
-#endif
 
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly

@@ -612,7 +612,6 @@ void Foam::mechanicalModel::correct
 }
 
 
-#ifndef FOAMEXTEND
 void Foam::mechanicalModel::correct
 (
     const CompactListList<tensor>& gradDQuad,
@@ -634,7 +633,6 @@ void Foam::mechanicalModel::correct
         );
     }
 }
-#endif
 
 
 void Foam::mechanicalModel::mapGradToSubMeshes(const volTensorField& gradD)
@@ -701,7 +699,6 @@ void Foam::mechanicalModel::grad
 }
 
 
-#ifndef FOAMEXTEND
 void Foam::mechanicalModel::grad
 (
     const volVectorField& D,
@@ -723,7 +720,6 @@ void Foam::mechanicalModel::grad
         );
     }
 }
-#endif
 
 
 void Foam::mechanicalModel::grad

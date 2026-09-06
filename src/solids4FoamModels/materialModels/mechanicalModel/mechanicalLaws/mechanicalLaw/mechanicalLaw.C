@@ -1723,7 +1723,6 @@ void Foam::mechanicalLaw::correct
 }
 
 
-#ifndef FOAMEXTEND
 void Foam::mechanicalLaw::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
@@ -1737,7 +1736,6 @@ void Foam::mechanicalLaw::correct
         "\n for the " + type() + " mechanical law"
     );
 }
-#endif
 
 
 Foam::scalar Foam::mechanicalLaw::residual()
