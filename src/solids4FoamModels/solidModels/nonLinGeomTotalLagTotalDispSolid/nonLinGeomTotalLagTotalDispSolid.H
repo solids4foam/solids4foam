@@ -167,6 +167,11 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
 
+        //- Replace the volumetric part of the stress with the solved
+        //  pressure. Both the residual and the linear predictor do this and
+        //  they have to agree, so it lives here rather than at each of them
+        void replaceVolumetricStress(const volScalarField& p);
+
         //- Somewhere for the law to put its volumetric response
         volScalarField& volumetricResponse() const;
 

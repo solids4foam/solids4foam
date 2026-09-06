@@ -165,7 +165,32 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
         // p() = p().oldTime() + dpdt*runTime().deltaT()
         //     + 0.5*sqr(runTime().deltaT())*d2pdt2;
 
-        sigma() = dev(sigma()) - p()*I;
+        replaceVolumetricStress(p());
+    }
+}
+
+
+void nonLinGeomTotalLagTotalDispSolid::replaceVolumetricStress
+(
+    const volScalarField& p
+)
+{
+    // On the framework path correctStress() has already left the stress
+    // without its volumetric response, so the solved pressure is simply
+    // added. The legacy path has to project, because a law that cannot
+    // separate the two gives nothing else to work with - and the projection
+    // is right only where what remains is trace free, which an active tension
+    // along a fibre direction is not.
+    //
+    // In one place because there is more than one caller: the residual and
+    // the linear predictor both do this, and they have to agree
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        sigma() = sigma() - p*I;
+    }
+    else
+    {
+        sigma() = dev(sigma()) - p*I;
     }
 }
 
@@ -1347,14 +1372,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // volumetric response, so the pressure is simply added; the
         // deviatoric projection is what the legacy path has to fall back on,
         // and it is right only for a law whose remaining stress is trace free
-        if (useMechanicalConstitutiveLawManager_)
-        {
-            sigma() = sigma() - p*I;
-        }
-        else
-        {
-            sigma() = dev(sigma()) - p*I;
-        }
+        replaceVolumetricStress(p);
 
         // Calculate the pressure gradient
         const volVectorField gradp(fvc::grad(p));

@@ -2190,7 +2190,26 @@ dereferenced it, because no law reached by that constructor called
 The member now defaults to `nullptr` where it is declared as well as in every
 constructor, so leaving it out of a future one cannot bring this back.
 
-### 22.5 Still open
+### 22.5 The second call site
+
+A review found that `predict()` did the replacement too, and did it
+unconditionally:
+
+    sigma() = dev(sigma()) - p()*I;
+
+so on the framework path it re-projected out the active tension's mean stress
+that `correctStress()` had just been changed to keep. Two call sites that have
+to agree and did not.
+
+The branch now lives in one place, `replaceVolumetricStress`, and both callers
+use it. The converged answer does not move - checked, with the predictor
+enabled, against both the old and the new form, and both give 0.00115475 -
+because the predictor only sets the starting point for the Newton solve and
+the residual was already right. So this was an inconsistency rather than a
+wrong result, and it is worth saying which: a check that has never failed is
+not evidence, and neither is a fix whose effect was never measured.
+
+### 22.6 Still open
 
 The small-strain path has no split. `linGeomTotalDispSolid` keeps
 `dev(sigma()) - p*I`, which is exact for isotropic linear elasticity and wrong
