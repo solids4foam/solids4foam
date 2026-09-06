@@ -84,7 +84,7 @@ tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
 
     const vectorField normal(mesh().faceAreas()/mag(mesh().faceAreas()));
     const CompactListList<scalar>& quadW =
-        displacementMLS().quadrature().faceQuadWeights();
+        displacementLeastSquares().quadrature().faceQuadWeights();
     const CompactListList<tensor>& quadGradD = gradDQuad();
 
     // Only boundary values are required for enforcing traction conditions
@@ -156,7 +156,7 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     J_ = det(F_);
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 
     if (solvePressure())
     {
@@ -165,7 +165,103 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
         // p() = p().oldTime() + dpdt*runTime().deltaT()
         //     + 0.5*sqr(runTime().deltaT())*d2pdt2;
 
-        sigma() = dev(sigma()) - p()*I;
+        replaceVolumetricStress(p());
+    }
+}
+
+
+void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
+{
+    if (volumetricClosureChecked_)
+    {
+        return;
+    }
+
+
+    // The pressure equation hard-codes its half of the constitutive model:
+    // its residual is -p/K + stabilisation - 0.5*(J^2 - 1)/J, so it assumes
+    // the law's volumetric energy is U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)) and
+    // takes K from the mechanical model. Nothing in providesVolumetricSplit()
+    // promises that. A law with a different U(J) would separate its response
+    // honestly and then be solved against a pressure equation describing a
+    // different material - silently, because both halves are individually
+    // reasonable.
+    //
+    // The response the law returns is exactly dU/dJ, so the assumption can be
+    // checked rather than trusted. Once is enough: it is a property of the
+    // law, not of the state
+    const volScalarField assumed
+    (
+        0.5*(sqr(J_) - 1.0)/(J_*rKappa())
+    );
+
+    const volScalarField& actual = volumetricResponse();
+
+    // Guarded on the size of the comparison rather than on a threshold in
+    // the kinematics. Both responses are zero in an undeformed material, and
+    // for a nearly incompressible case they stay small for ever - plateHole's
+    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
+    // either fires on nothing or never fires at all. What matters is only
+    // that there is something to compare: once either response is non-zero
+    // the comparison is relative and means something at any magnitude
+    const scalar scale =
+        max
+        (
+            gMax(mag(Foam::primitiveField(assumed))),
+            gMax(mag(Foam::primitiveField(actual)))
+        );
+
+    if (scale <= 0)
+    {
+        return;
+    }
+
+    volumetricClosureChecked_ = true;
+    const scalar err =
+        gMax
+        (
+            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
+        );
+
+    if (err > 1e-8*scale)
+    {
+        FatalErrorInFunction
+            << "The law's volumetric response is not the one the pressure "
+            << "equation was written for." << nl << nl
+            << "    The pressure equation assumes "
+            << "U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)), so dU/dJ = "
+            << "0.5*K*(J^2 - 1)/J, with K taken from the mechanical model. "
+            << "The law returned something else: the largest difference is "
+            << err << " against a response of order " << scale << '.' << nl << nl
+            << "    Separating the volumetric response honestly is not enough "
+            << "on its own - the pressure equation has to be solving for the "
+            << "same thing, or the two halves describe different materials."
+            << exit(FatalError);
+    }
+}
+
+
+void nonLinGeomTotalLagTotalDispSolid::replaceVolumetricStress
+(
+    const volScalarField& p
+)
+{
+    // On the framework path correctStress() has already left the stress
+    // without its volumetric response, so the solved pressure is simply
+    // added. The legacy path has to project, because a law that cannot
+    // separate the two gives nothing else to work with - and the projection
+    // is right only where what remains is trace free, which an active tension
+    // along a fibre direction is not.
+    //
+    // In one place because there is more than one caller: the residual and
+    // the linear predictor both do this, and they have to agree
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        sigma() = sigma() - p*I;
+    }
+    else
+    {
+        sigma() = dev(sigma()) - p*I;
     }
 }
 
@@ -208,7 +304,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 #ifndef FOAMEXTEND
                 // Face quadrature weights include the reference face area
                 const CompactListList<scalar>& faceQuadWeights =
-                    displacementMLS().quadrature().faceQuadWeights();
+                    displacementLeastSquares().quadrature().faceQuadWeights();
 
                 const CompactListList<tensor>& faceGradD = gradDQuad();
 
@@ -495,7 +591,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         const volScalarField DEqnA("DEqnA", DEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -611,14 +707,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     {
 #ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
-        gradD() = displacementMLS().grad(D());
+        gradD() = displacementLeastSquares().grad(D());
         F_ = I + gradD().T();
         Finv_ = inv(F_);
         J_ = det(F_);
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
 
@@ -648,6 +744,244 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 #endif
 
     return true;
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+Foam::scalar Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // A framework law is a pure function of the kinematics and the old-time
+    // state, and the framework deliberately does not under-relax the plastic
+    // strain increment as the legacy law does, so the constitutive update does
+    // not lag the displacement solution between outer iterations. There is
+    // therefore nothing for a material residual to measure, and convergence is
+    // governed by the displacement residuals alone.
+    //
+    // Querying the legacy law here instead would be worse than useless: its
+    // correct() is never called on this path, so its previous-iteration fields
+    // are never stored and asking for its residual aborts
+    return 0.0;
+}
+
+
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateTotalFields()
+{
+    // The legacy path accumulates its per-step fields here
+    solidModel::updateTotalFields();
+
+    // The framework keeps its own state, and its laws may have end-of-step
+    // work or diagnostics. Nothing called this before, so those hooks were
+    // dead code
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
+}
+
+
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework takes the finite-strain kinematics explicitly rather than
+    // looking them up, and rolls the constitutive history over itself. F, J
+    // and their inverses are already members, updated immediately before every
+    // call site, and their old times are instantiated by makeImpK()
+    if (solvePressure())
+    {
+        // The pressure is an independent unknown here, and it stands in for
+        // the law's volumetric response. So the law is asked for its stress
+        // without that response rather than being asked for the total and
+        // having a deviatoric projection taken of it afterwards.
+        //
+        // The two are not the same. A projection assumes everything the
+        // pressure must not replace is trace free, which holds for an
+        // isotropic hyperelastic law written on an isochoric measure and
+        // fails as soon as anything else is present - an active tension along
+        // a fibre direction, for instance, whose spherical part the
+        // projection would discard and the pressure would not put back. Laws
+        // that cannot separate the two are refused by name
+        mechanicalManager().updateStressFiniteStrainSplit
+        (
+            F_,
+            F_.oldTime(),
+            Finv_,
+            Finv_.oldTime(),
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            volumetricResponse()
+        );
+
+        checkVolumetricClosure();
+
+        return;
+    }
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        J_,
+        J_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDQuad(), sigmaQuad());
+        return;
+    }
+
+    // The quadrature points carry their own constitutive state, distinct from
+    // the cell-centred one, because they are a different set of integration
+    // points. The old-time gradient comes from solidModel, which takes a copy
+    // at the end of each time step: the current field is rebuilt on every
+    // evaluation, so a history-dependent law would otherwise have nothing to
+    // read
+    quadDeformationGradient(gradDQuad(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadDeformationGradient(gradDQuad0(), FQuad0Ptr_);
+    quadInverseAndJacobian(FQuad0Ptr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuad0Ptr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
+{
+    // With the mixed displacement-pressure formulation the implicit stiffness
+    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
+    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu.
+    //
+    // The legacy branch below uses 2*mu here instead. That difference is
+    // deliberate and is left in: impK is the coefficient of a Laplacian that
+    // is added and subtracted, so it sets how the solution is reached and not
+    // what it is, and (4/3)*mu is the value the surrogate actually implies.
+    // linGeomTotalDispSolid already uses (4/3)*mu for the same formulation, so
+    // this also makes the two solvers agree. Only the convergence path
+    // changes, and only when the framework is switched on
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        if (solvePressure())
+        {
+            return tmp<volScalarField>
+            (
+                new volScalarField(2.0*mechanical().shearModulus())
+            );
+        }
+
+        return mechanical().impK();
+    }
+
+    // Announce it, so that a case which sets the switch can be shown to have
+    // taken this path. The switch lives in the <type>Coeffs sub-dictionary,
+    // and a switch that silently does nothing when misplaced is worse than no
+    // switch at all
+    Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
+        << " (" << tangentRequestName(req) << ")" << endl;
+
+    // Match the legacy field exactly in name, dimensions and boundary types:
+    // it is registered under "impK" and looked up by that name by the contact
+    // and cohesive zone models
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the current deformation gradient, which is the identity on
+    // a cold start and the restart value otherwise - the same state dependence
+    // the legacy impK() has, since it is likewise frozen at construction.
+    // F_, Finv_ and J_ are declared before impK_, so they are already built
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        req
+    );
+
+    return tImpK;
 }
 
 
@@ -724,12 +1058,15 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         ),
         fvc::d2dt2(D())
     ),
-    impK_
+    useMechanicalConstitutiveLawManager_
     (
-        solvePressure()
-      ? 2.0*mechanical().shearModulus()
-      : mechanical().impK()
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
     ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     rKappaPtr_(),
@@ -751,7 +1088,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     // constructor to allow it to correctly initialise fields
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     Info<< "solvePressure = " << solvePressure() << endl;
@@ -890,6 +1227,33 @@ void nonLinGeomTotalLagTotalDispSolid::makeRKappa() const
 }
 
 
+volScalarField&
+nonLinGeomTotalLagTotalDispSolid::volumetricResponse() const
+{
+    if (volumetricResponsePtr_.empty())
+    {
+        volumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "volumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return volumetricResponsePtr_();
+}
+
+
 const volScalarField& nonLinGeomTotalLagTotalDispSolid::rKappa() const
 {
     if (rKappaPtr_.empty())
@@ -960,7 +1324,7 @@ label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
         (
             jac,
             *this,
-            displacementMLS(),
+            displacementLeastSquares(),
             D(),
             blockSize_
         );
@@ -1011,11 +1375,30 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             << abort(FatalError);
     }
 
+    // The high-order Jacobian recovers the shear modulus from the implicit
+    // stiffness by mu = (3/4)*(impK - K). That inverts impK = (4/3)*mu + K,
+    // which is the value a displacement formulation asks for. A mixed
+    // formulation asks for (4/3)*mu alone, so the same expression returns
+    // mu - (3/4)*K: negative, and for this branch's cases negative by
+    // megapascals. It would assemble a Jacobian for a material with negative
+    // stiffness rather than fail
+    if (solvePressure() && highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "solvePressure must be disabled when using the high order "
+            << "Jacobian." << nl
+            << "The high order Jacobian recovers the shear modulus from the "
+            << "implicit stiffness, assuming impK = (4/3)*mu + K. With a "
+            << "pressure solved separately impK is (4/3)*mu, and that "
+            << "assumption returns a negative shear modulus."
+            << abort(FatalError);
+    }
+
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
-        gradD() = displacementMLS().grad(D);
+        gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
@@ -1053,13 +1436,13 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
 #ifndef FOAMEXTEND
         // Calculate sigma at the face quadrature points
-        mechanical().correct(gradDQuad(), sigmaQuad());
+        correctStressQuad();
 #endif
     }
     else
     {
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())
@@ -1075,8 +1458,13 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        // Replace the pressure component of stress.
+        //
+        // On the framework path the stress already arrives without its
+        // volumetric response, so the pressure is simply added; the
+        // deviatoric projection is what the legacy path has to fall back on,
+        // and it is right only for a law whose remaining stress is trace free
+        replaceVolumetricStress(p);
 
         // Calculate the pressure gradient
         const volVectorField gradp(fvc::grad(p));
@@ -1318,13 +1706,14 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         tmp<volScalarField> tLambda = impK_ - 2.0*mu;
         const volScalarField& lambda = tLambda();
 
-        const movingLeastSquares& mls = displacementMLS();
+        const leastSquaresScheme& reconstruction =
+            displacementLeastSquares();
 
         hofvm::laplacianIntoPETScMatrix
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             mu
         );
@@ -1333,7 +1722,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             mu
         );
@@ -1342,10 +1731,23 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         (
             jac,
             *this,
-            mls,
+            reconstruction,
             D,
             lambda
         );
+
+        if (momentumStabilisation().supportsHighOrderResidual())
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
+        }
 
         fvVectorMatrix transientJ
         (

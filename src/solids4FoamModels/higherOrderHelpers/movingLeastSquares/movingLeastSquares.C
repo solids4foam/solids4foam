@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "movingLeastSquares.H"
+#include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "compatibilityFunctions.H"
@@ -37,10 +38,16 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(movingLeastSquares, 0);
+addToRunTimeSelectionTable
+(
+    leastSquaresScheme,
+    movingLeastSquares,
+    dictionary
+);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-const movingLeastSquaresStencil& movingLeastSquares::stencil() const
+const leastSquaresStencil& movingLeastSquares::stencil() const
 {
     if (stencilPtr_.empty())
     {
@@ -96,6 +103,12 @@ movingLeastSquares::cellThirdGradCoeffs() const
 }
 
 
+const CompactListList<label>& movingLeastSquares::faceGradStencil() const
+{
+    return stencil().facesStencil();
+}
+
+
 const List<CompactListList<vector>>&
 movingLeastSquares::faceGradCoeffs() const
 {
@@ -105,6 +118,67 @@ movingLeastSquares::faceGradCoeffs() const
     }
 
     return autoPtrRef(faceGradCoeffsPtr_);
+}
+
+
+void movingLeastSquares::cellValueCoeffsAtPoint
+(
+    const label cellI,
+    const point& x,
+    UList<scalar>& coeffs
+) const
+{
+    const UList<label>& cellStencil = stencil().cellsStencil()[cellI];
+
+    if (coeffs.size() != cellStencil.size() + 1)
+    {
+        FatalErrorInFunction
+            << "Coefficient list size " << coeffs.size()
+            << " does not match stencil plus owner size "
+            << cellStencil.size() + 1 << " for cell " << cellI
+            << abort(FatalError);
+    }
+
+    const vector r = x - mesh_.C()[cellI];
+    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
+    const CompactListList<symmTensor>* secondDerivativeCoeffsPtr = nullptr;
+    const CompactListList<symmTensor3rdOrder>*
+        thirdDerivativeCoeffsPtr = nullptr;
+
+    if (polynomialOrder() >= 2)
+    {
+        secondDerivativeCoeffsPtr = &cellSecondGradCoeffs();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        thirdDerivativeCoeffsPtr = &cellThirdGradCoeffs();
+    }
+
+    forAll(coeffs, coeffI)
+    {
+        coeffs[coeffI] = r & gradCoeffs[coeffI];
+
+        if (secondDerivativeCoeffsPtr)
+        {
+            const symmTensor& secondDerivativeCoeff =
+                (*secondDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                0.5*(r & (secondDerivativeCoeff & r));
+        }
+        if (thirdDerivativeCoeffsPtr)
+        {
+            const symmTensor3rdOrder& thirdDerivativeCoeff =
+                (*thirdDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                (1.0/6.0)*cubicForm(thirdDerivativeCoeff, r);
+        }
+    }
+
+    // The final coefficient belongs to the central cell. Add the original
+    // cell-centre value from the Taylor expansion.
+    coeffs[cellStencil.size()] += 1.0;
 }
 
 
@@ -199,7 +273,7 @@ void movingLeastSquares::makeStencils() const
 
     stencilPtr_.set
     (
-        new movingLeastSquaresStencil
+        new leastSquaresStencil
         (
             mesh_,
             haloDepthScale_,
@@ -673,7 +747,7 @@ void movingLeastSquares::calcCellCoeffs() const
                 Eigen::RowVectorXd::Zero(A.cols())
                 : (A.row(dRows.iyz) * invh2).eval();
 
-            // Store Hessian tensor
+            // Store second-derivative tensor
             for (label i = 0; i < A.cols(); ++i)
             {
                 (*cellSecondGradCoeffsPtr_)[cellI][i] =
@@ -795,7 +869,7 @@ void movingLeastSquares::calcFaceCoeffs() const
     }
 
     // Reference to face stencils, quadrature points and remote centres
-    const CompactListList<label>& stencils = stencil().facesStencil();
+    const CompactListList<label>& stencils = faceGradStencil();
     const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
 
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
@@ -1066,7 +1140,7 @@ movingLeastSquares::movingLeastSquares
     const dictionary& dict
 )
 :
-    mesh_(mesh),
+    leastSquaresScheme(mesh),
     stencilPtr_(),
     quadraturePtr_(),
     weightFuncPtr_(),
@@ -1160,6 +1234,7 @@ movingLeastSquares::~movingLeastSquares()
 
 void Foam::movingLeastSquares::clear() const
 {
+    clearFaceCentreValueCoeffs();
     stencilPtr_.clear();
     quadraturePtr_.clear();
     weightFuncPtr_.clear();
@@ -1170,6 +1245,55 @@ void Foam::movingLeastSquares::clear() const
     faceGradCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
     faceConditionNumberPtr_.clear();
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volScalarField& vf,
+    CompactListList<vector>& result
+) const
+{
+    this->fGrad<scalar>(vf, result);
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volVectorField& vf,
+    CompactListList<tensor>& result
+) const
+{
+    this->fGrad<vector>(vf, result);
+}
+
+
+tmp<volVectorField> movingLeastSquares::grad
+(
+    const volScalarField& vf
+) const
+{
+    return this->grad<scalar>(vf);
+}
+
+
+tmp<volTensorField> movingLeastSquares::grad
+(
+    const volVectorField& vf
+) const
+{
+    return this->grad<vector>(vf);
+}
+
+
+autoPtr<CompactListList<scalar>>
+movingLeastSquares::patchFaceQuadValues
+(
+    const volScalarField& vf,
+    const label patchI
+) const
+{
+    return this->patchFaceQuadValues<scalar>(vf, patchI);
 }
 
 
@@ -1207,6 +1331,28 @@ movingLeastSquares::patchFaceQuadValues
         << abort(FatalError);
 
     return autoPtr<CompactListList<vector>>();
+}
+
+
+scalar movingLeastSquares::valueAtPoint
+(
+    const volScalarField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<scalar>(vf, cellID, x);
+}
+
+
+vector movingLeastSquares::valueAtPoint
+(
+    const volVectorField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<vector>(vf, cellID, x);
 }
 
 
@@ -1329,6 +1475,7 @@ autoPtr<List<symmTensor3rdOrder>> movingLeastSquares::thirdGrad
 
     return tThirdGrad;
 }
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

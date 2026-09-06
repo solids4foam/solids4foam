@@ -208,6 +208,52 @@ for approach in "${APPROACHES[@]}"; do
 done
 
 # ------------------------------------------------------------
+# The framework's check on GuccioneElastic's isochoric split
+# ------------------------------------------------------------
+# This case uses GuccioneElastic on its own, so its split can be checked
+# directly: a law that declares it can separate its isochoric stress from its
+# volumetric response is taken at its word by every mixed formulation, and a
+# superposed dilation is the one thing that tells an honest split from dev()
+# of a total. Where the law is wrapped in electroMechanicalLaw the check does
+# not apply, because the active tension is not derived from a potential - so
+# this is where it does apply
+run_split_check() {
+    local d
+    for d in "${REGRESSION_ROOT}"/*; do
+        [[ -d "${d}/constant/polyMesh" ]] || continue
+
+        if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+            echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
+            return 0
+        fi
+
+        if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
+        then
+            echo "FAIL: the law checks did not pass"
+            grep -m2 "FAIL:" "${d}/log.unit" || true
+            return 1
+        fi
+
+        if ! grep -q "isochoric stress ignores a superposed dilation" \
+            "${d}/log.unit"
+        then
+            echo "FAIL: GuccioneElastic's isochoric split was not checked"
+            return 1
+        fi
+
+        echo "PASS: GuccioneElastic's isochoric split is dilation invariant"
+        return 0
+    done
+
+    echo "SKIP: mechanicalConstitutiveLaw checks (no meshed case)"
+    return 0
+}
+
+if ! run_split_check; then
+    failures=$((failures + 1))
+fi
+
+# ------------------------------------------------------------
 # Cleanup
 # ------------------------------------------------------------
 

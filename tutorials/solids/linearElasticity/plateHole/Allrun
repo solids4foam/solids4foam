@@ -78,7 +78,7 @@ if [[ "${APPROACH}" == "parallel" ]]; then
 fi
 
 case "${APPROACH}" in
-    segregated|segregatedManager|petscSnes|petscSnesPressure|highOrder|highOrderFourthOrder)
+    segregated|segregatedManager|petscSnes|petscSnesPressure|petscSnesPressureManager|highOrder|highOrderFourthOrder)
         RUN_MODE="${ARG2:-serial}"
         case "${RUN_MODE}" in
             serial|parallel) ;;
@@ -225,6 +225,14 @@ select_approach() {
             solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "petscSnesPressure"
             ;;
+        petscSnesPressureManager)
+            echo "Using the mixed displacement-pressure formulation with the"\
+                 "constitutive law manager"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "petscSnesPressure"
+            rm -f constant/solidProperties
+            ln -s solidProperties.petscSnesPressureManager constant/solidProperties
+            ;;
         highOrder)
             echo "Using the highOrder approach"
             solids4Foam::caseDoesNotRunWithFoamExtend
@@ -257,7 +265,7 @@ echo
 solids4Foam::runApplication blockMesh
 
 case "${APPROACH}" in
-    segregated|segregatedManager|petscSnes|petscSnesPressure|highOrder|highOrderFourthOrder)
+    segregated|segregatedManager|petscSnes|petscSnesPressure|petscSnesPressureManager|highOrder|highOrderFourthOrder)
         if [[ "${RUN_MODE}" == "parallel" ]]; then
             solids4Foam::runApplication decomposePar
             solids4Foam::runParallel solids4Foam

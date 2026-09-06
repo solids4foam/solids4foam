@@ -68,8 +68,8 @@ void rbfInterfaceToInterfaceMapping::makeZoneAToZoneBInterpolator() const
             new RBFInterpolation(rbfFunction)
         );
 
-    const vectorField zoneBFaceCentres(zoneB().faceCentres());
-    const vectorField zoneAFaceCentres(zoneA().faceCentres());
+    const vectorField zoneBFaceCentres(zoneBRef().faceCentres());
+    const vectorField zoneAFaceCentres(zoneARef().faceCentres());
 
     matrix zoneAX(zoneAFaceCentres.size(), 3);
     matrix zoneBX(zoneBFaceCentres.size(), 3);
@@ -150,8 +150,8 @@ void rbfInterfaceToInterfaceMapping::makeZoneBToZoneAInterpolator() const
             new RBFInterpolation(rbfFunction)
         );
 
-    const vectorField zoneBPoints = zoneB().localPoints();
-    const vectorField zoneAPoints = zoneA().localPoints();
+    const vectorField zoneBPoints = zoneBRef().localPoints();
+    const vectorField zoneAPoints = zoneARef().localPoints();
 
     matrix zoneAX(zoneAPoints.size(), 3);
     matrix zoneBX(zoneBPoints.size(), 3);

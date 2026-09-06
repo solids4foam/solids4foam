@@ -60,10 +60,13 @@ Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::yieldFunction
     // q = sqrt(3/2) |s|
     // For radial return: q = qTrial - 3*muBar*DLambda
     // with epsilonPEq = epsilonPEq0 + sqrt(2/3)*DLambda
-    const scalar sigmaY =
-        yieldStress(epsilonPEq0 + sqrt(2.0/3.0)*DLambda);
+    // DLambda is the equivalent plastic strain increment itself, so the
+    // hardening curve is evaluated at epsilonPEq0 + DLambda and the return
+    // mapping reduces q by 3*mu*DLambda. See the derivation at the closed-form
+    // branch in evaluate()
+    const scalar sigmaY = yieldStress(epsilonPEq0 + DLambda);
 
-    return qTrial - 3.0*muBar*sqrt(3.0/2.0)*DLambda - sigmaY;
+    return qTrial - 3.0*muBar*DLambda - sigmaY;
 }
 
 
@@ -111,8 +114,13 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
             << "Plasticity Newton loop not converging" << nl;
     }
 
-    curSigmaY =
-        yieldStress(epsilonPEq0 + sqrt(2.0/3.0)*DLambda);
+    // At the same equivalent plastic strain the yield function was solved
+    // with, and that the strain update below uses. This law's DLambda is the
+    // equivalent plastic strain increment itself, where the legacy law's is
+    // the plastic multiplier and increments it by sqrt(2/3)*DLambda; this line
+    // kept the legacy form and so applied that factor a second time, storing a
+    // yield stress from a plastic strain the solve never visited
+    curSigmaY = yieldStress(epsilonPEq0 + DLambda);
 }
 
 
@@ -126,8 +134,8 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
 :
     mechanicalConstitutiveLaw(dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
     mu_("mu", E_.dimensions(), 0.0),
     kappa_("kappa", E_.dimensions(), 0.0),
     stressPlasticStrainSeries_(dict),
@@ -137,6 +145,39 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     maxNewtonIter_(dict.lookupOrDefault<label>("NewtonMaxIter", 200)),
     finiteDiff_(dict.lookupOrDefault<scalar>("NewtonFiniteDiffEps", 0.25e-6))
 {
+    // The material may be given either as E and nu or as mu and K, matching
+    // the legacy law, so that an existing case dictionary needs no change.
+    // The legacy law tries E and nu first, so this does too
+    if (dict.found("E") && dict.found("nu"))
+    {
+        E_ = dimensionedScalar(dict.lookup("E"));
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        const dimensionedScalar muIn(dict.lookup("mu"));
+        const dimensionedScalar KIn(dict.lookup("K"));
+
+        if (muIn.dimensions() != dimPressure || KIn.dimensions() != dimPressure)
+        {
+            FatalIOErrorInFunction(dict)
+                << "The shear modulus mu and bulk modulus K must both have "
+                << "dimensions " << dimPressure
+                << exit(FatalIOError);
+        }
+
+        // Invert mu = E/(2*(1 + nu)) and K = E/(3*(1 - 2*nu))
+        E_ = 9.0*KIn*muIn/(3.0*KIn + muIn);
+        nu_ = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+    }
+    else
+    {
+        FatalIOErrorInFunction(dict)
+            << "Specify the elastic properties either as 'E' and 'nu' or as "
+            << "'mu' and 'K'."
+            << exit(FatalIOError);
+    }
+
     if (E_.dimensions() != dimPressure)
     {
         FatalIOErrorInFunction(dict)
@@ -203,31 +244,46 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::initialiseState
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 (
-    mechanicalConstitutiveLawState& state
+    mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
-    // Total plastic strain
-    state.symmTensorField("epsilonP") = symmTensor::zero;
+    // This law's history, declared rather than created in initialiseState so
+    // that the manager knows it exists. Nothing can be written for a restart
+    // that has not been declared, and these are exactly the fields a restart
+    // has to carry: a plastic law resumed without them starts again from an
+    // unyielded state.
+    //
+    // The defaults are the values initialiseState used to assign, so a cold
+    // start is unchanged
+    spec.addSymmTensor
+    (
+        "epsilonP",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        symmTensor::zero
+    );
 
-    // Total plastic strain (old time)
-    state.symmTensorField0("epsilonP") = symmTensor::zero;
+    spec.addScalar
+    (
+        "epsilonPEq",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        0.0
+    );
 
-    // Equivalent plastic strain
-    state.scalarField("epsilonPEq") = 0.0;
-
-    // Equivalent plastic strain (old time)
-    state.scalarField0("epsilonPEq") = 0.0;
-
-    // Yield stress
-    state.scalarField("sigmaY") = stressPlasticStrainSeries_(0.0);
+    spec.addScalar
+    (
+        "sigmaY",
+        mechanicalConstitutiveLawStateSpec::stateRole::persistent,
+        stressPlasticStrainSeries_(0.0)
+    );
 }
 
 
 void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
     mechanicalConstitutiveLawState& state,
     mechanicalConstitutiveLawResponse& response
 ) const
@@ -255,6 +311,15 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     Field<scalar>& sigmaY = state.scalarField("sigmaY");
 
     // Optional scalar tangent
+    // Whether the caller wants the deviatoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does.
+    // The return mapping only ever touches the deviatoric trial stress, and
+    // J2 plasticity has no plastic volume change, so the volumetric term is
+    // already a separate quantity here rather than something to extract
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
     const bool needScalarTan = response.wantsScalarTangent();
     UIndirectList<scalar>* scalarTanPtr = nullptr;
     if (needScalarTan)
@@ -303,6 +368,12 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
             // Full stress = hydro + deviatoric
             sigma[i] = sTrial + kappa*trEps*I;
+
+            if (wantsSplit)
+            {
+                (*volumetricPtr)[i] = kappa*trEps;
+                sigma[i] = sTrial;
+            }
 
             if (needScalarTan)
             {
@@ -371,47 +442,61 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             // For associative J2 plasticity with plastic multiplier increment
             // Δλ, the radial return mapping gives:
             //
-            //     q = qTrial - 3 μ sqrt(3/2) Δλ
+            //     q = qTrial - 3 μ Δλ
             //
             // The equivalent plastic strain evolves as:
             //
-            //     εp_eq = εp_eq0 + sqrt(2/3) Δλ
+            //     εp_eq = εp_eq0 + Δλ
             //
             // For linear isotropic hardening:
             //
-            //     σY = σY0 + Hp * (sqrt(2/3) Δλ)
+            //     σY = σY0 + Hp Δλ
             //
             // Substituting into the consistency condition f = q − σY = 0:
             //
             //     qTrial
-            //   − 3 μ sqrt(3/2) Δλ
-            //   − (σY0 + Hp sqrt(2/3) Δλ) = 0
+            //   − 3 μ Δλ
+            //   − (σY0 + Hp Δλ) = 0
             //
             // which gives the closed-form solution:
             //
-            //     Δλ = (qTrial − σY0)
-            //           / (3 μ sqrt(3/2) + Hp sqrt(2/3))
+            //     Δλ = (qTrial − σY0) / (3 μ + Hp)
             //
             // Perfect plasticity is recovered by setting Hp = 0.
-            const scalar denom = 3.0*mu*sqrt(3.0/2.0) + Hp_*sqrt(2.0/3.0);
+            const scalar denom = 3.0*mu + Hp_;
             dLambda = fTrial/max(denom, SMALL);
-            curSigmaY = sigmaYTrial + Hp_*sqrt(2.0/3.0)*dLambda;
+            curSigmaY = sigmaYTrial + Hp_*dLambda;
         }
 
-        // Plastic strain increment = (3/2)*dLambda*n  (standard J2 small-strain)
-        const symmTensor DEpsilonP = 1.5*dLambda*n;
+        // Plastic flow, with dLambda the equivalent plastic strain increment:
+        //
+        //     DEpsilonP  = (3/2) dLambda s/q = sqrt(3/2) dLambda n
+        //     |DEpsilonP| = sqrt(3/2) dLambda
+        //     DEpsilonPEq = sqrt(2/3) |DEpsilonP| = dLambda
+        //
+        // which is self-consistent, unlike the previous form that combined
+        // DEpsilonP = (3/2) dLambda n with DEpsilonPEq = sqrt(2/3) dLambda and
+        // so disagreed with itself by a factor of 3/2
+        const symmTensor DEpsilonP = sqrt(3.0/2.0)*dLambda*n;
 
         epsilonP[i] = epsilonP0[i] + DEpsilonP;
-        epsilonPEq[i] = epsilonPEq0[i] + sqrt(2.0/3.0)*dLambda;
+        epsilonPEq[i] = epsilonPEq0[i] + dLambda;
         sigmaY[i] = curSigmaY;
 
         // Returned deviatoric stress:
-        // s = sTrial - 2 mu DEpsilonP
-        // with DEpsilonP = 3/2 dLambda n => s = sTrial - 3 mu dLambda n
-        const symmTensor s = sTrial - (3.0*mu*dLambda)*n;
+        //     s = sTrial - 2 mu DEpsilonP = sTrial - 2 mu sqrt(3/2) dLambda n
+        // so that |s| = |sTrial| - 2 mu sqrt(3/2) dLambda and hence
+        //     q = qTrial - 3 mu dLambda
+        const symmTensor s = sTrial - (2.0*mu*sqrt(3.0/2.0)*dLambda)*n;
 
         // Total small strain stress
         sigma[i] = s + kappa*trEps*I;
+
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = kappa*trEps;
+            sigma[i] = s;
+        }
 
         if (needScalarTan)
         {
@@ -419,7 +504,7 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             scalar theta = 1.0;
             if (magSTrial > SMALL)
             {
-                theta = 1.0 - (3.0*mu*dLambda)/magSTrial;
+                theta = 1.0 - (2.0*mu*sqrt(3.0/2.0)*dLambda)/magSTrial;
                 theta = max(theta, 0.0);
             }
 
@@ -441,7 +526,7 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     // return mapping just performed nor the history it started from
     if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
     {
-        finiteDifferenceFourthOrder(kin, state, response);
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
     }
     else if (response.tangentReq() == tangentRequest::fourthOrder)
     {
@@ -458,7 +543,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
 (
     const mechanicalConstitutiveLawState& state,
     const scalar time,
-    const label timeIndex
+    const label timeIndex,
+    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
     const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
@@ -480,18 +566,63 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
         }
     }
 
-    reduce(nYielding, sumOp<label>());
-    reduce(maxDEpsilonPEq, maxOp<scalar>());
+    // Reported, not reduced. The manager gathers these from the internal
+    // state and from every boundary state this law owns, and reduces once per
+    // quantity - which is what makes the boundary points countable at all,
+    // and what stops a per-patch collective from hanging on a decomposed mesh
+    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
 
-    const int nTotalCells = returnReduce(epsilonPEq.size(), sumOp<int>());
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "yielding integration points",
+            scalar(nYielding),
+            diagnostic::combineOperation::sum
+        )
+    );
 
-    if (debug)
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "integration points",
+            scalar(epsilonPEq.size()),
+            diagnostic::combineOperation::sum
+        )
+    );
+
+    diagnostics.append
+    (
+        diagnostic
+        (
+            "max DEpsilonPEq",
+            maxDEpsilonPEq,
+            diagnostic::combineOperation::maximum
+        )
+    );
+}
+
+
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::reportDiagnostics
+(
+    const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+) const
+{
+    if (!debug || diagnostics.size() != 3)
     {
-        Info<< nl << "Max DEpsilonPEq is " << maxDEpsilonPEq << nl
-            << "Number of yielding integration points = " << nYielding
-            << "/" << nTotalCells
-            << nl << endl;
+        return;
     }
+
+    // Same wording as before, and the same debug switch decides it. The
+    // numbers are larger than they used to be, because the boundary
+    // integration points are counted now: they were skipped entirely while
+    // the reducing happened in here
+    Info<< nl << "Max DEpsilonPEq is " << diagnostics[2].value() << nl
+        << "Number of yielding integration points = "
+        << label(diagnostics[0].value())
+        << "/" << label(diagnostics[1].value())
+        << nl << endl;
 }
 
 

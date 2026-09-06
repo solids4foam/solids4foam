@@ -18,6 +18,13 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "interfaceToInterfaceMapping.H"
+#include "pointIOField.H"
+#include "polyMesh.H"
+#ifdef FOAMEXTEND
+    #include "foamTime.H"
+#else
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -25,6 +32,95 @@ namespace Foam
 {
     defineTypeNameAndDebug(interfaceToInterfaceMapping, 0);
     defineRunTimeSelectionTable(interfaceToInterfaceMapping, dictionary);
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::standAlonePatch>
+Foam::interfaceToInterfaceMapping::makeReferenceZone
+(
+    const globalPolyPatch& globalPatch
+) const
+{
+    const polyMesh& mesh = globalPatch.mesh();
+
+    const pointIOField referencePoints
+    (
+        IOobject
+        (
+            "points",
+            mesh.time().constant(),
+            polyMesh::meshSubDir,
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
+    );
+
+    if (referencePoints.size() != mesh.nPoints())
+    {
+        FatalErrorInFunction
+            << "Reference mesh points do not correspond to the current mesh"
+            << nl
+            << "    reference points : " << referencePoints.size() << nl
+            << "    current points   : " << mesh.nPoints() << nl
+            << "    patch            : " << globalPatch.patchName() << nl << nl
+            << "The interface-to-interface correspondence is built from the "
+            << "undeformed mesh points in the \"" << mesh.time().constant()
+            << "\" instance, so the mesh must not change topology during the "
+            << "run." << nl
+            << "This case appears to change topology, which is not currently "
+            << "supported for mapped interfaces." << nl
+            << "Note that the correspondence is deliberately not rebuilt from "
+            << "the current interface geometry: that would make it depend on "
+            << "when it is first used."
+            << abort(FatalError);
+    }
+
+    const labelList& meshPoints = globalPatch.patch().meshPoints();
+    pointField patchPoints(meshPoints.size());
+
+    forAll(meshPoints, pointI)
+    {
+        patchPoints[pointI] = referencePoints[meshPoints[pointI]];
+    }
+
+    return autoPtr<standAlonePatch>
+    (
+        new standAlonePatch
+        (
+            globalPatch.globalPatch().localFaces(),
+            globalPatch.patchPointToGlobal(patchPoints)()
+        )
+    );
+}
+
+
+// * * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * //
+
+const Foam::standAlonePatch&
+Foam::interfaceToInterfaceMapping::zoneARef() const
+{
+    if (zoneARefPtr_.empty())
+    {
+        zoneARefPtr_ = makeReferenceZone(globalPatchA());
+    }
+
+    return zoneARefPtr_();
+}
+
+
+const Foam::standAlonePatch&
+Foam::interfaceToInterfaceMapping::zoneBRef() const
+{
+    if (zoneBRefPtr_.empty())
+    {
+        zoneBRefPtr_ = makeReferenceZone(globalPatchB());
+    }
+
+    return zoneBRefPtr_();
 }
 
 

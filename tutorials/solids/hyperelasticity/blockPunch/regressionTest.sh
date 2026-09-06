@@ -28,6 +28,7 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 
 APPROACHES=(
     segregated
+    segregatedManager
     petscSnes
     highOrder
 )
@@ -188,6 +189,7 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 failures=0
+declare -A RESULT_DISP
 
 # The framework checks depend only on the mesh and the material, so they are
 # run once rather than once per approach
@@ -228,6 +230,8 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
+    RESULT_DISP["${approach}"]=$(extract_final_disp_z "${CASE_DIR}")
+
     # Before the Allclean below, which removes the mesh
     if [ "${constitutive_tested}" = false ]; then
         constitutive_tested=true
@@ -241,6 +245,27 @@ for approach in "${APPROACHES[@]}"; do
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     fi
 done
+
+# segregatedManager is solidProperties.segregated plus the framework switch and
+# nothing else, so the two must agree. This is the only end-to-end comparison
+# of the framework's neoHookeanElastic against the legacy law
+if [[ -n "${RESULT_DISP[segregated]:-}" \
+   && -n "${RESULT_DISP[segregatedManager]:-}" ]]
+then
+    a="${RESULT_DISP[segregated]}"
+    b="${RESULT_DISP[segregatedManager]}"
+
+    if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
+        printf "PASS: legacy and framework disp_z agree (%.8g vs %.8g)\n" \
+            "$a" "$b"
+    else
+        printf "FAIL: legacy and framework disp_z differ (%.8g vs %.8g)\n" \
+            "$a" "$b"
+        failures=$((failures + 1))
+    fi
+else
+    echo "SKIP: cross-check needs both segregated approaches to have run"
+fi
 
 echo
 if (( failures == 0 )); then

@@ -77,10 +77,12 @@ class linearElasticMisesPlasticMechanicalConstitutiveLaw
         const dimensionedScalar rho_;
 
         //- Young's modulus
-        const dimensionedScalar E_;
+        //  Set in the constructor body, since the material may be given as
+        //  mu and K instead
+        dimensionedScalar E_;
 
         //- Poisson's ration
-        const dimensionedScalar nu_;
+        dimensionedScalar nu_;
 
         //- Second Lamé parameter (shear modulus)
         dimensionedScalar mu_;
@@ -183,16 +185,26 @@ public:
 
     // Edit
 
-        //- Initialise constitutive state variables
-        virtual void initialiseState
+        //- Declare this law's history, so that the manager can carry it
+        //  across a restart
+        virtual void declareState
         (
-            mechanicalConstitutiveLawState& state
-        ) const;
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
+
+        //- The stress is a deviatoric part plus K*tr(epsilon), and the
+        //  return mapping only touches the deviatoric part, so the two can be
+        //  handed back separately
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
 
         //- Small-strain constitutive evaluation
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const override;
@@ -202,7 +214,14 @@ public:
         (
             const mechanicalConstitutiveLawState& state,
             const scalar time,
-            const label timeIndex
+            const label timeIndex,
+            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+        ) const override;
+
+        //- Say what was found, once the manager has reduced it
+        virtual void reportDiagnostics
+        (
+            const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
         ) const override;
 };
 

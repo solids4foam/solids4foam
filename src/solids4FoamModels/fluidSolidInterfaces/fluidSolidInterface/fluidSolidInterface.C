@@ -1274,6 +1274,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }
+
+    fluid().syncGlobalPatches();
 }
 
 
@@ -1451,6 +1453,8 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
+    solid().syncGlobalPatches();
+
     // Maximum residual for all interfaces
     scalar maxResidual = 0;
 

@@ -1980,6 +1980,477 @@ applications must be rebuilt **together** before any result from the test
 application means anything - the same trap as the vtable mismatch in section
 8.14. A test result from a half-rebuilt tree is not evidence.
 
+### 8.16 Empty patches: the boundary fix was still incomplete
+
+Section 8.14 fixed the flat-list update to evaluate boundary integration
+points. It was still wrong, and the first two-dimensional case to exercise it
+said so immediately.
+
+`lawBoundaryFaces_` is built from `mesh.boundary()`, the **fv** boundary. An
+`empty` patch has no fvPatch faces at all, so that list is empty for it, and
+the code skipped the patch. But an empty patch's **polyPatch** faces still
+occupy slots in the face-centred topology's index space, because
+`nIntegrationPoints()` is `mesh.nFaces()`. Those slots were left unwritten -
+precisely the defect of section 8.14, surviving in the two-dimensional case.
+
+`blockPunch` is three-dimensional and has no empty patch, so the regression
+guard added in section 8.15 could not see it. `rotatingCylinder` is
+two-dimensional, and its boundary check failed on the first run with a
+relative error of 3714 - which is `GREAT/(lambda + 2 mu)`, i.e. the poison,
+untouched. The poison is what made the diagnosis immediate rather than a
+puzzle: an unpoisoned buffer would have shown an arbitrary number.
+
+**Fixed** by addressing such patches through the polyPatch and taking the law
+from the owner cell. Two consequences worth stating:
+
+- These faces take no part in the finite volume discretisation - that is what
+  `empty` means - so they are evaluated against a **scratch state**, not the
+  per-patch state, which does not exist for them. They get a well-defined
+  value without committing history for a face the discretisation does not
+  have.
+- That scratch state must be handed to `initialiseState`, exactly as a real
+  state is. Skipping that made `perforatedPlate` fail with "Requested state
+  field 'epsilonP' does not exist" - a history-dependent law failing to find
+  its own history. A bare state of the right size is not a usable state.
+
+**The lesson repeats.** Each round of this defect was found by a case with a
+mesh feature the previous cases lacked, never by reasoning about the code.
+Coverage of a topology contract means coverage of the mesh variety the
+contract has to survive: 3D, 2D with empty patches, and - still untested here
+- wedge, cyclic and processor patches.
+
+### 8.17 The blocker is law coverage, not solver plumbing
+
+Migrating `nonLinGeomTotalLagTotalDispSolid` and `nonLinGeomUpdatedLagSolid`
+turned out to be straightforward: both hold their kinematics as volFields and
+evaluate stress at cell centres only, so no face-based finite-strain
+kinematics were needed after all. What stopped both from being *verifiable*
+was the set of laws the framework implements.
+
+Counting the tutorials by law:
+
+| Solver | Tutorials | Laws they use |
+|---|---|---|
+| `linGeomTotalDispSolid` | 16 | `linearElastic`, `linearElasticMisesPlastic` |
+| `nonLinGeomUpdatedLagSolid` | 9 | `neoHookeanElasticMisesPlastic`, `MooneyRivlinElastic` |
+| `nonLinGeomTotalLagTotalDispSolid` | 8 | `MooneyRivlinElastic`, `StVenantKirchhoffElastic` |
+
+The framework had `linearElastic`, `linearElasticMisesPlastic` and
+`neoHookeanElastic`. That covers the first row completely and the other two
+not at all: the only neo-Hookean cases using the finite-strain solvers are
+FSI. Adding `StVenantKirchhoffElastic` bought coverage of one case,
+`rotatingCylinder`, and that single case immediately found the empty-patch
+defect of section 8.16.
+
+**`MooneyRivlinElastic` does not fit the current law contract.** It calls
+`updateSigmaHyd`, which, when `pressureSmoothingScaleFactor` is set, *solves a
+Laplacian equation* for the hydrostatic stress over the whole field. A
+`mechanicalConstitutiveLaw` is a pure function of integration-point kinematics
+and old-time state; a field-level implicit solve is not expressible in that
+interface.
+
+**Resolved: the smoothing does not come across.** Pressure smoothing is the
+solid model's business, not the law's - it stabilises the discretisation, it
+does not describe the material - and the field-level solve is to be added at
+the solid model level separately. The framework law therefore drops
+`updateSigmaHyd` entirely and returns the unsmoothed hydrostatic stress
+`p = K (J^2 - 1)/2`, which keeps `mechanicalConstitutiveLaw` a pure function
+of integration-point kinematics and old-time state.
+
+That decision is what made `MooneyRivlinElastic` implementable here. Note the
+consequence: until the solid model provides the smoothing, a case that relied
+on `pressureSmoothingScaleFactor` will converge differently under the
+framework. The two migrations in this PR are unaffected, because they take
+only `impK` from the framework and never call a law for a stress.
+
+With `MooneyRivlinElastic` in place the coverage gap partly closes.
+`longWall` exercises the total Lagrangian solver's framework path in CI.
+
+The updated Lagrangian solver was verified **by hand, not in CI**, on
+`cylinderCrush` under foam-extend, which is the only tutorial pairing that
+solver with a law the framework implements. Both arms agree exactly:
+force_y = -70145.7 N and disp_y = -0.0998977 m with the legacy impK and with
+the framework impK, and the framework's own constitutive checks pass on that
+mesh.
+
+It is deliberately **not** wired into CI, for a reason worth recording. Run
+locally the case completes all 30 time steps of its 30 s ramp. The regression
+bands it is checked against, force_y in [-550, -545] N and disp_y in
+[-0.0034, -0.0032] m, correspond instead to roughly t = 1 s: the displacement
+ramps to about -0.0999 m at t = 30, and one thirtieth of that is -0.0033,
+which is what CI reports (-0.00329221). So in CI the case appears to stop
+after about one time step, and the expected values encode that truncated run
+rather than the completed one.
+
+Until that discrepancy is understood, this case is not a trustworthy vehicle
+for a two-arm comparison, and doubling a long contact run in CI on top of an
+unexplained early stop is not a good trade. The single-arm test is left
+exactly as it was.
+
+`neoHookeanElasticMisesPlastic`, which nine tutorials need, remains the other
+gap. It is history-dependent finite-strain plasticity, a substantial law in
+its own right, and is left for a later increment.
+
+One further limitation worth recording: the framework's material constants are
+uniform per law, whereas the legacy `MooneyRivlinElastic` holds `c10`, `c01`
+and `c11` as volScalarFields that may be read per cell. Spatially varying
+constants belong with the wider question of how the framework carries
+per-integration-point material data, alongside initial stress and fibre
+directions - see `DESIGN-state-io.md`.
+
+### 8.18 impK under the mixed formulation: the two solvers disagreed
+
+Review caught that the framework arm of `nonLinGeomTotalLagTotalDispSolid`
+does not reproduce its legacy `impK` when `solvePressure()` is set. The legacy
+code uses `2*mu`; the framework request `scalarDeviatoric` yields `(4/3)*mu`.
+
+That is a real difference, and worth stating rather than quietly matching,
+because the two migrated solvers did not agree with each other to begin with:
+`linGeomTotalDispSolid` already used `(4/3)*mu` for exactly the same
+formulation. So there was no single legacy convention to preserve.
+
+`(4/3)*mu` is kept. It is the value the surrogate implies - the scalar
+Laplacian standing in for `div(dev(sigma))` is
+`mu*lap(D) + (1/3)*mu*grad(div(D))` - and it makes the two solvers agree.
+`impK` is the coefficient of a Laplacian that is added implicitly and
+subtracted explicitly, so it sets how the solution is reached and not what it
+is: only the convergence path changes, and only when the framework is switched
+on. Nothing in the default configuration moves.
+
+The general point: "matches the legacy value" is not always a well-defined
+target, and where the legacy values disagree among themselves it is better to
+pick the defensible one and say so than to reproduce an arbitrary choice per
+solver.
+
+### 8.19 The stress comes from the framework, and what that cost
+
+Every migration before this took only `impK`, which cannot change results, so
+the framework's central path had never been driven by a solver. All three
+cell-centred solid models now take their stress from it behind the same
+switch: `linGeomTotalDispSolid`, `nonLinGeomTotalLagTotalDispSolid` and
+`nonLinGeomUpdatedLagSolid`.
+
+Three results, in increasing order of interest:
+
+* `plateHole`, small strain, `linearElastic`: the legacy and framework arms
+  agree to **every digit**.
+* `rotatingCylinder`, finite strain, `StVenantKirchhoffElastic`: likewise
+  exact, sigmaEq 3700.73 both ways.
+* `longWall`, finite strain, `MooneyRivlinElastic`: agree to about **2e-6
+  relative**, not exactly. This case sets `solvePressureEqn`, so the legacy law
+  solves a Laplacian for its hydrostatic stress and the framework law does not.
+
+That last one is the useful one. The difference is the pressure smoothing whose
+removal §8.17 justified on the grounds that it stabilises the discretisation
+rather than describing the material. A 2e-6 change in the converged answer is
+what that claim predicts, and is the first evidence for it. One case is not a
+proof - a nearly incompressible material could be far more sensitive - so the
+claim stays provisional until the solid model owns the smoothing and the two
+can be compared with it present.
+
+**Identical numbers are not evidence on their own.** They are equally what a
+switch that does nothing produces, which has already happened once in this
+work. So the framework path was confirmed independently: the solver log shows
+the manager constructed, and perturbing the framework stress by 0.1% moves
+`plateHole`'s converged result from 2.22246e+06 to 2.22248e+06, which a dead
+branch cannot do.
+
+**What was not migrated at the time, and since has been.** The high-order
+quadrature stress stayed on the legacy path because evaluating a law through
+the `CompactListList` overload needs the old-time gradient at the quadrature
+points, and no solver kept one: `gradDQuad()` is rebuilt each call. A
+history-independent law would not notice; a history-dependent one would
+silently read the wrong state. `solidModel` now takes a copy of the quadrature
+gradient at the end of each step, `gradDQuad0()`, which closed it for the
+small-strain solver and then for the two finite-strain ones. See §8.26.
+
+### 8.20 Sharing a TypeName with a legacy law has a portability trap
+
+Every framework law deliberately takes the same `TypeName` as the legacy law
+it replaces, so that a case dictionary needs no change. That is the right
+choice, and it has one consequence that is invisible on OpenFOAM.com.
+
+Debug switches are registered **globally by name**, not per runtime-selection
+table. Two classes sharing a name therefore register the same switch, and if
+they declare *different* defaults, OpenFOAM.org fails at start-up with
+
+```text
+    Multiple defaults set for debug switch neoHookeanElasticMisesPlastic
+```
+
+before any case runs. Every tutorial in the CI job failed, including ones that
+never touch the framework, because the error is thrown during static
+initialisation. OpenFOAM.com tolerates the same mismatch silently, so the whole
+thing is invisible locally.
+
+It happened because `neoHookeanElasticMisesPlastic` was scaffolded from
+`linearElasticMisesPlastic`, which legitimately uses a debug default of 1,
+while its own legacy counterpart uses 0.
+
+**Rule: a framework law's debug default must equal that of the legacy law
+whose TypeName it shares.** All seven pairs were checked; only that one
+differed. Worth re-checking whenever a law is added, because the symptom is a
+total, unrelated-looking CI failure on one fork only.
+
+### 8.21 The plastic law was wrong, and only a real solve found it
+
+Running `perforatedPlate` through both paths - the first end-to-end comparison
+of a *plastic* framework law against its legacy counterpart - showed the
+framework giving about 5% more equivalent strain and 2.6% more stress.
+
+Isolating the cause mattered, because two things had changed at once. Forcing
+the legacy `impK` while keeping the framework stress reproduced the discrepancy
+exactly, so it was not a Jacobian or convergence artefact: the stress itself
+was wrong.
+
+**The defect.** `linearElasticMisesPlastic` disagreed with itself about what
+its plastic multiplier meant. It set
+
+```text
+    DEpsilonP = 1.5 dLambda n      so  |DEpsilonP| = 1.5 dLambda
+```
+
+whose equivalent plastic strain increment is
+`sqrt(2/3) |DEpsilonP| = sqrt(3/2) dLambda`, but then accumulated
+`epsilonPEq += sqrt(2/3) dLambda` - short by a factor of 3/2 - and the
+closed-form hardening denominator carried the same error.
+
+**Why every existing check missed it.** Under perfect plasticity the *stress*
+is still right: the multiplier and the stress update are consistent with each
+other, and only the accumulated equivalent strain is wrong. It goes wrong when
+hardening is active, because the yield stress is then evaluated at the wrong
+accumulated strain. The closed-form tangent check, the finite-difference
+tangent check and the saturation check are all blind to that.
+
+**The fix** is the standard convention in which `dLambda` *is* the equivalent
+plastic strain increment:
+
+```text
+    q           = qTrial - 3 mu dLambda
+    DEpsilonP   = sqrt(3/2) dLambda n
+    DEpsilonPEq = dLambda
+    dLambda     = (qTrial - sigmaY0) / (3 mu + Hp)
+```
+
+which is self-consistent. The framework then reproduces the legacy result
+exactly: epsilonEq 0.00507147, sigmaEq 1.79161e+08, and 30 yielding
+integration points against 30 yielding cells.
+
+**The lesson.** Unit checks on a constitutive law verify the parts of it you
+thought to check. A history-dependent law compared against a trusted
+implementation over a real load path checks the parts you did not. This is the
+argument for migrating the stress rather than stopping at `impK`: an `impK`
+migration cannot change results, and therefore cannot detect this class of
+error at all.
+
+Two supporting gaps were fixed alongside it.
+`mechanicalConstitutiveLawManager::endTimeStep()` existed but nothing called
+it, so framework laws had no end-of-step hook and no diagnostic; it is now
+called from all three migrated solid models. And the regression test's
+extraction preferred the legacy yielding message, which in the framework arm is
+still emitted by the idle legacy law and truthfully reports zero, masking the
+framework's own count.
+
+### 8.22 Two defects behind the finite-strain discrepancy, and how they hid
+
+`neckingBar` is the only tutorial pairing `nonLinGeomUpdatedLagSolid` with
+`neoHookeanElasticMisesPlastic` and no pressure smoothing, so the only place
+the finite-strain plastic path can be compared against legacy exactly. It did
+not agree - legacy 63.64368, framework 63.61524, and the framework arm failed
+to converge. There turned out to be two independent defects.
+
+**Defect 1: the framework neo-Hookean used a different volumetric energy.**
+The legacy law's hydrostatic stress is `0.5*K*(J^2 - 1)`; the framework's was
+`K*log(J)`. The two agree to first order in `(J - 1)` and diverge after that.
+This is pre-existing framework code, not part of the migration.
+
+**Defect 2: the relative deformation gradient was built from a stale inverse.**
+The framework is given `Finv` and `Finv0` and forms the relative deformation
+gradient as `F & Finv0`. `nonLinGeomUpdatedLagSolid` keeps no inverse, so the
+migration added one as a field and relied on its old time. That is wrong: this
+solver updates `F_` again inside `updateTotalFields()`, *after* the last stress
+evaluation of the step, so the derived field's stored old time is the inverse
+of a mid-iteration `F_` rather than of the converged end-of-step one. `Finv0`
+is now formed as `inv(F_.oldTime())`, which is correct by construction because
+the solver maintains `F_`'s own old time.
+
+With both fixed, every comparison is exact: `neckingBar` 74.4649 on both paths,
+and 338.34384 on both paths in the elastic reductions used to bisect.
+
+**How they hid, which is the point.** Both defects are invisible to every check
+that existed:
+
+- The near-identity finite-difference tangent test cannot separate
+  `0.5*K*(J^2 - 1)` from `K*log(J)`, because that is exactly where they agree.
+- No elastic law reads `Finv0` at all, so the stale inverse was silent in
+  `plateHole`, `rotatingCylinder` and `longWall`. Only a history-dependent law
+  in an updated Lagrangian solver touches it.
+
+**How they were found.** By bisection on a real solve, not by reading code. The
+sequence was: confirm the difference survives tightening the solver tolerance,
+disabling the material-residual gate, and swapping `impK`; then swap the
+plastic law for an elastic one, which isolated defect 1; then suppress yielding
+in the plastic law, which isolated defect 2 to the elastic predictor; then
+substitute an explicitly computed `inv(F_.oldTime())`, which identified it
+exactly.
+
+An independent line-by-line review of the two implementations had passed the
+plastic law as faithful, and was right to: defect 2 is not in the law at all,
+it is in what the solid model hands it.
+
+### 8.23 An over-broad fork guard left boundary values uncorrected on .org
+
+With the two defects of §8.22 fixed, `perforatedPlate` agreed exactly on
+OpenFOAM.com and still differed by 1.8e-3 on OpenFOAM.org. A difference that
+appears on one fork only is not a model difference, so the search was over the
+fork-guarded code, of which the manager had exactly five sites:
+
+```text
+    #ifndef OPENFOAM_ORG
+        stress.correctBoundaryConditions();
+    #endif
+```
+
+Removing all five and compiling on OpenFOAM-9 shows what the guard is really
+for: that fork's `fvsPatchField` has no `evaluate()`, so
+`correctBoundaryConditions()` does not compile for a **surface** field. It
+compiles perfectly well for a volField.
+
+Four of the five sites were volFields - two scalar tangents and two cell-centred
+stresses - and were guarded needlessly, so on OpenFOAM.org the framework simply
+never corrected its boundary values. The one surface-field site keeps the guard,
+now with a comment saying why. With that, `perforatedPlate` agrees exactly on
+OpenFOAM.org too, at the same values as OpenFOAM.com.
+
+The lesson is about the shape of the guard rather than the bug. A guard written
+as "not on this fork" hides *why*, so it gets copied to the next site that
+looks similar - which is how the finite-strain tangent added during this work
+inherited it. A guard that names its reason, as this one now does, does not
+spread.
+
+### 8.24 Every law is now compared against its legacy counterpart
+
+Each framework law now has a regression case that runs the legacy and framework
+paths side by side and requires them to agree. That closes the gap this work
+kept falling into: a law that passes every unit check and an independent
+line-by-line review, and still does not reproduce the legacy result.
+
+<!-- markdownlint-disable MD013 -->
+
+| Law | Case | Agreement | Defects this found |
+|---|---|---|---|
+| `linearElastic` | `plateHole` | exact | - |
+| `linearElasticMisesPlastic` | `perforatedPlate` | exact | plastic multiplier convention, §8.21 |
+| `neoHookeanElastic` | `blockPunch` | exact | volumetric energy, §8.22 |
+| `StVenantKirchhoffElastic` | `rotatingCylinder` | exact | - |
+| `MooneyRivlinElastic` | `longWall` | 2e-6 | - (the pressure smoothing, §8.19) |
+| `neoHookeanElasticMisesPlastic` | `neckingBar` | exact | stale relative deformation gradient, §8.22 |
+| `viscousHookeanElastic` | `viscoTube` | exact | - |
+
+<!-- markdownlint-enable MD013 -->
+
+Four defects across seven laws. None was found by the unit checks, the
+closed-form comparisons, the finite-difference tangent tests, or review; three
+of the four were in code written before this migration. The fourth, §8.23, was
+visible on one fork only and needed the comparison to be run on that fork.
+
+**What made these cases work as checks**, and what to preserve when adding a
+law:
+
+- The two arms must differ in *nothing* but the switch. Where a case had no
+  suitable second arm, the properties file was duplicated and the switch added,
+  rather than any setting being adjusted to help it pass.
+- Each arm asserts from the solver log which path it actually took. Identical
+  results are equally what a switch that does nothing produces, and that has
+  happened here.
+- The case must not enable pressure smoothing, or the framework legitimately
+  differs and the comparison can only be approximate. `longWall` is the one
+  case in that position, and its tolerance says so explicitly.
+
+The remaining laws in the legacy library have no framework counterpart yet.
+When one is added, it needs a case in this table before it can be considered
+migrated.
+
+### 8.25 The high-order quadrature stress, and the topology it needed
+
+The high-order path evaluates the stress at face quadrature points, and was
+left on the legacy path in §8.19 because the framework's `CompactListList`
+overload needs an old-time gradient there and the solver keeps none. Adding
+that old-time copy turned out to be the smaller half of the problem.
+
+`solidModel` now takes a copy of `gradDQuad` at the end of each time step,
+since the current field is rebuilt on every evaluation and there is nothing
+else to take it from. With that in place the framework still refused the
+update:
+
+```text
+    Size of cellToIntegrationPointIDs (4070) does not match number of mesh
+    cells (1000)
+```
+
+The `CompactListList` overload assumed the rows are **cells**. High-order
+quadrature rows are **faces**. The framework had `compactCell` and no compact
+face topology at all, so this was a structural gap rather than a missing field.
+
+`compactFaceIntegrationPointTopology` fills it, and differs from the cell
+version in more than which entity indexes the rows. A face is shared by two
+cells, so the same quadrature point is reachable from both and would be
+aggregated twice when the manager gathers a material's points. It therefore
+reports `requiresUniqueIntegrationPointsPerMaterial()` true where the cell
+version reports false, which is also what restricts a flat-list update over it
+to a single material.
+
+The manager chooses between the two by row count, and checks: `nCells` gives
+the cell topology, `nFaces` the face one, and anything else is a fatal error
+naming both counts. A mesh never has as many cells as faces, so the two cannot
+be confused, and the failure mode is a message rather than a wrong answer.
+
+`plateHole` verifies it: `highOrder` and `highOrderFourthOrder` agree exactly,
+at 2.0061e-08, 4.81145e-08 and 54331.2. The topology error above is worth
+keeping in mind as evidence in its own right - it proves the framework branch
+is the one being taken, so the agreement is not a switch that does nothing.
+
+**Since migrated**: the finite-strain quadrature stress in both `nonLinGeom`
+solvers. See §8.26.
+
+### 8.26 The finite-strain quadrature stress
+
+Both `nonLinGeom` solvers now take their high-order quadrature stress from the
+framework. Two things that looked like blockers were not.
+
+The `CompactListList` finite-strain overload was already there and already
+implemented; the note above said it did not exist, and by the time anyone read
+it again that had stopped being true. The other was the old-time kinematics,
+and each solver turned out to have what it needed. The total-Lagrangian solver
+uses `gradDQuad0()`, added to `solidModel` for the small-strain migration; a
+comment at its call site still said "this solver keeps no such field", which
+had also gone stale. The updated-Lagrangian solver already keeps `FQuadOld`,
+stored from the converged total gradient at the end of each step.
+
+`F`, `Finv` and `J` at the quadrature points are built by two helpers on
+`solidModel`, shared rather than written twice, and held in members rather than
+rebuilt per call: they are each as large as the quadrature stress itself. They
+take their offsets from the gradient, so every list handed to the manager
+shares one row structure, which is what it requires.
+
+The updated-Lagrangian old time is `FQuadOld` directly and is deliberately not
+derived from anything at the point of use. That solver keeps updating its
+kinematics after the last stress evaluation of a step, so a derived old time
+would be taken from a mid-iteration state - the same trap as `Finv0` at the
+cell centres, recorded in §8.13.
+
+Verified on `rotatingBlock`, which already had both a `highOrder` and a
+`highOrderUpdatedLagrangian` arm. Each gained a `Manager` counterpart that
+links the base arm's own files and puts one `solidProperties` over the top, so
+the pair differs in the constitutive path and in nothing else. Both pairs agree
+bit for bit, and each arm asserts from the solver log which path it took.
+
+The cell-centre stress differs between the arms by about 2e-3 Pa on a material
+of 200 GPa, which is round-off on a rigid rotation whose true stress is zero,
+and it does not reach the solution: with `highOrderResidual` the momentum
+residual is built from the quadrature stress, and the displacement agrees
+exactly.
+
 ### 8.15 Open questions still outstanding
 
 OQ-1 (restart `impK` state-dependence), OQ-3 (configurable `impKf_` cadence),

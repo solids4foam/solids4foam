@@ -27,7 +27,7 @@ solvers
         relTol          0.1;
     }
 
-    p
+    porePressure
     {
         solver          GAMG;
         tolerance       1e-09;
@@ -47,7 +47,7 @@ relaxationFactors
     equations
     {
         D    0.999;
-        p    0.999;
+        porePressure    0.999;
     }
 
     // Under-relaxating the D field by 0.1-0.9 can improve convergence in some
@@ -55,7 +55,7 @@ relaxationFactors
     fields
     {
         D       0.7;
-        p       0.3;
+        porePressure       0.3;
     }
 }
 
