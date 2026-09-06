@@ -656,8 +656,12 @@ int main(int argc, char *argv[])
             dimensionedScalar(hgoDict.lookup("mu")).value();
         const scalar k1Val =
             dimensionedScalar(hgoDict.lookup("k1")).value();
-        const scalar k2Val = readScalar(hgoDict.lookup("k2"));
-        const scalar angle = readScalar(hgoDict.lookup("fibreAngle"));
+        // Dimensioned, as the law reads them and as the legacy dictionary
+        // writes them
+        const scalar k2Val =
+            dimensionedScalar(hgoDict.lookup("k2")).value();
+        const scalar angle =
+            dimensionedScalar(hgoDict.lookup("fibreAngle")).value();
 
         if (mag(angle) > SMALL)
         {

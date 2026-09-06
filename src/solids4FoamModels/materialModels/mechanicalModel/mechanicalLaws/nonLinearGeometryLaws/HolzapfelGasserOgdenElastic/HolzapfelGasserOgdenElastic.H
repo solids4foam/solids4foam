@@ -179,6 +179,9 @@ public:
         virtual tmp<volScalarField> impK() const;
 
         //- Return bulk modulus
+        //- Return the ground substance shear modulus
+        virtual tmp<volScalarField> shearModulus() const;
+
         virtual tmp<volScalarField> bulkModulus() const;
 
         //- Calculate the stress

@@ -12,50 +12,36 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application solids4Foam;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          0.02;
-
-writeControl    timeStep;
-
-writeInterval   1;
-
-purgeWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable yes;
-
-adjustTimeStep  no;
-
-maxCo           0.2;
-
-functions
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
-    pointHistory
+    solutionAlgorithm PETScSNES;
+
+    // Solve pressure as an additional unknown (mixed formulation)
+    solvePressure true;
+
+    useMechanicalConstitutiveLawManager yes;
+
+    stabilisation
     {
-        type          solidPointDisplacement;
-        point         (0.0003 0 2.5e+5);
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 100;
+        }
+
+        pressure
+        {
+            type                RhieChow;
+            scaleFactor         1;
+            scaleFactorJacobian 1;
+        }
     }
 }
 

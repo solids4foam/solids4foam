@@ -1223,7 +1223,20 @@ void nonLinGeomTotalLagTotalDispSolid::makeRKappa() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+    // From whichever model is actually describing the material. The two are
+    // not interchangeable: a law may be written for exact incompressibility
+    // in the legacy hierarchy - HolzapfelGasserOgdenElastic reports GREAT -
+    // and carry a finite penalty in the framework, and the pressure equation
+    // has to use the one whose stress it is replacing. linGeomTotalDispSolid
+    // already branched here; this did not, which the closure check found
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        rKappaPtr_.set(new volScalarField(1.0/mechanicalManager().kappa()));
+    }
+    else
+    {
+        rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+    }
 }
 
 

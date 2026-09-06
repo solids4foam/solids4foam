@@ -76,8 +76,8 @@ Description
         rho             rho [1 -3 0 0 0 0 0] <value>;
         mu              mu  [1 -1 -2 0 0 0 0] <value>;
         k1              k1  [1 -1 -2 0 0 0 0] <value>;
-        k2              <value>;                    // dimensionless
-        fibreAngle      <value>;                    // degrees
+        k2              k2 [0 0 0 0 0 0 0] <value>;
+        fibreAngle      fibreAngle [0 0 0 0 0 0 0] <value>;   // degrees
         bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] <value>;
 
         // Optional: fibres the same everywhere, rather than Ec and Ea fields

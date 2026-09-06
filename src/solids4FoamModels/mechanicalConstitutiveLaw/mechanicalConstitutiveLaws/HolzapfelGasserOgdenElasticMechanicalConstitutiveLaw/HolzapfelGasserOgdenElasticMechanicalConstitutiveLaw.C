@@ -50,9 +50,17 @@ HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw
     rho_(dict.lookup("rho")),
     mu_(dict.lookup("mu")),
     k1_(dict.lookup("k1")),
-    k2_(readScalar(dict.lookup("k2"))),
-    // Read in degrees, as the legacy law reads it, and kept in radians
-    fibreAngle_(readScalar(dict.lookup("fibreAngle"))*M_PI/180.0),
+    // k2 and fibreAngle are dimensionless, but they are read as dimensioned
+    // scalars because that is how the legacy law reads them and one material
+    // dictionary has to serve both: a case that runs the two side by side
+    // constructs both laws from the same entries
+    k2_(dimensionedScalar(dict.lookup("k2")).value()),
+
+    // Read in degrees, as the legacy law reads them, and kept in radians
+    fibreAngle_
+    (
+        dimensionedScalar(dict.lookup("fibreAngle")).value()*M_PI/180.0
+    ),
     bulkModulus_(dict.lookup("bulkModulus")),
     EcDefault_
     (

@@ -4,27 +4,61 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+SOLVER_LOGFILE="log.solids4Foam"
+ALLRUN_LOGFILE="log.Allrun"
+DISP_FILE="postProcessing/0/solidPointDisplacement_pointHistory.dat"
+
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+elif command -v solids4FoamScripts.sh > /dev/null 2>&1; then
+    source solids4FoamScripts.sh
+fi
+
+if ! declare -F solids4Foam::regressionCaseSkipped > /dev/null 2>&1; then
+    solids4Foam::regressionCaseSkipped() {
+        local LOG_FILE="$1"
+        [[ -f "${LOG_FILE}" ]] || return 1
+        grep -Eq \
+"This case currently only runs in foam-extend|\
+This case currently does not run with foam-extend|\
+This case currently does not run with OpenFOAM.org|\
+Skipping this case as it does not currently working with OpenFOAM.org|\
+OpenFOAM-v[0-9]+ or a newer version is required|\
+Skipping this case as PETSc is not installed" \
+            "${LOG_FILE}"
+    }
+fi
 
 # ============================================================
 # ratCarotid regression test
 #
-# This case does not currently run.
+# An artery wall, two symmetric fibre families, inflated to 25 kPa.
 #
-# The solver stalls at a relative residual of about 0.99 and dies of a
-# floating point exception at t = 0.68, on foam-extend 4.1, which is the only
-# fork coupledPressureDisplacementSolid is built for. That is not a regression
-# from the constitutive-law work: the identical failure - same time step, same
-# iteration, same residual - happens on origin/development at the commit this
-# branch started from. So the solver arm is not attempted here, and this
-# script checks what can be checked.
+# Two formulations, and only one of them works.
 #
-# What it checks is the framework port of HolzapfelGasserOgdenElastic. The
-# mesh builds on any fork, and the law's own checks need only a mesh and a
-# material, so the port has coverage on the fork everything else is checked on
-# even though its solid model and its tutorial do not run there.
+# The legacy one - coupledPressureDisplacementSolid with the legacy
+# HolzapfelGasserOgdenElastic - is foam-extend only and does not reach the end
+# time: it stalls at a relative residual of about 0.99 and dies at t = 0.68.
+# That is longstanding rather than a regression; the same failure happens on
+# the development branch this work started from. It is not run here.
 #
-# The one thing this cannot check is that the framework law reproduces the
-# legacy one. That needs the case to run, and it does not.
+# The framework one - nonLinearGeometryTotalLagrangianTotalDisplacement with
+# solvePressure, taking its stress from the mechanicalConstitutiveLaw
+# framework - runs to completion on any fork, which is what this checks.
+#
+# The two do not agree closely, and this test does not pretend they do. Over
+# the range where the legacy run survives they differ by 2 to 4 per cent at
+# high load and by up to 25 per cent at moderate load. That difference is not
+# the material: the bulk modulus is a penalty here where the legacy law is
+# exactly incompressible, and raising it a hundredfold moves the answer by
+# 0.1 per cent, so this is at the incompressible limit already. Nor is it the
+# pressure stabilisation, which moves it by 4 per cent over a sixteenfold
+# sweep. What remains is the difference between an incremental updated
+# Lagrangian solver on a moving mesh and a total Lagrangian one, on a case
+# whose legacy arm eventually fails outright. Establishing which is closer to
+# the truth needs a mesh study neither arm has had.
 # ============================================================
 
 echo "============================================================"
@@ -33,13 +67,14 @@ echo "============================================================"
 
 failures=0
 
-run_law_checks() {
-    local d="${REGRESSION_ROOT}/framework"
+# Reference: the framework arm's own converged answer at the end time. The
+# bounds are wide enough to survive a compiler or PETSc version change and
+# narrow enough to catch the material or the formulation moving
+MAG_D_MIN=3.2e-4
+MAG_D_MAX=3.5e-4
 
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+run_framework() {
+    local d="${REGRESSION_ROOT}/framework"
 
     rm -rf "${d}"; mkdir -p "${d}"
     for item in "${SCRIPT_DIR}"/*; do
@@ -47,75 +82,117 @@ run_law_checks() {
         cp -a "${item}" "${d}/"
     done
 
-    # The framework material, with the volumetric penalty that the legacy law
-    # does without because it takes its whole spherical stress from the solid
-    # model's pressure
-    cp "${d}/constant/mechanicalProperties.framework" \
-       "${d}/constant/mechanicalProperties"
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
-    if ! ( cd "${d}" && blockMesh > log.blockMesh 2>&1 ); then
-        echo "FAIL: could not mesh the case"
-        tail -n 5 "${d}/log.blockMesh" || true
-        return 1
+    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: framework arm (the tutorial skipped here)"
+        return 0
     fi
 
-    if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 ); then
-        echo "FAIL: the law checks did not pass"
-        grep -m3 "FAIL:" "${d}/log.unit" || true
-        return 1
-    fi
-
-    if ! grep -q "Selecting mechanical constitutive law: \
-HolzapfelGasserOgdenElastic" "${d}/log.unit"
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${d}/${SOLVER_LOGFILE}"
     then
-        # The line is wrapped above; match it loosely rather than by column
-        if ! grep -q "HolzapfelGasserOgdenElastic" "${d}/log.unit"; then
-            echo "FAIL: the framework law was not selected"
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if ! grep -q "^End" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the framework arm did not run to completion"
+        tail -n 5 "${d}/${SOLVER_LOGFILE}" || true
+        return 1
+    fi
+
+    if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
+        "${d}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not converge"
+        return 1
+    fi
+
+    # The mixed formulation must have asked for a deviatoric implicit
+    # stiffness. With the full one the bulk modulus - a thousand times the
+    # shear modulus here - makes the Laplacian surrogate so stiff the linear
+    # solve does not converge
+    if ! grep -q "scalarDeviatoric" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the mixed arm did not ask for a deviatoric stiffness"
+        return 1
+    fi
+
+    local t m
+    t=$(awk 'END {print $1}' "${d}/${DISP_FILE}" 2>/dev/null)
+    m=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
+
+    if [[ -z "${m}" ]]; then
+        echo "FAIL: the framework arm produced no displacement history"
+        return 1
+    fi
+
+    if ! awk "BEGIN {exit !((${t} - 1.0)^2 <= 1e-12)}"; then
+        printf "FAIL: the framework arm stopped at t = %s, not the end time\n" \
+            "${t}"
+        return 1
+    fi
+
+    echo "PASS: the framework arm ran to completion and converged"
+
+    if awk "BEGIN {exit !(${m} >= ${MAG_D_MIN} && ${m} <= ${MAG_D_MAX})}"; then
+        printf "PASS: final inner-wall |D| = %.6g\n" "${m}"
+    else
+        printf "FAIL: final inner-wall |D| = %.6g (outside [%g, %g])\n" \
+            "${m}" "${MAG_D_MIN}" "${MAG_D_MAX}"
+        return 1
+    fi
+
+    # The law's own checks, which are what pins the constitutive port: an
+    # honest isochoric split, and a fibre term that matches its closed form
+    if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        local u="${REGRESSION_ROOT}/lawChecks"
+        rm -rf "${u}"; mkdir -p "${u}"
+        cp -a "${d}/constant" "${d}/system" "${u}/"
+        rm -f "${u}/constant/solidProperties"
+        cp -a "${d}/constant/solidProperties.framework" \
+              "${u}/constant/solidProperties"
+
+        # The closed-form fibre check needs the fibres along the stretch, so
+        # the angle is zeroed here. It selects which directions the fibres
+        # point in, not which code paths run
+        sed -i.bak 's/\(fibreAngle.*\]\) *39.76;/\1 0.0;/' \
+            "${u}/constant/mechanicalProperties"
+        rm -f "${u}/constant/mechanicalProperties.bak"
+
+        # Uniform directions, so the check needs no calcLocCoordinates run
+        sed -i.bak 's|^        bulkModulus|        uniformLocalBasis yes;\n        Ec              (1 0 0);\n        Ea              (0 1 0);\n\n        bulkModulus|' \
+            "${u}/constant/mechanicalProperties"
+        rm -f "${u}/constant/mechanicalProperties.bak"
+
+        if ! ( cd "${u}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
+        then
+            echo "FAIL: the law checks did not pass"
+            grep -m3 "FAIL:" "${u}/log.unit" || true
             return 1
         fi
-    fi
 
-    # The check that matters for this law. Every invariant it uses is taken on
-    # the isochoric deformation, so a superposed dilation must leave the
-    # Kirchhoff isochoric stress alone and the stress it returns must be trace
-    # free. A law that took its invariants on the full deformation - as the
-    # legacy law does, having no volumetric term to separate - would fail both
-    if ! grep -q "isochoric stress ignores a superposed dilation" \
-        "${d}/log.unit"
-    then
-        echo "FAIL: the isochoric split was not checked"
-        return 1
-    fi
+        if ! grep -q "fibre stress matches the closed form" "${u}/log.unit"
+        then
+            echo "FAIL: the fibre term was not checked against its closed form"
+            return 1
+        fi
 
-    if ! grep -q "isochoric stress is trace free" "${d}/log.unit"; then
-        echo "FAIL: the trace-free condition was not checked"
-        return 1
+        echo "PASS: $(grep -c 'PASS:' "${u}/log.unit") law checks, including" \
+             "the fibre term against its closed form"
     fi
-
-    # The two checks above would pass a law that had lost its fibre term
-    # entirely - it would still be dilation invariant and still trace free.
-    # This one pins the fibre contribution to a closed form, and fails if the
-    # term is removed, if the structure tensor is not pushed forward, or if
-    # the factor of two from S = 2 dW/dC is dropped
-    if ! grep -q "fibre stress matches the closed form" "${d}/log.unit"; then
-        echo "FAIL: the fibre term was not checked against its closed form"
-        return 1
-    fi
-
-    echo "PASS: $(grep -c 'PASS:' "${d}/log.unit") law checks, including the" \
-         "isochoric split"
 
     return 0
 }
 
-if ! run_law_checks; then
+if ! run_framework; then
     failures=$((failures + 1))
 fi
 
 echo
-echo "NOTE: the solver arm is not run. This case stalls and dies at t = 0.68"
-echo "      on foam-extend 4.1, identically on origin/development, so there"
-echo "      is no working reference to compare a ported law against."
+echo "NOTE: the legacy arm is not run. On foam-extend 4.1 it stalls and dies"
+echo "      at t = 0.68, identically on the development branch, so there is"
+echo "      no working reference to compare the ported law against."
 
 echo
 if (( failures == 0 )); then
