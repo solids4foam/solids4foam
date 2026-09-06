@@ -27,7 +27,6 @@ License
 #include "mat66.H"
 #include "Switch.H"
 #include "CompactListList.H"
-#include "syncTools.H"
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -60,34 +59,6 @@ void combineDiagnostic
     {
         into.value() = max(into.value(), from.value());
     }
-}
-
-
-// Sum a point field across processor boundaries.
-//
-// A point on a processor boundary is held by every rank that touches it, and
-// each rank has accumulated only its own cells' contributions. Summing them
-// makes every copy agree, and agree with what a serial run would have built.
-//
-// The signature differs between forks: OpenFOAM.com and OpenFOAM.org offer a
-// four-argument convenience overload that defaults the transform, foam-extend
-// has only the five-argument form whose last argument says whether to apply
-// separation. Separation is for transformed cyclics, which these accumulators
-// are not, so it is false
-template<class Type>
-void syncPointSum(const polyMesh& mesh, Field<Type>& fld)
-{
-#ifdef OPENFOAM_NOT_EXTEND
-    syncTools::syncPointList
-    (
-        mesh, fld, plusEqOp<Type>(), pTraits<Type>::zero
-    );
-#else
-    syncTools::syncPointList
-    (
-        mesh, fld, plusEqOp<Type>(), pTraits<Type>::zero, false
-    );
-#endif
 }
 
 
@@ -3456,22 +3427,40 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
-    // Make the accumulators whole before dividing by them.
+    // A point on a processor boundary is held by every rank that touches it,
+    // and each rank has accumulated only what it can see, so the collapsed
+    // value differs between ranks and matches a serial run on none of them.
     //
-    // A point on a processor boundary belongs to every rank that touches it,
-    // and each rank has accumulated only the cells it owns. Dividing now would
-    // give each rank a different average over a different subset - wrong on
-    // all of them, and wrong in a way that changes with the decomposition.
-    // Summed first, every copy holds what a serial run would have built
+    // Summing the accumulators across ranks is NOT the fix, and was tried:
+    // this topology asks for unique integration points per material, so a
+    // point receives one contribution per material present on the rank rather
+    // than one per cell. Summing then counts a material once for every rank
+    // that holds it. Take a point shared by materials A and B with stresses
+    // 10 and 40. In serial the collapse is 25. Decomposed so that rank 0 has
+    // both materials and rank 1 has A as well, summing gives (10 + 40 + 10)/3
+    // = 20 - a different wrong answer, and one that changes with the
+    // decomposition just as the unsynchronised version does.
+    //
+    // What this needs is per-material contributions and multiplicities
+    // reconciled across ranks before the materials are combined, or weights
+    // that are genuinely additive. Neither is written, and nothing calls
+    // either collapse overload today - no solid model does, and the
+    // vertex-centred models evaluate on dual-mesh faces with no collapse - so
+    // this refuses rather than guessing. See DESIGN-state-io.md section 24.1
     if (Pstream::parRun())
     {
-        syncPointSum(mesh_, Foam::primitiveFieldRef(stressSum));
-        syncPointSum(mesh_, Foam::primitiveFieldRef(weightSum));
-
-        if (tangentWeightPtr)
-        {
-            syncPointSum(mesh_, Foam::primitiveFieldRef(*tangentWeightPtr));
-        }
+        FatalErrorInFunction
+            << "Point-centred stress collapse is not implemented for a "
+            << "decomposed mesh." << nl << nl
+            << "    A point on a processor boundary is held by several ranks "
+            << "and each has accumulated only its own contributions, so the "
+            << "collapsed value would depend on the decomposition. Summing "
+            << "the accumulators does not fix it: this topology contributes "
+            << "once per material rather than once per cell, so a sum counts "
+            << "each material once per rank that holds it." << nl << nl
+            << "    Run this case in serial, or use a topology that does not "
+            << "collapse."
+            << exit(FatalError);
     }
 
     // Collapse
@@ -3956,10 +3945,26 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
     mechanicalConstitutiveLawState& state,
     const scalar time,
     const label timeIndex,
-    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics,
+    DynamicList<const mechanicalConstitutiveLaw*>* reporters,
+    DynamicList<label>* firsts,
+    DynamicList<label>* counts
 ) const
 {
+    const label before = diagnostics.size();
+
     law.endTimeStep(state, time, timeIndex, diagnostics);
+
+    // Who said what. A composite's sub-law reports its own quantities, and
+    // without this the wrapper would be handed them and drop them on the
+    // floor - it inherits the empty reporting hook, so a nested plastic law's
+    // numbers would be reduced and then silently discarded
+    if (reporters && diagnostics.size() > before)
+    {
+        reporters->append(&law);
+        firsts->append(before);
+        counts->append(diagnostics.size() - before);
+    }
 
     const wordList childNames(law.childStateNames());
 
@@ -3971,7 +3976,10 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
             state.child(childNames[i]),
             time,
             timeIndex,
-            diagnostics
+            diagnostics,
+            reporters,
+            firsts,
+            counts
         );
     }
 }
@@ -4015,12 +4023,22 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
         forAll(laws_, lawI)
         {
             DynamicList<mechanicalConstitutiveLawDiagnostic> diagnostics;
+            DynamicList<const mechanicalConstitutiveLaw*> reporters;
+            DynamicList<label> firsts;
+            DynamicList<label> counts;
 
             // The law and every law below it. A composite's sub-law keeps its
             // own history and was never told the step had ended
             endTimeStepLaw
             (
-                laws_[lawI], tp.states_[lawI], time, timeIndex, diagnostics
+                laws_[lawI],
+                tp.states_[lawI],
+                time,
+                timeIndex,
+                diagnostics,
+                &reporters,
+                &firsts,
+                &counts
             );
 
             if (diagnostics.empty())
@@ -4035,6 +4053,19 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
             {
                 forAll(tp.boundaryStates_[lawI], patchI)
                 {
+                    // A coupled patch has a state allocated but never
+                    // evaluated - the evaluation loops skip it, because the
+                    // cell on the other side belongs to another rank and
+                    // computes it there. Counting it here would put the same
+                    // faces in the total twice, once from each side, and make
+                    // the total depend on how the mesh was cut: this case
+                    // reports 380 integration points in serial and would
+                    // report 458 on four ranks
+                    if (mesh_.boundary()[patchI].coupled())
+                    {
+                        continue;
+                    }
+
                     DynamicList<mechanicalConstitutiveLawDiagnostic> patchDiags;
 
                     endTimeStepLaw
@@ -4043,7 +4074,10 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                         tp.boundaryStates_[lawI][patchI],
                         time,
                         timeIndex,
-                        patchDiags
+                        patchDiags,
+                        nullptr,
+                        nullptr,
+                        nullptr
                     );
 
                     if (patchDiags.size() != diagnostics.size())
@@ -4064,6 +4098,27 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 
                     forAll(diagnostics, d)
                     {
+                        // Names and operations too, not just the count. Two
+                        // quantities that arrive in a different order, or one
+                        // that is summed here and maximised there, would
+                        // combine silently and give a number that means
+                        // nothing
+                        if
+                        (
+                            patchDiags[d].name() != diagnostics[d].name()
+                         || patchDiags[d].op() != diagnostics[d].op()
+                        )
+                        {
+                            FatalErrorInFunction
+                                << "The law for material '" << lawNames_[lawI]
+                                << "' reported '" << patchDiags[d].name()
+                                << "' where the internal points reported '"
+                                << diagnostics[d].name() << "'." << nl << nl
+                                << "    A law must report the same quantities "
+                                << "in the same order every time it is asked."
+                                << exit(FatalError);
+                        }
+
                         combineDiagnostic(diagnostics[d], patchDiags[d]);
                     }
                 }
@@ -4088,10 +4143,19 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                 }
             }
 
-            // The law says what it did. The manager knows how to combine the
+            // Each law that reported says what it did, and is handed back
+            // only its own quantities. The manager knows how to combine the
             // numbers but not what they mean, and the switch that decides
             // whether anyone wants to hear it belongs to the law
-            laws_[lawI].reportDiagnostics(diagnostics);
+            forAll(reporters, r)
+            {
+                const SubList<mechanicalConstitutiveLawDiagnostic> slice
+                (
+                    diagnostics, counts[r], firsts[r]
+                );
+
+                reporters[r]->reportDiagnostics(slice);
+            }
         }
     }
 }

@@ -426,7 +426,10 @@ class mechanicalConstitutiveLawManager
             mechanicalConstitutiveLawState& state,
             const scalar time,
             const label timeIndex,
-            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics,
+            DynamicList<const mechanicalConstitutiveLaw*>* reporters = nullptr,
+            DynamicList<label>* firsts = nullptr,
+            DynamicList<label>* counts = nullptr
         ) const;
 
         //- True if this law, or any law below it, keeps history
