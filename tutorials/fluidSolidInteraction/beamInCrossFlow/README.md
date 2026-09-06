@@ -49,7 +49,8 @@ This case can be analysed in two forms:
 The `beamInCrossFlow` case in solids4foam is set up in the modified form;
  however, it is straight-forward to return the case to its original form by
  setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
- and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+ setting `E` to `1.4e6` in `constant/solid/mechanicalProperties`, and running
+ past `t = 4 s` until the solution is steady.
 ```
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
@@ -69,7 +70,7 @@ $$
 
 For the solid, we assume finite strains (though a small strain assumption would
 be OK in the the original form of the case) with the material behaviour
-described by the neo-Hookean hyperelastic law:
+described by the St Venant-Kirchhoff hyperelastic law:
 
 $$
 \rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
@@ -77,10 +78,12 @@ $$
 $$
 
 $$
-\boldsymbol{\sigma} = \frac{1}{J}
-\left[ \frac{K}{2} (J^2 - 1) \mathbf{I}
-+ \mu J^{-\frac{2}{3}} \mathrm{dev} \left[ \mathbf{F}
-\cdot \mathbf{F}^T \right] \right]
+\boldsymbol{E} = \frac{1}{2}(\boldsymbol{F}^T\boldsymbol{F} - \mathbf{I})
+\qquad
+\boldsymbol{S} = 2\mu\boldsymbol{E}
++ \lambda\mathrm{tr}(\boldsymbol{E})\mathbf{I}
+\qquad
+\boldsymbol{\sigma} = \frac{1}{J}\boldsymbol{F}\boldsymbol{S}\boldsymbol{F}^T
 $$
 
 $$
@@ -195,6 +198,13 @@ loose tolerances, by comparing:
 
 This is intended as a practical regression test for the case setup and the FSI
 coupling implementations, rather than as a strict bitwise comparison.
+
+## Verification and convergence studies
+
+The opt-in [`verification/`](verification/) directory complements the fast
+regression test with isolated mesh/time convergence studies and published
+benchmark comparisons. These studies are not part of normal CI. See its README
+for commands and expected runtime.
 
 The `Allrun` script is shown below:
 

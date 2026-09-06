@@ -164,7 +164,7 @@ prepare_case() {
         local base_item
         base_item=$(basename "${item}")
 
-        if [[ "${base_item}" == "regressionTests" ]]; then
+        if [[ "${base_item}" == "regressionTests" || "${base_item}" == "verification" ]]; then
             continue
         fi
 
@@ -318,23 +318,14 @@ check_case() {
     return "${failures}"
 }
 
-# Reference values updated for the interface-normal correction (PR #375): the
-# fluid pressure is now applied using the deformed interface normals rather
-# than the initial-configuration ones, which shifts every FSI result. See
-# https://github.com/solids4foam/solids4foam/pull/375
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=0.0254734
-    REF_FINAL_DISP=0.0237615
-    REF_FINAL_FORCE=4.68516
-elif [[ "${variant}" == "openfoamorg" ]]; then
-    REF_MAX_DISP=0.0249245
-    REF_FINAL_DISP=0.0231857
-    REF_FINAL_FORCE=4.58300
-else
-    REF_MAX_DISP=0.0249071
-    REF_FINAL_DISP=0.0231620
-    REF_FINAL_FORCE=4.58284
-fi
+# St Venant-Kirchhoff reference values, regenerated from the OpenFOAM.com
+# v2512 IQNILS run after aligning the tutorial material law with the
+# Richter/Tukovic benchmark. The existing tolerances cover the known small
+# cross-version differences; the high-order variant uses the same references
+# with its widened displacement tolerance.
+REF_MAX_DISP=0.0263297
+REF_FINAL_DISP=0.0247337
+REF_FINAL_FORCE=4.799864
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
