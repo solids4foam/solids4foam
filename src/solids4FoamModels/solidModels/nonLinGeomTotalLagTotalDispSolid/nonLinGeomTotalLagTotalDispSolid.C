@@ -170,6 +170,74 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 }
 
 
+void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
+{
+    if (volumetricClosureChecked_)
+    {
+        return;
+    }
+
+    // Not on the first call. At that point the deformation gradient is the
+    // identity, so both the law's response and the assumed one are zero and
+    // the comparison holds for any law whatever - a check that cannot fail.
+    // Wait until the material has actually been deformed enough for the two
+    // to say something different, and only then record it as checked
+    const scalar maxDilation = gMax(mag(Foam::primitiveField(J_) - 1.0));
+
+    if (maxDilation < 1e-6)
+    {
+        return;
+    }
+
+    volumetricClosureChecked_ = true;
+
+    // The pressure equation hard-codes its half of the constitutive model:
+    // its residual is -p/K + stabilisation - 0.5*(J^2 - 1)/J, so it assumes
+    // the law's volumetric energy is U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)) and
+    // takes K from the mechanical model. Nothing in providesVolumetricSplit()
+    // promises that. A law with a different U(J) would separate its response
+    // honestly and then be solved against a pressure equation describing a
+    // different material - silently, because both halves are individually
+    // reasonable.
+    //
+    // The response the law returns is exactly dU/dJ, so the assumption can be
+    // checked rather than trusted. Once is enough: it is a property of the
+    // law, not of the state
+    const volScalarField assumed
+    (
+        0.5*(sqr(J_) - 1.0)/(J_*rKappa())
+    );
+
+    const volScalarField& actual = volumetricResponse();
+
+    // Scaled by the assumed response rather than the law's own, so that a
+    // law returning zero is caught rather than measured against its mistake
+    const scalar scale =
+        max(gMax(mag(Foam::primitiveField(assumed))), SMALL);
+    const scalar err =
+        gMax
+        (
+            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
+        );
+
+    if (err > 1e-8*scale)
+    {
+        FatalErrorInFunction
+            << "The law's volumetric response is not the one the pressure "
+            << "equation was written for." << nl << nl
+            << "    The pressure equation assumes "
+            << "U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)), so dU/dJ = "
+            << "0.5*K*(J^2 - 1)/J, with K taken from the mechanical model. "
+            << "The law returned something else: the largest difference is "
+            << err << " against a response of order " << scale << '.' << nl << nl
+            << "    Separating the volumetric response honestly is not enough "
+            << "on its own - the pressure equation has to be solving for the "
+            << "same thing, or the two halves describe different materials."
+            << exit(FatalError);
+    }
+}
+
+
 void nonLinGeomTotalLagTotalDispSolid::replaceVolumetricStress
 (
     const volScalarField& p
@@ -769,6 +837,8 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
             sigma(),
             volumetricResponse()
         );
+
+        checkVolumetricClosure();
 
         return;
     }

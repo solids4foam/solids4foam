@@ -2209,7 +2209,30 @@ the residual was already right. So this was an inconsistency rather than a
 wrong result, and it is worth saying which: a check that has never failed is
 not evidence, and neither is a fix whose effect was never measured.
 
-### 22.6 Still open
+### 22.6 The half the pressure equation owns
+
+`providesVolumetricSplit()` says the law can hand back `dU/dJ`. It says
+nothing about which `U`. The pressure equation, meanwhile, hard-codes one: its
+residual is `-p/K + stabilisation - 0.5*(J^2 - 1)/J`, so it assumes
+`U(J) = 0.25*K*(J^2 - 1 - 2*ln(J))` and takes `K` from the mechanical model. A
+law with a different volumetric energy would separate its response perfectly
+honestly and then be solved against a pressure equation describing a different
+material - silently, because each half is individually reasonable.
+
+Since the law now returns `dU/dJ`, the assumption can be checked instead of
+trusted, and that is what `checkVolumetricClosure` does. Once per run: it is a
+property of the law, not of the state.
+
+Not on the first call, though. The first evaluation happens at `F = I`, where
+both the law's response and the assumed one are zero, so the comparison holds
+for any law whatever. The first version checked there, and a control that
+returned `1.1*dU/dJ` sailed through it. It now waits until the material has
+actually been deformed, and the same control is refused by name with the size
+of the disagreement.
+
+### 22.7 Still open
+
+
 
 The small-strain path has no split. `linGeomTotalDispSolid` keeps
 `dev(sigma()) - p*I`, which is exact for isotropic linear elasticity and wrong

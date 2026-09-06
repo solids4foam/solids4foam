@@ -107,6 +107,10 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- Set once the law's volumetric response has been checked against
+        //  the closure the pressure equation assumes
+        mutable bool volumetricClosureChecked_ = false;
+
         //- The law's own volumetric response, dU/dJ
         //  Only built when solvePressure is enabled on the constitutive-law
         //  framework. The value is not used: what matters is that asking for
@@ -170,6 +174,10 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Replace the volumetric part of the stress with the solved
         //  pressure. Both the residual and the linear predictor do this and
         //  they have to agree, so it lives here rather than at each of them
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
         void replaceVolumetricStress(const volScalarField& p);
 
         //- Somewhere for the law to put its volumetric response
