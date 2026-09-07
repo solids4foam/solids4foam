@@ -64,7 +64,14 @@ void nonLinGeomUpdatedLagSolid::predict()
     DD() = U()*runTime().deltaT() + 0.5*sqr(runTime().deltaT())*A_;
 
     // Update gradient of displacement increment
-    mechanical().grad(DD(), gradDD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkGrad(DD(), gradDD());
+    }
+    else
+    {
+        mechanical().grad(DD(), gradDD());
+    }
 
     // Relative deformation gradient
     relF_ = I + gradDD().T();
@@ -389,7 +396,14 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         D() = D().oldTime() + DD();
 
         // Update gradient of displacement increment
-        mechanical().grad(DD(), gradDD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkGrad(DD(), gradDD());
+        }
+        else
+        {
+            mechanical().grad(DD(), gradDD());
+        }
 
         // Relative deformation gradient
         relF_ = I + gradDD().T();
@@ -438,7 +452,14 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
     gradD() = fvc::grad(D());
 
     // Interpolate cell displacement increments to vertices
-    mechanical().interpolate(DD(), gradDD(), pointDD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkInterpolate(DD(), gradDD(), pointDD());
+    }
+    else
+    {
+        mechanical().interpolate(DD(), gradDD(), pointDD());
+    }
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();
@@ -531,7 +552,14 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     }
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(DD(), gradDD(), pointDD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkInterpolate(DD(), gradDD(), pointDD());
+    }
+    else
+    {
+        mechanical().interpolate(DD(), gradDD(), pointDD());
+    }
     pointDD().correctBoundaryConditions();
 
     // Total point displacement
@@ -965,7 +993,14 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     DD().correctBoundaryConditions();
     if (restart())
     {
-        mechanical().grad(DD(), gradDD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkGrad(DD(), gradDD());
+        }
+        else
+        {
+            mechanical().grad(DD(), gradDD());
+        }
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);
         relJ_ = det(relF_);
@@ -1065,6 +1100,55 @@ const volScalarField& nonLinGeomUpdatedLagSolid::rKappa() const
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::frameworkGrad
+(
+    const volVectorField& D,
+    volTensorField& gradD
+) const
+{
+    // A solid model on the constitutive-law framework computes its own
+    // gradient rather than asking the legacy mechanicalModel for one.
+    //
+    // That is not a preference. For more than one material the legacy grad()
+    // splits the mesh into per-material subMeshes, interpolates the
+    // displacement onto each, takes a gradient there and maps the result
+    // back, with a stress-based correction at the interface. Replacing that
+    // machinery is a large part of what the framework is for: the material
+    // aware least-squares gradient does the same job on one mesh, by drawing
+    // a cell's stencil only from cells of its own material.
+    //
+    // Routing the framework through the subMesh path anyway is not merely
+    // redundant, it is worse: on layeredPipe it puts the radial stress 0.0305
+    // from the analytical solution against a tolerance of 0.03, where the
+    // legacy path gives 0.0192. Computed directly it gives 0.0192 too
+    gradD = fvc::grad(D);
+}
+
+
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::frameworkInterpolate
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD
+)
+{
+    // As above: the legacy interpolate() routes multiple materials through
+    // subMeshes. volToPoint() is the base-mesh interpolator it uses for a
+    // single material, and is what the framework wants for any number.
+    //
+    // foam-extend's interpolator has no gradient-corrected form, so there the
+    // legacy call is kept: it is the same base-mesh interpolation for a
+    // single material, and this model has no multi-material framework case on
+    // that fork
+#ifdef OPENFOAM_NOT_EXTEND
+    mechanical().volToPoint().interpolate(D, gradD, pointD);
+#else
+    mechanical().interpolate(D, gradD, pointD);
+#endif
+}
+
 
 
 bool nonLinGeomUpdatedLagSolid::evolve()
@@ -1221,7 +1305,14 @@ label nonLinGeomUpdatedLagSolid::formResidual
     else
     {
         // Update displacement increment gradient
-        mechanical().grad(DD, gradDD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkGrad(DD, gradDD());
+        }
+        else
+        {
+            mechanical().grad(DD, gradDD());
+        }
     }
 
     // Relative deformation gradient

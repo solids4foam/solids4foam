@@ -213,6 +213,23 @@ class nonLinGeomUpdatedLagSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
+        //- Gradient, computed directly rather than through the legacy
+        //  mechanicalModel's per-material subMeshes. See the note on the
+        //  definition: the subMesh path is what the framework replaces
+        void frameworkGrad
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
+        //- Point interpolation, likewise on the base mesh
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
 
         //- Disallow default bitwise copy construct
         nonLinGeomUpdatedLagSolid(const nonLinGeomUpdatedLagSolid&);

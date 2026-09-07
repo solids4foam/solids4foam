@@ -2470,47 +2470,56 @@ framework is refused there by name, pointing at the model that does implement
 it. Porting it is ordinary work - the same shape as section 22 - and there is
 no case that needs it today.
 
-## 27. Multi-material on the framework is worse at the interface
+## 27. A solid model on the framework computes its own gradient
 
-Found by asking a review what else would block calling the port done, and then
-measuring it.
+The framework exists in large part to replace the legacy per-material subMesh
+machinery for multi-material cases. The solid models were not honouring that:
+they called `mechanical().grad()` and `mechanical().interpolate()` regardless
+of which model was describing the material, and for more than one material
+those split the mesh into subMeshes, interpolate the displacement onto each,
+take a gradient there and map the result back with a stress-based correction
+at the interface.
 
-`layeredPipe` is the only multi-material tutorial and it has no framework arm,
-so this combination had never been run. Run both ways:
+So a framework run was taking its stress from the framework and its gradient
+from the thing the framework replaces.
 
-    analytical radial stress error   legacy 0.0192   framework 0.0305
-    tolerance                                        0.03
+### 27.1 What it cost
 
-The framework arm is 1.6 times less accurate and fails the case's own check.
-The two differ by 1.7 per cent, and the difference is localised: the material
-interface is at r = 0.070, and every sample above the noise floor lies between
-r = 0.067 and r = 0.074.
+`layeredPipe` is the only multi-material tutorial and had no framework arm, so
+this had never been run. Against the case's own analytical solution:
 
-### 27.1 What it is not
+    radial stress error   legacy 0.0192   framework 0.0305   tolerance 0.03
 
-The obvious candidate was the bi-material interface correction in
-`solidSubMeshes::interpolateDtoSubMeshD`, which reads `subMeshSigma` - a
-per-material stress that the legacy `mechanicalModel::correct` writes when it
-evaluates each material on its own subMesh, and that the framework never
-writes because it evaluates on the base mesh. On the framework path those
-fields would hold whatever they last held.
+The framework arm was 1.6 times less accurate and failed. The difference was
+localised: the interface is at r = 0.070 and every sample above the noise
+floor lay between 0.067 and 0.074.
 
-That was tested rather than assumed: a `refreshSubMeshSigma` that maps the
-base stress back down to each subMesh after every evaluation, called 63 times
-in the run, changed the answer in no digit. So the stale field is real but is
-not the mechanism, and the change was withdrawn rather than shipped with a
-comment claiming it fixed something.
+### 27.2 What it was not
 
-### 27.2 What that means for the port
+Two wrong answers were tried before the right one, and both are worth
+recording because each looked plausible.
 
-Multi-material is a claim the framework should not currently make for a
-solver. Single-material agreement is established across sixteen tutorials;
-this is the one case with two materials sharing an interface, and it is
-measurably worse.
+The first was that the interface correction reads `subMeshSigma`, which the
+legacy path writes and the framework never does. A `refreshSubMeshSigma` that
+filled those fields from the base stress ran 63 times in the case and changed
+the answer in no digit. The stale field is real; it is not the mechanism.
 
-The next thing to try is whether the legacy advantage comes from evaluating
-each material on its own subMesh with that subMesh's own gradient - the
-framework evaluates every material on one base-mesh gradient - rather than
-from the interface stress correction. That is a different mechanism from the
-one ruled out above and would explain a difference concentrated exactly at the
-interface cells.
+The second was the gradient *scheme*. Setting `grad(D)` to the material-aware
+`leastSquaresS4f` changed nothing either - and the reason is the point: the
+base-mesh scheme is irrelevant when the base-mesh gradient is never used,
+because `mechanical().grad()` computes gradients on the subMeshes instead.
+
+### 27.3 What it is
+
+The solid models now compute their own gradient when the framework is active -
+`fvc::grad(D)`, on one mesh, with whatever scheme the case selects - and their
+own point interpolation on the base mesh. With the material-aware gradient
+scheme the framework arm gives 0.019179 against the legacy 0.019162, and
+passes.
+
+`layeredPipe` now carries both arms, so the combination the framework exists
+for is covered rather than assumed.
+
+The quadrature gradients are left alone: they take a different overload, on
+packed per-cell storage, with no subMesh path to avoid.
+

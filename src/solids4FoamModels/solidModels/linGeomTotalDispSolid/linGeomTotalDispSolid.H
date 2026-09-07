@@ -189,6 +189,23 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
+        //- Gradient, computed directly rather than through the legacy
+        //  mechanicalModel's per-material subMeshes. See the note on the
+        //  definition: the subMesh path is what the framework replaces
+        void frameworkGrad
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
+        //- Point interpolation, likewise on the base mesh
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);

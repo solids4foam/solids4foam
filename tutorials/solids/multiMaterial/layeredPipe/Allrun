@@ -9,6 +9,25 @@ source solids4FoamScripts.sh
 # Case does not run with OpenFOAM.org
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
+# Two arms: the legacy mechanicalModel by default, and the
+# mechanicalConstitutiveLaw framework with "./Allrun framework".
+#
+# The framework arm also switches grad(D) to the material-aware
+# leastSquaresS4f scheme. That pairing is the point: the framework replaces
+# the legacy per-material subMesh machinery, and the material-aware gradient
+# is what does that job on a single mesh
+APPROACH="legacy"
+for arg in "$@"; do
+    if [[ "$arg" == "framework" ]]; then APPROACH="framework"; fi
+done
+echo "Using the $APPROACH approach"
+
+if [[ "${APPROACH}" == "framework" ]]
+then
+    cp constant/solidProperties.framework constant/solidProperties
+    cp system/fvSchemes.framework system/fvSchemes
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 

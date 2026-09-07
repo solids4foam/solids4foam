@@ -165,6 +165,15 @@ class poroLinGeomSolid
             const volVectorField& D,
             const volScalarField& p
         );
+        //- Gradient, computed directly rather than through the legacy
+        //  mechanicalModel's per-material subMeshes. See the note on the
+        //  definition: the subMesh path is what the framework replaces
+        void frameworkGrad
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
 
         //- Disallow default bitwise copy construct
         poroLinGeomSolid(const poroLinGeomSolid&);
