@@ -952,40 +952,14 @@ int main(int argc, char *argv[])
     #include "setRootCase.H"
     #include "createTime.H"
 
-#ifdef FOAMEXTEND
-    autoPtr<dynamicFvMesh> meshPtr = dynamicFvMesh::New
-    (
-        IOobject
-        (
-            dynamicFvMesh::defaultRegion,
-            runTime.timeName(),
-            runTime,
-            IOobject::MUST_READ
-        )
-    );
-    dynamicFvMesh& mesh = autoPtrRef(meshPtr);
-    volVectorField displacement
-    (
-        IOobject
-        (
-            "D",
-            runTime.timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh
-    );
-#else
     autoPtr<solidModel> solidPtr = solidModel::New
     (
         runTime,
         dynamicFvMesh::defaultRegion
     );
-    solidModel& solid = solidPtr();
+    solidModel& solid = autoPtrRef(solidPtr);
     dynamicFvMesh& mesh = solid.mesh();
     volVectorField& displacement = solid.solutionD();
-#endif
 
     if (mesh.nGeometricD() != 2 && mesh.nGeometricD() != 3)
     {
