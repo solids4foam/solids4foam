@@ -2469,3 +2469,48 @@ Rather than leave it quietly wrong, the combination of `solvePressure` and the
 framework is refused there by name, pointing at the model that does implement
 it. Porting it is ordinary work - the same shape as section 22 - and there is
 no case that needs it today.
+
+## 27. Multi-material on the framework is worse at the interface
+
+Found by asking a review what else would block calling the port done, and then
+measuring it.
+
+`layeredPipe` is the only multi-material tutorial and it has no framework arm,
+so this combination had never been run. Run both ways:
+
+    analytical radial stress error   legacy 0.0192   framework 0.0305
+    tolerance                                        0.03
+
+The framework arm is 1.6 times less accurate and fails the case's own check.
+The two differ by 1.7 per cent, and the difference is localised: the material
+interface is at r = 0.070, and every sample above the noise floor lies between
+r = 0.067 and r = 0.074.
+
+### 27.1 What it is not
+
+The obvious candidate was the bi-material interface correction in
+`solidSubMeshes::interpolateDtoSubMeshD`, which reads `subMeshSigma` - a
+per-material stress that the legacy `mechanicalModel::correct` writes when it
+evaluates each material on its own subMesh, and that the framework never
+writes because it evaluates on the base mesh. On the framework path those
+fields would hold whatever they last held.
+
+That was tested rather than assumed: a `refreshSubMeshSigma` that maps the
+base stress back down to each subMesh after every evaluation, called 63 times
+in the run, changed the answer in no digit. So the stale field is real but is
+not the mechanism, and the change was withdrawn rather than shipped with a
+comment claiming it fixed something.
+
+### 27.2 What that means for the port
+
+Multi-material is a claim the framework should not currently make for a
+solver. Single-material agreement is established across sixteen tutorials;
+this is the one case with two materials sharing an interface, and it is
+measurably worse.
+
+The next thing to try is whether the legacy advantage comes from evaluating
+each material on its own subMesh with that subMesh's own gradient - the
+framework evaluates every material on one base-mesh gradient - rather than
+from the interface stress correction. That is a different mechanism from the
+one ruled out above and would explain a difference concentrated exactly at the
+interface cells.
