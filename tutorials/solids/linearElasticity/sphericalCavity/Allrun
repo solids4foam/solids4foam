@@ -125,6 +125,9 @@ require_petsc_or_exit_silently
 
 select_approach
 
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
 echo
 echo "Compiling libraries..."
 (cd src && bash ./Allwmake -s)

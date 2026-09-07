@@ -171,6 +171,9 @@ run_parallel_case() {
     (
         cd "${CASE_DIR}"
 
+        # Check case version is correct
+        solids4Foam::convertCaseFormat .
+
         echo "Compiling libraries..."
         (cd src && bash ./Allwmake -s)
 
