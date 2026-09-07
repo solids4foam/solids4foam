@@ -221,7 +221,7 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField Taf(fvc::interpolate(Ta));
 
         // Add active stress: convert 2nd Piola-Kirchhoff to Cauchy
-        sigma += J*symm(F & (Taf*f0f0f_) & F.T());
+        sigma += symm(F & (Taf*f0f0f_) & F.T())/J;
     }
     else
     {
@@ -232,7 +232,7 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
             currentTa = (mesh().time().value()/rampTime_)*Ta_;
         }
 
-        sigma += J*symm(F & (currentTa*f0f0f_) & F.T());
+        sigma += symm(F & (currentTa*f0f0f_) & F.T())/J;
     }
 }
 
