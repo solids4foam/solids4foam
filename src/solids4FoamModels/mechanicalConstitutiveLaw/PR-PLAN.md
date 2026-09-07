@@ -118,19 +118,40 @@ them:
 | `poroLinearGeometry` | 23 | yes |
 | `thermalLinearGeometry` | 14 | yes |
 | `coupledUnsLinearGeometryLinearElastic` | 14 | **no** |
-| `vertexCentredLinearGeometry` | 12 | yes |
+| `vertexCentredLinearGeometry` | 12 | tangent only |
 | `thermalSolid` | 2 | **no** |
 | `linearGeometry`, `kirchhoffPlate` | 1 each | **no** |
 
-So the framework reaches everything that matters except two, and the rest are
-selected by one or two cases each.
+One qualification on that table, found by review rather than by me:
+`vertexCentredLinearGeometry`'s switch moves only the Jacobian tangent. Its
+residual stress still comes from `dualMechanicalModel`, which its own header
+says - so the converged answer is the legacy one and only the convergence path
+changes. Count it as tangent integration, not a constitutive port.
+
+Note also that the counts are selections, which measure usage rather than
+runtime coverage. Several unported models do have working bodies on the
+primary forks - `unsLinearGeometry`, the two `unsNonLinearGeometry` models,
+`kirchhoffPlate`, `thermalSolid` - they are simply not chosen by any tutorial.
+So "the framework covers everything that runs on OpenFOAM.com" is not a claim
+that survives checking; what is true is that it covers everything the
+tutorials exercise, plus the three highest-usage models outright.
 
 **`coupledPressureDisplacementSolid`** is the substantial one: five tutorials -
 `cylindricalPressureVessel`, `heartTissueBeam`, `idealisedVentricle`,
 `ratCarotid`, `plateHole` - and foam-extend only. Its pressure equation already
-carries the matching penalty term, so the shapes should fit, but the
-linearisation needs checking: a constant `1/K` coefficient is not the tangent
-of the penalty, since `U''(J) = 0.5*K*(1 + J^-2)` equals `K` only at `J = 1`.
+carries a penalty term, `fvm::Sp(rKappa_, Dp_)` with `rKappa_ = 1/K`, so the
+shapes look compatible.
+
+An earlier note here said that coefficient was wrong because
+`U''(J) = 0.5*K*(1 + J^-2)` is not `K` away from `J = 1`. That was too quick.
+For the total Lagrangian residual the derivative with respect to `p` at fixed
+displacement is exactly `-1/K`; `U''` enters the displacement coupling
+instead. The coupled solver is a different question again - it solves a
+pressure *increment* and accumulates `p = p.oldTime() + Dp`, with no residual
+visibly enforcing the framework's `p = -dU/dJ`. What needs deriving before
+porting is that increment relation, not a coefficient: an infinitesimal
+current-configuration increment gives a compliance of `1/(J*U''(J))`, not
+`1/U''(J)`.
 
 **`coupledUnsLinearGeometryLinearElastic`** covers `cantilever2d`,
 `ellipticPlate` and `narrowTmember`. Linear elastic and block coupled, so it

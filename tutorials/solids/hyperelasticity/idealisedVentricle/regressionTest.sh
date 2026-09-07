@@ -190,6 +190,44 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
+    # The run has to have finished and converged. extract_max_sigma takes the
+    # last value in the log, and a run that stopped early still leaves one -
+    # so without this an arm that diverged at the second step would be
+    # compared against the other arm's converged answer and could pass
+    if ! grep -q "^End" "${case_dir}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: ${approach}: did not run to completion"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
+        "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${approach}: did not converge"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    # And each arm has to have taken the path it was set up for, or the
+    # comparison below is a run against itself
+    if [[ "${approach}" == "petscManager" ]]; then
+        if ! grep -q "Selecting mechanical constitutive law" \
+            "${case_dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${approach}: did not use the framework"
+            failures=$((failures + 1))
+            continue
+        fi
+    elif [[ "${approach}" == "petsc" ]]; then
+        if grep -q "Selecting mechanical constitutive law" \
+            "${case_dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${approach}: used the framework"
+            failures=$((failures + 1))
+            continue
+        fi
+    fi
+
     sigma=$(extract_max_sigma "${case_dir}")
 
     if [[ -z "${sigma}" ]]; then
