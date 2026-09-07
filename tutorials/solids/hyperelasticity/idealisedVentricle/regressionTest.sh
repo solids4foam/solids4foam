@@ -53,6 +53,7 @@ ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     "petsc"
+    "petscManager"
     "pressureDisplacement"
 )
 
@@ -205,7 +206,33 @@ for approach in "${APPROACHES[@]}"; do
             "${approach}" "${sigma}" "${SIGMA_MIN}" "${SIGMA_MAX}"
         failures=$((failures + 1))
     fi
+
+    if [[ "${approach}" == "petsc" ]]; then
+        legacy_sigma="${sigma}"
+    elif [[ "${approach}" == "petscManager" ]]; then
+        framework_sigma="${sigma}"
+    fi
 done
+
+# The two petsc arms are the same case and the same solver, differing only in
+# where the stress comes from. They are not expected to agree exactly: the
+# framework's GuccioneElastic builds Q from the isochoric strain where the
+# legacy law builds it from the full Green-Lagrange strain, so shape and
+# volume are separated in one and coupled in the other. Both reduce to the
+# published model in the incompressible limit it was written for. What the
+# bound says is that the reformulation is the only thing between them
+if [[ -n "${legacy_sigma:-}" && -n "${framework_sigma:-}" ]]; then
+    if awk "BEGIN {exit !((${framework_sigma} - ${legacy_sigma})^2 \
+        <= (0.01*${legacy_sigma})^2)}"
+    then
+        printf "PASS: framework near legacy, differing by the reformulation (%.6g vs %.6g)\n" \
+            "${legacy_sigma}" "${framework_sigma}"
+    else
+        printf "FAIL: framework and legacy differ by more than the reformulation explains (%.6g vs %.6g)\n" \
+            "${legacy_sigma}" "${framework_sigma}"
+        failures=$((failures + 1))
+    fi
+fi
 
 # ------------------------------------------------------------
 # The framework's check on GuccioneElastic's isochoric split
