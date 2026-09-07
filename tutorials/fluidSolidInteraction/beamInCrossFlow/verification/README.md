@@ -14,6 +14,7 @@ from either this directory or the repository root:
 source ~/bin/load-openfoam v2512
 cd tutorials/fluidSolidInteraction/beamInCrossFlow/verification
 ./Allverify --case original --study mesh
+./Allverify --case modified --study mesh
 # Optional steady-solution acceleration diagnostic
 ./Allverify --case original --study mesh --time-scheme Euler
 ```
@@ -52,40 +53,55 @@ reproduction across OpenFOAM versions, PETSc configurations, or hardware.
   records both literature columns: the Richter benchmark (`u_x`, `F_x`) and
   the Tukovic OpenFOAM calculation (`u_x`, `u_y`, `F_x`, `F_y`), each with its
   own relative error.
-- The modified large-deformation form is deliberately not exposed by
-  `Allverify` yet. It will be added after an independent verification study,
-  rather than treating its published result as an unchecked regression target.
+- `modified --study mesh` uses the large-deformation form shown in Tukovic's
+  Figure 28: `maxVelocity = 0.3`, a 1 s ramp, `E = 1e4 Pa`, and
+  St Venant-Kirchhoff elasticity. It runs 1x/2x/3x/4x/8x uniform refinements
+  to `t = 8 s`, with time steps `0.05`, `0.025`, `0.0166667`, `0.0125`, and
+  `0.00625 s`. Its primary checks are the Figure 28 values
+  `u_x(A)=0.01463 m`, `u_y(A)=0.005 m`, and `u_z(A)=-0.000447 m`.
+  The tutorial represents one side of the `z = 0` symmetry plane, whereas the
+  published transverse value is verified here as the symmetry-paired quantity
+  `2 u_z(A)`. The CSV retains both raw `u_z(A)` and
+  `uz_symmetry_difference = 2 u_z(A)`, making that convention explicit.
 
 The tutorial and every verification copy use `StVenantKirchhoffElastic`; the
 driver does not change the constitutive model.
 
-The mesh levels have approximately 1x, 8x, 64x, and 512x cells. `Allverify`
-returns zero only when the finest result is within 5% of the primary Richter
-values for `u_x(A)` and `F_x`, and the reference error for both
-quantities decreases from the 1x to 8x meshes with positive net order. This
-checks convergence toward the reference without requiring a fixed numerical
-regression value, so a future solver improvement is not rejected merely for
-changing a result.
+`Allverify` returns zero only when every primary quantity on the finest mesh
+is within 5% of its published reference and its reference error decreases from
+the coarsest to the finest mesh with positive net order. For the original form
+the primaries are the Richter `u_x(A)` and `F_x`; for the modified form they
+are the Tukovic Figure 28 `u_x(A)`, `u_y(A)`, and symmetry-paired `2u_z(A)`.
+This checks convergence toward the reference without requiring a fixed
+numerical regression value, so a future solver improvement is not rejected
+merely for changing a result.
+
+The original levels have approximately 1x, 8x, 64x, and 512x cells. The
+modified sequence additionally includes a 3x level, which is close in overall
+cell count to the published calculation.
 The published Tukovic calculation used a 273,539-cell unstructured fluid mesh
 and a 6,661-cell solid mesh; it visibly concentrates resolution around the
 plate. The supplied tutorial uses a reproducible structured mesh instead, so
 the uniform refinement family is retained as the primary verification study.
 The mesh sweep is therefore expected to bracket, rather than reproduce, the
 published mesh at an identical cell count. Runtime is highly
-machine- and coupling-dependent: the 8x mesh has roughly 7.6 million cells and
-took about 11 hours on 64 cores in the reference run. Schedule the mesh study
-only on resources appropriate for its final 8x member.
+machine- and coupling-dependent: the original 8x mesh has roughly 7.6 million
+cells and took about 11 hours on 64 cores in the reference run. Schedule either
+mesh study only on resources appropriate for its final 8x member.
 
 ## Case variants and parallel runs
 
 The driver selects the tutorial's `iqnils` coupling variant for every study so
-that a sweep changes only mesh resolution and time step. The original form is
-set explicitly in each isolated copy: `maxVelocity = 0.2`, a 4 s ramp,
-`E = 1.4e6 Pa`, and `StVenantKirchhoffElastic`.
+that a sweep changes only mesh resolution and time step. Each form is set
+explicitly in its isolated copy, including its inlet ramp and Young's modulus;
+both use `StVenantKirchhoffElastic`.
 
 Pass `--cores N` to use `N` MPI ranks for every case. `--cores auto` (the
-default) uses 1, 4, 8, and 64 ranks for the 1x, 2x, 4x, and 8x mesh levels
-respectively.
+default) uses 1, 4, 8, and 64 ranks for the original 1x, 2x, 4x, and 8x mesh
+levels respectively. For the modified 1x, 2x, 3x, 4x, and 8x levels it uses
+8, 4, 16, 8, and 64 ranks respectively, matching the completed reference
+runs. Override this with `--cores N` when a scheduler allocation requires a
+single rank count.
 The selected count is written to the CSV. For a shared machine, choose `N` from
 the available physical cores and available memory; do not launch multiple sweep
 members concurrently unless those resources are reserved.
@@ -102,21 +118,29 @@ verification. A literal `steadyState` fluid/solid scheme is not offered: in
 this coupled PIMPLE configuration it removes the stabilising transient storage
 and diverges during the inlet ramp.
 
-The mesh driver automatically writes a four-panel PNG comparison of the mesh
-predictions and published references. Regenerate it manually, if needed, with:
+The mesh driver automatically writes a PNG comparison of predictions and
+published references: four panels for the original form and three displacement
+panels for the modified form. Regenerate them manually, if needed, with:
 
 ```bash
 gnuplot scripts/plotMeshConvergence.gnuplot
+gnuplot scripts/plotModifiedMeshConvergence.gnuplot
 ```
 
-The script writes `original_mesh_sweep.png` to `verification/postProcessing/`.
-It uses the initial solid spacing of `0.025 m` and halves it for each mesh
-level.
+The scripts write `original_mesh_sweep.png` and `modified_mesh_sweep.png` to
+`verification/postProcessing/`. They use the initial solid spacing of `0.025 m`
+and the time-step-to-refinement relationship from the sweep configuration.
 
-## Reference result
+## Reference results
 
-The following plot is versioned with this verification setup. It records the
-successful four-level backward/BDF2 study at `t = 8 s`, and provides a visual
-reference for future local or manually dispatched reproductions.
+The following plots are versioned with this verification setup. They record the
+successful backward/BDF2 studies at `t = 8 s` and provide visual references for
+future local or manually dispatched reproductions.
+
+### Original small-deformation form
 
 ![Original benchmark mesh-convergence result](reference/original_mesh_t8_backward_vs_references.png)
+
+### Modified large-deformation form
+
+![Modified benchmark mesh-convergence result](reference/modified_mesh_t8_backward_vs_references.png)

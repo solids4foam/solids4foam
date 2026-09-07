@@ -25,19 +25,19 @@ set output output
 set multiplot layout 2,2 title "beamInCrossFlow original case: mesh study at t = 8 s"
 set format y "%.1e"
 set ylabel "u_x(A) [m]"
-plot data using (baseDeltaX/(2.0**$4)):9 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
+plot data using (baseDeltaX*$6/0.05):9 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
     richterUx with lines lw 2 dt 2 lc rgb "#cc0000" title "Richter benchmark", \
     tukovicUx with lines lw 2 dt 3 lc rgb "#6a3d9a" title "Tukovic OpenFOAM"
 set ylabel "u_y(A) [m]"
-plot data using (baseDeltaX/(2.0**$4)):10 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
+plot data using (baseDeltaX*$6/0.05):10 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
     tukovicUy with lines lw 2 dt 3 lc rgb "#6a3d9a" title "Tukovic OpenFOAM"
 set ylabel "F_x [N]"
 set format y "%.3f"
-plot data using (baseDeltaX/(2.0**$4)):12 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
+plot data using (baseDeltaX*$6/0.05):12 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
     richterFx with lines lw 2 dt 2 lc rgb "#cc0000" title "Richter benchmark", \
     tukovicFx with lines lw 2 dt 3 lc rgb "#6a3d9a" title "Tukovic OpenFOAM"
 set ylabel "F_y [N]"
-plot data using (baseDeltaX/(2.0**$4)):13 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
+plot data using (baseDeltaX*$6/0.05):13 with linespoints pt 7 ps 1.4 lw 2 lc rgb "#1f77b4" title "solids4foam", \
     tukovicFy with lines lw 2 dt 3 lc rgb "#6a3d9a" title "Tukovic OpenFOAM"
 unset multiplot
 set output

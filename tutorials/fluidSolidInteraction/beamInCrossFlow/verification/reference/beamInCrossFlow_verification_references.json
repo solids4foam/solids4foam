@@ -24,9 +24,22 @@
   "modified": {
     "description": "Tukovic large-deformation form using St Venant-Kirchhoff elasticity",
     "references": {
-      "ux": {"value": 0.01463, "tolerance": 0.10},
-      "uy": {"value": 0.005, "tolerance": 0.10},
-      "uz": {"value": -0.000447, "tolerance": 0.15}
+      "ux": {"value": 0.01463, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
+      "uy": {"value": 0.005, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
+      "uz_symmetry_difference": {"value": -0.000447, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28; compared as 2*uz"}
+    },
+    "publishedReferences": {
+      "tukovicFig28": {
+        "ux": 0.01463,
+        "uy": 0.005,
+        "uz_symmetry_difference": -0.000447
+      }
+    },
+    "mesh": {
+      "refinementFactors": [1, 2, 3, 4, 8],
+      "deltaTs": [0.05, 0.025, 0.0166667, 0.0125, 0.00625],
+      "endTime": 8.0,
+      "minimumReferenceErrorOrder": 0.0
     }
   },
   "mesh": {

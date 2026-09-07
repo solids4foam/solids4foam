@@ -202,7 +202,7 @@ coupling implementations, rather than as a strict bitwise comparison.
 ## Verification and convergence studies
 
 The opt-in [`verification/`](verification/) directory complements the fast
-regression test with isolated mesh/time convergence studies and published
+regression test with isolated mesh-convergence studies and published
 benchmark comparisons. These studies are not part of normal CI. See its README
 for commands and expected runtime.
 

@@ -253,7 +253,9 @@ def extract(case: Path, evaluation_time: float | None) -> dict[str, float]:
     force_time, force = force_at_or_before(find_force(case), evaluation_time)
     return {"evaluation_time": time, "force_time": force_time, "ux": displacement[0],
             "uy": displacement[1], "uz": displacement[2], "fx": force[0],
-            "fy": force[1], "fz": force[2], "cell_count": cell_count(case)}
+            "fy": force[1], "fz": force[2],
+            "uz_symmetry_difference": 2.0 * displacement[2],
+            "cell_count": cell_count(case)}
 
 
 def observed_order(coarse: float, medium: float, fine: float) -> float | None:
@@ -275,17 +277,20 @@ def reference_error_order(coarse_error: float, fine_error: float,
     return math.log(coarse_error / fine_error) / math.log(refinement_ratio)
 
 
-def study_cores(requested: str, study: str, refinement: int = 1) -> int:
+def study_cores(requested: str, form: str, refinement: int = 1) -> int:
     if requested != "auto":
         return int(requested)
-    if study == "mesh":
+    if form == "original":
         return {1: 1, 2: 4, 4: 8, 8: 64}[refinement]
-    return 4
+    if form == "modified":
+        return {1: 8, 2: 4, 3: 16, 4: 8, 8: 64}[refinement]
+    fail(f"Unknown case form: {form}")
 
 
-def create_mesh_plot(name: str) -> None:
+def create_mesh_plot(name: str, form: str) -> None:
     """Render the PNG convergence plot for a completed mesh sweep."""
-    plot_script = VERIFICATION / "scripts" / "plotMeshConvergence.gnuplot"
+    script_name = "plotMeshConvergence.gnuplot" if form == "original" else "plotModifiedMeshConvergence.gnuplot"
+    plot_script = VERIFICATION / "scripts" / script_name
     data = OUTPUT_ROOT / f"{name}.csv"
     output = OUTPUT_ROOT / f"{name}.png"
     result = subprocess.run(
@@ -310,7 +315,7 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
                   published_references: dict | None = None) -> bool:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     csv_path = OUTPUT_ROOT / f"{name}.csv"
-    quantities = ("ux", "uy", "uz", "fx", "fy", "fz")
+    quantities = ("ux", "uy", "uz", "fx", "fy", "fz", "uz_symmetry_difference")
     columns = ["case", "study", "time_scheme", "mesh_level", "cell_count", "delta_t", "cores", "evaluation_time"]
     columns += list(quantities)
     columns += [item for quantity in quantities for item in
@@ -368,7 +373,7 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("original",), required=True)
+    parser.add_argument("--case", choices=("original", "modified"), required=True)
     parser.add_argument("--study", choices=("mesh",), required=True)
     parser.add_argument("--cores", default="auto", help="MPI ranks per case: positive integer or auto (default)")
     parser.add_argument("--write-interval", type=int, help="write every N time steps (default: final time only)")
@@ -376,7 +381,7 @@ def main() -> int:
         "--time-scheme",
         choices=("backward", "Euler"),
         default="backward",
-        help="time scheme for the mesh diagnostic (default: backward)",
+        help="time scheme for the mesh studies (default: backward)",
     )
     args = parser.parse_args()
     if args.cores != "auto" and (not args.cores.isdecimal() or int(args.cores) < 1):
@@ -396,26 +401,35 @@ def main() -> int:
     (OUTPUT_ROOT / "verification_summary.md").write_text("# beamInCrossFlow verification summary\\n\\n")
     rows: list[dict] = []
     if args.study == "mesh":
-        mesh_end_time = references["mesh"]["endTime"]
-        mesh_factors = references["mesh"]["refinementFactors"]
-        mesh_delta_ts = references["mesh"]["deltaTs"]
+        mesh_spec = references[args.case].get("mesh", references["mesh"])
+        mesh_end_time = mesh_spec["endTime"]
+        mesh_factors = mesh_spec["refinementFactors"]
+        mesh_delta_ts = mesh_spec["deltaTs"]
         if len(mesh_factors) != len(mesh_delta_ts):
             fail("mesh refinementFactors and deltaTs must have the same length")
         scheme_suffix = "" if args.time_scheme == "backward" else f"_{args.time_scheme}"
         for level, (factor, mesh_delta_t) in enumerate(zip(mesh_factors, mesh_delta_ts)):
-            case = copy_case(f"original_mesh{scheme_suffix}_{factor}x")
-            set_case_form(case, "original", mesh_delta_t, mesh_end_time)
+            case = copy_case(f"{args.case}_mesh{scheme_suffix}_{factor}x")
+            set_case_form(case, args.case, mesh_delta_t, mesh_end_time)
             configure_time_scheme(case, args.time_scheme)
             configure_output(case, mesh_delta_t, mesh_end_time, args.write_interval)
             refine_mesh(case / "system/fluid/blockMeshDict", factor)
             refine_mesh(case / "system/solid/blockMeshDict", factor)
-            cores = study_cores(args.cores, "mesh", factor)
+            cores = study_cores(args.cores, args.case, factor)
             run_case(case, f"mesh level {factor}x", cores)
             row = extract(case, None)
-            row.update({"case": "original", "study": "mesh", "time_scheme": args.time_scheme, "mesh_level": level, "delta_t": mesh_delta_t, "cores": cores})
+            row.update({"case": args.case, "study": "mesh", "time_scheme": args.time_scheme, "mesh_level": level, "delta_t": mesh_delta_t, "cores": cores})
             rows.append(row)
-        name = f"original_mesh_sweep{scheme_suffix}"
-        order = observed_order(rows[-3]["ux"], rows[-2]["ux"], rows[-1]["ux"])
+        name = f"{args.case}_mesh_sweep{scheme_suffix}"
+        # Both families contain a systematic 2x/4x/8x subset.  The modified
+        # family also has a 3x member to compare with the published cell count,
+        # so do not use the last three entries indiscriminately.
+        order_factors = (2, 4, 8)
+        if all(factor in mesh_factors for factor in order_factors):
+            order_rows = [rows[mesh_factors.index(factor)] for factor in order_factors]
+            order = observed_order(*(row["ux"] for row in order_rows))
+        else:
+            order = None
         refinement_ratio = mesh_factors[-1] / mesh_factors[0]
         reference_orders = {
             quantity: reference_error_order(
@@ -423,20 +437,20 @@ def main() -> int:
                 relative_error(rows[-1][quantity], spec["value"]),
                 refinement_ratio,
             )
-            for quantity, spec in references["original"]["references"].items()
+            for quantity, spec in references[args.case]["references"].items()
             if spec.get("primary", True)
         }
         passed = write_results(
             name,
             rows,
-            references["original"]["references"],
+            references[args.case]["references"],
             order,
             reference_orders,
-            references["mesh"]["minimumReferenceErrorOrder"],
+            mesh_spec["minimumReferenceErrorOrder"],
             -1,
-            references["original"]["publishedReferences"],
+            references[args.case].get("publishedReferences"),
         )
-        create_mesh_plot(name)
+        create_mesh_plot(name, args.case)
         return 0 if passed else 1
     fail(f"Unsupported study: {args.study}")
 
