@@ -2414,3 +2414,58 @@ for `impK()`. The constant coefficient stays, because it is a preconditioner
 and a wrong one costs iterations rather than accuracy - but it is a provisional
 surrogate awaiting convergence evidence on a fibre-dominated case, not a
 considered improvement.
+
+## 26. What a review of the whole port found, and what it corrected
+
+### 26.1 The artery difference was mine, not the formulations'
+
+`ratCarotid`'s framework arm was first written with a momentum stabilisation
+`scaleFactor` of 100, copied from `problem3` without thought, against 0 in the
+legacy arm. At that value the two sat 2 per cent apart at the last time they
+share and 25 per cent apart mid-ramp, and this note attributed the difference
+to updated Lagrangian against total Lagrangian.
+
+That was wrong, and the review said so. The stabilisation is a difference
+between the face gradient and the interpolated cell gradient; it does not
+vanish when the nonlinear solve converges, so its size is part of the answer
+rather than part of the path to it. Swept:
+
+    scaleFactor    100      10       3       1
+    t = 0.66     2.09%   0.25%   0.11%   0.07%
+    t = 0.4     25.53%   9.05%   7.41%   6.91%
+
+At 1 the answer is converged in the parameter - 1 and 3 differ by 0.04 per
+cent - and the arms agree to 0.07 per cent at the last shared time. The
+tutorial now uses 1.
+
+What remains is about 7 per cent mid-ramp, and it is not explained. It is no
+longer attributed to anything: compressibility and pressure stabilisation were
+measured and ruled out, the stabilisation above was the dominant term, and
+nothing measured accounts for the rest.
+
+### 26.2 "Framework active" did not mean "legacy inactive"
+
+The `rKappa` bug fixed for `nonLinGeomTotalLagTotalDispSolid` - taking the
+bulk modulus from the legacy model whichever model was describing the
+material - was not the only instance. A sweep found:
+
+  - `nonLinGeomUpdatedLagSolid` had the identical unbranched `rKappa`.
+  - All three high-order Jacobians recover a shear modulus as
+    `(3/4)*(impK - K)`, and read `K` from the legacy model while `impK` comes
+    from the framework. For a law reporting `GREAT` in the legacy hierarchy
+    that is a large negative shear modulus, and unlike the mixed case it
+    needed no unusual configuration to reach.
+
+All four now take the bulk modulus from whichever model is active.
+
+### 26.3 The updated Lagrangian mixed formulation is refused, not approximated
+
+`nonLinGeomUpdatedLagSolid` never had the split work section 22 describes: it
+asks the framework for a total stress and takes `dev()` of it. That is right
+only where what remains is trace free, which is the thing sections 20 to 22
+exist to stop assuming.
+
+Rather than leave it quietly wrong, the combination of `solvePressure` and the
+framework is refused there by name, pointing at the model that does implement
+it. Porting it is ordinary work - the same shape as section 22 - and there is
+no case that needs it today.

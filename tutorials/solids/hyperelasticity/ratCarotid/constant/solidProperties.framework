@@ -32,8 +32,16 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     {
         momentum
         {
+            // 1, not the 100 this was copied from. The stabilisation is a
+            // difference between the face gradient and the interpolated cell
+            // gradient, and it does not vanish when the nonlinear solve
+            // converges - so its size is part of the answer, not only part of
+            // the path to it. At 100 this case sits 2 per cent from the
+            // legacy arm at the last time they share and 25 per cent from it
+            // mid-ramp; at 1 those become 0.07 and 7 per cent, and the answer
+            // is converged in the parameter - 1 and 3 differ by 0.04 per cent
             type        diffStencilLaplacian;
-            scaleFactor 100;
+            scaleFactor 1;
         }
 
         pressure

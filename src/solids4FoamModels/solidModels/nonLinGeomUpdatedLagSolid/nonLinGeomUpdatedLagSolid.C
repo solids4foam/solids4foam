@@ -1037,7 +1037,19 @@ void nonLinGeomUpdatedLagSolid::makeRKappa() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+    // From whichever model describes the material, as in
+    // nonLinGeomTotalLagTotalDispSolid. The two are not interchangeable: a
+    // law written for exact incompressibility in the legacy hierarchy reports
+    // GREAT and carries a finite penalty in the framework, and the pressure
+    // equation has to use the one whose stress it is replacing
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        rKappaPtr_.set(new volScalarField(1.0/mechanicalManager().kappa()));
+    }
+    else
+    {
+        rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+    }
 }
 
 
@@ -1171,6 +1183,31 @@ label nonLinGeomUpdatedLagSolid::formResidual
             << abort(FatalError);
     }
 
+    // The mixed formulation on the framework has not been ported to this
+    // model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // stress and its volumetric response apart, and replaces the second with
+    // the solved pressure; this one asks for a total stress and takes dev()
+    // of it, which is the same thing only where what remains is trace free.
+    // Refused rather than solved approximately: the difference is a different
+    // material rather than a visible error
+    if (solvePressure() && useMechanicalConstitutiveLawManager_)
+    {
+        FatalErrorInFunction
+            << "solvePressure is not supported by this solid model when the "
+            << "mechanicalConstitutiveLaw framework is enabled." << nl << nl
+            << "    The mixed formulation replaces the law's volumetric "
+            << "response with a solved pressure. This model still recovers "
+            << "that part by taking dev() of the total stress, which is "
+            << "correct only where everything the pressure must not replace "
+            << "is trace free - true of an isotropic hyperelastic law and "
+            << "false of, for instance, an active tension along a fibre "
+            << "direction." << nl << nl
+            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
+            << "which asks the law for the two apart, or disable one of "
+            << "solvePressure and useMechanicalConstitutiveLawManager."
+            << abort(FatalError);
+    }
+
     if (highOrderResidual())
     {
 #ifndef FOAMEXTEND
@@ -1243,7 +1280,17 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Replace the pressure component of stress
+        // Replace the pressure component of stress.
+        //
+        // The projection, not the declared split. This model has not had the
+        // work nonLinGeomTotalLagTotalDispSolid had: it asks the framework
+        // for a total stress and takes dev() of it, which is right only where
+        // what remains is trace free. That holds for an isotropic
+        // hyperelastic law and fails for anything else - an active tension
+        // along a fibre direction, say, whose spherical part the projection
+        // discards and the pressure does not restore. The combination is
+        // refused at construction rather than solved approximately; see
+        // DESIGN-state-io.md section 26
         sigma() = dev(sigma()) - p*I;
 
         // Calculate the pressure gradient
@@ -1479,7 +1526,20 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        tmp<volScalarField> tK = mechanical().bulkModulus();
+        // From whichever model describes the material. This K is combined
+        // with impK_ to recover a shear modulus, so mixing the framework's
+        // stiffness with the legacy model's bulk modulus gives a shear
+        // modulus for neither: a law written for exact incompressibility in
+        // the legacy hierarchy reports GREAT
+        tmp<volScalarField> tK
+        (
+            useMechanicalConstitutiveLawManager_
+          ? tmp<volScalarField>
+            (
+                new volScalarField(mechanicalManager().kappa())
+            )
+          : mechanical().bulkModulus()
+        );
         const volScalarField& K = tK();
 
         tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);

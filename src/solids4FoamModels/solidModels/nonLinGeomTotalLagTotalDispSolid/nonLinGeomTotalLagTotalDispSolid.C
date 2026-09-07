@@ -1710,7 +1710,20 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        tmp<volScalarField> tK = mechanical().bulkModulus();
+        // From whichever model describes the material. This K is combined
+        // with impK_ to recover a shear modulus, so mixing the framework's
+        // stiffness with the legacy model's bulk modulus gives a shear
+        // modulus for neither: a law written for exact incompressibility in
+        // the legacy hierarchy reports GREAT
+        tmp<volScalarField> tK
+        (
+            useMechanicalConstitutiveLawManager_
+          ? tmp<volScalarField>
+            (
+                new volScalarField(mechanicalManager().kappa())
+            )
+          : mechanical().bulkModulus()
+        );
         const volScalarField& K = tK();
 
         tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);

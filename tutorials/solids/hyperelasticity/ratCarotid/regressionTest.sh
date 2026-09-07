@@ -48,17 +48,26 @@ fi
 # solvePressure, taking its stress from the mechanicalConstitutiveLaw
 # framework - runs to completion on any fork, which is what this checks.
 #
-# The two do not agree closely, and this test does not pretend they do. Over
-# the range where the legacy run survives they differ by 2 to 4 per cent at
-# high load and by up to 25 per cent at moderate load. That difference is not
-# the material: the bulk modulus is a penalty here where the legacy law is
-# exactly incompressible, and raising it a hundredfold moves the answer by
-# 0.1 per cent, so this is at the incompressible limit already. Nor is it the
-# pressure stabilisation, which moves it by 4 per cent over a sixteenfold
-# sweep. What remains is the difference between an incremental updated
-# Lagrangian solver on a moving mesh and a total Lagrangian one, on a case
-# whose legacy arm eventually fails outright. Establishing which is closer to
-# the truth needs a mesh study neither arm has had.
+# Over the range where the legacy run survives the two agree to 0.07 per cent
+# at the last time they share, and to about 1 per cent at t = 0.6. They are
+# further apart mid-ramp, around 7 per cent at t = 0.4, and that is not
+# explained.
+#
+# Most of what looked like disagreement was the momentum stabilisation. This
+# arm was first written with scaleFactor 100, copied from another case without
+# thought, against 0 in the legacy arm; at that value the two sat 2 per cent
+# apart at the last shared time and 25 per cent apart mid-ramp. The
+# stabilisation is a difference between the face gradient and the interpolated
+# cell gradient and does not vanish on convergence, so its size is part of the
+# answer. At 1 the answer is converged in the parameter - 1 and 3 differ by
+# 0.04 per cent - and agreement is what it is above.
+#
+# Ruled out as causes: compressibility, since the bulk modulus is a penalty
+# here where the legacy law is exactly incompressible and raising it a
+# hundredfold moves the answer 0.1 per cent; and the pressure stabilisation,
+# 4 per cent over a sixteenfold sweep. What is left of the mid-ramp difference
+# is unestablished. It is not attributed to the formulations here, because
+# nothing measured says so.
 # ============================================================
 
 echo "============================================================"
