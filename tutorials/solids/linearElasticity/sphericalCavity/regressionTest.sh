@@ -163,6 +163,7 @@ link_case_files_for_suffix() {
 
 
 run_parallel_case() {
+    solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     solids4Foam::requirePetscOrExitSilently
 
