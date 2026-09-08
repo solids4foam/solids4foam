@@ -72,6 +72,23 @@ class tetQuadrature
     public quadrature
 {
 
+    // Private typedefs
+
+        //- Barycentric coordinates used by the quadrature rules below
+        //
+        //  foam-extend provides no barycentric class, so solids4foam
+        //  supplies a minimal stand-in under its own name; every other
+        //  variant uses the native class. Aliasing whichever applies here,
+        //  in class scope, keeps the rule tables variant-agnostic without
+        //  solids4foam ever declaring a "barycentric" of its own in the
+        //  Foam namespace.
+#ifdef FOAMEXTEND
+        typedef foamExtendBarycentric barycentric;
+#else
+        typedef Foam::barycentric barycentric;
+#endif
+
+
     // Private data
 
         //- Store tetrahedron using tetrahedron template

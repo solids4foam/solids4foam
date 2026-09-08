@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::barycentric2D
+    Foam::foamExtendBarycentric2D
 
 Description
     Minimal three-component barycentric coordinates for foam-extend, which is
@@ -42,10 +42,10 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                     Class barycentric2D Declaration
+                 Class foamExtendBarycentric2D Declaration
 \*---------------------------------------------------------------------------*/
 
-class barycentric2D
+class foamExtendBarycentric2D
 {
     // Private data
 
@@ -64,7 +64,7 @@ public:
     // Constructors
 
         //- Construct with all coordinates set to zero
-        barycentric2D()
+        foamExtendBarycentric2D()
         :
             a_(0.0),
             b_(0.0),
@@ -72,7 +72,7 @@ public:
         {}
 
         //- Construct from three coordinates
-        barycentric2D
+        foamExtendBarycentric2D
         (
             const scalar a,
             const scalar b,

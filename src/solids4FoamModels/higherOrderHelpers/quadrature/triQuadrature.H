@@ -72,6 +72,23 @@ class triQuadrature
     public quadrature
 {
 
+    // Private typedefs
+
+        //- Barycentric coordinates used by the quadrature rules below
+        //
+        //  foam-extend provides no barycentric2D class, so solids4foam
+        //  supplies a minimal stand-in under its own name; every other
+        //  variant uses the native class. Aliasing whichever applies here,
+        //  in class scope, keeps the rule tables variant-agnostic without
+        //  solids4foam ever declaring a "barycentric2D" of its own in the
+        //  Foam namespace.
+#ifdef FOAMEXTEND
+        typedef foamExtendBarycentric2D barycentric2D;
+#else
+        typedef Foam::barycentric2D barycentric2D;
+#endif
+
+
     // Private data
 
         //- Store triangle using triangle template
