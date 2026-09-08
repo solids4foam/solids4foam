@@ -154,7 +154,10 @@ Field<Type>& mechanicalConstitutiveLawState::accessField
         table.insert
         (
             name,
-            autoPtr<Field<Type>>(new Field<Type>(size_, Zero))
+            autoPtr<Field<Type>>
+            (
+                new Field<Type>(size_, pTraits<Type>::zero)
+            )
         );
     }
 
@@ -181,50 +184,161 @@ const Field<Type>& mechanicalConstitutiveLawState::getField
 }
 
 
+void mechanicalConstitutiveLawState::checkNotShadow(const word& what) const
+{
+    if (isShadow())
+    {
+        FatalErrorInFunction
+            << "'" << what << "' would modify history through a shadow state."
+            << nl
+            << "A shadow aliases the old-time fields of its parent so that a "
+            << "tangent query can evaluate a law without disturbing them. "
+            << "Only current-time fields may be written through a shadow."
+            << exit(FatalError);
+    }
+}
+
+
+template<class Type>
+const HashTable<autoPtr<Field<Type>>>&
+mechanicalConstitutiveLawState::readableFields0() const
+{
+    // A shadow reads its parent's history, never its own
+    if (isShadow())
+    {
+        return shadowedPtr_->readableFields0<Type>();
+    }
+
+    return fields0<Type>();
+}
+
+
 // * * * * * * * * * * * * Public interface * * * * * * * * * * * * * * * //
+
+mechanicalConstitutiveLawState& mechanicalConstitutiveLawState::child
+(
+    const word& name
+) const
+{
+    HashTable<autoPtr<mechanicalConstitutiveLawState>>::iterator iter =
+        children_.find(name);
+
+    if (iter != children_.end())
+    {
+        return iter()();
+    }
+
+    if (isShadow())
+    {
+        // A shadow of this state must present shadows of the children, or a
+        // sub-law evaluated through it would read and write the parent's own
+        // history, which is exactly what shadowing exists to prevent
+        children_.insert
+        (
+            name,
+            autoPtr<mechanicalConstitutiveLawState>
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    shadowedPtr_->child(name),
+                    SHADOW
+                )
+            )
+        );
+    }
+    else
+    {
+        children_.insert
+        (
+            name,
+            autoPtr<mechanicalConstitutiveLawState>
+            (
+                new mechanicalConstitutiveLawState(size_)
+            )
+        );
+    }
+
+    return children_[name]();
+}
+
+
+bool mechanicalConstitutiveLawState::foundChild(const word& name) const
+{
+    return children_.found(name);
+}
+
+
+wordList mechanicalConstitutiveLawState::childNames() const
+{
+    return children_.toc();
+}
+
 
 void mechanicalConstitutiveLawState::setSize(const label newSize)
 {
+    checkNotShadow("setSize");
+
     size_ = newSize;
+
+    forAllIter
+    (
+        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
+    )
+    {
+        citer()->setSize(newSize);
+    }
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 
     forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 }
 
 
 void mechanicalConstitutiveLawState::storeOldTime()
 {
+    checkNotShadow("storeOldTime");
+
+    // A composite's history lives in its children, so the rollover has to
+    // reach them; otherwise a sub-law would read this step's values as though
+    // they were last step's
+    forAllIter
+    (
+        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
+    )
+    {
+        citer()->storeOldTime();
+    }
+
     // Scalars
 #ifdef OPENFOAM_COM
     forAllConstIters(scalarFields0_, iter)
@@ -319,6 +433,8 @@ const Field<scalar>& mechanicalConstitutiveLawState::scalarField
 
 Field<scalar>& mechanicalConstitutiveLawState::scalarField0(const word& name)
 {
+    checkNotShadow("scalarField0");
+
     return accessField(fields0<scalar>(), name);
 }
 
@@ -327,7 +443,7 @@ const Field<scalar>& mechanicalConstitutiveLawState::scalarField0
     const word& name
 ) const
 {
-    return getField(fields0<scalar>(), name);
+    return getField(readableFields0<scalar>(), name);
 }
 
 const Field<scalar>& mechanicalConstitutiveLawState::getScalarField
@@ -343,7 +459,7 @@ const Field<scalar>& mechanicalConstitutiveLawState::getScalarField0
     const word& name
 ) const
 {
-    return getField(fields0<scalar>(), name);
+    return getField(readableFields0<scalar>(), name);
 }
 
 
@@ -364,6 +480,8 @@ const Field<vector>& mechanicalConstitutiveLawState::vectorField
 
 Field<vector>& mechanicalConstitutiveLawState::vectorField0(const word& name)
 {
+    checkNotShadow("vectorField0");
+
     return accessField(fields0<vector>(), name);
 }
 
@@ -372,7 +490,7 @@ const Field<vector>& mechanicalConstitutiveLawState::vectorField0
     const word& name
 ) const
 {
-    return getField(fields0<vector>(), name);
+    return getField(readableFields0<vector>(), name);
 }
 
 const Field<vector>& mechanicalConstitutiveLawState::getVectorField
@@ -388,7 +506,7 @@ const Field<vector>& mechanicalConstitutiveLawState::getVectorField0
     const word& name
 ) const
 {
-    return getField(fields0<vector>(), name);
+    return getField(readableFields0<vector>(), name);
 }
 
 
@@ -409,6 +527,8 @@ const Field<tensor>& mechanicalConstitutiveLawState::tensorField
 
 Field<tensor>& mechanicalConstitutiveLawState::tensorField0(const word& name)
 {
+    checkNotShadow("tensorField0");
+
     return accessField(fields0<tensor>(), name);
 }
 
@@ -417,7 +537,7 @@ const Field<tensor>& mechanicalConstitutiveLawState::tensorField0
     const word& name
 ) const
 {
-    return getField(fields0<tensor>(), name);
+    return getField(readableFields0<tensor>(), name);
 }
 
 const Field<tensor>& mechanicalConstitutiveLawState::getTensorField
@@ -433,7 +553,7 @@ const Field<tensor>& mechanicalConstitutiveLawState::getTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<tensor>(), name);
+    return getField(readableFields0<tensor>(), name);
 }
 
 
@@ -460,6 +580,8 @@ Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
     const word& name
 )
 {
+    checkNotShadow("symmTensorField0");
+
     return accessField(fields0<symmTensor>(), name);
 }
 
@@ -468,7 +590,7 @@ const Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<symmTensor>(), name);
+    return getField(readableFields0<symmTensor>(), name);
 }
 
 const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField
@@ -484,7 +606,7 @@ const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField0
     const word& name
 ) const
 {
-    return getField(fields0<symmTensor>(), name);
+    return getField(readableFields0<symmTensor>(), name);
 }
 
 } // End namespace Foam

@@ -45,10 +45,19 @@ Description
          the dual faces uses the material of the owning primary cell.
       6. A fourth-order tangent on the dual faces matches the closed-form
          isotropic stiffness, including with more than one material.
-      7. The misuse guards fire: a fourth-order tangent on a topology that
+      7. The finite-difference fourth-order tangent reproduces the analytical
+         one, which also checks its Voigt shear convention.
+      8. A tangent query leaves the constitutive state untouched, so a stress
+         evaluated before and after intervening queries at wildly different
+         kinematics is identical.
+      9. updateScalarTangent agrees with the tangent from a stress update.
+     9a. The finite-strain finite-difference tangent of a hyperelastic law
+         reproduces the analytical small-strain isotropic tangent near F = I.
+     10. The misuse guards fire: a fourth-order tangent on a topology that
          cannot carry one, a flat-list update on a topology whose integration
-         points are shared between cells, a tangent request with no storage,
-         and a duplicate registerTopology key.
+         points are shared between cells and where more than one material
+         could claim them, a tangent request with no storage, and a duplicate
+         registerTopology key.
 
 Author
     Philip Cardiff, UCD.
@@ -57,24 +66,8 @@ Author
 
 #include "fvCFD.H"
 
-#ifdef FOAMEXTEND
-
-// The mechanical constitutive law framework is not part of the foam-extend
-// build: its sources are absent from src/solids4FoamModels/Make/files.foamextend
-// and its headers do not compile there. There is nothing to test on this fork
-int main(int argc, char *argv[])
-{
-    Info<< nl
-        << "The mechanical constitutive law framework is not built for "
-        << "foam-extend, so there is nothing to test." << nl << nl
-        << "End" << nl << endl;
-
-    return 0;
-}
-
-#else
-
 #include "mechanicalConstitutiveLawManager.H"
+#include "mechanicalConstitutiveLawInputs.H"
 #include "integrationPointTopologies.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
 #include "mat66.H"
@@ -213,20 +206,121 @@ int main(int argc, char *argv[])
     scalarField refMu(mesh.nCells(), 0.0);
     scalarField refLambda(mesh.nCells(), 0.0);
 
+    // The closed-form checks need a law whose stress and tangent are known
+    // here. Everything else - path agreement, state preservation, the
+    // topologies and the guards - applies to any law, and a history-dependent
+    // law is the only thing that exercises the shadow state properly
+    bool allLinearElastic = true;
+    bool allNeoHookean = true;
+    bool allStVenantKirchhoff = true;
+    bool allMooneyRivlin = true;
+    bool allNeoHookeanPlastic = true;
+    bool allViscoelastic = true;
+    bool allHGO = true;
+    forAll(lawEntries, lawI)
+    {
+        const word type(lawEntries[lawI].dict().lookup("type"));
+
+        if (type != "linearElastic")
+        {
+            allLinearElastic = false;
+        }
+
+        if (type != "neoHookeanElastic")
+        {
+            allNeoHookean = false;
+        }
+
+        if (type != "StVenantKirchhoffElastic")
+        {
+            allStVenantKirchhoff = false;
+        }
+
+        if (type != "MooneyRivlinElastic")
+        {
+            allMooneyRivlin = false;
+        }
+
+        if (type != "HolzapfelGasserOgdenElastic")
+        {
+            allHGO = false;
+        }
+
+        if (type != "neoHookeanElasticMisesPlastic")
+        {
+            allNeoHookeanPlastic = false;
+        }
+
+        if (type != "viscousHookeanElastic")
+        {
+            allViscoelastic = false;
+        }
+    }
+
+    // Both are finite-strain-only laws: they implement no small-strain
+    // evaluation, and both linearise to isotropic elasticity near F = I
+    const bool allFiniteStrainOnly =
+        allNeoHookean
+     || allStVenantKirchhoff
+     || allMooneyRivlin
+     || allNeoHookeanPlastic;
+
     forAll(lawEntries, lawI)
     {
         const dictionary& lawDict = lawEntries[lawI].dict();
 
-        if (word(lawDict.lookup("type")) != "linearElastic")
+        if (!allLinearElastic && !allFiniteStrainOnly)
         {
-            FatalErrorInFunction
-                << "This test assumes every material is linearElastic, but "
-                << lawEntries[lawI].keyword() << " is of type "
-                << word(lawDict.lookup("type")) << exit(FatalError);
+            continue;
         }
 
-        const scalar E = dimensionedScalar(lawDict.lookup("E")).value();
-        const scalar nu = dimensionedScalar(lawDict.lookup("nu")).value();
+        // A law may be given as E and nu or as mu and K, so accept either
+        // here too rather than assuming the first form
+        scalar E = 0.0;
+        scalar nu = 0.0;
+
+        if (allMooneyRivlin)
+        {
+            // Mooney-Rivlin is given as c10, c01, c11 and either K or nu.
+            // Its small-strain limit has mu = 2*(c10 + c01), and where nu is
+            // given the bulk modulus follows from E = 6*(c10 + c01), exactly
+            // as the law itself derives them
+            const scalar c10 =
+                dimensionedScalar(lawDict.lookup("c10")).value();
+            const scalar c01 =
+                dimensionedScalar(lawDict.lookup("c01")).value();
+
+            const scalar muIn = 2.0*(c10 + c01);
+
+            scalar KIn = 0.0;
+            if (lawDict.found("K"))
+            {
+                KIn = dimensionedScalar(lawDict.lookup("K")).value();
+            }
+            else
+            {
+                const scalar nuIn =
+                    dimensionedScalar(lawDict.lookup("nu")).value();
+
+                KIn = 6.0*(c10 + c01)/(3.0*(1.0 - 2.0*nuIn));
+            }
+
+            E = 9.0*KIn*muIn/(3.0*KIn + muIn);
+            nu = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+        }
+        else if (lawDict.found("mu") && lawDict.found("K"))
+        {
+            const scalar muIn = dimensionedScalar(lawDict.lookup("mu")).value();
+            const scalar KIn = dimensionedScalar(lawDict.lookup("K")).value();
+
+            E = 9.0*KIn*muIn/(3.0*KIn + muIn);
+            nu = (3.0*KIn - 2.0*muIn)/(2.0*(3.0*KIn + muIn));
+        }
+        else
+        {
+            E = dimensionedScalar(lawDict.lookup("E")).value();
+            nu = dimensionedScalar(lawDict.lookup("nu")).value();
+        }
 
         const scalar mu = E/(2.0*(1.0 + nu));
 
@@ -266,7 +360,8 @@ int main(int argc, char *argv[])
 
     Info<< "    materials: " << lawEntries.size()
         << ", planeStress: " << planeStress
-        << ", cells: " << mesh.nCells() << endl;
+        << ", cells: " << mesh.nCells()
+        << ", closed-form checks: " << Switch(allLinearElastic) << endl;
 
     // ---------------------------------------------------------------------
     // Construct the manager and the test kinematics
@@ -322,7 +417,732 @@ int main(int argc, char *argv[])
 
     const scalar dt = runTime.deltaTValue();
 
+    // Some laws are finite strain only, and asking them for a small-strain
+    // stress is a fatal error rather than a wrong answer. Ask once, quietly,
+    // so that the checks which need small strain can be skipped for such a law
+    // instead of taking the whole run down with them
+    bool smallStrainCapable = true;
+    {
+        symmTensorField probeSigma(mesh.nCells(), symmTensor::zero);
+
+        FatalError.throwExceptions();
+
+        try
+        {
+            manager.updateStressSmallStrain
+            (
+                manager.topologyFor
+                (
+                    cellCentredIntegrationPointTopology::typeName
+                ),
+                Foam::primitiveField(gradD),
+                Foam::primitiveField(gradD0),
+                dt,
+                probeSigma,
+                nullptr,
+                nullptr,
+                tangentRequest::none
+            );
+        }
+        catch (const Foam::error&)
+        {
+            smallStrainCapable = false;
+        }
+
+        FatalError.dontThrowExceptions();
+    }
+
+    // ------------------------------------------------------------------
+    Info<< nl << "A declared isochoric split is an honest one" << endl;
+
+    // A law that declares it can separate its isochoric stress from its
+    // volumetric response is taken at its word by every mixed formulation, and
+    // the declaration is a claim the framework cannot otherwise check: a law
+    // written on the full deformation can return dev() of its total stress and
+    // look exactly like one written on Cbar.
+    //
+    // What tells them apart is a superposed dilation. Under F -> c*F the
+    // isochoric deformation Fbar = J^(-1/3)*F is unchanged, so a law whose
+    // energy depends on Fbar alone returns the same Kirchhoff isochoric
+    // stress, J*sigma_iso. A law whose energy sees the whole deformation does
+    // not. The Cauchy stress itself does change, by 1/c^3, because it is per
+    // current area - so the comparison is on J*sigma_iso and not on sigma_iso
+    // Finite strain only: the check superposes a dilation on F, so it needs
+    // laws that evaluate a finite-strain kinematics. A small-strain law may
+    // separate its volumetric response perfectly well - linearElastic does -
+    // and still have no finite-strain evaluation to call
+    if
+    (
+        !smallStrainCapable
+     && manager.allLawsProvideVolumetricSplit()
+     && manager.allLawsHaveDilationInvariantIsochoricStress()
+    )
+    {
+        const label n = mesh.nCells();
+
+        volTensorField Fd
+        (
+            IOobject("Fd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedTensor("I", dimless, I)
+        );
+        volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
+        volScalarField Jd
+        (
+            IOobject("Jd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedScalar("one", dimless, 1.0)
+        );
+        volScalarField Jd0(Jd);
+
+        volSymmTensorField isoStress
+        (
+            IOobject("isoStress", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+        );
+        volScalarField volResponse
+        (
+            IOobject("volResponse", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        // A deformation with shear and stretch, so the isochoric part is not
+        // trivially zero, and the same one scaled by a pure dilation
+        const tensor gradDbase
+        (
+            0.03, 0.012, 0.0,
+            0.008, -0.02, 0.005,
+            0.0, 0.004, 0.017
+        );
+
+        symmTensorField kirchhoffA(n, symmTensor::zero);
+        symmTensorField kirchhoffB(n, symmTensor::zero);
+
+        for (label pass = 0; pass < 2; ++pass)
+        {
+            const scalar c = (pass == 0 ? 1.0 : 1.19);
+
+            forAll(Fd, cellI)
+            {
+                const tensor Fi = c*(I + gradDbase);
+                Foam::primitiveFieldRef(Fd)[cellI] = Fi;
+                Foam::primitiveFieldRef(Finvd)[cellI] = inv(Fi);
+                Foam::primitiveFieldRef(Jd)[cellI] = det(Fi);
+            }
+
+            manager.updateStressFiniteStrainSplit
+            (
+                Fd, Fd0, Finvd, Finvd0, Jd, Jd0, dt, isoStress, volResponse
+            );
+
+            forAll(isoStress, cellI)
+            {
+                const symmTensor tau =
+                    Foam::primitiveField(Jd)[cellI]
+                   *Foam::primitiveField(isoStress)[cellI];
+
+                if (pass == 0)
+                {
+                    kirchhoffA[cellI] = tau;
+                }
+                else
+                {
+                    kirchhoffB[cellI] = tau;
+                }
+            }
+        }
+
+        scalar maxDiff = 0.0;
+        scalar scale = SMALL;
+
+        forAll(kirchhoffA, cellI)
+        {
+            maxDiff = max(maxDiff, mag(kirchhoffA[cellI] - kirchhoffB[cellI]));
+            scale = max(scale, mag(kirchhoffA[cellI]));
+        }
+
+        const scalar relDiff = maxDiff/scale;
+
+        report
+        (
+            "the isochoric stress ignores a superposed dilation",
+            relDiff < 1e-10,
+            "relative change " + Foam::name(relDiff)
+        );
+
+        // And the isochoric stress must be trace-free for a law with no
+        // spherical stress of its own. A law that adds one - an active tension
+        // or a pore pressure - legitimately fails this, so it is only checked
+        // where the total and the split differ by the volumetric response
+        // alone
+        scalar maxTrace = 0.0;
+
+        forAll(isoStress, cellI)
+        {
+            maxTrace =
+                max(maxTrace, mag(tr(Foam::primitiveField(isoStress)[cellI])));
+        }
+
+        // Asserted, not merely reported. This is the condition under which
+        // a deviatoric projection of the total stress and the law's own
+        // isochoric stress are the same thing - which is what the solid
+        // models did before they could ask, and what they still do on the
+        // legacy path. A law that declares a dilation invariant split and
+        // then returns a stress with a trace has quietly made that
+        // substitution wrong wherever it is still used
+        scalar maxStress = 0.0;
+
+        forAll(isoStress, cellI)
+        {
+            maxStress =
+                max
+                (
+                    maxStress,
+                    mag(Foam::primitiveField(isoStress)[cellI])
+                );
+        }
+
+        reportError
+        (
+            "the isochoric stress is trace free",
+            maxTrace/max(maxStress, SMALL),
+            1e-10
+        );
+    }
+    else
+    {
+        Info<< "    SKIP: this check does not apply here - "
+            << (
+                   smallStrainCapable
+                 ? "these are small-strain laws, and this check superposes a "
+                   "dilation on the deformation gradient"
+                 : manager.allLawsProvideVolumetricSplit()
+                 ? "a law adds a stress that is not derived from a potential, "
+                   "so its split is not dilation invariant"
+                 : "no law here separates its isochoric and volumetric "
+                   "responses"
+               )
+            << endl;
+    }
+
+    // ------------------------------------------------------------------
+    // The fibre term, against a closed form
+    //
+    // The two checks above are necessary and not sufficient: deleting the
+    // fibre term entirely leaves a law that is still dilation invariant and
+    // still trace free, so both would pass a law that had lost half its
+    // physics. This pins the fibre contribution to a number.
+    //
+    // Under a uniaxial isochoric stretch F = diag(l, 1/sqrt(l), 1/sqrt(l))
+    // with the fibres along x - fibreAngle zero, so both families coincide
+    // with the stretch direction - the deformation is already isochoric, so
+    // Fbar = F and J = 1. Then I4 = I6 = l^2, both families pull along x, and
+    // eliminating the pressure by requiring zero lateral stress leaves
+    //
+    //     sigma_xx - sigma_yy = mu*(l^2 - 1/l)
+    //                         + 4*k1*l^2*(l^2 - 1)*exp(k2*(l^2 - 1)^2)
+    //
+    // which is what the difference of the returned isochoric stresses must
+    // be, since the volumetric response is spherical and cancels from it
+    if (allHGO)
+    {
+        Info<< nl << "The fibre term against a closed form" << endl;
+
+        const dictionary& hgoDict = lawEntries[0].dict();
+
+        const scalar muVal =
+            dimensionedScalar(hgoDict.lookup("mu")).value();
+        const scalar k1Val =
+            dimensionedScalar(hgoDict.lookup("k1")).value();
+        // Dimensioned, as the law reads them and as the legacy dictionary
+        // writes them
+        const scalar k2Val =
+            dimensionedScalar(hgoDict.lookup("k2")).value();
+        const scalar angle =
+            dimensionedScalar(hgoDict.lookup("fibreAngle")).value();
+
+        if (mag(angle) > SMALL)
+        {
+            Info<< "    SKIP: this check needs fibreAngle 0, and this case "
+                << "sets " << angle << endl;
+        }
+        else
+        {
+            const label n = mesh.nCells();
+
+            volTensorField Fd
+            (
+                IOobject("Fu", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedTensor("I", dimless, I)
+            );
+            volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
+            volScalarField Jd
+            (
+                IOobject("Ju", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedScalar("one", dimless, 1.0)
+            );
+            volScalarField Jd0(Jd);
+
+            volSymmTensorField isoStress
+            (
+                IOobject("isoU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+            );
+            volScalarField volResponse
+            (
+                IOobject("volU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                mesh,
+                dimensionedScalar("0", dimPressure, 0.0)
+            );
+
+            // Well past the exponential's knee, so that a wrong coefficient
+            // or a missing push-forward shows up as a large error rather than
+            // a small one
+            const scalar lambda = 1.35;
+            const scalar s = 1.0/Foam::sqrt(lambda);
+
+            const tensor Fu(lambda, 0, 0, 0, s, 0, 0, 0, s);
+
+            forAll(Fd, cellI)
+            {
+                Foam::primitiveFieldRef(Fd)[cellI] = Fu;
+                Foam::primitiveFieldRef(Finvd)[cellI] = inv(Fu);
+                Foam::primitiveFieldRef(Jd)[cellI] = det(Fu);
+            }
+
+            manager.updateStressFiniteStrainSplit
+            (
+                Fd, Fd0, Finvd, Finvd0, Jd, Jd0, dt, isoStress, volResponse
+            );
+
+            const scalar l2 = sqr(lambda);
+
+            const scalar expected =
+                muVal*(l2 - 1.0/lambda)
+              + 4.0*k1Val*l2*(l2 - 1.0)*Foam::exp(k2Val*sqr(l2 - 1.0));
+
+            scalar maxErr = 0.0;
+
+            forAll(isoStress, cellI)
+            {
+                const symmTensor& sig =
+                    Foam::primitiveField(isoStress)[cellI];
+
+                const scalar got =
+                    sig[symmTensor::XX] - sig[symmTensor::YY];
+
+                maxErr = max(maxErr, mag(got - expected));
+            }
+
+            Info<< "        (uniaxial stretch " << lambda
+                << ", expected sigma_xx - sigma_yy = " << expected << ')'
+                << endl;
+
+            reportError
+            (
+                "the fibre stress matches the closed form",
+                maxErr/max(mag(expected), SMALL),
+                1e-10
+            );
+        }
+    }
+
     // ---------------------------------------------------------------------
+    // Finite-strain finite-difference tangent
+    //
+    // Run first, and on its own, because a finite-strain law such as
+    // neoHookeanElastic or StVenantKirchhoffElastic implements no small-strain
+    // evaluation: every check below would fatal on it
+    // ---------------------------------------------------------------------
+
+    if (allFiniteStrainOnly)
+    {
+        Info<< nl << "Finite-strain finite-difference tangent" << endl;
+
+        // A hyperelastic law linearises to isotropic elasticity as F
+        // approaches the identity, so at a small deformation its
+        // finite-difference spatial tangent must reproduce the analytical
+        // small-strain tangent built from the same constants. That checks the
+        // perturbation, the recomputed inverse and determinant, and the Voigt
+        // convention at once
+        // Face-centred: a cell-centred topology deliberately cannot carry a
+        // fourth-order tangent, since the operators that consume one are
+        // assembled from face fluxes
+        const integrationPointTopology& topo =
+            manager.topologyFor
+            (
+                faceCentredIntegrationPointTopology::typeName
+            );
+
+        const label n = topo.nIntegrationPoints();
+
+        tensorField F(n, tensor::zero);
+        tensorField Finv(n, tensor::zero);
+        scalarField J(n, 0.0);
+        const tensorField F0(n, I);
+        const tensorField Finv0(n, I);
+        const scalarField J0(n, 1.0);
+
+        // A uniform small deformation is enough: the check is on the tangent,
+        // not on any particular strain state.
+        //
+        // It must also stay below yield for an elasto-plastic law, since the
+        // target below is the elastic tangent. That sets the scale: the
+        // deviatoric trial stress is about 2*mu*strain, and cylinderExpansion
+        // yields at 0.5 MPa with mu = 3.8 GPa, so a 1e-4 strain would already
+        // be plastic and the elastic tangent would be the wrong target. 1e-6
+        // is elastic for any realistic material.
+        //
+        // It costs no accuracy in the difference: the perturbation is
+        // max(1e-8, 1e-6*mag(F - I)), which is at its 1e-8 floor for both
+        // strains, so the stress difference being measured is the same size
+        // either way
+        const tensor gradDSmall
+        (
+            1e-6,  0.5e-6, 0.0,
+            0.5e-6, -0.7e-6, 0.0,
+            0.0,    0.0,   0.3e-6
+        );
+
+        forAll(F, ipI)
+        {
+            F[ipI] = I + gradDSmall;
+            Finv[ipI] = inv(F[ipI]);
+            J[ipI] = det(F[ipI]);
+        }
+
+        // Poisoned, so that an integration point the manager fails to
+        // reach fails the comparison deterministically. mat66 is a POD, so
+        // left alone its contents would be whatever memory held, which is a
+        // test that passes or fails by luck
+        List<mat66> fdC(n);
+        forAll(fdC, ipI)
+        {
+            for (label i = 0; i < 6; ++i)
+            {
+                for (label j = 0; j < 6; ++j)
+                {
+                    fdC[ipI](i, j) = GREAT;
+                }
+            }
+        }
+
+        manager.updateTangentFiniteStrain
+        (
+            topo, F, F0, Finv, Finv0, J, J0, dt,
+            nullptr, &fdC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        const label XX = symmTensor::XX;
+        const label YY = symmTensor::YY;
+        const label ZZ = symmTensor::ZZ;
+        const label XY = symmTensor::XY;
+
+        // Every integration point of the topology, boundary faces included.
+        // The deformation is uniform, so the tangent is the same everywhere
+        // and the boundary points are held to exactly the same standard as
+        // the internal ones.
+        //
+        // This is deliberate, and is the regression guard for the defect of
+        // section 8.14: the face-centred topology reports nFaces integration
+        // points, and until the manager evaluated the boundary ones, every
+        // entry from nInternalFaces upwards was left unwritten. Restricting
+        // this loop to internal faces would hide a repeat of that defect
+        const label nInternal = mesh.nInternalFaces();
+
+        // Single material here, so the constants are uniform
+        const scalar mu = refMu[0];
+        const scalar lambda = refLambda[0];
+        const scalar scale = lambda + 2.0*mu;
+
+        scalar maxRelErrorInternal = 0.0;
+        scalar maxRelErrorBoundary = 0.0;
+
+        for (label ipI = 0; ipI < n; ++ipI)
+        {
+            const mat66& C = fdC[ipI];
+
+            scalar e = 0.0;
+            e = max(e, mag(C(XX, XX) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(ZZ, ZZ) - (lambda + 2.0*mu))/scale);
+            e = max(e, mag(C(XX, YY) - lambda)/scale);
+            e = max(e, mag(C(XY, XY) - mu)/scale);
+            e = max(e, mag(C(XX, XY))/scale);
+
+            if (ipI < nInternal)
+            {
+                maxRelErrorInternal = max(maxRelErrorInternal, e);
+            }
+            else
+            {
+                maxRelErrorBoundary = max(maxRelErrorBoundary, e);
+            }
+        }
+
+        reportError
+        (
+            "reproduces the small-strain isotropic tangent near F = I",
+            maxRelErrorInternal,
+            1e-3
+        );
+
+        reportError
+        (
+            "reproduces that tangent on boundary faces too",
+            maxRelErrorBoundary,
+            1e-3
+        );
+
+        // -----------------------------------------------------------------
+        // Plasticity: the return mapping must actually return
+        //
+        // The check above stays deliberately below yield, so it exercises the
+        // elastic predictor and nothing else. This one drives the material
+        // well past yield and asserts the property that distinguishes a
+        // working return map from a broken one: the deviatoric stress
+        // saturates. Doubling the strain in the elastic range doubles the
+        // deviatoric stress; once yielding, it must grow far more slowly,
+        // and for a perfectly plastic curve hardly at all.
+        //
+        // This is deliberately independent of the hardening curve, so it does
+        // not need to read the yield stress table the case supplies
+        // -----------------------------------------------------------------
+        if (allNeoHookeanPlastic)
+        {
+            Info<< nl << "Plastic return mapping" << endl;
+
+            const scalar strainA = 1e-2;
+            const scalar strainB = 2e-2;
+
+            scalar magDevA = 0.0;
+            scalar magDevB = 0.0;
+
+            for (label pass = 0; pass < 2; ++pass)
+            {
+                const scalar e = (pass == 0 ? strainA : strainB);
+
+                const tensor gradDLarge
+                (
+                    e,      0.5*e, 0.0,
+                    0.5*e, -0.7*e, 0.0,
+                    0.0,    0.0,   0.3*e
+                );
+
+                forAll(F, ipI)
+                {
+                    F[ipI] = I + gradDLarge;
+                    Finv[ipI] = inv(F[ipI]);
+                    J[ipI] = det(F[ipI]);
+                }
+
+                symmTensorField sigmaLarge(n, symmTensor::zero);
+
+                // A tangent-free stress update. Both passes start from the
+                // same old-time state, so this compares two trial states from
+                // one history rather than a load path
+                manager.updateStressFiniteStrain
+                (
+                    topo, F, F0, Finv, Finv0, J, J0, dt,
+                    sigmaLarge, nullptr, nullptr,
+                    tangentRequest::none
+                );
+
+                scalar acc = 0.0;
+                for (label ipI = 0; ipI < n; ++ipI)
+                {
+                    acc = max(acc, mag(dev(sigmaLarge[ipI])));
+                }
+
+                if (pass == 0)
+                {
+                    magDevA = acc;
+                }
+                else
+                {
+                    magDevB = acc;
+                }
+            }
+
+            // Elastic would give 2.0; a working return map gives close to 1
+            const scalar growth = magDevB/max(magDevA, SMALL);
+
+            reportError
+            (
+                "deviatoric stress saturates once yielding",
+                mag(growth - 1.0),
+                0.5
+            );
+
+            // And it must genuinely have yielded, or the check above is
+            // vacuous: the stress must be far below the elastic prediction
+            const scalar elasticPrediction = 2.0*refMu[0]*strainB;
+
+            reportError
+            (
+                "the large deformation is well past yield",
+                magDevB/elasticPrediction,
+                0.5
+            );
+        }
+
+        Info<< nl
+            << "============================================================"
+            << nl;
+
+        if (nFailed_ == 0)
+        {
+            Info<< "All mechanicalConstitutiveLaw checks passed" << nl
+                << "============================================================"
+                << nl << nl << "End" << nl << endl;
+            return 0;
+        }
+
+        Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
+            << "============================================================"
+            << nl << endl;
+
+        return 1;
+    }
+
+    // ---------------------------------------------------------------------
+    // 0b. Viscoelastic relaxation, and the time increment reaching the law
+    //
+    // This is the first law whose response depends on the time increment, so
+    // it is the first end-to-end check that dt travels through the inputs
+    // object. Two evaluations are made from the same rest state:
+    //
+    //   dt -> 0   no relaxation, so every Maxwell arm carries the full
+    //             deviatoric stress and the response is the instantaneous
+    //             elastic one
+    //   dt -> inf every arm has relaxed to nothing and only the equilibrium
+    //             branch remains
+    //
+    // The ratio of the two deviatoric stresses is therefore exactly
+    // gammaInf = EInfinity/(EInfinity + sum(E)), which the case dictionary
+    // gives, so this is an exact target rather than a bound.
+    //
+    // This must run before any other section, because both evaluations have
+    // to start from the same rest state, and a later section commits a time
+    // step after which the old-time state is no longer rest
+    // ---------------------------------------------------------------------
+
+    if (allViscoelastic)
+    {
+        Info<< nl << "0b. Viscoelastic relaxation" << endl;
+
+        const dictionary& lawDict = lawEntries[0].dict();
+
+        const scalar EInf =
+            dimensionedScalar(lawDict.lookup("EInfinity")).value();
+        const scalarList EArms(lawDict.lookup("E"));
+
+        scalar E0 = EInf;
+        forAll(EArms, i)
+        {
+            E0 += EArms[i];
+        }
+
+        const scalar gammaInf = EInf/E0;
+
+        // A uniform deviatoric deformation
+        forAll(gradD, cellI)
+        {
+            gradD[cellI] = tensor(1e-5, 0, 0, 0, -1e-5, 0, 0, 0, 0);
+        }
+        gradD.correctBoundaryConditions();
+
+        volSymmTensorField sigmaInst
+        (
+            IOobject
+            (
+                "sigmaInst",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+        );
+
+        volSymmTensorField sigmaLong("sigmaLong", sigmaInst);
+
+        const scalar tauMin = min(scalarList(lawDict.lookup("relaxationTimes")));
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, 1e-8*tauMin, sigmaInst
+        );
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, 1e8*tauMin, sigmaLong
+        );
+
+        scalar maxErr = 0.0;
+        scalar maxInst = 0.0;
+        forAll(sigmaInst, cellI)
+        {
+            const scalar mInst = mag(dev(sigmaInst[cellI]));
+            const scalar mLong = mag(dev(sigmaLong[cellI]));
+
+            maxInst = max(maxInst, mInst);
+
+            if (mInst > SMALL)
+            {
+                maxErr = max(maxErr, mag(mLong/mInst - gammaInf));
+            }
+        }
+
+        reportError
+        (
+            "relaxes from the instantaneous to the long-term modulus",
+            maxErr,
+            1e-6
+        );
+
+        // And it must actually have relaxed, or the ratio check is vacuous
+        report
+        (
+            "the instantaneous and long-term responses differ",
+            maxInst > SMALL && gammaInf < 0.99
+        );
+    }
+
+
+
+    if (!smallStrainCapable)
+    {
+        Info<< nl << "The remaining checks are small strain, and no law here "
+            << "evaluates a small-strain" << nl << "kinematics, so they are "
+            << "skipped." << nl;
+
+        Info<< nl << "============================================================"
+            << nl;
+
+        if (nFailed_ == 0)
+        {
+            Info<< "All mechanicalConstitutiveLaw checks passed" << nl
+                << "============================================================"
+                << nl << endl;
+
+            Info<< "End\n" << endl;
+
+            return 0;
+        }
+
+        Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
+            << "============================================================"
+            << nl << endl;
+
+        return 1;
+    }
+
     // 1. Closed-form stress and scalar tangent through the volField overload
     // ---------------------------------------------------------------------
 
@@ -374,19 +1194,27 @@ int main(int argc, char *argv[])
             refImpK[cellI] = 2.0*refMu[cellI] + refLambda[cellI];
         }
 
-        reportError
-        (
-            "stress matches the closed form",
-            relativeDifference(Foam::primitiveField(sigma), refSigma),
-            1e-12
-        );
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "stress matches the closed form",
+                relativeDifference(Foam::primitiveField(sigma), refSigma),
+                1e-12
+            );
 
-        reportError
-        (
-            "scalar tangent matches 2*mu + lambda",
-            relativeDifference(Foam::primitiveField(impK), refImpK),
-            1e-12
-        );
+            reportError
+            (
+                "scalar tangent matches 2*mu + lambda",
+                relativeDifference(Foam::primitiveField(impK), refImpK),
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: closed-form stress and tangent "
+                << "(not all materials are linearElastic)" << endl;
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -672,12 +1500,20 @@ int main(int argc, char *argv[])
               + refLambda[cellI]*tr(dualGradD[dualFaceI])*I;
         }
 
-        reportError
-        (
-            "dual-face stress uses the owning cell's material",
-            relativeDifference(dualSigma, refDualSigma),
-            1e-12
-        );
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "dual-face stress uses the owning cell's material",
+                relativeDifference(dualSigma, refDualSigma),
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: dual-face closed-form stress "
+                << "(not all materials are linearElastic)" << endl;
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -686,6 +1522,12 @@ int main(int argc, char *argv[])
 
     Info<< nl << "6. Fourth-order tangent on the dual faces" << endl;
 
+    if (!allLinearElastic)
+    {
+        Info<< "    SKIP: no analytical fourth-order tangent for these "
+            << "materials" << endl;
+    }
+    else
     {
         List<mat66> dualC(nInternalDualFaces);
 
@@ -731,19 +1573,246 @@ int main(int argc, char *argv[])
             maxRelError = max(maxRelError, mag(C(XX, XY))/scale);
         }
 
-        reportError
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "the tangent matches the closed-form isotropic stiffness",
+                maxRelError,
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: closed-form isotropic stiffness "
+                << "(not all materials are linearElastic)" << endl;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 7. Finite-difference fourth-order tangent
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "7. Finite-difference fourth-order tangent" << endl;
+
+    {
+        List<mat66> fdC(nInternalDualFaces);
+        List<mat66> fdCagain(nInternalDualFaces);
+
+        manager.updateTangentSmallStrain
         (
-            "the tangent matches the closed-form isotropic stiffness",
-            maxRelError,
-            1e-12
+            dualTopo, dualGradD, dualGradD0, dt,
+            nullptr, &fdC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        if (allLinearElastic)
+        {
+            // Compare against the analytical tangent rather than a
+            // hand-written closed form, so the check is on the finite
+            // difference itself, including its Voigt shear convention
+            List<mat66> analyticC(nInternalDualFaces);
+
+            manager.updateTangentSmallStrain
+            (
+                dualTopo, dualGradD, dualGradD0, dt,
+                nullptr, &analyticC, tangentRequest::fourthOrder
+            );
+
+            scalar maxRelError = 0.0;
+            forAll(fdC, dualFaceI)
+            {
+                const label cellI = dualFaceToCell[dualFaceI];
+                const scalar scale = refLambda[cellI] + 2.0*refMu[cellI];
+
+                for (label i = 0; i < 6; ++i)
+                {
+                    for (label j = 0; j < 6; ++j)
+                    {
+                        maxRelError =
+                            max
+                            (
+                                maxRelError,
+                                mag
+                                (
+                                    fdC[dualFaceI](i, j)
+                                  - analyticC[dualFaceI](i, j)
+                                )/scale
+                            );
+                    }
+                }
+            }
+
+            reportError("matches the analytical tangent", maxRelError, 1e-6);
+        }
+
+        // With no analytical tangent to compare against, require that the
+        // finite difference is finite and that repeating it gives exactly the
+        // same answer. For a history-dependent law that is a direct check that
+        // the perturbed evaluations left no trace in the state
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt,
+            nullptr, &fdCagain, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        bool finiteAndRepeatable = true;
+        forAll(fdC, dualFaceI)
+        {
+            for (label i = 0; i < 6; ++i)
+            {
+                for (label j = 0; j < 6; ++j)
+                {
+                    const scalar a = fdC[dualFaceI](i, j);
+
+                    if (a != a || mag(a) > GREAT)
+                    {
+                        finiteAndRepeatable = false;
+                    }
+
+                    if (a != fdCagain[dualFaceI](i, j))
+                    {
+                        finiteAndRepeatable = false;
+                    }
+                }
+            }
+        }
+
+        report
+        (
+            "is finite and exactly repeatable",
+            finiteAndRepeatable
         );
     }
 
     // ---------------------------------------------------------------------
-    // 7. Misuse guards
+    // 8. A tangent query leaves the constitutive state alone
     // ---------------------------------------------------------------------
 
-    Info<< nl << "7. Misuse guards" << endl;
+    Info<< nl << "8. Tangent queries preserve constitutive state" << endl;
+
+    {
+        // A law is a function of the kinematics and the OLD-time state, so a
+        // stress evaluated straight after a tangent query cannot see anything
+        // the query wrote: it recomputes from the same history. The damage a
+        // query can do is to the CURRENT-time fields, which endTimeStep()
+        // reads and which storeOldTime() promotes to history at the next time
+        // step. So the query has to be straddled by a time step to be seen.
+        symmTensorField sigmaA(nInternalDualFaces, symmTensor::zero);
+        symmTensorField sigmaB(nInternalDualFaces, symmTensor::zero);
+
+        // Establish history at the working strain
+        manager.updateStressSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt, sigmaA
+        );
+
+        // A tangent query at a strain far beyond the working one. Left in the
+        // current-time fields, this is what would be committed below
+        tensorField wildGradD(nInternalDualFaces, tensor::zero);
+        forAll(wildGradD, i)
+        {
+            wildGradD[i] = 50.0*dualGradD[i];
+        }
+
+        scalarField throwaway(nInternalDualFaces, 0.0);
+        List<mat66> throwawayC(nInternalDualFaces);
+
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, wildGradD, dualGradD0, dt,
+            &throwaway, nullptr, tangentRequest::scalar
+        );
+
+        if (allLinearElastic)
+        {
+            manager.updateTangentSmallStrain
+            (
+                dualTopo, wildGradD, dualGradD0, dt,
+                nullptr, &throwawayC, tangentRequest::fourthOrder
+            );
+        }
+
+        manager.updateTangentSmallStrain
+        (
+            dualTopo, wildGradD, dualGradD0, dt,
+            nullptr, &throwawayC, tangentRequest::fourthOrderFiniteDifference
+        );
+
+        // Cross a time step, which commits the current-time fields to history,
+        // then evaluate the same strain again.
+        // setTime rather than operator++: this application is not the solver,
+        // so running a time step would execute the case's function objects,
+        // and those generally expect a registered solidModel. Only the time
+        // index matters here, since that is what the manager keys its
+        // old-time rollover on
+        runTime.setTime
+        (
+            runTime.value() + runTime.deltaTValue(),
+            runTime.timeIndex() + 1
+        );
+
+        manager.updateStressSmallStrain
+        (
+            dualTopo, dualGradD, dualGradD0, dt, sigmaB
+        );
+
+        // A viscoelastic law relaxes, so its stress at a given strain is a
+        // function of how much time has passed. Time-independence is the
+        // wrong property to demand of it
+        if (!allViscoelastic)
+        {
+        reportError
+        (
+            "the same strain gives the same stress across a committed "
+            "time step",
+            relativeDifference(sigmaA, sigmaB),
+            1e-12
+        );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 9. updateScalarTangent, the cell-centred convenience form
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "9. Cell-centred scalar tangent query" << endl;
+
+    {
+        volScalarField queriedImpK
+        (
+            IOobject
+            (
+                "queriedImpK",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        manager.updateScalarTangent
+        (
+            gradD, gradD0, dt, queriedImpK, tangentRequest::scalar
+        );
+
+        reportError
+        (
+            "agrees with the tangent from the stress update",
+            relativeDifference
+            (
+                Foam::primitiveField(impK), Foam::primitiveField(queriedImpK)
+            ),
+            1e-15
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // 10. Misuse guards
+    // ---------------------------------------------------------------------
+
+    Info<< nl << "10. Misuse guards" << endl;
 
     {
         symmTensorField scratch(mesh.nCells(), symmTensor::zero);
@@ -809,7 +1878,77 @@ int main(int argc, char *argv[])
                 threw = true;
             }
 
-            report("a flat-list update on shared points is rejected", threw);
+            // The flat-list update performs no collapse, so a topology whose
+            // integration points are shared between cells is refused only
+            // when there is more than one law: with a single material no
+            // integration point can belong to two materials and there is
+            // nothing to collapse
+            if (lawEntries.size() > 1)
+            {
+                report
+                (
+                    "a flat-list update on shared points is rejected with "
+                    "several materials",
+                    threw
+                );
+            }
+            else
+            {
+                report
+                (
+                    "a flat-list update on shared points is allowed with one "
+                    "material",
+                    !threw
+                );
+            }
+        }
+
+        // The inputs object's own contract. No law reads a live input yet,
+        // so without this the class would ship unexercised
+        {
+            const scalar dtIn = 0.125;
+            mechanicalConstitutiveLawInputs inputs(dtIn);
+
+            report
+            (
+                "inputs carries the time increment",
+                mag(inputs.dt() - dtIn) < SMALL
+            );
+
+            report
+            (
+                "an unsupplied scalar input is absent, not zero",
+                !inputs.foundScalar("T") && inputs.findScalar("T") == nullptr
+            );
+
+            const scalarField T(3, 300.0);
+            inputs.setScalar("T", T);
+
+            report
+            (
+                "a supplied scalar input is found and readable",
+                inputs.foundScalar("T")
+             && inputs.findScalar("T") != nullptr
+             && mag(inputs.getScalar("T")[1] - 300.0) < SMALL
+            );
+
+            // A required input that was never supplied must fail rather than
+            // read as zero, which would be a plausible wrong answer
+            bool threw = false;
+            try
+            {
+                inputs.getScalar("thisWasNeverSupplied");
+            }
+            catch (const Foam::error&)
+            {
+                threw = true;
+            }
+
+            report
+            (
+                "a missing required input is rejected, not defaulted",
+                threw
+            );
         }
 
         // A tangent request with no storage to put it in
@@ -863,6 +2002,109 @@ int main(int argc, char *argv[])
     }
 
     // ---------------------------------------------------------------------
+    // Child states
+    //
+    // A composite law gives each sub-law a state of its own. These check the
+    // three things that make that safe: a child is sized like its parent, the
+    // old-time rollover reaches it, and a shadow of a parent presents shadows
+    // of the children rather than the children themselves
+    // ---------------------------------------------------------------------
+    {
+        Info<< nl << "Child states" << nl;
+
+        mechanicalConstitutiveLawState parent(4);
+
+        report
+        (
+            "child is absent until asked for",
+            !parent.foundChild("sub")
+        );
+
+        mechanicalConstitutiveLawState& sub = parent.child("sub");
+
+        report("child is created on first use", parent.foundChild("sub"));
+        report
+        (
+            "child is sized like its parent",
+            sub.size() == parent.size(),
+            "got " + Foam::name(sub.size())
+        );
+        report
+        (
+            "the same child comes back each time",
+            &parent.child("sub") == &sub
+        );
+
+        // A child's own history must roll over with its parent's. Both times
+        // are created up front, as a law's own initialisation does: the
+        // rollover walks the old-time table, so a field with no old-time entry
+        // is deliberately not history
+        sub.scalarField("h") = 1.0;
+        sub.scalarField0("h") = 0.0;
+        parent.storeOldTime();
+        sub.scalarField("h") = 2.0;
+
+        const mechanicalConstitutiveLawState& csub = sub;
+
+        report
+        (
+            "storeOldTime reaches the child",
+            mag(csub.scalarField0("h")[0] - 1.0) < SMALL
+         && mag(csub.scalarField("h")[0] - 2.0) < SMALL,
+            "old " + Foam::name(csub.scalarField0("h")[0])
+          + ", current " + Foam::name(csub.scalarField("h")[0])
+        );
+
+        parent.setSize(6);
+
+        report
+        (
+            "setSize reaches the child",
+            sub.size() == 6,
+            "got " + Foam::name(sub.size())
+        );
+
+        // A shadow must shadow all the way down. Writing through the shadow's
+        // child must leave the real child alone, and reading history through
+        // it must give the real child's history
+        {
+            mechanicalConstitutiveLawState shadow
+            (
+                parent, mechanicalConstitutiveLawState::SHADOW
+            );
+
+            mechanicalConstitutiveLawState& shadowSub = shadow.child("sub");
+
+            report
+            (
+                "a shadow's child is not the parent's child",
+                &shadowSub != &sub
+            );
+
+            report("a shadow's child is itself a shadow", shadowSub.isShadow());
+
+            const mechanicalConstitutiveLawState& cShadowSub = shadowSub;
+
+            report
+            (
+                "a shadow's child reads the real child's history",
+                mag(cShadowSub.scalarField0("h")[0] - 1.0) < SMALL,
+                "got " + Foam::name(cShadowSub.scalarField0("h")[0])
+            );
+
+            shadowSub.scalarField("h") = 99.0;
+
+            report
+            (
+                "writing through a shadow's child leaves the child alone",
+                mag(csub.scalarField("h")[0] - 2.0) < SMALL,
+                "got " + Foam::name(csub.scalarField("h")[0])
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+
 
     Info<< nl << "============================================================"
         << nl;
@@ -886,6 +2128,5 @@ int main(int argc, char *argv[])
 }
 
 
-#endif // FOAMEXTEND
 
 // ************************************************************************* //
