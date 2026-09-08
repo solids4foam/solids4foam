@@ -190,7 +190,7 @@ Type leastSquaresScheme::evaluateCellValueCoeffs
 {
     auto& cellStencils =
         compactListListCRef(stencil().cellsStencil());
-    const UList<label> cellStencil = cellStencils[cellI];
+    const UList<label>& cellStencil = cellStencils[cellI];
 
     if (coeffs.size() != cellStencil.size() + 1)
     {
