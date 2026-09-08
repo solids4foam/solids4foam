@@ -1140,9 +1140,6 @@ public:
             //- Write fields
             virtual void writeFields(const Time& runTime);
 
-            //- Return the desired new time-step size
-            virtual scalar newDeltaT();
-
             //- Move the mesh by the provided point displacement field
             //  Note: any global patches must be synchronised before this is
             //  called.  syncGlobalPatches() displaces the mesh points by

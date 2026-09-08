@@ -2345,15 +2345,6 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
-Foam::scalar Foam::solidModel::newDeltaT()
-{
-    return min
-    (
-        runTime().deltaTValue(),
-        mechanical().newDeltaT()
-    );
-}
-
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
