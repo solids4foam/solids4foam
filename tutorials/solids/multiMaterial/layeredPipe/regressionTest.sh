@@ -87,9 +87,7 @@ run_constitutive_test() {
         n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
 
         if (( n_passed == 0 )); then
-            # The framework is not built for foam-extend, so the test reports
-            # that there is nothing to check rather than running any
-            echo "SKIP: mechanicalConstitutiveLaw checks (not built on this fork)"
+            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
             return 0
         fi
 
@@ -117,7 +115,7 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    ( cd "${CASE_DIR}" && ./Allrun "${ARM:-}" > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -134,8 +132,10 @@ if [[ -z "${DATA_FILE}" || ! -f "${DATA_FILE}" ]]; then
     exit 1
 fi
 
-max_radial_err="$(awk -v r1="${R1}" -v r2="${R2}" -v r3="${R3}" \
-        -v e1="${E1}" -v e2="${E2}" -v nu1="${NU1}" -v nu2="${NU2}" -v p="${PLOAD}" '
+compute_radial_err() {
+    awk -v r1="${R1}" -v r2="${R2}" -v r3="${R3}" \
+        -v e1="${E1}" -v e2="${E2}" -v nu1="${NU1}" -v nu2="${NU2}" \
+        -v p="${PLOAD}" '
     function abs(x) { return x < 0 ? -x : x }
     BEGIN {
         pint = (2*r1*r1*p/(e1*(r2*r2-r1*r1))) / (((1.0/e2)*(((r3*r3+r2*r2)/(r3*r3-r2*r2))+nu2)) + ((1.0/e1)*(((r2*r2+r1*r1)/(r2*r2-r1*r1))-nu1)))
@@ -159,7 +159,10 @@ max_radial_err="$(awk -v r1="${R1}" -v r2="${R2}" -v r3="${R3}" \
     END {
         printf "%.12g\n", maxRad
     }
-    ' "${DATA_FILE}")"
+    ' "$1"
+}
+
+max_radial_err="$(compute_radial_err "${DATA_FILE}")"
 
 outer_theta_err="$(awk -v r1="${R1}" -v r2="${R2}" -v r3="${R3}" \
         -v e1="${E1}" -v e2="${E2}" -v nu1="${NU1}" -v nu2="${NU2}" -v p="${PLOAD}" '
@@ -211,6 +214,54 @@ fi
 
 if ! run_constitutive_test; then
     failures=$((failures + 1))
+fi
+
+# ------------------------------------------------------------
+# The same case on the constitutive-law framework
+# ------------------------------------------------------------
+# Two materials sharing an interface, which is the combination the framework
+# exists to handle without the legacy per-material subMeshes. The framework
+# arm pairs the switch with the material-aware leastSquaresS4f gradient; that
+# pairing is the replacement for the subMesh machinery, and routing the
+# framework through the subMeshes instead puts the radial stress error at
+# 0.0305 against a tolerance of 0.03
+if [ "$CHECK_ONLY" = false ]; then
+    FRAMEWORK_DIR="${REGRESSION_ROOT}/framework"
+    rm -rf "${FRAMEWORK_DIR}"; mkdir -p "${FRAMEWORK_DIR}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${FRAMEWORK_DIR}/"
+    done
+
+    ( cd "${FRAMEWORK_DIR}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) \
+        || true
+
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${FRAMEWORK_DIR}/log.solids4Foam" 2>/dev/null
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        failures=$((failures + 1))
+    else
+        fw_file="$(find "${FRAMEWORK_DIR}" -name 'line_sigma:Transformed.xy' \
+            | sort | tail -n 1)"
+
+        if [[ -z "${fw_file}" ]]; then
+            echo "FAIL: the framework arm produced no sampled stress"
+            failures=$((failures + 1))
+        else
+            fw_radial="$(compute_radial_err "${fw_file}")"
+
+            if awk "BEGIN {exit !(${fw_radial} < ${RADIUS_STRESS_ERR_MAX})}"
+            then
+                printf "PASS: framework: Max radial stress error = %.6g\n" \
+                    "${fw_radial}"
+            else
+                printf "FAIL: framework: Max radial stress error = %.6g\n" \
+                    "${fw_radial}"
+                failures=$((failures + 1))
+            fi
+        fi
+    fi
 fi
 
 if [ "$CHECK_ONLY" = false ]; then

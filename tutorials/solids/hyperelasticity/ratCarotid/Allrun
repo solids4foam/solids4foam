@@ -9,7 +9,28 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
+# Two formulations:
+#
+#   framework (default) - nonLinearGeometryTotalLagrangianTotalDisplacement
+#       with solvePressure, taking its stress from the
+#       mechanicalConstitutiveLaw framework. Runs on any fork, and runs to
+#       completion.
+#
+#   legacy - coupledPressureDisplacementSolid with the legacy
+#       HolzapfelGasserOgdenElastic. foam-extend only, and it does not reach
+#       the end time: it stalls at a relative residual of about 0.99 and dies
+#       at t = 0.68. That is longstanding, not a regression - the same failure
+#       happens on the development branch.
+APPROACH="framework"
+for arg in "$@"; do
+    if [[ "$arg" == "legacy" ]]; then APPROACH="legacy"; fi
+done
+echo "Using the $APPROACH formulation"
+
+if [[ "${APPROACH}" == "legacy" ]]
+then
+    solids4Foam::caseOnlyRunsWithFoamExtend
+fi
 
 # Compile case-local utilities
 (cd src && bash ./Allwmake -s) || exit 1
@@ -26,16 +47,33 @@ mkdir -p "${BLOCK_MESH_DICT_DIR}"
 m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
 runApplication blockMesh
 
-# Create 0 folder
+# Create 0 folder. psi0 and psi1 are the local-coordinate seeds that
+# calcLocCoordinates needs; both formulations use them
 mkdir 0
-cp -r 0.orig/Dp ./0
-cp -r 0.orig/DD ./0
-cp -r 0.orig/pointDD ./0
 cp -r 0.orig/psi0 ./0
 cp -r 0.orig/psi1 ./0
 
-# Calculate local coordinate systems
+if [[ "${APPROACH}" == "legacy" ]]
+then
+    cp -r 0.orig/Dp ./0
+    cp -r 0.orig/DD ./0
+    cp -r 0.orig/pointDD ./0
+else
+    cp -r 0.orig/D ./0
+    cp -r 0.orig/pointD ./0
+fi
+
+# Calculate local coordinate systems. This runs against the case's own
+# schemes, before the framework ones are put in place: it needs a gradient
+# scheme that the solver's fvSchemes does not carry
 runApplication calcLocCoordinates
+
+if [[ "${APPROACH}" != "legacy" ]]
+then
+    ln -sf solidProperties.framework constant/solidProperties
+    ln -sf fvSolution.framework system/fvSolution
+    ln -sf fvSchemes.framework system/fvSchemes
+fi
 
 # Run solver
 if [[ "$1" == "parallel" ]]

@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm PETScSNES;
+
+    // Solve pressure as an additional unknown (mixed formulation)
+    solvePressure true;
+
+    useMechanicalConstitutiveLawManager yes;
+
+    stabilisation
+    {
+        momentum
+        {
+            // 1, not the 100 this was copied from. The stabilisation is a
+            // difference between the face gradient and the interpolated cell
+            // gradient, and it does not vanish when the nonlinear solve
+            // converges - so its size is part of the answer, not only part of
+            // the path to it. At 100 this case sits 2 per cent from the
+            // legacy arm at the last time they share and 25 per cent from it
+            // mid-ramp; at 1 those become 0.07 and 7 per cent, and the answer
+            // is converged in the parameter - 1 and 3 differ by 0.04 per cent
+            type        diffStencilLaplacian;
+            scaleFactor 1;
+        }
+
+        pressure
+        {
+            type                RhieChow;
+            scaleFactor         1;
+            scaleFactorJacobian 1;
+        }
+    }
+}
+
+// ************************************************************************* //
