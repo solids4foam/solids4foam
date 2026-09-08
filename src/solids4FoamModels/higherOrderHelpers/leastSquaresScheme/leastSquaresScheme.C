@@ -315,11 +315,7 @@ void leastSquaresScheme::evaluateFaceCentreValues
 
         forAll(patch, patchFaceI)
         {
-#ifdef FOAMEXTEND
             const label faceI = patch.patch().start() + patchFaceI;
-#else
-            const label faceI = patch.start() + patchFaceI;
-#endif
 
             patchOwnerValues[patchFaceI] = evaluateCellValueCoeffs
             (

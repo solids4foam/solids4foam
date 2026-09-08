@@ -1004,11 +1004,7 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
 
         forAll(patch, patchFaceI)
         {
-#ifdef FOAMEXTEND
             const label faceI = patch.patch().start() + patchFaceI;
-#else
-            const label faceI = patch.start() + patchFaceI;
-#endif
             const label ownCellID = faceCells[patchFaceI];
             const PetscInt globalOwnRow =
                 petscSnesHelper.globalCells().toGlobal(ownCellID);

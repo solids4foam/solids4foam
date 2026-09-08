@@ -297,11 +297,7 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
 
         const processorFvPatch& procPatch =
             refCast<const processorFvPatch>(patch);
-#ifdef FOAMEXTEND
         const label patchStart = patch.patch().start();
-#else
-        const label patchStart = patch.start();
-#endif
 
         labelField localSizes(patch.size(), 0);
         label nLocalValues = 0;

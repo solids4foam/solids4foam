@@ -306,11 +306,7 @@ void kExactLeastSquares::fGrad
         const processorFvPatch& procPatch =
             refCast<const processorFvPatch>(patch);
         const labelUList& faceCells = patch.faceCells();
-#ifdef FOAMEXTEND
         const label patchStart = patch.patch().start();
-#else
-        const label patchStart = patch.start();
-#endif
 
         label nValues = 0;
         forAll(patch, patchFaceI)
@@ -406,11 +402,7 @@ void kExactLeastSquares::fGrad
 
         forAll(patch, patchFaceI)
         {
-#ifdef FOAMEXTEND
             const label faceI = patch.patch().start() + patchFaceI;
-#else
-            const label faceI = patch.start() + patchFaceI;
-#endif
             const label ownCellI = faceCells[patchFaceI];
             const labelUList& cellStencil = cellStencils[ownCellI];
             const label Nn = cellStencil.size();
