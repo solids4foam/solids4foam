@@ -214,7 +214,6 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
     }
 
     // Scalar tangent: only if explicitly requested
-    // Scalar tangent: only if explicitly requested
     if (response.wantsScalarTangent())
     {
         UIndirectList<scalar>& K = response.scalarTangent();

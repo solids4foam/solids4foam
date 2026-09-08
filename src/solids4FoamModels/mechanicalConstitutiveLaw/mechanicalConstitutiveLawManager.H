@@ -762,6 +762,10 @@ class mechanicalConstitutiveLawManager
             }
         }
 
+        //- Roll every law's state to old time, once, on the first
+        //  evaluation of a new time step. Called from each entry point
+        //  rather than by the solid model, so that a law's history advances
+        //  exactly once per step however many times its stress is evaluated
         void updateOldTimeIfNeeded();
 
 
@@ -846,12 +850,15 @@ public:
         //  fields
         surfaceSymmTensorField& surfaceStressSum() const;
         surfaceScalarField& surfaceStressWeight() const;
+        //- Scratch accumulator for collapsing scalar tangents onto faces,
+        //  allocated on first use and reused thereafter
         surfaceScalarField& surfaceTangentWeight() const;
 
         //- Create (if required) and return scratch containers for point
         //  fields
         pointSymmTensorField& pointStressSum() const;
         pointScalarField& pointStressWeight() const;
+        //- As above, for point-centred topologies
         pointScalarField& pointTangentWeight() const;
 
         //- Clear surface scratch fields
@@ -1279,6 +1286,11 @@ public:
             return laws_.size();
         }
 
+        //- True if every law can separate its isochoric stress from its
+        //  volumetric response. Asked rather than assumed by anything that
+        //  wants to exercise the split without demanding it - the unit test
+        //  does; a mixed formulation calls
+        //  checkVolumetricSplitSupported() instead and refuses by name
         bool allLawsProvideVolumetricSplit() const;
 
         //- True if every law's split stress is a function of the isochoric

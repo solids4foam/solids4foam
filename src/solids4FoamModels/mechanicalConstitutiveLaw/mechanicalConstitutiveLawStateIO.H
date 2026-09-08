@@ -157,16 +157,20 @@ public:
             return cellI;
         }
 
+        //- Encode a mesh face as a negative entity index
         static inline label faceEntity(const label faceI)
         {
             return -(faceI + 1);
         }
 
+        //- Whether an entity index denotes a face rather than a cell
         static inline bool isFaceEntity(const label entity)
         {
             return entity < 0;
         }
 
+        //- The mesh face an entity index denotes. Undefined unless
+        //  isFaceEntity() is true for it
         static inline label entityFace(const label entity)
         {
             return -entity - 1;
