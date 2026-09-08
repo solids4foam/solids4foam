@@ -1203,9 +1203,15 @@ void linGeomTotalDispSolid::setDeltaT(Time& runTime)
     if (solutionAlg() == solutionAlgorithm::EXPLICIT)
     {
         // Max wave speed in the domain
+        // impK_ and rho() are the model's own, so they follow whichever
+        // model is describing the material: impK_ comes from makeImpK, which
+        // branches on the framework. Asking mechanical() directly would size
+        // the explicit time step from the legacy stiffness on a framework
+        // run, and the two differ - (4/3)*mu against 2*mu for the mixed
+        // formulation, and whatever a ported law reports otherwise
         const scalar waveSpeed = max
         (
-            Foam::sqrt(mechanical().impK()/mechanical().rho())
+            Foam::sqrt(impK_/rho())
         ).value();
 
         // deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
