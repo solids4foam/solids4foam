@@ -1661,7 +1661,13 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     // Calculate stress at dual faces
     dualMechanicalPtr_().correct(dualSigmaf_);
 
-    if (solidModelDict().lookupOrDefault<Switch>("approximateJacobian", false))
+    // Fidelity of the material tangent used to build the Jacobian. The
+    // default reproduces the previous behaviour, which was
+    // 'approximateJacobian' defaulting to false, i.e. a full material tangent
+    const tangentRequest jacTangent =
+        jacobianTangent(tangentRequest::fourthOrder);
+
+    if (jacTangent == tangentRequest::scalar)
     {
         // Add laplacian term as a compact approximate linearisation of
         // div(sigma)
@@ -1676,6 +1682,15 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
             dualImpKf(),
             false           // flip sign
         );
+    }
+    else if (jacTangent != tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "jacobianTangent " << tangentRequestName(jacTangent)
+            << " is not supported by " << type() << "." << nl
+            << "This solid model assembles its Jacobian either from a scalar "
+            << "tangent or from a full fourth-order material tangent."
+            << exit(FatalError);
     }
     else
     {

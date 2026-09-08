@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
@@ -1140,6 +1141,7 @@ Foam::solidModel::solidModel
     ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
+    restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
@@ -1250,6 +1252,80 @@ Foam::solidModel::solidModel
     }
     else
     {
+        // Starting from a time that is not the first, without having been
+        // asked to write what a restart needs. The fields below are switched
+        // off in this branch, so the run is about to continue from a state it
+        // only partly has: the displacement comes back, the increment and the
+        // gradient it is measured against do not.
+        //
+        // Whether that matters depends on the material. A law written in total
+        // strain will not notice; an incremental one reads the whole run's
+        // strain as a single step's and is wrong by tens of percent while
+        // running happily to the end. That is too quiet a way to be wrong to
+        // leave unsaid, and too common a mistake to assume: the flag defaults
+        // to off and most cases never set it
+        if (runTime.startTimeIndex() > 0)
+        {
+            // Continuing from a time that is not the first, without having
+            // been asked to write what a restart needs. Whether that matters
+            // depends on the material: one written in total strain will not
+            // notice, while an incremental one reads the whole run's strain as
+            // a single step's and is wrong by tens of percent while running
+            // happily to the end.
+            //
+            // The fields may still be there, if the run that produced this
+            // time directory did ask for them, so look before complaining
+            IOobject gradD0IO
+            (
+                "grad(D)_0",
+                runTime.timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            );
+
+#ifdef OPENFOAM_NOT_EXTEND
+            const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+            const bool present = gradD0IO.headerOk();
+#endif
+
+            if (!present && !restartSpecified_)
+            {
+                // The case has not said anything about restarting, and is
+                // restarting. Refuse: this is a mistake far more often than it
+                // is a choice, and the cost of being wrong is a plausible
+                // answer rather than an obvious failure
+                FatalErrorInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << ", but the fields a consistent restart needs were "
+                    << "never written." << nl << nl
+                    << "    The displacement increment, the old-time "
+                    << "displacement gradient and the point fields are only "
+                    << "written when the case asks for them." << nl << nl
+                    << "    Either" << nl << nl
+                    << "        restart yes;" << nl << nl
+                    << "    in the solidModel's coefficients dictionary, and "
+                    << "run again from the start; or" << nl << nl
+                    << "        restart no;" << nl << nl
+                    << "    to say that this material does not need them and "
+                    << "continue. A material written in total strain does not; "
+                    << "an incremental one does, and without them reads the "
+                    << "whole run's strain as one step's."
+                    << exit(FatalError);
+            }
+            else if (!present)
+            {
+                // Said 'no' deliberately. Their call, said once
+                WarningInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << " with 'restart no': the displacement increment and "
+                    << "old-time gradient were not written, so an incremental "
+                    << "material would continue from the wrong strain."
+                    << endl;
+            }
+        }
+
         D_.oldTime().writeOpt() = IOobject::NO_WRITE;
         D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
         DD_.writeOpt() = IOobject::NO_WRITE;
@@ -1706,6 +1782,158 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 void Foam::solidModel::updateTotalFields()
 {
     mechanical().updateTotalFields();
+
+    // Take the old-time copy of the quadrature gradient now, at the end of the
+    // step, while the current field holds the converged value. It is rebuilt
+    // on each evaluation, so there is nothing else to take it from.
+    // The high-order discretisation, and hence gradDQuad(), does not exist on
+    // foam-extend
+#ifndef FOAMEXTEND
+    if (gradDQuadPtr_.valid())
+    {
+        if (gradDQuad0Ptr_.empty())
+        {
+            gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        }
+
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+    }
+#endif
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModel::quadDeformationGradient
+(
+    const CompactListList<tensor>& gradD,
+    autoPtr<CompactListList<tensor>>& FPtr
+)
+{
+    if (FPtr.empty())
+    {
+        FPtr.set(new CompactListList<tensor>());
+    }
+
+    FPtr().offsets() = gradD.offsets();
+    FPtr().m().setSize(gradD.m().size());
+
+    const List<tensor>& gradDv = gradD.m();
+    List<tensor>& F = FPtr().m();
+
+    forAll(gradDv, i)
+    {
+        F[i] = I + gradDv[i].T();
+    }
+}
+
+
+void Foam::solidModel::quadInverseAndJacobian
+(
+    const CompactListList<tensor>& F,
+    autoPtr<CompactListList<tensor>>& FinvPtr,
+    autoPtr<CompactListList<scalar>>& JPtr
+)
+{
+    if (FinvPtr.empty())
+    {
+        FinvPtr.set(new CompactListList<tensor>());
+        JPtr.set(new CompactListList<scalar>());
+    }
+
+    FinvPtr().offsets() = F.offsets();
+    JPtr().offsets() = F.offsets();
+    FinvPtr().m().setSize(F.m().size());
+    JPtr().m().setSize(F.m().size());
+
+    const List<tensor>& Fv = F.m();
+    List<tensor>& Finv = FinvPtr().m();
+    List<scalar>& J = JPtr().m();
+
+    forAll(Fv, i)
+    {
+        Finv[i] = inv(Fv[i]);
+        J[i] = det(Fv[i]);
+    }
+}
+#endif
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
+(
+    mechanicalConstitutiveLawManager& manager,
+    const tangentRequest req
+) const
+{
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    //
+    // Evaluated at zero gradient against a state with no history, which makes
+    // this the elastic tangent. Two reasons, and the first is a correctness
+    // one. impK is formed once and kept, so on a cold start it is formed
+    // before anything has happened, while on a restart it would be formed
+    // against restored history and come out different - and since the solver
+    // stops on a residual measured relative to its first one, a different impK
+    // moves where the step stops and the run no longer reproduces the
+    // uninterrupted one. Evaluating it cold makes it the same either way.
+    //
+    // The legacy impK() reaches the same value by a longer road: it scales by
+    // 1 - 2*mu*DLambda/magSTrial, but DLambda is NO_READ and starts at zero,
+    // so the factor is exactly one and the result is elastic whether the run
+    // was restarted or not. What looks like a state dependence there is not
+    // one, which is worth saying because the comment here used to claim the
+    // opposite.
+    //
+    // Nothing is lost. This is a scalar preconditioner for an approximate
+    // Jacobian, and the elastic value is in practice as good as a scaled one
+    const volTensorField zeroGradD
+    (
+        IOobject
+        (
+            "zeroGradD",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("zero", gradD().dimensions(), tensor::zero)
+    );
+
+    manager.updateScalarTangent
+    (
+        zeroGradD,
+        zeroGradD,
+        mesh().time().deltaTValue(),
+        impK,
+        req,
+        true        // evaluate against a state with no history
+    );
+
+    return tImpK;
 }
 
 
@@ -2117,15 +2345,6 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
-Foam::scalar Foam::solidModel::newDeltaT()
-{
-    return min
-    (
-        runTime().deltaTValue(),
-        mechanical().newDeltaT()
-    );
-}
-
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
@@ -2170,6 +2389,48 @@ void Foam::solidModel::moveMesh
 const Foam::dictionary& Foam::solidModel::solidModelDict() const
 {
     return solidProperties_.subDict(type_ + "Coeffs");
+}
+
+
+Foam::tangentRequest Foam::solidModel::jacobianTangent
+(
+    const tangentRequest deflt
+) const
+{
+    const dictionary& dict = solidModelDict();
+
+    if (dict.found("approximateJacobian"))
+    {
+        if (dict.found("jacobianTangent"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "Both 'approximateJacobian' and 'jacobianTangent' are set."
+                << nl
+                << "'approximateJacobian' is deprecated: use "
+                << "'jacobianTangent' only."
+                << exit(FatalIOError);
+        }
+
+        const Switch approximate(dict.lookup("approximateJacobian"));
+
+        const tangentRequest req =
+            approximate
+          ? tangentRequest::scalar
+          : tangentRequest::fourthOrder;
+
+        WarningInFunction
+            << "'approximateJacobian' is deprecated. Replace it with "
+            << "'jacobianTangent " << tangentRequestName(req) << ";'" << endl;
+
+        return req;
+    }
+
+    if (!dict.found("jacobianTangent"))
+    {
+        return deflt;
+    }
+
+    return tangentRequestNamed(word(dict.lookup("jacobianTangent")));
 }
 
 // ************************************************************************* //

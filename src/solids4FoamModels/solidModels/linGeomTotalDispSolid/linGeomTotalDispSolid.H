@@ -37,6 +37,8 @@ SourceFiles
 #define linGeomTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
@@ -66,6 +68,23 @@ class linGeomTotalDispSolid
 {
     // Private data
 
+        //- Take the implicit stiffness from the mechanical constitutive law
+        //  framework rather than from the legacy mechanicalModel.
+        //  Opt-in, and declared before impK_ so that it is set when impK_ is
+        //  constructed.
+        //  impK is a Jacobian and a stabilisation coefficient, not a material
+        //  response, so this changes the convergence path and the size of a
+        //  stabilisation term that vanishes under mesh refinement. The stress
+        //  still comes from mechanicalModel either way
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- Mechanical constitutive law manager, when the above is set
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
+        //- Material tangent at mesh faces, for the high-order Jacobian.
+        //  Held here so it is allocated once rather than per assembly
+        mutable List<mat66> faceMaterialTangent_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -83,6 +102,17 @@ class linGeomTotalDispSolid
         //  Used in the pressure Jacobian when solvePressure is enabled
         const volScalarField rKappa_;
 
+        //- The laws' own volumetric response, K*tr(epsilon)
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value is what checkVolumetricClosure compares against the
+        //  relation the pressure equation was written for
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
+        //- Set once that comparison has been made
+        mutable bool volumetricClosureChecked_ = false;
+
         //- Acceleration field
         //  Only used by the explicit solution scheme
         volVectorField A_;
@@ -97,6 +127,44 @@ class linGeomTotalDispSolid
         volScalarField ds_;
 
     // Private Member Functions
+
+        //- Return the mechanical constitutive law manager, constructing it on
+        //  first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Return the implicit stiffness, from the constitutive law framework
+        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  legacy mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
+
+        //- Return the reciprocal of the bulk modulus, from the same source
+        tmp<volScalarField> makeRKappa() const;
+
+        //- Update the stress at the face quadrature points of the high-order
+        //  discretisation, from the same source as correctStress().
+        //  The high-order discretisation does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+#endif
+
+        //- Update the cell-centred stress, from the framework when
+        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  mechanicalModel otherwise
+        //- Somewhere for the laws to put their volumetric response
+        volScalarField& volumetricResponse() const;
+
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
+        //- Replace the volumetric part of the stress with the solved pressure
+        void replaceVolumetricStress(const volScalarField& p);
+
+        void correctStress();
+
+        //- Return the material tangent at mesh faces, indexed by face, for
+        //  the high-order Jacobian
+        const List<mat66>& faceMaterialTangent() const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
@@ -121,6 +189,23 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
+        //- Gradient, computed directly rather than through the legacy
+        //  mechanicalModel's per-material subMeshes. See the note on the
+        //  definition: the subMesh path is what the framework replaces
+        void frameworkGrad
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
+        //- Point interpolation, likewise on the base mesh
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
@@ -179,6 +264,14 @@ public:
             virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
+            virtual void updateTotalFields() override;
+
             virtual bool evolve();
 
 #ifdef USE_PETSC

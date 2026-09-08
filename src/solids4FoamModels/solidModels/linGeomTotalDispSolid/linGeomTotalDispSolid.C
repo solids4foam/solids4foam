@@ -17,6 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+#include "enhancedVolPointInterpolation.H"
+#endif
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -57,10 +60,134 @@ void linGeomTotalDispSolid::predict()
     D() = D().oldTime() + U()*runTime().deltaT();
 
     // Update gradient of displacement
-    mechanical().grad(D(), gradD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkGrad(D(), gradD());
+    }
+    else
+    {
+        mechanical().grad(D(), gradD());
+    }
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
+
+    // On the split path correctStress() leaves the stress without its
+    // volumetric part, so without this the predictor would hand the solver a
+    // stress that is missing a term rather than an approximate total one.
+    // The legacy path is left alone deliberately: it already has a total
+    // stress here, and this is only a starting point for the solve
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        replaceVolumetricStress(p());
+    }
+}
+
+
+volScalarField& linGeomTotalDispSolid::volumetricResponse() const
+{
+    if (volumetricResponsePtr_.empty())
+    {
+        volumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "volumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return volumetricResponsePtr_();
+}
+
+
+void linGeomTotalDispSolid::checkVolumetricClosure() const
+{
+    if (volumetricClosureChecked_)
+    {
+        return;
+    }
+
+    // The pressure equation hard-codes its half of the model: its residual is
+    // -p/K + stabilisation - tr(gradD), so it assumes the volumetric response
+    // is K*tr(epsilon) and takes K from the mechanical model.
+    // providesVolumetricSplit() promises that a law can separate its
+    // volumetric response, not that the response is this one. Since the law
+    // returns it, the assumption is checked rather than trusted
+    const volScalarField assumed(tr(gradD())/rKappa_);
+
+    const volScalarField& actual = volumetricResponse();
+
+    // Guarded on the size of the comparison rather than on a threshold in
+    // the kinematics. Both responses are zero in an undeformed material, and
+    // for a nearly incompressible case they stay small for ever - plateHole's
+    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
+    // either fires on nothing or never fires at all. What matters is only
+    // that there is something to compare: once either response is non-zero
+    // the comparison is relative and means something at any magnitude
+    const scalar scale =
+        max
+        (
+            gMax(mag(Foam::primitiveField(assumed))),
+            gMax(mag(Foam::primitiveField(actual)))
+        );
+
+    if (scale <= 0)
+    {
+        return;
+    }
+
+    volumetricClosureChecked_ = true;
+
+    const scalar err =
+        gMax
+        (
+            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
+        );
+
+    if (err > 1e-8*scale)
+    {
+        FatalErrorInFunction
+            << "The law's volumetric response is not the one the pressure "
+            << "equation was written for." << nl << nl
+            << "    The pressure equation assumes a volumetric response of "
+            << "K*tr(epsilon), with K taken from the mechanical model. The "
+            << "law returned something else: the largest difference is "
+            << err << " against a response of order " << scale << '.' << nl << nl
+            << "    Separating the volumetric response is not enough on its "
+            << "own - the pressure equation has to be solving for the same "
+            << "thing, or the two halves describe different materials."
+            << exit(FatalError);
+    }
+}
+
+
+void linGeomTotalDispSolid::replaceVolumetricStress(const volScalarField& p)
+{
+    // On the framework path correctStress() has already left the stress
+    // without its volumetric response, so the solved pressure is simply
+    // added. The legacy path has to project, because a law that cannot
+    // separate the two gives nothing else to work with - and the projection
+    // is right only where what remains is trace free.
+    //
+    // In one place because there is more than one caller
+    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    {
+        sigma() = sigma() - p*I;
+    }
+    else
+    {
+        sigma() = dev(sigma()) - p*I;
+    }
 }
 
 
@@ -296,7 +423,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             DD() = D() - D().oldTime();
 
             // Update gradient of displacement
-            mechanical().grad(D(), gradD());
+            if (useMechanicalConstitutiveLawManager_)
+            {
+                frameworkGrad(D(), gradD());
+            }
+            else
+            {
+                mechanical().grad(D(), gradD());
+            }
 
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
@@ -307,7 +441,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             const volScalarField DEqnA("DEqnA", DEqn.A());
 
             // Calculate the stress using run-time selectable mechanical law
-            mechanical().correct(sigma());
+            correctStress();
         }
         while
         (
@@ -323,7 +457,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         );
 
         // Interpolate cell displacements to vertices
-        mechanical().interpolate(D(), gradD(), pointD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkInterpolate(D(), gradD(), pointD());
+        }
+        else
+        {
+            mechanical().interpolate(D(), gradD(), pointD());
+        }
 
         // Increment of displacement
         DD() = D() - D().oldTime();
@@ -416,16 +557,30 @@ bool linGeomTotalDispSolid::evolveSnes()
 
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 #endif
     }
     else
     {
-        mechanical().grad(D(), gradD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkGrad(D(), gradD());
+        }
+        else
+        {
+            mechanical().grad(D(), gradD());
+        }
     }
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), gradD(), pointD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkInterpolate(D(), gradD(), pointD());
+    }
+    else
+    {
+        mechanical().interpolate(D(), gradD(), pointD());
+    }
     pointD().correctBoundaryConditions();
 
     // Increment of displacement
@@ -515,10 +670,19 @@ bool linGeomTotalDispSolid::evolveExplicit()
     }
 
     // Update gradient of displacement
-    mechanical().grad(D, gradD);
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkGrad(D, gradD);
+    }
+    else
+    {
+        mechanical().grad(D, gradD);
+    }
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma);
+    // Calculate the stress using run-time selectable mechanical law.
+    // sigma here is a reference to solidModel::sigma(), so this is the same
+    // field correctStress() updates
+    correctStress();
 
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -541,6 +705,250 @@ bool linGeomTotalDispSolid::evolveExplicit()
        - dampingCoeff()*fvc::ddt(D);
 
     return true;
+}
+
+
+Foam::scalar Foam::solidModels::linGeomTotalDispSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return mechanical().residual();
+    }
+
+    // A framework law is a pure function of the kinematics and the old-time
+    // state, and the framework deliberately does not under-relax the plastic
+    // strain increment as the legacy law does, so the constitutive update does
+    // not lag the displacement solution between outer iterations. There is
+    // therefore nothing for a material residual to measure, and convergence is
+    // governed by the displacement residuals alone.
+    //
+    // Querying the legacy law here instead would be worse than useless: its
+    // correct() is never called on this path, so its previous-iteration fields
+    // are never stored and asking for its residual aborts
+    return 0.0;
+}
+
+
+void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
+{
+    // One or the other, not both. The base call runs the legacy laws'
+    // end-of-step work, which is not the no-op it looks like -
+    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
+    // diagnostics there, and others recompute an effective stiffness. On a
+    // framework run those laws are never evaluated, so that work is done on
+    // stale inputs and read by nothing
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        mechanicalManager().endTimeStep();
+    }
+    else
+    {
+        solidModel::updateTotalFields();
+    }
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(gradDQuad(), sigmaQuad());
+        return;
+    }
+
+    // The quadrature points carry their own constitutive state, distinct from
+    // the cell-centred one, because they are a different set of integration
+    // points. The old-time gradient comes from solidModel, which takes a copy
+    // at the end of each time step: the current field is rebuilt on every
+    // evaluation, so a history-dependent law would otherwise have nothing to
+    // read
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradDQuad(),
+        gradDQuad0(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+#endif
+
+
+void Foam::solidModels::linGeomTotalDispSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate updateTotalFields() call
+    if (solvePressure())
+    {
+        // The pressure is an independent unknown and stands in for the law's
+        // volumetric response, so the law is asked for its stress without
+        // that response rather than being asked for the total and having a
+        // deviatoric projection taken of it. The two are the same only where
+        // what remains is trace free, which an isotropic law satisfies and an
+        // anisotropic one does not. Laws that cannot separate them are
+        // refused by name
+        mechanicalManager().updateStressSmallStrainSplit
+        (
+            gradD(),
+            gradD().oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            volumetricResponse()
+        );
+
+        checkVolumetricClosure();
+
+        return;
+    }
+
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModels::linGeomTotalDispSolid::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
+{
+    // For the mixed displacement-pressure formulation the implicit stiffness
+    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
+    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        if (solvePressure())
+        {
+            return tmp<volScalarField>
+            (
+                new volScalarField((4.0/3.0)*mechanical().shearModulus())
+            );
+        }
+
+        return mechanical().impK();
+    }
+
+    return frameworkImpK(mechanicalManager(), req);
+}
+
+
+const Foam::List<Foam::mat66>&
+Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        FatalErrorInFunction
+            << "'jacobianTangent fourthOrder' needs the material tangent from "
+            << "the mechanical constitutive law framework, but "
+            << "'useMechanicalConstitutiveLawManager' is not set." << nl
+            << "The legacy mechanicalModel cannot supply one on the primary "
+            << "mesh."
+            << exit(FatalError);
+    }
+
+    const fvMesh& m = mesh();
+
+    // Indexed by mesh face, which is what hofvm::divSigmaIntoPETScMatrix
+    // expects and what the face-centred topology provides
+    faceMaterialTangent_.setSize(m.nFaces());
+
+    const integrationPointTopology& faceTopo =
+        mechanicalManager().topologyFor
+        (
+            faceCentredIntegrationPointTopology::typeName
+        );
+
+    // The topology spans internal faces then boundary faces in patch order,
+    // so gather the face gradients into one flat field in the same order
+    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+    const surfaceTensorField gradDf0(fvc::interpolate(gradD().oldTime()));
+
+    Field<tensor> gradDFlat(m.nFaces(), tensor::zero);
+    Field<tensor> gradD0Flat(m.nFaces(), tensor::zero);
+
+    const label nInt = m.nInternalFaces();
+    for (label faceI = 0; faceI < nInt; ++faceI)
+    {
+        gradDFlat[faceI] = Foam::primitiveField(gradDf)[faceI];
+        gradD0Flat[faceI] = Foam::primitiveField(gradDf0)[faceI];
+    }
+
+    forAll(m.boundary(), patchI)
+    {
+        const label start = m.boundaryMesh()[patchI].start();
+        const fvsPatchTensorField& pGradD = gradDf.boundaryField()[patchI];
+        const fvsPatchTensorField& pGradD0 = gradDf0.boundaryField()[patchI];
+
+        forAll(pGradD, faceI)
+        {
+            gradDFlat[start + faceI] = pGradD[faceI];
+            gradD0Flat[start + faceI] = pGradD0[faceI];
+        }
+    }
+
+    mechanicalManager().updateTangentSmallStrain
+    (
+        faceTopo,
+        gradDFlat,
+        gradD0Flat,
+        mesh().time().deltaTValue(),
+        nullptr,
+        &faceMaterialTangent_,
+        tangentRequest::fourthOrder
+    );
+
+    return faceMaterialTangent_;
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::linGeomTotalDispSolid::makeRKappa() const
+{
+    if (!useMechanicalConstitutiveLawManager_)
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField(1.0/mechanical().bulkModulus())
+        );
+    }
+
+    return tmp<volScalarField>
+    (
+        new volScalarField(1.0/mechanicalManager().kappa())
+    );
 }
 
 
@@ -568,20 +976,18 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
-    impK_
+    useMechanicalConstitutiveLawManager_
     (
-        // Note: for the mixed displacement-pressure formulation, the implicit
-        // stiffness is the scalar Laplacian surrogate for div(dev(sigma)),
-        // which is mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu.
-        // This matches tangentRequest::scalarDeviatoric in the
-        // mechanicalConstitutiveLaw framework
-        solvePressure()
-      ? (4.0/3.0)*mechanical().shearModulus()
-      : mechanical().impK()
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
     ),
+    mechanicalManagerPtr_(),
+    impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
-    rKappa_(1.0/mechanical().bulkModulus()),
+    rKappa_(makeRKappa()),
     A_
     (
         IOobject
@@ -624,7 +1030,14 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     // For consistent restarts, we will calculate the gradient field
     D().correctBoundaryConditions();
     D().storePrevIter();
-    mechanical().grad(D(), gradD());
+    if (useMechanicalConstitutiveLawManager_)
+    {
+        frameworkGrad(D(), gradD());
+    }
+    else
+    {
+        mechanical().grad(D(), gradD());
+    }
 
     Info<< "solvePressure = " << solvePressure() << endl;
 
@@ -677,6 +1090,37 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh().schemesDict().gradScheme("grad(" + D().name() +')')
 #endif
     );
+
+    // A multi-material framework run needs a material-aware gradient, and
+    // this refuses rather than warns.
+    //
+    // The framework replaces the legacy per-material subMesh machinery, so it
+    // computes one gradient on one mesh - which is only right if the scheme
+    // knows not to draw a cell's stencil across a material interface.
+    // leastSquaresS4f does; the ordinary schemes do not, and layeredPipe then
+    // puts the radial stress 0.0494 from the analytical solution against a
+    // tolerance of 0.03, where the material-aware scheme gives 0.0192.
+    //
+    // A warning would not do: the answer is wrong by more than the case's own
+    // tolerance, and silently so
+    if
+    (
+        useMechanicalConstitutiveLawManager_
+     && mechanicalManager().nLaws() > 1
+     && gradDScheme != "leastSquaresS4f"
+    )
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "More than one material on the mechanicalConstitutiveLaw "
+            << "framework needs a material-aware gradient for grad("
+            << D().name() << "), and `" << gradDScheme << "` is not one."
+            << nl << nl
+            << "    The framework computes one gradient on one mesh in place "
+            << "of the legacy per-material subMeshes, which only works if the "
+            << "scheme keeps a cell's stencil within its own material. Set "
+            << "`grad(" << D().name() << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
 
     if
     (
@@ -736,14 +1180,84 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
+void Foam::solidModels::linGeomTotalDispSolid::frameworkGrad
+(
+    const volVectorField& D,
+    volTensorField& gradD
+) const
+{
+    // A solid model on the constitutive-law framework computes its own
+    // gradient rather than asking the legacy mechanicalModel for one.
+    //
+    // That is not a preference. For more than one material the legacy grad()
+    // splits the mesh into per-material subMeshes, interpolates the
+    // displacement onto each, takes a gradient there and maps the result
+    // back, with a stress-based correction at the interface. Replacing that
+    // machinery is a large part of what the framework is for: the material
+    // aware least-squares gradient does the same job on one mesh, by drawing
+    // a cell's stencil only from cells of its own material.
+    //
+    // Routing the framework through the subMesh path anyway is not merely
+    // redundant, it is worse: on layeredPipe it puts the radial stress 0.0305
+    // from the analytical solution against a tolerance of 0.03, where the
+    // legacy path gives 0.0192. Computed directly it gives 0.0192 too
+    gradD = fvc::grad(D);
+}
+
+
+void Foam::solidModels::linGeomTotalDispSolid::frameworkInterpolate
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD
+)
+{
+    // As above: the legacy interpolate() routes multiple materials through
+    // subMeshes. The interpolator itself is not legacy - it is a
+    // mesh-registered singleton that mechanicalModel merely looks up - so it
+    // is fetched here directly rather than through that accessor.
+    //
+    // foam-extend's has no gradient-corrected form, so there the legacy call
+    // is kept. That is a real limitation rather than a tidy fallback: on
+    // foam-extend a multi-material framework run would take this route and
+    // get the subMesh interpolation, so the combination is refused below
+#ifdef OPENFOAM_NOT_EXTEND
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
+#else
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        FatalErrorInFunction
+            << "The constitutive-law framework does not support more than one "
+            << "material on foam-extend in this solid model." << nl << nl
+            << "    The point interpolation would fall back to the legacy "
+            << "per-material subMesh path, which is what the framework "
+            << "replaces, and this fork's interpolator has no "
+            << "gradient-corrected form to use instead."
+            << exit(FatalError);
+    }
+
+    mechanical().interpolate(D, gradD, pointD);
+#endif
+}
+
+
+
 void linGeomTotalDispSolid::setDeltaT(Time& runTime)
 {
     if (solutionAlg() == solutionAlgorithm::EXPLICIT)
     {
         // Max wave speed in the domain
+        // impK_ rather than mechanical().impK(): it comes from makeImpK,
+        // which branches on the framework, so an explicit run sizes its step
+        // from the stiffness it is actually solving with.
+        //
+        // rho() is NOT branched - solidModel::makeRho builds it from
+        // mechanical().rho() whatever model is active. That is left because
+        // the two agree by construction, both reading the same rho entry
+        // per material, and not because anything here checks it
         const scalar waveSpeed = max
         (
-            Foam::sqrt(mechanical().impK()/mechanical().rho())
+            Foam::sqrt(impK_/rho())
         ).value();
 
         // deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
@@ -929,7 +1443,7 @@ label linGeomTotalDispSolid::formResidual
         mechanical().grad(D, gradDQuad());
 
         // Calculate sigma at quadrature points
-        mechanical().correct(gradDQuad(), sigmaQuad());
+        correctStressQuad();
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
@@ -938,14 +1452,21 @@ label linGeomTotalDispSolid::formResidual
     else
     {
         // Update gradient of displacement
-        mechanical().grad(D, gradD());
+        if (useMechanicalConstitutiveLawManager_)
+        {
+            frameworkGrad(D, gradD());
+        }
+        else
+        {
+            mechanical().grad(D, gradD());
+        }
 
         // Enforce the boundary conditions again for any conditions that
         // use gradD
         //D.correctBoundaryConditions();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     // Update velocity
@@ -965,7 +1486,7 @@ label linGeomTotalDispSolid::formResidual
         p.correctBoundaryConditions();
 
         // Replace the pressure component of stress
-        sigma() = dev(sigma()) - p*I;
+        replaceVolumetricStress(p);
 
         // Calculate the pressure gradient (we should store this!)
         const volVectorField gradp(fvc::grad(p));
@@ -1172,44 +1693,72 @@ label linGeomTotalDispSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        tmp<volScalarField> tK = mechanical().bulkModulus();
-        const volScalarField& K = tK();
+        const leastSquaresScheme& reconstruction = displacementLeastSquares();
 
-        tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
-        const volScalarField& mu = tMu();
+        if (jacobianTangent(tangentRequest::scalar) == tangentRequest::fourthOrder)
+        {
+            // Assemble from the full material tangent
+            hofvm::divSigmaIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                faceMaterialTangent()
+            );
+        }
+        else
+        {
+            // Back-derive an isotropic tangent pair from impK and the bulk
+            // modulus, inverting impK = (4/3)*mu_eff + K.
+            //
+            // This is exact for every law that currently defines impK in that
+            // form, plastic points included: linearElasticMisesPlastic returns
+            // scaleFactor*(4/3)*mu + K, so mu_eff comes back as scaleFactor*mu
+            // and lambda as K - (2/3)*scaleFactor*mu, which is deviatoric
+            // softening at unchanged bulk modulus.
+            //
+            // What is wrong with it is structural. It assumes an algebraic
+            // form for impK() that nothing declares or checks, and impK is
+            // deliberately the "whatever converges best" coefficient, so a law
+            // is free to return something else. And no isotropic pair can
+            // represent an anisotropic tangent however it is obtained; the
+            // orthotropic law escapes only because it leaves bulkModulus()
+            // unimplemented, so this branch fatal-errors rather than
+            // computing nonsense.
+            //
+            // Retained as the default so existing cases are unchanged. Set
+            // 'jacobianTangent fourthOrder' to assemble from the material
+            // tangent instead, which needs no assumption about impK and works
+            // for an anisotropic law
+            // From whichever model describes the material. This K is combined
+            // with impK_ to recover a shear modulus, so mixing the framework's
+            // stiffness with the legacy model's bulk modulus gives a shear
+            // modulus for neither: a law written for exact incompressibility in
+            // the legacy hierarchy reports GREAT
+            tmp<volScalarField> tK
+            (
+                useMechanicalConstitutiveLawManager_
+              ? tmp<volScalarField>
+                (
+                    new volScalarField(mechanicalManager().kappa())
+                )
+              : mechanical().bulkModulus()
+            );
+            const volScalarField& K = tK();
 
-        tmp<volScalarField> tLambda = impK_ - 2.0*mu;
-        const volScalarField& lambda = tLambda();
+            tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
+            const volScalarField& mu = tMu();
 
-        const leastSquaresScheme& reconstruction =
-            displacementLeastSquares();
+            tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+            const volScalarField& lambda = tLambda();
 
-        hofvm::laplacianIntoPETScMatrix
-        (
-            jac,
-            *this,
-            reconstruction,
-            D,
-            mu
-        );
+            hofvm::laplacianIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-        hofvm::laplacianTransposeIntoPETScMatrix
-        (
-            jac,
-            *this,
-            reconstruction,
-            D,
-            mu
-        );
+            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-        hofvm::laplacianTraceIntoPETScMatrix
-        (
-            jac,
-            *this,
-            reconstruction,
-            D,
-            lambda
-        );
+            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, reconstruction, D, lambda);
+        }
 
         if (momentumStabilisation().supportsHighOrderResidual())
         {
