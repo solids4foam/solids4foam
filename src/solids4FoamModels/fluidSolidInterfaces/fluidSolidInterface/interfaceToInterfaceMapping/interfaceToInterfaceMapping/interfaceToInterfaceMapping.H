@@ -21,6 +21,21 @@ Class
 Description
     Virtual base class for mapping/interpolating between two interfaces
 
+    The interface-to-interface correspondence is topological in body-fitted
+    FSI: the same solid face lies beside the same fluid face for the duration
+    of the run.  It is therefore constructed once from the undeformed geometry
+    rather than from the current interface, which follows the fluid mesh motion
+    and the solid deformation.  Building it from the current interface would
+    make the correspondence depend on when it happens to be first used.
+
+    The undeformed geometry is read from the mesh points in the "constant"
+    instance, so every mesh whose interface is mapped must have its points
+    available there and must not change topology during the run.  Both
+    conditions are checked in makeReferenceZone(), which aborts if they are not
+    met: silently falling back to the current geometry would reintroduce the
+    ordering dependence described above, and a point-count mismatch may signal
+    a topology change for which no correspondence is well defined.
+
 Author
     Philip Cardiff, UCD.
 
@@ -65,6 +80,12 @@ class interfaceToInterfaceMapping
         //- Const reference to the globalPatchB
         const globalPolyPatch& globalPatchB_;
 
+        // Demand-driven data
+
+            //- Reference-configuration copies used to construct the mapping
+            mutable autoPtr<standAlonePatch> zoneARefPtr_;
+            mutable autoPtr<standAlonePatch> zoneBRefPtr_;
+
 
     // Private Member Functions
 
@@ -73,6 +94,25 @@ class interfaceToInterfaceMapping
 
         //- Disallow default bitwise assignment
         void operator=(const interfaceToInterfaceMapping&);
+
+        //- Build a zone from the constant mesh points
+        autoPtr<standAlonePatch> makeReferenceZone
+        (
+            const globalPolyPatch& globalPatch
+        ) const;
+
+
+protected:
+
+    // Protected Member Functions
+
+        //- Return zoneA in the reference configuration
+        //  Use this, rather than zoneA(), for any geometry the mapping is
+        //  constructed from
+        const standAlonePatch& zoneARef() const;
+
+        //- Return zoneB in the reference configuration
+        const standAlonePatch& zoneBRef() const;
 
 
 public:
@@ -170,13 +210,18 @@ public:
                 return globalPatchB_;
             };
 
-            //- Const access to the zoneA
+            //- Const access to the zoneA in its current configuration
+            //  This follows the fluid mesh motion and the solid deformation.
+            //  It identifies the zone, and gives its size, but the geometry
+            //  the mapping is built from comes from zoneARef(): see the class
+            //  description above
             const standAlonePatch& zoneA() const
             {
                 return globalPatchA_.globalPatch();
             }
 
-            //- Const access to the zoneB
+            //- Const access to the zoneB in its current configuration
+            //  As zoneA() above; the mapping geometry comes from zoneBRef()
             const standAlonePatch& zoneB() const
             {
                 return globalPatchB_.globalPatch();

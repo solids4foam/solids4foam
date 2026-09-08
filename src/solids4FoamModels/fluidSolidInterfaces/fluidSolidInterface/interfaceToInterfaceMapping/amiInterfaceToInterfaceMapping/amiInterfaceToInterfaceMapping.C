@@ -46,81 +46,6 @@ addToRunTimeSelectionTable
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-autoPtr<standAlonePatch>
-amiInterfaceToInterfaceMapping::makeReferenceZone
-(
-    const globalPolyPatch& globalPatch
-) const
-{
-    const polyMesh& mesh = globalPatch.mesh();
-    const pointIOField referencePoints
-    (
-        IOobject
-        (
-            "points",
-            mesh.time().constant(),
-            polyMesh::meshSubDir,
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE,
-            false
-        )
-    );
-
-    if (referencePoints.size() != mesh.nPoints())
-    {
-        FatalErrorInFunction
-            << "Reference mesh points do not correspond to the current mesh"
-            << nl
-            << "    reference points : " << referencePoints.size() << nl
-            << "    current points   : " << mesh.nPoints() << nl
-            << "    patch            : " << globalPatch.patchName()
-            << abort(FatalError);
-    }
-
-    const labelList& meshPoints = globalPatch.patch().meshPoints();
-    pointField patchPoints(meshPoints.size());
-
-    forAll(meshPoints, pointI)
-    {
-        patchPoints[pointI] = referencePoints[meshPoints[pointI]];
-    }
-
-    return autoPtr<standAlonePatch>
-    (
-        new standAlonePatch
-        (
-            globalPatch.globalPatch().localFaces(),
-            globalPatch.patchPointToGlobal(patchPoints)()
-        )
-    );
-}
-
-
-const standAlonePatch&
-amiInterfaceToInterfaceMapping::zoneARef() const
-{
-    if (zoneARefPtr_.empty())
-    {
-        zoneARefPtr_ = makeReferenceZone(globalPatchA());
-    }
-
-    return zoneARefPtr_();
-}
-
-
-const standAlonePatch&
-amiInterfaceToInterfaceMapping::zoneBRef() const
-{
-    if (zoneBRefPtr_.empty())
-    {
-        zoneBRefPtr_ = makeReferenceZone(globalPatchB());
-    }
-
-    return zoneBRefPtr_();
-}
-
-
 void amiInterfaceToInterfaceMapping::makeInterpolator() const
 {
     if (interpolatorPtr_.valid())
@@ -677,8 +602,6 @@ amiInterfaceToInterfaceMapping::amiInterfaceToInterfaceMapping
     (
         type, dict, patchA, patchB, globalPatchA, globalPatchB
     ),
-    zoneARefPtr_(),
-    zoneBRefPtr_(),
     interpolatorPtr_(nullptr),
     zoneAPointAddressingPtr_(nullptr),
     zoneAPointWeightsPtr_(nullptr),

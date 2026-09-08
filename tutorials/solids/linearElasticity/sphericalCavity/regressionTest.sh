@@ -29,21 +29,15 @@ SIGMA_MAX=2.0e6
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+PARALLEL_N_PROCS=2
 
 APPROACHES=(
     segregated
     petscSnes
-    highOrder
-)
-
-# Approaches that are known to diverge on this case and are not checked here.
-# The mesh is tetrahedral, and the standard leastSquaresS4f gradient stencil is
-# too small on tetrahedra, so the segregated and petscSnes approaches diverge.
-# The high-order approach uses a larger stencil, even at p = 1, and converges.
-# See https://github.com/solids4foam/solids4foam/issues/356
-SKIPPED_APPROACHES=(
-    segregated
-    petscSnes
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
+    highOrder-movingLeastSquares-parallel
+    highOrder-kExactLeastSquares-parallel
 )
 
 echo "============================================================"
@@ -71,6 +65,11 @@ prepare_case() {
     sed -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
+
+    sed -E -i.bak \
+        "s/^[[:space:]]*numberOfSubdomains[[:space:]]+[0-9]+;/numberOfSubdomains ${PARALLEL_N_PROCS};/" \
+        "${CASE_DIR}/system/decomposeParDict"
+    rm -f "${CASE_DIR}/system/decomposeParDict.bak"
 
 }
 
@@ -117,6 +116,126 @@ extract_max_sigma() {
         | awk '{print $NF}' || true
 }
 
+select_run_approach() {
+    local requested="$1"
+
+    case "${requested}" in
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+            local least_squares_type="${requested#highOrder-}"
+            sed -E -i.bak \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
+                "${CASE_DIR}/constant/solidProperties.highOrder"
+            rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+            RUN_APPROACH=highOrder
+            RUN_MODE=serial
+            ;;
+        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel)
+            local least_squares_type="${requested#highOrder-}"
+            least_squares_type="${least_squares_type%-parallel}"
+            sed -E -i.bak \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
+                "${CASE_DIR}/constant/solidProperties.highOrder"
+            rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+            RUN_APPROACH=highOrder
+            RUN_MODE=parallel
+            ;;
+        *)
+            RUN_APPROACH="${requested}"
+            RUN_MODE=serial
+            ;;
+    esac
+}
+
+
+link_case_files_for_suffix() {
+    local suffix="$1"
+
+    while IFS= read -r -d '' file; do
+        rm -f "${file%.*}"
+        ln -nsf "$(basename "${file}")" "${file%.*}"
+    done < <(
+        find "${CASE_DIR}/constant" "${CASE_DIR}/system" \
+            -type f -name "*.${suffix}" -print0
+    )
+}
+
+
+run_parallel_case() {
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::requirePetscOrExitSilently
+
+    link_case_files_for_suffix highOrder
+
+    (
+        cd "${CASE_DIR}"
+
+        echo "Compiling libraries..."
+        (cd src && bash ./Allwmake -s)
+
+        mv 0 0.tmp
+        solids4Foam::runApplication gmsh -3 -format msh2 sphericalCavity.geo
+        solids4Foam::runApplication gmshToFoam sphericalCavity.msh
+        solids4Foam::runApplication changeDictionary
+        mv 0.tmp 0
+
+        solids4Foam::runApplication decomposePar
+        solids4Foam::runParallel solids4Foam
+        solids4Foam::runApplication reconstructPar
+    )
+}
+
+run_parallel_high_order_grad_test() {
+    local least_squares_type="$1"
+    local suffix="${least_squares_type}.parallel"
+    local log_file="${CASE_DIR}/log.Test-highOrderGrad.${suffix}"
+
+    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+        echo "SKIP: Test-highOrderGrad is not available with foam-extend"
+        return 0
+    fi
+
+    if ! command -v Test-highOrderGrad >/dev/null 2>&1; then
+        echo "SKIP: Test-highOrderGrad is not available"
+        return 0
+    fi
+
+    sed -E -i.bak \
+        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\1type ${least_squares_type};/" \
+        "${CASE_DIR}/constant/solidProperties.highOrder"
+    rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
+
+    if ! grep -qE \
+        "^[[:space:]]*type[[:space:]]+${least_squares_type};" \
+        "${CASE_DIR}/constant/solidProperties.highOrder"
+    then
+        echo "FAIL: Could not select ${least_squares_type}"
+        return 1
+    fi
+
+    if ! (
+        cd "${CASE_DIR}"
+        solids4Foam::runParallel \
+            -n "${PARALLEL_N_PROCS}" \
+            -o -s "${suffix}" Test-highOrderGrad >/dev/null 2>&1
+    ); then
+        echo "FAIL: Test-highOrderGrad (${least_squares_type}, parallel)"
+        return 1
+    fi
+
+    if grep -q "Overall result: PASSED" "${log_file}"
+    then
+        echo "PASS: Test-highOrderGrad (${least_squares_type}, parallel)"
+        return 0
+    fi
+
+    echo "FAIL: Test-highOrderGrad (${least_squares_type}, parallel)"
+    return 1
+}
+
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -161,26 +280,32 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "Testing approach: ${approach}"
         echo "------------------------------------------------------------"
 
-        skip_approach=false
-        for skipped in "${SKIPPED_APPROACHES[@]}"; do
-            if [[ "${approach}" == "${skipped}" ]]; then
-                skip_approach=true
-                break
-            fi
-        done
-
-        if [ "${skip_approach}" = true ]; then
-            echo "Skipping ${approach}: the leastSquaresS4f gradient stencil is"
-            echo "too small on the tetrahedral mesh and the solution diverges"
-            continue
-        fi
-
+        select_run_approach "${approach}"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-        ( cd "${CASE_DIR}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+
+        if [[ "${RUN_MODE}" == "parallel" ]]; then
+            run_parallel_case \
+                > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
+        else
+            (
+                cd "${CASE_DIR}"
+                ./Allrun "${RUN_APPROACH}" \
+                    > "${ALLRUN_LOGFILE}" 2>&1
+            )
+        fi
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
             continue
+        fi
+
+        if [[ "${approach}" == highOrder-*-parallel ]]; then
+            least_squares_type="${approach#highOrder-}"
+            least_squares_type="${least_squares_type%-parallel}"
+
+            if ! run_parallel_high_order_grad_test "${least_squares_type}"; then
+                failures=$((failures + 1))
+            fi
         fi
 
         if ! check_solver_extrema "${approach}"; then

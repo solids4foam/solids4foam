@@ -20,6 +20,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "lookupSolidModel.H"
 
 namespace
 {
@@ -88,6 +89,83 @@ namespace Foam
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void Foam::pressurisedCylinderAnalyticalSolution::
+calculateAnalyticalCellDisplacement
+(
+    const fvMesh& mesh,
+    vectorField& analyticalD
+) const
+{
+#ifndef FOAMEXTEND
+    const solidModel& solMod = lookupSolidModel(mesh);
+    bool useCellAverage = false;
+
+    if (solMod.highOrderResidual())
+    {
+        const dictionary& displacementDict =
+            solMod.solidModelDict()
+           .subDict("highOrderCoeffs")
+           .subDict("displacement");
+
+        useCellAverage =
+            displacementDict.lookupOrDefault<word>
+            (
+                "type",
+                "movingLeastSquares"
+            ) == "kExactLeastSquares";
+    }
+
+    const vectorField& cellCentres = mesh.C().internalField();
+
+    if (useCellAverage)
+    {
+        const fvMeshQuadrature& quadrature =
+            solMod.displacementLeastSquares().quadrature();
+        const CompactListList<point>& cellQuadPoints =
+            quadrature.cellQuadPoints();
+        const CompactListList<scalar>& cellQuadWeights =
+            quadrature.cellQuadWeights();
+        const scalarField& cellVolumes = mesh.V();
+
+        Info<< "Using cell-average analytical displacement" << endl;
+
+        forAll(analyticalD, cellI)
+        {
+            vector cartesianAverage = vector::zero;
+
+            forAll(cellQuadPoints[cellI], pointI)
+            {
+                cartesianAverage +=
+                    cellQuadWeights[cellI][pointI]
+                   *analyticalSol_.displacement
+                    (
+                        cellQuadPoints[cellI][pointI]
+                    );
+            }
+
+            cartesianAverage /= cellVolumes[cellI];
+            analyticalD[cellI] = transformDisplacementToCylindrical
+            (
+                cartesianAverage,
+                cellCentres[cellI]
+            );
+        }
+    }
+    else
+#else
+    const vectorField& cellCentres = mesh.C().internalField();
+#endif
+    {
+        Info<< "Using point-valued analytical displacement" << endl;
+
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] =
+                analyticalSol_.cylindricalDisplacement(cellCentres[cellI]);
+        }
+    }
+}
 
 bool Foam::pressurisedCylinderAnalyticalSolution::writeData()
 {
@@ -158,10 +236,11 @@ bool Foam::pressurisedCylinderAnalyticalSolution::writeData()
                 sI[cellI] = analyticalSol_.cylindricalStress(CI[cellI]);
             }
 
-            if (cellDisplacement_)
-            {
-                aDI[cellI] = analyticalSol_.cylindricalDisplacement(CI[cellI]);
-            }
+        }
+
+        if (cellDisplacement_)
+        {
+            calculateAnalyticalCellDisplacement(mesh, aDI);
         }
 
         forAll(analyticalStress.boundaryField(), patchI)

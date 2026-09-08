@@ -57,8 +57,8 @@ void ggiInterfaceToInterfaceMapping::makeInterpolator() const
     (
         new GGIInterpolation<standAlonePatch, standAlonePatch>
         (
-            zoneA(),
-            zoneB(),
+            zoneARef(),
+            zoneBRef(),
             tensorField(0),
             tensorField(0),
             vectorField(0), // Slave-to-master separation. Bug fix
@@ -123,10 +123,10 @@ void ggiInterfaceToInterfaceMapping::checkZoneAToZoneBError() const
 void ggiInterfaceToInterfaceMapping::checkZoneBToZoneAError() const
 {
     const vectorField zoneBPointsAtFluid =
-        interpolator().slaveToMasterPointInterpolate(zoneB().localPoints());
+        interpolator().slaveToMasterPointInterpolate(zoneBRef().localPoints());
             //(currentSolidZonesPoints()[interfaceI]); // double-check
 
-    const vectorField& zoneAPoints = zoneA().localPoints();
+    const vectorField& zoneAPoints = zoneARef().localPoints();
 
     Info<< "interface-to-interface point error: "
         << gMax(mag(zoneAPoints - zoneBPointsAtFluid))

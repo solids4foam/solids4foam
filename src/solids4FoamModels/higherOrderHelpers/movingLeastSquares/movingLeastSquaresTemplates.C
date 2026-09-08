@@ -57,6 +57,71 @@ inline Type movingLeastSquares::fieldValue
 
 
 template<class Type>
+Type movingLeastSquares::evaluateAtPoint
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    if (cellID >= mesh_.nCells())
+    {
+        FatalErrorInFunction
+            << "Cell ID " << cellID << " is outside the local cell range 0 to "
+            << mesh_.nCells() - 1 << abort(FatalError);
+    }
+
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+    const CompactListList<label>& stencils = stencil().cellsStencil();
+
+    // Construct all coefficient tables collectively before checking for the
+    // negative cell marker used by parallel point evaluation.
+    (void)cellGradCoeffs();
+    if (polynomialOrder() >= 2)
+    {
+        (void)cellSecondGradCoeffs();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        (void)cellThirdGradCoeffs();
+    }
+
+    const UList<Type>& vfI = vf.internalField();
+    const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
+
+    // A negative cell ID marks a point owned by another processor. All
+    // processors still perform the coefficient setup and field exchange above
+    // because these operations can require collective communication.
+    if (cellID < 0)
+    {
+        return pTraits<Type>::zero;
+    }
+
+    const UList<label>& cellStencil = stencils[cellID];
+    scalarField valueCoeffs(cellStencil.size() + 1);
+    cellValueCoeffsAtPoint(cellID, x, valueCoeffs);
+    Type value = valueCoeffs[cellStencil.size()]*vfI[cellID];
+
+    forAll(cellStencil, cI)
+    {
+        value +=
+            valueCoeffs[cI]
+           *fieldValue
+            (
+                cellStencil[cI],
+                globalCells,
+                remoteLoc,
+                vfI,
+                remoteField
+            );
+    }
+
+    return value;
+}
+
+
+template<class Type>
 autoPtr<CompactListList<Type>> movingLeastSquares::patchFaceQuadValues
 (
     const GeometricField<Type, fvPatchField, volMesh>&,
@@ -163,7 +228,7 @@ movingLeastSquares::fGrad
         new CompactListList<GradType>(quadrature().faceQuadPoints().sizes())
     );
 
-    faceGrad(vf, autoPtrRef(tResult));
+    this->fGrad(vf, autoPtrRef(tResult));
 
     return tResult;
 }
@@ -183,7 +248,7 @@ void movingLeastSquares::fGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
     const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
-    const CompactListList<label>& stencils = stencil().facesStencil();
+    const CompactListList<label>& stencils = faceGradStencil();
     const List<CompactListList<vector>>& fGradCoeffs = this->faceGradCoeffs();
 
     // Get values from remote processors

@@ -55,7 +55,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
         {
             FatalIOErrorInFunction(dict)
                 << "The mechanicalLaw " << modelType
-                << " can only be used with a linear geometry solid model"
+                << " can only be used with a non-linear geometry solid model"
                 << endl << endl
                 << "Valid linearGeometry mechanicalLaws are : " << endl
                 << linGeomMechLawConstructorTablePtr_->sortedToc()
@@ -144,14 +144,14 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
 
     if (!ctorPtr)
     {
-        // Check if the user inadvertently specified a nonlinear law
+        // Check if the user inadvertently specified a linear law
         auto* ctorPtrOther = linGeomMechLawConstructorTable(modelType);
 
         if (ctorPtrOther)
         {
             FatalIOErrorInFunction(dict)
                 << "The mechanicalLaw " << modelType
-                << " can only be used with a non-linear geometry solid model"
+                << " can only be used with a linear geometry solid model"
                 << endl << endl
                 << "Valid nonLinearGeometry mechanicalLaws are : " << endl
                 << nonLinGeomMechLawConstructorTablePtr_->sortedToc()
@@ -177,7 +177,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
 
     if (cstrIter == nonLinGeomMechLawConstructorTablePtr_->end())
     {
-        // Check if the user inadvertently specified a nonlinear law
+        // Check if the user inadvertently specified a linear law
         linGeomMechLawConstructorTable::iterator lgLawIter =
             linGeomMechLawConstructorTablePtr_->find(modelType);
 

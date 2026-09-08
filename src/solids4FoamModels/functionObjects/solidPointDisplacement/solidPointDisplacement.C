@@ -23,9 +23,6 @@ License
 #include "pointFields.H"
 #include "OSspecific.H"
 #include "lookupSolidModel.H"
-#ifndef FOAMEXTEND
-    #include "symmTensor3rdOrder.H"
-#endif
 #ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
@@ -66,9 +63,23 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
 
     if (mesh.foundObject<volVectorField>("D"))
     {
-        if (cellID_ > -1)
+        const volVectorField& D = mesh.lookupObject<volVectorField>("D");
+
+        if (solMod.highOrderResidual())
         {
-            const volVectorField& D = mesh.lookupObject<volVectorField>("D");
+            // This call is deliberately made on every processor. The scheme
+            // constructs the required reconstruction data collectively and
+            // returns zero where cellID_ is negative.
+            pointDValue =
+                solMod.displacementLeastSquares().valueAtPoint
+                (
+                    D,
+                    cellID_,
+                    point_
+                );
+        }
+        else if (cellID_ > -1)
+        {
             pointDValue = D[cellID_];
 
             const vector distance = point_ - mesh.C()[cellID_];
@@ -88,52 +99,6 @@ void Foam::solidPointDisplacement::extrapolatedPointDisplacement()
                 // Without gradient available we will write closest cell centre
                 // displacement
                 closestPointDisplacement();
-            }
-
-            // Extrapolate from cell using higher order gradient
-            if
-            (
-                solMod.highOrderResidual()
-             && solMod.displacementMLS().polynomialOrder() >= 2
-            )
-            {
-                volScalarField Dx(D.component(vector::X));
-                volScalarField Dy(D.component(vector::Y));
-                volScalarField Dz(D.component(vector::Z));
-
-                tmp<volSymmTensorField> tSecondGradDx =
-                    solMod.displacementMLS().secondGrad(Dx);
-                tmp<volSymmTensorField> tSecondGradDy =
-                    solMod.displacementMLS().secondGrad(Dy);
-                tmp<volSymmTensorField> tSecondGradDz =
-                    solMod.displacementMLS().secondGrad(Dz);
-
-                pointDValue.x() +=
-                    0.5*(distance & tSecondGradDx().internalField()[cellID_]
-                      & distance);
-                pointDValue.y() +=
-                    0.5*(distance & tSecondGradDy().internalField()[cellID_]
-                      & distance);
-                pointDValue.z() +=
-                    0.5*(distance & tSecondGradDz().internalField()[cellID_]
-                      & distance);
-
-                if (solMod.displacementMLS().polynomialOrder() >= 3)
-                {
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDx =
-                        solMod.displacementMLS().thirdGrad(Dx);
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDy =
-                        solMod.displacementMLS().thirdGrad(Dy);
-                    autoPtr<List<symmTensor3rdOrder>> tThirdGradDz =
-                        solMod.displacementMLS().thirdGrad(Dz);
-
-                    pointDValue.x() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDx)[cellID_], distance);
-                    pointDValue.y() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDy)[cellID_], distance);
-                    pointDValue.z() +=
-                        (1.0/6.0)*cubicForm((*tThirdGradDz)[cellID_], distance);
-                }
             }
         }
     }

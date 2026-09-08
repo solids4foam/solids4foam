@@ -24,6 +24,7 @@ License
 #include "sphericalCavityStressDisplacement.H"
 #include "OSspecific.H"
 #include "compatibilityFunctions.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,6 +43,84 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+void Foam::sphericalCavityAnalyticalSolution::
+calculateAnalyticalCellDisplacement
+(
+    const fvMesh& mesh,
+    vectorField& analyticalD
+) const
+{
+#ifndef FOAMEXTEND
+    const solidModel& solMod = lookupSolidModel(mesh);
+    bool useCellAverage = false;
+
+    if (solMod.highOrderResidual())
+    {
+        const dictionary& displacementDict =
+            solMod.solidModelDict()
+           .subDict("highOrderCoeffs")
+           .subDict("displacement");
+
+        useCellAverage =
+            displacementDict.lookupOrDefault<word>
+            (
+                "type",
+                "movingLeastSquares"
+            ) == "kExactLeastSquares";
+    }
+
+    if (useCellAverage)
+    {
+        const fvMeshQuadrature& quadrature =
+            solMod.displacementLeastSquares().quadrature();
+        const CompactListList<point>& cellQuadPoints =
+            quadrature.cellQuadPoints();
+        const CompactListList<scalar>& cellQuadWeights =
+            quadrature.cellQuadWeights();
+        const scalarField& cellVolumes = mesh.V();
+
+        Info<< "Using cell-average analytical displacement" << endl;
+
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] = vector::zero;
+
+            forAll(cellQuadPoints[cellI], pointI)
+            {
+                analyticalD[cellI] +=
+                    cellQuadWeights[cellI][pointI]
+                   *sphericalCavityDisplacement
+                    (
+                        nu_,
+                        T0_,
+                        E_,
+                        cavityR_,
+                        cellQuadPoints[cellI][pointI]
+                    );
+            }
+
+            analyticalD[cellI] /= cellVolumes[cellI];
+        }
+    }
+    else
+#endif
+    {
+        Info<< "Using point-valued analytical displacement" << endl;
+
+        const vectorField& cellCentres = mesh.C().internalField();
+        forAll(analyticalD, cellI)
+        {
+            analyticalD[cellI] = sphericalCavityDisplacement
+            (
+                nu_,
+                T0_,
+                E_,
+                cavityR_,
+                cellCentres[cellI]
+            );
+        }
+    }
+}
 
 bool Foam::sphericalCavityAnalyticalSolution::writeData()
 {
@@ -123,14 +202,11 @@ bool Foam::sphericalCavityAnalyticalSolution::writeData()
                     sphericalCavityStress(T0_, nu_, cavityR_, CI[cellI]);
             }
 
-            if (cellDisplacement_)
-            {
-                aDI[cellI] =
-                    sphericalCavityDisplacement
-                    (
-                        nu_, T0_, E_, cavityR_, CI[cellI]
-                    );
-            }
+        }
+
+        if (cellDisplacement_)
+        {
+            calculateAnalyticalCellDisplacement(mesh, aDI);
         }
 
         forAll(analyticalStress.boundaryField(), patchI)

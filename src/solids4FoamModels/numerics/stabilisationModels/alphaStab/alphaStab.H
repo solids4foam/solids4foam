@@ -61,15 +61,6 @@ class alphaStab
 
     // Private Member Functions
 
-         //- Same as patchNeighbourField() function, added for third gradient
-        template<class Type>
-        void exchangeProcessorPatchField
-        (
-            const processorFvPatch& procPatch,
-            const Field<Type>& sendField,
-            Field<Type>& recvField
-        ) const;
-
         //- Template calculation of the stabilisation
         template<class GeoField, class GradField, class SurfaceField>
         void computeDiffStencil
@@ -80,23 +71,15 @@ class alphaStab
             scalar scaleFactor
         ) const;
 
-        //- Template calculation of the high ordet stabilisation for scalar
+        //- Template calculation of the high-order stabilisation
 #ifndef FOAMEXTEND
-        void computeDiffStencilHighOrderScalar
+        template<class GeoField, class SurfaceField>
+        void computeDiffStencilHighOrder
         (
-            const volScalarField& field,
-            const volVectorField& gradField,
-            surfaceScalarField& faceFlux,
-            scalar scaleFactor
-        ) const;
-
-        //- Template calculation of the high ordet stabilisation for vector
-        void computeDiffStencilHighOrderVector
-        (
-            const volVectorField& field,
-            const volTensorField& gradField,
-            surfaceVectorField& faceFlux,
-            scalar scaleFactor
+            const GeoField& field,
+            SurfaceField& faceFlux,
+            const scalar scaleFactor,
+            const leastSquaresScheme& reconstruction
         ) const;
 #endif
 

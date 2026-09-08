@@ -51,8 +51,8 @@ void directMapInterfaceToInterfaceMapping::checkZoneSizes() const
 {
     if
     (
-        zoneA().size() != zoneB().size()
-     || zoneA().nPoints() != zoneB().nPoints()
+        zoneARef().size() != zoneBRef().size()
+     || zoneARef().nPoints() != zoneBRef().nPoints()
     )
     {
         FatalErrorIn(type() + "::checkZoneSizes() const")
@@ -132,7 +132,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE
                 ),
-                labelList(zoneB().size(), -1)
+                labelList(zoneBRef().size(), -1)
             )
         );
         labelList& zoneAToZoneBMap = zoneAToZoneBFaceMapPtr_();
@@ -141,8 +141,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // relative tolerance
 
-        const vectorField zoneACf(zoneA().faceCentres());
-        const vectorField zoneBCf(zoneB().faceCentres());
+        const vectorField zoneACf(zoneARef().faceCentres());
+        const vectorField zoneBCf(zoneBRef().faceCentres());
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneBCf, zoneBFaceI)
@@ -162,7 +162,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
     if (gMin(zoneAToZoneBFaceMapPtr_()) == -1)
     {
         labelList& zoneAToZoneBMap = zoneAToZoneBFaceMapPtr_();
-        const vectorField zoneBCf(zoneB().faceCentres());
+        const vectorField zoneBCf(zoneBRef().faceCentres());
         Info<< "A direct map was not found for the following faces:" << endl;
         forAll(zoneBCf, zoneBFaceI)
         {
@@ -252,7 +252,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE
                 ),
-                labelList(zoneA().size(), -1)
+                labelList(zoneARef().size(), -1)
             )
         );
         labelList& zoneBToZoneAMap = zoneBToZoneAFaceMapPtr_();
@@ -261,8 +261,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // tolerance
 
-        const vectorField zoneACf(zoneA().faceCentres());
-        const vectorField zoneBCf(zoneB().faceCentres());
+        const vectorField zoneACf(zoneARef().faceCentres());
+        const vectorField zoneBCf(zoneBRef().faceCentres());
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneACf, zoneAFaceI)
@@ -283,7 +283,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
     if (gMin(zoneBToZoneAFaceMapPtr_()) == -1)
     {
         labelList& zoneBToZoneAMap = zoneBToZoneAFaceMapPtr_();
-        const vectorField zoneACf(zoneA().faceCentres());
+        const vectorField zoneACf(zoneARef().faceCentres());
         Info<< "A direct map was not found for the following faces:" << endl;
         forAll(zoneACf, zoneAFaceI)
         {
@@ -373,7 +373,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE
                 ),
-                labelList(zoneB().nPoints(), -1)
+                labelList(zoneBRef().nPoints(), -1)
             )
         );
         labelList& zoneAToZoneBMap = zoneAToZoneBPointMapPtr_();
@@ -382,8 +382,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // tolerance
 
-        const vectorField& zoneALP = zoneA().localPoints();
-        const vectorField& zoneBLP = zoneB().localPoints();
+        const vectorField& zoneALP = zoneARef().localPoints();
+        const vectorField& zoneBLP = zoneBRef().localPoints();
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneBLP, zoneBPointI)
@@ -482,7 +482,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
                     IOobject::NO_READ,
                     IOobject::AUTO_WRITE
                 ),
-                labelList(zoneA().nPoints(), -1)
+                labelList(zoneARef().nPoints(), -1)
             )
         );
         labelList& zoneBToZoneAMap = zoneBToZoneAPointMapPtr_();
@@ -491,8 +491,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // tolerance
 
-        const vectorField& zoneALP = zoneA().localPoints();
-        const vectorField& zoneBLP = zoneB().localPoints();
+        const vectorField& zoneALP = zoneARef().localPoints();
+        const vectorField& zoneBLP = zoneBRef().localPoints();
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneALP, zoneAPointI)
@@ -534,12 +534,12 @@ void directMapInterfaceToInterfaceMapping::calcMinEdgeLengths() const
         )   << "Pointer already set!" << abort(FatalError);
     }
 
-    minEdgeLengthsPtr_.set(new scalarField(zoneA().nPoints(), 0));
+    minEdgeLengthsPtr_.set(new scalarField(zoneARef().nPoints(), 0));
     scalarField& minEdgeLength = minEdgeLengthsPtr_();
 
-    const edgeList& edges = zoneA().edges();
-    const vectorField& points = zoneA().localPoints();
-    const labelListList& pointEdges = zoneA().pointEdges();
+    const edgeList& edges = zoneARef().edges();
+    const vectorField& points = zoneARef().localPoints();
+    const labelListList& pointEdges = zoneARef().pointEdges();
 
     forAll(points, pointI)
     {

@@ -13,8 +13,10 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=2e-3
-DISP_FINAL_TOL=2e-3
+# The high-order and standard PETSc discretisations share the same reference
+# values. Their small, expected discretisation difference is covered here.
+DISP_MAX_TOL=6e-3
+DISP_FINAL_TOL=6e-3
 FORCE_FINAL_TOL=0.2
 
 # Log files
@@ -22,7 +24,6 @@ ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
@@ -102,7 +103,7 @@ extract_final_force() {
     }
     END {
         if (last != "") print last
-    }' "${1}/${FORCE_FILE}"
+    }' "${1}"
 }
 
 abs() {
@@ -153,7 +154,8 @@ patch_end_time() {
 
 prepare_case() {
     local coupling="$1"
-    local case_dir="${REGRESSION_ROOT}/${coupling}"
+    local case_name="${2:-${coupling}}"
+    local case_dir="${REGRESSION_ROOT}/${case_name}"
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -177,7 +179,7 @@ prepare_case() {
         ln -vnsf "controlDict.${coupling}" system/controlDict
         ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
 
-        if [[ "${variant}" == "foamextend" ]]; then
+if [[ "${variant}" == "foamextend" ]]; then
             ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
         elif [[ "${variant}" == "openfoamorg" ]]; then
             ln -vnsf "fvSolution.${coupling}.openfoamorg" system/fluid/fvSolution
@@ -210,6 +212,17 @@ run_case() {
         if [[ ! -e force.dat && -f forces.dat ]]; then
             ln -s forces.dat force.dat
         fi
+    )
+}
+
+run_high_order_case() {
+    local case_dir="$1"
+
+    echo "Running high-order IQNILS regression case"
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun iqnils highOrder > "${ALLRUN_LOGFILE}" 2>&1
     )
 }
 
@@ -259,7 +272,7 @@ check_case() {
 
     max_disp=$(extract_max_displacement "${case_dir}")
     final_disp=$(extract_final_displacement "${case_dir}")
-    final_force=$(extract_final_force "${case_dir}")
+    final_force=$(extract_final_force "${force_file}")
 
     if [[ -z "${max_disp}" || -z "${final_disp}" || -z "${final_force}" ]]; then
         echo "FAIL [${coupling}]: Could not extract regression quantities"
@@ -305,18 +318,22 @@ check_case() {
     return "${failures}"
 }
 
+# Reference values updated for the interface-normal correction (PR #375): the
+# fluid pressure is now applied using the deformed interface normals rather
+# than the initial-configuration ones, which shifts every FSI result. See
+# https://github.com/solids4foam/solids4foam/pull/375
 if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=0.0395292
-    REF_FINAL_DISP=0.0387511
-    REF_FINAL_FORCE=6.63982
+    REF_MAX_DISP=0.0254734
+    REF_FINAL_DISP=0.0237615
+    REF_FINAL_FORCE=4.68516
 elif [[ "${variant}" == "openfoamorg" ]]; then
-    REF_MAX_DISP=0.0389623
-    REF_FINAL_DISP=0.0381231
-    REF_FINAL_FORCE=6.57859
+    REF_MAX_DISP=0.0249245
+    REF_FINAL_DISP=0.0231857
+    REF_FINAL_FORCE=4.58300
 else
-    REF_MAX_DISP=0.0389009
-    REF_FINAL_DISP=0.0380463
-    REF_FINAL_FORCE=6.57095
+    REF_MAX_DISP=0.0249071
+    REF_FINAL_DISP=0.0231620
+    REF_FINAL_FORCE=4.58284
 fi
 
 aitken_case=$(prepare_case aitken)
@@ -324,6 +341,11 @@ run_case "${aitken_case}" aitken
 
 iqnils_case=$(prepare_case iqnils)
 run_case "${iqnils_case}" iqnils
+
+if [[ "${variant}" != "foamextend" ]]; then
+    high_order_case=$(prepare_case iqnils highOrder)
+    run_high_order_case "${high_order_case}"
+fi
 
 echo
 
@@ -336,6 +358,14 @@ check_case aitken "${aitken_case}" \
 check_case iqnils "${iqnils_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
+
+if [[ "${variant}" != "foamextend" ]]; then
+    check_case highOrder "${high_order_case}" \
+        "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+        || failures=$((failures + $?))
+else
+    echo "Skipping high-order regression case: unavailable on foam-extend"
+fi
 
 echo
 if (( failures == 0 )); then

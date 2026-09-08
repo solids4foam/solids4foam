@@ -31,6 +31,7 @@ License
 #include "triQuadrature.H"
 #include "tetQuadrature.H"
 #include "lineQuadrature.H"
+#include "processorFvPatch.H"
 
 namespace Foam
 {
@@ -234,6 +235,121 @@ void fvMeshQuadrature::calcQuadPointsAndWeights() const
             << mesh_.nGeometricD() << "D model!"
             << abort(FatalError);
     }
+}
+
+
+void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
+{
+    if (processorFaceQuadratureSynchronised_)
+    {
+        return;
+    }
+
+    if (!Pstream::parRun())
+    {
+        processorFaceQuadratureSynchronised_ = true;
+        return;
+    }
+
+    if (faceQuadPointsPtr_.empty() || faceQuadWeightsPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Face quadrature points and weights must be calculated before "
+            << "processor-face synchronisation"
+            << abort(FatalError);
+    }
+
+    CompactListList<point>& faceQuadPoints = *faceQuadPointsPtr_;
+    CompactListList<scalar>& faceQuadWeights = *faceQuadWeightsPtr_;
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh_.boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const processorFvPatch& procPatch =
+            refCast<const processorFvPatch>(patch);
+        const label patchStart = patch.start();
+
+        labelField localSizes(patch.size(), 0);
+        label nLocalValues = 0;
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patchStart + patchFaceI;
+            localSizes[patchFaceI] = faceQuadPoints[faceI].size();
+            nLocalValues += localSizes[patchFaceI];
+        }
+
+        if (Pstream::myProcNo() < procPatch.neighbProcNo())
+        {
+            pointField masterPoints(nLocalValues);
+            scalarField masterWeights(nLocalValues);
+            label valueI = 0;
+
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    masterPoints[valueI] = faceQuadPoints[faceI][qpI];
+                    masterWeights[valueI] = faceQuadWeights[faceI][qpI];
+                    ++valueI;
+                }
+            }
+
+            procPatch.send(Pstream::commsTypes::blocking, localSizes);
+            procPatch.send(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.send(Pstream::commsTypes::blocking, masterWeights);
+        }
+        else
+        {
+            labelField masterSizes(patch.size(), 0);
+            procPatch.receive(Pstream::commsTypes::blocking, masterSizes);
+
+            label nMasterValues = 0;
+            forAll(masterSizes, patchFaceI)
+            {
+                if (localSizes[patchFaceI] != masterSizes[patchFaceI])
+                {
+                    FatalErrorInFunction
+                        << "Processor patch " << patch.name() << " face "
+                        << patchFaceI << " has " << localSizes[patchFaceI]
+                        << " local quadrature points but "
+                        << masterSizes[patchFaceI]
+                        << " master quadrature points"
+                        << abort(FatalError);
+                }
+
+                nMasterValues += masterSizes[patchFaceI];
+            }
+
+            pointField masterPoints(nMasterValues);
+            scalarField masterWeights(nMasterValues);
+            procPatch.receive(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.receive(Pstream::commsTypes::blocking, masterWeights);
+
+            label valueI = 0;
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    faceQuadPoints[faceI][qpI] = masterPoints[valueI];
+                    faceQuadWeights[faceI][qpI] = masterWeights[valueI];
+                    ++valueI;
+                }
+            }
+        }
+    }
+
+    processorFaceQuadratureSynchronised_ = true;
 }
 
 
@@ -884,6 +1000,168 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     }
 }
 
+
+void fvMeshQuadrature::calcFirstOrderCellMoments() const
+{
+    if (firstOrderCellMomentsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    firstOrderCellMomentsPtr_.set
+    (
+        new List<vector>(mesh_.nCells(), vector::zero)
+    );
+
+    List<vector>& firstOrderCellMoments = *firstOrderCellMomentsPtr_;
+
+    forAll(cellCentres, cellI)
+    {
+        vector& firstMoment = firstOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            firstMoment.x() += w*r.x();
+            firstMoment.y() += w*r.y();
+
+            if (!twoD)
+            {
+                firstMoment.z() += w*r.z();
+            }
+        }
+
+        firstMoment /= cellVolumes[cellI];
+    }
+}
+
+
+void fvMeshQuadrature::calcCellMoments() const
+{
+    if
+    (
+        secondOrderCellMomentsPtr_.valid()
+     || thirdOrderCellMomentsPtr_.valid()
+    )
+    {
+        FatalErrorInFunction
+            << "Pointers already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Cell moments are not required for integration order "
+            << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    secondOrderCellMomentsPtr_.set
+    (
+        new List<symmTensor>(mesh_.nCells(), symmTensor::zero)
+    );
+
+    if (cellOrder_ > 2)
+    {
+        thirdOrderCellMomentsPtr_.set
+        (
+            new List<symmTensor3rdOrder>
+            (
+                mesh_.nCells(),
+                symmTensor3rdOrder::zero
+            )
+        );
+    }
+
+    List<symmTensor>& secondOrderCellMoments =
+        *secondOrderCellMomentsPtr_;
+
+    forAll(cellCentres, cellI)
+    {
+        symmTensor& secondMoment = secondOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            secondMoment.xx() += w*r.x()*r.x();
+            secondMoment.xy() += w*r.x()*r.y();
+            secondMoment.yy() += w*r.y()*r.y();
+
+            if (!twoD)
+            {
+                secondMoment.xz() += w*r.x()*r.z();
+                secondMoment.yz() += w*r.y()*r.z();
+                secondMoment.zz() += w*r.z()*r.z();
+            }
+
+            if (thirdOrderCellMomentsPtr_.valid())
+            {
+                symmTensor3rdOrder& thirdMoment =
+                    (*thirdOrderCellMomentsPtr_)[cellI];
+
+                thirdMoment.xxx() += w*r.x()*r.x()*r.x();
+                thirdMoment.xxy() += w*r.x()*r.x()*r.y();
+                thirdMoment.xyy() += w*r.x()*r.y()*r.y();
+                thirdMoment.yyy() += w*r.y()*r.y()*r.y();
+
+                if (!twoD)
+                {
+                    thirdMoment.xxz() += w*r.x()*r.x()*r.z();
+                    thirdMoment.xyz() += w*r.x()*r.y()*r.z();
+                    thirdMoment.xzz() += w*r.x()*r.z()*r.z();
+                    thirdMoment.yyz() += w*r.y()*r.y()*r.z();
+                    thirdMoment.yzz() += w*r.y()*r.z()*r.z();
+                    thirdMoment.zzz() += w*r.z()*r.z()*r.z();
+                }
+            }
+        }
+
+        secondMoment /= cellVolumes[cellI];
+        if (thirdOrderCellMomentsPtr_.valid())
+        {
+            (*thirdOrderCellMomentsPtr_)[cellI] /= cellVolumes[cellI];
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fvMeshQuadrature::fvMeshQuadrature
@@ -900,8 +1178,12 @@ fvMeshQuadrature::fvMeshQuadrature
     allowDegenerateTriFallback_(allowDegenerateTriFallback),
     faceQuadPointsPtr_(),
     faceQuadWeightsPtr_(),
+    processorFaceQuadratureSynchronised_(false),
     cellQuadPointsPtr_(),
-    cellQuadWeightsPtr_()
+    cellQuadWeightsPtr_(),
+    firstOrderCellMomentsPtr_(),
+    secondOrderCellMomentsPtr_(),
+    thirdOrderCellMomentsPtr_()
 {
 }
 
@@ -924,6 +1206,8 @@ const CompactListList<point>& fvMeshQuadrature::faceQuadPoints() const
         calcQuadPointsAndWeights();
     }
 
+    synchroniseProcessorFaceQuadrature();
+
     return autoPtrRef(faceQuadPointsPtr_);
 }
 
@@ -934,6 +1218,8 @@ const CompactListList<scalar>& fvMeshQuadrature::faceQuadWeights() const
     {
         calcQuadPointsAndWeights();
     }
+
+    synchroniseProcessorFaceQuadrature();
 
     return autoPtrRef(faceQuadWeightsPtr_);
 }
@@ -959,12 +1245,72 @@ const CompactListList<scalar>& fvMeshQuadrature::cellQuadWeights() const
     return autoPtrRef(cellQuadWeightsPtr_);
 }
 
+
+const List<vector>& fvMeshQuadrature::firstOrderCellMoments() const
+{
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (firstOrderCellMomentsPtr_.empty())
+    {
+        calcFirstOrderCellMoments();
+    }
+
+    return *firstOrderCellMomentsPtr_;
+}
+
+
+const List<symmTensor>& fvMeshQuadrature::secondOrderCellMoments() const
+{
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Second-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (secondOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return *secondOrderCellMomentsPtr_;
+}
+
+
+const List<symmTensor3rdOrder>&
+fvMeshQuadrature::thirdOrderCellMoments() const
+{
+    if (cellOrder_ < 3)
+    {
+        FatalErrorInFunction
+            << "Third-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (thirdOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return *thirdOrderCellMomentsPtr_;
+}
+
+
 void fvMeshQuadrature::clear()
 {
+    processorFaceQuadratureSynchronised_ = false;
     faceQuadPointsPtr_.clear();
     faceQuadWeightsPtr_.clear();
     cellQuadPointsPtr_.clear();
     cellQuadWeightsPtr_.clear();
+    firstOrderCellMomentsPtr_.clear();
+    secondOrderCellMomentsPtr_.clear();
+    thirdOrderCellMomentsPtr_.clear();
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

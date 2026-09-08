@@ -37,7 +37,7 @@ Author
 #include "tensor.H"
 #include "fvMatrices.H"
 #include "volFields.H"
-#include "movingLeastSquares.H"
+#include "leastSquaresScheme.H"
 #include "foamPetscSnesHelper.H"
 
 namespace Foam
@@ -84,7 +84,7 @@ namespace hofvm
     (
         Mat& jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const label blockSize,
         const bool createMat = true
@@ -95,7 +95,7 @@ namespace hofvm
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
         const label rowOffset = 0,
@@ -107,7 +107,7 @@ namespace hofvm
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
         const label rowOffset = 0,
@@ -119,9 +119,23 @@ namespace hofvm
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
+        const label rowOffset = 0,
+        const label colOffset = 0
+    );
+
+    //- Add the high-order alpha-stabilisation derivative to the PETSc matrix
+    //  Serial implementation; for now no contribution is inserted in parallel
+    void insertAlphaStabIntoPETScMatrix
+    (
+        Mat jac,
+        const foamPetscSnesHelper& petscSnesHelper,
+        const leastSquaresScheme& reconstruction,
+        const volVectorField& D,
+        const surfaceScalarField& diffusivity,
+        const scalar scaleFactor,
         const label rowOffset = 0,
         const label colOffset = 0
     );

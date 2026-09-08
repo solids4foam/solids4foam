@@ -603,6 +603,9 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise global patches with the current mesh points
+            void syncGlobalPatches() const;
+
         // Edit
 
             //- Set temperature and heat flux at specified patch

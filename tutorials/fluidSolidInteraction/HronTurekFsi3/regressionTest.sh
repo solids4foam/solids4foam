@@ -24,9 +24,15 @@ FY_TOL=1e-3
 # Note: the force references are the total force. They were previously the
 # total force plus the pressure force, as the extraction summed the OpenFOAM.com
 # total and pressure columns.
-REF_TIP_UY=-0.0006538
-REF_FX=-0.0391405
-REF_FY=-0.0416587
+# Reference values updated for the interface-normal correction (PR #375): the
+# fluid pressure is now applied using the deformed interface normals rather than
+# the initial-configuration ones, which shifts every FSI result. See
+# https://github.com/solids4foam/solids4foam/pull/375
+# The values are the midpoint of OpenFOAM-v2412, OpenFOAM-v2512 and
+# OpenFOAM-9; the spread across those is well inside the tolerances above.
+REF_TIP_UY=-0.00031014
+REF_FX=-0.0393827
+REF_FY=-0.0461165
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
