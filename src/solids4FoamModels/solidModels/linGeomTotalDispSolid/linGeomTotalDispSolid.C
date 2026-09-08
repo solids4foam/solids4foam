@@ -17,6 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+#include "enhancedVolPointInterpolation.H"
+#endif
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -673,14 +676,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
     }
     else
     {
-        if (useMechanicalConstitutiveLawManager_)
-        {
-            frameworkGrad(D, gradD);
-        }
-        else
-        {
-            mechanical().grad(D, gradD);
-        }
+        mechanical().grad(D, gradD);
     }
 
     // Calculate the stress using run-time selectable mechanical law.
@@ -735,15 +731,19 @@ Foam::scalar Foam::solidModels::linGeomTotalDispSolid::materialResidual()
 
 void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
 {
-    // The legacy path accumulates its per-step fields here
-    solidModel::updateTotalFields();
-
-    // The framework keeps its own state, and its laws may have end-of-step
-    // work or diagnostics. Nothing called this before, so those hooks were
-    // dead code
+    // One or the other, not both. The base call runs the legacy laws'
+    // end-of-step work, which is not the no-op it looks like -
+    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
+    // diagnostics there, and others recompute an effective stiffness. On a
+    // framework run those laws are never evaluated, so that work is done on
+    // stale inputs and read by nothing
     if (useMechanicalConstitutiveLawManager_)
     {
         mechanicalManager().endTimeStep();
+    }
+    else
+    {
+        solidModel::updateTotalFields();
     }
 }
 
@@ -1091,6 +1091,37 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 #endif
     );
 
+    // A multi-material framework run needs a material-aware gradient, and
+    // this refuses rather than warns.
+    //
+    // The framework replaces the legacy per-material subMesh machinery, so it
+    // computes one gradient on one mesh - which is only right if the scheme
+    // knows not to draw a cell's stencil across a material interface.
+    // leastSquaresS4f does; the ordinary schemes do not, and layeredPipe then
+    // puts the radial stress 0.0494 from the analytical solution against a
+    // tolerance of 0.03, where the material-aware scheme gives 0.0192.
+    //
+    // A warning would not do: the answer is wrong by more than the case's own
+    // tolerance, and silently so
+    if
+    (
+        useMechanicalConstitutiveLawManager_
+     && mechanicalManager().nLaws() > 1
+     && gradDScheme != "leastSquaresS4f"
+    )
+    {
+        FatalErrorIn(type() + "::" + type())
+            << "More than one material on the mechanicalConstitutiveLaw "
+            << "framework needs a material-aware gradient for grad("
+            << D().name() << "), and `" << gradDScheme << "` is not one."
+            << nl << nl
+            << "    The framework computes one gradient on one mesh in place "
+            << "of the legacy per-material subMeshes, which only works if the "
+            << "scheme keeps a cell's stencil within its own material. Set "
+            << "`grad(" << D().name() << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
+
     if
     (
         solutionAlg() == solutionAlgorithm::PETSC_SNES
@@ -1182,16 +1213,29 @@ void Foam::solidModels::linGeomTotalDispSolid::frameworkInterpolate
 )
 {
     // As above: the legacy interpolate() routes multiple materials through
-    // subMeshes. volToPoint() is the base-mesh interpolator it uses for a
-    // single material, and is what the framework wants for any number.
+    // subMeshes. The interpolator itself is not legacy - it is a
+    // mesh-registered singleton that mechanicalModel merely looks up - so it
+    // is fetched here directly rather than through that accessor.
     //
-    // foam-extend's interpolator has no gradient-corrected form, so there the
-    // legacy call is kept: it is the same base-mesh interpolation for a
-    // single material, and this model has no multi-material framework case on
-    // that fork
+    // foam-extend's has no gradient-corrected form, so there the legacy call
+    // is kept. That is a real limitation rather than a tidy fallback: on
+    // foam-extend a multi-material framework run would take this route and
+    // get the subMesh interpolation, so the combination is refused below
 #ifdef OPENFOAM_NOT_EXTEND
-    mechanical().volToPoint().interpolate(D, gradD, pointD);
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
 #else
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        FatalErrorInFunction
+            << "The constitutive-law framework does not support more than one "
+            << "material on foam-extend in this solid model." << nl << nl
+            << "    The point interpolation would fall back to the legacy "
+            << "per-material subMesh path, which is what the framework "
+            << "replaces, and this fork's interpolator has no "
+            << "gradient-corrected form to use instead."
+            << exit(FatalError);
+    }
+
     mechanical().interpolate(D, gradD, pointD);
 #endif
 }
@@ -1203,12 +1247,14 @@ void linGeomTotalDispSolid::setDeltaT(Time& runTime)
     if (solutionAlg() == solutionAlgorithm::EXPLICIT)
     {
         // Max wave speed in the domain
-        // impK_ and rho() are the model's own, so they follow whichever
-        // model is describing the material: impK_ comes from makeImpK, which
-        // branches on the framework. Asking mechanical() directly would size
-        // the explicit time step from the legacy stiffness on a framework
-        // run, and the two differ - (4/3)*mu against 2*mu for the mixed
-        // formulation, and whatever a ported law reports otherwise
+        // impK_ rather than mechanical().impK(): it comes from makeImpK,
+        // which branches on the framework, so an explicit run sizes its step
+        // from the stiffness it is actually solving with.
+        //
+        // rho() is NOT branched - solidModel::makeRho builds it from
+        // mechanical().rho() whatever model is active. That is left because
+        // the two agree by construction, both reading the same rho entry
+        // per material, and not because anything here checks it
         const scalar waveSpeed = max
         (
             Foam::sqrt(impK_/rho())

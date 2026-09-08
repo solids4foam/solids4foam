@@ -1273,6 +1273,12 @@ public:
         //- True if every law can separate its isochoric stress from its
         //  volumetric response. Asked rather than assumed by anything that
         //  wants to exercise the split without demanding it
+        //- How many materials this manager holds
+        label nLaws() const
+        {
+            return laws_.size();
+        }
+
         bool allLawsProvideVolumetricSplit() const;
 
         //- True if every law's split stress is a function of the isochoric

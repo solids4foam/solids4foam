@@ -2523,3 +2523,51 @@ for is covered rather than assumed.
 The quadrature gradients are left alone: they take a different overload, on
 packed per-cell storage, with no subMesh path to avoid.
 
+## 28. What a review of the gradient work found
+
+### 28.1 The refusal that was missing
+
+Removing the subMesh route made the wrong gradient scheme worse, not better.
+With the framework computing one gradient on one mesh, `layeredPipe` on a
+scheme that is not material-aware gives a radial stress error of 0.0494
+against a tolerance of 0.03 - where routing through the subMeshes gave 0.0305
+and the material-aware scheme gives 0.0192. That is the cost of drawing a
+cell's stencil across a material interface.
+
+So the combination is refused rather than warned about: more than one material
+on the framework, with `grad(D)` set to anything but `leastSquaresS4f`, stops
+at construction and says what to set. A warning would not do when the answer
+is wrong by more than the case's own tolerance.
+
+### 28.2 Three claims corrected
+
+**"setRestart and updateTotalFields are harmless because the legacy laws hold
+no state that anything reads."** Wrong on the reason.
+`linearElasticMohrCoulombPlastic::updateTotalFields` updates strain, plastic
+fields and diagnostics; others recompute an effective stiffness. On a
+framework run that work is done on stale inputs. Nothing reads it, so the
+answer was not wrong - but "no state" was false, and it is now one branch or
+the other rather than both.
+
+**"impK_ and rho() are the model's own, so they follow whichever model is
+active."** Half right. `impK_` does. `rho()` does not:
+`solidModel::makeRho` builds it from `mechanical().rho()` regardless. The two
+agree because both read the same `rho` entry per material, which is a reason
+to leave it and not a reason to have claimed it was branched.
+
+**The updated-Lagrangian mixed refusal is in `formResidual`, not at
+construction** as its comment said.
+
+### 28.3 What the sweep left
+
+`frameworkInterpolate` now fetches the point interpolator from the mesh
+directly rather than through `mechanical()`, since that accessor was only
+holding a mesh-registered singleton. On foam-extend there is no
+gradient-corrected form, so more than one material takes the subMesh route
+there - and that is now refused too rather than quietly taken.
+
+Still legacy, and deliberately: the quadrature gradients, which use a
+different overload that rejects more than one material anyway; the density,
+above; and `vertexCentredLinGeomSolid`, whose residual stress is legacy by
+design - it integrates the framework for the Jacobian tangent only, so
+keeping its gradient mapping is consistent rather than an oversight.

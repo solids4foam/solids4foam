@@ -17,6 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_NOT_EXTEND
+#include "enhancedVolPointInterpolation.H"
+#endif
 #include "nonLinGeomUpdatedLagSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -1135,16 +1138,29 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::frameworkInterpolate
 )
 {
     // As above: the legacy interpolate() routes multiple materials through
-    // subMeshes. volToPoint() is the base-mesh interpolator it uses for a
-    // single material, and is what the framework wants for any number.
+    // subMeshes. The interpolator itself is not legacy - it is a
+    // mesh-registered singleton that mechanicalModel merely looks up - so it
+    // is fetched here directly rather than through that accessor.
     //
-    // foam-extend's interpolator has no gradient-corrected form, so there the
-    // legacy call is kept: it is the same base-mesh interpolation for a
-    // single material, and this model has no multi-material framework case on
-    // that fork
+    // foam-extend's has no gradient-corrected form, so there the legacy call
+    // is kept. That is a real limitation rather than a tidy fallback: on
+    // foam-extend a multi-material framework run would take this route and
+    // get the subMesh interpolation, so the combination is refused below
 #ifdef OPENFOAM_NOT_EXTEND
-    mechanical().volToPoint().interpolate(D, gradD, pointD);
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
 #else
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        FatalErrorInFunction
+            << "The constitutive-law framework does not support more than one "
+            << "material on foam-extend in this solid model." << nl << nl
+            << "    The point interpolation would fall back to the legacy "
+            << "per-material subMesh path, which is what the framework "
+            << "replaces, and this fork's interpolator has no "
+            << "gradient-corrected form to use instead."
+            << exit(FatalError);
+    }
+
     mechanical().interpolate(D, gradD, pointD);
 #endif
 }
@@ -1380,7 +1396,9 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // hyperelastic law and fails for anything else - an active tension
         // along a fibre direction, say, whose spherical part the projection
         // discards and the pressure does not restore. The combination is
-        // refused at construction rather than solved approximately; see
+        // refused where the residual is formed - not at construction, as
+        // an earlier version of this comment said - rather than solved
+        // approximately; see
         // DESIGN-state-io.md section 26
         sigma() = dev(sigma()) - p*I;
 
@@ -1866,14 +1884,19 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     }
 #endif
 
-    solidModel::updateTotalFields();
-
-    // The framework keeps its own state, and its laws may have end-of-step
-    // work or diagnostics. Nothing called this before, so those hooks were
-    // dead code
+    // One or the other, not both. The base call runs the legacy laws'
+    // end-of-step work, which is not the no-op it looks like -
+    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
+    // diagnostics there, and others recompute an effective stiffness. On a
+    // framework run those laws are never evaluated, so that work is done on
+    // stale inputs and read by nothing
     if (useMechanicalConstitutiveLawManager_)
     {
         mechanicalManager().endTimeStep();
+    }
+    else
+    {
+        solidModel::updateTotalFields();
     }
 }
 
