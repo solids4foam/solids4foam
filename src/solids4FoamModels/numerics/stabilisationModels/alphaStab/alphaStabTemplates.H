@@ -25,7 +25,6 @@ License
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
-#ifndef FOAMEXTEND
 template<class GeoField, class SurfaceField>
 void Foam::alphaStab::computeDiffStencilHighOrder
 (
@@ -121,10 +120,17 @@ void Foam::alphaStab::computeDiffStencilHighOrder
 
         if (isA<processorFvPatch>(patch))
         {
+#ifdef FOAMEXTEND
+            const processorPolyPatch& procPatch =
+                refCast<const processorPolyPatch>(patch.patch());
+            const vectorField& neighbourCellCentres =
+                procPatch.neighbFaceCellCentres();
+#else
             const processorFvPatch& procPatch =
                 refCast<const processorFvPatch>(patch);
             const vectorField& neighbourCellCentres =
                 procPatch.procPolyPatch().neighbFaceCellCentres();
+#endif
             const labelUList& faceCells = patch.faceCells();
             const Field<Type>& patchNeighbourValue =
                 neighbourFaceValueBf[patchi];
@@ -166,7 +172,6 @@ void Foam::alphaStab::computeDiffStencilHighOrder
         }
     }
 }
-#endif
 
 
 template<class GeoField, class GradField, class SurfaceField>

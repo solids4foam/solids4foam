@@ -23,6 +23,7 @@ InClass
 #include "cantileverDisplacementFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -153,7 +154,6 @@ void Foam::cantileverDisplacementFvPatchVectorField::updateCoeffs()
 }
 
 
-#ifndef FOAMEXTEND
 Foam::autoPtr<Foam::CompactListList<Foam::vector>>
 Foam::cantileverDisplacementFvPatchVectorField::evaluateQuadrature
 () const
@@ -162,12 +162,14 @@ Foam::cantileverDisplacementFvPatchVectorField::evaluateQuadrature
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     // faceQuadPoints is list for whole mesh.
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
@@ -201,7 +203,6 @@ Foam::cantileverDisplacementFvPatchVectorField::evaluateQuadrature
 
     return tQuadPointsValue;
 }
-#endif
 
 
 void Foam::cantileverDisplacementFvPatchVectorField::write(Ostream& os) const

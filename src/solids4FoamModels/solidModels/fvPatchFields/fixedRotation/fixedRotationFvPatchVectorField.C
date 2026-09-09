@@ -398,7 +398,6 @@ gradientBoundaryCoeffs() const
 }
 
 
-#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 fixedRotationFvPatchVectorField::evaluateQuadrature() const
 {
@@ -406,7 +405,7 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     // already been moved by the accumulated displacement, so the quadrature
     // points lie in the configuration at the start of the time step and only
     // the increment of the rigid rotation is applied below
-    const bool incremental = (internalField().name() == "DD");
+    const bool incremental = (internalFieldName(*this) == "DD");
 
     if (incremental && (!angleSeries_.size() || originSeries_.size()))
     {
@@ -423,11 +422,13 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // faceQuadPoints is a list for the whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
@@ -440,7 +441,7 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     );
 
     // Get a reference to the actual data for easier access
-    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+    CompactListList<vector>& quadPointsValue = autoPtrRef(tQuadPointsValue);
 
     // Rotation angle applied to the current quadrature point positions
     // Note: rotationAngle_ and rotationOrigin_ are updated by updateCoeffs
@@ -495,7 +496,6 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
 
     return tQuadPointsValue;
 }
-#endif
 
 
 void fixedRotationFvPatchVectorField::write(Ostream& os) const

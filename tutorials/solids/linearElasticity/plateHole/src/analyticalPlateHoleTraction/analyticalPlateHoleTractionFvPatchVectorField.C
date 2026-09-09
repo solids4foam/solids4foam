@@ -26,6 +26,7 @@ License
 #include "fixedValueFvPatchFields.H"
 #include "lookupSolidModel.H"
 #include "plateHoleAnalyticalFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -172,7 +173,6 @@ void analyticalPlateHoleTractionFvPatchVectorField::updateCoeffs()
     solidTractionFvPatchVectorField::updateCoeffs();
 }
 
-#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 analyticalPlateHoleTractionFvPatchVectorField::evaluateQuadrature() const
 {
@@ -180,11 +180,13 @@ analyticalPlateHoleTractionFvPatchVectorField::evaluateQuadrature() const
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
@@ -227,7 +229,6 @@ analyticalPlateHoleTractionFvPatchVectorField::evaluateQuadrature() const
 
     return tQuadPointsValue;
 }
-#endif
 
 
 // Write
