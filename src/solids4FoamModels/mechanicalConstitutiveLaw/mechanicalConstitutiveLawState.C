@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "mechanicalConstitutiveLawState.H"
+#include "compatibilityFunctions.H"
 
 namespace Foam
 {
@@ -280,44 +281,41 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 
     size_ = newSize;
 
-    forAllIter
-    (
-        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
-    )
+    forAllIters(children_, citer)
     {
         citer()->setSize(newSize);
     }
 
-    forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields_, iter)
+    forAllIters(scalarFields_, iter)
     {
         iter()->setSize(newSize, pTraits<scalar>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields_, iter)
+    forAllIters(vectorFields_, iter)
     {
         iter()->setSize(newSize, pTraits<vector>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields_, iter)
+    forAllIters(tensorFields_, iter)
     {
         iter()->setSize(newSize, pTraits<tensor>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields_, iter)
+    forAllIters(symmTensorFields_, iter)
     {
         iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 
-    forAllIter(HashTable<autoPtr<Field<scalar>>>, scalarFields0_, iter)
+    forAllIters(scalarFields0_, iter)
     {
         iter()->setSize(newSize, pTraits<scalar>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<vector>>>, vectorFields0_, iter)
+    forAllIters(vectorFields0_, iter)
     {
         iter()->setSize(newSize, pTraits<vector>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<tensor>>>, tensorFields0_, iter)
+    forAllIters(tensorFields0_, iter)
     {
         iter()->setSize(newSize, pTraits<tensor>::zero);
     }
-    forAllIter(HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields0_, iter)
+    forAllIters(symmTensorFields0_, iter)
     {
         iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
@@ -331,20 +329,13 @@ void mechanicalConstitutiveLawState::storeOldTime()
     // A composite's history lives in its children, so the rollover has to
     // reach them; otherwise a sub-law would read this step's values as though
     // they were last step's
-    forAllIter
-    (
-        HashTable<autoPtr<mechanicalConstitutiveLawState>>, children_, citer
-    )
+    forAllIters(children_, citer)
     {
         citer()->storeOldTime();
     }
 
     // Scalars
-#ifdef OPENFOAM_COM
     forAllConstIters(scalarFields0_, iter)
-#else
-    forAllConstIter(HashTable<autoPtr<Field<scalar>>>, scalarFields0_, iter)
-#endif
     {
         const word& name = iter.key();
         if (!scalarFields_.found(name))
@@ -358,11 +349,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // Vectors
-#ifdef OPENFOAM_COM
     forAllConstIters(vectorFields0_, iter)
-#else
-    forAllConstIter(HashTable<autoPtr<Field<vector>>>, vectorFields0_, iter)
-#endif
     {
         const word& name = iter.key();
         if (!vectorFields_.found(name))
@@ -376,11 +363,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // Tensors
-#ifdef OPENFOAM_COM
     forAllConstIters(tensorFields0_, iter)
-#else
-    forAllConstIter(HashTable<autoPtr<Field<tensor>>>, tensorFields0_, iter)
-#endif
     {
         const word& name = iter.key();
         if (!tensorFields_.found(name))
@@ -394,14 +377,7 @@ void mechanicalConstitutiveLawState::storeOldTime()
     }
 
     // SymmTensors
-#ifdef OPENFOAM_COM
     forAllConstIters(symmTensorFields0_, iter)
-#else
-    forAllConstIter
-    (
-        HashTable<autoPtr<Field<symmTensor>>>, symmTensorFields0_, iter
-    )
-#endif
     {
         const word& name = iter.key();
         if (!symmTensorFields_.found(name))

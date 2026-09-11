@@ -56,8 +56,8 @@ Description
     framework switch, so it cannot reach this. It does already carry a penalty
     term in its pressure equation - fvm::Sp(rKappa_, Dp_) with rKappa_ = 1/K -
     which is a reason to expect the shapes to match when that solid model is
-    ported rather than evidence that they do. DESIGN-state-io.md section 25.2
-    records the linearisation question that comes with it.
+    ported rather than evidence that they do. How that term is linearised is
+    an open question that comes with the port.
 
     The local basis is prescribed state. A case supplies Ec and Ea fields -
     calcLocCoordinates writes them - and a case whose fibres are the same

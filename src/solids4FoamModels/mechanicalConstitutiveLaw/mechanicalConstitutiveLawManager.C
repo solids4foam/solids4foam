@@ -403,21 +403,6 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 }
 
 
-const Foam::integrationPointTopology&
-Foam::mechanicalConstitutiveLawManager::compactFaceTopologyFor
-(
-    const CompactListList<tensor>& layout
-) const
-{
-    FatalErrorInFunction
-        << "compactFaceTopologyFor is not yet implemented"
-        << exit(FatalError);
-
-    // Dummy return to silence compiler warnings
-    return topologyFor(cellCentredIntegrationPointTopology::typeName);
-}
-
-
 Foam::mechanicalConstitutiveLawManager::topologyEntry&
 Foam::mechanicalConstitutiveLawManager::topology
 (
@@ -1488,10 +1473,7 @@ void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
         }
 
         // Loop over all topology entries
-        forAllIter
-        (
-            HashTable<autoPtr<topologyEntry>>, topologyEntries_, topoIter
-        )
+        forAllIters(topologyEntries_, topoIter)
         {
             topologyEntry& entry = topoIter()();
 
@@ -1731,7 +1713,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     lawCells_.setSize(lawEntries.size());
     lawBoundaryFaces_.setSize(lawEntries.size());
 
-    // Look list of law names
+    // Build the list of law names
     wordList lawNames(lawEntries.size());
     forAll(lawNames, lawI)
     {
@@ -1794,8 +1776,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
             mechanicalConstitutiveLaw::New(lawDict)
         );
 
-        if (laws_.size() == 1)
+        if (lawNames.size() == 1)
         {
+            // A single law covers the whole domain, so no cellZone is needed
             lawCells_[lawI] = Foam::identity(mesh_.nCells());
         }
         else // more than one material law
@@ -1857,7 +1840,10 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         {
             const labelList& faceCells = mesh.boundary()[patchI].faceCells();
 
-            labelHashSet curFaceSet;
+            // Collected in ascending face order: the boundary constitutive
+            // state is indexed by position in this list, so the order must be
+            // reproducible
+            DynamicList<label> curFaces(faceCells.size());
 
             forAll(faceCells, faceI)
             {
@@ -1865,11 +1851,11 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 
                 if (cellToLaw[cellID] == lawI)
                 {
-                    curFaceSet.insert(faceI);
+                    curFaces.append(faceI);
                 }
             }
 
-            lawBoundaryFaces_[lawI][patchI] = curFaceSet.toc();
+            lawBoundaryFaces_[lawI][patchI].transfer(curFaces);
         }
     }
 }
@@ -2915,7 +2901,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         Foam::primitiveField(gradD0),
         dt,
         Foam::primitiveFieldRef(stress),
-        scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
+        scalarTangentPtr
+      ? &Foam::primitiveFieldRef(*scalarTangentPtr)
+      : nullptr,
         nullptr,
         tangentReq,
         false,          // commit the constitutive state
@@ -2927,12 +2915,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     topologyEntry& tp = topology(topo);
 
-    forAll(laws_, lawI)
+    // Optionally, update the boundary field
+    // Boundary constitutive response uses independent state objects, allowing
+    // history-dependent laws to operate correctly on boundary faces
+    if (tp.boundaryAware_)
     {
-        // Optionally, update the boundary field
-        // Boundary constitutive response uses independent state objects,
-        // allowing history-dependent laws to operate correctly on boundary faces.
-        if (tp.boundaryAware_)
+        forAll(laws_, lawI)
         {
             forAll(gradD.boundaryField(), patchI)
             {
@@ -3148,7 +3136,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 }
                 else if (collapseRule == stressCollapseRule::harmonic)
                 {
-                    (*tangentWeightPtr)[faceI] += 1.0/K;
+                    (*tangentWeightPtr)[faceI] += 1.0/max(K, SMALL);
                 }
                 else
                 {
@@ -3168,7 +3156,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
         // Optionally, update the boundary field
         // Boundary constitutive response uses independent state objects,
-        // allowing history-dependent laws to operate correctly on boundary faces.
+        // allowing history-dependent laws to operate correctly on boundary
+        // faces
         if (tp.boundaryAware_)
         {
             forAll(gradD.boundaryField(), patchI)
@@ -3264,8 +3253,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             }
             else if (collapseRule == stressCollapseRule::harmonic)
             {
-                // Harmonicaly average the tangent
-                (*scalarTangentPtr)[faceI] = w/(*tangentWeightPtr)[faceI];
+                // Harmonically average the tangent
+                (*scalarTangentPtr)[faceI] =
+                    w/max((*tangentWeightPtr)[faceI], SMALL);
             }
             else
             {
@@ -3446,7 +3436,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // that are genuinely additive. Neither is written, and nothing calls
     // either collapse overload today - no solid model does, and the
     // vertex-centred models evaluate on dual-mesh faces with no collapse - so
-    // this refuses rather than guessing. See DESIGN-state-io.md section 24.1
+    // this refuses rather than guessing
     if (Pstream::parRun())
     {
         FatalErrorInFunction
@@ -3623,7 +3613,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         Foam::primitiveField(J0),
         dt,
         Foam::primitiveFieldRef(stress),
-        scalarTangentPtr ? &Foam::primitiveFieldRef(*scalarTangentPtr) : nullptr,
+        scalarTangentPtr
+      ? &Foam::primitiveFieldRef(*scalarTangentPtr)
+      : nullptr,
         nullptr,
         tangentReq,
         false,          // commit the constitutive state
@@ -3634,87 +3626,100 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     topologyEntry& tp = topology(topo);
 
-    forAll(laws_, lawI)
+    // Optionally, update the boundary field
+    // Boundary constitutive response uses independent state objects, allowing
+    // history-dependent laws to operate correctly on boundary faces
+    if (tp.boundaryAware_)
     {
-        // Update the boundary field
-        // Boundary constitutive response uses independent state objects,
-        // allowing history-dependent laws to operate correctly on boundary faces.
-        forAll(F.boundaryField(), patchI)
+        forAll(laws_, lawI)
         {
-            if (!F.boundaryField()[patchI].coupled())
+            forAll(F.boundaryField(), patchI)
             {
-                // Select all faces on the patch for which the adjacent cell is
-                // in this material
-                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+                if (!F.boundaryField()[patchI].coupled())
+                {
+                    // Select all faces on the patch whose adjacent cell is
+                    // in this material
+                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
 
-                // "View" into the J for this material => does not copy data
-                const UIndirectList<scalar> JView
-                (
-                    J.boundaryField()[patchI], faces
-                );
+                    if
+                    (
+                        faces.empty()
+                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                    )
+                    {
+                        continue;
+                    }
 
-                // "View" into the J0 for this material => does not copy data
-                const UIndirectList<scalar> J0View
-                (
-                    J0.boundaryField()[patchI], faces
-                );
 
-                // "View" into the F for this material => does not copy data
-                const UIndirectList<tensor> FView
-                (
-                    F.boundaryField()[patchI], faces
-                );
+                    // "View" into the J for this material => does not copy data
+                    const UIndirectList<scalar> JView
+                    (
+                        J.boundaryField()[patchI], faces
+                    );
 
-                // "View" into the F0 for this material => does not copy data
-                const UIndirectList<tensor> F0View
-                (
-                    F0.boundaryField()[patchI], faces
-                );
+                    // "View" into the J0 for this material => does not copy data
+                    const UIndirectList<scalar> J0View
+                    (
+                        J0.boundaryField()[patchI], faces
+                    );
 
-                // "View" into the Finv for this material => does not copy data
-                const UIndirectList<tensor> FinvView
-                (
-                    Finv.boundaryField()[patchI], faces
-                );
+                    // "View" into the F for this material => does not copy data
+                    const UIndirectList<tensor> FView
+                    (
+                        F.boundaryField()[patchI], faces
+                    );
 
-                // "View" into the Finv0 for this material => does not copy data
-                const UIndirectList<tensor> Finv0View
-                (
-                    Finv0.boundaryField()[patchI], faces
-                );
+                    // "View" into the F0 for this material => does not copy data
+                    const UIndirectList<tensor> F0View
+                    (
+                        F0.boundaryField()[patchI], faces
+                    );
 
-                // "View" into the stress for this material => does not copy data
-                UIndirectList<symmTensor> stressView
-                (
-                    Foam::boundaryFieldRef(stress)[patchI], faces
-                );
+                    // "View" into the Finv for this material => does not copy data
+                    const UIndirectList<tensor> FinvView
+                    (
+                        Finv.boundaryField()[patchI], faces
+                    );
 
-                // Create wrapper for kinematic data: input to material law
-                // This does not copy data
-                finiteStrainMechanicalConstitutiveLawKinematics kin
-                (
-                    FView, F0View, JView, J0View, FinvView, Finv0View
-                );
+                    // "View" into the Finv0 for this material => does not copy data
+                    const UIndirectList<tensor> Finv0View
+                    (
+                        Finv0.boundaryField()[patchI], faces
+                    );
 
-                // This path computes no fourth-order tangent, so none is
-                // offered
-                evaluateResponse
-                (
-                    laws_[lawI],
-                    kin,
-                    inputs,
-                    tp.boundaryStates_[lawI][patchI],
-                    stressView,
-                    faces,
-                    scalarTangentPtr
-                  ? &scalarTangentPtr->boundaryField()[patchI]
-                  : nullptr,
-                    static_cast<const UList<mat66>*>(nullptr),
-                    tangentReq,
-                    volumetricResponsePtr
-                  ? &volumetricResponsePtr->boundaryField()[patchI]
-                  : nullptr
-                );
+                    // "View" into the stress for this material => does not copy data
+                    UIndirectList<symmTensor> stressView
+                    (
+                        Foam::boundaryFieldRef(stress)[patchI], faces
+                    );
+
+                    // Create wrapper for kinematic data: input to material law
+                    // This does not copy data
+                    finiteStrainMechanicalConstitutiveLawKinematics kin
+                    (
+                        FView, F0View, JView, J0View, FinvView, Finv0View
+                    );
+
+                    // This path computes no fourth-order tangent, so none is
+                    // offered
+                    evaluateResponse
+                    (
+                        laws_[lawI],
+                        kin,
+                        inputs,
+                        tp.boundaryStates_[lawI][patchI],
+                        stressView,
+                        faces,
+                        scalarTangentPtr
+                      ? &scalarTangentPtr->boundaryField()[patchI]
+                      : nullptr,
+                        static_cast<const UList<mat66>*>(nullptr),
+                        tangentReq,
+                        volumetricResponsePtr
+                      ? &volumetricResponsePtr->boundaryField()[patchI]
+                      : nullptr
+                    );
+                }
             }
         }
     }

@@ -56,7 +56,7 @@ namespace Foam
     //- For each internal face, whether it lies between two different materials
     tmp<Field<bool>> cellZoneInterface
     (
-        const fvMesh& mesh, const bool debug = true
+        const fvMesh& mesh, const bool debug = false
     );
 
     //- For each face of a coupled patch, whether the cell on the other side
