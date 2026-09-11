@@ -148,7 +148,7 @@ Foam::fixedValueCorrectedFvPatchScalarField::gradientBoundaryCoeffs() const
 
 void Foam::fixedValueCorrectedFvPatchScalarField::write(Ostream& os) const
 {
-    fvPatchField<scalar>::write(os);
+    fixedValueFvPatchScalarField::write(os);
 
     os.writeKeyword("nonOrthogonalCorrections")
         << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
