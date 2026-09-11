@@ -78,7 +78,7 @@ class integrationPointTopology;
 class CompactListListBase;
 struct mat66;
 
-/*---------------------------------------------------------------------------* \
+/*---------------------------------------------------------------------------*\
               Class mechanicalConstitutiveLawManager Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -89,7 +89,7 @@ class mechanicalConstitutiveLawManager
         //- Reference to mesh
         const fvMesh& mesh_;
 
-        //- Pointer to the ooint mesh, if needed
+        //- Pointer to the point mesh, if needed
         mutable const pointMesh* pMeshPtr_;
 
         //- Current time index so we can track when there is a new time step
@@ -207,8 +207,8 @@ class mechanicalConstitutiveLawManager
                 FatalError
                     << "Field '" << fieldName << "' is associated with a "
                     << "different mesh." << nl
-                    << "Expected mesh address: " << expectedMesh.name() << nl
-                    << "Field mesh address:    " << fieldMesh.name()
+                    << "Expected mesh: " << expectedMesh.name() << nl
+                    << "Field mesh:    " << fieldMesh.name()
                     << exit(FatalError);
             }
         }
@@ -287,15 +287,6 @@ class mechanicalConstitutiveLawManager
         //  for the lifetime of the manager.
         //  The layout is used only for addressing; the value type is irrelevant
         const integrationPointTopology& compactCellTopologyFor
-        (
-            const CompactListList<tensor>& layout
-        ) const;
-
-        //- Return (and lazily construct) a compact face-based integration-point
-        //  topology inferred from a CompactListList layout.
-        //  Intended for discretisations with face-based integration points.
-        //  The layout is used only for addressing; the value type is irrelevant
-        const integrationPointTopology& compactFaceTopologyFor
         (
             const CompactListList<tensor>& layout
         ) const;
@@ -548,9 +539,11 @@ public:
 
         //- Update the engineering (small-strain) stress field stored on mesh
         //  faces using the configured mechanical constitutive laws.
-        //  Unlike cell-based approach, faces can appear in more than one
-        //  material law (e.g., material interface), so a stress "collapse" rule
-        //  must be defined to specify how the multiple stresses are combined
+        //  Unlike the cell-based approach, a face can belong to more than one
+        //  material law (e.g. at a material interface), so a stress "collapse"
+        //  rule says how the multiple contributions are combined.
+        //  Note: the collapse rule currently governs the tangent only; the
+        //  stress is always collapsed as an arithmetic mean
         void updateStressSmallStrain
         (
             const surfaceTensorField& gradD,
@@ -564,10 +557,12 @@ public:
         );
 
         //- Update the engineering (small-strain) stress field stored on mesh
-        //  faces using the configured mechanical constitutive laws.
-        //  Unlike cell-based approach, points can appear in more than one
-        //  material law (e.g., material interface), so a stress "collapse" rule
-        //  must be defined to specify how the multiple stresses are combined
+        //  points using the configured mechanical constitutive laws.
+        //  Unlike the cell-based approach, a point can belong to more than one
+        //  material law (e.g. at a material interface), so a stress "collapse"
+        //  rule says how the multiple contributions are combined.
+        //  Note: the collapse rule currently governs the tangent only; the
+        //  stress is always collapsed as an arithmetic mean
         void updateStressSmallStrain
         (
             const pointTensorField& gradD,
@@ -627,31 +622,6 @@ public:
             volScalarField* scalarTangentPtr = nullptr,
             const tangentRequest tangentReq = tangentRequest::none
         );
-
-        //- Update the true (Cauchy) stress field stored on mesh faces using the
-        //  configured mechanical constitutive laws for a finite-strain formulation.
-        //  This interface is intended for  discretisations where stresses are
-        //  evaluated at face-based integration points.
-        //  The stress is evaluated from the current and previous deformation
-        //  gradients, their inverses, determinants, and the supplied time
-        //  increment, and is updated in-place.
-        //  Constitutive history variables are stored and updated internally via
-        //  mechanicalConstitutiveLawState objects.
-        //  Optionally computes an approximate scalar material tangent when
-        //  requested.
-        // void updateStressFiniteStrain
-        // (
-        //     const surfaceTensorField& F,
-        //     const surfaceTensorField& F0,
-        //     const surfaceScalarField& J,
-        //     const surfaceScalarField& J0,
-        //     const surfaceTensorField& Finv,
-        //     const surfaceTensorField& Finv0,
-        //     const scalar dt,
-        //     surfaceSymmTensorField& stress,
-        //     surfaceScalarField* scalarTangentPtr = nullptr,
-        //     const tangentRequest tangentReq = tangentRequest::none
-        // );
 
         //- Update the true (Cauchy) stress values stored in a compact
         //  integration-point layout using the configured mechanical

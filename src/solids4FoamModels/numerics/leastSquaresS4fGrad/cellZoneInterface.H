@@ -30,6 +30,7 @@ Author
 #define cellZoneInterface_H
 
 #include "boolList.H"
+#include "fvMesh.H"
 #include "compatibilityFunctions.H"
 
 
@@ -38,11 +39,12 @@ Author
 namespace Foam
 {
 
-    //- Return a boolList indicating, for each internal face, if it
-    //  straddles two cell zones (true) or not (false)
+    //- Return a field indicating, for each internal face, whether it
+    //  straddles two cell zones (true) or not (false).
+    //  Every face is false if the mesh has fewer than two cell zones
     tmp<Field<bool>> cellZoneInterface
     (
-        const fvMesh& mesh, const bool debug = true
+        const fvMesh& mesh, const bool debug = false
     );
 
 } // End namespace Foam

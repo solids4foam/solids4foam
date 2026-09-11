@@ -68,7 +68,6 @@ Author
 #ifndef finiteStrainMechanicalConstitutiveLawKinematics_H
 #define finiteStrainMechanicalConstitutiveLawKinematics_H
 
-#include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "UIndirectList.H"
 #include "tensor.H"
 #include "symmTensor.H"

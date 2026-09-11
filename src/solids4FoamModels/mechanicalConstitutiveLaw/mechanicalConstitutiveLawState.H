@@ -27,8 +27,23 @@ Description
     hardening variables, or internal inelastic measures.
 
     State variables are stored as typed Field<T> objects indexed by name.
-    Fields are created lazily on first access unless explicitly queried
-    via get-only accessors.
+
+    Each type has two families of accessor, and the difference between them
+    matters:
+
+      - scalarField(name), vectorField(name), ... : the non-const overloads
+        create the field, zero-initialised and sized to size(), if it is not
+        already there. These are for the law's initialiseState(), where the
+        history variables are declared.
+
+      - getScalarField(name), getVectorField(name), ... : never create. A
+        name that is not there is a fatal error. These are for the evaluation
+        path, where creating a field would silently discard the history
+        instead of reporting a typo.
+
+    The const overloads of the first family behave as the second: a const
+    state cannot create anything. The get-prefixed names exist so that the
+    no-create intent can also be expressed on a non-const state.
 
     Both current-time and old-time storage are supported to enable implicit
     time integration and consistent return mapping algorithms.
@@ -47,7 +62,8 @@ Author
 #ifndef mechanicalConstitutiveLawState_H
 #define mechanicalConstitutiveLawState_H
 
-#include "mechanicalConstitutiveLawState.H"
+#include "HashTable.H"
+#include "autoPtr.H"
 #include "UIndirectList.H"
 #include "Field.H"
 #include "tensor.H"
@@ -80,6 +96,7 @@ class mechanicalConstitutiveLawState
         HashTable<autoPtr<Field<tensor>>> tensorFields0_;
         HashTable<autoPtr<Field<symmTensor>>> symmTensorFields0_;
 
+        //- Number of integration points each state field is sized to
         label size_;
 
 
@@ -156,7 +173,7 @@ public:
         Field<scalar>& scalarField0(const word& name);
         const Field<scalar>& scalarField0(const word& name) const;
 
-        // Get-only (no creation)
+        //- Get-only: fatal if the field has not been created
         const Field<scalar>& getScalarField(const word& name) const;
         const Field<scalar>& getScalarField0(const word& name) const;
 
@@ -169,6 +186,7 @@ public:
         Field<vector>& vectorField0(const word& name);
         const Field<vector>& vectorField0(const word& name) const;
 
+        //- Get-only: fatal if the field has not been created
         const Field<vector>& getVectorField(const word& name) const;
         const Field<vector>& getVectorField0(const word& name) const;
 
@@ -181,6 +199,7 @@ public:
         Field<tensor>& tensorField0(const word& name);
         const Field<tensor>& tensorField0(const word& name) const;
 
+        //- Get-only: fatal if the field has not been created
         const Field<tensor>& getTensorField(const word& name) const;
         const Field<tensor>& getTensorField0(const word& name) const;
 
@@ -193,6 +212,7 @@ public:
         Field<symmTensor>& symmTensorField0(const word& name);
         const Field<symmTensor>& symmTensorField0(const word& name) const;
 
+        //- Get-only: fatal if the field has not been created
         const Field<symmTensor>& getSymmTensorField(const word& name) const;
         const Field<symmTensor>& getSymmTensorField0(const word& name) const;
 };

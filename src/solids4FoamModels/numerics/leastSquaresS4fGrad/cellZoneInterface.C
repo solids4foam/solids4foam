@@ -29,8 +29,8 @@ namespace Foam
     //  straddles two cell zones (true) or not (false)
     tmp<Field<bool>> cellZoneInterface(const fvMesh& mesh, const bool debug)
     {
-        // Create a field indicating internal faces on bi-material interfaces; that
-        // is, they straddle two contiguous cell zones
+        // Create a field indicating internal faces on bi-material
+        // interfaces; that is, they straddle two contiguous cell zones
 
         // Set local references to mesh data
         const labelUList& owner = mesh.owner();
@@ -54,9 +54,10 @@ namespace Foam
                     if (cellZoneID[cellID] != -1)
                     {
                         FatalErrorInFunction
-                            << "Cell " << cellID << " is in more than on cell zone!"
-                            << nl << "It is in cells zones " << cellZoneID[cellID]
-                            << " and " << cI << exit(FatalError);
+                            << "Cell " << cellID
+                            << " is in more than one cell zone!" << nl
+                            << "It is in cell zones " << cellZoneID[cellID]
+                            << " and " << czI << exit(FatalError);
                     }
 
                     cellZoneID[cellID] = czI;
@@ -88,8 +89,8 @@ namespace Foam
             if (debug)
             {
                 InfoInFunction
-                    << nl << "There are " << nInterfaceFaces << " faces on an interface"
-                    << nl << endl;
+                    << nl << "There are " << nInterfaceFaces
+                    << " faces on an interface" << nl << endl;
             }
 
             if (Pstream::parRun())

@@ -264,19 +264,23 @@ when explicitly requested by a client. The manager does not retain a universal
 coefficient for a solid model. The caller owns the requested tangent storage,
 chooses when it is refreshed, and decides how it enters its linearisation.
 
-This question is resolved in `DESIGN-tangents.md`. In summary: the solid model
-owns its implicit stiffness fields (`impK`, `impKf`, `rImpK`) and obtains their
-values from this framework via `tangentRequest::scalar`; the fidelity of the
-material tangent used in the Jacobian is a separate, per-solid-model dictionary
-choice. The stabilisation model supplies the discrete operator, never the
-coefficient, so the two are never additively combined.
+The division of responsibility is: the solid model owns its implicit stiffness
+fields (`impK`, `impKf`, `rImpK`) and obtains their values from this framework
+via `tangentRequest::scalar`; the fidelity of the material tangent used in the
+Jacobian is a separate, per-solid-model dictionary choice. The stabilisation
+model supplies the discrete operator, never the coefficient, so the two are
+never additively combined.
 
-Supported current requests include:
+The available requests are the `tangentRequest` enumeration:
 
-- requested explicitly by the solver,
-- computed only when needed,
-- scalar tangents suitable for segregated or mixed formulations,
-- fourth-order tangents where the selected update interface supports them.
+- `none`: stress only,
+- `scalar` and `scalarDeviatoric`: scalar tangents suitable for segregated or
+  mixed formulations,
+- `fourthOrder` and `fourthOrderFiniteDifference`: full 6x6 Voigt tangents,
+  where the selected update interface and topology support them.
+
+A tangent is computed only when it is asked for, and the caller owns the
+storage it is written into.
 
 ---
 
@@ -328,6 +332,7 @@ Planned extensions include:
 - a dual-face integration point topology for the vertex-centred solid models,
 - a law-defined hydrostatic response for mixed displacement-pressure solvers.
 
-See `DESIGN-tangents.md` for the design that resolves how solid models obtain
-material stiffness for their residual and their Jacobian, and for the staged
-plan by which solid models adopt this framework.
+Solid models adopt this framework incrementally: a model first takes only its
+Jacobian tangent from the manager, via `updateTangentSmallStrain`, while its
+residual stress still comes from the legacy `mechanicalModel`; the residual
+follows once the model's own integration-point topology is in place.

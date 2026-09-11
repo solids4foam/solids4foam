@@ -64,7 +64,6 @@ Author
 #ifndef smallStrainMechanicalConstitutiveLawKinematics_H
 #define smallStrainMechanicalConstitutiveLawKinematics_H
 
-#include "smallStrainMechanicalConstitutiveLawKinematics.H"
 #include "UIndirectList.H"
 #include "tensor.H"
 #include "symmTensor.H"
