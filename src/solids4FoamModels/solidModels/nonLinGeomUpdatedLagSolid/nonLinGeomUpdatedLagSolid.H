@@ -87,14 +87,6 @@ class nonLinGeomUpdatedLagSolid
         //- Acceleration
         volVectorField A_;
 
-        //- Take the implicit stiffness from the mechanicalConstitutiveLaw
-        //  framework rather than from the legacy mechanicalModel.
-        //  Declared before impK_ because makeImpK() consults it
-        const Switch useMechanicalConstitutiveLawManager_;
-
-        //- The mechanicalConstitutiveLaw framework, built on demand
-        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
-
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -156,21 +148,17 @@ class nonLinGeomUpdatedLagSolid
         //- Allocate the reciprocal of the bulk modulus
         void makeRKappa() const;
 
-        //- Return const access to the reciprocal of the bulk modulus
-        //- The mechanicalConstitutiveLaw framework, built on first use
-        mechanicalConstitutiveLawManager& mechanicalManager() const;
-
         //- Inverse of the total deformation gradient, needed by the
         //  framework and not otherwise kept by this solver. Built on first use
         mutable autoPtr<volTensorField> FinvPtr_;
 
         //- Update the cell-centred stress, from the framework when
-        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  the framework is in use and from the legacy
         //  mechanicalModel otherwise
         void correctStress();
 
         //- Update the stress at the face quadrature points, from the framework
-        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  when the framework is in use and from the
         //  legacy mechanicalModel otherwise.
         //  The high-order face quadrature does not exist on foam-extend
 #ifndef FOAMEXTEND
@@ -187,13 +175,14 @@ class nonLinGeomUpdatedLagSolid
 #endif
 
         //- Construct impK from the framework when
-        //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
+        //  the framework is in use, and from the legacy
         //  mechanicalModel otherwise
         tmp<volScalarField> makeImpK() const;
 
         //- Construct impKf to match whichever impK was built
         tmp<surfaceScalarField> makeImpKf() const;
 
+        //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
 
         //- Enforce traction boundary conditions on the provided traction field
@@ -213,15 +202,6 @@ class nonLinGeomUpdatedLagSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-        //- Gradient, computed directly rather than through the legacy
-        //  mechanicalModel's per-material subMeshes. See the note on the
-        //  definition: the subMesh path is what the framework replaces
-        void frameworkGrad
-        (
-            const volVectorField& D,
-            volTensorField& gradD
-        ) const;
-
         //- Point interpolation, likewise on the base mesh
         void frameworkInterpolate
         (
@@ -333,11 +313,11 @@ public:
                 const fvPatch& patch
             ) const;
 
-            //- Update total accumulated fields
             //- Material residual, zero on the framework path: see the
             //  base class declaration
             virtual scalar materialResidual() override;
 
+            //- Update total accumulated fields
             virtual void updateTotalFields();
 };
 

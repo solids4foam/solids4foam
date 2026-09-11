@@ -512,23 +512,6 @@ void vertexCentredLinGeomSolid::makeFixedDofRowsIS() const
 #endif // USE_PETSC
 
 
-mechanicalConstitutiveLawManager&
-vertexCentredLinGeomSolid::mechanicalManager() const
-{
-    if (mechanicalManagerPtr_.empty())
-    {
-        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
-        // both frameworks are built from exactly the same entries
-        mechanicalManagerPtr_.set
-        (
-            new mechanicalConstitutiveLawManager(mesh(), mechanical())
-        );
-    }
-
-    return mechanicalManagerPtr_();
-}
-
-
 const integrationPointTopology&
 vertexCentredLinGeomSolid::dualFaceTopology() const
 {
@@ -848,14 +831,6 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
             dualMeshMap().dualFaceToCell()
         )
     ),
-    useMechanicalConstitutiveLawManager_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "useMechanicalConstitutiveLawManager", false
-        )
-    ),
-    mechanicalManagerPtr_(),
     dualFaceTopologyPtr_(nullptr),
     blockSize_
     (
@@ -1372,7 +1347,7 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (jacTangent == tangentRequest::scalar)
     {
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             // Scalar tangent at the internal dual faces, taken from the
             // constitutive law framework. A tangent query does not disturb
@@ -1454,7 +1429,7 @@ label vertexCentredLinGeomSolid::formJacobian
         // iterates dualMesh.owner()
         List<mat66> materialTangent(dualMesh().nInternalFaces());
 
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             mechanicalManager().updateTangentSmallStrain
             (

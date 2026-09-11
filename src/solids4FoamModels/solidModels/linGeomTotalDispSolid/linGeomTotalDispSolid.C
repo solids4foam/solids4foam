@@ -60,7 +60,7 @@ void linGeomTotalDispSolid::predict()
     D() = D().oldTime() + U()*runTime().deltaT();
 
     // Update gradient of displacement
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         frameworkGrad(D(), gradD());
     }
@@ -77,7 +77,7 @@ void linGeomTotalDispSolid::predict()
     // stress that is missing a term rather than an approximate total one.
     // The legacy path is left alone deliberately: it already has a total
     // stress here, and this is only a starting point for the solve
-    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    if (useMechanicalConstitutiveLawManager() && solvePressure())
     {
         replaceVolumetricStress(p());
     }
@@ -180,7 +180,7 @@ void linGeomTotalDispSolid::replaceVolumetricStress(const volScalarField& p)
     // is right only where what remains is trace free.
     //
     // In one place because there is more than one caller
-    if (useMechanicalConstitutiveLawManager_ && solvePressure())
+    if (useMechanicalConstitutiveLawManager() && solvePressure())
     {
         sigma() = sigma() - p*I;
     }
@@ -423,7 +423,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             DD() = D() - D().oldTime();
 
             // Update gradient of displacement
-            if (useMechanicalConstitutiveLawManager_)
+            if (useMechanicalConstitutiveLawManager())
             {
                 frameworkGrad(D(), gradD());
             }
@@ -457,7 +457,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         );
 
         // Interpolate cell displacements to vertices
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             frameworkInterpolate(D(), gradD(), pointD());
         }
@@ -562,7 +562,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
     else
     {
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             frameworkGrad(D(), gradD());
         }
@@ -573,7 +573,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
 
     // Interpolate cell displacements to vertices
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         frameworkInterpolate(D(), gradD(), pointD());
     }
@@ -670,7 +670,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
     }
 
     // Update gradient of displacement
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         frameworkGrad(D, gradD);
     }
@@ -710,7 +710,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
 
 Foam::scalar Foam::solidModels::linGeomTotalDispSolid::materialResidual()
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         return mechanical().residual();
     }
@@ -737,7 +737,7 @@ void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
     // diagnostics there, and others recompute an effective stiffness. On a
     // framework run those laws are never evaluated, so that work is done on
     // stale inputs and read by nothing
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         mechanicalManager().endTimeStep();
     }
@@ -752,7 +752,7 @@ void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
 #ifndef FOAMEXTEND
 void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         mechanical().correct(gradDQuad(), sigmaQuad());
         return;
@@ -777,7 +777,7 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
 
 void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         mechanical().correct(sigma());
         return;
@@ -820,23 +820,6 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 }
 
 
-Foam::mechanicalConstitutiveLawManager&
-Foam::solidModels::linGeomTotalDispSolid::mechanicalManager() const
-{
-    if (mechanicalManagerPtr_.empty())
-    {
-        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
-        // both frameworks are built from exactly the same entries
-        mechanicalManagerPtr_.set
-        (
-            new mechanicalConstitutiveLawManager(mesh(), mechanical())
-        );
-    }
-
-    return mechanicalManagerPtr_();
-}
-
-
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 {
@@ -848,7 +831,7 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
       ? tangentRequest::scalarDeviatoric
       : tangentRequest::scalar;
 
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         if (solvePressure())
         {
@@ -868,7 +851,7 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 const Foam::List<Foam::mat66>&
 Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         FatalErrorInFunction
             << "'jacobianTangent fourthOrder' needs the material tangent from "
@@ -937,7 +920,7 @@ Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeRKappa() const
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         return tmp<volScalarField>
         (
@@ -976,14 +959,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
-    useMechanicalConstitutiveLawManager_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "useMechanicalConstitutiveLawManager", false
-        )
-    ),
-    mechanicalManagerPtr_(),
     impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
@@ -1030,7 +1005,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     // For consistent restarts, we will calculate the gradient field
     D().correctBoundaryConditions();
     D().storePrevIter();
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         frameworkGrad(D(), gradD());
     }
@@ -1105,7 +1080,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     // tolerance, and silently so
     if
     (
-        useMechanicalConstitutiveLawManager_
+        useMechanicalConstitutiveLawManager()
      && mechanicalManager().nLaws() > 1
      && gradDScheme != "leastSquaresS4f"
     )
@@ -1180,31 +1155,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-void Foam::solidModels::linGeomTotalDispSolid::frameworkGrad
-(
-    const volVectorField& D,
-    volTensorField& gradD
-) const
-{
-    // A solid model on the constitutive-law framework computes its own
-    // gradient rather than asking the legacy mechanicalModel for one.
-    //
-    // That is not a preference. For more than one material the legacy grad()
-    // splits the mesh into per-material subMeshes, interpolates the
-    // displacement onto each, takes a gradient there and maps the result
-    // back, with a stress-based correction at the interface. Replacing that
-    // machinery is a large part of what the framework is for: the material
-    // aware least-squares gradient does the same job on one mesh, by drawing
-    // a cell's stencil only from cells of its own material.
-    //
-    // Routing the framework through the subMesh path anyway is not merely
-    // redundant, it is worse: on layeredPipe it puts the radial stress 0.0305
-    // from the analytical solution against a tolerance of 0.03, where the
-    // legacy path gives 0.0192. Computed directly it gives 0.0192 too
-    gradD = fvc::grad(D);
-}
-
-
 void Foam::solidModels::linGeomTotalDispSolid::frameworkInterpolate
 (
     const volVectorField& D,
@@ -1239,7 +1189,6 @@ void Foam::solidModels::linGeomTotalDispSolid::frameworkInterpolate
     mechanical().interpolate(D, gradD, pointD);
 #endif
 }
-
 
 
 void linGeomTotalDispSolid::setDeltaT(Time& runTime)
@@ -1452,7 +1401,7 @@ label linGeomTotalDispSolid::formResidual
     else
     {
         // Update gradient of displacement
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             frameworkGrad(D, gradD());
         }
@@ -1738,7 +1687,7 @@ label linGeomTotalDispSolid::formJacobian
             // the legacy hierarchy reports GREAT
             tmp<volScalarField> tK
             (
-                useMechanicalConstitutiveLawManager_
+                useMechanicalConstitutiveLawManager()
               ? tmp<volScalarField>
                 (
                     new volScalarField(mechanicalManager().kappa())
