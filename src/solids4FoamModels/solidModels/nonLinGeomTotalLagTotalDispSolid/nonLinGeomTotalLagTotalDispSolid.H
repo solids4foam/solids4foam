@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
 #include "hofvc.H"
 
@@ -98,6 +99,18 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- Set once the law's volumetric response has been checked against
+        //  the closure the pressure equation assumes
+        mutable bool volumetricClosureChecked_ = false;
+
+        //- The law's own volumetric response, dU/dJ
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value itself is what checkVolumetricClosure compares against
+        //  the volumetric energy the pressure equation was written for
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
@@ -106,6 +119,34 @@ class nonLinGeomTotalLagTotalDispSolid
 
 
     // Private Member Functions
+
+        //- Update the cell-centred stress, from the framework when
+        //  the framework is in use and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
+        //- Update the stress at the face quadrature points, from the framework
+        //  when the framework is in use and from the
+        //  legacy mechanicalModel otherwise.
+        //  The high-order face quadrature does not exist on foam-extend
+#ifndef FOAMEXTEND
+        void correctStressQuad();
+
+        //- Finite-strain kinematics at the face quadrature points, held here
+        //  rather than rebuilt per call because they are as large as the
+        //  quadrature stress itself
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuad0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+#endif
+
+        //- Construct impK from the framework when
+        //  the framework is in use, and from the legacy
+        //  mechanicalModel otherwise
+        tmp<volScalarField> makeImpK() const;
 
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;
@@ -119,6 +160,18 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
+
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
+        //- Replace the volumetric part of the stress with the solved
+        //  pressure. Both the residual and the linear predictor do this and
+        //  they have to agree, so it lives here rather than at each of them
+        void replaceVolumetricStress(const volScalarField& p);
+
+        //- Somewhere for the law to put its volumetric response
+        volScalarField& volumetricResponse() const;
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
@@ -137,6 +190,14 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
+        //- Point interpolation, likewise on the base mesh
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
 
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid
@@ -193,6 +254,14 @@ public:
             }
 
         // Edit
+
+            //- Material residual, zero on the framework path: see the
+            //  base class declaration
+            virtual scalar materialResidual() override;
+
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
+            virtual void updateTotalFields() override;
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();

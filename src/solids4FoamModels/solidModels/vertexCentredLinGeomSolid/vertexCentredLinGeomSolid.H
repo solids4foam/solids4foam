@@ -49,6 +49,8 @@ SourceFiles
 #include "uniformDimensionedFields.H"
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
+#include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
 #include "twoDPointCorrector.H"
 #ifdef OPENFOAM_COM
@@ -91,6 +93,10 @@ private:
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
+
+        //- Integration-point topology for the internal dual mesh faces,
+        //  owned by the manager
+        mutable const integrationPointTopology* dualFaceTopologyPtr_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -203,6 +209,9 @@ private:
             return fixedDofRowsISPtr_;
         }
 #endif
+
+        //- Return the integration-point topology for the internal dual faces
+        const integrationPointTopology& dualFaceTopology() const;
 
         //- Make dualImpKf field
         void makeDualImpKf() const;

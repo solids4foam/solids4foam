@@ -24,7 +24,7 @@ d2dt2Schemes
 ddtSchemes
 {
     default            none;
-    ddt(p)             Euler;
+    ddt(porePressure)             Euler;
     ddt(D)             Euler;
 }
 
@@ -43,7 +43,7 @@ laplacianSchemes
     default            none;
     laplacian(DD,D)    Gauss linear corrected;
     laplacian(DDD,DD)  Gauss linear corrected;
-    laplacian(p)       Gauss linear corrected;
+    laplacian(porePressure)       Gauss linear corrected;
 }
 
 snGradSchemes
