@@ -188,7 +188,7 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
 
     const UIndirectList<tensor>& gradD = kin.gradD();
 
-    // Field approach: this creates intermiedate temporary fields
+    // Field approach: this creates intermediate temporary fields
     // sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
 
     // Element-by-element approach: faster as it avoid intermediate fields
@@ -271,7 +271,7 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         {
             FatalErrorInFunction
                 << "Finite difference fourth order tangent requested but the "
-                << "response was not provided the with field"
+                << "response was not provided with the field"
                 << exit(FatalError);
         }
 
@@ -298,7 +298,7 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         const label YZ = symmTensor::YZ;
         const label XZ = symmTensor::XZ;
 
-        // Analytical calculate the tangent
+        // Analytically calculate the tangent
         forAll(Cfield, i)
         {
             // Take a reference to C for the current integration point

@@ -33,7 +33,7 @@ Description
     two forms is true when the z direction *is* solved, which is the opposite
     of what its legacy name suggests; and in that branch the zz, yz and xz
     components of the stress are not written at all, so they keep whatever the
-    caller's storage held. Both are recorded in DESIGN-state-io.md.
+    caller's storage held.
 
 SourceFiles
     anisotropicBiotElasticMechanicalConstitutiveLaw.C
