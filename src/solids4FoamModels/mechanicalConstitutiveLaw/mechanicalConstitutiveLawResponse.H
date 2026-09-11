@@ -54,9 +54,6 @@ Description
       diagnostics) may be added in the future without changing the
       fundamental role of the class.
 
-SourceFiles
-    mechanicalConstitutiveLawResponse.C
-
 Author
     Philip Cardiff, UCD.
 
@@ -65,7 +62,6 @@ Author
 #ifndef mechanicalConstitutiveLawResponse_H
 #define mechanicalConstitutiveLawResponse_H
 
-#include "mechanicalConstitutiveLawResponse.H"
 #include "UIndirectList.H"
 #include "symmTensor.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
@@ -78,7 +74,7 @@ namespace Foam
 // Forward Declarations
 struct mat66;
 
-/*---------------------------------------------------------------------------* \
+/*---------------------------------------------------------------------------*\
                Class mechanicalConstitutiveLawResponse Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -89,12 +85,12 @@ class mechanicalConstitutiveLawResponse
         //- View onto output fields (no ownership, no allocation)
         UIndirectList<symmTensor>& stress_;
 
-        //- Optional scalar tangent view:
-        //  Only allocated if not requested
+        //- Optional scalar tangent view.
+        //  Null unless the caller supplied storage for a scalar tangent
         UIndirectList<scalar>* scalarTangentPtr_;
 
-        //- Optional mat66 (6x6 matrix) tangent view:
-        //  Only allocated if not requested
+        //- Optional mat66 (6x6 matrix) tangent view.
+        //  Null unless the caller supplied storage for a fourth-order tangent
         UIndirectList<mat66>* fourthOrderTangentPtr_;
 
         //- What type, if any, material tangent is requested
@@ -259,7 +255,6 @@ public:
             return fourthOrderTangentPtr_ != nullptr;
         }
 
-        //- Does this reponse want a scalar tangent calculated
         //- Is the law being asked to split its answer?
         bool wantsVolumetricSplit() const
         {
@@ -285,6 +280,7 @@ public:
             volumetricPtr_ = &volumetric;
         }
 
+        //- Does this response want a scalar tangent calculated
         bool wantsScalarTangent() const
         {
             return
@@ -292,7 +288,7 @@ public:
              || tangentRequest_ == tangentRequest::scalarDeviatoric;
         }
 
-        //- Does this reponse want a fourth order tangent calculated
+        //- Does this response want a fourth order tangent calculated
         bool wantsFourthOrderTangent() const
         {
             return
