@@ -198,14 +198,12 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     // The initial stress is zero in all but the cases that supply one, and
     // adding a zero costs less than branching on it inside the loop.
     //
-    // It is read at old time, and through a const reference so that the const
-    // accessor is the one selected. A prescribed field is never written, so
-    // its two times always hold the same value; taking the old one is what
-    // makes this work inside a shadow state, which aliases its parent's
-    // old-time fields but owns current-time fields that start empty. Reading
-    // the current field would hand a tangent query a silent field of zeros
-    const mechanicalConstitutiveLawState& cState = state;
-    const Field<symmTensor>& sigma0 = cState.symmTensorField0("sigma0");
+    // It is read at old time. A prescribed field is never written, so its two
+    // times always hold the same value, and the old-time one is what a shadow
+    // state aliases; a shadow owns current-time fields that start empty, so
+    // reading the current field would hand a tangent query a silent field of
+    // zeros
+    const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     // Whether the caller wants the deviatoric stress and the volumetric
     // response separately, as a mixed displacement-pressure formulation does

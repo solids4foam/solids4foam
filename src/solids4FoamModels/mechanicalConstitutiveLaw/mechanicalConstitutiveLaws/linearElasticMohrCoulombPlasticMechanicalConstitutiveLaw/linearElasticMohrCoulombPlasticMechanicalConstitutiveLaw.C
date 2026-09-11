@@ -555,17 +555,16 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::evaluate
 
     // The previous step's stress variation, which the trial stress is built
     // on, and this step's, which is written here
-    const mechanicalConstitutiveLawState& cState = state;
     const Field<symmTensor>& deltaSigma0 =
-        cState.symmTensorField0("deltaSigma");
+        state.getSymmTensorField0("deltaSigma");
     Field<symmTensor>& deltaSigma = state.symmTensorField("deltaSigma");
 
     Field<scalar>& activeYield = state.scalarField("activeYield");
 
-    // Read at old time and through a const reference, so that a tangent query
-    // evaluated into a shadow state sees the value rather than a silently
-    // zero field. See linearElastic for the same reasoning
-    const Field<symmTensor>& sigma0 = cState.symmTensorField0("sigma0");
+    // Read at old time, so that a tangent query evaluated into a shadow state
+    // sees the value rather than a silently zero field. See linearElastic for
+    // the same reasoning
+    const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     const scalar muVal = mu_.value();
     const scalar lambdaVal = lambda_.value();

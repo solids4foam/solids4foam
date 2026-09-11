@@ -131,10 +131,11 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time through a const reference: a prescribed field holds the
-    // same value at both times, and the old one is what a shadow state aliases
-    const mechanicalConstitutiveLawState& cState = state;
-    const Field<vector>& f0 = cState.vectorField0("f0");
+    // Read at old time: a prescribed field is never written, so its two times
+    // always hold the same value, and the old-time one is what a shadow state
+    // aliases. A tangent query evaluated into a shadow would find the
+    // current-time field empty
+    const Field<vector>& f0 = state.getVectorField0("f0");
 
     // A field of active tension if the case asked for one, otherwise the
     // constant, ramped. Asked for rather than detected: the manager only
