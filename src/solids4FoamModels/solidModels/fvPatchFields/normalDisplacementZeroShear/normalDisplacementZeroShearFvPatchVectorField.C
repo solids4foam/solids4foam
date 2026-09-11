@@ -241,10 +241,13 @@ void normalDisplacementZeroShearFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+        // The same keyword it is read with, as for normalDisplacement: this
+        // condition had the identical defect and the identical consequence,
+        // a time directory the case could not be started again from
 #ifdef OPENFOAM_ORG
-        writeEntry(os, "normalDisp", normalDisp_);
+        writeEntry(os, "normalDisplacement", normalDisp_);
 #else
-        normalDisp_.writeEntry("normalDisp", os);
+        normalDisp_.writeEntry("normalDisplacement", os);
 #endif
     }
 
