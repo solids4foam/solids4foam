@@ -31,11 +31,13 @@ PLOAD=1e5
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 
 echo "============================================================"
 echo "layeredPipe regression test"
 echo "Max radial stress error  < ${RADIUS_STRESS_ERR_MAX}"
 echo "Outer-point theta error  < ${THETA_POINT_ERR_MAX}"
+echo "Plus the mechanicalConstitutiveLaw framework checks"
 echo "============================================================"
 echo
 
@@ -61,6 +63,43 @@ sample_file() {
     fi
 
     find "${CASE_DIR}" -name 'sigma:Transformed' | sort | tail -n 1
+}
+
+# Exercise the mechanicalConstitutiveLawManager evaluation paths on this case.
+# This tutorial is used because it is the only one with more than one material,
+# and the manager's integration-point addressing is per material. The framework
+# is not yet used by any solid model, so this is its only runtime coverage
+run_constitutive_test() {
+    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
+        return 0
+    fi
+
+    if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
+        echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
+        return 0
+    fi
+
+    if ( cd "${CASE_DIR}" && Test-mechanicalConstitutiveLaw \
+            > "${CONSTITUTIVE_LOGFILE}" 2>&1 )
+    then
+        local n_passed
+        n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
+
+        if (( n_passed == 0 )); then
+            # The framework is not built for foam-extend, so the test reports
+            # that there is nothing to check rather than running any
+            echo "SKIP: mechanicalConstitutiveLaw checks (not built on this fork)"
+            return 0
+        fi
+
+        echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
+        return 0
+    fi
+
+    echo "FAIL: mechanicalConstitutiveLaw checks"
+    grep 'FAIL:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true
+    return 1
 }
 
 CHECK_ONLY=false
@@ -167,6 +206,10 @@ if awk "BEGIN {exit !(${outer_theta_err} < ${THETA_POINT_ERR_MAX})}"; then
     printf "PASS: Outer-point theta error = %.6g\n" "${outer_theta_err}"
 else
     printf "FAIL: Outer-point theta error = %.6g\n" "${outer_theta_err}"
+    failures=$((failures + 1))
+fi
+
+if ! run_constitutive_test; then
     failures=$((failures + 1))
 fi
 

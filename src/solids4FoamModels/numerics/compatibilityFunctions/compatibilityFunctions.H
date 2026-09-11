@@ -31,6 +31,8 @@ Description
         - compactListListCRef(): access CompactListList rows for read-only use
         - boundaryFieldRef() : obtain a modifiable boundary field reference
         - makeList<T>()      : construct a List<T> from an initializer_list
+        - forAllIters()      : iterate a container without naming its type
+        - forAllConstIters() : as above, with const access
 
       Usage example:
           #include "compatibilityFunctions.H"
@@ -52,6 +54,38 @@ Author
 #include "CompactListList.H"
 #include "GeometricFields.H"
 #include "fvm.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// OpenFOAM.com provides forAllIters()/forAllConstIters(), which deduce the
+// container type, whereas foam-extend and OpenFOAM.org offer only the
+// three-argument forAllIter()/forAllConstIter(), where the container type must
+// be spelled out. Spelling it out is noisy for the nested template types used
+// for state storage, e.g.
+//
+//     forAllConstIter(HashTable<autoPtr<Field<symmTensor>>>, table, iter)
+//
+// so the two-argument forms are defined here for the forks that lack them,
+// giving one portable spelling across all of them
+#ifndef OPENFOAM_COM
+
+    #define forAllIters(container,iter)                                        \
+        for                                                                    \
+        (                                                                      \
+            auto iter = (container).begin();                                   \
+            iter != (container).end();                                         \
+            ++iter                                                             \
+        )
+
+    #define forAllConstIters(container,iter)                                   \
+        for                                                                    \
+        (                                                                      \
+            auto iter = (container).cbegin();                                  \
+            iter != (container).cend();                                        \
+            ++iter                                                             \
+        )
+
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -144,6 +178,20 @@ namespace Foam
     {
 #ifdef OPENFOAM_NOT_EXTEND
         return fld.primitiveFieldRef();
+#else
+        return fld.internalField();
+#endif
+    }
+
+    // Const field → const primitiveField&
+    template<class Type, template<class> class PatchField, class GeoMesh>
+    inline const Foam::Field<Type>& primitiveField
+    (
+        const Foam::GeometricField<Type, PatchField, GeoMesh>& fld
+    )
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        return fld.primitiveField();
 #else
         return fld.internalField();
 #endif
