@@ -3130,26 +3130,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             if (scalarTangentPtr && needsScalarTangent(tangentReq))
             {
                 const scalar K = (*scalarTangentPtr)[faceI];
-                if (collapseRule == stressCollapseRule::average)
-                {
-                    (*tangentWeightPtr)[faceI] += K;
-                }
-                else if (collapseRule == stressCollapseRule::harmonic)
+
+                if (collapseRule == stressCollapseRule::harmonic)
                 {
                     (*tangentWeightPtr)[faceI] += 1.0/max(K, SMALL);
                 }
                 else
                 {
-                    FatalErrorInFunction
-                        << "Invalid stress collapse rule combination:\n"
-                        << "collapseRule = "
-                        << stressCollapseRuleName(collapseRule)
-                        << nl
-                        << "tangentReq   = " << tangentRequestName(tangentReq)
-                        << nl
-                        << "scalarTangentPtr = "
-                        << (scalarTangentPtr ? "set" : "null")
-                        << exit(FatalError);
+                    // 'average', and 'none', which is only reached with a
+                    // single contribution and so is the same sum
+                    (*tangentWeightPtr)[faceI] += K;
                 }
             }
         }
@@ -3240,18 +3230,16 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 << exit(FatalError);
         }
 
-        // Stress collapse as arithmetic mean
+        checkCollapsePermitted(collapseRule, w, faceI, "Face");
+
+        // Stress collapse as arithmetic mean. With 'none' the weight is one,
+        // so this is the single contribution unchanged
         stress[faceI] = stressSum[faceI]/w;
 
         // Tangent collapse, if requested
         if (scalarTangentPtr && needsScalarTangent(tangentReq))
         {
-            if (collapseRule == stressCollapseRule::average)
-            {
-                // Arithmetic mean of the contributing tangents
-                (*scalarTangentPtr)[faceI] = (*tangentWeightPtr)[faceI]/w;
-            }
-            else if (collapseRule == stressCollapseRule::harmonic)
+            if (collapseRule == stressCollapseRule::harmonic)
             {
                 // Harmonically average the tangent
                 (*scalarTangentPtr)[faceI] =
@@ -3259,14 +3247,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             }
             else
             {
-                FatalErrorInFunction
-                    << "Invalid stress collapse rule combination:\n"
-                    << "collapseRule = " << stressCollapseRuleName(collapseRule)
-                    << nl
-                    << "tangentReq   = " << tangentRequestName(tangentReq) << nl
-                    << "scalarTangentPtr = "
-                    << (scalarTangentPtr ? "set" : "null")
-                    << exit(FatalError);
+                // Arithmetic mean of the contributing tangents
+                (*scalarTangentPtr)[faceI] = (*tangentWeightPtr)[faceI]/w;
             }
         }
     }
@@ -3399,19 +3381,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             {
                 const scalar K = (*scalarTangentPtr)[pointI];
 
-                if (collapseRule == stressCollapseRule::average)
-                {
-                    (*tangentWeightPtr)[pointI] += K;
-                }
-                else if (collapseRule == stressCollapseRule::harmonic)
+                if (collapseRule == stressCollapseRule::harmonic)
                 {
                     (*tangentWeightPtr)[pointI] += 1.0/max(K, SMALL);
                 }
                 else
                 {
-                    FatalErrorInFunction
-                        << "Invalid stress collapse rule"
-                        << exit(FatalError);
+                    // 'average', and 'none', which is only reached with a
+                    // single contribution and so is the same sum
+                    (*tangentWeightPtr)[pointI] += K;
                 }
             }
         }
@@ -3471,25 +3449,23 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 << exit(FatalError);
         }
 
+        checkCollapsePermitted(collapseRule, w, pointI, "Point");
+
+        // With 'none' the weight is one, so this is the single contribution
+        // unchanged
         stress[pointI] = stressSum[pointI]/w;
 
         if (scalarTangentPtr && needsScalarTangent(tangentReq))
         {
-            if (collapseRule == stressCollapseRule::average)
-            {
-                (*scalarTangentPtr)[pointI] =
-                    (*tangentWeightPtr)[pointI]/w;
-            }
-            else if (collapseRule == stressCollapseRule::harmonic)
+            if (collapseRule == stressCollapseRule::harmonic)
             {
                 (*scalarTangentPtr)[pointI] =
                     w/max((*tangentWeightPtr)[pointI], SMALL);
             }
             else
             {
-                FatalErrorInFunction
-                    << "Invalid stress collapse rule"
-                    << exit(FatalError);
+                (*scalarTangentPtr)[pointI] =
+                    (*tangentWeightPtr)[pointI]/w;
             }
         }
     }
