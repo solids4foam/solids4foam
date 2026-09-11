@@ -92,7 +92,6 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
     // Set elastic stiffness parameters
     if (model2d_)
     {
-
         // The reduced constants below are the plane stress ones: they come
         // from eliminating a zero out-of-plane stress, not a zero out-of-plane
         // strain. This law has no plane strain form, so a case that asked for
@@ -106,7 +105,6 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
                 << "strain reduction."
                 << abort(FatalError);
         }
-
 
         const scalar Ex = readScalar(dict.lookup("Ex"));
         const scalar Ey = readScalar(dict.lookup("Ey"));
