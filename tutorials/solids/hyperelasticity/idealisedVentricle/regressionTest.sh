@@ -53,6 +53,7 @@ ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     "petsc"
+    "petscManager"
     "pressureDisplacement"
 )
 
@@ -189,6 +190,44 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
+    # The run has to have finished and converged. extract_max_sigma takes the
+    # last value in the log, and a run that stopped early still leaves one -
+    # so without this an arm that diverged at the second step would be
+    # compared against the other arm's converged answer and could pass
+    if ! grep -q "^End" "${case_dir}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: ${approach}: did not run to completion"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
+        "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${approach}: did not converge"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    # And each arm has to have taken the path it was set up for, or the
+    # comparison below is a run against itself
+    if [[ "${approach}" == "petscManager" ]]; then
+        if ! grep -q "Selecting mechanical constitutive law" \
+            "${case_dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${approach}: did not use the framework"
+            failures=$((failures + 1))
+            continue
+        fi
+    elif [[ "${approach}" == "petsc" ]]; then
+        if grep -q "Selecting mechanical constitutive law" \
+            "${case_dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${approach}: used the framework"
+            failures=$((failures + 1))
+            continue
+        fi
+    fi
+
     sigma=$(extract_max_sigma "${case_dir}")
 
     if [[ -z "${sigma}" ]]; then
@@ -205,7 +244,79 @@ for approach in "${APPROACHES[@]}"; do
             "${approach}" "${sigma}" "${SIGMA_MIN}" "${SIGMA_MAX}"
         failures=$((failures + 1))
     fi
+
+    if [[ "${approach}" == "petsc" ]]; then
+        legacy_sigma="${sigma}"
+    elif [[ "${approach}" == "petscManager" ]]; then
+        framework_sigma="${sigma}"
+    fi
 done
+
+# The two petsc arms are the same case and the same solver, differing only in
+# where the stress comes from. They are not expected to agree exactly: the
+# framework's GuccioneElastic builds Q from the isochoric strain where the
+# legacy law builds it from the full Green-Lagrange strain, so shape and
+# volume are separated in one and coupled in the other. Both reduce to the
+# published model in the incompressible limit it was written for. What the
+# bound says is that the reformulation is the only thing between them
+if [[ -n "${legacy_sigma:-}" && -n "${framework_sigma:-}" ]]; then
+    if awk "BEGIN {exit !((${framework_sigma} - ${legacy_sigma})^2 \
+        <= (0.01*${legacy_sigma})^2)}"
+    then
+        printf "PASS: framework near legacy, differing by the reformulation (%.6g vs %.6g)\n" \
+            "${legacy_sigma}" "${framework_sigma}"
+    else
+        printf "FAIL: framework and legacy differ by more than the reformulation explains (%.6g vs %.6g)\n" \
+            "${legacy_sigma}" "${framework_sigma}"
+        failures=$((failures + 1))
+    fi
+fi
+
+# ------------------------------------------------------------
+# The framework's check on GuccioneElastic's isochoric split
+# ------------------------------------------------------------
+# This case uses GuccioneElastic on its own, so its split can be checked
+# directly: a law that declares it can separate its isochoric stress from its
+# volumetric response is taken at its word by every mixed formulation, and a
+# superposed dilation is the one thing that tells an honest split from dev()
+# of a total. Where the law is wrapped in electroMechanicalLaw the check does
+# not apply, because the active tension is not derived from a potential - so
+# this is where it does apply
+run_split_check() {
+    local d
+    for d in "${REGRESSION_ROOT}"/*; do
+        [[ -d "${d}/constant/polyMesh" ]] || continue
+
+        if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+            echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
+            return 0
+        fi
+
+        if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
+        then
+            echo "FAIL: the law checks did not pass"
+            grep -m2 "FAIL:" "${d}/log.unit" || true
+            return 1
+        fi
+
+        if ! grep -q "isochoric stress ignores a superposed dilation" \
+            "${d}/log.unit"
+        then
+            echo "FAIL: GuccioneElastic's isochoric split was not checked"
+            return 1
+        fi
+
+        echo "PASS: GuccioneElastic's isochoric split is dilation invariant"
+        return 0
+    done
+
+    echo "SKIP: mechanicalConstitutiveLaw checks (no meshed case)"
+    return 0
+}
+
+if ! run_split_check; then
+    failures=$((failures + 1))
+fi
 
 # ------------------------------------------------------------
 # Cleanup

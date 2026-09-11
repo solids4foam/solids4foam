@@ -24,16 +24,29 @@ mechanical
     {
         type HolzapfelGasserOgdenElastic;
         rho             rho [1 -3 0 0 0 0 0]  1200;
-        E               E   [1 -1 -2 0 0 0 0] 132.69e3; //mu*3, mu = 150e3
-        nu              nu  [0 0 0 0 0 0 0]   0.5;
+
 
         impKcoeff 1;
 
-        // HGO parameters
+        // The shear modulus, given directly rather than as E and nu: both
+        // laws read it, and the legacy one refuses a dictionary giving both
+        // forms. Same material as before - the legacy dictionary had
+        // E = 132.69e3 with nu = 0.5, and mu = E/(2*(1 + nu)) = 44.23e3
+        mu              mu  [1 -1 -2 0 0 0 0] 44.23e3;
+
+        // HGO parameters, as both laws read them
         fibreAngle fibreAngle [0  0  0 0 0 0 0] 39.76;   // In respect to
                                                          // circum dir
         k1                 k1 [1 -1 -2 0 0 0 0] 0.206e3;
         k2                 k2 [0  0  0 0 0 0 0] 1.465;
+
+        // Read by the framework law only. The legacy law has no volumetric
+        // term: it is written for exact incompressibility and takes the whole
+        // spherical stress from the solid model's pressure. The framework law
+        // carries the penalty the other hyperelastic laws use, and the solid
+        // model replaces that response with the pressure it solved. A
+        // thousand times the shear modulus approaches the same limit
+        bulkModulus bulkModulus [1 -1 -2 0 0 0 0] 44.23e6;
     }
 );
 

@@ -5,7 +5,8 @@ IFS=$'\n\t'
 # -------------------------------------------------------------------------
 # solids4Foam Allrun script
 # Allows selection of solution approach:
-#   segregated (default), petscSnes, petscSnesPressure, highOrder
+#   segregated (default), segregatedManager, petscSnes,
+#   petscSnesPressure, highOrder, highOrderFourthOrder
 #   pressureDisplacementCompressible [coarse|medium]
 #   pressureDisplacementIncompressible [coarse|medium]
 # -------------------------------------------------------------------------
@@ -19,11 +20,14 @@ Where [approach] is one of:
   segregated                           (default)
   petscSnes
   petscSnesPressure
+  segregatedManager
+  highOrderFourthOrder
   highOrder
   pressureDisplacementCompressible
   pressureDisplacementIncompressible
 
-For segregated|petscSnes|petscSnesPressure|highOrder, the second argument is
+For segregated|segregatedManager|petscSnes|petscSnesPressure|highOrder, the
+second argument is
 the run mode:
   serial                               (default)
   parallel
@@ -38,6 +42,8 @@ Examples:
   ./Allrun segregated
   ./Allrun petscSnes parallel
   ./Allrun petscSnesPressure
+  ./Allrun segregatedManager
+  ./Allrun highOrderFourthOrder
   ./Allrun highOrder
   ./Allrun pressureDisplacementCompressible medium
   ./Allrun pressureDisplacementIncompressible medium
@@ -72,7 +78,7 @@ if [[ "${APPROACH}" == "parallel" ]]; then
 fi
 
 case "${APPROACH}" in
-    segregated|petscSnes|petscSnesPressure|highOrder)
+    segregated|segregatedManager|petscSnes|petscSnesPressure|petscSnesPressureManager|highOrder|highOrderFourthOrder)
         RUN_MODE="${ARG2:-serial}"
         case "${RUN_MODE}" in
             serial|parallel) ;;
@@ -134,7 +140,7 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "${APPROACH}" in
-        petscSnes|petscSnesPressure|highOrder)
+        petscSnes|petscSnesPressure|highOrder|highOrderFourthOrder)
             solids4Foam::requirePetscOrExitSilently
             ;;
     esac
@@ -198,11 +204,34 @@ select_approach() {
             echo "Using the petscSnes approach"
             link_files_for_suffix "petscSnes"
             ;;
+        highOrderFourthOrder)
+            echo "Using the highOrder approach with a full material tangent"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "highOrder"
+            rm -f constant/solidProperties
+            ln -s solidProperties.highOrderFourthOrder constant/solidProperties
+            ;;
+
+        segregatedManager)
+            echo "Using the segregated approach with the constitutive law manager"
+            link_files_for_suffix "segregated"
+            rm -f constant/solidProperties
+            ln -s solidProperties.segregatedManager constant/solidProperties
+            ;;
+
         petscSnesPressure)
             echo "Using the petscSnes approach with the mixed"\
                  "displacement-pressure formulation"
             solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "petscSnesPressure"
+            ;;
+        petscSnesPressureManager)
+            echo "Using the mixed displacement-pressure formulation with the"\
+                 "constitutive law manager"
+            solids4Foam::caseDoesNotRunWithFoamExtend
+            link_files_for_suffix "petscSnesPressure"
+            rm -f constant/solidProperties
+            ln -s solidProperties.petscSnesPressureManager constant/solidProperties
             ;;
         highOrder)
             echo "Using the highOrder approach"
@@ -236,7 +265,7 @@ echo
 solids4Foam::runApplication blockMesh
 
 case "${APPROACH}" in
-    segregated|petscSnes|petscSnesPressure|highOrder)
+    segregated|segregatedManager|petscSnes|petscSnesPressure|petscSnesPressureManager|highOrder|highOrderFourthOrder)
         if [[ "${RUN_MODE}" == "parallel" ]]; then
             solids4Foam::runApplication decomposePar
             solids4Foam::runParallel solids4Foam
