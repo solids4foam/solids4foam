@@ -267,6 +267,37 @@ class mechanicalConstitutiveLawManager
             }
         }
 
+        //- Check that an integration point reached by more than one
+        //  constitutive law has been given a rule for combining them.
+        //  stressCollapseRule::none says there is no such rule, so a second
+        //  contribution is an error rather than something to average away
+        inline void checkCollapsePermitted
+        (
+            const stressCollapseRule collapseRule,
+            const scalar weight,
+            const label ipI,
+            const word& what
+        ) const
+        {
+            if (collapseRule != stressCollapseRule::none || weight < 1.5)
+            {
+                return;
+            }
+
+            FatalErrorInFunction
+                << what << ' ' << ipI << " was reached by "
+                << label(weight) << " mechanical constitutive laws, but the "
+                << "stress collapse rule is '"
+                << stressCollapseRuleName(collapseRule)
+                << "', which admits only one." << nl
+                << "An integration point shared between materials has as many "
+                << "stresses as it has materials, and no rule has been given "
+                << "for combining them." << nl
+                << "Pass stressCollapseRule::average or "
+                << "stressCollapseRule::harmonic to say how they combine."
+                << exit(FatalError);
+        }
+
         //- Check that the tangent storage required by the request has been
         //  supplied
         void checkTangentStorage
@@ -542,8 +573,8 @@ public:
         //  Unlike the cell-based approach, a face can belong to more than one
         //  material law (e.g. at a material interface), so a stress "collapse"
         //  rule says how the multiple contributions are combined.
-        //  Note: the collapse rule currently governs the tangent only; the
-        //  stress is always collapsed as an arithmetic mean
+        //  The default, stressCollapseRule::none, is a refusal rather than a
+        //  rule: a face reached by two laws is then an error
         void updateStressSmallStrain
         (
             const surfaceTensorField& gradD,
@@ -561,8 +592,8 @@ public:
         //  Unlike the cell-based approach, a point can belong to more than one
         //  material law (e.g. at a material interface), so a stress "collapse"
         //  rule says how the multiple contributions are combined.
-        //  Note: the collapse rule currently governs the tangent only; the
-        //  stress is always collapsed as an arithmetic mean
+        //  The default, stressCollapseRule::none, is a refusal rather than a
+        //  rule: a point reached by two laws is then an error
         void updateStressSmallStrain
         (
             const pointTensorField& gradD,
