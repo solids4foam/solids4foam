@@ -56,8 +56,10 @@ Description
      10. The misuse guards fire: a fourth-order tangent on a topology that
          cannot carry one, a flat-list update on a topology whose integration
          points are shared between cells and where more than one material
-         could claim them, a tangent request with no storage, and a duplicate
-         registerTopology key.
+         could claim them, a tangent request with no storage, a duplicate
+         registerTopology key, and - where the case has more than one
+         material - a face shared by two materials with no collapse rule to
+         combine them, which must be refused where a rule is accepted.
 
 Author
     Philip Cardiff, UCD.
@@ -1974,6 +1976,70 @@ int main(int argc, char *argv[])
             }
 
             report("a tangent request with no storage is rejected", threw);
+        }
+
+        // A face on a material interface is reached by two laws, so it has
+        // two stresses. stressCollapseRule::none gives no rule for combining
+        // them and must refuse; a rule that does must be accepted
+        if (lawEntries.size() > 1)
+        {
+            const surfaceTensorField faceGradD(fvc::interpolate(gradD));
+
+            surfaceSymmTensorField faceSigma
+            (
+                IOobject
+                (
+                    "faceSigma",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh,
+                dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+            );
+
+            bool threw = false;
+            try
+            {
+                manager.updateStressSmallStrain
+                (
+                    faceGradD,
+                    faceGradD,
+                    dt,
+                    faceSigma,
+                    stressCollapseRule::none
+                );
+            }
+            catch (const Foam::error&)
+            {
+                threw = true;
+            }
+
+            report("a shared face with no collapse rule is rejected", threw);
+
+            bool threwWithRule = false;
+            try
+            {
+                manager.updateStressSmallStrain
+                (
+                    faceGradD,
+                    faceGradD,
+                    dt,
+                    faceSigma,
+                    stressCollapseRule::average
+                );
+            }
+            catch (const Foam::error&)
+            {
+                threwWithRule = true;
+            }
+
+            report
+            (
+                "a shared face with a collapse rule is accepted",
+                !threwWithRule
+            );
         }
 
         // A key already in use by a topology of a different type
