@@ -1141,6 +1141,14 @@ Foam::solidModel::solidModel
     ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
     restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
@@ -1857,6 +1865,34 @@ void Foam::solidModel::quadInverseAndJacobian
     }
 }
 #endif
+
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModel::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModel::frameworkGrad
+(
+    const volVectorField& D,
+    volTensorField& gradD
+) const
+{
+    // See the header for why this does not call mechanical().grad()
+    gradD = fvc::grad(D);
+}
 
 
 Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK

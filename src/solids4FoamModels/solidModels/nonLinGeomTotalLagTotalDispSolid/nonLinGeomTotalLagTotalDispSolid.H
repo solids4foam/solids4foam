@@ -78,14 +78,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Acceleration
         volVectorField A_;
 
-        //- Take the implicit stiffness from the mechanicalConstitutiveLaw
-        //  framework rather than from the legacy mechanicalModel.
-        //  Declared before impK_ because makeImpK() consults it
-        const Switch useMechanicalConstitutiveLawManager_;
-
-        //- The mechanicalConstitutiveLaw framework, built on demand
-        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
-
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -128,16 +120,13 @@ class nonLinGeomTotalLagTotalDispSolid
 
     // Private Member Functions
 
-        //- The mechanicalConstitutiveLaw framework, built on first use
-        mechanicalConstitutiveLawManager& mechanicalManager() const;
-
         //- Update the cell-centred stress, from the framework when
-        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  the framework is in use and from the legacy
         //  mechanicalModel otherwise
         void correctStress();
 
         //- Update the stress at the face quadrature points, from the framework
-        //  when useMechanicalConstitutiveLawManager_ is set and from the
+        //  when the framework is in use and from the
         //  legacy mechanicalModel otherwise.
         //  The high-order face quadrature does not exist on foam-extend
 #ifndef FOAMEXTEND
@@ -155,7 +144,7 @@ class nonLinGeomTotalLagTotalDispSolid
 #endif
 
         //- Construct impK from the framework when
-        //  useMechanicalConstitutiveLawManager_ is set, and from the legacy
+        //  the framework is in use, and from the legacy
         //  mechanicalModel otherwise
         tmp<volScalarField> makeImpK() const;
 
@@ -172,13 +161,13 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
 
-        //- Replace the volumetric part of the stress with the solved
-        //  pressure. Both the residual and the linear predictor do this and
-        //  they have to agree, so it lives here rather than at each of them
         //- Refuse a law whose volumetric response is not the one the
         //  pressure equation was written for
         void checkVolumetricClosure() const;
 
+        //- Replace the volumetric part of the stress with the solved
+        //  pressure. Both the residual and the linear predictor do this and
+        //  they have to agree, so it lives here rather than at each of them
         void replaceVolumetricStress(const volScalarField& p);
 
         //- Somewhere for the law to put its volumetric response
@@ -201,15 +190,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-        //- Gradient, computed directly rather than through the legacy
-        //  mechanicalModel's per-material subMeshes. See the note on the
-        //  definition: the subMesh path is what the framework replaces
-        void frameworkGrad
-        (
-            const volVectorField& D,
-            volTensorField& gradD
-        ) const;
-
         //- Point interpolation, likewise on the base mesh
         void frameworkInterpolate
         (
@@ -275,15 +255,15 @@ public:
 
         // Edit
 
-            //- Evolve the solid solver and solve the mathematical model
-            //- Let the framework know the time step has ended, so a law
-            //  can report or commit anything it keeps per step
             //- Material residual, zero on the framework path: see the
             //  base class declaration
             virtual scalar materialResidual() override;
 
+            //- Let the framework know the time step has ended, so a law
+            //  can report or commit anything it keeps per step
             virtual void updateTotalFields() override;
 
+            //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
 #ifdef USE_PETSC

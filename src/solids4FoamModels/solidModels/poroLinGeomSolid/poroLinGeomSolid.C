@@ -192,14 +192,6 @@ poroLinGeomSolid::poroLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
-    useMechanicalConstitutiveLawManager_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "useMechanicalConstitutiveLawManager", false
-        )
-    ),
-    mechanicalManagerPtr_(),
     impK_(makeImpK()),
     impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
@@ -252,53 +244,9 @@ poroLinGeomSolid::poroLinGeomSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-void Foam::solidModels::poroLinGeomSolid::frameworkGrad
-(
-    const volVectorField& D,
-    volTensorField& gradD
-) const
-{
-    // A solid model on the constitutive-law framework computes its own
-    // gradient rather than asking the legacy mechanicalModel for one.
-    //
-    // That is not a preference. For more than one material the legacy grad()
-    // splits the mesh into per-material subMeshes, interpolates the
-    // displacement onto each, takes a gradient there and maps the result
-    // back, with a stress-based correction at the interface. Replacing that
-    // machinery is a large part of what the framework is for: the material
-    // aware least-squares gradient does the same job on one mesh, by drawing
-    // a cell's stencil only from cells of its own material.
-    //
-    // Routing the framework through the subMesh path anyway is not merely
-    // redundant, it is worse: on layeredPipe it puts the radial stress 0.0305
-    // from the analytical solution against a tolerance of 0.03, where the
-    // legacy path gives 0.0192. Computed directly it gives 0.0192 too
-    gradD = fvc::grad(D);
-}
-
-
-
-
-Foam::mechanicalConstitutiveLawManager&
-poroLinGeomSolid::mechanicalManager() const
-{
-    if (mechanicalManagerPtr_.empty())
-    {
-        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
-        // both frameworks are built from exactly the same entries
-        mechanicalManagerPtr_.set
-        (
-            new mechanicalConstitutiveLawManager(mesh(), mechanical())
-        );
-    }
-
-    return mechanicalManagerPtr_();
-}
-
-
 void poroLinGeomSolid::correctStress()
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         mechanical().correct(sigma());
         return;
@@ -320,7 +268,7 @@ void poroLinGeomSolid::correctStress()
 
 Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         return mechanical().impK();
     }
@@ -331,7 +279,7 @@ Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
 
 Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         return mechanical().impKf();
     }
@@ -344,7 +292,7 @@ Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
 
 Foam::scalar poroLinGeomSolid::materialResidual()
 {
-    if (!useMechanicalConstitutiveLawManager_)
+    if (!useMechanicalConstitutiveLawManager())
     {
         return mechanical().residual();
     }
@@ -361,7 +309,7 @@ void poroLinGeomSolid::updateTotalFields()
 
     // The framework keeps its own state, and its laws may have end-of-step
     // work or diagnostics
-    if (useMechanicalConstitutiveLawManager_)
+    if (useMechanicalConstitutiveLawManager())
     {
         mechanicalManager().endTimeStep();
     }
@@ -455,7 +403,7 @@ bool poroLinGeomSolid::evolve()
         DD() = D() - D().oldTime();
 
         // Update gradient of displacement
-        if (useMechanicalConstitutiveLawManager_)
+        if (useMechanicalConstitutiveLawManager())
         {
             frameworkGrad(D(), gradD());
         }

@@ -137,14 +137,12 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time and through a const reference, so that the const
-    // accessor is selected. A prescribed field is never written, so its two
-    // times always hold the same value; taking the old one is what makes this
-    // work inside a shadow state, which aliases its parent's old-time fields
-    // and owns current-time fields that start empty
-    const mechanicalConstitutiveLawState& cState = state;
-    const Field<vector>& Ec = cState.vectorField0("Ec");
-    const Field<vector>& Ea = cState.vectorField0("Ea");
+    // Read at old time: a prescribed field is never written, so its two times
+    // always hold the same value, and the old-time one is what a shadow state
+    // aliases. A tangent query evaluated into a shadow would find the
+    // current-time field empty
+    const Field<vector>& Ec = state.getVectorField0("Ec");
+    const Field<vector>& Ea = state.getVectorField0("Ea");
 
     // Whether the caller wants the isochoric stress and the volumetric
     // response separately, as a mixed displacement-pressure formulation does

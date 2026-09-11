@@ -83,15 +83,6 @@ class poroLinGeomSolid
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        //- Take the stress from the mechanicalConstitutiveLaw framework
-        //  rather than from the legacy mechanicalModel.
-        //  Declared before impK_ so that the manager exists by the time the
-        //  implicit stiffness is built from it
-        const Switch useMechanicalConstitutiveLawManager_;
-
-        //- The mechanicalConstitutiveLaw framework, built on first use
-        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
-
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
@@ -130,11 +121,8 @@ class poroLinGeomSolid
 
     // Private Member Functions
 
-        //- The framework, built on first use
-        mechanicalConstitutiveLawManager& mechanicalManager() const;
-
         //- Update the stress, from the framework when
-        //  useMechanicalConstitutiveLawManager_ is set and from the legacy
+        //  the framework is in use and from the legacy
         //  mechanicalModel otherwise
         void correctStress();
 
@@ -165,15 +153,6 @@ class poroLinGeomSolid
             const volVectorField& D,
             const volScalarField& p
         );
-        //- Gradient, computed directly rather than through the legacy
-        //  mechanicalModel's per-material subMeshes. See the note on the
-        //  definition: the subMesh path is what the framework replaces
-        void frameworkGrad
-        (
-            const volVectorField& D,
-            volTensorField& gradD
-        ) const;
-
 
         //- Disallow default bitwise copy construct
         poroLinGeomSolid(const poroLinGeomSolid&);
