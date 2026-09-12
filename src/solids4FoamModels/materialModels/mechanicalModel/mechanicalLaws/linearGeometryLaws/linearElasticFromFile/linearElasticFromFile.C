@@ -71,7 +71,7 @@ Foam::linearElasticFromFile::linearElasticFromFile
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        E_/(1.0 + nu_)
+        E_/(2.0*(1.0 + nu_))
     ),
     lambda_
     (
