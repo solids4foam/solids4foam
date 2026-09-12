@@ -117,6 +117,7 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/cooksMembrane"
     "solids/hyperelasticity/compressedSpheres"
     "solids/hyperelasticity/twistingHemisphere"
+    "solids/hyperelasticity/rubberSealing"
     "solids/beamsPlatesShells/squarePlate"
     "solids/linearElasticity/cantilever2d"
     "solids/linearElasticity/curvedCantilever"

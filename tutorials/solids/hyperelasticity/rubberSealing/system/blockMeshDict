@@ -1,0 +1,122 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 0.001;
+
+vertices
+(
+    (0 0 -0.5)      //0
+    (6.5 0 -0.5)    //1
+    (5.5 2 -0.5)    //2
+    (0 2 -0.5)      //3
+    (8.735 0 -0.5)  //4
+    (7.735  2 -0.5) //5
+    (3 7 -0.5)      //6
+    (5.235 7 -0.5)  //7
+    (2 9 -0.5)      //8
+    (4.235 9 -0.5)  //9
+    (0 7 -0.5)      //10
+    (0 9 -0.5)      //11
+
+    (0 0 0.5)      //12
+    (6.5 0 0.5)    //13
+    (5.5 2 0.5)    //14
+    (0 2 0.5)      //15
+    (8.735 0 0.5)  //16
+    (7.735  2 0.5) //16
+    (3 7 0.5)      //18
+    (5.235 7 0.5)  //19
+    (2 9 0.5)      //20
+    (4.235 9 0.5)  //21
+    (0 7 0.5)      //22
+    (0 9 0.5)      //23
+
+);
+
+blocks
+(
+    hex (0 1 2 3 12 13 14 15) (12 6 1) simpleGrading (1 1 1)
+    hex (1 4 5 2 13 16 17 14) (6 6 1) simpleGrading (1 1 1)
+    hex (2 5 7 6 14 17 19 18) (6 12 1) simpleGrading (1 1 1)
+    hex (10 6 8 11 22 18 20 23) (7 6 1) simpleGrading (1 1 1)
+    hex (6 7 9 8 18 19 21 20) (6 6 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch top
+    (
+        (11 23 20 8)
+        (8 20 21 9)
+    )
+
+    symmetry left-bottom
+    (
+        (0 12 15 3)
+    )
+
+    symmetry left-top
+    (
+        (10 22 23 11)
+    )
+
+    patch bottom
+    (
+        (12 0 1 13)
+        (16 13 1 4)
+    )
+
+    patch tractionFree
+    (
+        (15 14 2 3)
+        (14 18 6 2)
+        (22 10 6 18)
+        (19 7 9 21)
+        (17 5 7 19)
+        (16 4 5 17)
+    )
+
+    empty front
+    (
+        (12 13 14 15)
+        (13 16 17 14)
+        (14 17 19 18)
+        (18 19 21 20)
+        (22 18 20 23)
+    )
+
+    empty back
+    (
+        (0 3 2 1)
+        (2 5 4 1)
+        (2 6 7 5)
+        (6 8 9 7)
+        (11 8 6 10)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+
+// ************************************************************************* //
