@@ -176,6 +176,30 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
 
 ---
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory adds the order-of-accuracy
+sweep described above, ported from the `solid-benchmarks` cantilever study. It
+scales the axial and through-thickness divisions by powers of two from
+$$40 \times 2$$ to $$320 \times 16$$ cells and reads the displacement and
+stress error norms that the `cantileverAnalyticalSolution` function object
+already writes to the solver log:
+
+```bash
+cd verification
+./Allverify
+```
+
+For the default `petscSnes` approach, the relative displacement L2 error falls
+from $$0.170$$ to $$0.00604$$ over that family, a net order of $$1.61$$ that is
+still approaching second order (the last refinement gives $$1.88$$), and the
+whole sweep takes about 100 seconds. The `vertexCentred` approach is cleanly
+second order, and the `highOrder` approach reproduces the cubic Timoshenko
+solution to machine precision. The study is separate from `regressionTest.sh`
+and is not run by the normal tutorial tests.
+
+---
+
 ## References
 
 [1] [C.E. Augarde, A.J. Deeks, The use of Timoshenko’s exact solution for a

@@ -1,0 +1,13 @@
+# Steady vertical displacement at the point (4 -1 0.5) versus the mesh
+# spacing DeltaX, from the mesh study of
+#
+#   Z. Tukovic, A. Karac, P. Cardiff, H. Jasak, A. Ivankovic, OpenFOAM
+#   finite volume solver for fluid-solid interaction, Transactions of
+#   FAMENA, 42(3), 1-31, 2018.
+#
+# Column 1: DeltaX (m)
+# Column 2: steady Uy (m)
+0.012556535102991987, -0.25063344594594594
+0.025039224680577503, -0.24956925675675676
+0.04999675220314466, -0.24574324324324323
+0.10002817547478102, -0.23325168918918918

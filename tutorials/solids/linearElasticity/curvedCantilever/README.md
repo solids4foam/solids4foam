@@ -133,6 +133,25 @@ solids4foam built on foam-extend. To modify the case to run with the segregated
 `tutorials/solids/linearElasticity/narrowTmember/README.md` file.
 ```
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory adds the mesh-convergence
+sweep described above. It scales the circumferential and radial divisions by
+powers of two from $$50 \times 5$$ to $$400 \times 40$$ cells and measures the
+error of the sampled stress against the analytical solution on the same
+$$\theta = 45^\circ$$ line:
+
+```bash
+cd verification
+./Allverify
+```
+
+The relative L2 error falls from $$0.252$$ to $$0.0066$$ over that family, a
+net order of $$1.75$$, and the whole sweep takes about 35 seconds. The study is
+separate from `regressionTest.sh` and is not run by the normal tutorial test
+suites. See the verification README for the mesh levels, options, and
+acceptance criteria.
+
 ---
 
 ### References

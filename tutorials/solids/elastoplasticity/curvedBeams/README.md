@@ -87,6 +87,27 @@ to run the case (`> solids4Foam`). Optionally, if `gnuplot` is installed, the
 evolution of the horizontal and vertical reaction forces is plotted in the
 `reaction-x.png` and `reaction-y.png` files.
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory turns the curved-beams
+benchmark from `solid-benchmarks/elastoPlasticity/curvedBeams` into a mesh
+convergence study for this tutorial. It refines the tutorial `blockMesh`,
+extracts the total reaction force history on the `fixed` patch, and compares it
+with the published curves of Neto et al. [2] for friction coefficients of
+$$\mu = 0.0$$, $$0.3$$ and $$0.6$$:
+
+```bash
+cd verification
+./Allverify
+```
+
+On the finest 2 000-cell mesh the computed force history agrees with [2] to
+2.3% RMS and 1.8% at the peak force, and the change in the history between
+successive meshes decreases monotonically with an observed order of 0.62. The
+study is separate from `regressionTest.sh` and is not run by the normal
+tutorial test suites. See the verification README for the mesh levels, options,
+and acceptance criteria.
+
 ---
 
 ### References

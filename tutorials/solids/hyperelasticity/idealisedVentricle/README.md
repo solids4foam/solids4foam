@@ -65,6 +65,24 @@ The default approach can also be run in parallel using:
 ./Allrun parallel
 ```
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh
+convergence study from `solid-benchmarks/hyperElasticity/idealisedVentricle`
+into this tutorial. It refines the `blockMesh` divisions and the rotational
+extrusion layers together, samples the deformed mid-wall line of Problem 2 of
+Land et al. [3], and checks self-convergence of that line:
+
+```bash
+cd verification
+./Allverify
+```
+
+The default sweep runs the 1 620-, 12 960-, and 103 680-cell levels; an
+829 440-cell level is available explicitly. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
+
 ---
 
 ## References
@@ -79,3 +97,9 @@ e70268, 2026.](https://doi.org/10.1002/nme.70268)
 [A. Horvat, P. Milović, I. Karšaj, and Ž. Tuković, "A Block-Coupled
 Finite Volume Method for Incompressible Hyperelastic Solids", Applied
 Sciences, 15(23), 12660, 2025.](https://doi.org/10.3390/app152312660)
+
+[3]
+[S. Land, V. Gurev, S. Arens, et al., "Verification of cardiac mechanics
+software: benchmark problems and solutions for testing active and passive
+material behaviour", Proceedings of the Royal Society A, 471(2184), 20150641,
+2015.](https://doi.org/10.1098/rspa.2015.0641)
