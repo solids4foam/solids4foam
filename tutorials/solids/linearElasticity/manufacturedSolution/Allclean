@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+source solids4FoamScripts.sh
+
+wclean lib src
+cleanCase
+rm -f gmsh/cube.msh
+solids4Foam::restoreCaseFormat .
+
+for file in constant/solidProperties.segregated \
+            system/fvSolution.segregated
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
