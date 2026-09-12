@@ -968,6 +968,15 @@ void Foam::fluidModel::clearGlobalPatches() const
 }
 
 
+void Foam::fluidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        globalPatchesPtrList_[i].syncPoints();
+    }
+}
+
+
 void Foam::fluidModel::setDeltaT(Time& runTime)
 {
     if (adjustTimeStep_)

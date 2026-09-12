@@ -23,6 +23,7 @@ License
 #include "surfaceFields.H"
 #include "fluidSolidInterface.H"
 #include "compatibilityFunctions.H"
+#include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -33,14 +34,22 @@ namespace Foam
 
 const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
 {
-    if (rhoSolidHsPtr_.empty())
-    {
     #ifdef OPENFOAM_NOT_EXTEND
-        const fvMesh& mesh = internalField().mesh();
+    const fvMesh& mesh = internalField().mesh();
     #else
-        const fvMesh& mesh = dimensionedInternalField().mesh();
+    const fvMesh& mesh = dimensionedInternalField().mesh();
     #endif
 
+    if
+    (
+        rhoSolidHsPtr_.empty()
+     ||
+        (
+            constantHs_ < SMALL
+         && rhoSolidHsTimeIndex_ != mesh.time().timeIndex()
+        )
+    )
+    {
         // Looking up the FSI solver
         const fluidSolidInterface& fsi =
             mesh.objectRegistry::parent().lookupObject<fluidSolidInterface>
@@ -90,9 +99,30 @@ const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
         scalarField hs(rho.size(), constantHs_);
         if (constantHs_ < SMALL)
         {
-            // Calculate a virtual thickness based on the speed of sound and time
-            // step
-            hs = ap*mesh.time().deltaT().value();
+            scalar deltaT = mesh.time().deltaT().value();
+
+            const word ddtScheme =
+            #ifdef OPENFOAM_NOT_EXTEND
+                word(mesh.ddtScheme("ddt(U)"));
+            #else
+                mesh.schemesDict().ddtScheme("ddt(U)");
+            #endif
+
+            if
+            (
+                ddtScheme == fv::backwardDdtScheme<vector>::typeName
+             && mesh.time().timeIndex() > 1
+            )
+            {
+                const scalar deltaT0 = mesh.time().deltaT0().value();
+                const scalar Cn = 1 + deltaT/(deltaT + deltaT0);
+
+                deltaT /= Cn;
+            }
+
+            // Calculate a virtual thickness based on the p-wave speed and the
+            // effective time step used by the fluid momentum equation
+            hs = ap*deltaT;
 
             if (debug)
             {
@@ -138,9 +168,33 @@ const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
                 ].globalFaceToPatch(rhoHsZoneAtFluid)
             )
         );
+
+        rhoSolidHsTimeIndex_ = mesh.time().timeIndex();
     }
 
     return rhoSolidHsPtr_();
+}
+
+
+void elasticWallPressureFvPatchScalarField::reportRobinNumber
+(
+    const scalarField& robinNumber
+)
+{
+    #ifdef OPENFOAM_NOT_EXTEND
+    const fvMesh& mesh = internalField().mesh();
+    #else
+    const fvMesh& mesh = dimensionedInternalField().mesh();
+    #endif
+
+    if (robinNumberTimeIndex_ != mesh.time().timeIndex())
+    {
+        Info<< type() << " " << patch().name() << ": Robin number: min = "
+            << min(robinNumber) << ", max = " << max(robinNumber)
+            << ", mean = " << average(robinNumber) << endl;
+
+        robinNumberTimeIndex_ = mesh.time().timeIndex();
+    }
 }
 
 
@@ -156,6 +210,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
     rhoSolidHsPtr_(),
+    rhoSolidHsTimeIndex_(-1),
+    robinNumberTimeIndex_(-1),
     constantHs_(-1.0)
 {}
 
@@ -177,6 +233,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevAcceleration_(ptf.prevAcceleration_, mapper),
 #endif
     rhoSolidHsPtr_(),
+    rhoSolidHsTimeIndex_(-1),
+    robinNumberTimeIndex_(-1),
     constantHs_(ptf.constantHs_)
 {}
 
@@ -192,6 +250,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
     rhoSolidHsPtr_(),
+    rhoSolidHsTimeIndex_(-1),
+    robinNumberTimeIndex_(-1),
     constantHs_(dict.lookupOrDefault<scalar>("constantHs", -1.0))
 {
     if (dict.found("value"))
@@ -228,6 +288,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinFvPatchScalarField(pivpvf),
     prevPressure_(pivpvf.prevPressure_),
     prevAcceleration_(pivpvf.prevAcceleration_),
+    rhoSolidHsTimeIndex_(-1),
+    robinNumberTimeIndex_(-1),
     constantHs_(pivpvf.constantHs_)
 {}
 #endif
@@ -243,6 +305,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevPressure_(pivpvf.prevPressure_),
     prevAcceleration_(pivpvf.prevAcceleration_),
     rhoSolidHsPtr_(),
+    rhoSolidHsTimeIndex_(-1),
+    robinNumberTimeIndex_(-1),
     constantHs_(pivpvf.constantHs_)
 {}
 
@@ -265,6 +329,7 @@ void elasticWallPressureFvPatchScalarField::autoMap
 #endif
 
     rhoSolidHsPtr_.clear();
+    rhoSolidHsTimeIndex_ = -1;
 }
 
 
@@ -283,6 +348,7 @@ void elasticWallPressureFvPatchScalarField::rmap
     prevAcceleration_.rmap(mptf.prevAcceleration_, addr);
 
     rhoSolidHsPtr_.clear();
+    rhoSolidHsTimeIndex_ = -1;
 }
 
 void elasticWallPressureFvPatchScalarField::updateCoeffs()
@@ -333,6 +399,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             patch().lookupPatchField<surfaceScalarField, scalar>("phig");
 
         const scalarField c1(rhoSolidHs/rhoFluid);
+        reportRobinNumber(c1*patch().deltaCoeffs());
 
         if (pDims == dimPressure/dimDensity)
         {
@@ -369,6 +436,9 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             transportProperties.lookup("rho")
         );
 
+        const scalarField c1(rhoSolidHs/rhoFluid.value());
+        reportRobinNumber(c1*patch().deltaCoeffs());
+
         if (debug)
         {
             Info<< "rhoSolidHs = " << max(rhoSolidHs)
@@ -380,7 +450,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         {
             // p/rho
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolidHs/rhoFluid.value();
+            this->coeff1() = c1;
             this->rhs() =
                 prevPressure_/rhoFluid.value()
               - rhoSolidHs*prevDdtUn/rhoFluid.value();
@@ -389,7 +459,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         {
             // p
             this->coeff0() = 1.0;
-            this->coeff1() = rhoSolidHs/rhoFluid.value();
+            this->coeff1() = c1;
             this->rhs() = prevPressure_ - rhoSolidHs*prevDdtUn;
         }
     }

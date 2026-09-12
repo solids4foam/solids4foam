@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      extrudeMeshDict;
+}
+// Create a new mesh by extruding a patch
+constructFrom patch;
+
+// Allrun stages the fluid mesh as the default-region source mesh.
+sourceCase ".";
+
+// Patch to extrude
+sourcePatches
+(
+    wall
+);
+
+// Name of the original/exposed side
+exposedPatchName innerWall;
+
+// Extrude in patch-normal direction
+flipNormals false;
+
+extrudeModel linearNormal;
+
+// Number of cells through thickness
+nLayers 3;
+
+// Layer expansion ratio
+// 1.0 = equal thickness layers
+expansionRatio 1.0;
+
+// Normal extrusion settings
+linearNormalCoeffs
+{
+    thickness 0.0003;
+}
+
+// Optional mesh merging controls
+mergeFaces false;
+mergeTol 0;
+
+// ************************************************************************* //

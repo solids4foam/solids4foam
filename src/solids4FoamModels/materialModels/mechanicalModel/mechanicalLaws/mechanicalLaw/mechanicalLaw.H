@@ -484,6 +484,12 @@ public:
 
     // Member Functions
 
+        //- Return the total deformation gradient stored by this law
+        const volTensorField& F() const;
+
+        //- Return the total face deformation gradient stored by this law
+        const surfaceTensorField& Ff() const;
+
         //- Return name
         const word& name() const
         {
@@ -556,13 +562,11 @@ public:
 
         //- Calculate the stress at face quadrature points given the
         //  displacement gradient at quadrature points
-#ifndef FOAMEXTEND
         virtual void correct
         (
             CompactListList<symmTensor>& sigmaQuad,
             const CompactListList<tensor>& gradDQuad
         );
-#endif
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

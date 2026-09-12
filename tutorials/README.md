@@ -101,6 +101,15 @@ Regression tests are:
 Not all tutorials are covered by regression tests; coverage is expected to grow
 incrementally over time.
 
+### Opt-in Validation and Convergence Studies
+
+Selected tutorials may also provide an opt-in `verification/` directory for
+expensive mesh/time refinement studies against analytical or published
+benchmarks. These are deliberately not included in `Alltest` or
+`Alltest-regression`. For example, `fluidSolidInteraction/beamInCrossFlow`
+provides `verification/Allverify`; see its local README for usage and resource
+requirements.
+
 ---
 
 ## Continuous Integration (CI)

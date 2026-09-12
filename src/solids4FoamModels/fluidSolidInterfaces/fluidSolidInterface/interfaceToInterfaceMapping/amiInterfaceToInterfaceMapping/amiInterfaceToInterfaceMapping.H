@@ -56,10 +56,6 @@ class amiInterfaceToInterfaceMapping
 {
     // Private data
 
-            //- Reference-configuration copies used to construct the mapping
-            mutable autoPtr<standAlonePatch> zoneARefPtr_;
-            mutable autoPtr<standAlonePatch> zoneBRefPtr_;
-
             //- AMI interpolator between two standAlone patches
             mutable autoPtr<amiZoneInterpolation> interpolatorPtr_;
 
@@ -76,18 +72,6 @@ class amiInterfaceToInterfaceMapping
             mutable FieldField<Field, scalar>* zoneBPointWeightsPtr_;
 
     // Private Member Functions
-
-        //- Build a zone from the constant mesh points
-        autoPtr<standAlonePatch> makeReferenceZone
-        (
-            const globalPolyPatch& globalPatch
-        ) const;
-
-        //- Return zoneA in the reference configuration
-        const standAlonePatch& zoneARef() const;
-
-        //- Return zoneB in the reference configuration
-        const standAlonePatch& zoneBRef() const;
 
         //- Make the AMI interpolator
         void makeInterpolator() const;

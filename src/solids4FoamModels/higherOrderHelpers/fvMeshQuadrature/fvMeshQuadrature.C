@@ -24,18 +24,23 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "triFace.H"
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
     #include "triPointRef.H"
+#endif
+#ifdef OPENFOAM_ORG
     #include "faceAreaIntersect.H"
 #endif
 #include "triQuadrature.H"
 #include "tetQuadrature.H"
 #include "lineQuadrature.H"
+#include "processorFvPatch.H"
+#include "cellModeller.H"
+#include "debug.H"
 
 namespace Foam
 {
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
 typedef triangle<point, point> genericTriPoints;
 inline scalar genericTriQuality(const genericTriPoints& tri)
 {
@@ -49,7 +54,7 @@ inline scalar genericTriQuality(const genericTriPoints& tri)
 }
 #endif
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
 namespace
 {
 
@@ -63,9 +68,9 @@ public:
 
     storedTriPoints()
     :
-        a_(Zero),
-        b_(Zero),
-        c_(Zero)
+        a_(point::zero),
+        b_(point::zero),
+        c_(point::zero)
     {}
 
     storedTriPoints(const point& a, const point& b, const point& c)
@@ -103,7 +108,11 @@ public:
 
 inline bool isTetCellShape(const cellShape& shape)
 {
+#ifdef FOAMEXTEND
+    return shape.model() == *cellModeller::lookup("tet");
+#else
     return shape.model().name() == "tet";
+#endif
 }
 
 }
@@ -115,12 +124,28 @@ defineTypeNameAndDebug(fvMeshQuadrature, 0);
 
 const scalar fvMeshQuadrature::minTriAreaRatio_
 (
+#ifdef FOAMEXTEND
+    debug::optimisationSwitches().lookupOrAddDefault<scalar>
+    (
+        "fvMeshQuadratureMinTriAreaRatio",
+        0.05
+    )
+#else
     debug::floatOptimisationSwitch("fvMeshQuadratureMinTriAreaRatio", 0.05)
+#endif
 );
 
 const scalar fvMeshQuadrature::minTriQuality_
 (
+#ifdef FOAMEXTEND
+    debug::optimisationSwitches().lookupOrAddDefault<scalar>
+    (
+        "fvMeshQuadratureMinTriQuality",
+        0.01
+    )
+#else
     debug::floatOptimisationSwitch("fvMeshQuadratureMinTriQuality", 0.01)
+#endif
 );
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
@@ -237,6 +262,121 @@ void fvMeshQuadrature::calcQuadPointsAndWeights() const
 }
 
 
+void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
+{
+    if (processorFaceQuadratureSynchronised_)
+    {
+        return;
+    }
+
+    if (!Pstream::parRun())
+    {
+        processorFaceQuadratureSynchronised_ = true;
+        return;
+    }
+
+    if (faceQuadPointsPtr_.empty() || faceQuadWeightsPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Face quadrature points and weights must be calculated before "
+            << "processor-face synchronisation"
+            << abort(FatalError);
+    }
+
+    CompactListList<point>& faceQuadPoints = autoPtrRef(faceQuadPointsPtr_);
+    CompactListList<scalar>& faceQuadWeights = autoPtrRef(faceQuadWeightsPtr_);
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh_.boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const processorFvPatch& procPatch =
+            refCast<const processorFvPatch>(patch);
+        const label patchStart = patch.patch().start();
+
+        labelField localSizes(patch.size(), 0);
+        label nLocalValues = 0;
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patchStart + patchFaceI;
+            localSizes[patchFaceI] = faceQuadPoints[faceI].size();
+            nLocalValues += localSizes[patchFaceI];
+        }
+
+        if (Pstream::myProcNo() < procPatch.neighbProcNo())
+        {
+            pointField masterPoints(nLocalValues);
+            scalarField masterWeights(nLocalValues);
+            label valueI = 0;
+
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    masterPoints[valueI] = faceQuadPoints[faceI][qpI];
+                    masterWeights[valueI] = faceQuadWeights[faceI][qpI];
+                    ++valueI;
+                }
+            }
+
+            procPatch.send(Pstream::commsTypes::blocking, localSizes);
+            procPatch.send(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.send(Pstream::commsTypes::blocking, masterWeights);
+        }
+        else
+        {
+            labelField masterSizes(patch.size(), 0);
+            procPatch.receive(Pstream::commsTypes::blocking, masterSizes);
+
+            label nMasterValues = 0;
+            forAll(masterSizes, patchFaceI)
+            {
+                if (localSizes[patchFaceI] != masterSizes[patchFaceI])
+                {
+                    FatalErrorInFunction
+                        << "Processor patch " << patch.name() << " face "
+                        << patchFaceI << " has " << localSizes[patchFaceI]
+                        << " local quadrature points but "
+                        << masterSizes[patchFaceI]
+                        << " master quadrature points"
+                        << abort(FatalError);
+                }
+
+                nMasterValues += masterSizes[patchFaceI];
+            }
+
+            pointField masterPoints(nMasterValues);
+            scalarField masterWeights(nMasterValues);
+            procPatch.receive(Pstream::commsTypes::blocking, masterPoints);
+            procPatch.receive(Pstream::commsTypes::blocking, masterWeights);
+
+            label valueI = 0;
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPoints[faceI], qpI)
+                {
+                    faceQuadPoints[faceI][qpI] = masterPoints[valueI];
+                    faceQuadWeights[faceI][qpI] = masterWeights[valueI];
+                    ++valueI;
+                }
+            }
+        }
+    }
+
+    processorFaceQuadratureSynchronised_ = true;
+}
+
+
 void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
 {
     if
@@ -280,7 +420,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
     // Domain midpoint in empty direction
     const boundBox bb(pts);
     const scalar thickness = bb.span()[emptyCmpt];
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
     const scalar mid = bb.midpoint()[emptyCmpt];
 #else
     const scalar mid = bb.centre()[emptyCmpt];
@@ -318,8 +458,8 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
     faceQuadPointsPtr_.set(new CompactListList<point>(quadPtsPerFace));
     faceQuadWeightsPtr_.set(new CompactListList<scalar>(quadPtsPerFace));
 
-    CompactListList<point>& faceQP = *faceQuadPointsPtr_;
-    CompactListList<scalar>& faceQW = *faceQuadWeightsPtr_;
+    CompactListList<point>& faceQP = autoPtrRef(faceQuadPointsPtr_);
+    CompactListList<scalar>& faceQW = autoPtrRef(faceQuadWeightsPtr_);
 
     forAll(faces, faceI)
     {
@@ -436,8 +576,8 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
     cellQuadPointsPtr_.set(new CompactListList<point>(quadPtsPerCell));
     cellQuadWeightsPtr_.set(new CompactListList<scalar>(quadPtsPerCell));
 
-    CompactListList<point>&  cellQP = *cellQuadPointsPtr_;
-    CompactListList<scalar>& cellQW = *cellQuadWeightsPtr_;
+    CompactListList<point>& cellQP = autoPtrRef(cellQuadPointsPtr_);
+    CompactListList<scalar>& cellQW = autoPtrRef(cellQuadWeightsPtr_);
 
     // Triangulate selected faces and fill cell quadrature
     forAll(selectedFace, cellI)
@@ -492,7 +632,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights2D() const
             const genericTriPoints tp(a, b, c);
             const scalar triArea = tp.mag();
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
             const triQuadrature tq(tp.a(), tp.b(), tp.c(), cellOrder_);
 #else
             const triQuadrature tq(tp, cellOrder_);
@@ -556,10 +696,10 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
             new CompactListList<scalar>(labelList(mesh.nCells(), 1))
         );
 
-        CompactListList<point>& faceQP = *faceQuadPointsPtr_;
-        CompactListList<scalar>& faceQW = *faceQuadWeightsPtr_;
-        CompactListList<point>& cellQP = *cellQuadPointsPtr_;
-        CompactListList<scalar>& cellQW = *cellQuadWeightsPtr_;
+        CompactListList<point>& faceQP = autoPtrRef(faceQuadPointsPtr_);
+        CompactListList<scalar>& faceQW = autoPtrRef(faceQuadWeightsPtr_);
+        CompactListList<point>& cellQP = autoPtrRef(cellQuadPointsPtr_);
+        CompactListList<scalar>& cellQW = autoPtrRef(cellQuadWeightsPtr_);
 
         forAll(faces, faceI)
         {
@@ -589,7 +729,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     // and adaptive triangulation.
 
     // Points of each triangle sub-element
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
     List<List<storedTriPoints>> faceTri(mesh.nFaces());
 #else
     List<List<genericTriPoints>> faceTri(mesh.nFaces());
@@ -633,8 +773,9 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
 
         forAll(triFaces, triI)
         {
-#ifdef OPENFOAM_ORG
-            const triFace& triF = triFaces[triI];
+            const auto& triF = triFaces[triI];
+
+#ifndef OPENFOAM_COM
             const storedTriPoints tp
             (
                 pts[triF[0]],
@@ -642,7 +783,6 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
                 pts[triF[2]]
             );
 #else
-            const face& triF = triFaces[triI];
             const genericTriPoints tp
             (
                 pts[triF[0]],
@@ -666,7 +806,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
             {
                 const label nextpI = (pI + 1 < nPoints ? pI + 1 : 0);
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
                 const storedTriPoints tp(pts[f[pI]], pts[f[nextpI]], fc);
 #else
                 const genericTriPoints tp(pts[f[pI]], pts[f[nextpI]], fc);
@@ -691,12 +831,12 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     faceQuadPointsPtr_.set(new CompactListList<point>(quadPtsPerFace));
     faceQuadWeightsPtr_.set(new CompactListList<scalar>(quadPtsPerFace));
 
-    CompactListList<point>&  faceQP = *faceQuadPointsPtr_;
-    CompactListList<scalar>& faceQW = *faceQuadWeightsPtr_;
+    CompactListList<point>& faceQP = autoPtrRef(faceQuadPointsPtr_);
+    CompactListList<scalar>& faceQW = autoPtrRef(faceQuadWeightsPtr_);
 
     forAll(faceTri, faceI)
     {
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
         const List<storedTriPoints>& fT = faceTri[faceI];
 #else
         const List<genericTriPoints>& fT = faceTri[faceI];
@@ -704,7 +844,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
 
         forAll(fT, tI)
         {
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
             const storedTriPoints& tp = fT[tI];
             const triQuadrature tq(tp.a(), tp.b(), tp.c(), faceOrder_);
 #else
@@ -735,7 +875,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     {
         const cellShape& shape = mesh.cellShapes()[cellI];
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
         if (isTetCellShape(shape))
 #else
         if (shape.model() == cellModel::ref(cellModel::TET))
@@ -761,8 +901,8 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     cellQuadPointsPtr_.set(new CompactListList<point>(quadPtsPerCell));
     cellQuadWeightsPtr_.set(new CompactListList<scalar>(quadPtsPerCell));
 
-    CompactListList<point>&  cellQP = *cellQuadPointsPtr_;
-    CompactListList<scalar>& cellQW = *cellQuadWeightsPtr_;
+    CompactListList<point>& cellQP = autoPtrRef(cellQuadPointsPtr_);
+    CompactListList<scalar>& cellQW = autoPtrRef(cellQuadWeightsPtr_);
 
     // Loop over cells
 
@@ -774,7 +914,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
         const cell& c = mesh.cells()[cellI];
 
         // Skip decomposition for tetrahedral cells
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
         if (isTetCellShape(shape))
         {
             const tetrahedron<point, point> tet
@@ -833,7 +973,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
             forAll(c, fI)
             {
                 const label faceI = c[fI];
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
                 const List<storedTriPoints>& tris = faceTri[faceI];
 #else
                 const List<genericTriPoints>& tris = faceTri[faceI];
@@ -841,7 +981,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
 
                 forAll(tris, triI)
                 {
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
                     const storedTriPoints& tp = tris[triI];
                     const tetrahedron<point, point> subTet
                     (
@@ -884,6 +1024,187 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
     }
 }
 
+
+void fvMeshQuadrature::calcFirstOrderCellMoments() const
+{
+    if (firstOrderCellMomentsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+#ifdef FOAMEXTEND
+    // foam-extend's const CompactListList::operator[] cannot construct its
+    // const sub-list with modern Clang, so initialise through the public
+    // accessors and use the mutable cached storage for read-only traversal.
+    cellQuadPoints();
+    cellQuadWeights();
+    CompactListList<point>& quadPoints = autoPtrRef(cellQuadPointsPtr_);
+    CompactListList<scalar>& quadWeights = autoPtrRef(cellQuadWeightsPtr_);
+#else
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+#endif
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    firstOrderCellMomentsPtr_.set
+    (
+        new List<vector>(mesh_.nCells(), vector::zero)
+    );
+
+    List<vector>& firstOrderCellMoments =
+        autoPtrRef(firstOrderCellMomentsPtr_);
+
+    forAll(cellCentres, cellI)
+    {
+        vector& firstMoment = firstOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            firstMoment.x() += w*r.x();
+            firstMoment.y() += w*r.y();
+
+            if (!twoD)
+            {
+                firstMoment.z() += w*r.z();
+            }
+        }
+
+        firstMoment /= cellVolumes[cellI];
+    }
+}
+
+
+void fvMeshQuadrature::calcCellMoments() const
+{
+    if
+    (
+        secondOrderCellMomentsPtr_.valid()
+     || thirdOrderCellMomentsPtr_.valid()
+    )
+    {
+        FatalErrorInFunction
+            << "Pointers already set" << abort(FatalError);
+    }
+
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Cell moments are not required for integration order "
+            << cellOrder_ << abort(FatalError);
+    }
+
+    const bool twoD = mesh_.nGeometricD() == 2;
+    if (twoD && mesh_.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "The empty direction must be vector::Z"
+            << abort(FatalError);
+    }
+
+#ifdef FOAMEXTEND
+    // See calcFirstOrderCellMoments() for the CompactListList workaround.
+    cellQuadPoints();
+    cellQuadWeights();
+    CompactListList<point>& quadPoints = autoPtrRef(cellQuadPointsPtr_);
+    CompactListList<scalar>& quadWeights = autoPtrRef(cellQuadWeightsPtr_);
+#else
+    const CompactListList<point>& quadPoints = cellQuadPoints();
+    const CompactListList<scalar>& quadWeights = cellQuadWeights();
+#endif
+    const vectorField& cellCentres = mesh_.C();
+    const scalarField& cellVolumes = mesh_.V();
+
+    secondOrderCellMomentsPtr_.set
+    (
+        new List<symmTensor>(mesh_.nCells(), symmTensor::zero)
+    );
+
+    if (cellOrder_ > 2)
+    {
+        thirdOrderCellMomentsPtr_.set
+        (
+            new List<symmTensor3rdOrder>
+            (
+                mesh_.nCells(),
+                symmTensor3rdOrder::zero
+            )
+        );
+    }
+
+    List<symmTensor>& secondOrderCellMoments =
+        autoPtrRef(secondOrderCellMomentsPtr_);
+
+    forAll(cellCentres, cellI)
+    {
+        symmTensor& secondMoment = secondOrderCellMoments[cellI];
+
+        forAll(quadPoints[cellI], qI)
+        {
+            const vector r = quadPoints[cellI][qI] - cellCentres[cellI];
+            const scalar w = quadWeights[cellI][qI];
+
+            secondMoment.xx() += w*r.x()*r.x();
+            secondMoment.xy() += w*r.x()*r.y();
+            secondMoment.yy() += w*r.y()*r.y();
+
+            if (!twoD)
+            {
+                secondMoment.xz() += w*r.x()*r.z();
+                secondMoment.yz() += w*r.y()*r.z();
+                secondMoment.zz() += w*r.z()*r.z();
+            }
+
+            if (thirdOrderCellMomentsPtr_.valid())
+            {
+                symmTensor3rdOrder& thirdMoment =
+                    autoPtrRef(thirdOrderCellMomentsPtr_)[cellI];
+
+                thirdMoment.xxx() += w*r.x()*r.x()*r.x();
+                thirdMoment.xxy() += w*r.x()*r.x()*r.y();
+                thirdMoment.xyy() += w*r.x()*r.y()*r.y();
+                thirdMoment.yyy() += w*r.y()*r.y()*r.y();
+
+                if (!twoD)
+                {
+                    thirdMoment.xxz() += w*r.x()*r.x()*r.z();
+                    thirdMoment.xyz() += w*r.x()*r.y()*r.z();
+                    thirdMoment.xzz() += w*r.x()*r.z()*r.z();
+                    thirdMoment.yyz() += w*r.y()*r.y()*r.z();
+                    thirdMoment.yzz() += w*r.y()*r.z()*r.z();
+                    thirdMoment.zzz() += w*r.z()*r.z()*r.z();
+                }
+            }
+        }
+
+        secondMoment /= cellVolumes[cellI];
+        if (thirdOrderCellMomentsPtr_.valid())
+        {
+            autoPtrRef(thirdOrderCellMomentsPtr_)[cellI] /= cellVolumes[cellI];
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fvMeshQuadrature::fvMeshQuadrature
@@ -900,8 +1221,12 @@ fvMeshQuadrature::fvMeshQuadrature
     allowDegenerateTriFallback_(allowDegenerateTriFallback),
     faceQuadPointsPtr_(),
     faceQuadWeightsPtr_(),
+    processorFaceQuadratureSynchronised_(false),
     cellQuadPointsPtr_(),
-    cellQuadWeightsPtr_()
+    cellQuadWeightsPtr_(),
+    firstOrderCellMomentsPtr_(),
+    secondOrderCellMomentsPtr_(),
+    thirdOrderCellMomentsPtr_()
 {
 }
 
@@ -924,6 +1249,8 @@ const CompactListList<point>& fvMeshQuadrature::faceQuadPoints() const
         calcQuadPointsAndWeights();
     }
 
+    synchroniseProcessorFaceQuadrature();
+
     return autoPtrRef(faceQuadPointsPtr_);
 }
 
@@ -934,6 +1261,8 @@ const CompactListList<scalar>& fvMeshQuadrature::faceQuadWeights() const
     {
         calcQuadPointsAndWeights();
     }
+
+    synchroniseProcessorFaceQuadrature();
 
     return autoPtrRef(faceQuadWeightsPtr_);
 }
@@ -959,12 +1288,72 @@ const CompactListList<scalar>& fvMeshQuadrature::cellQuadWeights() const
     return autoPtrRef(cellQuadWeightsPtr_);
 }
 
+
+const List<vector>& fvMeshQuadrature::firstOrderCellMoments() const
+{
+    if (cellOrder_ < 1)
+    {
+        FatalErrorInFunction
+            << "First-order cell moments are not available for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (firstOrderCellMomentsPtr_.empty())
+    {
+        calcFirstOrderCellMoments();
+    }
+
+    return autoPtrRef(firstOrderCellMomentsPtr_);
+}
+
+
+const List<symmTensor>& fvMeshQuadrature::secondOrderCellMoments() const
+{
+    if (cellOrder_ < 2)
+    {
+        FatalErrorInFunction
+            << "Second-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (secondOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return autoPtrRef(secondOrderCellMomentsPtr_);
+}
+
+
+const List<symmTensor3rdOrder>&
+fvMeshQuadrature::thirdOrderCellMoments() const
+{
+    if (cellOrder_ < 3)
+    {
+        FatalErrorInFunction
+            << "Third-order cell moments are not required for integration "
+            << "order " << cellOrder_ << abort(FatalError);
+    }
+
+    if (thirdOrderCellMomentsPtr_.empty())
+    {
+        calcCellMoments();
+    }
+
+    return autoPtrRef(thirdOrderCellMomentsPtr_);
+}
+
+
 void fvMeshQuadrature::clear()
 {
+    processorFaceQuadratureSynchronised_ = false;
     faceQuadPointsPtr_.clear();
     faceQuadWeightsPtr_.clear();
     cellQuadPointsPtr_.clear();
     cellQuadWeightsPtr_.clear();
+    firstOrderCellMomentsPtr_.clear();
+    secondOrderCellMomentsPtr_.clear();
+    thirdOrderCellMomentsPtr_.clear();
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

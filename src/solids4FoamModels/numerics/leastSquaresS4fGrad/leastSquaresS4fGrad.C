@@ -157,6 +157,25 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
         lsGrad[neiFacei] -= neiLs[facei]*deltaVsf;
     }
 
+    // Cells where the face stencil is rank-deficient take their internal
+    // contribution from the wider point-cell stencil instead: their face
+    // vectors above are zero, so nothing is counted twice
+    const labelList& wideCells = lsv.wideCells();
+    const labelListList& wideStencil = lsv.wideStencil();
+    const List<vectorList>& wideVectors = lsv.wideVectors();
+
+    forAll(wideCells, wcI)
+    {
+        const label cellI = wideCells[wcI];
+        const labelList& stencil = wideStencil[wcI];
+        const vectorList& lsVecs = wideVectors[wcI];
+
+        forAll(stencil, i)
+        {
+            lsGrad[cellI] += lsVecs[i]*(vsf[stencil[i]] - vsf[cellI]);
+        }
+    }
+
     // Boundary faces
     forAll(vsf.boundaryField(), patchi)
     {

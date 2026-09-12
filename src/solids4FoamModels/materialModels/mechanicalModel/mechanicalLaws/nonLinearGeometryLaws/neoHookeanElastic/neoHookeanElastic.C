@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "neoHookeanElastic.H"
+#include "compatibilityFunctions.H"
 #include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -486,13 +487,14 @@ void Foam::neoHookeanElastic::correctF
 }
 
 
-#ifndef FOAMEXTEND
 void Foam::neoHookeanElastic::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
     const CompactListList<tensor>& gradDQuad
 )
 {
+    auto& gradDQuadRef = compactListListCRef(gradDQuad);
+
     if (pressureDisplacement_)
     {
         notImplemented
@@ -509,7 +511,7 @@ void Foam::neoHookeanElastic::correct
     forAll(sigmaQuad, faceI)
     {
         UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
-        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuadRef[faceI];
 
         forAll(faceSigmaQuad, qpI)
         {
@@ -539,7 +541,6 @@ void Foam::neoHookeanElastic::correct
         }
     }
 }
-#endif
 
 
 void Foam::neoHookeanElastic::setRestart()

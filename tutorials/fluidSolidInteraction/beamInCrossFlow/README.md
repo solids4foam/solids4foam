@@ -49,7 +49,8 @@ This case can be analysed in two forms:
 The `beamInCrossFlow` case in solids4foam is set up in the modified form;
  however, it is straight-forward to return the case to its original form by
  setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
- and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+ setting `E` to `1.4e6` in `constant/solid/mechanicalProperties`, and running
+ past `t = 4 s` until the solution is steady.
 ```
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
@@ -69,7 +70,7 @@ $$
 
 For the solid, we assume finite strains (though a small strain assumption would
 be OK in the the original form of the case) with the material behaviour
-described by the neo-Hookean hyperelastic law:
+described by the St Venant-Kirchhoff hyperelastic law:
 
 $$
 \rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
@@ -77,10 +78,12 @@ $$
 $$
 
 $$
-\boldsymbol{\sigma} = \frac{1}{J}
-\left[ \frac{K}{2} (J^2 - 1) \mathbf{I}
-+ \mu J^{-\frac{2}{3}} \mathrm{dev} \left[ \mathbf{F}
-\cdot \mathbf{F}^T \right] \right]
+\boldsymbol{E} = \frac{1}{2}(\boldsymbol{F}^T\boldsymbol{F} - \mathbf{I})
+\qquad
+\boldsymbol{S} = 2\mu\boldsymbol{E}
++ \lambda\mathrm{tr}(\boldsymbol{E})\mathbf{I}
+\qquad
+\boldsymbol{\sigma} = \frac{1}{J}\boldsymbol{F}\boldsymbol{S}\boldsymbol{F}^T
 $$
 
 $$
@@ -150,7 +153,11 @@ ground, wall and outlet.
 The tutorial case can be run using the included `Allrun` script. The tuned
 IQNILS setup is the default, i.e. `./Allrun`. The original Aitken setup can be
 selected with `./Allrun aitken`, and either option can be combined with
-`parallel`.
+`parallel`. The high-order total-Lagrangian solid configuration can be run with
+`./Allrun iqnils highOrder`; it can also be combined with `parallel`. This mode
+selects `solidProperties.iqnils.highOrder`, enables the high-order MLS
+residual, and uses the existing face-based IQNILS traction transfer with a
+piecewise-constant traction at every solid face quadrature point.
 
 For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
@@ -176,7 +183,11 @@ checks for both coupling options:
 For efficiency, the script runs both the `aitken` and `iqnils` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
-then.
+then. It also runs the `iqnils highOrder` variant and checks that it reaches the
+shortened end time. On supported OpenFOAM versions, the high-order result is
+checked against the same displacement and force references as the lower-order
+variants; the displacement tolerance is widened to allow the expected
+discretisation difference. The high-order variant is skipped on foam-extend.
 
 The script checks that both variants converge to the same solution, within
 loose tolerances, by comparing:
@@ -187,6 +198,13 @@ loose tolerances, by comparing:
 
 This is intended as a practical regression test for the case setup and the FSI
 coupling implementations, rather than as a strict bitwise comparison.
+
+## Verification and convergence studies
+
+The opt-in [`verification/`](verification/) directory complements the fast
+regression test with isolated mesh-convergence studies and published
+benchmark comparisons. These studies are not part of normal CI. See its README
+for commands and expected runtime.
 
 The `Allrun` script is shown below:
 
@@ -201,6 +219,8 @@ The `Allrun` script is shown below:
 # ./Allrun aitken
 # ./Allrun parallel
 # ./Allrun aitken parallel
+# ./Allrun iqnils highOrder
+# ./Allrun iqnils highOrder parallel
 
 coupling=iqnils
 runMode=serial

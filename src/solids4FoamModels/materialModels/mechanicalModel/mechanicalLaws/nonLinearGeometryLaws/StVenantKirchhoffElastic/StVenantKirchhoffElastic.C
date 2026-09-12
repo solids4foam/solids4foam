@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "StVenantKirchhoffElastic.H"
+#include "compatibilityFunctions.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
 
@@ -223,13 +224,14 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 }
 
 
-#ifndef FOAMEXTEND
 void Foam::StVenantKirchhoffElastic::correct
 (
     CompactListList<symmTensor>& sigmaQuad,
     const CompactListList<tensor>& gradDQuad
 )
 {
+    auto& gradDQuadRef = compactListListCRef(gradDQuad);
+
     // Get mu and lambda values
     const scalar mu = mu_.value();
     const scalar lambda = lambda_.value();
@@ -237,7 +239,7 @@ void Foam::StVenantKirchhoffElastic::correct
     forAll(sigmaQuad, faceI)
     {
         UList<symmTensor> faceSigmaQuad = sigmaQuad[faceI];
-        const UList<tensor> faceGradDQuad = gradDQuad[faceI];
+        const UList<tensor> faceGradDQuad = gradDQuadRef[faceI];
 
         forAll(faceSigmaQuad, qpI)
         {
@@ -255,7 +257,6 @@ void Foam::StVenantKirchhoffElastic::correct
         }
     }
 }
-#endif
 
 
 void Foam::StVenantKirchhoffElastic::setRestart()

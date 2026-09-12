@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "triQuadrature.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -47,8 +48,8 @@ void triQuadrature::constructRules()
         1,
         quadratureRule
         {
-            List<barycentric2D>{barycentric2D(1.0/3.0, 1.0/3.0, 1.0/3.0)},
-            List<scalar>{1.0}
+            makeList<barycentric2D>({barycentric2D(1.0/3.0, 1.0/3.0, 1.0/3.0)}),
+            makeList<scalar>({1.0})
         }
     );
 
@@ -58,13 +59,12 @@ void triQuadrature::constructRules()
         2,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(2.0/3.0, 1.0/6.0, 1.0/6.0),
                 barycentric2D(1.0/6.0, 2.0/3.0, 1.0/6.0),
                 barycentric2D(1.0/6.0, 1.0/6.0, 2.0/3.0)
-            },
-            List<scalar>{1.0/3.0, 1.0/3.0, 1.0/3.0}
+            }),
+            makeList<scalar>({1.0/3.0, 1.0/3.0, 1.0/3.0})
         }
     );
 
@@ -74,14 +74,13 @@ void triQuadrature::constructRules()
         3,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(1.0/3.0, 1.0/3.0, 1.0/3.0),
                 barycentric2D(0.6, 0.2, 0.2),
                 barycentric2D(0.2, 0.6, 0.2),
                 barycentric2D(0.2, 0.2, 0.6)
-            },
-            List<scalar>{-9.0/16.0, 25.0/48.0, 25.0/48.0, 25.0/48.0}
+            }),
+            makeList<scalar>({-9.0/16.0, 25.0/48.0, 25.0/48.0, 25.0/48.0})
         }
     );
 
@@ -91,24 +90,22 @@ void triQuadrature::constructRules()
         4,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.108103018168070, 0.445948490915965, 0.445948490915965),
                 barycentric2D(0.445948490915965, 0.108103018168070, 0.445948490915965),
                 barycentric2D(0.445948490915965, 0.445948490915965, 0.108103018168070),
                 barycentric2D(0.816847572980459, 0.091576213509771, 0.091576213509771),
                 barycentric2D(0.091576213509771, 0.816847572980459, 0.091576213509771),
                 barycentric2D(0.091576213509771, 0.091576213509771, 0.816847572980459)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.223381589678011,
                 0.223381589678011,
                 0.223381589678011,
                 0.109951743655322,
                 0.109951743655322,
                 0.109951743655322
-            }
+            })
         }
     );
 
@@ -118,8 +115,7 @@ void triQuadrature::constructRules()
         5,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(1.0/3.0, 1.0/3.0, 1.0/3.0),
                 barycentric2D(0.059715871789770, 0.470142064105115, 0.470142064105115),
                 barycentric2D(0.470142064105115, 0.059715871789770, 0.470142064105115),
@@ -127,9 +123,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.797426985353087, 0.101286507323456, 0.101286507323456),
                 barycentric2D(0.101286507323456, 0.797426985353087, 0.101286507323456),
                 barycentric2D(0.101286507323456, 0.101286507323456, 0.797426985353087),
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                  0.225000000000000,
                  0.132394152788506,
                  0.132394152788506,
@@ -137,7 +132,7 @@ void triQuadrature::constructRules()
                  0.125939180544827,
                  0.125939180544827,
                  0.125939180544827
-            }
+            })
         }
     );
 
@@ -147,8 +142,7 @@ void triQuadrature::constructRules()
         6,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.501426509658179, 0.249286745170910, 0.249286745170910),
                 barycentric2D(0.249286745170910, 0.501426509658179, 0.249286745170910),
                 barycentric2D(0.249286745170910, 0.249286745170910, 0.501426509658179),
@@ -161,9 +155,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.636502499121399, 0.053145049844817, 0.310352451033784),
                 barycentric2D(0.310352451033784, 0.636502499121399, 0.053145049844817),
                 barycentric2D(0.636502499121399, 0.310352451033784, 0.053145049844817)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.116786275726379,
                 0.116786275726379,
                 0.116786275726379,
@@ -176,7 +169,7 @@ void triQuadrature::constructRules()
                 0.082851075618374,
                 0.082851075618374,
                 0.082851075618374
-            }
+            })
         }
     );
 
@@ -186,8 +179,7 @@ void triQuadrature::constructRules()
         7,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.333333333333333, 0.333333333333333, 0.333333333333333),
                 barycentric2D(0.479308067841920, 0.260345966079040, 0.260345966079040),
                 barycentric2D(0.260345966079040, 0.479308067841920, 0.260345966079040),
@@ -201,9 +193,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.312865496004874, 0.638444188569810, 0.048690315425316),
                 barycentric2D(0.638444188569810, 0.048690315425316, 0.312865496004874),
                 barycentric2D(0.638444188569810, 0.312865496004874, 0.048690315425316)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                -0.149570044467682,
                 0.175615257433208,
                 0.175615257433208,
@@ -217,7 +208,7 @@ void triQuadrature::constructRules()
                 0.077113760890257,
                 0.077113760890257,
                 0.077113760890257
-            }
+            })
         }
     );
 
@@ -227,8 +218,7 @@ void triQuadrature::constructRules()
         8,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.333333333333333, 0.333333333333333, 0.333333333333333),
                 barycentric2D(0.081414823414554, 0.459292588292723, 0.459292588292723),
                 barycentric2D(0.459292588292723, 0.081414823414554, 0.459292588292723),
@@ -245,9 +235,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.263112829634638, 0.728492392955404, 0.008394777409958),
                 barycentric2D(0.728492392955404, 0.008394777409958, 0.263112829634638),
                 barycentric2D(0.728492392955404, 0.263112829634638, 0.008394777409958)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.144315607677787,
                 0.095091634267285,
                 0.095091634267285,
@@ -264,7 +253,7 @@ void triQuadrature::constructRules()
                 0.027230314174435,
                 0.027230314174435,
                 0.027230314174435
-            }
+            })
         }
     );
 
@@ -274,8 +263,7 @@ void triQuadrature::constructRules()
         9,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.333333333333333, 0.333333333333333, 0.333333333333333),
                 barycentric2D(0.020634961602525, 0.489682519198738, 0.489682519198738),
                 barycentric2D(0.489682519198738, 0.020634961602525, 0.489682519198738),
@@ -295,9 +283,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.221962989160766, 0.741198598784498, 0.036838412054736),
                 barycentric2D(0.741198598784498, 0.036838412054736, 0.221962989160766),
                 barycentric2D(0.741198598784498, 0.221962989160766, 0.036838412054736)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.097135796282799,
                 0.031334700227139,
                 0.031334700227139,
@@ -317,7 +304,7 @@ void triQuadrature::constructRules()
                 0.043283539377289,
                 0.043283539377289,
                 0.043283539377289
-            }
+            })
         }
     );
 
@@ -328,8 +315,7 @@ void triQuadrature::constructRules()
         10,
         quadratureRule
         {
-            List<barycentric2D>
-            {
+            makeList<barycentric2D>({
                 barycentric2D(0.333333333333333, 0.333333333333333, 0.333333333333333),
                 barycentric2D(0.028844733232685, 0.485577633383657, 0.485577633383657),
                 barycentric2D(0.485577633383657, 0.028844733232685, 0.485577633383657),
@@ -355,9 +341,8 @@ void triQuadrature::constructRules()
                 barycentric2D(0.066803251012200, 0.923655933587500, 0.009540815400299),
                 barycentric2D(0.923655933587500, 0.009540815400299, 0.066803251012200),
                 barycentric2D(0.923655933587500, 0.066803251012200, 0.009540815400299)
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.090817990382754,
                 0.036725957756467,
                 0.036725957756467,
@@ -383,7 +368,7 @@ void triQuadrature::constructRules()
                 0.009421666963733,
                 0.009421666963733,
                 0.009421666963733
-            }
+            })
         }
     );}
 
@@ -441,7 +426,7 @@ tmp<Field<point>> triQuadrature::barycentricToPoint
 ) const
 {
     tmp<Field<point>> tglobalPts(new Field<point>(localPts.size()));
-    Field<point>& globalPts = tglobalPts.ref();
+    Field<point>& globalPts = tmpRef(tglobalPts);
 
     forAll(globalPts, pointI)
     {

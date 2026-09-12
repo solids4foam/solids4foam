@@ -163,6 +163,7 @@ $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/thermalRobin/thermalRobinFvPatchScalarField.C
 $(fluidFvPatchFields)/flowRateOutletPressure/flowRateOutletPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/windkesselPressure/windkesselPressureFvPatchScalarField.C
 
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
@@ -221,6 +222,7 @@ numerics/multiplyCoeff/multiplyCoeff.C
 
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/OBB/OBB.C
 numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
 
@@ -242,7 +244,7 @@ numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 
-higherOrderHelpers/movingLeastSquaresStencil/movingLeastSquaresStencil.C
+higherOrderHelpers/leastSquaresStencil/leastSquaresStencil.C
 higherOrderHelpers/quadrature/quadrature.C
 higherOrderHelpers/quadrature/tetQuadrature.C
 higherOrderHelpers/quadrature/triQuadrature.C
@@ -251,7 +253,10 @@ higherOrderHelpers/fvMeshQuadrature/fvMeshQuadrature.C
 higherOrderHelpers/weightFunction/weightFunction.C
 higherOrderHelpers/SymmTensor3rdOrder/labelSymmTensor3rdOrder/labelSymmTensor3rdOrder.C
 higherOrderHelpers/SymmTensor3rdOrder/symmTensor3rdOrder/symmTensor3rdOrder.C
+higherOrderHelpers/leastSquaresScheme/leastSquaresScheme.C
+higherOrderHelpers/leastSquaresReconstruction/leastSquaresReconstruction.C
 higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
+higherOrderHelpers/kExactLeastSquares/kExactLeastSquares.C
 higherOrderHelpers/hofv/hofvm.C
 higherOrderHelpers/hofv/hofvc.C
 

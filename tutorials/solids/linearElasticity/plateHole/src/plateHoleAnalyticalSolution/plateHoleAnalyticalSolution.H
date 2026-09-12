@@ -117,6 +117,13 @@ class plateHoleAnalyticalSolution
         //- Analytical displacement solution
         vector plateHoleDisplacement(const vector& C, const fvMesh& mesh) const;
 
+        //- Calculate point-valued or cell-average analytical displacement
+        void calculateAnalyticalCellDisplacement
+        (
+            const fvMesh& mesh,
+            vectorField& analyticalD
+        ) const;
+
         //- Analytical hydrostatic pressure solution
         scalar plateHoleHydPressure(const vector& C, const fvMesh& mesh) const;
 
