@@ -6,6 +6,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ============================================================
 # cerebralAneurysm FSI regression test
 #
@@ -94,29 +97,42 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
-# The case requires PETSc and cartesianMesh: Allrun exits silently when either
-# is unavailable, in which case there is nothing to check
-if [[ ! -f "${CASE_DIR}/${DISP_FILE}" || ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
-    echo "Skipping regression checks because the case did not run in this environment"
+# The case requires PETSc and cartesianMesh: when either is unavailable Allrun
+# writes a declared skip message, which is the only valid reason to skip the
+# checks. Anything else that leaves the expected output missing or incomplete
+# is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
     exit 0
+fi
+
+if [[ ! -f "${CASE_DIR}/${DISP_FILE}" || ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
+    echo "FAIL: the case did not run in this environment:"
+    echo "      expected output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 disp_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
 force_time=$(latest_numeric_time "${CASE_DIR}/${FORCE_FILE}" || true)
 
 if [[ -z "${disp_time}" || -z "${force_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+    echo "FAIL: the case did not complete in this environment:"
+    echo "      the output files contain no time data and the tutorial did not"
+    echo "      declare a skip (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the case did not reach the requested end time"
-    exit 0
+    echo "FAIL: the displacement history stops at t = ${disp_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the force history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 # ------------------------------------------------------------
