@@ -201,6 +201,14 @@ representation using the OpenFOAM `polyDualMesh` utility:
     solids4Foam::runApplication changeDictionary
 ```
 
+## Verification and convergence study
+
+The opt-in [`verification/`](verification/) directory contains the migrated
+polyhedral mesh-convergence study. It checks displacement and stress error
+norms directly against the analytical solution and is not run by normal
+regression testing. See its README for commands, acceptance criteria, and
+resource requirements.
+
 ```warning
 The case is currently only works with the COM version of OpenFOAM!
 ```
