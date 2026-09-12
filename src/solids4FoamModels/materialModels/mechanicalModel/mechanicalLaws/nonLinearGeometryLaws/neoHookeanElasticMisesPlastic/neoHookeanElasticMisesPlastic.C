@@ -227,14 +227,16 @@ void Foam::neoHookeanElasticMisesPlastic::newtonLoop
 
         // fTrial will go to zero at convergence
         fTrial = yieldFunction(epsilonPEqOld, magSTrial, DLambda, muBar,  J);
-
-        if (i == MaxNewtonIter_)
-        {
-            WarningIn("neoHookeanElasticMisesPlastic::newtonLoop()")
-                << "Plasticity Newton loop not converging" << endl;
-        }
     }
     while ((mag(residual) > LoopTol_) && ++i < MaxNewtonIter_);
+
+    if (mag(residual) > LoopTol_)
+    {
+        WarningIn("neoHookeanElasticMisesPlastic::newtonLoop()")
+            << "Plasticity Newton loop not converging: residual = "
+            << mag(residual) << ", tolerance = " << LoopTol_
+            << ", iterations = " << MaxNewtonIter_ << endl;
+    }
 
     // Update current yield stress
     // Note: we divide by J to change the Kirchhoff yield stress to Cauchy yield
@@ -1376,7 +1378,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
             const scalarField& JP = Jf().boundaryField()[patchI];
             const scalarField& sigmaYP = sigmaYf_.boundaryField()[patchI];
             const scalarField& epsilonPEqOldP =
-                epsilonPEq_.oldTime().boundaryField()[patchI];
+                epsilonPEqf_.oldTime().boundaryField()[patchI];
 
             forAll(fTrialP, faceI)
             {
@@ -1671,7 +1673,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
             (
                 "Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()"
                 " const"
-            )   << "The error in the plastic strain is lover 50 times larger "
+            )   << "The error in the plastic strain is over 50 times larger "
                 << "than the desired value!\n    Consider starting the "
                 << "simulation with a smaller initial time-step" << endl;
         }
