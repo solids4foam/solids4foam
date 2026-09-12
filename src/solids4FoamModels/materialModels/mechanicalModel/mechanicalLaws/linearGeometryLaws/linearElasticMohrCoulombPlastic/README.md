@@ -68,8 +68,13 @@ that overload is not compiled for foam-extend.
 
 `planeStress` is read from the enclosing `mechanicalProperties` dictionary,
 not from the law dictionary. It changes the value of `lambda` as shown above.
-The constructor does not check the ranges of `nu`, `frictionAngle`, or
-`dilationAngle`.
+The constructor checks that the magnitude of `frictionAngle` is at least
+`1e-3` degrees, because `k` tends to 1 and the apex stress
+`2*cohesion*sqrt(k)/(k - 1)` becomes singular as the friction angle tends to
+zero; a fatal error is given otherwise. The purely cohesive (Tresca-like)
+limit is not implemented by this law: use `linearElasticMisesPlastic` for a
+pressure-independent yield surface. The constructor does not check the ranges
+of `nu` or `dilationAngle`.
 
 The base class reads `solvePressureEqn` and
 `pressureSmoothingScaleFactor`, but this law never calls
