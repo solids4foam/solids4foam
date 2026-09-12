@@ -129,3 +129,24 @@ The `coupledUnsLinearGeometryLinearElastic` solid model currently does not run
 in parallel. For a coupled solid model that *does* run in parallel, use the
 `vertexCentredLinGeomSolid` solid model.
 ```
+
+---
+
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh study
+from `solid-benchmarks/linearElasticity/narrowTmember` into this tutorial. It
+refines the tutorial `blockMesh` through the same mesh family used in the table
+above, samples the equivalent (von Mises) stress along the arc $$r = 1.5R$$ in
+the $$z = 0$$ plane, and compares it with the published curve:
+
+```bash
+cd verification
+./Allverify
+```
+
+On the finest 319 488-cell mesh the sampled profile agrees with the published
+curve to 1.7% RMS and 0.68% at the peak stress, and the change in the profile
+between successive meshes gives a net order of 1.76. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.

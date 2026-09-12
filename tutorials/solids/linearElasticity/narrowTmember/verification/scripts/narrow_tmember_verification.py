@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run the ellipticPlate mesh-convergence verification study.
+"""Run the narrowTmember mesh-convergence verification study.
 
 The study refines the tutorial blockMesh through the Demirdzic et al. (1997)
-mesh family, samples the equivalent (von Mises) stress along the line
-r = 2.1 m, z = 0.3 m, and checks convergence towards the published solution.
+mesh family, samples the equivalent (von Mises) stress along the arc r = 1.5R
+in the z = 0 plane, and checks convergence towards the published solution.
 """
 
 from __future__ import annotations
@@ -25,21 +25,16 @@ CASE_DIR = VERIFY_DIR.parent
 WORK_DIR = VERIFY_DIR / "work"
 POST_DIR = VERIFY_DIR / "postProcessing"
 REFERENCE_DIR = VERIFY_DIR / "reference"
-REFERENCE_FILE = (
-    REFERENCE_DIR / "ellipticPlate_verification_references.json"
-)
+REFERENCE_FILE = REFERENCE_DIR / "narrowTmember_verification_references.json"
 
-SAMPLE_DICT_NAME = "sampleVerificationLine"
+SAMPLE_DICT_NAME = "sampleVerificationArc"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the ellipticPlate verification variants"
+        description="Run the narrowTmember verification variants"
     )
-    parser.add_argument(
-        "--variants",
-        help="comma-separated variant names",
-    )
+    parser.add_argument("--variants", help="comma-separated variant names")
     parser.add_argument(
         "--levels",
         help="comma-separated mesh levels (1 is the coarsest)",
@@ -81,64 +76,77 @@ def ignored(directory: str, names: list[str]) -> set[str]:
     return ignored_names.intersection(names)
 
 
-def divisions_for_level(base_divisions: list[int], level: int) -> tuple[int, int, int]:
-    factor = 2 ** (level - 1)
-    return tuple(value * factor for value in base_divisions)
+def set_resolution(run_dir: Path, level: int, tutorial_level: int) -> None:
+    """Rescale every block division from the mesh the tutorial ships.
 
-
-def set_resolution(run_dir: Path, divisions: tuple[int, int, int]) -> None:
-    """Scale the block divisions, retaining the tutorial edge grading.
-
-    The tutorial keeps a separate mesh dictionary for OpenFOAM and for
-    foam-extend and its Allrun links whichever suits the loaded environment,
-    so both are refined here.
+    The tutorial dictionary holds one member of the Demirdzic mesh family, so
+    a level is reached by scaling it by a power of two. The grading is left
+    untouched, which keeps the family geometrically consistent.
     """
-    pattern = re.compile(
-        r"(^\s*hex\s*\([^)]*\)\s*)\(\s*\d+\s+\d+\s+\d+\s*\)", re.MULTILINE
-    )
-    updated = 0
-    for name in ("blockMeshDict.openfoam", "blockMeshDict.foamextend"):
-        block_mesh_dict = run_dir / "system" / name
-        if not block_mesh_dict.is_file():
-            continue
-        text, count = pattern.subn(
-            rf"\g<1>({divisions[0]} {divisions[1]} {divisions[2]})",
-            block_mesh_dict.read_text(),
-            count=1,
-        )
-        if count != 1:
-            raise RuntimeError(
-                f"could not set block divisions in {block_mesh_dict}"
-            )
-        block_mesh_dict.write_text(text)
-        updated += 1
-    if not updated:
-        raise RuntimeError(f"no blockMeshDict variant found in {run_dir}/system")
+    block_mesh_dict = run_dir / "system" / "blockMeshDict"
+    pattern = re.compile(r"(^\s*hex\s*\([^)]*\)\s*)\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\)",
+                         re.MULTILINE)
+    shift = level - tutorial_level
+    numerator = 2 ** shift if shift > 0 else 1
+    denominator = 2 ** (-shift) if shift < 0 else 1
+
+    def scale(match: re.Match[str]) -> str:
+        divisions = []
+        for index in (2, 3, 4):
+            value = int(match.group(index)) * numerator
+            if value % denominator:
+                raise RuntimeError(
+                    f"block division {match.group(index)} in {block_mesh_dict} "
+                    f"is not divisible by {denominator}; level {level} is not "
+                    "reachable from the supplied mesh"
+                )
+            divisions.append(value // denominator)
+        return f"{match.group(1)}({divisions[0]} {divisions[1]} {divisions[2]})"
+
+    text, count = pattern.subn(scale, block_mesh_dict.read_text())
+    if not count:
+        raise RuntimeError(f"no block divisions found in {block_mesh_dict}")
+    block_mesh_dict.write_text(text)
 
 
-def write_sample_dict(run_dir: Path, sample_line: dict) -> None:
-    """Write a sets function object sampling sigmaEq along the benchmark line."""
-    radius = float(sample_line["radius_m"])
-    z_coordinate = float(sample_line["z_m"])
-    samples = int(sample_line["samples"])
-    limit = 0.5 * math.pi
+def sample_points(arc: dict) -> list[tuple[float, float, float]]:
+    radius = float(arc["radius_m"])
+    z_coordinate = float(arc["z_m"])
+    samples = int(arc["samples"])
+    theta_min = math.radians(float(arc["theta_min_deg"]))
+    theta_max = math.radians(float(arc["theta_max_deg"]))
+    step = (theta_max - theta_min) / (samples - 1)
     points = []
     for index in range(samples):
-        theta = limit * index / (samples - 1)
-        # Keep the end points marginally inside the symmetry planes so the
-        # mesh search always succeeds.
-        theta = min(max(theta, 1.0e-9), limit - 1.0e-9)
+        theta = theta_min + index * step
+        # Keep the end points marginally inside the domain so the mesh search
+        # always succeeds.
+        theta = min(max(theta, theta_min + 1.0e-9), theta_max - 1.0e-9)
         points.append(
             (radius * math.cos(theta), radius * math.sin(theta), z_coordinate)
         )
+    return points
 
+
+def sample_angles(arc: dict) -> list[float]:
+    """Sample positions expressed in the angle convention of the reference."""
+    samples = int(arc["samples"])
+    theta_min = float(arc["theta_min_deg"])
+    theta_max = float(arc["theta_max_deg"])
+    offset = float(arc["reference_angle_offset_deg"])
+    step = (theta_max - theta_min) / (samples - 1)
+    return [theta_min + index * step + offset for index in range(samples)]
+
+
+def write_sample_dict(run_dir: Path, arc: dict) -> None:
     entries = "\n".join(
         f"            ({point[0]:.12g} {point[1]:.12g} {point[2]:.12g})"
-        for point in points
+        for point in sample_points(arc)
     )
     (run_dir / "system" / SAMPLE_DICT_NAME).write_text(
-        "// Sampling of sigmaEq along the line r = "
-        f"{radius} m, z = {z_coordinate} m, written by the verification driver.\n"
+        "// Sampling of sigmaEq along the arc r = "
+        f"{arc['radius_m']} m in the z = 0 plane, written by the "
+        "verification driver.\n"
         "type            sets;\n"
         "libs            (sampling);\n"
         "interpolationScheme cellPoint;\n"
@@ -161,11 +169,6 @@ def write_sample_dict(run_dir: Path, sample_line: dict) -> None:
     )
 
 
-def sample_angles(sample_line: dict) -> list[float]:
-    samples = int(sample_line["samples"])
-    return [90.0 * index / (samples - 1) for index in range(samples)]
-
-
 def read_sampled_stress(run_dir: Path) -> list[float]:
     candidates = sorted(
         (run_dir / "postProcessing" / SAMPLE_DICT_NAME).glob("*/arc_sigmaEq.xy")
@@ -183,7 +186,7 @@ def read_sampled_stress(run_dir: Path) -> list[float]:
 
 
 def read_reference_curve(path: Path) -> list[tuple[float, float]]:
-    """Return the digitised curve as (degrees, Pa), sorted by angle."""
+    """Return the published curve as (degrees, Pa), sorted by angle."""
     points = []
     for line in path.read_text().splitlines():
         if line.strip().startswith("#") or not line.strip():
@@ -217,7 +220,7 @@ def compare_with_reference(
     for angle, reference_value in reference:
         computed = interpolate(angles, values, angle)
         relative_errors.append(abs(computed - reference_value) / abs(reference_value))
-    peak_reference = max(reference, key=lambda point: point[0])
+    peak_reference = max(reference, key=lambda point: point[1])
     peak_computed = interpolate(angles, values, peak_reference[0])
     return {
         "reference_rms_relative_error": math.sqrt(
@@ -274,7 +277,7 @@ def run_level(
     reference: dict,
     reference_curve: list[tuple[float, float]],
     reuse: bool,
-) -> dict[str, float | int | str]:
+) -> dict:
     run_dir = WORK_DIR / variant_name / f"mesh{level}"
     solver_log = run_dir / "log.solids4Foam"
     completed_case = (
@@ -283,19 +286,14 @@ def run_level(
         and re.search(r"^End\s*$", solver_log.read_text(), re.MULTILINE)
     )
 
-    divisions = divisions_for_level(reference["base_divisions"], level)
     if completed_case:
         print(f"Reusing {variant_name} mesh{level} in {run_dir}")
     else:
         if run_dir.exists():
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
-        set_resolution(run_dir, divisions)
-        print(
-            f"Running {variant_name} mesh{level} "
-            f"({divisions[0]} {divisions[1]} {divisions[2]}) in {run_dir}",
-            flush=True,
-        )
+        set_resolution(run_dir, level, int(reference["tutorial_level"]))
+        print(f"Running {variant_name} mesh{level} in {run_dir}", flush=True)
         with (run_dir / "log.Allverify").open("w") as log:
             completed = subprocess.run(
                 ["./Allrun", variant["approach"]],
@@ -314,7 +312,8 @@ def run_level(
 
     check_solver_log(solver_log, f"{variant_name} mesh{level}")
 
-    write_sample_dict(run_dir, reference["sample_line"])
+    arc = reference["sample_arc"]
+    write_sample_dict(run_dir, arc)
     with (run_dir / "log.postProcess").open("w") as log:
         completed = subprocess.run(
             ["postProcess", "-func", SAMPLE_DICT_NAME, "-latestTime"],
@@ -330,15 +329,14 @@ def run_level(
         )
 
     values = read_sampled_stress(run_dir)
-    angles = sample_angles(reference["sample_line"])
+    angles = sample_angles(arc)
     if len(values) != len(angles):
         raise RuntimeError(
             f"expected {len(angles)} sampled values, found {len(values)} "
             f"in {run_dir}"
         )
     (POST_DIR / "profiles").mkdir(parents=True, exist_ok=True)
-    profile = POST_DIR / "profiles" / f"{variant_name}_mesh{level}_sigmaEq.txt"
-    profile.write_text(
+    (POST_DIR / "profiles" / f"{variant_name}_mesh{level}_sigmaEq.txt").write_text(
         "# angle_deg sigmaEq_Pa\n"
         + "".join(
             f"{angle:.10g} {value:.10g}\n" for angle, value in zip(angles, values)
@@ -346,13 +344,13 @@ def run_level(
     )
 
     cell_count = count_cells(run_dir)
-    log_text = solver_log.read_text()
-    clock_matches = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", log_text)
-    result: dict[str, float | int | str] = {
+    clock_matches = re.findall(
+        r"ClockTime\s*=\s*([0-9.eE+-]+)", solver_log.read_text()
+    )
+    result: dict = {
         "variant": variant_name,
         "approach": variant["approach"],
         "level": level,
-        "divisions": "x".join(str(value) for value in divisions),
         "cells": cell_count,
         "effective_spacing_m": cell_count ** (-1.0 / 3.0),
         "clock_time_s": float(clock_matches[-1]) if clock_matches else math.nan,
@@ -361,7 +359,7 @@ def run_level(
     numeric_values = (
         value
         for key, value in result.items()
-        if key not in {"variant", "approach", "divisions"}
+        if key not in {"variant", "approach"}
     )
     if not all(math.isfinite(float(value)) for value in numeric_values):
         raise RuntimeError(f"non-finite result extracted from {run_dir}")
@@ -369,13 +367,12 @@ def run_level(
 
 
 def rms_change(first: list[float], second: list[float]) -> float:
-    """RMS difference between two sampled profiles on the same sample points."""
     return math.sqrt(
         sum((left - right) ** 2 for left, right in zip(first, second)) / len(first)
     )
 
 
-def net_order(results: list[dict[str, float | int | str]], metric: str) -> float:
+def net_order(results: list[dict], metric: str) -> float:
     finite = [row for row in results if math.isfinite(float(row[metric]))]
     if len(finite) < 2:
         return math.nan
@@ -390,7 +387,7 @@ def net_order(results: list[dict[str, float | int | str]], metric: str) -> float
 
 
 def write_results(
-    results: list[dict[str, float | int | str]],
+    results: list[dict],
     variant_names: list[str],
     reference: dict,
     quick: bool,
@@ -407,15 +404,9 @@ def write_results(
         writer.writeheader()
         writer.writerows(results)
 
-    rms_tolerance = float(acceptance["reference_rms_relative_error_tolerance"])
-    peak_tolerance = float(acceptance["reference_peak_relative_error_tolerance"])
-    minimum_order = float(acceptance["minimum_net_order"])
-
-    # The published curve is digitised from a figure, so the difference from
-    # it stops falling once the discretisation error drops below the
-    # digitisation uncertainty. Convergence is therefore measured by the
-    # change in the computed profile between successive meshes, and the
-    # published curve is used to check the accuracy of the finest mesh.
+    # As in the ellipticPlate study, the published curve is digitised, so the
+    # difference from it floors out. Convergence is measured by the change in
+    # the computed profile; the published curve checks the finest mesh.
     orders = {
         name: net_order(grouped[name][1:], "profile_rms_change_pa")
         for name in variant_names
@@ -435,30 +426,30 @@ def write_results(
             passed = (
                 passed
                 and float(grouped[name][-1]["reference_rms_relative_error"])
-                <= rms_tolerance
+                <= float(acceptance["reference_rms_relative_error_tolerance"])
                 and float(grouped[name][-1]["reference_peak_relative_error"])
-                <= peak_tolerance
+                <= float(acceptance["reference_peak_relative_error_tolerance"])
                 and len(changes) >= 2
                 and all(right < left for left, right in zip(changes, changes[1:]))
-                and orders[name] > minimum_order
+                and orders[name] > float(acceptance["minimum_net_order"])
             )
 
     lines = [
-        "# ellipticPlate verification summary",
+        "# narrowTmember verification summary",
         "",
         f"- Mode: {'quick smoke test' if quick else 'full verification'}",
         f"- Variants: {', '.join(variant_names)}",
-        "- Reference: Demirdzic et al. (1997), sigmaEq on r = 2.1 m, z = 0.3 m",
+        "- Reference: Demirdzic et al. (1997), sigmaEq on the arc r = 1.5R",
     ]
     for name in variant_names:
         variant_results = grouped[name]
-        levels = ", ".join(str(row["level"]) for row in variant_results)
         lines.extend(
             [
                 "",
                 f"## {name}",
                 "",
-                f"- Levels: {levels}",
+                "- Levels: "
+                + ", ".join(str(row["level"]) for row in variant_results),
                 f"- Finest mesh: {int(variant_results[-1]['cells'])} cells",
                 "- Finest reference RMS relative error: "
                 f"{float(variant_results[-1]['reference_rms_relative_error']):.4f}",
@@ -487,7 +478,7 @@ def create_plot(variant_names: list[str], levels: list[int]) -> None:
     plot_script = SCRIPT_DIR / "plotSigmaEq.gnuplot"
     if shutil.which("gnuplot") is None or not plot_script.is_file():
         return
-    output = POST_DIR / "ellipticPlate_sigmaEq.pdf"
+    output = POST_DIR / "narrowTmember_sigmaEq.pdf"
     completed = subprocess.run(
         [
             "gnuplot",
@@ -546,7 +537,7 @@ def main() -> int:
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     POST_DIR.mkdir(parents=True, exist_ok=True)
-    results: list[dict[str, float | int | str]] = []
+    results: list[dict] = []
     failures = 0
     for name in variant_names:
         previous_profile: list[float] | None = None
