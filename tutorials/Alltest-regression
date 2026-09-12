@@ -114,6 +114,7 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/blockPunch"
     "solids/hyperelasticity/longWall"
     "solids/hyperelasticity/cantileverVibration"
+    "solids/hyperelasticity/cooksMembrane"
     "solids/beamsPlatesShells/squarePlate"
     "solids/linearElasticity/cantilever2d"
     "solids/linearElasticity/curvedCantilever"
