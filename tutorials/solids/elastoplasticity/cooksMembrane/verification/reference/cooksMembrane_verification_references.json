@@ -1,0 +1,15 @@
+{
+  "case_name": "updated-Lagrangian elastoplastic Cook's membrane",
+  "allrun_arguments": [],
+  "default_levels": [3, 6, 12, 24, 48],
+  "primary_reference": {
+    "label": "published converged range representative value",
+    "displacement_m": 0.00700,
+    "relative_tolerance": 0.08
+  },
+  "published_range_m": [0.00697, 0.00709],
+  "legacy_study": {
+    "repository": "solid-benchmarks/elastoPlasticity/cooksMembrane",
+    "mesh_cells_per_side": [3, 6, 12, 24, 48, 96, 192, 384]
+  }
+}

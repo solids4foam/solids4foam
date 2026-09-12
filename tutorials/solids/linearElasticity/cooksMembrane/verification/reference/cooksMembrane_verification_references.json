@@ -1,0 +1,15 @@
+{
+  "case_name": "linear-elastic Cook's membrane",
+  "allrun_arguments": ["segregated"],
+  "default_levels": [3, 6, 12, 24, 48, 96],
+  "primary_reference": {
+    "label": "CoFEA very-fine FE range midpoint",
+    "displacement_m": 0.03224,
+    "relative_tolerance": 0.01
+  },
+  "published_range_m": [0.03220, 0.03228],
+  "legacy_study": {
+    "repository": "solid-benchmarks/linearElasticity/cooksMembrane",
+    "mesh_cells_per_side": [3, 6, 12, 24, 48, 96, 192, 384]
+  }
+}

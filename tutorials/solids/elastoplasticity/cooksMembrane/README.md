@@ -110,6 +110,14 @@ run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
 Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed
 by running the `solids4foam` solver (`> solids4Foam`).
 
+## Verification and convergence study
+
+The opt-in [`verification/`](verification/) directory contains the migrated
+mesh-convergence study and published displacement references. It is separate
+from normal regression testing and is not run by `tutorials/Alltest` or
+`tutorials/Alltest-regression`. See its README for the command, acceptance
+criteria, and expected outputs.
+
 ---
 
 ### References
