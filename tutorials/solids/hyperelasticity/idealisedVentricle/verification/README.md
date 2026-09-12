@@ -98,6 +98,29 @@ three significant figures between the two finest meshes. The finest apex
 position differs from the independent block-coupled mixed pressure-displacement
 solution by 1.0%.
 
+Level 4 was run on a Linux cluster node (AMD EPYC 9684X, OpenFOAM v2512) through Slurm
+with `./Allverify --levels 1,2,3,4 --cores 1,8,32,64`:
+
+| Level | Cells | Ranks | Apex position (mm) | Mid-wall RMS change (m) | Solver wall clock (s) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1 620 | 1 | -26.487 | – | 75 |
+| 2 | 12 960 | 8 | -27.268 | 5.95e-04 | 167 |
+| 3 | 103 680 | 32 | -27.324 | 1.15e-04 | 786 |
+| 4 | 829 440 | 64 | -27.313 | 3.79e-05 | 8 629 |
+
+Levels 1 to 3 reproduce the workstation results above to every digit shown,
+despite the different platform and rank counts. With level 4 included, the
+mid-wall line change keeps falling, by a further factor of 3.0, and the net
+order over the four levels is 1.99. The apex position moves by only 0.011 mm
+between levels 3 and 4, and the finest value differs from the independent
+block-coupled solution by 0.99%. The whole four-level sweep took 2 h 48 min
+on 64 cores, dominated by level 4.
+
+When running under Slurm, note that a batch shell does not read the
+interactive profile: export `PETSC_DIR` and the PETSc library path explicitly,
+and set `OMP_NUM_THREADS=1`, or the PETSc/hypre threads oversubscribe the
+allocated cores and the run slows by orders of magnitude.
+
 ## Sampled quantity
 
 The mid-wall line is the curve used in the Land et al. Problem 2 figures. It is
