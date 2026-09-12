@@ -56,7 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cores",
         default="auto",
-        help="MPI ranks per case: a positive integer, or auto (default)",
+        help="MPI ranks: auto (default), one positive integer for every "
+             "level, or one comma-separated value per requested level",
     )
     parser.add_argument(
         "--reuse",
@@ -90,11 +91,31 @@ def ignored(directory: str, names: list[str]) -> set[str]:
     return ignored_names.intersection(names)
 
 
-def cores_for_level(requested: str, level: int) -> int:
-    """Use one rank for the tutorial mesh and scale up with cell count."""
-    if requested != "auto":
-        return int(requested)
-    return {1: 1, 2: 8, 3: 16, 4: 16}.get(level, 16)
+def parse_cores(requested: str, levels: list[int]) -> dict[int, int]:
+    """Map each requested level to its MPI rank count.
+
+    `auto` scales the ranks with the cell count on a workstation-sized
+    machine. A single value applies to every level. A comma-separated list is
+    matched to the requested levels in order, which is what a scheduler
+    allocation with one fixed rank count per mesh needs.
+    """
+    if requested == "auto":
+        default_cores = {1: 1, 2: 8, 3: 16, 4: 16}
+        return {level: default_cores.get(level, 16) for level in levels}
+
+    values = [value.strip() for value in requested.split(",")]
+    if not all(value.isdecimal() and int(value) >= 1 for value in values):
+        raise SystemExit(
+            "--cores must be auto, a positive integer, or one positive "
+            "integer per requested level"
+        )
+    if len(values) == 1:
+        return {level: int(values[0]) for level in levels}
+    if len(values) != len(levels):
+        raise SystemExit(
+            f"--cores lists {len(values)} values for {len(levels)} levels"
+        )
+    return {level: int(value) for level, value in zip(levels, values)}
 
 
 def set_resolution(run_dir: Path, level: int, reference: dict) -> tuple[int, int, int, int]:
@@ -503,14 +524,11 @@ def main() -> int:
         raise SystemExit("at least two positive levels are required")
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
-    if args.cores != "auto" and (
-        not args.cores.isdecimal() or int(args.cores) < 1
-    ):
-        raise SystemExit("--cores must be a positive integer or auto")
+    cores = parse_cores(args.cores, levels)
 
     required = ["blockMesh", "checkMesh", "createPatch", "extrudeMesh",
                 "postProcess", "solids4Foam"]
-    if args.cores == "auto" or int(args.cores) > 1:
+    if any(value > 1 for value in cores.values()):
         required.extend(["decomposePar", "reconstructPar"])
     missing = [command for command in required if shutil.which(command) is None]
     if missing:
@@ -529,7 +547,7 @@ def main() -> int:
                     all_variants[name],
                     level,
                     reference,
-                    cores_for_level(args.cores, level),
+                    cores[level],
                     args.reuse,
                 )
             except RuntimeError as error:

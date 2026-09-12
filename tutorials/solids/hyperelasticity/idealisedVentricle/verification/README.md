@@ -27,13 +27,15 @@ Useful options:
 ./Allverify --quick             # levels 1 and 2 only, smoke test
 ./Allverify --levels 1,2,3,4    # add the 829,440-cell level
 ./Allverify --cores 16          # fixed rank count for every level
+./Allverify --levels 1,2,3,4 --cores 1,8,32,64   # one rank count per level
 ./Allverify --reuse             # resume a sweep without re-running cases
 ```
 
 With `--cores auto` (the default) level 1 runs in serial and levels 2, 3, and 4
 run on 8, 16, and 16 ranks respectively, through the tutorial's own
 `./Allrun petsc parallel` path. Use `--cores N` when a scheduler allocation
-requires a fixed rank count.
+requires a fixed rank count, or pass one value per requested level when the
+allocation should grow with the mesh.
 
 Each level is a complete copy of the tutorial under the ignored
 `verification/work/` directory, so the tutorial itself and its regression test
