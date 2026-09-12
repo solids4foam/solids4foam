@@ -1,9 +1,10 @@
 # Spherical-cavity verification study
 
-This opt-in study migrates the polyhedral mesh-convergence sweep previously
-kept in `solid-benchmarks/linearElasticity/sphericalCavity`. Each level is a
-complete copy of the parent tutorial under `verification/work/`; the tutorial
-and its normal regression tests are not modified.
+This opt-in study migrates and extends the mesh-convergence sweep previously
+kept in `solid-benchmarks/linearElasticity/sphericalCavity`. It verifies both
+tetrahedral and polyhedral meshes. Each level is a complete copy of the parent
+tutorial under `verification/work/`; the tutorial and its normal regression
+tests are not modified.
 
 Source a supported OpenFOAM.com environment with PETSc, ensure Gmsh is
 available, and run:
@@ -13,12 +14,14 @@ cd tutorials/solids/linearElasticity/sphericalCavity/verification
 ./Allverify
 ```
 
-The driver uses the tutorial's `petscSnes poly` configuration and Gmsh minimum
-spacings of `0.02`, `0.01`, `0.005`, and `0.0025` m. These are the first four
-refinements from the legacy study; the much larger next level remains available
-with `--levels 0.02,0.01,0.005,0.0025,0.00125`. Use `--quick` for the first two
-levels, `--levels` for a custom refinement sequence, and `--reuse` to retain
-completed cases when resuming a sweep.
+The driver uses the tutorial's PETSc SNES configuration with `tet` and `poly`
+meshes. The tetrahedral default uses Gmsh minimum spacings of `0.02`, `0.01`,
+and `0.005` m; the polyhedral default also includes `0.0025` m. A tetrahedral
+mesh at `0.0025` m has approximately 1.23 million cells and can be requested
+explicitly with `--levels 0.02,0.01,0.005,0.0025`. The legacy polyhedral levels
+down to `0.00125` m remain available through `--levels`. Use `--quick` for the
+first two levels, `--meshes tet` or `--meshes poly` for one mesh family, and
+`--reuse` to retain completed cases when resuming a sweep.
 
 Results are written to the ignored `verification/postProcessing/` directory as
 CSV plus `verification_summary.md`. The CSV records cell count, effective
