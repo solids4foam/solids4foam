@@ -154,6 +154,30 @@ class fluidSolidInterface
         //  using the legacy minimum-based combination
         const Switch requireAllResidualMeasures_;
 
+        //- Pressure-change tolerance for Robin interfaces
+        const scalar robinPressureTolerance_;
+
+        //- Relative leakage-flux tolerance for Robin interfaces
+        const scalar robinFluxTolerance_;
+
+        //- Robin-condition flag for each interface
+        List<bool> robinInterfaces_;
+
+        //- Pressure at the previous FSI iteration on each Robin interface
+        List<scalarField> robinPressurePrev_;
+
+        //- Largest pressure norm in the current time step per interface
+        List<scalar> maxRobinPressureNorm_;
+
+        //- Largest boundary-throughput flux in the current time step
+        scalar maxRobinFluxNorm_;
+
+        //- Current maximum normalized Robin pressure residual
+        scalar robinPressureResidual_;
+
+        //- Current maximum normalized Robin leakage-flux residual
+        scalar robinFluxResidual_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
@@ -214,6 +238,24 @@ protected:
         {
             return fsiProperties_;
         }
+
+        //- Return true if the current residuals satisfy all active criteria
+        bool couplingConverged(const scalar displacementResidual) const;
+
+        //- Return the current normalized Robin pressure residual
+        scalar robinPressureResidual() const
+        {
+            return robinPressureResidual_;
+        }
+
+        //- Return the current normalized Robin leakage-flux residual
+        scalar robinFluxResidual() const
+        {
+            return robinFluxResidual_;
+        }
+
+        //- Return true if any interface uses a Robin pressure condition
+        bool hasRobinInterface() const;
 
 public:
 

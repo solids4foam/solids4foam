@@ -410,6 +410,26 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "requireAllResidualMeasures", false
         )
     ),
+    robinPressureTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinPressureTolerance", outerCorrTolerance_
+        )
+    ),
+    robinFluxTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinFluxTolerance", outerCorrTolerance_
+        )
+    ),
+    robinInterfaces_(),
+    robinPressurePrev_(),
+    maxRobinPressureNorm_(),
+    maxRobinFluxNorm_(0),
+    robinPressureResidual_(0),
+    robinFluxResidual_(0),
     residuals_(),
     residualsPrev_(),
     maxResidualsNorm_(),
@@ -586,6 +606,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
     residualsPrev_.setSize(nGlobalPatches_);
     maxResidualsNorm_.setSize(nGlobalPatches_);
     maxIntsDisplsNorm_.setSize(nGlobalPatches_);
+    robinInterfaces_.setSize(nGlobalPatches_, false);
+    robinPressurePrev_.setSize(nGlobalPatches_);
+    maxRobinPressureNorm_.setSize(nGlobalPatches_, 0);
 
     initializeFields();
 
@@ -710,8 +733,13 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
 
         mkDir(historyDir);
         residualFilePtr_.set(new OFstream(historyDir/"fsiResiduals.dat"));
-        residualFilePtr_()
-            << "Time outerCorrector residual" << endl;
+        residualFilePtr_() << "Time outerCorrector residual";
+        if (hasRobinInterface())
+        {
+            residualFilePtr_()
+                << " robinPressureResidual robinFluxResidual";
+        }
+        residualFilePtr_() << endl;
     }
 
     return residualFilePtr_();
@@ -764,6 +792,9 @@ void Foam::fluidSolidInterface::setDeltaT(Time& runTime)
 void Foam::fluidSolidInterface::initializeFields()
 {
     outerCorr_ = 0;
+    maxRobinFluxNorm_ = 0;
+    robinPressureResidual_ = 0;
+    robinFluxResidual_ = 0;
 
     //- Check is any of the patches have changed sizes
     bool needUpdate = false;
@@ -841,6 +872,23 @@ void Foam::fluidSolidInterface::initializeFields()
         maxResidualsNorm_[interfaceI] = 0;
 
         maxIntsDisplsNorm_[interfaceI] = 0;
+
+        const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        robinInterfaces_[interfaceI] =
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                fluid().solutionP().boundaryField()[fluidPatchID]
+            );
+        maxRobinPressureNorm_[interfaceI] = 0;
+        if (robinInterfaces_[interfaceI])
+        {
+            robinPressurePrev_[interfaceI] =
+                fluid().solutionP().boundaryField()[fluidPatchID];
+        }
+        else
+        {
+            robinPressurePrev_[interfaceI].clear();
+        }
 
         interfacesPointsDispls_[interfaceI] =
             vectorField(nPoints, vector::zero);
@@ -1618,7 +1666,108 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         maxResidual = max(maxResidual, residualInterfaceI);
     }
 
+    robinPressureResidual_ = 0;
+    robinFluxResidual_ = 0;
+
+    if (!hasRobinInterface())
+    {
+        return maxResidual;
+    }
+
+    scalar boundaryFluxNorm = 0;
+    forAll(fluid().phi().boundaryField(), patchI)
+    {
+        if (!fluidMesh().boundary()[patchI].coupled())
+        {
+            boundaryFluxNorm +=
+                sum(mag(fluid().phi().boundaryField()[patchI]));
+        }
+    }
+    reduce(boundaryFluxNorm, sumOp<scalar>());
+    maxRobinFluxNorm_ = max(maxRobinFluxNorm_, boundaryFluxNorm);
+
+    forAll(robinInterfaces_, interfaceI)
+    {
+        if (!robinInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        const scalarField currentPressure
+        (
+            fluid().solutionP().boundaryField()[fluidPatchID]
+        );
+        const scalar pressureNorm = Foam::sqrt(gSum(magSqr(currentPressure)));
+        maxRobinPressureNorm_[interfaceI] = max
+        (
+            maxRobinPressureNorm_[interfaceI], pressureNorm
+        );
+
+        const scalar pressureResidual =
+            Foam::sqrt
+            (
+                gSum
+                (
+                    magSqr
+                    (
+                        currentPressure - robinPressurePrev_[interfaceI]
+                    )
+                )
+            )
+           /(maxRobinPressureNorm_[interfaceI] + SMALL);
+
+        const scalar fluxResidual =
+            gSum(mag(fluid().phi().boundaryField()[fluidPatchID]))
+           /(maxRobinFluxNorm_ + SMALL);
+
+        robinPressurePrev_[interfaceI] = currentPressure;
+        robinPressureResidual_ = max
+        (
+            robinPressureResidual_, pressureResidual
+        );
+        robinFluxResidual_ = max(robinFluxResidual_, fluxResidual);
+
+        Info<< "Robin pressure residual for interface " << interfaceI
+            << ": " << pressureResidual << nl
+            << "Robin leakage-flux residual for interface " << interfaceI
+            << ": " << fluxResidual << endl;
+    }
+
     return maxResidual;
+}
+
+
+bool Foam::fluidSolidInterface::hasRobinInterface() const
+{
+    forAll(robinInterfaces_, interfaceI)
+    {
+        if (robinInterfaces_[interfaceI])
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool Foam::fluidSolidInterface::couplingConverged
+(
+    const scalar displacementResidual
+) const
+{
+    if (displacementResidual > outerCorrTolerance_)
+    {
+        return false;
+    }
+
+    return
+        !hasRobinInterface()
+     || (
+            robinPressureResidual_ <= robinPressureTolerance_
+         && robinFluxResidual_ <= robinFluxTolerance_
+        );
 }
 
 

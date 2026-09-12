@@ -152,9 +152,12 @@ ground, wall and outlet.
 
 The tutorial case can be run using the included `Allrun` script. The tuned
 IQNILS setup is the default, i.e. `./Allrun`. The original Aitken setup can be
-selected with `./Allrun aitken`, and either option can be combined with
-`parallel`. The high-order total-Lagrangian solid configuration can be run with
-`./Allrun iqnils highOrder`; it can also be combined with `parallel`. This mode
+selected with `./Allrun aitken`, and the Robin-Neumann variant with
+`./Allrun robin`; each option can be combined with `parallel`. The Robin variant
+uses `elasticWallPressure`, `elasticWallVelocity`, and fixed displacement
+relaxation with a factor of 1. The high-order total-Lagrangian solid
+configuration can be run with `./Allrun iqnils highOrder`; it can also be
+combined with `parallel`. This mode
 selects `solidProperties.iqnils.highOrder`, enables the high-order MLS
 residual, and uses the existing face-based IQNILS traction transfer with a
 piecewise-constant traction at every solid face quadrature point.
@@ -176,11 +179,11 @@ iterations than Aitken.
 ## Regression Test
 
 The case also includes a `regressionTest.sh` script which runs short regression
-checks for both coupling options:
+checks for the Aitken, IQNILS, and Robin coupling options:
 
 - `./regressionTest.sh`
 
-For efficiency, the script runs both the `aitken` and `iqnils` variants in
+For efficiency, the script runs the `aitken`, `iqnils`, and `robin` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
 then. It also runs the `iqnils highOrder` variant and checks that it reaches the
@@ -189,7 +192,18 @@ checked against the same displacement and force references as the lower-order
 variants; the displacement tolerance is widened to allow the expected
 discretisation difference. The high-order variant is skipped on foam-extend.
 
-The script checks that both variants converge to the same solution, within
+For an `elasticWallPressure` interface, FSI convergence additionally requires
+the normalized pressure change and relative leakage flux to satisfy
+`robinPressureTolerance` and `robinFluxTolerance`. Both default to
+`outerCorrTolerance`. The pressure change is normalized by the largest
+interface-pressure norm in the current time step, while the mesh-relative
+interface flux is normalized by the largest total boundary throughput in that
+time step. This case uses `1e-5` and `5e-3`, respectively, to remain above the
+fluid linear-solver residual floor during the low-throughput inlet ramp. These
+two residuals are appended to
+`postProcessing/fsiResiduals.dat`.
+
+The script checks that all three variants converge to the same solution, within
 loose tolerances, by comparing:
 
 - the maximum tip `Dx`,
@@ -217,12 +231,14 @@ The `Allrun` script is shown below:
 # Example usage
 # ./Allrun            # default behaviour is the tuned IQNILS setup
 # ./Allrun aitken
+# ./Allrun robin
 # ./Allrun parallel
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
 
 coupling=iqnils
+interfaceCondition=dirichletNeumann
 runMode=serial
 
 for arg in "$@"
@@ -234,12 +250,16 @@ do
         iqnils|IQNILS)
             coupling=iqnils
             ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [parallel]"
             exit 1
             ;;
     esac
@@ -247,14 +267,17 @@ done
 
 echo "Using ${coupling} coupling setup"
 
-for file in \
-    constant/fsiProperties \
-    constant/solid/solidProperties \
-    system/controlDict \
-    system/fluid/fvSolution
-do
-    ln -vnsf "$(basename "$file").${coupling}" "$file"
-done
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+if [[ "${coupling}" == "robin" ]]; then
+    solutionSetup=iqnils
+else
+    solutionSetup=${coupling}
+fi
+ln -vnsf "solidProperties.${solutionSetup}" constant/solid/solidProperties
+ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+ln -vnsf "fvSolution.${solutionSetup}" system/fluid/fvSolution
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
@@ -586,7 +609,7 @@ bool AitkenCouplingInterface::evolve()
         // Calculate the FSI residual
         residualNorm = updateResidual();
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+    while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
 

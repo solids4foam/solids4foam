@@ -123,10 +123,17 @@ bool AitkenCouplingInterface::evolve()
             residualFile()
                 << runTime().value() << " "
                 << outerCorr() << " "
-                << residualNorm << endl;
+                << residualNorm;
+            if (hasRobinInterface())
+            {
+                residualFile()
+                    << " " << robinPressureResidual()
+                    << " " << robinFluxResidual();
+            }
+            residualFile() << endl;
         }
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+    while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
 

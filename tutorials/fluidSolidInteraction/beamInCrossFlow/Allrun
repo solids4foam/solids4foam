@@ -9,6 +9,7 @@ source solids4FoamScripts.sh
 # Example usage
 # ./Allrun            # default behaviour is the tuned IQNILS setup
 # ./Allrun aitken
+# ./Allrun robin
 # ./Allrun parallel
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
@@ -18,6 +19,7 @@ source solids4FoamScripts.sh
 solids4Foam::requirePetscOrExitSilently
 
 coupling=iqnils
+interfaceCondition=dirichletNeumann
 runMode=serial
 fvSolutionSuffix=""
 solidPropertiesSuffix=""
@@ -31,6 +33,10 @@ do
         iqnils|IQNILS)
             coupling=iqnils
             ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
         parallel)
             runMode=parallel
             ;;
@@ -39,7 +45,7 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils] [highOrder] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]"
             exit 1
             ;;
     esac
@@ -54,9 +60,16 @@ fi
 echo "Using ${coupling} coupling setup"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-ln -vnsf "solidProperties.${coupling}${solidPropertiesSuffix}" constant/solid/solidProperties
-ln -vnsf "controlDict.${coupling}" system/controlDict
-ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
+if [[ "${coupling}" == "robin" ]]; then
+    solutionSetup=iqnils
+else
+    solutionSetup=${coupling}
+fi
+ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
+ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
