@@ -184,7 +184,11 @@ void Foam::diffusionHyperElastic::correct(volSymmTensorField& sigma)
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
     // enforced by the solver via the enforceLinear switch
-    if (updateF(sigma, mu_, K_))
+    // The diffusivity scaling d_ is applied to the moduli passed to updateF,
+    // rather than to sigma afterwards, so that the stress calculated on the
+    // enforced-linear path is scaled by d_ as well; note that the incremental
+    // forms of that path add to sigma.oldTime(), which must not be re-scaled
+    if (updateF(sigma, mu(d_*mu_), K(d_*K_)))
     {
         return;
     }
@@ -196,10 +200,12 @@ void Foam::diffusionHyperElastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
 
     // Calculate the deviatoric stress
-    const volSymmTensorField s(mu_*dev(bEbar));
+    // Note: mu() is mu_ scaled by d_, as set in the updateF call above
+    const volSymmTensorField s(mu()*dev(bEbar));
 
     // Calculate the Cauchy stress
-    sigma = d_*(s + 0.5*K()*(pow(J, 2.0) - 1.0)*I)/J;
+    // Note: K() is K_ scaled by d_, as set in the updateF call above
+    sigma = (s + 0.5*K()*(pow(J, 2.0) - 1.0)*I)/J;
 }
 
 
