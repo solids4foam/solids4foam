@@ -296,7 +296,7 @@ Foam::thermoMechanicalLaw::lookupTemperatureField()
     }
     else
     {
-        FatalErrorIn("Foam::poroMechanicalLaw::lookupTemperatureField()")
+        FatalErrorIn("Foam::thermoMechanicalLaw::lookupTemperatureField()")
             << "No T field found in memory or on disk. Make sure you have "
             << "either specified a solidModel that solves for temperature "
             << "or give the T field in at least the starting time "
