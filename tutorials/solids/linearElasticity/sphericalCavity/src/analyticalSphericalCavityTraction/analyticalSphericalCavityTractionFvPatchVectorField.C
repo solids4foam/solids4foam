@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "sphericalCavityStressDisplacement.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -154,7 +155,6 @@ void analyticalSphericalCavityTractionFvPatchVectorField::updateCoeffs()
 }
 
 
-#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 analyticalSphericalCavityTractionFvPatchVectorField::evaluateQuadrature() const
 {
@@ -162,11 +162,13 @@ analyticalSphericalCavityTractionFvPatchVectorField::evaluateQuadrature() const
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;
@@ -203,7 +205,6 @@ analyticalSphericalCavityTractionFvPatchVectorField::evaluateQuadrature() const
 
     return tQuadPointsValue;
 }
-#endif
 
 
 // Write

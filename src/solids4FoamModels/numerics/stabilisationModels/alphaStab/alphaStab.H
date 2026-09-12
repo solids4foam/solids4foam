@@ -72,7 +72,6 @@ class alphaStab
         ) const;
 
         //- Template calculation of the high-order stabilisation
-#ifndef FOAMEXTEND
         template<class GeoField, class SurfaceField>
         void computeDiffStencilHighOrder
         (
@@ -81,7 +80,6 @@ class alphaStab
             const scalar scaleFactor,
             const leastSquaresScheme& reconstruction
         ) const;
-#endif
 
         //- Disallow default bitwise copy construct
         alphaStab(const alphaStab&);

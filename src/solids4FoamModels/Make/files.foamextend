@@ -228,6 +228,7 @@ numerics/multiplyCoeff/multiplyCoeff.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/OBB/OBB.C
 numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
 numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
@@ -292,7 +293,7 @@ $(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
 $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
-/*higherOrderHelpers/leastSquaresStencil/leastSquaresStencil.C
+higherOrderHelpers/leastSquaresStencil/leastSquaresStencil.C
 higherOrderHelpers/quadrature/quadrature.C
 higherOrderHelpers/quadrature/tetQuadrature.C
 higherOrderHelpers/quadrature/triQuadrature.C
@@ -306,7 +307,7 @@ higherOrderHelpers/leastSquaresReconstruction/leastSquaresReconstruction.C
 higherOrderHelpers/movingLeastSquares/movingLeastSquares.C
 higherOrderHelpers/kExactLeastSquares/kExactLeastSquares.C
 higherOrderHelpers/hofv/hofvm.C
-higherOrderHelpers/hofv/hofvc.C*/
+higherOrderHelpers/hofv/hofvc.C
 
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

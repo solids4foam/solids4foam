@@ -195,11 +195,6 @@ run_high_order_grad_test() {
     local suffix="${least_squares_type}.serial"
     local log_file="${CASE_DIR}/log.Test-highOrderGrad.${suffix}"
 
-    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-        echo "SKIP: Test-highOrderGrad is not available with foam-extend"
-        return 0
-    fi
-
     if ! command -v Test-highOrderGrad >/dev/null 2>&1; then
         echo "SKIP: Test-highOrderGrad is not available"
         return 0

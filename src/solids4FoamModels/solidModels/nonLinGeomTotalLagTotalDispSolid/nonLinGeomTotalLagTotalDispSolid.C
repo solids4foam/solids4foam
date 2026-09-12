@@ -27,9 +27,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
-#ifndef FOAMEXTEND
-    #include "hofvm.H"
-#endif
+#include "hofvm.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -61,7 +59,6 @@ tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
         return fvc::interpolate(J_*Finv_.T()) & mesh().Sf();
     }
 
-#ifndef FOAMEXTEND
     const surfaceVectorField& Sf = mesh().Sf();
 
     tmp<surfaceVectorField> tSfCurrent
@@ -80,18 +77,19 @@ tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
             dimensionedVector("one", Sf.dimensions(), vector::one)
         )
     );
-    surfaceVectorField& SfCurrent = tSfCurrent.ref();
+    surfaceVectorField& SfCurrent = tmpRef(tSfCurrent);
 
     const vectorField normal(mesh().faceAreas()/mag(mesh().faceAreas()));
-    const CompactListList<scalar>& quadW =
-        displacementLeastSquares().quadrature().faceQuadWeights();
-    const CompactListList<tensor>& quadGradD = gradDQuad();
+    auto& quadW = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadWeights()
+    );
+    auto& quadGradD = compactListListCRef(gradDQuad());
 
     // Only boundary values are required for enforcing traction conditions
     forAll(SfCurrent.boundaryField(), patchI)
     {
-        vectorField& SfCurrentPatch =
-            SfCurrent.boundaryFieldRef()[patchI];
+        vectorField& SfCurrentPatch = boundaryFieldRef(SfCurrent)[patchI];
 
         forAll(SfCurrentPatch, faceI)
         {
@@ -122,13 +120,6 @@ tmp<surfaceVectorField> nonLinGeomTotalLagTotalDispSolid::currentSf() const
     }
 
     return tSfCurrent;
-#else
-    notImplemented
-    (
-        type() + "::currentSf() with a high-order residual"
-    );
-    return tmp<surfaceVectorField>();
-#endif
 }
 
 
@@ -205,12 +196,13 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 
             if (highOrderResidual())
             {
-#ifndef FOAMEXTEND
                 // Face quadrature weights include the reference face area
-                const CompactListList<scalar>& faceQuadWeights =
-                    displacementLeastSquares().quadrature().faceQuadWeights();
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
 
-                const CompactListList<tensor>& faceGradD = gradDQuad();
+                auto& faceGradD = compactListListCRef(gradDQuad());
 
                 const vectorField nRef
                 (
@@ -220,8 +212,10 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 
                 autoPtr<CompactListList<vector>> quadratureValues =
                     tracPatch.evaluateQuadrature();
-                const CompactListList<vector>& tractionPressureQuad =
-                    quadratureValues();
+                auto& tractionPressureQuad = compactListListCRef
+                (
+                    quadratureValues()
+                );
                 const scalarField& pressure = tracPatch.pressure();
                 const scalarField& magSfRef =
                     mesh().boundary()[patchI].magSf();
@@ -282,7 +276,6 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                         }
                     }
                 }
-#endif
             }
             else
             {
@@ -609,7 +602,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
         gradD() = displacementLeastSquares().grad(D());
         F_ = I + gradD().T();
@@ -619,7 +611,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
         mechanical().correct(sigma());
-#endif
     }
 
     // Interpolate cell displacements to vertices
@@ -953,7 +944,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 
 label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
 {
-#ifndef FOAMEXTEND
     if (highOrderJacobian())
     {
         return hofvm::initialiseJacobian
@@ -965,7 +955,6 @@ label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
             blockSize_
         );
     }
-#endif
 
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
@@ -1013,13 +1002,11 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update cell-centre gradient of displacement
         gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
         mechanical().grad(D, gradDQuad());
-#endif
     }
     else
     {
@@ -1051,10 +1038,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Calculate sigma at the face quadrature points
         mechanical().correct(gradDQuad(), sigmaQuad());
-#endif
     }
     else
     {
@@ -1132,7 +1117,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     //surfaceVectorField traction(n & fvc::interpolate(sigma()));
     surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
-#ifndef FOAMEXTEND
     if (highOrderResidual())
     {
         // Replace the Cauchy traction (force per unit deformed area) with the
@@ -1141,7 +1125,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // quadrature points
         traction = hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), mesh);
     }
-#endif
 
     //fvc::div(J_*Finv_ & sigma(), "div(sigma)");
 
@@ -1181,9 +1164,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         residual -= rho()*hofvc::d2dt2(D);
-#endif
     }
     else
     {
@@ -1304,7 +1285,6 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
 
     if (highOrderJacobian())
     {
-#ifndef FOAMEXTEND
         // Note: unlike the fallback fvVectorMatrix approxJ path below, we do
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
@@ -1375,7 +1355,6 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
         );
-#endif
     }
     else
     {
