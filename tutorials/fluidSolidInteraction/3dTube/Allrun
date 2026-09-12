@@ -10,6 +10,7 @@ source solids4FoamScripts.sh
 # ./Allrun # default behaviour is Robin-Neumann coupling
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
+# ./Allrun weakCoupling
 
 # This case requires PETSc to be installed
 solids4Foam::requirePetscOrExitSilently
@@ -22,6 +23,15 @@ if [[ "$1" == "sonicLiquidFluid" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
+elif [[ "$1" == "weakCoupling" ]]; then
+    # Weak (explicit) coupling, with the Robin-Neumann fluid setup
+    echo "Using the weak coupling approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+    # Override the interface with the weak coupling variant
+    ln -vnsf fsiProperties.weakCoupling constant/fsiProperties
 elif [[ "$1" == "dirichletNeumann" ]]; then
     # Dirichlet-Neumann pimpleFluid approach
     echo "Using the Dirichlet-Neumann pimpleFluid approach"
