@@ -1,0 +1,25 @@
+{
+  "default_levels": [1, 2, 3, 4, 5],
+  "default_variants": ["segregated"],
+  "tutorial_level": 2,
+  "domain_area_m2": 3.8036504592,
+  "variants": {
+    "segregated": {"approach": "segregated", "rtol": 1e-10},
+    "petscSnes": {"approach": "petscSnes"},
+    "highOrder": {"approach": "highOrder"}
+  },
+  "acceptance": {
+    "required_metrics": [
+      "displacement_l2_m",
+      "displacement_linf_m",
+      "stress_xx_l2_pa",
+      "stress_xx_linf_pa"
+    ],
+    "minimum_net_order": {
+      "displacement_l2_m": 1.5,
+      "displacement_linf_m": 1.5,
+      "stress_xx_l2_pa": 1.0,
+      "stress_xx_linf_pa": 0.7
+    }
+  }
+}

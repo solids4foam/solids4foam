@@ -216,6 +216,29 @@ linear-elastic plate-hole benchmark.
 
 ---
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh study
+from `solid-benchmarks/linearElasticity/plateHole` into this tutorial. It
+refines the tutorial `blockMesh` through the same mesh family, from 250 to
+64 000 cells, and reads the error norms that the `plateHoleAnalyticalSolution`
+function object prints against the analytical solution:
+
+```bash
+cd verification
+./Allverify
+```
+
+Because the reference is an exact analytical solution, the study checks the
+observed order of accuracy directly. On the default `segregated` sweep the
+displacement L2 error falls from 2.97e-08 m to 3.20e-10 m, a net order of 1.63
+that approaches the expected second order, 1.92, between the two finest meshes;
+the stress L2 error gives a net order of 1.38. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
+
+---
+
 ### References
 
 [1]
