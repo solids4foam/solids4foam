@@ -709,3 +709,45 @@ is simply replaced with:
 number of processors `nProcs`.
 
 In case that `$FOAM_MPI` is set to `msmpi`, `mpirun` is replaced with `msmpi`.
+
+---
+
+## `solids4foam::requireGnuSed()`
+
+The case-format conversion functions, and the `D`/`DD` renaming in
+`solids4Foam::runSolidModel()`, rely on GNU `sed`, in particular on in-place
+editing with `-i` and no backup suffix.
+
+- **Function purpose**
+  Resolves the GNU `sed` command once and stores it in the `SOLIDS4FOAM_SED`
+  variable, which every function that needs GNU `sed` then uses. GNU `sed`
+  exposed as `sed` is preferred, as on Linux and on macOS when the Homebrew
+  `gnubin` directory is first in the `PATH`; otherwise the Homebrew `gsed`
+  command is used. If neither provides GNU `sed`, a clear error is printed and
+  the script exits.
+
+- **Function arguments**
+  None
+
+On macOS, the system `sed` is BSD `sed`, so GNU `sed` must be installed:
+
+```bash
+brew install gnu-sed
+```
+
+This provides `gsed`, which the scripts use automatically. Optionally, the GNU
+versions can be placed first in the `PATH`:
+
+```bash
+echo 'export PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"' \
+    >> "$HOME/.bash_profile"
+```
+
+The resolution and its callers are covered by the shell tests in
+`applications/scripts/tests/testGnuSedResolution.sh`, which emulate the macOS
+situation with stub commands and require neither macOS nor a build of
+`solids4foam`:
+
+```bash
+./applications/scripts/tests/testGnuSedResolution.sh
+```
