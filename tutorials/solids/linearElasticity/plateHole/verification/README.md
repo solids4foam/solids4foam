@@ -1,11 +1,12 @@
 # plateHole verification study
 
-This opt-in study migrates the mesh study from
+This opt-in study migrates the mesh studies from
 `solid-benchmarks/linearElasticity/plateHole` into the tutorial itself. It
-refines the tutorial `blockMesh` through the benchmark mesh family and reads
-the error norms that the `plateHoleAnalyticalSolution` function object already
-prints against the analytical plate-with-hole solution, so no extra sampling
-is needed.
+supports both the structured `blockMesh` family and the unstructured
+triangular-prism Gmsh family from the benchmark. The driver reads the error
+norms that the `plateHoleAnalyticalSolution` function object already prints
+against the analytical plate-with-hole solution, so no extra sampling is
+needed.
 
 The reference here is an exact analytical solution rather than a digitised
 curve, so the error itself is meaningful and the study checks the observed
@@ -28,8 +29,11 @@ Useful options:
 
 ```bash
 ./Allverify --quick                 # two coarsest levels, smoke test only
+./Allverify --mesh triangular       # unstructured triangular-prism family
 ./Allverify --variants petscSnes    # PETSc SNES solution algorithm
 ./Allverify --variants highOrder    # high-order least-squares discretisation
+./Allverify --variants vertexCentred # vertex-centred formulation
+./Allverify --mesh triangular --variants vertexCentred
 ./Allverify --levels 2,3,4          # a subset of the family
 ./Allverify --reuse                 # resume a sweep without re-running cases
 ./Allverify --keep-going            # continue after an individual case fails
@@ -37,23 +41,30 @@ Useful options:
 
 The variants are the solution approaches the tutorial `Allrun` accepts on an
 OpenFOAM.com installation: `segregated` (the default), `petscSnes` and
-`highOrder`. The two PETSc approaches are skipped silently by the tutorial
-when PETSc is unavailable, which the driver reports as a missing solver log.
-The foam-extend-only `pressureDisplacement*` approaches are out of scope.
+`highOrder`, plus the legacy benchmark's `vertexCentred` formulation. The
+`petscSnes`, `highOrder`, and `vertexCentred` variants require a solids4foam
+build with PETSc. The two cell-centred PETSc approaches are skipped silently
+by the tutorial when PETSc is unavailable, which the driver reports as a
+missing solver log. The foam-extend-only `pressureDisplacement*` approaches
+are out of scope.
 
 Each level is a complete copy of the tutorial under the ignored
 `verification/work/` directory, so the tutorial itself and its regression test
-are never modified. Two things are changed in the copy: the block divisions in
-`system/blockMeshDict`, and, for the segregated variant, the solidModel
-convergence tolerance `rTol`, which is tightened from its default of `1e-6` to
-`1e-10` so that the iterative error stays well below the discretisation error
-on the finer meshes. With the shipped tolerance the displacement error stalls
-near `2e-9` m from level 4 onwards and the convergence curve flattens.
+are never modified. For the structured family the driver changes the block
+divisions in `system/blockMeshDict`. For the triangular family it installs the
+benchmark Gmsh geometry, converts the mesh with `gmshToFoam`, and restores the
+OpenFOAM boundary types with `changeDictionary`. For the segregated variant,
+the solidModel convergence tolerance `rTol` is tightened from its default of
+`1e-6` to `1e-10` so that the iterative error stays well below the
+discretisation error on the finer meshes. With the shipped tolerance the
+structured displacement error stalls near `2e-9` m from level 4 onwards and
+the convergence curve flattens.
 
-Results are written to the ignored `verification/postProcessing/` directory as
-`mesh_convergence.csv`, `verification_summary.md`, the per-variant convergence
-data under `profiles/`, and, when `gnuplot` is available,
-`plateHole_convergence.pdf`.
+Results are written to the ignored `verification/postProcessing/` directory.
+The structured sweep produces `mesh_convergence.csv` and
+`verification_summary.md`; triangular output names have a `triangular_`
+prefix. Per-variant convergence data are stored under `profiles/`, and a PDF
+plot is generated when `gnuplot` is available.
 
 ## Mesh levels
 
@@ -74,6 +85,19 @@ the benchmark exactly.
 Levels 1 to 5 form the default sweep and take about four and a half minutes in
 total, serial, on an Apple M1 Ultra.
 
+The unstructured family uses the benchmark's nominal Gmsh spacings. Its first
+four levels form the default triangular sweep; level 5 is retained as an
+explicit extended option because its roughly quarter-million-cell segregated
+solve is substantially more expensive.
+
+| Level | Nominal spacing (m) | Cells |
+|---:|---:|---:|
+| 1 | 0.1 | 978 |
+| 2 | 0.05 | 4 026 |
+| 3 | 0.025 | 16 296 |
+| 4 | 0.0125 | 64 257 |
+| 5 | 0.00625 | approximately 256 000 |
+
 ## Acceptance criteria
 
 The four metrics are the mean L2 and LInf norms of the cell displacement
@@ -83,9 +107,12 @@ sweep each metric must
 - decrease monotonically with every refinement, and
 - give a net order of accuracy, measured between the coarsest and finest
   meshes against the effective cell spacing, above the minimum recorded in
-  `reference/plateHole_verification_references.json`: 1.5 for both
-  displacement norms, 1.0 for the stress L2 norm and 0.7 for the stress LInf
-  norm.
+  `reference/plateHole_verification_references.json`.
+
+For the structured family the minimum orders are 1.5 for both displacement
+norms, 1.0 for the stress L2 norm, and 0.7 for the stress LInf norm. The
+triangular minima are respectively 1.5, 1.5, 0.9, and 0.55, reflecting the
+lower stress convergence order on the unstructured cells next to the hole.
 
 The stress minima are lower than the displacement ones because the largest
 stress error sits in the cells at the hole, where the gradient is steepest, so
@@ -100,7 +127,7 @@ finite positive numbers.
 Recorded with OpenFOAM v2512 and the default `segregated` variant on an Apple
 M1 Ultra:
 
-| Level | Cells | Spacing (m) | D, L2 (m) | D, LInf (m) | σ<sub>xx</sub>, L2 (Pa) | σ<sub>xx</sub>, LInf (Pa) | Solver wall clock (s) |
+| Level | Cells | Spacing | D L2 | D LInf | Stress L2 | Stress LInf | Time |
 |---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 | 250 | 0.1233 | 2.966e-08 | 1.072e-07 | 24 036 | 154 295 | 1 |
 | 2 | 1 000 | 0.0617 | 1.349e-08 | 4.216e-08 | 10 420 | 105 030 | <1 |
@@ -120,6 +147,18 @@ orders of 1.83, 1.81, 1.39 and 0.84 in the same order, with level-to-level
 displacement L2 orders of 1.54, 1.86, 1.95 and 1.98, in one minute and
 47 seconds for the whole sweep. The `highOrder` variant reaches a net order of
 2.68 for the displacement L2 norm on the two coarsest meshes alone.
+
+The added legacy variants were recorded with OpenFOAM v2512 on the same
+machine. The table lists net orders over each default mesh family; all values
+pass the acceptance criteria above.
+
+| Mesh family | Variant | D L2 | D LInf | Stress L2 | Stress LInf |
+|:---|:---|---:|---:|---:|---:|
+| structured | `vertexCentred` | 1.98 | 1.98 | 1.96 | 1.76 |
+| triangular | `segregated` | 1.90 | 1.66 | 1.02 | 0.68 |
+| triangular | `petscSnes` | 1.92 | 1.73 | 1.12 | 0.76 |
+| triangular | `highOrder` | 3.39 | 3.28 | 2.76 | 2.03 |
+| triangular | `vertexCentred` | 1.93 | 1.82 | 1.00 | 0.61 |
 
 ## References
 

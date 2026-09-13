@@ -30,6 +30,7 @@ REFERENCE_FILE = REFERENCE_DIR / "plateHole_verification_references.json"
 
 # Components of the symmetric stress tensor reported by the function object.
 STRESS_XX_COMPONENT = 0
+MESH_FAMILIES = ("structured", "triangular")
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,8 +39,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--variants", help="comma-separated variant names")
     parser.add_argument(
+        "--mesh",
+        choices=MESH_FAMILIES,
+        default="structured",
+        help="mesh family to verify (default: structured)",
+    )
+    parser.add_argument(
         "--levels",
-        help="comma-separated mesh levels (1 is the coarsest)",
+        help="comma-separated levels in the selected mesh family",
     )
     parser.add_argument(
         "--quick",
@@ -83,6 +90,112 @@ def ignored(directory: str, names: list[str]) -> set[str]:
         )
 
     return ignored_names.intersection(names)
+
+
+def copy_file(source: Path, destination: Path) -> None:
+    """Copy one case input, replacing a tutorial selection symlink if needed."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.is_symlink() or destination.exists():
+        destination.unlink()
+    shutil.copy2(source, destination)
+
+
+def select_cell_approach(run_dir: Path, approach: str) -> None:
+    """Select an Allrun cell-centred approach without creating a mesh."""
+    for directory, stem in (
+        ("constant", "solidProperties"),
+        ("system", "fvSchemes"),
+        ("system", "fvSolution"),
+    ):
+        copy_file(
+            run_dir / directory / f"{stem}.{approach}",
+            run_dir / directory / stem,
+        )
+
+
+def select_vertex_approach(run_dir: Path) -> None:
+    """Install the point field and model inputs used by the legacy study."""
+    displacement = run_dir / "0" / "D"
+    if displacement.is_symlink() or displacement.exists():
+        displacement.unlink()
+    override_dir = VERIFY_DIR / "caseOverrides" / "vertexCentred"
+    for source in override_dir.rglob("*"):
+        if source.is_file():
+            copy_file(source, run_dir / source.relative_to(override_dir))
+
+
+def set_triangular_resolution(run_dir: Path, level: int, reference: dict) -> None:
+    """Install the legacy Gmsh geometry and select its nominal spacing."""
+    spacings = reference["triangular_spacings_m"]
+    if level > len(spacings):
+        raise RuntimeError(
+            f"triangular level {level} is unavailable; the finest supplied "
+            f"level is {len(spacings)}"
+        )
+    spacing = float(spacings[level - 1])
+    geometry = VERIFY_DIR / "meshes" / "plateHole.geo"
+    copy_file(geometry, run_dir / geometry.name)
+    geometry_path = run_dir / geometry.name
+    text = geometry_path.read_text()
+    text, count = re.subn(
+        r"(?m)^dx\s*=\s*[0-9.eE+-]+\s*;",
+        f"dx = {spacing:.10g};",
+        text,
+        count=1,
+    )
+    if count != 1:
+        raise RuntimeError(f"could not set mesh spacing in {geometry_path}")
+    geometry_path.write_text(text)
+    copy_file(
+        VERIFY_DIR / "meshes" / "changeDictionaryDict",
+        run_dir / "system" / "changeDictionaryDict",
+    )
+
+
+def run_logged(command: list[str], run_dir: Path, log_name: str) -> None:
+    """Run one application and retain its complete output."""
+    log_path = run_dir / log_name
+    with log_path.open("w") as log:
+        completed = subprocess.run(
+            command,
+            cwd=run_dir,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    if completed.returncode:
+        raise RuntimeError(
+            f"{' '.join(command)} failed with exit code "
+            f"{completed.returncode}; see {log_path}"
+        )
+
+
+def run_custom_case(run_dir: Path, mesh_family: str) -> None:
+    """Run a vertex-centred or Gmsh case outside the tutorial Allrun path."""
+    run_logged(["bash", "./Allwmake", "-s"], run_dir / "src", "log.Allwmake")
+    if mesh_family == "structured":
+        run_logged(["blockMesh"], run_dir, "log.blockMesh")
+    else:
+        run_logged(
+            [
+                "gmsh",
+                "-3",
+                "-format",
+                "msh2",
+                "-algo",
+                "del2d",
+                "plateHole.geo",
+            ],
+            run_dir,
+            "log.gmsh",
+        )
+        run_logged(
+            ["gmshToFoam", "plateHole.msh"],
+            run_dir,
+            "log.gmshToFoam",
+        )
+        run_logged(["changeDictionary"], run_dir, "log.changeDictionary")
+    run_logged(["solids4Foam"], run_dir, "log.solids4Foam")
 
 
 def set_resolution(run_dir: Path, level: int, tutorial_level: int) -> None:
@@ -240,16 +353,24 @@ def check_solver_log(solver_log: Path, label: str) -> None:
         raise RuntimeError(
             f"{label} did not reach the end of the run; see {solver_log}"
         )
+    if "The momentum equation converged in all time-steps" not in text:
+        raise RuntimeError(
+            f"{label} did not report momentum convergence; see {solver_log}"
+        )
 
 
 def run_level(
+    mesh_family: str,
     variant_name: str,
     variant: dict,
     level: int,
     reference: dict,
     reuse: bool,
 ) -> dict[str, float | int | str]:
-    run_dir = WORK_DIR / variant_name / f"mesh{level}"
+    if mesh_family == "structured":
+        run_dir = WORK_DIR / variant_name / f"mesh{level}"
+    else:
+        run_dir = WORK_DIR / mesh_family / variant_name / f"mesh{level}"
     solver_log = run_dir / "log.solids4Foam"
     completed_case = (
         reuse
@@ -263,25 +384,38 @@ def run_level(
         if run_dir.exists():
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
-        set_resolution(run_dir, level, int(reference["tutorial_level"]))
-        if "rtol" in variant:
+        if mesh_family == "structured":
+            set_resolution(run_dir, level, int(reference["tutorial_level"]))
+        else:
+            set_triangular_resolution(run_dir, level, reference)
+        if "rtol" in variant and variant_name != "vertexCentred":
             set_convergence_tolerance(
                 run_dir, variant["approach"], float(variant["rtol"])
             )
-        print(f"Running {variant_name} mesh{level} in {run_dir}", flush=True)
-        with (run_dir / "log.Allverify").open("w") as log:
-            completed = subprocess.run(
-                ["./Allrun", variant["approach"]],
-                cwd=run_dir,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                check=False,
-            )
-        if completed.returncode:
-            raise RuntimeError(
-                f"{variant_name} mesh{level} failed; "
-                f"see {run_dir / 'log.Allverify'}"
-            )
+        print(
+            f"Running {mesh_family} {variant_name} mesh{level} in {run_dir}",
+            flush=True,
+        )
+        if variant_name == "vertexCentred":
+            select_vertex_approach(run_dir)
+            run_custom_case(run_dir, mesh_family)
+        elif mesh_family == "triangular":
+            select_cell_approach(run_dir, variant["approach"])
+            run_custom_case(run_dir, mesh_family)
+        else:
+            with (run_dir / "log.Allverify").open("w") as log:
+                completed = subprocess.run(
+                    ["./Allrun", variant["approach"]],
+                    cwd=run_dir,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
+            if completed.returncode:
+                raise RuntimeError(
+                    f"{variant_name} mesh{level} failed; "
+                    f"see {run_dir / 'log.Allverify'}"
+                )
         if not solver_log.exists():
             raise RuntimeError(
                 f"solver log was not created in {run_dir}; the "
@@ -292,14 +426,18 @@ def run_level(
     check_solver_log(solver_log, f"{variant_name} mesh{level}")
 
     log_text = solver_log.read_text()
-    displacement = extract_norms(log_text, "Writing DDifference field")
-    point_displacement = extract_norms(
-        log_text, "Writing pointDDifference field"
+    displacement_marker = (
+        "Writing pointDDifference field"
+        if variant_name == "vertexCentred"
+        else "Writing DDifference field"
     )
+    displacement = extract_norms(log_text, displacement_marker)
+    point_displacement = extract_norms(log_text, "Writing pointDDifference field")
     stress_xx = extract_stress_norms(log_text, STRESS_XX_COMPONENT)
     cell_count = count_cells(run_dir)
     clock_matches = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", log_text)
     result: dict[str, float | int | str] = {
+        "mesh_family": mesh_family,
         "variant": variant_name,
         "approach": variant["approach"],
         "level": level,
@@ -319,7 +457,7 @@ def run_level(
     numeric_values = (
         value
         for key, value in result.items()
-        if key not in {"variant", "approach"}
+        if key not in {"mesh_family", "variant", "approach"}
     )
     if not all(math.isfinite(float(value)) for value in numeric_values):
         raise RuntimeError(f"non-finite result extracted from {solver_log}")
@@ -338,7 +476,9 @@ def net_order(results: list[dict[str, float | int | str]], metric: str) -> float
 
 
 def write_profiles(
-    results: list[dict[str, float | int | str]], variant_name: str
+    results: list[dict[str, float | int | str]],
+    mesh_family: str,
+    variant_name: str,
 ) -> None:
     """Write the data the convergence plot needs, free of column indices."""
     profiles = POST_DIR / "profiles"
@@ -360,13 +500,19 @@ def write_profiles(
                 )
             )
         )
-    (profiles / f"{variant_name}_convergence.txt").write_text(
+    profile_name = (
+        variant_name
+        if mesh_family == "structured"
+        else f"{mesh_family}_{variant_name}"
+    )
+    (profiles / f"{profile_name}_convergence.txt").write_text(
         "\n".join(lines) + "\n"
     )
 
 
 def write_results(
     results: list[dict[str, float | int | str]],
+    mesh_family: str,
     variant_names: list[str],
     reference: dict,
     quick: bool,
@@ -374,7 +520,7 @@ def write_results(
     POST_DIR.mkdir(parents=True, exist_ok=True)
     acceptance = reference["acceptance"]
     metrics = acceptance["required_metrics"]
-    minimum_order = acceptance["minimum_net_order"]
+    minimum_order = acceptance["minimum_net_order_by_mesh"][mesh_family]
     grouped = {
         name: [row for row in results if row["variant"] == name]
         for name in variant_names
@@ -384,7 +530,9 @@ def write_results(
         for name in variant_names
     }
 
-    with (POST_DIR / "mesh_convergence.csv").open("w", newline="") as stream:
+    output_prefix = "" if mesh_family == "structured" else f"{mesh_family}_"
+    csv_path = POST_DIR / f"{output_prefix}mesh_convergence.csv"
+    with csv_path.open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
@@ -413,6 +561,7 @@ def write_results(
     lines = [
         "# plateHole verification summary",
         "",
+        f"- Mesh family: {mesh_family}",
         f"- Mode: {'quick smoke test' if quick else 'full verification'}",
         f"- Variants: {', '.join(variant_names)}",
         "- Reference: the analytical plate-with-hole solution evaluated by the"
@@ -441,23 +590,29 @@ def write_results(
             )
     lines.extend(["", f"- Result: {'PASS' if passed else 'FAIL'}"])
     summary = "\n".join(lines) + "\n"
-    (POST_DIR / "verification_summary.md").write_text(summary)
+    summary_path = POST_DIR / f"{output_prefix}verification_summary.md"
+    summary_path.write_text(summary)
     print(summary)
-    print(f"CSV: {POST_DIR / 'mesh_convergence.csv'}")
+    print(f"CSV: {csv_path}")
     return passed
 
 
-def create_plot(variant_names: list[str]) -> None:
+def create_plot(mesh_family: str, variant_names: list[str]) -> None:
     plot_script = SCRIPT_DIR / "plotConvergence.gnuplot"
     if shutil.which("gnuplot") is None or not plot_script.is_file():
         return
-    output = POST_DIR / "plateHole_convergence.pdf"
+    output = POST_DIR / f"plateHole_{mesh_family}_convergence.pdf"
+    profile_name = (
+        variant_names[0]
+        if mesh_family == "structured"
+        else f"{mesh_family}_{variant_names[0]}"
+    )
     completed = subprocess.run(
         [
             "gnuplot",
             "-e",
             f"profiles='{POST_DIR / 'profiles'}'; "
-            f"variant='{variant_names[0]}'; "
+            f"variant='{profile_name}'; "
             f"output='{output}'",
             str(plot_script),
         ],
@@ -487,17 +642,29 @@ def main() -> int:
     if args.levels:
         levels = [int(value) for value in args.levels.split(",")]
     else:
-        levels = [int(value) for value in reference["default_levels"]]
+        levels = [
+            int(value)
+            for value in reference["default_levels_by_mesh"][args.mesh]
+        ]
     if args.quick:
         levels = levels[:2]
     if len(levels) < 2 or any(level <= 0 for level in levels):
         raise SystemExit("at least two positive levels are required")
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
+    if args.mesh == "triangular" and max(levels) > len(
+        reference["triangular_spacings_m"]
+    ):
+        raise SystemExit(
+            "triangular levels exceed the supplied spacing family"
+        )
 
+    required_commands = ["blockMesh", "checkMesh", "solids4Foam"]
+    if args.mesh == "triangular":
+        required_commands.extend(("gmsh", "gmshToFoam", "changeDictionary"))
     missing = [
         command
-        for command in ("blockMesh", "checkMesh", "solids4Foam")
+        for command in required_commands
         if shutil.which(command) is None
     ]
     if missing:
@@ -511,7 +678,14 @@ def main() -> int:
         for level in levels:
             try:
                 results.append(
-                    run_level(name, all_variants[name], level, reference, args.reuse)
+                    run_level(
+                        args.mesh,
+                        name,
+                        all_variants[name],
+                        level,
+                        reference,
+                        args.reuse,
+                    )
                 )
             except RuntimeError as error:
                 print(f"ERROR: {error}", file=sys.stderr)
@@ -520,14 +694,16 @@ def main() -> int:
                     return 1
         variant_results = [row for row in results if row["variant"] == name]
         if variant_results:
-            write_profiles(variant_results, name)
+            write_profiles(variant_results, args.mesh, name)
     if any(
         sum(row["variant"] == name for row in results) < 2 for name in variant_names
     ):
         print("ERROR: fewer than two levels completed for a variant", file=sys.stderr)
         return 1
-    passed = write_results(results, variant_names, reference, args.quick)
-    create_plot(variant_names)
+    passed = write_results(
+        results, args.mesh, variant_names, reference, args.quick
+    )
+    create_plot(args.mesh, variant_names)
     return 0 if passed and failures == 0 else 1
 
 
