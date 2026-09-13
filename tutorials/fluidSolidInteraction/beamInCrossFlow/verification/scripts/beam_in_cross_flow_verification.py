@@ -281,11 +281,21 @@ def robin_residual_summary(case: Path) -> dict[str, float]:
 
     # Columns: time, iteration, displacement, pressure and leakage-flux
     # residuals and (when written) the Robin convergence state (0 not
-    # converged, 1 converged, 2 stalled within the stall tolerance)
+    # converged, 1 converged, 2 stalled within the stall tolerance). The
+    # state column is located by header name so that older files with
+    # additional columns are read correctly.
+    header = path.read_text(errors="replace").splitlines()[0].split()
+    state_index = (
+        header.index("robinConvergenceState")
+        if "robinConvergenceState" in header else None
+    )
     final_by_time: dict[float, list[float]] = {}
+    states: dict[float, float] = {}
     for fields in rows:
-        values = [float(value) for value in fields[:6]]
+        values = [float(value) for value in fields[:5]]
         final_by_time[values[0]] = values
+        if state_index is not None and len(fields) > state_index:
+            states[values[0]] = float(fields[state_index])
 
     pressure_tolerance = dictionary_scalar(
         case / "constant/fsiProperties.robin", "robinPressureTolerance"
@@ -300,10 +310,10 @@ def robin_residual_summary(case: Path) -> dict[str, float]:
         case / "constant/fsiProperties.robin", "nOuterCorr"
     ))
     def converged(values: list[float]) -> bool:
-        # The solver's iteration-error criterion may accept a step whose
-        # latest residual changes exceed the tolerances
-        if len(values) >= 6:
-            return values[5] > 0
+        # The solver may accept a step whose latest residuals exceed the
+        # tolerances (stalled residuals); use its convergence state if written
+        if values[0] in states:
+            return states[values[0]] > 0
         return (
             values[2] <= displacement_tolerance
             and values[3] <= pressure_tolerance
