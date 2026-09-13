@@ -30,7 +30,7 @@ Description
                   + 2*(
                           c1
                         + 2*c2*(isoI1 - 3)
-                        + 3*c3*(isoI1 - 3)
+                        + 3*c3*(isoI1 - 3)^2
                      )*dev(isoB)
 
     where:
