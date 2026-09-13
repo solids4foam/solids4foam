@@ -79,7 +79,9 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   system [2]. The case uses `constantHs 5e-4` and permits up to 30 FSI
   correctors per time step. The `fixedRelaxation` coupling uses a relaxation
   factor of 1.0, i.e. no additional under-relaxation is applied, as the Robin
-  condition already provides the required stability.
+  condition already provides the required stability; the Robin-Neumann
+  coupling is designed for such unrelaxed iterations, and Aitken or IQN-ILS
+  acceleration is not recommended with it.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 

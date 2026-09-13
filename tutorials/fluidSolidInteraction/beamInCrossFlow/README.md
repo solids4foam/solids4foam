@@ -192,15 +192,34 @@ checked against the same displacement and force references as the lower-order
 variants; the displacement tolerance is widened to allow the expected
 discretisation difference. The high-order variant is skipped on foam-extend.
 
-For an `elasticWallPressure` interface, FSI convergence additionally requires
-the normalized pressure change and relative leakage flux to satisfy
-`robinPressureTolerance` and `robinFluxTolerance`. Both default to
-`outerCorrTolerance`. The pressure change is normalized by the largest
-interface-pressure norm in the current time step, while the mesh-relative
-interface flux is normalized by the largest total boundary throughput in that
-time step. This case uses `1e-5` and `5e-3`, respectively, to remain above the
-fluid linear-solver residual floor during the low-throughput inlet ramp. These
-two residuals are appended to
+For an `elasticWallPressure` interface, FSI convergence also considers the
+normalized interface-pressure change (`robinPressureTolerance`, default
+`outerCorrTolerance`) and the kinematic residual (`robinFluxTolerance`, default
+`10*outerCorrTolerance`): the interface flux relative to the mesh motion, i.e.
+the leakage through the moving wall, normalized by the largest boundary
+throughput plus interface motion flux in the time step. The pressure change is
+normalized by the largest interface-pressure norm in the time step.
+
+The fluid models build the Robin target acceleration from the fluid mesh
+motion (`robinKinematicConsistency`, default on, in the fluid `PIMPLE`
+dictionary), so the converged interface flux equals the mesh flux and the
+leakage is an iteration error that vanishes as the iterations converge, as for
+a Dirichlet velocity condition. Without it, the leakage has a discretisation
+floor and is only reported.
+
+With the default `robinConvergence residual`, the latest displacement,
+pressure-change and (if kinematically consistent) leakage residuals must
+satisfy their tolerances. A step whose residuals stall, i.e. whose mean
+contraction rate over the last `robinStallIterations` (4) iterations in which
+the solid solution changed lies between `robinStallRate` (0.97) and its
+inverse, is accepted if the residuals are within `robinStallToleranceFactor`
+(10) times their tolerances, which avoids iterations that only reproduce
+inner-solver noise. `robinConvergence iterationError` additionally estimates
+the remaining iteration error as `R*rho/(1 - rho)` from the observed
+contraction rate `rho`, requires it for slowly contracting iterations (rate
+above `robinSlowRate`, 0.9) and stops as soon as it satisfies the tolerances.
+Before `couplingStartTime` only the displacement residual is used. The
+residuals, the leakage and the convergence state are appended to
 `postProcessing/fsiResiduals.dat`.
 
 The script checks that all three variants converge to the same solution, within

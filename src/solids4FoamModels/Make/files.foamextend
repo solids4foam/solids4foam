@@ -152,6 +152,7 @@ $(fluidFvPatchFields)/correctedFvPatchFields/fixedValueCorrected/fixedValueCorre
 $(fluidFvPatchFields)/correctedFvPatchFields/fixedValueCorrected/fixedValueCorrectedFvPatchScalarField.C
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarFieldRobinCoeff.C
 $(fluidFvPatchFields)/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C

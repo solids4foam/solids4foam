@@ -22,11 +22,15 @@ solids4Foam::runApplication -s fluid blockMesh -region fluid -dict system/fluid/
 solids4Foam::runApplication setFields -region fluid
 
 # Determine coupling mode
-MODE=${1:-iqnils}
+MODE=${1:-robin}
 FSP=constant/fsiProperties
 FSP_BACKUP="${FSP}.bak"
 
 case "$MODE" in
+    robin)
+        echo "Using Robin-Neumann coupling with fixed relaxation 1"
+        COUPLING_FILE="${FSP}.robin"
+        ;;
     aitken)
         echo "Using Aitken coupling"
         COUPLING_FILE="${FSP}.aitken"

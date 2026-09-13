@@ -86,6 +86,18 @@ class pimpleFluid
         // Move mesh in the outer corrector loop flag
         const bool moveMeshOuterCorrectors_;
 
+        //- Build the Robin FSI interface flux from the old wall velocity
+        //  (true) rather than the old fluid face velocity Uf (false). The
+        //  latter carries any fluid-wall velocity mismatch over to the next
+        //  time step, so interface leakage accumulates
+        const bool robinFluxFromWallVelocity_;
+
+        //- Build the explicit part of the Robin interface flux from the mesh
+        //  flux, so that the converged interface flux equals the mesh flux
+        //  (no leakage through the moving wall), as for a Dirichlet velocity
+        //  condition
+        const bool robinKinematicConsistency_;
+
         //- Cumulative continuity errors
         scalar cumulativeContErr_;
 

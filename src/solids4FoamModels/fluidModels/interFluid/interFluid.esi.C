@@ -101,6 +101,52 @@ void interFluid::updateRobinFsiInterfacePhi
                     << "Not implemented for backward scheme"
                     << exit(FatalError);
             }
+
+            // Kinematic consistency: at a converged Robin state the pressure
+            // equals the previous-iteration pressure, so the Robin condition
+            // fixes the normal pressure gradient, snGrad(p_rgh) =
+            // gSrc - rho*a_s, where phig = gSrc*rAU*|Sf|. Choosing phiHbyA
+            // such that the resulting interface flux,
+            // phiHbyA - rAU*snGrad(p_rgh)*|Sf|, equals the mesh flux removes
+            // the leakage through the moving wall without changing the Robin
+            // condition itself
+            elasticWallPressureFvPatchScalarField& pRobin =
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        p.boundaryField()[patchI]
+                    )
+                );
+
+            // Only if the mesh follows the solid: with under-relaxation or
+            // interface acceleration the mesh lags the solid during the
+            // iterations and must not enter the flux
+            const bool consistent =
+                mesh().moving()
+             && pRobin.fluidMeshFollowsSolid()
+             && mesh().solutionDict().subDict("PIMPLE").lookupOrDefault
+                (
+                    "robinKinematicConsistency", true
+                );
+
+            if (consistent)
+            {
+                const scalarField& rhoB =
+                    mesh().lookupObject<volScalarField>
+                    (
+                        "rho"
+                    ).boundaryField()[patchI];
+
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    fvc::meshPhi(U)().boundaryField()[patchI]
+                  + phig.boundaryField()[patchI]
+                  - rAU.boundaryField()[patchI]
+                   *mesh().magSf().boundaryField()[patchI]
+                   *rhoB*pRobin.prevNormalAcceleration();
+            }
+
+            pRobin.setKinematicConsistency(consistent);
         }
         else if
         (

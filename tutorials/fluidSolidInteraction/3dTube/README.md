@@ -95,7 +95,12 @@ In this tutorial, we will compare six variants of the approaches above:
 5. **Robin-Neumann formulation with an incompressible fluid**: Support for this
    approach is implemented in the `pimpleFluid` model, where we apply special
    interface boundary conditions: `elasticWallPressure` for the fluid pressure
-   field, and `elasticWallVelocity` for the fluid velocity field.
+   field, and `elasticWallVelocity` for the fluid velocity field. The Robin
+   coefficient is chosen automatically (`hsModel secant`, the default), and the
+   coupling uses unrelaxed fixed-point iterations (`fixedRelaxation` with
+   `relaxationFactor 1` in `constant/fsiProperties.robin`), for which the
+   Robin-Neumann approach is designed; Aitken or IQN-ILS acceleration is not
+   recommended with it.
 6. **Dirichlet-Neumann formulation with IQNILS acceleration and an
    incompressible fluid model using preCICE**: This approach is the same as
    approach 1, except the [preCICE](http://precice.org) coupling implementation

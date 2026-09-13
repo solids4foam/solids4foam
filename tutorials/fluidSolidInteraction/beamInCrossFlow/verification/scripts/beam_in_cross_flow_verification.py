@@ -279,9 +279,13 @@ def robin_residual_summary(case: Path) -> dict[str, float]:
     if not rows or any(len(fields) < 5 for fields in rows):
         fail(f"Robin residual columns are missing from {path}")
 
+    # Columns: time, iteration, displacement, pressure and kinematic
+    # residuals, and (when written) the leakage flux and the Robin
+    # convergence state (0 not converged, 1 converged, 2 stalled within the
+    # stall tolerance)
     final_by_time: dict[float, list[float]] = {}
     for fields in rows:
-        values = [float(value) for value in fields[:5]]
+        values = [float(value) for value in fields[:7]]
         final_by_time[values[0]] = values
 
     pressure_tolerance = dictionary_scalar(
@@ -296,11 +300,19 @@ def robin_residual_summary(case: Path) -> dict[str, float]:
     n_outer_corr = int(dictionary_scalar(
         case / "constant/fsiProperties.robin", "nOuterCorr"
     ))
+    def converged(values: list[float]) -> bool:
+        # The solver's iteration-error criterion may accept a step whose
+        # latest residual changes exceed the tolerances
+        if len(values) >= 7:
+            return values[6] > 0
+        return (
+            values[2] <= displacement_tolerance
+            and values[3] <= pressure_tolerance
+            and values[4] <= flux_tolerance
+        )
+
     unconverged = [
-        values for values in final_by_time.values()
-        if values[2] > displacement_tolerance
-        or values[3] > pressure_tolerance
-        or values[4] > flux_tolerance
+        values for values in final_by_time.values() if not converged(values)
     ]
     if unconverged:
         fail(

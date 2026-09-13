@@ -118,20 +118,7 @@ bool AitkenCouplingInterface::evolve()
         }
 
         // Optional: write residuals to file
-        if (writeResidualsToFile() && Pstream::master())
-        {
-            residualFile()
-                << runTime().value() << " "
-                << outerCorr() << " "
-                << residualNorm;
-            if (hasRobinInterface())
-            {
-                residualFile()
-                    << " " << robinPressureResidual()
-                    << " " << robinFluxResidual();
-            }
-            residualFile() << endl;
-        }
+        writeResidualLine(residualNorm);
     }
     while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
