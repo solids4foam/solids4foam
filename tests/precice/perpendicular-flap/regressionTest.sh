@@ -140,18 +140,20 @@ final_time=$(
 
 if [[ -z "${final_time}" ]]
 then
-    echo "Skipping regression checks because the case produced no watch-point data"
-    exit 0
+    echo "FAIL: the case produced no watch-point data"
+    exit 1
 fi
 
-# A run that stopped early is reported as a skip rather than a failure, matching
-# the convention of the tutorial regression tests. The driver reports the
-# participant exit status separately.
+# A run that stopped early is a failure, not a skip. Unlike the tutorial
+# regression tests, the end time here is set by caseSetup rather than by a
+# user who may have shortened the run, so stopping short of it means a
+# participant crashed, diverged or was killed by the timeout: exactly the
+# regressions these checks exist to catch.
 if ! awk "BEGIN {exit !(${final_time} + 0 >= ${REG_END_TIME} - 1e-9)}"
 then
-    echo "Skipping regression checks because the case did not reach the"
-    echo "requested end time (reached ${final_time}, expected ${REG_END_TIME})"
-    exit 0
+    echo "FAIL: the case did not reach the requested end time"
+    echo "      (reached ${final_time}, expected ${REG_END_TIME})"
+    exit 1
 fi
 
 # ------------------------------------------------------------

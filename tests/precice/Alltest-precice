@@ -280,10 +280,9 @@ runCase()
         pids+=("$!")
     done
 
-    # Wait for all of them, remembering whether any failed. Note that a failing
-    # participant is not necessarily a test failure: regressionTest.sh decides,
-    # since a case that did not reach the requested end time is reported as a
-    # skip rather than a failure.
+    # Wait for all of them, remembering whether any failed. A participant that
+    # crashed or was killed by the timeout fails the case, even if the output it
+    # wrote before stopping happens to pass the checks
     local runStatus=0
     local pid
     for pid in "${pids[@]}"
@@ -293,13 +292,18 @@ runCase()
 
     if (( runStatus != 0 ))
     then
-        echo "  At least one participant exited with a non-zero status"
+        echo "  FAIL: at least one participant exited with a non-zero status;"
+        echo "        see log.run in each participant directory"
     fi
 
-    # Hand over to the case's own checks
+    # Hand over to the case's own checks, which are run regardless so that
+    # their output is available to diagnose a failed participant
+    local checkStatus=0
     (
         cd "${tutorialDir}" && "${SCRIPT_DIR}/${caseName}/regressionTest.sh"
-    )
+    ) || checkStatus=1
+
+    (( runStatus == 0 && checkStatus == 0 ))
 }
 
 PASSED=()

@@ -46,7 +46,14 @@ run time, so the job does not run on every pull request. It runs:
 - on any pull request carrying the `test-precice` label — remove and re-add the
   label to trigger it again, the same convention the preCICE adapter
   repositories use with their `trigger-system-tests` label;
-- manually, via `gh workflow run preciceTest.yml`.
+- manually, via `gh workflow run preciceTest.yml --ref <branch>`, once the
+  workflow has reached `master` (GitHub only offers manual runs of workflows
+  present on the default branch).
+
+preCICE is built from source, without PETSc and without its tests, and the
+build is cached by `PRECICE_VERSION`. GitHub scopes caches made on a pull
+request to that pull request, so the cache saves the build on re-runs and
+label re-triggers rather than across pull requests.
 
 ## Layout
 
@@ -99,7 +106,7 @@ Generate the committed values in the same container CI uses, since results can
 differ between OpenFOAM versions:
 
 ```bash
-docker run --rm --user 1001 -e HOME=/work -v "$PWD:/work/ws" -w /work \
+docker run --rm -e HOME=/work -v "$PWD:/work/ws" -w /work \
   philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh \
   bash -lc '...'   # see .github/workflows/preciceTest.yml for the full steps
 ```
@@ -119,6 +126,9 @@ per-case `regressionTest.sh` scripts used elsewhere in this repository. The
 upstream system tests already do the full `fieldcompare` comparison against
 Git-LFS reference results.
 
-A case that does not reach its requested end time is reported as a skip rather
-than a failure, matching the convention of the other regression tests; the
-driver reports the participant exit status separately.
+A case fails if any participant exits with a non-zero status, including being
+killed by the `TIMEOUT` in `caseSetup`, or if it does not reach its requested
+end time. This differs from the tutorial regression tests, which skip a case
+that stopped early: here the end time is fixed by `caseSetup`, so stopping
+short of it means a participant crashed or diverged, which is the kind of
+regression these tests exist to catch.

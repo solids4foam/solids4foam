@@ -35,16 +35,11 @@ jobs:
 
     runs-on: ubuntu-22.04
 
-    # Ubuntu 22.04 (jammy), matching the preCICE package installed below, and
-    # with PETSc, which the upstream solid case requires.
+    # The OpenFOAM-v2512 image with PETSc, which the upstream solid case
+    # requires.
     # Unlike the other workflows, this one runs the container as root, so that
-    # the preCICE package can be installed with apt, which resolves its
-    # Depends. Installing it without apt, by unpacking it, skips those, and the
-    # image ships neither the boost-log nor the PETSc runtime libraries that
-    # libprecice.so.3 needs: the adapter library then fails to dlopen and the
-    # run aborts with "Cannot load function type preciceAdapterFunctionObject".
-    # The dlerror line naming the missing library is printed unprefixed about
-    # 20 lines earlier, so it is easy to miss.
+    # the preCICE build dependencies missing from the image can be installed
+    # with apt.
     container:
       image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
       env:
@@ -52,6 +47,7 @@ jobs:
 
     env:
       FOAM_BASHRC: /usr/lib/openfoam/openfoam2512/etc/bashrc
+      PRECICE_PREFIX: /opt/precice
 
     steps:
       - uses: actions/checkout@v4
@@ -61,24 +57,63 @@ jobs:
         # blank lines that versions.txt carries for human readers
         run: grep -E '^[A-Z][A-Z0-9_]*=' tests/precice/versions.txt >> "$GITHUB_ENV"
 
-      - name: Install preCICE
-        shell: bash -l {0}
+      - name: Install the preCICE dependencies
+        # The image already has the rest of Boost, MPI and CMake. These are
+        # needed at run time too, so they are installed even when the preCICE
+        # build itself is restored from the cache. Boost.Test is required by
+        # the preCICE CMake configuration even with BUILD_TESTING off.
+        run: |
+          apt-get -qq update
+          DEBIAN_FRONTEND=noninteractive apt-get -qq -y install \
+              --no-install-recommends \
+              libboost-log-dev libboost-test-dev libeigen3-dev libxml2-dev
+
+      - name: Restore the preCICE build
+        id: precice-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PRECICE_PREFIX }}
+          # Bump the trailing number after changing the build options below
+          key: precice-${{ env.PRECICE_VERSION }}-openfoam-v2512-ubuntu-22.04-1
+
+      - name: Build preCICE
+        # Built from source rather than installed from the release .deb, whose
+        # Depends pull in the distribution PETSc alongside the image's own, and
+        # which ties the preCICE version to the Ubuntu release of the image.
+        # PETSc is disabled: the upstream cases use the <mapping:rbf> alias,
+        # which always selects the Eigen partition-of-unity solver, so it is
+        # not needed and the image's PETSc is left alone. Tests are not built,
+        # which is most of the build time.
+        if: steps.precice-cache.outputs.cache-hit != 'true'
         run: |
           set -e
-          wget -q "https://github.com/precice/precice/releases/download/v${PRECICE_VERSION}/libprecice3_${PRECICE_VERSION}_${PRECICE_DEB_DISTRO}.deb"
-          apt-get -qq update
-          apt-get -qq -y install "./libprecice3_${PRECICE_VERSION}_${PRECICE_DEB_DISTRO}.deb"
-          pkg-config --modversion libprecice
+          wget -q -O precice.tar.gz \
+              "https://github.com/precice/precice/archive/refs/tags/v${PRECICE_VERSION}.tar.gz"
+          mkdir precice-src
+          tar -xzf precice.tar.gz -C precice-src --strip-components=1
+          cmake -S precice-src -B precice-build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="${PRECICE_PREFIX}" \
+              -DCMAKE_INSTALL_LIBDIR=lib \
+              -DBUILD_TESTING=OFF \
+              -DPRECICE_FEATURE_PETSC_MAPPING=OFF \
+              -DPRECICE_FEATURE_PYTHON_ACTIONS=OFF \
+              -DPRECICE_BINDINGS_FORTRAN=OFF
+          cmake --build precice-build -j "$(nproc)"
+          cmake --install precice-build
+          rm -rf precice.tar.gz precice-src precice-build
 
-      - name: PETSc sanity check
-        shell: bash -l {0}
+      - name: Put preCICE on the search paths
         run: |
-          # Installing preCICE pulls in the distribution PETSc packages. Check
-          # that PETSC_DIR still points at the PETSc solids4foam is built
-          # against, so that this does not silently change the build.
-          source "${FOAM_BASHRC}"
-          echo "PETSC_DIR = $PETSC_DIR"
-          test -d "$PETSC_DIR/include"
+          set -e
+          echo "PKG_CONFIG_PATH=${PRECICE_PREFIX}/lib/pkgconfig" >> "$GITHUB_ENV"
+          # Through the linker cache rather than LD_LIBRARY_PATH, so that the
+          # adapter library finds libprecice however the tutorial scripts set
+          # up their environment
+          echo "${PRECICE_PREFIX}/lib" > /etc/ld.so.conf.d/precice.conf
+          ldconfig
+          PKG_CONFIG_PATH="${PRECICE_PREFIX}/lib/pkgconfig" \
+              pkg-config --modversion libprecice
 
       - name: Build the OpenFOAM preCICE adapter
         shell: bash -l {0}
