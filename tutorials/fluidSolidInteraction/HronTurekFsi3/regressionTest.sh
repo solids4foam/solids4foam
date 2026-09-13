@@ -34,6 +34,12 @@ REF_TIP_UY=-0.00031014
 REF_FX=-0.0393827
 REF_FY=-0.0461165
 
+# foam-extend uses GGI rather than AMI for the interface interpolation and has
+# a distinct, repeatable tip displacement at the regression end time.
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    REF_TIP_UY=-0.000169319
+fi
+
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
