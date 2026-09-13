@@ -57,6 +57,20 @@ void interFluid::updateRobinFsiInterfacePhi
     const volScalarField& rAU
 ) const
 {
+    // Mesh flux subtracted from the absolute flux by fvc::makeRelative
+    tmp<surfaceScalarField> tmeshPhi;
+    if
+    (
+        mesh().moving()
+     && mesh().solutionDict().subDict("PIMPLE").lookupOrDefault
+        (
+            "robinKinematicConsistency", true
+        )
+    )
+    {
+        tmeshPhi = fvc::meshPhi(U);
+    }
+
     forAll(p.boundaryField(), patchI)
     {
         const bool isElasticSlipWall =
@@ -123,12 +137,7 @@ void interFluid::updateRobinFsiInterfacePhi
             // interface acceleration the mesh lags the solid during the
             // iterations and must not enter the flux
             const bool consistent =
-                mesh().moving()
-             && pRobin.fluidMeshFollowsSolid()
-             && mesh().solutionDict().subDict("PIMPLE").lookupOrDefault
-                (
-                    "robinKinematicConsistency", true
-                );
+                tmeshPhi.valid() && pRobin.fluidMeshFollowsSolid();
 
             if (consistent)
             {
@@ -139,7 +148,7 @@ void interFluid::updateRobinFsiInterfacePhi
                     ).boundaryField()[patchI];
 
                 phiHbyA.boundaryFieldRef()[patchI] =
-                    fvc::meshPhi(U)().boundaryField()[patchI]
+                    tmeshPhi().boundaryField()[patchI]
                   + phig.boundaryField()[patchI]
                   - rAU.boundaryField()[patchI]
                    *mesh().magSf().boundaryField()[patchI]

@@ -201,7 +201,7 @@ class fluidSolidInterface
         //- Current maximum normalized Robin pressure residual
         scalar robinPressureResidual_;
 
-        //- Current maximum normalized Robin kinematic (flux) residual
+        //- Current maximum normalized Robin leakage-flux residual
         scalar robinFluxResidual_;
 
 
@@ -209,8 +209,6 @@ class fluidSolidInterface
         //  current time step
         scalar maxRobinKinematicNorm_;
 
-        //- Current normalized absolute Robin leakage flux (diagnostic)
-        scalar robinLeakage_;
 
         //- Residual histories of the current time step: displacement,
         //  pressure and kinematic residuals
@@ -299,17 +297,12 @@ protected:
             return robinPressureResidual_;
         }
 
-        //- Return the current normalized Robin kinematic (flux) residual
+        //- Return the current normalized Robin leakage-flux residual
         scalar robinFluxResidual() const
         {
             return robinFluxResidual_;
         }
 
-        //- Return the current normalized absolute Robin leakage flux
-        scalar robinLeakage() const
-        {
-            return robinLeakage_;
-        }
 
         //- Return the Robin convergence state of the latest iteration
         label robinConvergenceState() const

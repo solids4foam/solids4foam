@@ -211,7 +211,7 @@ Final design (`robinConvergence residual`, default): displacement residual
 leakage normalised by the throughput plus the interface motion flux `<=
 robinFluxTolerance` (default `10*outerCorrTolerance`); otherwise the leakage
 is only reported. Before `couplingStartTime` only the displacement residual
-is used. The residual file gains the leakage and a convergence-state column.
+is used. The residual file gains a convergence-state column.
 
 An iteration-error criterion (`robinConvergence iterationError`) was also
 implemented and compared: it estimates the remaining error of each residual
@@ -228,7 +228,8 @@ unreliable and added iterations (cerebralAneurysm 21 vs 17, container 7.2 vs
 
 Mean FSI iterations per step (steps reaching `nOuterCorr` in brackets) and
 final interface leakage, normalised by the throughput plus the interface
-motion flux, with the PR #450 criteria (absolute leakage normalised by the
+motion flux (the Robin interfaces are excluded from the throughput), with
+the PR #450 criteria (absolute leakage normalised by the
 throughput, tolerance `outerCorrTolerance`; run with the wall-velocity flux
 start) and with the final defaults of this work (`hsModel secant`,
 `robinKinematicConsistency`, `robinConvergence residual`):

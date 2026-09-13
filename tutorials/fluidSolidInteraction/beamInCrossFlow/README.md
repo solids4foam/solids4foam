@@ -219,7 +219,7 @@ the remaining iteration error as `R*rho/(1 - rho)` from the observed
 contraction rate `rho`, requires it for slowly contracting iterations (rate
 above `robinSlowRate`, 0.9) and stops as soon as it satisfies the tolerances.
 Before `couplingStartTime` only the displacement residual is used. The
-residuals, the leakage and the convergence state are appended to
+pressure and leakage-flux residuals and the convergence state are appended to
 `postProcessing/fsiResiduals.dat`.
 
 The script checks that all three variants converge to the same solution, within

@@ -608,12 +608,16 @@ def summarize_run(run_dir):
             maxDispPIter=max(dp_iters),
             meanFinalFlux=sum(final_flux)/n,
         )
-    if len(header) >= 7:
-        # Final Robin convergence state of each step (iterationError
-        # criterion): leakage in column 6, state in column 7
-        states = [int(steps[t][-1][5]) for t in order]
+    if "robinConvergenceState" in header:
+        # Final Robin convergence state and leakage of each step, located by
+        # header name (row values exclude the time column)
+        iState = header.index("robinConvergenceState") - 1
+        iLeak = header.index(
+            "robinLeakage" if "robinLeakage" in header else "robinFluxResidual"
+        ) - 1
+        states = [int(steps[t][-1][iState]) for t in order]
         out.update(
-            meanLeakage=sum(steps[t][-1][4] for t in order)/n,
+            meanLeakage=sum(steps[t][-1][iLeak] for t in order)/n,
             nStalled=sum(1 for s in states if s == 2),
             nUnconverged=sum(1 for s in states if s == 0),
         )

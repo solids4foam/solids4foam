@@ -456,7 +456,6 @@ Foam::fluidSolidInterface::fluidSolidInterface
     robinPressureResidual_(0),
     robinFluxResidual_(0),
     maxRobinKinematicNorm_(0),
-    robinLeakage_(0),
     robinDispHistory_(),
     robinPressureHistory_(),
     robinFluxHistory_(),
@@ -643,6 +642,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     robinPressurePrev_.setSize(nGlobalPatches_);
     maxRobinPressureNorm_.setSize(nGlobalPatches_, 0);
 
+    if (robinStallIterations_ < 0)
+    {
+        FatalErrorInFunction
+            << "robinStallIterations must be non-negative (0 disables the"
+            << " stall detection)" << abort(FatalError);
+    }
+
     if
     (
         robinConvergence_ != "iterationError"
@@ -783,7 +789,7 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
         {
             residualFilePtr_()
                 << " robinPressureResidual robinFluxResidual"
-                << " robinLeakage robinConvergenceState";
+                << " robinConvergenceState";
         }
         residualFilePtr_() << endl;
     }
@@ -841,7 +847,6 @@ void Foam::fluidSolidInterface::initializeFields()
     maxRobinKinematicNorm_ = 0;
     robinPressureResidual_ = 0;
     robinFluxResidual_ = 0;
-    robinLeakage_ = 0;
     robinDispHistory_.clear();
     robinPressureHistory_.clear();
     robinFluxHistory_.clear();
@@ -1745,7 +1750,6 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
     robinPressureResidual_ = 0;
     robinFluxResidual_ = 0;
-    robinLeakage_ = 0;
     robinKinematicConsistency_ = true;
 
     if (!hasRobinInterface())
@@ -1759,7 +1763,20 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     scalar interfaceMotionNorm = 0;
     forAll(fluid().phi().boundaryField(), patchI)
     {
-        if (!fluidMesh().boundary()[patchI].coupled())
+        // Physical boundaries only: the flux through the Robin interfaces is
+        // the leakage itself, which must not enter its own scale
+        bool robinPatch = false;
+        forAll(robinInterfaces_, interfaceI)
+        {
+            robinPatch =
+                robinPatch
+             || (
+                    robinInterfaces_[interfaceI]
+                 && fluidPatchIndices()[interfaceI] == patchI
+                );
+        }
+
+        if (!fluidMesh().boundary()[patchI].coupled() && !robinPatch)
         {
             boundaryFluxNorm +=
                 sum(mag(fluid().phi().boundaryField()[patchI]));
@@ -1843,22 +1860,17 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
                 fluid().solutionP().boundaryField()[fluidPatchID]
             ).kinematicConsistency();
 
-        const scalar fluxResidual = leakage;
-
         robinPressurePrev_[interfaceI] = currentPressure;
         robinPressureResidual_ = max
         (
             robinPressureResidual_, pressureResidual
         );
-        robinFluxResidual_ = max(robinFluxResidual_, fluxResidual);
-        robinLeakage_ = max(robinLeakage_, leakage);
+        robinFluxResidual_ = max(robinFluxResidual_, leakage);
 
         Info<< "Robin pressure residual for interface " << interfaceI
             << ": " << pressureResidual << nl
-            << "Robin kinematic (flux-change) residual for interface "
-            << interfaceI << ": " << fluxResidual << nl
-            << "Robin leakage flux for interface " << interfaceI << ": "
-            << leakage << endl;
+            << "Robin leakage-flux residual for interface " << interfaceI
+            << ": " << leakage << endl;
     }
 
     robinDispHistory_.append(maxResidual);
@@ -1958,7 +1970,7 @@ namespace Foam
 
         rate = max(values[n - 1]/values[n - 2], values[n - 2]/values[n - 3]);
 
-        if (n > nStall)
+        if (nStall > 0 && n > nStall)
         {
             scalar logRate = 0;
             for (label i = n - nStall; i < n; i++)
@@ -2028,7 +2040,8 @@ void Foam::fluidSolidInterface::evaluateRobinConvergence()
 
         // Stalled residuals: they no longer decrease (e.g. inner-solver
         // tolerances), so further iterations are pointless; they are
-        // accepted if they are close to their tolerances
+        // accepted if they are close to their tolerances. Only the stall
+        // flag of robinResidualTest is used here.
         const UList<scalar>* histories[3] =
         {
             &robinDispHistory_, &robinPressureHistory_, &robinFluxHistory_
@@ -2206,7 +2219,6 @@ void Foam::fluidSolidInterface::writeResidualLine(const scalar residualNorm)
         residualFile()
             << " " << robinPressureResidual_
             << " " << robinFluxResidual_
-            << " " << robinLeakage_
             << " " << state;
     }
 
