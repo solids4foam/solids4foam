@@ -9,6 +9,9 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
@@ -255,19 +258,33 @@ check_case() {
         force_time=""
     fi
 
-    if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-        echo "Skipping ${coupling} regression checks because the case did not complete in this environment"
+    # A skip is only valid if the tutorial declared one in the Allrun log.
+    # Anything else that leaves the expected output missing or incomplete is a
+    # failure.
+    if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping ${coupling} regression checks because the tutorial skipped in this environment"
         return 0
+    fi
+
+    if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+        echo "FAIL [${coupling}]: the case did not run or did not complete in this"
+        echo "      environment: expected output is missing and the tutorial did"
+        echo "      not declare a skip (see ${case_dir}/${ALLRUN_LOGFILE})"
+        return 1
     fi
 
     if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REGRESSION_END_TIME})}"; then
-        echo "Skipping ${coupling} regression checks because the displacement history did not reach the requested end time"
-        return 0
+        echo "FAIL [${coupling}]: the displacement history stops at t = ${disp_time},"
+        echo "      short of the requested end time ${REGRESSION_END_TIME}: the case"
+        echo "      did not complete"
+        return 1
     fi
 
     if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REGRESSION_END_TIME})}"; then
-        echo "Skipping ${coupling} regression checks because the force history did not reach the requested end time"
-        return 0
+        echo "FAIL [${coupling}]: the force history stops at t = ${force_time},"
+        echo "      short of the requested end time ${REGRESSION_END_TIME}: the case"
+        echo "      did not complete"
+        return 1
     fi
 
     max_disp=$(extract_max_displacement "${case_dir}")

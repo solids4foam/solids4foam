@@ -34,6 +34,12 @@ REF_TIP_UY=-0.00031014
 REF_FX=-0.0393827
 REF_FY=-0.0461165
 
+# foam-extend uses GGI rather than AMI for the interface interpolation and has
+# a distinct, repeatable tip displacement at the regression end time.
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    REF_TIP_UY=-0.000169319
+fi
+
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
@@ -148,6 +154,13 @@ find_force_file() {
 prepare_case
 run_case
 
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 tip_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
 force_file=""
 if force_file=$(find_force_file); then
@@ -156,19 +169,25 @@ else
     force_time=""
 fi
 
-if [[ -z "${tip_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+if [[ -z "${tip_time}" ]]; then
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      displacement output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${tip_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the tip displacement history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the tip displacement history stops at t = ${tip_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
-if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the force history did not reach the requested end time"
-    exit 0
+if [[ -n "${force_time}" ]] \
+    && ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"
+then
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 tip_uy=$(extract_final_tip_uy)

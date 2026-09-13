@@ -112,6 +112,13 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
 disp_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
 force_file=""
 if force_file=$(find_force_file); then
@@ -121,18 +128,22 @@ else
 fi
 
 if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      expected output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the case did not reach the requested end time"
-    exit 0
+    echo "FAIL: the displacement history stops at t = ${disp_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the force history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 # OpenFOAM variant compatibility
