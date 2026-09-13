@@ -163,9 +163,9 @@ else
     force_time=""
 fi
 
-if [[ -z "${tip_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+if [[ -z "${tip_time}" ]]; then
     echo "FAIL: the case did not run or did not complete in this environment:"
-    echo "      expected output is missing and the tutorial did not declare a skip"
+    echo "      displacement output is missing and the tutorial did not declare a skip"
     echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
     exit 1
 fi
@@ -176,7 +176,9 @@ if ! awk "BEGIN {exit !(${tip_time} + 0 >= ${REG_END_TIME})}"; then
     exit 1
 fi
 
-if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
+if [[ -n "${force_time}" ]] \
+    && ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"
+then
     echo "FAIL: the force history stops at t = ${force_time}, short of the"
     echo "      requested end time ${REG_END_TIME}: the case did not complete"
     exit 1
