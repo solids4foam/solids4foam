@@ -158,7 +158,7 @@ check_converged() {
     status=$(awk -v t="${time}" '
         /^Time = / {cur = $3; next}
         (cur - t)^2 < 1e-8 && /Max iterations reached/ {s = "capped"}
-        (cur - t)^2 < 1e-8 && /residual has converged/ {s = "converged"}
+        (cur - t)^2 < 1e-8 && /residual has converged|Both residuals have converged/ {s = "converged"}
         END {print s}' "${CASE_DIR}/${SOLVER_LOGFILE}")
 
     if [[ "${status}" == "converged" ]]; then
