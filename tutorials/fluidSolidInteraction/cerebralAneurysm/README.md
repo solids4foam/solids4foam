@@ -188,6 +188,14 @@ The number of FSI (outer) iterations performed in each time step is recorded in
 `fsiIterations.gnuplot` to produce `fsiIterations.pdf` and `fsiIterations.png`
 (this step is skipped if `gnuplot` is not installed).
 
+The `surfaceFieldValue` function objects in `system/controlDict` also record
+the signed mass flow through the two inlets, the four outlets, and the fluid
+FSI patch. `interfaceAbsoluteMassFlowRate` records the sum of the magnitudes of
+the face fluxes on the FSI patch, so local leakage cannot be hidden by
+cancellation in the signed interface flow. The values are calculated from the
+mesh-relative volumetric flux `phi` and scaled by the blood density of
+$$1050\,\mathrm{kg\,m^{-3}}$$ to give mass flow in $$\mathrm{kg\,s^{-1}}$$.
+
 ![FSI iterations per time step](images/fsiIterations.png)
 
 **Figure 6: Number of fluid-solid interaction iterations per time step over one
