@@ -52,17 +52,17 @@ function die()
 # Extracts useful info from log file.
 function logReport()
 {
-    case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
-    app=`echo $1 | sed s/"\(.*\)\."/""/g`
+    case=`dirname "$1" | sed s/"\(.*\)\.\/"/""/g`
+    app=`echo "$1" | sed s/"\(.*\)\."/""/g`
     if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
     then
-        app=`echo $1 | rev | cut -d'.' -f 2,1 | rev`
+        app=`echo "$1" | rev | cut -d'.' -f 2,1 | rev`
     fi
     appAndCase="Application $app - case $case"
 
-    fatalError=`grep "FOAM FATAL" $1`
-    otherError=`grep "ERROR" $1`
-    completed=`grep -E "^[\t ]*[eE]nd" $1`
+    fatalError=`grep "FOAM FATAL" "$1"`
+    otherError=`grep "ERROR" "$1"`
+    completed=`grep -E "^[\t ]*[eE]nd" "$1"`
 
     if [ "$fatalError" ]
     then
@@ -74,7 +74,7 @@ function logReport()
         return
     elif [ "$completed" ]
     then
-        completionTime=`tail -20 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
+        completionTime=`tail -20 "$1" | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
         if [ "$completionTime" ]
         then
             completionTime="in $completionTime"
@@ -257,10 +257,10 @@ do
     if [ -d $application ]
     then
         cd $application
-        for log in `find . -name "log.*" | xargs ls -rt`
+        while IFS= read -r -d '' log
         do
-            logReport $log >> ../testLoopReport
-        done
+            logReport "$log" >> ../testLoopReport
+        done < <(find . -type f -name "log.*" -print0)
         echo "" >> ../testLoopReport
         cd ..
     fi
@@ -268,7 +268,7 @@ done
 
 # Create concatenated logs file
 echo; echo "Preparing logs"
-find . -name "log.*" -exec cat {} \; >> logs
+find . -type f -name "log.*" -exec cat {} \; >> logs
 
 # Output summary statistics
 echo; echo "Summary statistics"
