@@ -19,17 +19,28 @@ Variants:
 
 ## Summary table
 
-| case (steps) | pWaveSpeed | thicknessLimited | best fixed | secant median | secant minimax |
+Columns: `pWaveSpeed` (pWS), `thicknessLimited` (TL), best fixed (`hsScale`
+in brackets), secant median (med) and secant minimax (mm).
+
+| case | pWS | TL | best fixed | med | mm |
 |---|---|---|---|---|---|
-| 3dTube, dt (60) | 4.57 / 6 | 5.05 / 6 | 4.57 (pWaveSpeed, 1.03x) | **4.08 / 6** | 4.12 / 6 |
-| 3dTube, 4 dt (40) | 52.4 / 57 | 6.78 / 10 | 6.78 (1x) | **5.90 / 11** | 6.43 / 10 |
-| 3dTube, 16 dt (15) | crash | 21.6 / 24 | 8.87 / 11 (2x) | **7.27 / 12** | 7.67 / 12 |
-| beamInCrossFlow modified (20) | 52.2 / 194 | 50.0 / 96 | 27.4 / 52 (2x) | 28.8 / 38 | **24.0 / 34** |
-| beamInCrossFlow original (20) | 9.80 / 12 | 108.6 / 143 | 61.0 / 79 (2x) | 9.45 / 22 | **9.05 / 22** |
-| fillingElasticContainer (2000) | crash | 5.83 / 19 | 5.83 (1x) | **5.55 / 20** | 6.42 / 30 |
-| cerebralAneurysm (10), iter to 1e-3 | crash | 7.5 | 5.8 (1.5x) | **5.2** | 8.9 |
-| flexibleDamBreakRobin (~400, adaptive dt) | 11.5 / 22 | 14.1 / 26 | 11.3 / 25 (2x) | **10.9 / 21** | 11.4 / 21 |
-| HronTurekFsi3Robin (300 coupled) | crash | 13.9 / 100 * | 13.9 / 100 * | crash | 13.9 / 100 * |
+| 3dTube dt | 4.57/6 | 5.05/6 | 4.57 (1.03x) + | **4.08/6** | 4.12/6 |
+| 3dTube 4dt | 52.4/57 | 6.78/10 | 6.78 (1x) | **5.90/11** | 6.43/10 |
+| 3dTube 16dt | crash | 21.6/24 | 8.87/11 (2x) | **7.27/12** | 7.67/12 |
+| beam modified | 52.2/194 | 50.0/96 | 27.4/52 (2x) | 28.8/38 | **24.0/34** |
+| beam original | 9.80/12 | 108.6/143 | 61.0/79 (2x) | 9.45/22 | **9.05/22** |
+| container | crash | 5.83/19 | 5.83 (1x) | **5.55/20** | 6.42/30 |
+| aneurysm | crash | 7.5 | 5.8 (1.5x) | **5.2** | 8.9 |
+| dam break | 11.5/22 | 14.1/26 | 11.3/25 (2x) | **10.9/21** | 11.4/21 |
+| Turek-Hron | crash | 13.9/100 * | 13.9/100 * | crash | 13.9/100 * |
+
+Cases (time steps): `3dTube` with the tutorial time step dt (60), 4 dt (40)
+and 16 dt (15); `beamInCrossFlow` modified (20) and original (20);
+`fillingElasticContainer` (2000); `cerebralAneurysm` (10), FSI iterations to
+1e-3; `flexibleDamBreakRobin` (~400, adaptive dt); `HronTurekFsi3Robin` (300
+coupled).
+
+`+` best fixed choice: `pWaveSpeed` (1.03x).
 
 `*` most steps reach `nOuterCorr = 100`: the iterations contract at about 0.95.
 
@@ -117,9 +128,9 @@ passes for all four variants.
   larger parallel runs (the modified beam on 4 cores reproduces the serial
   iterations: 24.0 mean), and mesh-refinement studies.
 
-# Part 2: interface leakage and Robin convergence criteria
+## Part 2: interface leakage and Robin convergence criteria
 
-## Why the converged Robin interface leaks
+### Why the converged Robin interface leaks
 
 Tukovic et al. (2018) derive the interface volume flux from the Euler
 momentum balance at the wall, Eqs. (28)-(30): `(1/a_P)_bi = dt`,
@@ -142,7 +153,7 @@ step n+1 = leak at step n), giving the leakage floors seen with PR #450
 Dirichlet-Neumann has no such error: the wall velocity sets the flux to the
 mesh flux (3dTube: relative wall flux 4e-22, machine zero).
 
-## Fixes
+### Fixes
 
 1. `robinFluxFromWallVelocity` (pimpleFluid, default on): build the Robin
    flux from the old wall velocity (set by `elasticWallVelocity` from the mesh
@@ -190,7 +201,7 @@ convective and viscous parts of `HbyA` at the wall face, which changes the
 wall pressure gradient by a first-order (half-cell) term in this viscous
 case. This is a separate discretisation question.
 
-## Convergence criteria
+### Convergence criteria
 
 PR #450 required the displacement residual, the relative interface pressure
 change and the absolute leakage (normalised by the throughput) to satisfy
@@ -241,10 +252,14 @@ start) and with the final defaults of this work (`hsModel secant`,
 | beamInCrossFlow original | 9.05 | 9.0 | 8e-8 |
 | cerebralAneurysm | 30 (10 of 10) | 17.3 | 1.3e-4 |
 | flexibleDamBreakRobin | 94.5 (384 of 410) | 11.8 | 5e-9 |
-| fillingElasticContainer, fixed relaxation 1 | 21.4 (1262 of 2000 unconverged) | 6.34 | 1.1e-4 |
-| fillingElasticContainer as shipped (IQN-ILS, 0.1) | - | 8.67 (0) | reported only |
-| HronTurekFsi3Robin, before coupling | 100 | 1 | - |
-| HronTurekFsi3Robin, coupled | 100 | 100 (scalar-coefficient limit, see part 1) | 5e-6 |
+| container, relaxation 1 | 21.4 (1262 of 2000 unconverged) | 6.34 | 1.1e-4 |
+| container, as shipped | - | 8.67 (0) | reported only |
+| Turek-Hron, before coupling | 100 | 1 | - |
+| Turek-Hron, coupled | 100 | 100 (scalar-coefficient limit) | 5e-6 |
+
+Container: `fillingElasticContainer` with fixed relaxation 1, or as shipped
+(IQN-ILS, relaxation 0.1). Turek-Hron: `HronTurekFsi3Robin`; the coupled steps
+reach `nOuterCorr` because of the scalar-coefficient limit (see part 1).
 
 In 3dTube the final defaults move the solution towards the
 Dirichlet-Neumann one: maximum displacement difference 0.49% -> 0.12%, force
@@ -267,7 +282,7 @@ one FSI iteration (mean 1.26), and the converged coupling (mean 8.7) gives
 -0.4822 (-0.4817 to -0.4826 across coupling methods and Robin coefficient
 models); the shift comes from the Robin convergence criteria of PR #450.
 
-## Remaining limitations
+### Remaining limitations
 
 - The flux-side consistency is only implemented for the OpenFOAM.com
   pimpleFluid and interFluid; the OpenFOAM.org and foam-extend variants keep

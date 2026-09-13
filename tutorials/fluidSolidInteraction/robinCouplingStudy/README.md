@@ -37,12 +37,16 @@ wavenumbers `k` the impedance grows to about `rho_s l sqrt(1 + (k l)^2)`.
 
 ## Models available in `elasticWallPressure`
 
-| `hsModel` | coefficient |
-|---|---|
-| `pWaveSpeed` | `hs = c_p dt_eff`, with `c_p = sqrt(impK/rho_s)` |
-| `constant` | `hs = constantHs`, or a nonuniform `hs` field |
-| `thicknessLimited` | `hs = l tanh(H/l)`; `H` is the local wall thickness found by ray casting through the solid, halved for walls wetted on both sides |
-| `secant` (default) | starts from `seedModel` (default `thicknessLimited`) and rescales it using the solid and fluid impedances measured from the changes in interface pressure and acceleration between FSI iterations |
+`hsModel` selects the coefficient:
+
+- `pWaveSpeed`: `hs = c_p dt_eff`, with `c_p = sqrt(impK/rho_s)`;
+- `constant`: `hs = constantHs`, or a nonuniform `hs` field;
+- `thicknessLimited`: `hs = l tanh(H/l)`, where `H` is the local wall
+  thickness found by ray casting through the solid, halved for walls wetted on
+  both sides;
+- `secant` (default): starts from `seedModel` (default `thicknessLimited`)
+  and rescales it using the solid and fluid impedances measured from the
+  changes in interface pressure and acceleration between FSI iterations.
 
 Secant settings: `secantUpdate` (`iteration` or `timeStep`), `secantFit`
 (`minimax` over the recorded impedance samples, or the `median` of the
@@ -75,15 +79,14 @@ Cases: `3dTube`, `beamInCrossFlow` (modified form), `beamInCrossFlowOriginal`,
 
 Example:
 
-```bash
-cd scripts
-./robin_hs_study.py run --case 3dTube --jobs 4 \
-    --common "fsi.robinFluxTolerance=1,bc.writeDiagnostics=yes" \
-    --variant "default" \
-    --variant "tl:bc.hsModel=thicknessLimited" \
-    --variant "secant:bc.hsModel=secant,bc.secantFit=minimax,bc.secantUpdate=iteration"
-./robin_hs_study.py summarize --case 3dTube
-```
+    cd scripts
+    secant="bc.hsModel=secant,bc.secantFit=minimax,bc.secantUpdate=iteration"
+    ./robin_hs_study.py run --case 3dTube --jobs 4 \
+        --common "fsi.robinFluxTolerance=1,bc.writeDiagnostics=yes" \
+        --variant "default" \
+        --variant "tl:bc.hsModel=thicknessLimited" \
+        --variant "secant:$secant"
+    ./robin_hs_study.py summarize --case 3dTube
 
 Part 1 of the study (the Robin coefficient) set `robinFluxTolerance 1`: with
 the original interface flux formulation the leakage levels off at a
