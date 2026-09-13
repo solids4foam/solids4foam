@@ -38,8 +38,8 @@ m4_define(l, 1)
 m4_define(r, 0.75)
 
 // MESH
-m4_define(foundationGrid, 120 30 1) 
-m4_define(slabGrid, 12 6 1) 
+m4_define(foundationGrid, 120 30 1)
+m4_define(slabGrid, 12 6 1)
 m4_define(grading, 1 1 1)
 
 // FRONT AND BACK PLANES

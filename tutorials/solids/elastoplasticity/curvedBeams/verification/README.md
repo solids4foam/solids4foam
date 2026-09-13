@@ -108,7 +108,7 @@ never reached its end time.
 Recorded with foam-extend-4.1 and the default `mu0.3` variant on an Apple M1
 Ultra, in serial:
 
-| Level | Cells | Peak F<sub>x</sub> (N) | Peak F<sub>y</sub> (N) | RMS error vs. reference | Peak error vs. reference | Force RMS change (N) | Solver time (s) |
+| Level | Cells | Peak Fx | Peak Fy | RMS error | Peak error | RMS ΔF | Time |
 |---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 | 150 | 17.340 | 40.532 | 0.0437 | 0.0392 | – | 26 |
 | 2 | 500 | 17.218 | 39.317 | 0.0196 | 0.0080 | 0.706 | 52 |

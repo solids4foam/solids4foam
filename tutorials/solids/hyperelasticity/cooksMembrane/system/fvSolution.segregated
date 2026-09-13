@@ -28,4 +28,13 @@ solvers
     }
 }
 
+relaxationFactors
+{
+    fields
+    {
+        // Keep the first nonlinear update admissible when FOAM_SIGFPE is set
+        D               0.7;
+    }
+}
+
 // ************************************************************************* //

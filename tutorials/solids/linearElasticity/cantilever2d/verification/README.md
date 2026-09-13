@@ -128,7 +128,7 @@ cell.
 
 ### Other variants
 
-| Variant | Displacement L2 net order | Stress L2 net order | Finest displacement L2 |
+| Variant | Disp. L2 order | Stress L2 order | Finest disp. L2 |
 |:---|---:|---:|---:|
 | `petscSnes` | 1.61 | 1.53 | 0.006043 |
 | `vertexCentred` | 2.07 | 2.00 | 0.0008479 |

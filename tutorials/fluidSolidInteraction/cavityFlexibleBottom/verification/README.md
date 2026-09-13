@@ -101,7 +101,7 @@ steady response.
 Recorded with OpenFOAM v2512 and the default `aitken` variant on an Apple M1
 Ultra. The whole default sweep took about ten minutes in serial.
 
-| Level | ΔX (m) | Steady u<sub>y</sub> (m) | vs. reference | Steady F<sub>y</sub> (N) | vs. reference | u<sub>y</sub> change (m) |
+| Level | ΔX (m) | uy (m) | Error | Fy (N) | Error | Δuy (m) |
 |---:|---:|---:|---:|---:|---:|---:|
 | 1 | 0.1 | -0.20246 | 13.2% | -5.15312 | 0.13% | – |
 | 2 | 0.05 | -0.22883 | 6.88% | -5.23894 | 0.19% | 2.64e-02 |

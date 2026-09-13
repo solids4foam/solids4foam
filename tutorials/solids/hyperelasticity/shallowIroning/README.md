@@ -150,28 +150,28 @@ literature as the global coefficient of friction $$\mu_g$$. Table 1 summarises
 the values of the global coefficient of friction from the literature and
 `solids4foam`.
 
-**Table 1: Comparison of global coefficients of friction $$\mu_g$$ (at a
-normalised time of 1.5, i.e. $$t = 3.5$$ s in `solids4foam`)**
+Table 1: Comparison of global coefficients of friction $$\mu_g$$ (at a
+normalised time of 1.5, i.e. $$t = 3.5$$ s in `solids4foam`)
 
-|                     |   [6]    |   [1]    |   [8]    |   [5]    |   [4]    |   [3]    |   [2]    | solids4foam |
-| :-----------------: | :------: | :------: | :------: | :------: | :------: | :------: | :------: | :---------: |
-| $$(\mu_g)_{t=1.5}$$ | $$0.30$$ | $$0.32$$ | $$0.32$$ | $$0.34$$ | $$0.38$$ | $$0.47$$ | $$0.53$$ |  $$0.31$$   |
+| Quantity | [6] | [1] | [8] | [5] | [4] | [3] | [2] | solids4foam |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| $$(\mu_g)_{t=1.5}$$ | 0.30 | 0.32 | 0.32 | 0.34 | 0.38 | 0.47 | 0.53 | 0.31 |
 
 Table 2 compares the reaction forces with the reference solutions at the end
 of the indentation (normalised time 1.0, $$t = 1$$ s) and in the middle of
 the sliding (normalised time 1.5, $$t = 3.5$$ s). The reference values are
 linearly interpolated from the digitised curves in the `reference` directory.
 
-**Table 2: Vertical and horizontal reaction forces (N)**
+Table 2: Vertical and horizontal reaction forces (N)
 
-|                          | Vertical, 1.0 | Horizontal, 1.0 | Vertical, 1.5 | Horizontal, 1.5 |
-| :----------------------- | :-----------: | :-------------: | :-----------: | :-------------: |
-| solids4foam (tutorial)   |     316.4     |      55.0       |     395.1     |      122.7      |
-| Code_Aster [5]           |     332.0     |      71.0       |     421.0     |      143.3      |
-| Hartmann et al. [4]      |     319.5     |      67.2       |     408.4     |      160.2      |
-| Fischer and Wriggers [2] |     297.9     |      62.1       |     365.1     |      188.8      |
-| Yastrebov [3]            |     289.7     |      58.5       |     359.5     |      170.8      |
-| Poulios and Renard [6]   |     267.9     |      55.3       |     337.4     |      102.1      |
+| Source | V, 1.0 | H, 1.0 | V, 1.5 | H, 1.5 |
+|:---|---:|---:|---:|---:|
+| solids4foam (tutorial) | 316.4 | 55.0 | 395.1 | 122.7 |
+| Code_Aster [5] | 332.0 | 71.0 | 421.0 | 143.3 |
+| Hartmann et al. [4] | 319.5 | 67.2 | 408.4 | 160.2 |
+| Fischer and Wriggers [2] | 297.9 | 62.1 | 365.1 | 188.8 |
+| Yastrebov [3] | 289.7 | 58.5 | 359.5 | 170.8 |
+| Poulios and Renard [6] | 267.9 | 55.3 | 337.4 | 102.1 |
 
 The predicted vertical reaction force lies within the spread of the reference
 solutions throughout the load history, between the results of Code_Aster [5]

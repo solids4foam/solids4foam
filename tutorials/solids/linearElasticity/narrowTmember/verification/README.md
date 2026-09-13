@@ -75,7 +75,7 @@ usable numbers.
 
 Recorded with OpenFOAM v2512 and the `petscSnes` variant on an Apple M1 Ultra:
 
-| Level | Cells | Peak σ<sub>eq</sub> (MPa) | RMS error vs. reference | Profile RMS change (Pa) | Solver wall clock (s) |
+| Level | Cells | Peak stress (MPa) | RMS error | Change (Pa) | Time (s) |
 |---:|---:|---:|---:|---:|---:|
 | 1 | 624 | 6.866 | 0.1466 | – | <1 |
 | 2 | 4 992 | 6.397 | 0.0456 | 2.35e+05 | 1 |

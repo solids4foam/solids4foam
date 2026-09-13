@@ -140,7 +140,7 @@ same scale).
 
 **Table 1: Vertical force and twisting torque on the coarse mesh.**
 
-| Angle | Force, solids4foam | Force [3] | Torque, solids4foam | Torque [3] | Torque [2] |
+| Angle | S4F force | Force [3] | S4F torque | Torque [3] | Torque [2] |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0° | 1.282 | 1.230 | 0.000 | 0.002 | 0.003 |
 | 20° | 1.241 | 1.234 | 0.139 | 0.146 | 0.144 |

@@ -86,7 +86,7 @@ the sweep produces usable numbers.
 Recorded with OpenFOAM v2512 on a 20-core Apple M1 Ultra using the default
 `--cores auto` allocation. The whole default sweep took 17 minutes.
 
-| Level | Cells | Ranks | Apex position (mm) | Mid-wall RMS change (m) | Solver wall clock (s) |
+| Level | Cells | Ranks | Apex (mm) | RMS change (m) | Time (s) |
 |---:|---:|---:|---:|---:|---:|
 | 1 | 1 620 | 1 | -26.487 | – | 50 |
 | 2 | 12 960 | 8 | -27.268 | 5.95e-04 | 111 |
@@ -98,10 +98,10 @@ three significant figures between the two finest meshes. The finest apex
 position differs from the independent block-coupled mixed pressure-displacement
 solution by 1.0%.
 
-Level 4 was run on a Linux cluster node (AMD EPYC 9684X, OpenFOAM v2512) through Slurm
-with `./Allverify --levels 1,2,3,4 --cores 1,8,32,64`:
+Level 4 was run on a Linux cluster node (AMD EPYC 9684X, OpenFOAM v2512)
+through Slurm with `./Allverify --levels 1,2,3,4 --cores 1,8,32,64`:
 
-| Level | Cells | Ranks | Apex position (mm) | Mid-wall RMS change (m) | Solver wall clock (s) |
+| Level | Cells | Ranks | Apex (mm) | RMS change (m) | Time (s) |
 |---:|---:|---:|---:|---:|---:|
 | 1 | 1 620 | 1 | -26.487 | – | 75 |
 | 2 | 12 960 | 8 | -27.268 | 5.95e-04 | 167 |
@@ -126,7 +126,7 @@ allocated cores and the run slows by orders of magnitude.
 The mid-wall line is the curve used in the Land et al. Problem 2 figures. It is
 the ellipse midway between the endocardial and epicardial surfaces,
 
-```
+```text
 x = r_s sin(u),    y = 0,    z = r_l cos(u)
 ```
 
@@ -144,4 +144,4 @@ G. Plank, S. Rossi, D. Ruprecht, G. Seemann, N. P. Smith, J. Sundnes,
 J. J. Rice, N. Trayanova, D. Wang, Z. J. Wang, S. A. Niederer, Verification of
 cardiac mechanics software: benchmark problems and solutions for testing active
 and passive material behaviour, *Proceedings of the Royal Society A*, 471(2184),
-20150641, 2015. https://doi.org/10.1098/rspa.2015.0641
+20150641, 2015. [doi:10.1098/rspa.2015.0641](https://doi.org/10.1098/rspa.2015.0641)

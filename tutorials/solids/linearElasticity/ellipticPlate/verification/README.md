@@ -80,7 +80,7 @@ usable numbers.
 
 Recorded with OpenFOAM v2512 and the `petscSnes` variant on an Apple M1 Ultra:
 
-| Level | Cells | Peak σ<sub>eq</sub> (MPa) | RMS error vs. reference | Profile RMS change (Pa) |
+| Level | Cells | Peak stress (MPa) | RMS error | Profile change (Pa) |
 |---:|---:|---:|---:|---:|
 | 1 | 72 | 3.920 | 0.1117 | – |
 | 2 | 576 | 3.438 | 0.0534 | 3.23e+05 |

@@ -117,9 +117,9 @@ close to where the Abaqus and FEBio forces drop, but it drops further, so at
 6 mm it is 13% to 22% below the published values. By 7.5 mm, the force has
 recovered to within the scatter of the published solutions.
 
-**Table 1: Compression force (N) for frictionless contact**
+Table 1: Compression force (N) for frictionless contact
 
-| Displacement (mm) | solids4foam (coarse mesh) | Abaqus [2] | FEBio [2] | Areias et al. [4] | Puso and Laursen [3] |
+| Disp. (mm) | solids4foam | Abaqus [2] | FEBio [2] | Areias [4] | Puso [3] |
 | --- | --- | --- | --- | --- | --- |
 | 2.5 | 0.999 | 1.025 | 0.978 | 0.888 | 0.899 |
 | 5.0 | 2.300 | 2.402 | 2.441 | 2.241 | 2.322 |
@@ -128,14 +128,15 @@ recovered to within the scatter of the published solutions.
 
 With frictional contact (`./Allrun friction`), the coarse-mesh force lies
 within, or at most 3% above, the band of published solutions up to 5 mm
-(Table 2), although it oscillates between about 3 and 5 mm, where many increments reach the maximum
-number of momentum correctors. The drop in the force after buckling is again
+(Table 2), although it oscillates between about 3 and 5 mm, where many
+increments reach the maximum number of momentum correctors. The drop in the
+force after buckling is again
 larger than in the published solutions, and by 7.5 mm the force is 3% to 7%
 below them.
 
-**Table 2: Compression force (N) for frictional contact ($$\mu = 0.5$$)**
+Table 2: Compression force (N) for frictional contact ($$\mu = 0.5$$)
 
-| Displacement (mm) | solids4foam (coarse mesh) | Abaqus [2] | FEBio [2] | Areias et al. [4] |
+| Disp. (mm) | solids4foam | Abaqus [2] | FEBio [2] | Areias et al. [4] |
 | --- | --- | --- | --- | --- |
 | 2.5 | 1.070 | 1.032 | 1.045 | 0.932 |
 | 5.0 | 2.382 | 2.576 | 2.586 | 2.343 |
