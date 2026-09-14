@@ -71,6 +71,13 @@ release. For complete commit-level details and contributor information, see the
   which previously discarded its face-centre history and so restarted with a
   zero interface velocity. The history is now written to, and read from, the
   time directories, and is mapped by `decomposePar` and `reconstructPar`.
+- Fixed the restart behaviour of `fluxCorrectedVelocity` boundaries in
+  `fluidModel`. As the condition is derived from `zeroGradient`, it does not
+  read the `value` entry that it writes, so the normal component of the
+  velocity was replaced by a zero-gradient extrapolation on restart. The
+  current boundary values of `U` are now re-derived from `phi`, and those of
+  its old-time levels, for which `phi` is not written, are read back from the
+  time directories.
 
 ### Removed in v2.4
 
