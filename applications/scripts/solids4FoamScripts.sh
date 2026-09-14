@@ -877,11 +877,21 @@ function solids4Foam::runApplication()
              "remove log file '$logFile' to re-run"
     else
         echo "Running $appRun on $PWD"
+        local rc=0
         if [ "$logMode" = append ]
         then
-            $appRun $appArgs "$@" >> $logFile 2>&1 || echo "ERROR" >> $logFile
+            $appRun $appArgs "$@" >> $logFile 2>&1 || rc=$?
         else
-            $appRun $appArgs "$@" > $logFile 2>&1 || echo "ERROR" >> $logFile
+            $appRun $appArgs "$@" > $logFile 2>&1 || rc=$?
+        fi
+
+        if [ "$rc" -ne 0 ]
+        then
+            # Keep the ERROR marker that existing scripts grep for
+            echo "ERROR" >> $logFile
+            echo "Error: $appName failed with exit code $rc;" \
+                 "see $PWD/$logFile" 1>&2
+            return "$rc"
         fi
     fi
 }
