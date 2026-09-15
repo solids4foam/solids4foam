@@ -200,6 +200,19 @@ the leakage through the moving wall, normalized by the largest boundary
 throughput plus interface motion flux in the time step. The pressure change is
 normalized by the largest interface-pressure norm in the time step.
 
+If the flow is at or near rest, e.g. a closed or pressurised cavity without
+throughput or interface motion, these scales vanish and the leakage floor of
+the inner solvers can keep the relative residuals above their tolerances. The
+optional `robinFluxReferenceVelocity` (a characteristic flow velocity, default
+0, i.e. off) then bounds the flux scale from below by this velocity times the
+Robin interface area, and `robinPressureReference` (a characteristic pressure,
+in the units of the fluid pressure, default 0) bounds the pressure scale. They
+only take effect when the flow's own scale is smaller, which the log reports as
+`(reference flux scale)` or `(reference pressure scale)`; a value much larger
+than the expected flow loosens the checks. If the iterations reach
+`nOuterCorr` with a Robin residual that has no reference scale above its
+tolerance, the log suggests setting them.
+
 The fluid models build the Robin target acceleration from the fluid mesh
 motion (`robinKinematicConsistency`, default on, in the fluid `PIMPLE`
 dictionary), so the converged interface flux equals the mesh flux and the

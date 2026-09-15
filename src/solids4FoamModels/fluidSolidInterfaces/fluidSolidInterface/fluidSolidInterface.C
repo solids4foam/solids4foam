@@ -450,6 +450,20 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "robinStallToleranceFactor", 10
         )
     ),
+    robinFluxReferenceVelocity_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinFluxReferenceVelocity", 0
+        )
+    ),
+    robinPressureReference_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinPressureReference", 0
+        )
+    ),
     robinInterfaces_(),
     robinPressurePrev_(),
     maxRobinPressureNorm_(),
@@ -462,6 +476,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     robinConvergenceState_(0),
     robinKinematicConsistency_(true),
     robinRelaxationWarned_(false),
+    robinReferenceHintIssued_(false),
     residuals_(),
     residualsPrev_(),
     maxResidualsNorm_(),
@@ -647,6 +662,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
         FatalErrorInFunction
             << "robinStallIterations must be non-negative (0 disables the"
             << " stall detection)" << abort(FatalError);
+    }
+
+    if (robinFluxReferenceVelocity_ < 0 || robinPressureReference_ < 0)
+    {
+        FatalErrorInFunction
+            << "robinFluxReferenceVelocity and robinPressureReference must be"
+            << " non-negative (0 disables them)" << abort(FatalError);
     }
 
     if
@@ -1761,6 +1783,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     // swept by the moving Robin interfaces
     scalar boundaryFluxNorm = 0;
     scalar interfaceMotionNorm = 0;
+    scalar robinInterfaceArea = 0;
     forAll(fluid().phi().boundaryField(), patchI)
     {
         // Physical boundaries only: the flux through the Robin interfaces is
@@ -1780,6 +1803,20 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         {
             boundaryFluxNorm +=
                 sum(mag(fluid().phi().boundaryField()[patchI]));
+        }
+    }
+    forAll(robinInterfaces_, interfaceI)
+    {
+        if (robinInterfaces_[interfaceI])
+        {
+            robinInterfaceArea +=
+                sum
+                (
+                    fluidMesh().magSf().boundaryField()
+                    [
+                        fluidPatchIndices()[interfaceI]
+                    ]
+                );
         }
     }
     if (fluidMesh().moving())
@@ -1804,8 +1841,17 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     }
     reduce(boundaryFluxNorm, sumOp<scalar>());
     reduce(interfaceMotionNorm, sumOp<scalar>());
+    reduce(robinInterfaceArea, sumOp<scalar>());
     maxRobinKinematicNorm_ =
         max(maxRobinKinematicNorm_, boundaryFluxNorm + interfaceMotionNorm);
+
+    // Flow at or near rest: without throughput and interface motion the flux
+    // scale vanishes, and the leakage floor of the inner solvers would give a
+    // large residual, so the optional reference flux bounds the scale
+    const scalar robinReferenceFlux =
+        robinFluxReferenceVelocity_*robinInterfaceArea;
+    const bool fluxScaleLimited = robinReferenceFlux > maxRobinKinematicNorm_;
+    const scalar fluxScale = max(maxRobinKinematicNorm_, robinReferenceFlux);
 
     forAll(robinInterfaces_, interfaceI)
     {
@@ -1825,6 +1871,19 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             maxRobinPressureNorm_[interfaceI], pressureNorm
         );
 
+        // Optional reference pressure, as the norm of a uniform interface
+        // pressure, bounds the scale of a pressure at or near zero
+        const scalar referencePressureNorm =
+            robinPressureReference_
+           *Foam::sqrt
+            (
+                scalar(returnReduce(currentPressure.size(), sumOp<label>()))
+            );
+        const bool pressureScaleLimited =
+            referencePressureNorm > maxRobinPressureNorm_[interfaceI];
+        const scalar pressureScale =
+            max(maxRobinPressureNorm_[interfaceI], referencePressureNorm);
+
         const scalar pressureResidual =
             Foam::sqrt
             (
@@ -1836,7 +1895,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
                     )
                 )
             )
-           /(maxRobinPressureNorm_[interfaceI] + SMALL);
+           /(pressureScale + SMALL);
 
         // Interface flux relative to the mesh motion, i.e. the leakage
         // through the moving wall
@@ -1850,8 +1909,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         // convergence criterion. Otherwise the leakage has a discretisation
         // floor (it does not vanish as the iterations converge) and is only
         // reported.
-        const scalar leakage =
-            gSum(mag(leak))/(maxRobinKinematicNorm_ + SMALL);
+        const scalar leakage = gSum(mag(leak))/(fluxScale + SMALL);
 
         robinKinematicConsistency_ =
             robinKinematicConsistency_
@@ -1868,9 +1926,12 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         robinFluxResidual_ = max(robinFluxResidual_, leakage);
 
         Info<< "Robin pressure residual for interface " << interfaceI
-            << ": " << pressureResidual << nl
+            << ": " << pressureResidual
+            << (pressureScaleLimited ? " (reference pressure scale)" : "")
+            << nl
             << "Robin leakage-flux residual for interface " << interfaceI
-            << ": " << leakage << endl;
+            << ": " << leakage
+            << (fluxScaleLimited ? " (reference flux scale)" : "") << endl;
     }
 
     robinDispHistory_.append(maxResidual);
@@ -1878,6 +1939,49 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     robinFluxHistory_.append(robinFluxResidual_);
 
     evaluateRobinConvergence();
+
+    // The FSI iterations ran out with a Robin residual that has no reference
+    // scale above its tolerance: if the flow is at or near rest, the relative
+    // residual has no meaningful scale, so point to the reference options
+    if
+    (
+        !robinReferenceHintIssued_
+     && coupled()
+     && robinConvergenceState_ == 0
+     && outerCorr_ >= nOuterCorr_
+    )
+    {
+        const bool pressureUnscaled =
+            robinPressureResidual_ > robinPressureTolerance_
+         && robinPressureReference_ <= 0;
+        const bool fluxUnscaled =
+            robinKinematicConsistency_
+         && robinFluxResidual_ > robinFluxTolerance_
+         && robinFluxReferenceVelocity_ <= 0;
+
+        if (pressureUnscaled || fluxUnscaled)
+        {
+            robinReferenceHintIssued_ = true;
+
+            Info<< nl << "Robin FSI iterations reached nOuterCorr with a"
+                << " Robin residual above its tolerance. If the flow is at or"
+                << " near rest (little throughput or interface motion), the"
+                << " relative residual has no physical scale: set";
+            if (fluxUnscaled)
+            {
+                Info<< " robinFluxReferenceVelocity (a characteristic"
+                    << " velocity of the flow)";
+            }
+            if (pressureUnscaled)
+            {
+                Info<< (fluxUnscaled ? " and" : "")
+                    << " robinPressureReference (a characteristic pressure)";
+            }
+            Info<< " in fsiProperties. Otherwise, check the inner-solver"
+                << " tolerances and nOuterCorr. This hint is written once."
+                << nl << endl;
+        }
+    }
 
     return maxResidual;
 }

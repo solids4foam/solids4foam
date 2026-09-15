@@ -159,9 +159,10 @@ class fluidSolidInterface
 
         //- Tolerance for the Robin kinematic residual: the interface flux
         //  relative to the mesh motion (leakage), normalised by the
-        //  throughput plus the interface motion flux; it is only tested if
-        //  the Robin condition is kinematically consistent with the mesh
-        //  motion, otherwise it is reported
+        //  throughput plus the interface motion flux (at least the optional
+        //  reference flux, see robinFluxReferenceVelocity_); it is only
+        //  tested if the Robin condition is kinematically consistent with the
+        //  mesh motion, otherwise it is reported
         const scalar robinFluxTolerance_;
 
         //- Robin convergence test: residual (default) requires the latest
@@ -187,6 +188,19 @@ class fluidSolidInterface
         //  factor of their tolerances (inner-solver floors); otherwise the
         //  iterations continue
         const scalar robinStallToleranceFactor_;
+
+        //- Optional reference velocity for the Robin kinematic residual: the
+        //  leakage is normalised by at least this velocity times the Robin
+        //  interface area, so that a flow at or near rest (no throughput and
+        //  no interface motion) does not leave the residual without a scale;
+        //  0 (default) disables the floor
+        const scalar robinFluxReferenceVelocity_;
+
+        //- Optional reference pressure for the Robin pressure residual (in
+        //  the units of the fluid solution pressure): the pressure change is
+        //  normalised by at least this pressure; 0 (default) disables the
+        //  floor
+        const scalar robinPressureReference_;
 
         //- Robin-condition flag for each interface
         List<bool> robinInterfaces_;
@@ -226,6 +240,9 @@ class fluidSolidInterface
 
         //- Has the warning about relaxed Robin coupling been issued
         bool robinRelaxationWarned_;
+
+        //- Has the hint about the Robin reference scales been issued
+        bool robinReferenceHintIssued_;
 
         //- List of current FSI residuals
         List<vectorField> residuals_;
