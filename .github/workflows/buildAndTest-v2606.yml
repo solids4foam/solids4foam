@@ -80,7 +80,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: regression-test-logs.OpenFOAM-v2606
-          path: tutorialsTest-regression
+          # The mechanicalConstitutiveLaw state files are named
+          # <material>:<topology>:<field>, and a colon is not allowed in an
+          # artifact path, so one of them would stop the whole upload
+          path: |
+            tutorialsTest-regression
+            !tutorialsTest-regression/**/*:*
           retention-days: 10
 
       - name: Set job status
