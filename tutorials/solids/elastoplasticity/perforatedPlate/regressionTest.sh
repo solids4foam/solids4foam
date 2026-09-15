@@ -516,6 +516,16 @@ run_reconstructed_restart_test() {
         return 0
     fi
 
+    # foam-extend's reconstructPar writes the gradient of a patch that one
+    # processor holds none of as a scalar, uniform 0, whatever the field's type,
+    # and the traction patch here is such a patch. The reconstructed D then
+    # cannot be read, which is a fault of the tool and not of anything this
+    # test is about
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        echo "SKIP: reconstructed restart (foam-extend's reconstructPar)"
+        return 0
+    fi
+
     local d="${REGRESSION_ROOT}/frameworkReconstructed"
 
     prepare_case "frameworkReconstructed"
