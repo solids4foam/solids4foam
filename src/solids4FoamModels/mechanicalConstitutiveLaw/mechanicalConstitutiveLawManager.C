@@ -325,18 +325,38 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     const CompactListList<tensor>& layout
 ) const
 {
+    // OpenFOAM.org keeps size() in a member of its own, which a layout filled
+    // in through offsets() and m() - as the quadrature layouts are - leaves at
+    // zero, so there the rows are counted from the offset table, which holds
+    // one more entry than there are rows. The other forks derive size() from
+    // their offsets, and foam-extend's hold row ends rather than row starts,
+    // so they keep size(), sizes() and index()
+#ifdef OPENFOAM_ORG
+    const labelUList& offsets = layout.offsets();
+    const label nRows = max(offsets.size() - 1, label(0));
+
+    labelList rowSizes(nRows);
+    forAll(rowSizes, rowI)
+    {
+        rowSizes[rowI] = offsets[rowI + 1] - offsets[rowI];
+    }
+#else
+    const label nRows = layout.size();
+    const labelList rowSizes(layout.sizes());
+#endif
+
     // Which entity indexes the rows is decided by the row count, and checked.
     // A mesh never has as many cells as faces, so the two cases cannot be
     // confused, and anything else is an error rather than a guess
-    const bool cellBased = (layout.size() == mesh_.nCells());
-    const bool faceBased = (layout.size() == mesh_.nFaces());
+    const bool cellBased = (nRows == mesh_.nCells());
+    const bool faceBased = (nRows == mesh_.nFaces());
 
     if (!cellBased && !faceBased)
     {
         FatalErrorInFunction
             << "A compact integration-point layout must have one row per cell "
             << "or one row per face." << nl
-            << "This one has " << layout.size() << " rows, while the mesh has "
+            << "This one has " << nRows << " rows, while the mesh has "
             << mesh_.nCells() << " cells and " << mesh_.nFaces() << " faces."
             << exit(FatalError);
     }
@@ -364,18 +384,20 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     //  - integration-point counts encoded in sub-list sizes
 
     // Build cell → IP addressing
-    const labelList rowSizes(layout.sizes());
-
+    // rowSizes rather than layout[cellI].size(): the const operator[] does
+    // not compile on foam-extend
     CompactListList<label> cellToIP(rowSizes);
 
-    for (label cellI = 0; cellI < layout.size(); ++cellI)
+    for (label cellI = 0; cellI < nRows; ++cellI)
     {
-        // sizes() rather than layout[cellI].size(): the const operator[] does
-        // not compile on foam-extend
         const label n = rowSizes[cellI];
         for (label j = 0; j < n; ++j)
         {
+#ifdef OPENFOAM_ORG
+            cellToIP(cellI, j) = offsets[cellI] + j;
+#else
             cellToIP(cellI, j) = layout.index(cellI, j);
+#endif
         }
     }
 
