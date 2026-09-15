@@ -145,7 +145,10 @@ Abaqus.**
 | Displacement at minimum (m) | 0.025 | 0.018 |
 
 The `regressionTest.sh` script runs the default configuration and checks that
-the peak tip displacement over the run lies within $$[2.70, 2.75]$$ m.
+the peak tip displacement over the run lies within $$[2.70, 2.78]$$ m. The
+band allows for small differences between OpenFOAM versions: the peak is
+2.7247 m with OpenFOAM-v2512, 2.7404 m with foam-extend-4.1 and 2.7556 m with
+OpenFOAM-9.
 
 ---
 

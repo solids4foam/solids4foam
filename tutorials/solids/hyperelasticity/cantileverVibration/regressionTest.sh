@@ -27,12 +27,14 @@ fi
 # deltaT = 0.005 s, OpenFOAM-v2512): peak = 2.7247 m at t = 0.31 s.
 # The Abaqus (C3D8) reference peak is 2.8007 m at t = 0.318 s (see
 # abaqusC3D8.dat); the tutorial mesh is a coarse demonstration mesh, so the
-# band below is centred on the measured solids4foam value (approx. +/- 0.9%),
-# not on the Abaqus value.
+# band below is based on the measured solids4foam values, not on the Abaqus
+# value. The peak varies slightly between OpenFOAM versions (v2512: 2.7247 m,
+# foam-extend-4.1: 2.7404 m, OpenFOAM-9: 2.7556 m), so the band covers all
+# three with a margin of approximately 0.9%.
 # ============================================================
 
 PEAK_MIN=2.70
-PEAK_MAX=2.75
+PEAK_MAX=2.78
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
