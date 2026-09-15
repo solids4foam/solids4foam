@@ -30,6 +30,9 @@ echo "Using the $APPROACH formulation"
 if [[ "${APPROACH}" == "legacy" ]]
 then
     solids4Foam::caseOnlyRunsWithFoamExtend
+else
+    # The framework formulation solves with PETSc SNES
+    solids4Foam::requirePetscOrExitSilently
 fi
 
 # Compile case-local utilities

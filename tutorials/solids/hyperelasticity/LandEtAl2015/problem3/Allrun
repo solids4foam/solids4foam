@@ -19,6 +19,17 @@ echo "Using MESH_NUMBER=$MESH_NUMBER"
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Both formulations solve with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+
+# The mesh is built with the OpenFOAM.com forms of blockMesh -dict, the
+# extrudeMesh sector model and createPatch, none of which the other forks share
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 # Select the solid formulation: "displacement" (default) or "pressure".
 # The selected fvSolution and solidProperties variants are activated by
 # symbolically linking the corresponding "*.<formulation>" files into place.
