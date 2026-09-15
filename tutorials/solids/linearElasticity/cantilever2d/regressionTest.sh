@@ -551,7 +551,11 @@ else
 fi
 
 if [ "$CHECK_ONLY" = false ]; then
-    if make_sigma0_baseline; then
+    # The sigma0 arms run the default petscSnes formulation, and the
+    # cantileverTraction library they need is built by that arm's Allrun
+    if [[ -z "${PETSC_DIR:-}" ]]; then
+        echo "SKIP: sigma0 comparisons (PETSc is not installed)"
+    elif make_sigma0_baseline; then
         for sigma0_mode in dict field both; do
             if ! run_sigma0_comparison "${sigma0_mode}"; then
                 failures=$((failures + 1))
