@@ -140,7 +140,7 @@ link_files_for_suffix() {
 
 require_petsc_or_exit_silently() {
     case "${APPROACH}" in
-        petscSnes|petscSnesPressure|highOrder|highOrderFourthOrder)
+        petscSnes|petscSnesPressure|petscSnesPressureManager|highOrder|highOrderFourthOrder)
             solids4Foam::requirePetscOrExitSilently
             ;;
     esac
