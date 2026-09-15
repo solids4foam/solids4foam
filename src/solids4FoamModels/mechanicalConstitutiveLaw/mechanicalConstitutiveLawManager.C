@@ -632,21 +632,19 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
         scalarField& fld = store[key]();
         fld.setSize(faces.size(), 0.0);
 
-        tmp<volScalarField> tsrc;
+        // A registered field is used where it is; only a missing one is built.
+        // The two are kept apart rather than put through one tmp, because
+        // foam-extend's tmp refuses to be assigned one that holds a reference
+        const bool registered = mesh_.foundObject<volScalarField>(name);
 
-        if (mesh_.foundObject<volScalarField>(name))
-        {
-            tsrc = tmp<volScalarField>
-            (
-                mesh_.lookupObject<volScalarField>(name)
-            );
-        }
-        else
-        {
-            tsrc = prescribedField<scalar>(name);
-        }
+        const tmp<volScalarField> tsrc
+        (
+            registered
+          ? tmp<volScalarField>()
+          : prescribedField<scalar>(name)
+        );
 
-        if (!tsrc.valid())
+        if (!registered && !tsrc.valid())
         {
             FatalErrorInFunction
                 << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -656,7 +654,10 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
                 << exit(FatalError);
         }
 
-        const fvPatchField<scalar>& psrc = tsrc().boundaryField()[patchI];
+        const volScalarField& src =
+            registered ? mesh_.lookupObject<volScalarField>(name) : tsrc();
+
+        const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
         forAll(faces, faceI)
         {
