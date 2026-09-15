@@ -109,15 +109,9 @@ bool fixedRelaxationCouplingInterface::evolve()
         }
 
         // Optional: write residuals to file
-        if (writeResidualsToFile() && Pstream::master())
-        {
-            residualFile()
-                << runTime().value() << " "
-                << outerCorr() << " "
-                << residualNorm << endl;
-        }
+        writeResidualLine(residualNorm);
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+    while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
 

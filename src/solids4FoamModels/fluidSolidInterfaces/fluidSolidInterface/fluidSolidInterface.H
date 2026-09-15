@@ -154,6 +154,96 @@ class fluidSolidInterface
         //  using the legacy minimum-based combination
         const Switch requireAllResidualMeasures_;
 
+        //- Pressure-change tolerance for Robin interfaces
+        const scalar robinPressureTolerance_;
+
+        //- Tolerance for the Robin kinematic residual: the interface flux
+        //  relative to the mesh motion (leakage), normalised by the
+        //  throughput plus the interface motion flux (at least the optional
+        //  reference flux, see robinFluxReferenceVelocity_); it is only
+        //  tested if the Robin condition is kinematically consistent with the
+        //  mesh motion, otherwise it is reported
+        const scalar robinFluxTolerance_;
+
+        //- Robin convergence test: residual (default) requires the latest
+        //  displacement, pressure-change and kinematic residuals to satisfy
+        //  their tolerances; iterationError also estimates the remaining
+        //  iteration error from the observed contraction rates, requires it
+        //  for slowly contracting iterations, stops early for quickly
+        //  contracting ones and accepts stalled iterations close to the
+        //  tolerances
+        const word robinConvergence_;
+
+        //- Contraction rate at or above which a residual below its
+        //  tolerance must also satisfy the iteration-error estimate
+        const scalar robinSlowRate_;
+
+        //- Contraction rate at or above which the iterations are stalled
+        const scalar robinStallRate_;
+
+        //- Number of successive contraction rates used to detect a stall
+        const label robinStallIterations_;
+
+        //- A stall is accepted as converged if the residuals are within this
+        //  factor of their tolerances (inner-solver floors); otherwise the
+        //  iterations continue
+        const scalar robinStallToleranceFactor_;
+
+        //- Optional reference velocity for the Robin kinematic residual: the
+        //  leakage is normalised by at least this velocity times the Robin
+        //  interface area, so that a flow at or near rest (no throughput and
+        //  no interface motion) does not leave the residual without a scale;
+        //  0 (default) disables the floor
+        const scalar robinFluxReferenceVelocity_;
+
+        //- Optional reference pressure for the Robin pressure residual (in
+        //  the units of the fluid solution pressure): the pressure change is
+        //  normalised by at least this pressure; 0 (default) disables the
+        //  floor
+        const scalar robinPressureReference_;
+
+        //- Robin-condition flag for each interface
+        List<bool> robinInterfaces_;
+
+        //- Pressure at the previous FSI iteration on each Robin interface
+        List<scalarField> robinPressurePrev_;
+
+        //- Largest pressure norm in the current time step per interface
+        List<scalar> maxRobinPressureNorm_;
+
+
+        //- Current maximum normalized Robin pressure residual
+        scalar robinPressureResidual_;
+
+        //- Current maximum normalized Robin leakage-flux residual
+        scalar robinFluxResidual_;
+
+
+        //- Largest boundary-throughput plus interface-motion flux in the
+        //  current time step
+        scalar maxRobinKinematicNorm_;
+
+
+        //- Residual histories of the current time step: displacement,
+        //  pressure and kinematic residuals
+        DynamicList<scalar> robinDispHistory_;
+        DynamicList<scalar> robinPressureHistory_;
+        DynamicList<scalar> robinFluxHistory_;
+
+        //- Robin convergence state of the latest FSI iteration: 0 not
+        //  converged, 1 converged, 2 stalled within the stall tolerance
+        label robinConvergenceState_;
+
+        //- Are all Robin conditions kinematically consistent with the mesh
+        //  motion (then the leakage is used as a kinematic residual)
+        bool robinKinematicConsistency_;
+
+        //- Has the warning about relaxed Robin coupling been issued
+        bool robinRelaxationWarned_;
+
+        //- Has the hint about the Robin reference scales been issued
+        bool robinReferenceHintIssued_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
@@ -214,6 +304,38 @@ protected:
         {
             return fsiProperties_;
         }
+
+        //- Return true if the current residuals satisfy all active criteria
+        bool couplingConverged(const scalar displacementResidual) const;
+
+        //- Return the current normalized Robin pressure residual
+        scalar robinPressureResidual() const
+        {
+            return robinPressureResidual_;
+        }
+
+        //- Return the current normalized Robin leakage-flux residual
+        scalar robinFluxResidual() const
+        {
+            return robinFluxResidual_;
+        }
+
+
+        //- Return the Robin convergence state of the latest iteration
+        label robinConvergenceState() const
+        {
+            return robinConvergenceState_;
+        }
+
+        //- Write the residuals of the latest FSI iteration to the residual
+        //  file (master only)
+        void writeResidualLine(const scalar residualNorm);
+
+        //- Evaluate the Robin convergence state from the residual histories
+        void evaluateRobinConvergence();
+
+        //- Return true if any interface uses a Robin pressure condition
+        bool hasRobinInterface() const;
 
 public:
 
@@ -558,6 +680,16 @@ public:
             //- Update elasticWallPressure boundary condition acceleration, if
             //  found
             virtual void updateElasticWallPressureAcceleration();
+
+            //- Is the fluid interface moved to the solid interface in every
+            //  FSI iteration (no under-relaxation or acceleration of the
+            //  interface displacement)? The Robin interface flux is then made
+            //  consistent with the mesh motion; with a relaxed interface the
+            //  mesh motion lags the solid and must not enter the flux
+            virtual bool fluidMeshFollowsSolid() const
+            {
+                return false;
+            }
 
             //- Sync the fluidZonePointsDispl field across processors
             virtual void syncFluidZonePointsDispl

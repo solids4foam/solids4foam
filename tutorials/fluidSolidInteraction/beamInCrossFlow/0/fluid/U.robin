@@ -11,38 +11,54 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p_rgh;
+    class       volVectorField;
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [1 -1 -2 0 0 0 0];
+dimensions      [0 1 -1 0 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform (0 0 0);
 
 boundaryField
 {
     interface
     {
-        type            elasticWallPressure;
-        value           uniform 0;
+        type            elasticWallVelocity;
+        value           uniform (0 0 0);
     }
-
-    walls
+    outlet
     {
-        type            fixedFluxPressure;
-        value           uniform 0;
+        type            zeroGradient;
     }
-
-    atmosphere
+    inlet
     {
-        type            totalPressure;
-        p0              uniform 0;
+        type            paraboloidInletVelocity;
+        maxVelocity     0.3;
+        yWidth          0.2;
+        zWidth          0.4;
+        timeVaryingEndTime 1.0;
+        timeAtMaxVelocity 1.0;
+        value           uniform (0 0 0);
     }
-
-    defaultFaces
+    bottom
     {
-        type            empty;
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    left
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    symmetry
+    {
+        type            symmetry;
     }
 }
 

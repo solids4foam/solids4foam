@@ -47,5 +47,8 @@
     "deltaTs": [0.05, 0.025, 0.0125, 0.00625],
     "endTime": 8.0,
     "minimumReferenceErrorOrder": 0.0
+  },
+  "coupling": {
+    "relativeTolerance": 0.01
   }
 }
