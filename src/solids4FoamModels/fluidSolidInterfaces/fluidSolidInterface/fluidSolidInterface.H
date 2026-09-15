@@ -96,6 +96,9 @@ class fluidSolidInterface
         //- Maximal number of outer correctors
         const label nOuterCorr_;
 
+        //- Allow unconverged coupling steps to be accepted
+        const Switch allowUnconvergedCoupling_;
+
         //- Optional additional mesh correction step after FSI loop
         const Switch additionalMeshCorrection_;
 
@@ -358,6 +361,12 @@ public:
             label nOuterCorr() const
             {
                 return nOuterCorr_;
+            }
+
+            //- Allow unconverged coupling steps to be accepted
+            const Switch& allowUnconvergedCoupling() const
+            {
+                return allowUnconvergedCoupling_;
             }
 
             //- Return reference to writeResidualToFile switch
