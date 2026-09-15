@@ -128,7 +128,7 @@ bool AitkenCouplingInterface::evolve()
     }
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
-    if (residualNorm > outerCorrTolerance())
+    if (!(residualNorm <= outerCorrTolerance()))
     {
         FatalErrorInFunction
             << "FSI coupling did not converge after " << outerCorr()

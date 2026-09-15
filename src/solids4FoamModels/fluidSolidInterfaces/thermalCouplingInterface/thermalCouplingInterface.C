@@ -212,8 +212,8 @@ bool thermalCouplingInterface::evolve()
 
     if
     (
-        residualNormTherm > outerCorrTolerance()
-     || residualNormMech > outerCorrTolerance()
+        !(residualNormTherm <= outerCorrTolerance())
+     || !(residualNormMech <= outerCorrTolerance())
     )
     {
         FatalErrorInFunction
