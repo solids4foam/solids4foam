@@ -236,7 +236,10 @@ if [ "$CHECK_ONLY" = false ]; then
     ( cd "${FRAMEWORK_DIR}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) \
         || true
 
-    if ! grep -q "Selecting mechanical constitutive law" \
+    if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: the framework arm does not run in this environment"
+    elif ! grep -q "Selecting mechanical constitutive law" \
         "${FRAMEWORK_DIR}/log.solids4Foam" 2>/dev/null
     then
         echo "FAIL: the framework arm did not use the framework"

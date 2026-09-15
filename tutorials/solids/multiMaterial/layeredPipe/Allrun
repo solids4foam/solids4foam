@@ -24,6 +24,10 @@ echo "Using the $APPROACH approach"
 
 if [[ "${APPROACH}" == "framework" ]]
 then
+    # On foam-extend the framework refuses more than one material in this
+    # solid model
+    solids4Foam::caseDoesNotRunWithFoamExtend
+
     cp constant/solidProperties.framework constant/solidProperties
     cp system/fvSchemes.framework system/fvSchemes
 fi
