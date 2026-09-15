@@ -34,6 +34,65 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace
+{
+    // The smallest and largest eigenvalues of a symmetric tensor.
+    //
+    // OpenFOAM.org and foam-extend find eigenvalues as the roots of the
+    // characteristic cubic. A repeated eigenvalue is a double root, which
+    // rounding can push off the real axis, and both then report it as complex
+    // and return zero for it. The empty-direction fill in
+    // calcWideStencilVectors gives a repeated eigenvalue in every uniform 2-D
+    // cell, so there a healthy stencil would read as rank-deficient. The
+    // trigonometric form used here is exact for a symmetric tensor, repeated
+    // eigenvalues included, and gives the same answer on every fork
+    void minMaxEigenValues
+    (
+        const Foam::symmTensor& T,
+        Foam::scalar& lambdaMin,
+        Foam::scalar& lambdaMax
+    )
+    {
+        using namespace Foam;
+
+        const scalar q = tr(T)/3.0;
+
+        const scalar p =
+            Foam::sqrt
+            (
+                (
+                    sqr(T.xx() - q) + sqr(T.yy() - q) + sqr(T.zz() - q)
+                  + 2.0*(sqr(T.xy()) + sqr(T.xz()) + sqr(T.yz()))
+                )/6.0
+            );
+
+        if (p <= SMALL*mag(q) || p < VSMALL)
+        {
+            // Isotropic, or zero
+            lambdaMin = q;
+            lambdaMax = q;
+            return;
+        }
+
+        symmTensor B(T);
+        B.xx() -= q;
+        B.yy() -= q;
+        B.zz() -= q;
+        B /= p;
+
+        const scalar phi = Foam::acos(max(min(0.5*det(B), 1.0), -1.0))/3.0;
+
+        // The three eigenvalues are q + 2p cos(phi + 2k pi/3), k = 0, 1, 2, and
+        // with phi in [0, pi/3] the largest is k = 0 and the smallest k = 1
+        lambdaMax = q + 2.0*p*Foam::cos(phi);
+        lambdaMin =
+            q - p*(Foam::cos(phi) + Foam::sqrt(3.0)*Foam::sin(phi));
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * //
 
 Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
@@ -441,9 +500,10 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     forAll(dd, cellI)
     {
         const symmTensor ddc(dd[cellI] + (tr(dd[cellI])/3.0)*emptyDirs);
-        const vector eVals = eigenValues(ddc);
-        const scalar lambdaMin = eVals[vector::X];
-        const scalar lambdaMax = eVals[vector::Z];
+
+        scalar lambdaMin = 0;
+        scalar lambdaMax = 0;
+        minMaxEigenValues(ddc, lambdaMin, lambdaMax);
 
         const bool rankDeficient =
         (
@@ -483,7 +543,10 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     wideStencil_.setSize(nWide);
     wideVectors_.setSize(nWide);
 
-    if (nWide == 0)
+    // Decided globally, not per processor: what follows exchanges data across
+    // coupled patches and reduces, and a processor that returned here would
+    // leave the others waiting on it
+    if (returnReduce(nWide, sumOp<label>()) == 0)
     {
         return;
     }
@@ -622,8 +685,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         }
     }
 
-    // Warn if any cell is still rank-deficient after widening: in parallel the
-    // point-cell stencil is truncated at processor boundaries
+    // Check whether any cell is still rank-deficient after widening
     label nStillSingular = 0;
     label worstCell = -1;
     scalar worstRatio = GREAT;
@@ -631,10 +693,10 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     forAll(wideDd, wcI)
     {
         const symmTensor ddc(wideDd[wcI] + (tr(wideDd[wcI])/3.0)*emptyDirs);
-        const vector eVals = eigenValues(ddc);
 
-        const scalar lambdaMin = eVals[vector::X];
-        const scalar lambdaMax = eVals[vector::Z];
+        scalar lambdaMin = 0;
+        scalar lambdaMax = 0;
+        minMaxEigenValues(ddc, lambdaMin, lambdaMax);
 
         if (lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax)
         {
@@ -651,21 +713,54 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         }
     }
 
-    if (returnReduce(nStillSingular, sumOp<label>()) > 0)
+    reduce(nStillSingular, sumOp<label>());
+
+    // Every cell is -1 with a single material, on every processor
+    bool multiMaterial = false;
+    forAll(materialID, cellI)
+    {
+        if (materialID[cellI] != -1)
+        {
+            multiMaterial = true;
+            break;
+        }
+    }
+    reduce(multiMaterial, orOp<bool>());
+
+    if (nStillSingular > 0 && !multiMaterial)
+    {
+        // With a single material nothing has been filtered, so the stencil is
+        // the one this scheme used before the filtering arrived, and so is the
+        // answer. A body one cell thick in some direction produces this in
+        // serial - the striker in pipeCrush is a single row of cells - and a
+        // point-cell stencil truncated at a processor boundary can produce it
+        // in parallel. Neither is new, so neither is fatal
+        WarningInFunction
+            << nStillSingular
+            << " cells remain rank-deficient after widening the gradient"
+            << " stencil to point neighbours." << nl
+            << "    Worst on this processor: cell " << worstCell
+            << ", smallest eigenvalue ratio " << worstRatio << nl
+            << "    Either the body is one cell thick in some direction or, in"
+            << " parallel, the point-cell stencil is truncated at a processor"
+            << " boundary." << endl;
+    }
+    else if (nStillSingular > 0)
     {
         // A cell whose stencil cannot span the mesh's directions has no
-        // gradient that can be reconstructed from it, and there is no sound
-        // fallback: widening again would not help, and falling back on an
-        // unfiltered stencil would build the gradient from two materials at
-        // once, which is what the filtering exists to prevent.
+        // gradient that can be reconstructed from it, and with several
+        // materials there is no sound fallback: widening again would not help,
+        // and falling back on an unfiltered stencil would build the gradient
+        // from two materials at once, which is what the filtering exists to
+        // prevent.
         //
-        // Two geometries produce this. Where the case has several materials,
-        // the cell's own material does not surround it - a material one cell
-        // thick, or a cell at a material corner or tip. Where it has one, the
-        // point-cell stencil has been truncated at a processor boundary. Both
-        // mean the same thing about the answer, so both are fatal
+        // Two geometries produce this. The cell's own material does not
+        // surround it - a material one cell thick, or a cell at a material
+        // corner or tip - or the point-cell stencil has been truncated at a
+        // processor boundary. Both mean the same thing about the answer, so
+        // both are fatal
         FatalErrorInFunction
-            << returnReduce(nStillSingular, sumOp<label>())
+            << nStillSingular
             << " cells remain rank-deficient after widening the gradient"
             << " stencil to point neighbours of the same material." << nl
             << "    Worst on this processor: cell " << worstCell
