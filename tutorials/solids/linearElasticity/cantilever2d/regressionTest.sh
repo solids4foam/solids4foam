@@ -226,7 +226,7 @@ run_sigma0_comparison() {
     fi
 
     local t
-    t=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
+    t=$(solids4Foam::latestTime "${legacy_dir}")
 
     if [[ -z "${t}" ]]; then
         echo "FAIL: sigma0 ${mode} arms produced no result"
@@ -395,7 +395,7 @@ make_sigma0_baseline() {
     ) || return 1
 
     local t
-    t=$(foamListTimes -case "${d}" -latestTime 2>/dev/null | tail -n 1)
+    t=$(solids4Foam::latestTime "${d}")
     SIGMA0_BASELINE_D="${d}/${t}/D"
 }
 

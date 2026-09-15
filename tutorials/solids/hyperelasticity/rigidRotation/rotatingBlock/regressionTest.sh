@@ -110,8 +110,7 @@ for approach in "${APPROACHES[@]}"; do
 
     # Keep the displacement so the framework arms can be compared against the
     # legacy ones after the loop; the case directory is reused and cleaned
-    latest_time=$(foamListTimes -case "${CASE_DIR}" -latestTime 2>/dev/null \
-        | tail -n 1)
+    latest_time=$(solids4Foam::latestTime "${CASE_DIR}")
 
     if [[ -n "${latest_time}" && -f "${CASE_DIR}/${latest_time}/D" ]]; then
         cp "${CASE_DIR}/${latest_time}/D" "${REGRESSION_ROOT}/D.${approach}"

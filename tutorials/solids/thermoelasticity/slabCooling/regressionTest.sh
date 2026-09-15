@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # slabCooling regression test
@@ -118,7 +123,7 @@ run_framework_comparison() {
     fi
 
     local t
-    t=$(foamListTimes -case "${dir}" -latestTime 2>/dev/null | tail -n 1)
+    t=$(solids4Foam::latestTime "${dir}")
 
     if [[ -z "${t}" || ! -f "${dir}/${t}/D" || ! -f "${CASE_DIR}/${t}/D" ]]; then
         echo "FAIL: the framework comparison produced no D field"

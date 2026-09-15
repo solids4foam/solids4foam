@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # hotSphere regression test
@@ -179,9 +184,8 @@ run_framework_comparison() {
     fi
 
     local tL tF
-    tL=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
-    tF=$(foamListTimes -case "${framework_dir}" -latestTime 2>/dev/null \
-        | tail -n 1)
+    tL=$(solids4Foam::latestTime "${legacy_dir}")
+    tF=$(solids4Foam::latestTime "${framework_dir}")
 
     if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
         echo "FAIL: the two arms reached different times ('${tL}' vs '${tF}')"
