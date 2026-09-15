@@ -807,13 +807,31 @@ function solids4Foam::regressionCaseSkipped()
 function solids4Foam::latestTime()
 {
     local CASE_DIR=$1
+    local dir name latest
 
-    \ls -1 "${CASE_DIR}" 2>/dev/null \
-        | grep -E '^[0-9]+([.][0-9]*)?([eE][-+]?[0-9]+)?$' \
-        | awk '$1 + 0 != 0' \
-        | sort -g \
-        | tail -n 1 \
-        || true
+    # As foamListTimes reads them: directories that are not hidden and whose
+    # names read as numbers, negative ones included. The latest is taken
+    # first and dropped if it is 0, so a case whose latest time is 0 has none
+    latest=$(
+        for dir in "${CASE_DIR}"/*
+        do
+            [[ -d "${dir}" ]] || continue
+            name="${dir##*/}"
+            [[ "${name}" =~ ^[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]] \
+                || continue
+            echo "${name}"
+        done \
+            | sort -g \
+            | tail -n 1 \
+            || true
+    )
+
+    if [[ -n "${latest}" ]] && awk "BEGIN {exit !(${latest} + 0 != 0)}"
+    then
+        echo "${latest}"
+    fi
+
+    return 0
 }
 
 
