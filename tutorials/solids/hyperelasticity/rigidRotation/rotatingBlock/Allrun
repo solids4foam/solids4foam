@@ -117,7 +117,7 @@ select_approach() {
     echo "Using the $APPROACH approach"
     case "$APPROACH" in
         totalLagrangian|totalLagrangianPetscSnes|highOrder|highOrderManager)
-            if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == "highOrder" ]]; then
+            if [[ "$APPROACH" == *"PetscSnes" || "$APPROACH" == highOrder* ]]; then
                 require_petsc_or_exit_silently
             fi
             if [[ "$APPROACH" == highOrder* ]]; then
