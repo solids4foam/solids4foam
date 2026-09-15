@@ -142,8 +142,8 @@ run_framework_comparison() {
     fi
 
     local tL tF
-    tL=$(foamListTimes -case "${CASE_DIR}" -latestTime 2>/dev/null | tail -n 1)
-    tF=$(foamListTimes -case "${dir}" -latestTime 2>/dev/null | tail -n 1)
+    tL=$(solids4Foam::latestTime "${CASE_DIR}")
+    tF=$(solids4Foam::latestTime "${dir}")
 
     if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
         echo "FAIL: the arms reached different times ('${tL}' vs '${tF}')"
@@ -167,7 +167,7 @@ run_framework_comparison() {
 epsilon=$(grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
     | tail -n 1 | awk '{print $NF}' || true)
 
-latest=$(foamListTimes -case "${CASE_DIR}" -latestTime 2>/dev/null | tail -n 1)
+latest=$(solids4Foam::latestTime "${CASE_DIR}")
 
 if [[ -z "${epsilon}" || -z "${latest}" ]]; then
     echo "FAIL: could not extract the regression quantities"

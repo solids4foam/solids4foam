@@ -137,9 +137,8 @@ run_framework_comparison() {
     fi
 
     local tL tF
-    tL=$(foamListTimes -case "${legacy_dir}" -latestTime 2>/dev/null | tail -n 1)
-    tF=$(foamListTimes -case "${framework_dir}" -latestTime 2>/dev/null \
-        | tail -n 1)
+    tL=$(solids4Foam::latestTime "${legacy_dir}")
+    tF=$(solids4Foam::latestTime "${framework_dir}")
 
     if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
         echo "FAIL: the arms reached different times ('${tL}' vs '${tF}')"

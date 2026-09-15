@@ -797,6 +797,27 @@ function solids4Foam::regressionCaseSkipped()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# latestTime
+#     Print the latest time directory of a case other than 0, or nothing if the
+#     case has none, as foamListTimes -latestTime does. foam-extend has no
+#     foamListTimes. Always succeeds, so it is safe under set -eo pipefail
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::latestTime()
+{
+    local CASE_DIR=$1
+
+    \ls -1 "${CASE_DIR}" 2>/dev/null \
+        | grep -E '^[0-9]+([.][0-9]*)?([eE][-+]?[0-9]+)?$' \
+        | awk '$1 + 0 != 0' \
+        | sort -g \
+        | tail -n 1 \
+        || true
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # removeEmptyDirs
 #     Ported from preCICE toolbox
 #     Remove empty time directories that are generated when running FSI cases
