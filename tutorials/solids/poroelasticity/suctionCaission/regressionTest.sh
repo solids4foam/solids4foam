@@ -148,7 +148,7 @@ run_framework_comparison() {
 
     local ok=0
     local f
-    for f in D p; do
+    for f in D porePressure; do
         if [[ ! -f "${legacy_dir}/${tL}/${f}" ]]; then
             continue
         fi

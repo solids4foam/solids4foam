@@ -52,7 +52,7 @@ cell- or face-centred overloads the selected solid model calls.
 | --- | --- | --- |
 | `effectiveStressMechanicalLaw` | yes | Nested mechanical-law dictionary |
 | `biotCoeff` | no | Biot coefficient, dimensionless; default `1.0` |
-| `pressureFieldName` | no | Pressure field name; default `p` |
+| `pressureFieldName` | no | Pressure field name; default `porePressure` |
 | `pressureFieldRegion` | no | Pressure field region; default `region0` |
 | `p0` | no | Uniform initial pore pressure; default `0`, `[1 -1 -2 0 0 0 0]` |
 | `rho` | yes | Density, `[1 -3 0 0 0 0 0]` |
@@ -97,7 +97,7 @@ mechanical
 
         // Optional
         // biotCoeff          biotCoeff [0 0 0 0 0 0 0] 1.0;
-        // pressureFieldName  p;
+        // pressureFieldName  porePressure;
         // pressureFieldRegion region0;
         // p0                 p0 [1 -1 -2 0 0 0 0] 0;
     }
