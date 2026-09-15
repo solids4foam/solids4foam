@@ -71,10 +71,11 @@ extract_max_sigma() {
 }
 
 extract_yielding_cells() {
+    # awk reads all its input: "head -n 1" would close the pipe early, and
+    # the resulting SIGPIPE in tail fails the script under pipefail
     grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | tail -n 101 \
-        | head -n 1 \
-        | awk '{print $1}'
+        | awk 'NR == 1 {print $1}'
 }
 
 # ------------------------------------------------------------

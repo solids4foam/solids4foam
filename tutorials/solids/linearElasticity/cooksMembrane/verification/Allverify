@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Opt-in mesh verification driver for the linear-elastic Cook's membrane.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for Cook's membrane verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 \
+    "${SCRIPT_DIR}/../../../../verification/cooks_membrane_verification.py" \
+    --verification-dir "${SCRIPT_DIR}" "$@"

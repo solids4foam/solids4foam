@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // Clamped end
+    back
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+
+    // Free end: a constant (dead) traction of 50 kPa in both the x and y
+    // directions is applied suddenly at t = 0 and held fixed thereafter
+    front
+    {
+        type            solidTraction;
+        traction        uniform (50e3 50e3 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    "top|bottom|left|right"
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

@@ -161,6 +161,25 @@ helper script located in `system/makeBlockMeshDict.py`. The `Allrun` script
 links the appropriate `blockMeshDict` for the loaded OpenFOAM variant.
 ```
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh
+convergence study from `solid-benchmarks/linearElasticity/ellipticPlate` into
+this tutorial. It refines the tutorial `blockMesh` through the mesh family of
+Demirdžić et al. [2], samples the equivalent (von Mises) stress along the line
+$$r = 2.1$$ m, $$z = 0.3$$ m, and compares it with the published curve:
+
+```bash
+cd verification
+./Allverify
+```
+
+On the finest 294 912-cell mesh the sampled profile agrees with [2] to 2.5%
+RMS and 1.0% at the peak stress, and the change in the profile between the two
+finest meshes gives an observed order of 1.98. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
+
 ---
 
 ## References

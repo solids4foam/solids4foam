@@ -405,7 +405,15 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
     forAll(dd, cellI)
     {
-        const symmTensor ddc(dd[cellI] + (tr(dd[cellI])/3.0)*emptyDirs);
+        // dd scales with the face area. Normalise it by its trace before the
+        // eigenvalue decomposition: the foam-extend eigenValues() compares
+        // the determinant with an absolute SMALL, and so reports a spurious
+        // zero eigenvalue in every cell of a finely scaled mesh
+        const scalar trDd = tr(dd[cellI]);
+        const symmTensor ddc
+        (
+            (dd[cellI] + (trDd/3.0)*emptyDirs)/max(trDd, VSMALL)
+        );
         const vector eVals = eigenValues(ddc);
         const scalar lambdaMin = eVals[vector::X];
         const scalar lambdaMax = eVals[vector::Z];
@@ -448,7 +456,8 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     wideStencil_.setSize(nWide);
     wideVectors_.setSize(nWide);
 
-    if (nWide == 0)
+    // Decide globally: every rank must reach the reduction below
+    if (returnReduce(nWide, sumOp<label>()) == 0)
     {
         return;
     }
@@ -578,7 +587,12 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     label nStillSingular = 0;
     forAll(wideDd, wcI)
     {
-        const symmTensor ddc(wideDd[wcI] + (tr(wideDd[wcI])/3.0)*emptyDirs);
+        // Normalised by the trace, as above
+        const scalar trDd = tr(wideDd[wcI]);
+        const symmTensor ddc
+        (
+            (wideDd[wcI] + (trDd/3.0)*emptyDirs)/max(trDd, VSMALL)
+        );
         const vector eVals = eigenValues(ddc);
 
         if
