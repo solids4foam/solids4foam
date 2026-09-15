@@ -41,6 +41,11 @@ FRAMEWORK_YIELD_MAX=44
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
+# The GitHub runners have two cores, and Open MPI will not start more ranks
+# than there are slots, so the parallel restarts use two, as the other parallel
+# regression tests do. Any number other than one exercises the mapping
+PARALLEL_N_PROCS=2
+
 echo "============================================================"
 echo "Elastoplastic perforated plate regression test"
 echo "Max epsilonEq           in [${EPSILON_MIN}, ${EPSILON_MAX}]"
@@ -412,7 +417,7 @@ fi
 # undecomposed case for the state and distributes it itself, using the
 # cellProcAddressing that decomposePar already writes.
 #
-# This runs serially to t = 10, decomposes onto four processors, and continues
+# This runs serially to t = 10, decomposes onto two processors, and continues
 # there. The answer has to be the uninterrupted serial one, because a change of
 # decomposition is not supposed to be a change of problem
 run_parallel_restart_test() {
@@ -432,9 +437,9 @@ run_parallel_restart_test() {
 
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
-    cat > "${d}/system/decomposeParDict" << 'EOD'
+    cat > "${d}/system/decomposeParDict" << EOD
 FoamFile { version 2.0; format ascii; class dictionary; object decomposeParDict; }
-numberOfSubdomains 4;
+numberOfSubdomains ${PARALLEL_N_PROCS};
 method scotch;
 EOD
 
@@ -458,7 +463,7 @@ EOD
     fi
     echo "PASS: parallel restart: state is not in the processor directories"
 
-    if ! ( cd "${d}" && mpirun -np 4 solids4Foam -parallel > log.par 2>&1 ); then
+    if ! ( cd "${d}" && mpirun -np "${PARALLEL_N_PROCS}" solids4Foam -parallel > log.par 2>&1 ); then
         echo "FAIL: parallel restart did not run"
         grep -m2 "FOAM FATAL" -A3 "${d}/log.par" || true
         return 1
@@ -482,11 +487,11 @@ EOD
     local a="${RESULT_EPS[framework]}"
 
     if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
-        printf "PASS: restart on four processors matches the serial run (%.8g vs %.8g)\n" \
-            "$a" "$eps"
+        printf "PASS: restart on %s processors matches the serial run (%.8g vs %.8g)\n" \
+            "${PARALLEL_N_PROCS}" "$a" "$eps"
     else
-        printf "FAIL: restart on four processors differs (%.8g vs %.8g)\n" \
-            "$a" "$eps"
+        printf "FAIL: restart on %s processors differs (%.8g vs %.8g)\n" \
+            "${PARALLEL_N_PROCS}" "$a" "$eps"
         return 1
     fi
 
@@ -520,9 +525,9 @@ run_reconstructed_restart_test() {
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 
-    cat > "${d}/system/decomposeParDict" << 'EOD'
+    cat > "${d}/system/decomposeParDict" << EOD
 FoamFile { version 2.0; format ascii; class dictionary; object decomposeParDict; }
-numberOfSubdomains 4;
+numberOfSubdomains ${PARALLEL_N_PROCS};
 method scotch;
 EOD
 
@@ -536,7 +541,7 @@ EOD
         return 0
     fi
 
-    if ! ( cd "${d}" && mpirun -np 4 solids4Foam -parallel > log.par1 2>&1 )
+    if ! ( cd "${d}" && mpirun -np "${PARALLEL_N_PROCS}" solids4Foam -parallel > log.par1 2>&1 )
     then
         echo "FAIL: reconstructed restart: the parallel leg did not run"
         return 1
