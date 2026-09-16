@@ -251,6 +251,37 @@ Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField>
+Foam::HolzapfelGasserOgdenElastic::shearModulus() const
+{
+    // The effective shear modulus, which is the field impK() is built from.
+    // Added so that this law can be used with a solid model that asks for one
+    // - the mixed formulation in nonLinGeomTotalLagTotalDispSolid does, to
+    // build its implicit stiffness - rather than failing as notImplemented.
+    //
+    // muEff_ rather than the ground substance mu_, so that the two agree:
+    // calcEffectiveShearModulus() refreshes it from the current deformation
+    // each time step, so it carries the fibre stiffness, and a caller building
+    // a Laplacian coefficient from this gets the same material it would get
+    // from impK()
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "shearModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            muEff_
+        )
+    );
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::bulkModulus() const
 {
     return tmp<volScalarField>
