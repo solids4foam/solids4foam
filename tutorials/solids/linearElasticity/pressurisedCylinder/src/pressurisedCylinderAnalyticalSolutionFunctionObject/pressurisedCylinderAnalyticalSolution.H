@@ -88,6 +88,13 @@ class pressurisedCylinderAnalyticalSolution
 
     // Private Member Functions
 
+        //- Calculate point-valued or cell-average analytical displacement
+        void calculateAnalyticalCellDisplacement
+        (
+            const fvMesh& mesh,
+            vectorField& analyticalD
+        ) const;
+
         //- Write data
         bool writeData();
 

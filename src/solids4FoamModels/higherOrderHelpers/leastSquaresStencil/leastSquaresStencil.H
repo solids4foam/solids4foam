@@ -16,10 +16,10 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    movingLeastSquaresStencil
+    leastSquaresStencil
 
 Description
-    Constructs cell- and face-centred stencils for Moving Least Squares (MLS)
+    Constructs cell- and face-centred stencils for least-squares
     reconstruction using a nearest-neighbour strategy.
 
     For local stencils, neighbouring cells are identified using layered
@@ -36,13 +36,13 @@ Description
     was chosen for improved robustness, particularly for faces near
     processor boundaries and other geometrically challenging regions.
 
-    The resulting stencils are intended for high-order MLS-based gradient
+    The resulting stencils are intended for high-order least-squares gradient
     and reconstruction operators in solids4foam, with explicit support for
     parallel execution.
 
 SourceFile
-    movingLeastSquaresStencil.C
-    movingLeastSquaresStencilTemplates.C
+    leastSquaresStencil.C
+    leastSquaresStencilTemplates.C
 
 Author
     Ivan Batistic, UCD.
@@ -50,8 +50,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef movingLeastSquaresStencil_H
-#define movingLeastSquaresStencil_H
+#ifndef leastSquaresStencil_H
+#define leastSquaresStencil_H
 
 #include "Map.H"
 #include "Field.H"
@@ -72,7 +72,7 @@ namespace Foam
 class fvMesh;
 
 
-class movingLeastSquaresStencil
+class leastSquaresStencil
 {
 
     // Private data
@@ -97,10 +97,10 @@ class movingLeastSquaresStencil
         //- Marked cells at processor boundary
         mutable autoPtr<boolList> procCellsPtr_;
 
-        //- Face-centred MLS stencils (global cell IDs)
+        //- Face-centred least-squares stencils (global cell IDs)
         mutable autoPtr<CompactListList<label>> facesStencilPtr_;
 
-        //- Cell-centred MLS stencils assembled from face stencils
+        //- Cell-centred least-squares stencils assembled from face stencils
         //  (global cell IDs)
         mutable autoPtr<CompactListList<label>> cellsStencilPtr_;
 
@@ -121,10 +121,10 @@ class movingLeastSquaresStencil
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        movingLeastSquaresStencil(const movingLeastSquaresStencil&) = delete;
+        leastSquaresStencil(const leastSquaresStencil&) = delete;
 
         //- Disallow default bitwise assignment
-        void operator=(const movingLeastSquaresStencil&) = delete;
+        void operator=(const leastSquaresStencil&) = delete;
 
         //- Calculate axis-aligned bounding box for owned cells
         treeBoundBox calcOwnedCellsBox() const;
@@ -186,10 +186,10 @@ class movingLeastSquaresStencil
 
 public:
 
-    TypeName("movingLeastSquaresStencil");
+    TypeName("leastSquaresStencil");
 
     // Constructors
-    movingLeastSquaresStencil
+    leastSquaresStencil
     (
         const fvMesh& mesh,
         const scalar haloDepthScale,
@@ -198,7 +198,7 @@ public:
     );
 
     // Destructor
-    virtual ~movingLeastSquaresStencil() = default;
+    virtual ~leastSquaresStencil() = default;
 
     // Member Functions
 
@@ -264,7 +264,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #ifdef NoRepository
-    #include "movingLeastSquaresStencilTemplates.C"
+    #include "leastSquaresStencilTemplates.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

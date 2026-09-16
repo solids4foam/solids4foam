@@ -17,15 +17,20 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "movingLeastSquaresStencil.H"
+#include "leastSquaresStencil.H"
 #include "fvMesh.H"
+#ifdef FOAMEXTEND
+    #include "Pstream.H"
+#else
+    #include "PstreamBuffers.H"
+#endif
 
 // * * * * * * * * * * *  Public Member Functions  * * * * * * * * * * * * * //
 
 
 template<class Type>
 Foam::Map<Type>
-Foam::movingLeastSquaresStencil::remoteFieldMap
+Foam::leastSquaresStencil::remoteFieldMap
 (
     const UList<Type>& fld
 ) const
@@ -67,7 +72,7 @@ Foam::movingLeastSquaresStencil::remoteFieldMap
 
 template<class Type>
 Foam::List<Foam::Field<Type>>
-Foam::movingLeastSquaresStencil::remoteFieldPerProc
+Foam::leastSquaresStencil::remoteFieldPerProc
 (
     const UList<Type>& fld
 ) const
@@ -81,6 +86,73 @@ Foam::movingLeastSquaresStencil::remoteFieldPerProc
         return remoteFld;
     }
 
+#ifdef FOAMEXTEND
+    List<labelList> sendRequests(Pstream::nProcs());
+
+    forAll(remoteCells, procI)
+    {
+        if (procI != Pstream::myProcNo())
+        {
+            sendRequests[procI] = remoteCells[procI];
+        }
+    }
+
+    List<labelList> receivedRequests;
+    labelListList requestSizes;
+    Pstream::exchange<labelList, label>
+    (
+        sendRequests,
+        receivedRequests,
+        requestSizes
+    );
+
+    List<Field<Type>> sendValues(Pstream::nProcs());
+
+    forAll(receivedRequests, requestingProc)
+    {
+        const labelList& requestedGlobalIDs =
+            receivedRequests[requestingProc];
+        Field<Type>& values = sendValues[requestingProc];
+        values.setSize(requestedGlobalIDs.size());
+
+        forAll(requestedGlobalIDs, i)
+        {
+            const label globalCellID = requestedGlobalIDs[i];
+            const label localCellID = globalCells_.toLocal(globalCellID);
+
+            if (localCellID < 0 || localCellID >= mesh_.nCells())
+            {
+                FatalErrorInFunction
+                    << "Invalid global->local mapping: globalCellID="
+                    << globalCellID << ", localCellID=" << localCellID
+                    << ", on proc " << Pstream::myProcNo()
+                    << abort(FatalError);
+            }
+
+            values[i] = fld[localCellID];
+        }
+    }
+
+    labelListList fieldSizes;
+    Pstream::exchange<Field<Type>, Type>
+    (
+        sendValues,
+        remoteFld,
+        fieldSizes
+    );
+
+    forAll(remoteCells, procI)
+    {
+        if (remoteFld[procI].size() != remoteCells[procI].size())
+        {
+            FatalErrorInFunction
+                << "Field reply size mismatch from proc " << procI
+                << ": got " << remoteFld[procI].size()
+                << ", expected " << remoteCells[procI].size()
+                << abort(FatalError);
+        }
+    }
+#else
     PstreamBuffers reqBufs(Pstream::commsTypes::nonBlocking);
 
     // Phase 1: send requested global cell IDs to each processor
@@ -185,6 +257,7 @@ Foam::movingLeastSquaresStencil::remoteFieldPerProc
 
         remoteFld[procI].transfer(values);
     }
+#endif
 
     return remoteFld;
 }

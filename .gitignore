@@ -5,6 +5,8 @@ notes.txt
 todo*
 tutorialsTest*
 regressionTests*
+**/verification/work/
+**/verification/postProcessing/
 codex*.md
 
 # Build log files

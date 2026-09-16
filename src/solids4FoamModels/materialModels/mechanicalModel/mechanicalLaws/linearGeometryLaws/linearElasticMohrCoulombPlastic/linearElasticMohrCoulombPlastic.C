@@ -407,6 +407,49 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
     }
 }
 
+// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
+
+Foam::dimensionedScalar
+Foam::linearElasticMohrCoulombPlastic::readFrictionAngle
+(
+    const dictionary& dict
+)
+{
+    const dimensionedScalar varPhi(dict.lookup("frictionAngle"));
+
+    // The derived parameter k = (1 + sin(varPhi))/(1 - sin(varPhi)) tends to 1
+    // as varPhi tends to zero, and the apex stress
+    // sigma_a = 2*c*sqrt(k)/(k - 1) then tends to infinity, i.e. the apex of
+    // the Mohr-Coulomb surface moves to infinity. This limiting (Tresca-like)
+    // case is not implemented, so it is rejected here rather than dividing by
+    // zero when constructing the derived parameters below
+    const scalar smallFrictionAngle = 1e-3;
+
+    if (mag(varPhi.value()) < smallFrictionAngle)
+    {
+        FatalErrorIn
+        (
+            "Foam::dimensionedScalar"
+            " Foam::linearElasticMohrCoulombPlastic::readFrictionAngle"
+            "(const dictionary&)"
+        )   << "The 'frictionAngle' entry in the '" << dict.name()
+            << "' dictionary is " << varPhi.value() << " degrees, which is at "
+            << "or near zero." << nl
+            << "The linearElasticMohrCoulombPlastic law cannot be used in this "
+            << "limit: as the friction angle tends to zero, the apex of the "
+            << "Mohr-Coulomb surface moves to infinity and the derived "
+            << "parameters become singular (division by zero)." << nl
+            << "Please specify a 'frictionAngle' with a magnitude of at least "
+            << smallFrictionAngle << " degrees, or, for a pressure-independent "
+            << "(Tresca/von Mises type) law, use the "
+            << "'linearElasticMisesPlastic' mechanical law instead."
+            << abort(FatalError);
+    }
+
+    return varPhi;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -429,7 +472,7 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     ),
     mu_(E_/(2.0*(1.0 + nu_))),
     K_(lambda_ + (2.0/3.0)*mu_),
-    varPhi_(dict.lookup("frictionAngle")),
+    varPhi_(readFrictionAngle(dict)),
     c_(dict.lookup("cohesion")),
     varPsi_(dict.lookup("dilationAngle")),
     k_

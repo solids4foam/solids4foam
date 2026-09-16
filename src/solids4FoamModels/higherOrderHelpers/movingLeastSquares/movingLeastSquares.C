@@ -18,13 +18,16 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "movingLeastSquares.H"
+#include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "compatibilityFunctions.H"
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
-#include "symmetryPlanePolyPatch.H"
+#ifndef FOAMEXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementFvPatchVectorField.H"
@@ -37,17 +40,23 @@ namespace Foam
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(movingLeastSquares, 0);
+addToRunTimeSelectionTable
+(
+    leastSquaresScheme,
+    movingLeastSquares,
+    dictionary
+);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-const movingLeastSquaresStencil& movingLeastSquares::stencil() const
+const leastSquaresStencil& movingLeastSquares::stencil() const
 {
     if (stencilPtr_.empty())
     {
         makeStencils();
     }
 
-    return *stencilPtr_;
+    return autoPtrRef(stencilPtr_);
 }
 
 const CompactListList<scalar>& movingLeastSquares::cellInterpCoeffs() const
@@ -96,6 +105,12 @@ movingLeastSquares::cellThirdGradCoeffs() const
 }
 
 
+const CompactListList<label>& movingLeastSquares::faceGradStencil() const
+{
+    return stencil().facesStencil();
+}
+
+
 const List<CompactListList<vector>>&
 movingLeastSquares::faceGradCoeffs() const
 {
@@ -105,6 +120,67 @@ movingLeastSquares::faceGradCoeffs() const
     }
 
     return autoPtrRef(faceGradCoeffsPtr_);
+}
+
+
+void movingLeastSquares::cellValueCoeffsAtPoint
+(
+    const label cellI,
+    const point& x,
+    UList<scalar>& coeffs
+) const
+{
+    auto& cellsStencil =
+        compactListListCRef(stencil().cellsStencil());
+    auto& gradCoeffsTable =
+        compactListListCRef(cellGradCoeffs());
+    const UList<label>& cellStencil = cellsStencil[cellI];
+
+    if (coeffs.size() != cellStencil.size() + 1)
+    {
+        FatalErrorInFunction
+            << "Coefficient list size " << coeffs.size()
+            << " does not match stencil plus owner size "
+            << cellStencil.size() + 1 << " for cell " << cellI
+            << abort(FatalError);
+    }
+
+    const vector r = x - mesh_.C()[cellI];
+    const UList<vector>& gradCoeffs = gradCoeffsTable[cellI];
+    auto* secondDerivativeCoeffsPtr =
+        polynomialOrder() >= 2
+      ? &compactListListCRef(cellSecondGradCoeffs())
+      : nullptr;
+    auto* thirdDerivativeCoeffsPtr =
+        polynomialOrder() >= 3
+      ? &compactListListCRef(cellThirdGradCoeffs())
+      : nullptr;
+
+    forAll(coeffs, coeffI)
+    {
+        coeffs[coeffI] = r & gradCoeffs[coeffI];
+
+        if (secondDerivativeCoeffsPtr)
+        {
+            const symmTensor& secondDerivativeCoeff =
+                (*secondDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                0.5*(r & (secondDerivativeCoeff & r));
+        }
+        if (thirdDerivativeCoeffsPtr)
+        {
+            const symmTensor3rdOrder& thirdDerivativeCoeff =
+                (*thirdDerivativeCoeffsPtr)[cellI][coeffI];
+
+            coeffs[coeffI] +=
+                (1.0/6.0)*cubicForm(thirdDerivativeCoeff, r);
+        }
+    }
+
+    // The final coefficient belongs to the central cell. Add the original
+    // cell-centre value from the Taylor expansion.
+    coeffs[cellStencil.size()] += 1.0;
 }
 
 
@@ -199,7 +275,7 @@ void movingLeastSquares::makeStencils() const
 
     stencilPtr_.set
     (
-        new movingLeastSquaresStencil
+        new leastSquaresStencil
         (
             mesh_,
             haloDepthScale_,
@@ -284,7 +360,7 @@ void movingLeastSquares::generateExponents
     exponents.setCapacity(estimatedSize);
 
     // Add the constant term first
-    exponents.append(FixedList<label, 3>{0, 0, 0});
+    exponents.append(FixedList<label, 3>(0));
 
     // 2D and 3D cases have different number of exponents in Taylor series
     if (mesh_.nGeometricD() == 2)
@@ -294,7 +370,10 @@ void movingLeastSquares::generateExponents
             for (label i = n; i >= 0; --i)
             {
                 const label j = n - i;
-                FixedList<label, 3> exponent  = {i, j, 1};
+                FixedList<label, 3> exponent(0);
+                exponent[0] = i;
+                exponent[1] = j;
+                exponent[2] = 1;
                 exponents.append(exponent);
             }
         }
@@ -313,7 +392,10 @@ void movingLeastSquares::generateExponents
                         // Skip the constant term as it's already added
                         continue;
                     }
-                    FixedList<label, 3> exponent = {i, j, k};
+                    FixedList<label, 3> exponent(0);
+                    exponent[0] = i;
+                    exponent[1] = j;
+                    exponent[2] = k;
                     exponents.append(exponent);
                 }
             }
@@ -478,7 +560,8 @@ void movingLeastSquares::calcCellCoeffs() const
     const bool twoD = mesh.nGeometricD() == 2;
     const globalIndex& globalCells = stencil().globalCells();
     const vectorField& CI = mesh.C().internalField();
-    const CompactListList<label>& stencils = stencil().cellsStencil();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
 
     // Allocate CompactListList, size is stencil plus cell centre
     labelList rowSizes(mesh.nCells());
@@ -489,11 +572,13 @@ void movingLeastSquares::calcCellCoeffs() const
 
     // Allocate CompactListList for interpolation coefficients
     cellInterpCoeffsPtr_.set(new CompactListList<scalar>(rowSizes));
-    CompactListList<scalar>& cellInterpCoeffs = *cellInterpCoeffsPtr_;
+    CompactListList<scalar>& cellInterpCoeffs =
+        autoPtrRef(cellInterpCoeffsPtr_);
 
     // Allocate CompactListList for gradient interpolation coefficients
     cellGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
-    CompactListList<vector>& cellGradCoeffs = *cellGradCoeffsPtr_;
+    CompactListList<vector>& cellGradCoeffs =
+        autoPtrRef(cellGradCoeffsPtr_);
 
     if (polynomialOrder() >= 2)
     {
@@ -673,10 +758,10 @@ void movingLeastSquares::calcCellCoeffs() const
                 Eigen::RowVectorXd::Zero(A.cols())
                 : (A.row(dRows.iyz) * invh2).eval();
 
-            // Store Hessian tensor
+            // Store second-derivative tensor
             for (label i = 0; i < A.cols(); ++i)
             {
-                (*cellSecondGradCoeffsPtr_)[cellI][i] =
+                autoPtrRef(cellSecondGradCoeffsPtr_)[cellI][i] =
                     symmTensor
                     (
                         cxxRow(i),
@@ -737,7 +822,7 @@ void movingLeastSquares::calcCellCoeffs() const
                     cyzzRow(i),
                     czzzRow(i)
                 );
-                (*cellThirdGradCoeffsPtr_)[cellI][i] = t;
+                autoPtrRef(cellThirdGradCoeffsPtr_)[cellI][i] = t;
             }
         }
     }
@@ -780,7 +865,8 @@ void movingLeastSquares::calcFaceCoeffs() const
     (
         new List<CompactListList<vector>>(mesh.nFaces())
     );
-    List<CompactListList<vector>>& faceGradCoeffs = *faceGradCoeffsPtr_;
+    List<CompactListList<vector>>& faceGradCoeffs =
+        autoPtrRef(faceGradCoeffsPtr_);
 
     // Calculate Taylor series exponents, exponents differs for 2D and 3D case
     DynamicList<FixedList<label, 3>> exponents;
@@ -795,8 +881,9 @@ void movingLeastSquares::calcFaceCoeffs() const
     }
 
     // Reference to face stencils, quadrature points and remote centres
-    const CompactListList<label>& stencils = stencil().facesStencil();
-    const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
+    auto& stencils = compactListListCRef(faceGradStencil());
+    auto& faceQuadPts =
+        compactListListCRef(quadrature().faceQuadPoints());
 
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
 
@@ -860,7 +947,9 @@ void movingLeastSquares::calcFaceCoeffs() const
             if
             (
                 isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchID])
+#ifndef FOAMEXTEND
              || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchID])
+#endif
             )
             {
                 symmetryFace = true;
@@ -1037,7 +1126,7 @@ void movingLeastSquares::calcFaceCoeffs() const
                 const polyPatch& pp = mesh_.boundaryMesh()[patchID];
                 const label localFaceI = faceI - pp.start();
 
-                faceConditionNumber().boundaryFieldRef()[patchID][localFaceI]
+                boundaryFieldRef(faceConditionNumber())[patchID][localFaceI]
                     = avgCond;
             }
         }
@@ -1066,7 +1155,7 @@ movingLeastSquares::movingLeastSquares
     const dictionary& dict
 )
 :
-    mesh_(mesh),
+    leastSquaresScheme(mesh),
     stencilPtr_(),
     quadraturePtr_(),
     weightFuncPtr_(),
@@ -1160,6 +1249,7 @@ movingLeastSquares::~movingLeastSquares()
 
 void Foam::movingLeastSquares::clear() const
 {
+    clearFaceCentreValueCoeffs();
     stencilPtr_.clear();
     quadraturePtr_.clear();
     weightFuncPtr_.clear();
@@ -1170,6 +1260,55 @@ void Foam::movingLeastSquares::clear() const
     faceGradCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
     faceConditionNumberPtr_.clear();
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volScalarField& vf,
+    CompactListList<vector>& result
+) const
+{
+    this->fGrad<scalar>(vf, result);
+}
+
+
+void movingLeastSquares::fGrad
+(
+    const volVectorField& vf,
+    CompactListList<tensor>& result
+) const
+{
+    this->fGrad<vector>(vf, result);
+}
+
+
+tmp<volVectorField> movingLeastSquares::grad
+(
+    const volScalarField& vf
+) const
+{
+    return this->grad<scalar>(vf);
+}
+
+
+tmp<volTensorField> movingLeastSquares::grad
+(
+    const volVectorField& vf
+) const
+{
+    return this->grad<vector>(vf);
+}
+
+
+autoPtr<CompactListList<scalar>>
+movingLeastSquares::patchFaceQuadValues
+(
+    const volScalarField& vf,
+    const label patchI
+) const
+{
+    return this->patchFaceQuadValues<scalar>(vf, patchI);
 }
 
 
@@ -1210,6 +1349,28 @@ movingLeastSquares::patchFaceQuadValues
 }
 
 
+scalar movingLeastSquares::valueAtPoint
+(
+    const volScalarField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<scalar>(vf, cellID, x);
+}
+
+
+vector movingLeastSquares::valueAtPoint
+(
+    const volVectorField& vf,
+    const label cellID,
+    const point& x
+) const
+{
+    return this->evaluateAtPoint<vector>(vf, cellID, x);
+}
+
+
 tmp<volSymmTensorField> movingLeastSquares::secondGrad
 (
     const volScalarField& s
@@ -1219,9 +1380,10 @@ tmp<volSymmTensorField> movingLeastSquares::secondGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<symmTensor>& secondGradCoeffs =
-        this->cellSecondGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& secondGradCoeffs =
+        compactListListCRef(this->cellSecondGradCoeffs());
 
     const scalarField& sI = s.internalField();
     const List<Field<scalar>> remoteField = stencil().remoteFieldPerProc(sI);
@@ -1249,7 +1411,7 @@ tmp<volSymmTensorField> movingLeastSquares::secondGrad
         )
     );
 
-    volSymmTensorField& secondGrad = tSecondGrad.ref();
+    volSymmTensorField& secondGrad = tmpRef(tSecondGrad);
 
     forAll(stencils, cellI)
     {
@@ -1290,9 +1452,10 @@ autoPtr<List<symmTensor3rdOrder>> movingLeastSquares::thirdGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<symmTensor3rdOrder>& thirdGradCoeffs =
-        cellThirdGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& thirdGradCoeffs =
+        compactListListCRef(cellThirdGradCoeffs());
 
     const scalarField& sI = s.internalField();
     const List<Field<scalar>> remoteField = stencil().remoteFieldPerProc(sI);
@@ -1329,6 +1492,7 @@ autoPtr<List<symmTensor3rdOrder>> movingLeastSquares::thirdGrad
 
     return tThirdGrad;
 }
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

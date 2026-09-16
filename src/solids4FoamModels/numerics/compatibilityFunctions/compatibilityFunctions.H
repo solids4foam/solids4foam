@@ -28,6 +28,7 @@ Description
 
         - tmpRef()           : access the underlying object of a tmp<T>
         - autoPtrRef()       : access the underlying object of a autoPtr<T>
+        - compactListListCRef(): access CompactListList rows for read-only use
         - boundaryFieldRef() : obtain a modifiable boundary field reference
         - makeList<T>()      : construct a List<T> from an initializer_list
 
@@ -48,6 +49,7 @@ Author
 
 #include "tmp.H"
 #include "autoPtr.H"
+#include "CompactListList.H"
 #include "GeometricFields.H"
 #include "fvm.H"
 
@@ -97,6 +99,39 @@ namespace Foam
         return t.ref(); // com
 #else
         return t();     // foam-extend/org
+#endif
+    }
+
+    //- Return a reference for read-only CompactListList traversal
+    //
+    //  OpenFOAM.org and OpenFOAM.com return a const reference, as indicated
+    //  by the CRef suffix. foam-extend's const CompactListList::operator[]
+    //  does not compile with modern Clang, although its non-const operator[]
+    //  does. The foam-extend branch therefore casts away constness solely to
+    //  select the working overload.
+    //
+    //  Always bind the result using auto&, so it remains const on variants
+    //  that support const row access. Never modify the list through the
+    //  returned reference: doing so may change cached data and is undefined
+    //  behaviour when the original object is genuinely const.
+    //
+    //  Example:
+    //      auto& rows = compactListListCRef(list);
+    //      const label value = rows[rowI][columnI];
+    template<class T>
+#ifdef FOAMEXTEND
+    inline CompactListList<T>& compactListListCRef
+#else
+    inline const CompactListList<T>& compactListListCRef
+#endif
+    (
+        const CompactListList<T>& list
+    )
+    {
+#ifdef FOAMEXTEND
+        return const_cast<CompactListList<T>&>(list);
+#else
+        return list;
 #endif
     }
 

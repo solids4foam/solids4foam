@@ -921,13 +921,13 @@ function solids4Foam::getNumberOfProcessors()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 function solids4Foam::runParallel()
 {
-    local appName appRun logFile logMode nProcs
+    local appName="" appRun="" logFile="" logMode="" nProcs=""
 
     # Any additional parsed arguments (eg, decomposeParDict)
     local appArgs="-parallel"
 
     local mpirun="mpirun"
-    if [ "$FOAM_MPI" = msmpi ]
+    if [ "${FOAM_MPI:-}" = msmpi ]
     then
         mpirun="mpiexec"
     fi
