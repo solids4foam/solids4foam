@@ -155,7 +155,7 @@ Field<Type>& mechanicalConstitutiveLawState::accessField
         table.insert
         (
             name,
-            autoPtr<Field<Type>>(new Field<Type>(size_, Zero))
+            autoPtr<Field<Type>>(new Field<Type>(size_, pTraits<Type>::zero))
         );
     }
 
@@ -190,36 +190,36 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
 
     forAllIters(scalarFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIters(vectorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIters(tensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIters(symmTensorFields_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 
     forAllIters(scalarFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<scalar>::zero);
     }
     forAllIters(vectorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<vector>::zero);
     }
     forAllIters(tensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<tensor>::zero);
     }
     forAllIters(symmTensorFields0_, iter)
     {
-        iter()->setSize(newSize, Zero);
+        iter()->setSize(newSize, pTraits<symmTensor>::zero);
     }
 }
 

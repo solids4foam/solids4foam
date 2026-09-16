@@ -44,6 +44,7 @@ Author
 
 #include "integrationPointTopology.H"
 #include "CompactListList.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -105,7 +106,7 @@ public:
         const label cellI
     ) const override
     {
-        return cellToIntegrationPointIDs_[cellI];
+        return compactListListCRef(cellToIntegrationPointIDs_)[cellI];
     }
 
     //- Does this topology store boundary integration points per patch
