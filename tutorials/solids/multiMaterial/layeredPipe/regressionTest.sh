@@ -87,10 +87,10 @@ run_constitutive_test() {
         n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
 
         if (( n_passed == 0 )); then
-            # The framework is not built for foam-extend, so the test reports
-            # that there is nothing to check rather than running any
-            echo "SKIP: mechanicalConstitutiveLaw checks (not built on this fork)"
-            return 0
+            # The test exited zero but reported nothing: it did not run the
+            # checks it is here for, so this is a failure, not a skip
+            echo "FAIL: mechanicalConstitutiveLaw checks (no checks reported)"
+            return 1
         fi
 
         echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
