@@ -1,0 +1,3 @@
+Test-fluxCorrectedVelocityRestart.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-fluxCorrectedVelocityRestart

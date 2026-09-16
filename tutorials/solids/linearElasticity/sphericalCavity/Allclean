@@ -13,6 +13,9 @@ cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones* sphericalCavity.msh
 \rm -rf VTK case.foam postProcessing constant/polyMesh/boundary* *.obj
 
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
+
 # Link files back to default solid model settings
 for file in $(find ./constant ./system -name '*.petscSnes')
 do

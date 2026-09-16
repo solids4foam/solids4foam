@@ -18,9 +18,7 @@ linearElasticCt
 happens, and selecting `linearElasticCt` in `mechanicalProperties` fails with
 an unknown-type error. The source is present and this page describes it, but
 the law has to be added to a build list before it can be used. This is tracked
-as [issue #336](https://github.com/solids4foam/solids4foam/issues/336); note
-that [issue #335](https://github.com/solids4foam/solids4foam/issues/335)
-applies to this law too once it is built.
+as [issue #336](https://github.com/solids4foam/solids4foam/issues/336).
 ```
 
 ---
@@ -48,7 +46,7 @@ they are found.
 The elastic coefficients and stress are then evaluated as implemented:
 
 ```text
-mu     = E/(1 + nu)
+mu     = E/(2*(1 + nu))
 lambda = E*nu/((1 + nu)*(1 - 2*nu))         // plane strain / 3-D
 lambda = E*nu/((1 + nu)*(1 - nu))           // planeStress yes
 
@@ -166,7 +164,7 @@ offset and path entries are then not read.
 
 - `E`: cell-wise Young's modulus. It has zero-gradient boundaries and is
   explicitly written during construction.
-- `mu`: cell-wise coefficient `E/(1 + nu)` with its face interpolation
+- `mu`: cell-wise shear modulus `E/(2*(1 + nu))` with its face interpolation
   maintained in `muf_`.
 - `lambda`: cell-wise first Lame coefficient with its face interpolation
   maintained in `lambdaf_`.

@@ -69,7 +69,9 @@ SourceFiles
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
-#include "symmetryPlanePolyPatch.H"
+#ifndef FOAMEXTEND
+    #include "symmetryPlanePolyPatch.H"
+#endif
 #include "emptyPolyPatch.H"
 
 namespace Foam
@@ -322,7 +324,7 @@ private:
                 makeWeightFunction();
             }
 
-            return *weightFuncPtr_;
+            return autoPtrRef(weightFuncPtr_);
         }
 
         //- Const access to the quadrature data
@@ -333,7 +335,7 @@ private:
                 makeQuadrature();
             }
 
-            return *quadraturePtr_;
+            return autoPtrRef(quadraturePtr_);
         }
 
         //- Return the cell and face stencil
