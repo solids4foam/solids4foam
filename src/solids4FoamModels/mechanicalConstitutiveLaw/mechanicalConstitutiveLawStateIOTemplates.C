@@ -332,13 +332,23 @@ bool Foam::mechanicalConstitutiveLawStateIO::distributeFromSerial
                 << exit(FatalError);
         }
 
-        if (entities.empty())
+        // No locations here has two meanings and only one is a mistake.
+        //
+        // The list is built per law and per rank, so a rank that holds none
+        // of this material has none of its integration points either, and
+        // nothing to map is not an error - it is what a decomposition that
+        // put the material elsewhere looks like from here. The values this
+        // rank does hold, none, are all mapped.
+        //
+        // Holding values and having no locations for them is the mistake,
+        // and it is the one the message is about
+        if (entities.empty() && totalSize(parts) > 0)
         {
             FatalErrorInFunction
-                << "Restarting '" << name << "' from the undecomposed case, "
-                << "but this topology records no integration point locations, "
-                << "so its entries cannot be matched to the ones in that file."
-                << nl
+                << "Restarting '" << name << "' from the undecomposed case: "
+                << "this rank holds " << totalSize(parts) << " values for it "
+                << "and no integration point locations to match them to the "
+                << "ones in that file." << nl
                 << "Only the cell-centred topology writes locations, so a case "
                 << "on any other cannot change its decomposition between runs."
                 << exit(FatalError);
