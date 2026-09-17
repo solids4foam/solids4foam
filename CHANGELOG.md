@@ -6,7 +6,17 @@ release. For complete commit-level details and contributor information, see the
 
 ## [Unreleased]
 
-### Changed in Unreleased
+### Added
+
+- Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
+  the [preCICE tutorials](https://github.com/precice/tutorials) against the
+  current source and checks them against stored reference values. The preCICE
+  team's own system tests pin a released solids4foam image, so they cannot
+  catch a regression introduced on a branch; this closes that gap. Run by the
+  `preCICE coupling test` workflow for pull requests targeting `master`, for
+  any pull request labelled `test-precice`, and on request.
+
+### Changed
 
 - `linearGeometryTotalDisplacement` with `solvePressure yes` now uses an
   implicit stiffness of `(4/3)*mu` rather than `2*mu`. The mixed
@@ -17,6 +27,14 @@ release. For complete commit-level details and contributor information, see the
   solved, so converged results are unchanged within tolerance, but the
   iteration count and the path taken to get there move for every case that
   selects this option.
+
+### Removed
+
+- Removed `tutorials/fluidSolidInteraction-preCICE`, which held standalone
+  `3dTube` and `flexibleOversetCylinder` preCICE cases that were not covered by
+  any test. solids4foam's preCICE cases are now maintained upstream in the
+  preCICE tutorials and tested by `tests/precice`. The removed cases remain
+  available as an archive from the solids4foam website.
 
 ## [v2.4] - 2026-08-24
 
