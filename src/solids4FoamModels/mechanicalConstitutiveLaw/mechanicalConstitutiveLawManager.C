@@ -1308,7 +1308,10 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         // refuses rather than guessing
         labelList entities;
 
-        if (topo.type() == cellCentredIntegrationPointTopology::typeName)
+        const bool topologyRecordsLocations =
+            (topo.type() == cellCentredIntegrationPointTopology::typeName);
+
+        if (topologyRecordsLocations)
         {
             const labelList& ipIDs = entry.lawIntegrationPointIDs_[lawI];
 
@@ -1359,7 +1362,16 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
             )
         );
 
-        if (!entities.empty())
+        // On whether this topology records locations, not on whether this
+        // rank has any. A rank holding no cells of this material has an empty
+        // list, and that is a statement about the decomposition rather than an
+        // absence of information: the file still has to be written, because
+        // reconstructing a decomposed state requires the pair of files from
+        // every processor directory and refuses the lot if one is missing.
+        // A topology that records no locations at all writes neither file, and
+        // a restart on a changed decomposition then refuses rather than
+        // guessing, which is the intended behaviour
+        if (topologyRecordsLocations)
         {
             // Written in the numbering of the undecomposed mesh, whichever way
             // this run is being run. A serial run's locations are what a
@@ -4257,10 +4269,26 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     // the same keys. A topology is built on first use, so a rank that has not
     // reached that use holds one fewer. The reductions below are per topology,
     // so that rank calls fewer collectives than the others and the run stops
-    // dead with no indication of why. Say what happened instead
+    // dead with no indication of why. Say what happened instead.
+    //
+    // The type registered under each key goes into the digest as well as the
+    // key. registerTopology() takes the name from the caller, so two ranks can
+    // supply the same word for different topologies; the keys would then agree
+    // while the point sets behind them do not, and the reductions would pair
+    // one rank's quantity with another's
     if (Pstream::parRun())
     {
-        const label check = keyListChecksum(topologyKeys);
+        wordList keysAndTypes(2*topologyKeys.size());
+
+        forAll(topologyKeys, keyI)
+        {
+            const word& key = topologyKeys[keyI];
+
+            keysAndTypes[2*keyI] = key;
+            keysAndTypes[2*keyI + 1] = autoPtrRef(topologyCache_[key]).type();
+        }
+
+        const label check = keyListChecksum(keysAndTypes);
 
         if
         (
@@ -4273,6 +4301,9 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                 << "integration-point topologies." << nl << nl
                 << "    This rank holds " << topologyKeys.size() << ": "
                 << topologyKeys << nl << nl
+                << "    The type registered under each key is compared too, "
+                << "so this also fires where the names agree and the "
+                << "topologies behind them do not." << nl << nl
                 << "    Topologies are created when they are first used, so "
                 << "this means some rank reached an evaluation that the "
                 << "others did not. The end-of-step diagnostics reduce once "
