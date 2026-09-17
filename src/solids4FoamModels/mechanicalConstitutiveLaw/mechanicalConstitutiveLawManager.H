@@ -261,6 +261,24 @@ class mechanicalConstitutiveLawManager
             }
         }
 
+        //- Check that two compact layouts have the same rows, not merely the
+        //  same number of values.
+        //
+        //  Equal flattened lengths are not enough: row sizes of [2, 1] and
+        //  [1, 2] both hold three values, and flat index 1 is then the second
+        //  point of the first cell in one and the first point of the second
+        //  cell in the other. Nothing downstream can notice, because every
+        //  list is the length it should be and the addressing is implied by
+        //  the offsets rather than carried with the values
+        static void checkCompactRowSizes
+        (
+            const labelList& ref,
+            const word& refName,
+            const labelList& other,
+            const word& otherName,
+            const word& context
+        );
+
         //- Check the provided compact list sizes are consistent.
         //  Defined in the .C so that this header does not need the complete
         //  CompactListList type

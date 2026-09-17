@@ -1349,6 +1349,52 @@ int main(int argc, char *argv[])
             tangentRequest::scalar
         );
 
+        // A layout with the same number of values and different rows. The
+        // flat index of a point then differs between the two lists, so one
+        // cell's strain would be read as another's, and every list is still
+        // exactly the length it should be - nothing downstream can notice
+        if (mesh.nCells() >= 2)
+        {
+            labelList crossed(sizes);
+            crossed[0] = sizes[0] + 1;
+            crossed[1] = sizes[1] - 1;
+
+            if (crossed[1] >= 0)
+            {
+                const CompactListList<tensor> oddGradD0
+                (
+                    crossed, tensor::zero
+                );
+
+                bool threw = false;
+                FatalError.throwExceptions();
+                try
+                {
+                    manager.updateStressSmallStrain
+                    (
+                        compactGradD,
+                        oddGradD0,
+                        dt,
+                        compactSigma,
+                        &compactImpK,
+                        tangentRequest::scalar
+                    );
+                }
+                catch (const Foam::error&)
+                {
+                    threw = true;
+                }
+                FatalError.dontThrowExceptions();
+
+                report
+                (
+                    "a compact layout with the same length and different "
+                    "rows is rejected",
+                    threw
+                );
+            }
+        }
+
         reportError
         (
             "stress matches the volField overload",

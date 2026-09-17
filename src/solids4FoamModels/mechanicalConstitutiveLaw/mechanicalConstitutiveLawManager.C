@@ -261,6 +261,46 @@ void evaluateResponse
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
 
+void Foam::mechanicalConstitutiveLawManager::checkCompactRowSizes
+(
+    const labelList& ref,
+    const word& refName,
+    const labelList& other,
+    const word& otherName,
+    const word& context
+)
+{
+    if (other.size() != ref.size())
+    {
+        FatalErrorInFunction
+            << "Inconsistent compact layouts in " << context << nl << nl
+            << "    " << refName << " has " << ref.size() << " rows and "
+            << otherName << " has " << other.size() << '.' << nl << nl
+            << "    The rows are the integration points of one mesh entity, "
+            << "so two layouts with different row counts describe different "
+            << "meshes."
+            << exit(FatalError);
+    }
+
+    forAll(ref, rowI)
+    {
+        if (other[rowI] != ref[rowI])
+        {
+            FatalErrorInFunction
+                << "Inconsistent compact layouts in " << context << nl << nl
+                << "    Row " << rowI << " holds " << ref[rowI]
+                << " integration points in " << refName << " and "
+                << other[rowI] << " in " << otherName << '.' << nl << nl
+                << "    The two hold the same number of values in total, so "
+                << "every list is the length it should be, but the flat index "
+                << "of a point differs between them: values from one entity "
+                << "would be read as another's."
+                << exit(FatalError);
+        }
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
 (
     const CompactListList<tensor>& a,
@@ -291,6 +331,12 @@ void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
             << ", got: " << tangentPtr->size()
             << exit(FatalError);
     }
+
+    // The lengths agreeing does not make the layouts the same
+    const labelList refRows(out.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", a.sizes(), "grad", context);
+    checkCompactRowSizes(refRows, "the stress", b.sizes(), "grad0", context);
 }
 
 
@@ -3940,14 +3986,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 )
 {
     // Check field sizes are consistent
-    checkCompactLayoutConsistency
+    const word context("updateStressFiniteStrain (CompactListList)");
+
+    checkCompactLayoutConsistency(F, F0, stress, scalarTangentPtr, context);
+
+    // The four the check above does not see. They are addressed by the same
+    // flat index as F, so a different row shape puts one entity's inverse or
+    // Jacobian against another's deformation gradient
+    const labelList refRows(stress.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", Finv.sizes(), "Finv", context);
+    checkCompactRowSizes
     (
-        F,
-        F0,
-        stress,
-        scalarTangentPtr,
-        "updateStressFiniteStrain (CompactListList)"
+        refRows, "the stress", Finv0.sizes(), "Finv0", context
     );
+    checkCompactRowSizes(refRows, "the stress", J.sizes(), "J", context);
+    checkCompactRowSizes(refRows, "the stress", J0.sizes(), "J0", context);
 
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(F);
