@@ -115,6 +115,9 @@ class mechanicalConstitutiveLawInputs
         //  than another name-keyed table
         mutable const UList<symmTensor>* incomingStressPtr_;
 
+        //- Scale supplied by the manager, reduced over every rank
+        mutable scalar convergenceScale_;
+
 
     // Private Member Functions
 
@@ -137,7 +140,8 @@ public:
             time_(time),
             scalarFields_(),
             vectorFields_(),
-            incomingStressPtr_(nullptr)
+            incomingStressPtr_(nullptr),
+            convergenceScale_(0)
         {}
 
 
@@ -159,6 +163,28 @@ public:
             scalar time() const
             {
                 return time_;
+            }
+
+            //- A scale the law normalises its convergence test by, the same
+            //  on every rank.
+            //
+            //  A law that needs one must not reduce for itself: the manager
+            //  calls it only where it has integration points, and that
+            //  differs between ranks, so the reductions would not pair up and
+            //  the run would hang. The manager asks every law for its local
+            //  value on every rank, reduces once, and supplies the result
+            //  here.
+            //
+            //  Zero where the law asked for none
+            scalar convergenceScale() const
+            {
+                return convergenceScale_;
+            }
+
+            //- Supply that scale
+            void setConvergenceScale(const scalar s) const
+            {
+                convergenceScale_ = s;
             }
 
             //- Is the standing stress available?

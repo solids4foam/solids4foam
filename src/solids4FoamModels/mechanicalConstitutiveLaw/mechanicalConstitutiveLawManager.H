@@ -200,6 +200,12 @@ class mechanicalConstitutiveLawManager
             //- True if this topology supports boundary integration points
             bool boundaryAware_;
 
+            //- Each law's convergence scale for the current evaluation,
+            //  reduced over every rank. Held here so that the boundary
+            //  evaluations use the same scale as the internal ones rather
+            //  than one taken over whichever faces this rank happens to hold
+            scalarList lawConvergenceScales_;
+
             //- Scratch storage for live coupling inputs, per law, keyed by
             //  field name. A law that asks for one is handed a view of its own
             //  integration points, and the storage is kept here rather than
@@ -214,12 +220,14 @@ class mechanicalConstitutiveLawManager
                 states_(),
                 boundaryStates_(),
                 boundaryAware_(false),
+                lawConvergenceScales_(),
                 lawScalarInputs_()
             {}
         };
 
         //- Cache of topology-specific integration-point data and state
-        //  Keyed by the address of the integrationPointTopology instance
+        //  Keyed as topologyCache_ is, by the name the topology was
+        //  registered under
         mutable HashTable<autoPtr<topologyEntry>> topologyEntries_;
 
         //- Shape of the compact layout each compact topology was built
@@ -339,6 +347,20 @@ class mechanicalConstitutiveLawManager
         const integrationPointTopology& compactCellTopologyFor
         (
             const CompactListList<tensor>& layout
+        ) const;
+
+        //- Each law's convergence scale, reduced over every rank.
+        //  Asked of every law whether or not this rank holds any of its
+        //  points, so that the number of reductions is the same everywhere
+        scalarList finiteStrainConvergenceScales
+        (
+            topologyEntry& tp,
+            const UList<tensor>& F,
+            const UList<tensor>& F0,
+            const UList<tensor>& Finv,
+            const UList<tensor>& Finv0,
+            const UList<scalar>& J,
+            const UList<scalar>& J0
         ) const;
 
         //- The key a topology is registered under in topologyCache_.

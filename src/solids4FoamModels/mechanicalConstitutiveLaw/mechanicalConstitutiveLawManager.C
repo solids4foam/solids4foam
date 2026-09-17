@@ -493,6 +493,58 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 }
 
 
+Foam::scalarList
+Foam::mechanicalConstitutiveLawManager::finiteStrainConvergenceScales
+(
+    topologyEntry& tp,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0
+) const
+{
+    scalarList scales(laws_.size(), 0.0);
+
+    // Every law, on every rank, whether or not this rank holds any of its
+    // points. That is the point of doing it here: the evaluation loops skip a
+    // law with no points, so a law reducing for itself would reduce a
+    // different number of times on each rank
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> FView(F, ipIDs);
+        const UIndirectList<tensor> F0View(F0, ipIDs);
+        const UIndirectList<tensor> FinvView(Finv, ipIDs);
+        const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+        const UIndirectList<scalar> JView(J, ipIDs);
+        const UIndirectList<scalar> J0View(J0, ipIDs);
+
+        const finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView, F0View, JView, J0View, FinvView, Finv0View
+        );
+
+        scales[lawI] =
+            laws_[lawI].localConvergenceScale(kin, tp.states_[lawI]);
+    }
+
+    // One reduction per law, in law order, which every rank shares
+    forAll(scales, lawI)
+    {
+        reduce(scales[lawI], maxOp<scalar>());
+    }
+
+    // Kept so that the boundary evaluations use the same scale as the
+    // internal ones
+    tp.lawConvergenceScales_ = scales;
+
+    return scales;
+}
+
+
 const Foam::word&
 Foam::mechanicalConstitutiveLawManager::topologyKeyFor
 (
@@ -2565,6 +2617,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
 
     topologyEntry& tp = topology(topo);
 
+    // One collective per law, before any of them is evaluated.
+    //
+    // A law that normalises its convergence test by a scale over its points
+    // needs that scale to be the same everywhere, and cannot reduce for
+    // itself: the loop below skips a law where this rank holds none of its
+    // points, so the reductions would not pair up. Asked of every law on
+    // every rank, including where it has no points, the count matches
+    const scalarList lawScales
+    (
+        finiteStrainConvergenceScales(tp, F, F0, Finv, Finv0, J, J0)
+    );
+
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
@@ -2574,6 +2638,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         {
             continue;
         }
+
+        inputs.setConvergenceScale(lawScales[lawI]);
 
         // A tangent query evaluates against a shadow of the law's state: the
         // shadow aliases the old-time fields, so history is read but never
@@ -3739,6 +3805,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     {
         forAll(laws_, lawI)
         {
+            // The same scale the internal points were evaluated with. Taking
+            // it over this rank's faces instead would make the convergence
+            // tolerance depend on where the mesh was cut
+            if (lawI < tp.lawConvergenceScales_.size())
+            {
+                inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
+            }
+
             forAll(F.boundaryField(), patchI)
             {
                 if (!F.boundaryField()[patchI].coupled())

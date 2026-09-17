@@ -292,6 +292,46 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
+Foam::scalar
+Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::
+localConvergenceScale
+(
+    const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawState& state
+) const
+{
+    if (!nonLinearPlasticity_)
+    {
+        return 0;
+    }
+
+    const UIndirectList<tensor>& F = kin.F();
+    const UIndirectList<tensor>& Finv0 = kin.Finv0();
+    const UIndirectList<scalar>& J = kin.J();
+    const UIndirectList<scalar>& J0 = kin.J0();
+
+    const Field<symmTensor>& bEbar0 = state.getSymmTensorField0("bEbar");
+
+    // The Newton residual is normalised by the largest trial elastic strain,
+    // so that the tolerance means the same at every integration point. Over
+    // this law's own points rather than the whole mesh, which is enough for a
+    // tolerance scale, and over none at all on a rank that holds none - the
+    // reduction in the manager is what makes the answer the same everywhere
+    scalar maxMagBE = 0;
+
+    forAll(F, i)
+    {
+        const scalar relJi = J[i]/J0[i];
+        const tensor relFbari(pow(relJi, -1.0/3.0)*(F[i] & Finv0[i]));
+
+        maxMagBE =
+            max(maxMagBE, mag(symm(relFbari & bEbar0[i] & relFbari.T())));
+    }
+
+    return maxMagBE;
+}
+
+
 void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 (
     mechanicalConstitutiveLawStateSpec& spec
@@ -376,27 +416,14 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     // so that the tolerance means the same at every integration point. It is
     // a tolerance scale only, so evaluating it over this law's own points
     // rather than the whole mesh is sufficient
+    // Supplied by the manager, which asked every law for its local value on
+    // every rank and reduced once. Reducing here instead would call a
+    // different number of collectives on each rank, because the manager
+    // evaluates a law only where it has integration points
     scalar maxMagBE = SMALL;
     if (nonLinearPlasticity_)
     {
-        for (label i = 0; i < nIP; ++i)
-        {
-            const scalar relJi = J[i]/J0[i];
-            const tensor relFbari
-            (
-                pow(relJi, -1.0/3.0)*(F[i] & Finv0[i])
-            );
-
-            maxMagBE =
-                max
-                (
-                    maxMagBE,
-                    mag(symm(relFbari & bEbar0[i] & relFbari.T()))
-                );
-        }
-
-        reduce(maxMagBE, maxOp<scalar>());
-        maxMagBE = max(maxMagBE, SMALL);
+        maxMagBE = max(inputs.convergenceScale(), SMALL);
     }
 
     for (label i = 0; i < nIP; ++i)
