@@ -126,14 +126,16 @@ namespace Foam
     }
 
     // const
+    //
+    // No fork split here, unlike the non-const overload above:
+    // OpenFOAM.com's autoPtr::ref() is not const, so it cannot serve a const
+    // autoPtr at all. operator()() is const on every supported fork - com
+    // autoPtr.H:261, foam-extend autoPtr.H:118 - and foam-extend comments
+    // operator* out, so this is the one spelling that works everywhere
     template<class T>
     inline const T& autoPtrRef(const autoPtr<T>& t)
     {
-#ifdef OPENFOAM_COM
-        return t.ref(); // com
-#else
-        return t();     // foam-extend/org
-#endif
+        return t();
     }
 
     //- Return a reference for read-only CompactListList traversal
