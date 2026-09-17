@@ -19,7 +19,14 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+/* Not compiled: vertexCentredNonLinTotalLagGeometry does not currently run.
+   No tutorial selects it, so nothing exercised it; an attempt to give it one
+   failed inside the PETSc solve. Its dictionary entries useGeometricStiffness,
+   compactImplicitStencil and the material's tangentEps also have no defaults
+   and are set by no case. Fixing it is separate from the mechanical
+   constitutive law work; see the solver's README.md.
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
+*/
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
