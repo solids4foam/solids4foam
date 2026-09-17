@@ -34,11 +34,6 @@ Description
     to field location, mesh topology, and region selection are handled
     exclusively at this level.
 
-    In its initial form, the manager supports a single constitutive law
-    applied to the entire domain. This functionality may be extended
-    incrementally to support multiple laws, multiple regions, boundary
-    contributions, and tangent-related quantities.
-
     Notes:
     - Constitutive laws are stateless; all history variables are stored
       in mechanicalConstitutiveLawState objects owned by the manager.
@@ -66,6 +61,7 @@ Author
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
+#include "integrationPointTopology.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -122,20 +118,22 @@ class mechanicalConstitutiveLawManager
 
         //- Cell indices defining the material support for each mechanical
         //  constitutive law.
-        //  Materials in solids4foam are always defined per cell (via cellZones),
-        //  independent of the discretisation order or the locations at which
-        //  stresses or strains are evaluated.
-        //  These lists are used to construct integration-point mappings and to
-        //  assemble cell-based material properties (e.g. density, bulk modulus).
+        //  Materials in solids4foam are always defined per cell (via
+        //  cellZones), independent of the discretisation order or the
+        //  locations at which stresses or strains are evaluated.
+        //  These lists are used to construct integration-point mappings and
+        //  to assemble cell-based material properties (e.g. density, bulk
+        //  modulus).
         List<labelList> lawCells_;
 
         //- Boundary patch face indices per mechanical constitutive law.
-        //  For each mechanicalConstitutiveLaw, this stores a list over boundary
-        //  patches, where each entry contains the local face indices (within that
-        //  patch) whose owner cell belongs to the corresponding law.
+        //  For each mechanicalConstitutiveLaw, this stores a list over
+        //  boundary patches, where each entry contains the local face indices
+        //  (within that patch) whose owner cell belongs to the corresponding
+        //  law.
         //  In other words:
-        //    lawBoundaryFaces_[lawI][patchI] gives the list of boundary faces on
-        //    patch patchI whose adjacent cell is assigned to law lawI.
+        //    lawBoundaryFaces_[lawI][patchI] gives the list of boundary faces
+        //    on patch patchI whose adjacent cell is assigned to law lawI.
         List<List<labelList>> lawBoundaryFaces_;
 
         //- Scratch fields for stress accumulation on surface fields
@@ -170,21 +168,21 @@ class mechanicalConstitutiveLawManager
         mutable HashTable<autoPtr<integrationPointTopology>> topologyCache_;
 
         //- Topology-specific constitutive data owned by the manager.
-        //  A topologyEntry groups together all data that depends on the *location*
-        //  of integration points (e.g. cell-centred, face-centred, vertex-centred,
-        //  or higher-order multi-point layouts).
+        //  A topologyEntry groups together all data that depends on the
+        //  *location* of integration points (e.g. cell-centred, face-centred,
+        //  vertex-centred, or higher-order multi-point layouts).
         //  For a given integrationPointTopology, this includes:
         //    - the mapping from mechanical laws to integration-point indices
         //      (lawIntegrationPointIDs),
-        //    - the constitutive state objects storing history variables at those
-        //      integration points, and
+        //    - the constitutive state objects storing history variables at
+        //      those integration points, and
         //    - optional boundary constitutive states where applicable.
         //  This indirection allows a single mechanicalConstitutiveLawManager to
         //  evaluate stresses at multiple locations (cells, faces, points, etc.)
         //  using the same material definitions, while keeping state variables
         //  strictly separated per topology.
-        //  Topology entries are constructed lazily on first use and cached for the
-        //  lifetime of the manager.
+        //  Topology entries are constructed lazily on first use and cached
+        //  for the lifetime of the manager.
         struct topologyEntry
         {
             //- The topology that defines this entry (non-owning)
@@ -202,6 +200,12 @@ class mechanicalConstitutiveLawManager
             //- True if this topology supports boundary integration points
             bool boundaryAware_;
 
+            //- Each law's convergence scale for the current evaluation,
+            //  reduced over every rank. Held here so that the boundary
+            //  evaluations use the same scale as the internal ones rather
+            //  than one taken over whichever faces this rank happens to hold
+            scalarList lawConvergenceScales_;
+
             //- Scratch storage for live coupling inputs, per law, keyed by
             //  field name. A law that asks for one is handed a view of its own
             //  integration points, and the storage is kept here rather than
@@ -216,13 +220,23 @@ class mechanicalConstitutiveLawManager
                 states_(),
                 boundaryStates_(),
                 boundaryAware_(false),
+                lawConvergenceScales_(),
                 lawScalarInputs_()
             {}
         };
 
         //- Cache of topology-specific integration-point data and state
-        //  Keyed by the address of the integrationPointTopology instance
+        //  Keyed as topologyCache_ is, by the name the topology was
+        //  registered under
         mutable HashTable<autoPtr<topologyEntry>> topologyEntries_;
+
+        //- Shape of the compact layout each compact topology was built
+        //  from, keyed as topologyCache_ is.
+        //  The key names the role and is identical on every rank; this
+        //  records the addressing behind it, so a second layout arriving
+        //  under the same role is refused rather than silently given the
+        //  first one's history
+        mutable HashTable<word> compactFingerprints_;
 
 
     // Private Member Functions
@@ -246,6 +260,24 @@ class mechanicalConstitutiveLawManager
                     << exit(FatalError);
             }
         }
+
+        //- Check that two compact layouts have the same rows, not merely the
+        //  same number of values.
+        //
+        //  Equal flattened lengths are not enough: row sizes of [2, 1] and
+        //  [1, 2] both hold three values, and flat index 1 is then the second
+        //  point of the first cell in one and the first point of the second
+        //  cell in the other. Nothing downstream can notice, because every
+        //  list is the length it should be and the addressing is implied by
+        //  the offsets rather than carried with the values
+        static void checkCompactRowSizes
+        (
+            const labelList& ref,
+            const word& refName,
+            const labelList& other,
+            const word& otherName,
+            const word& context
+        );
 
         //- Check the provided compact list sizes are consistent.
         //  Defined in the .C so that this header does not need the complete
@@ -335,11 +367,50 @@ class mechanicalConstitutiveLawManager
             const CompactListList<tensor>& layout
         ) const;
 
+        //- Each law's convergence scale, reduced over every rank.
+        //  Asked of every law whether or not this rank holds any of its
+        //  points, so that the number of reductions is the same everywhere
+        scalarList finiteStrainConvergenceScales
+        (
+            topologyEntry& tp,
+            const UList<tensor>& F,
+            const UList<tensor>& F0,
+            const UList<tensor>& Finv,
+            const UList<tensor>& Finv0,
+            const UList<scalar>& J,
+            const UList<scalar>& J0
+        ) const;
+
+        //- The key a topology is registered under in topologyCache_.
+        //
+        //  Identity is the registration key, not the object's address. The
+        //  address is not identity: it is reused once an object dies, and it
+        //  differs between ranks, so anything ordered by it - the collective
+        //  reduction in endTimeStep(), the restart file names - would order
+        //  differently on each rank and could pair one topology's history with
+        //  another's after a free and reallocate.
+        //
+        //  The address is still the right way to *find* the entry, because a
+        //  registered topology lives as long as the manager: comparing
+        //  addresses here is a membership test, which is sound, rather than a
+        //  persistent name, which is not.
+        //
+        //  Fatal if the topology is not one this manager owns. Every topology
+        //  reaches the manager through topologyFor(), registerTopology() or
+        //  compactCellTopologyFor(), all of which register it, so a topology
+        //  that is not in the cache is a caller holding an object the manager
+        //  never took ownership of, and its state would be silently unrelated
+        //  to any other
+        const word& topologyKeyFor(const integrationPointTopology& topo) const;
+
         //- Ensure a topology entry exists and return it
         topologyEntry& topology
         (
             const integrationPointTopology& topo
         ) const;
+
+        //- As above, by registration key
+        topologyEntry& topology(const word& key) const;
 
         //- Commit old-time state for all topology entries if needed
         //- Where a prescribed field is read from.
@@ -466,10 +537,15 @@ class mechanicalConstitutiveLawManager
 
         //- Register the persistent state of every law on this topology for
         //  writing, and on a restart read it back
+        //  Named by the key the topology was registered under, not by its
+        //  class name: two topologies of one class under different keys keep
+        //  their own history, and naming the files by class would have them
+        //  overwrite and then restore each other's
         void setupStateRestart
         (
             topologyEntry& entry,
-            const integrationPointTopology& topo
+            const integrationPointTopology& topo,
+            const word& topologyKey
         ) const;
 
         //- One law's persistent state, recursing into any child states
@@ -948,6 +1024,12 @@ public:
         //  lifetime of the manager.
         //  The key shares a namespace with the run-time selectable topology
         //  type names, so it must not collide with one.
+        //  It must also be the same word on every rank. The key is what
+        //  names this topology's state and orders the end-of-step
+        //  reduction, so a key built from something rank-local - a cell
+        //  count, a local digest - would have the ranks reduce in
+        //  different orders. endTimeStep() checks this and stops, but it
+        //  cannot repair it.
         //  The call is idempotent: registering a key that is already present
         //  returns the topology already held and discards the supplied one.
         //  This matters because constitutive state is keyed on the topology
@@ -1163,14 +1245,15 @@ public:
         //  gradients and the supplied time increment, and written in-place to
         //  the packed integration-point storage.
         //  Constitutive history variables are updated internally via
-        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  mechanicalConstitutiveLawState objects associated with each
+        //  material.
         //  This interface is intended for higher-order or multi-point
         //  formulations, e.g. Gauss-point-based discretisations.
         //  Optionally computes an approximate scalar material tangent defined
         //  per integration point when requested.
         //  Requirement:
-        //    - All CompactListList inputs must share identical offsets and total
-        //      size.
+        //    - All CompactListList inputs must share identical offsets and
+        //      total size.
         void updateStressSmallStrain
         (
             const CompactListList<tensor>& gradD,
@@ -1214,7 +1297,8 @@ public:
         //  increment, and written in-place to the packed integration-point
         //  storage.
         //  Constitutive history variables are updated internally via
-        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  mechanicalConstitutiveLawState objects associated with each
+        //  material.
         //  This interface is intended for higher-order or multi-point
         //  formulations, e.g. Gauss-point-based discretisations.
         //  Optionally computes an approximate scalar material tangent defined

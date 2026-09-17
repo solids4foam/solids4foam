@@ -36,6 +36,10 @@ Description
 SourceFiles
     linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw.C
 
+Author
+    Tian Tang, DTU.
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw_H

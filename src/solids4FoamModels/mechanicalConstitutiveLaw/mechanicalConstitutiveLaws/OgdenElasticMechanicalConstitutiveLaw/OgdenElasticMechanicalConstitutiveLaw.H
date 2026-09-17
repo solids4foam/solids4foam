@@ -32,6 +32,10 @@ Description
 SourceFiles
     OgdenElasticMechanicalConstitutiveLaw.C
 
+Author
+    Joszef Nagy, Eulerian Solutions.
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef OgdenElasticMechanicalConstitutiveLaw_H

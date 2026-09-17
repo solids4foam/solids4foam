@@ -75,6 +75,9 @@ Description
 SourceFiles
     neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw_H
@@ -92,7 +95,7 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-             Class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw Declaration
+   Class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw Declaration
 \*---------------------------------------------------------------------------*/
 
 class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
@@ -237,6 +240,14 @@ public:
         //- Finite-strain constitutive evaluation.
         //  There is deliberately no small-strain overload: this law is
         //  formulated multiplicatively and has no small-strain form
+        //- Largest trial elastic strain over this law's points, which the
+        //  manager reduces and hands back as the convergence scale
+        virtual scalar localConvergenceScale
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const;
+
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,

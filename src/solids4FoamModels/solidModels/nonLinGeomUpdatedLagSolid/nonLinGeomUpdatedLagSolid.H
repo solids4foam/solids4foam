@@ -110,7 +110,6 @@ class nonLinGeomUpdatedLagSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
-#ifndef FOAMEXTEND
         //- Total deformation gradient at the face quadrature points at the
         //  start of the time step
         //  Only used by the high-order approach: the updated Lagrangian
@@ -122,7 +121,6 @@ class nonLinGeomUpdatedLagSolid
         //  Only used by the high-order approach: this is what the mechanical
         //  law expects, as opposed to the relative gradient held in gradDQuad()
         mutable autoPtr<CompactListList<tensor>> gradDTotalQuadPtr_;
-#endif
 
 
     // Private Member Functions
@@ -131,7 +129,6 @@ class nonLinGeomUpdatedLagSolid
         //  previous time-steps
         void predict();
 
-#ifndef FOAMEXTEND
         //- Allocate the quadrature point deformation gradient fields
         void makeQuadratureKinematics() const;
 
@@ -143,7 +140,6 @@ class nonLinGeomUpdatedLagSolid
         //- Store the current total deformation gradient at the face quadrature
         //  points as the reference for the next time step
         void storeQuadratureKinematicsOldTime() const;
-#endif
 
         //- Allocate the reciprocal of the bulk modulus
         void makeRKappa() const;

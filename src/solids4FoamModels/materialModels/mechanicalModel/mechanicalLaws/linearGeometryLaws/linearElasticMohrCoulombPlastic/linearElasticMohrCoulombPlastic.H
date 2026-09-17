@@ -157,6 +157,11 @@ class linearElasticMohrCoulombPlastic
 
     // Private Member Functions
 
+        //- Read the frictionAngle entry from the dictionary and check that it
+        //  is not at or near zero, as the derived parameters are singular in
+        //  that limit
+        static dimensionedScalar readFrictionAngle(const dictionary& dict);
+
         //- Calculate the stress
         void calculateStress(symmTensor& sigma, scalar& activeYield) const;
 

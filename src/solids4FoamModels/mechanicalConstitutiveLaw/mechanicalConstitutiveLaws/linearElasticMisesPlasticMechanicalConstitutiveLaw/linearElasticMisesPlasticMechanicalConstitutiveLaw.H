@@ -48,6 +48,9 @@ Description
 SourceFiles
     linearElasticMisesPlasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef linearElasticMisesPlasticMechanicalConstitutiveLaw_H
@@ -64,7 +67,7 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-             Class linearElasticMisesPlasticMechanicalConstitutiveLaw Declaration
+     Class linearElasticMisesPlasticMechanicalConstitutiveLaw Declaration
 \*---------------------------------------------------------------------------*/
 
 class linearElasticMisesPlasticMechanicalConstitutiveLaw

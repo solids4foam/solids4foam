@@ -4,17 +4,17 @@ sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 ifdef PETSC_DIR
-    ifeq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
-        ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
-            include $(GENERAL_RULES)/mplibType
-        else
-            include $(GENERAL_RULES)/mpi-rules
-        endif
-        VERSION_SPECIFIC_INC += \
-            $(PINC) -I$(PETSC_DIR)/include \
-            -I$(PETSC_DIR)/$(PETSC_ARCH)/include -DUSE_PETSC
-        VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
+    ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+        include $(RULES)/mplib$(WM_MPLIB)
+    else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
+        include $(GENERAL_RULES)/mplibType
+    else
+        include $(GENERAL_RULES)/mpi-rules
     endif
+    VERSION_SPECIFIC_INC += \
+        $(PINC) -I$(PETSC_DIR)/include \
+        -I$(PETSC_DIR)/$(PETSC_ARCH)/include -DUSE_PETSC
+    VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
 endif
 
 EXE_INC = \

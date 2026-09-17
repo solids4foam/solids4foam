@@ -19,15 +19,17 @@ Class
     thermalSolid
 
 Description
-    Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed.
+    Heat-conduction-only solid model: the transient heat equation is solved for
+    the temperature field T, using the run-time selectable thermal model for the
+    specific heat capacity and thermal conductivity.
 
-    The heat equation and momentum equation are solved in a strongly coupled
-    fashion i.e. just like in solidDisplacementFoam.
+    No mechanical problem is solved: there is no momentum equation, no
+    displacement, strain or stress solution, and tractionBoundarySnGrad()
+    returns a zero field. The mechanical law is only consulted for the density
+    used in the heat capacity term.
 
-    The stress is calculated by the run-time selectable mechanical law.
-
-    Added functions required for CHT explicit coupling
+    This model is intended for the solid side of conjugate heat transfer, where
+    it provides the functions required for explicit CHT coupling.
 
 Author
     Philip Cardiff, UCD.
@@ -87,7 +89,7 @@ class thermalSolid
 
     // Private Member Functions
 
-        //- Check if the momentum equation is converged
+        //- Check if the heat equation is converged
         bool converged
         (
             const int iCorr,

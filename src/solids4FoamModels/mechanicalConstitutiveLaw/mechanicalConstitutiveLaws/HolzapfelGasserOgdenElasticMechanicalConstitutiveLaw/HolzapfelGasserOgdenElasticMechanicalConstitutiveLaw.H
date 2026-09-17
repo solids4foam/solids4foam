@@ -89,6 +89,10 @@ Description
 SourceFiles
     HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw.C
 
+Author
+    Zeljko Tukovic, FSB Zagreb.
+    Ported by Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw_H

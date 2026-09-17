@@ -451,7 +451,6 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
 }
 
 
-#ifndef FOAMEXTEND
 const Foam::leastSquaresScheme&
 Foam::solidModel::displacementLeastSquares() const
 {
@@ -493,8 +492,10 @@ void Foam::solidModel::makeSigmaQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -513,10 +514,8 @@ void Foam::solidModel::makeSigmaQuad() const
         }
     }
 }
-#endif
 
 
-#ifndef FOAMEXTEND
 void Foam::solidModel::makeGradDQuad() const
 {
     if (!gradDQuadPtr_.empty())
@@ -525,8 +524,10 @@ void Foam::solidModel::makeGradDQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -545,7 +546,6 @@ void Foam::solidModel::makeGradDQuad() const
         }
     }
 }
-#endif
 
 
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
@@ -1364,15 +1364,6 @@ Foam::solidModel::solidModel
         highOrderResidual_ =
             hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
 
-#ifdef FOAMEXTEND
-        if (highOrderJacobian_ || highOrderResidual_)
-        {
-            FatalErrorInFunction
-                << "High-order MLS discretisation is not supported on "
-                << "foam-extend." << abort(FatalError);
-        }
-#endif
-
         if
         (
             (highOrderJacobian_ || highOrderResidual_)
@@ -2154,7 +2145,6 @@ void Foam::solidModel::setTraction
     }
 }
 
-#ifndef FOAMEXTEND
 void Foam::solidModel::setTractionQuadrature
 (
     fvPatchVectorField& tractionPatch,
@@ -2176,7 +2166,6 @@ void Foam::solidModel::setTractionQuadrature
             << solidTractionFvPatchVectorField::typeName << abort(FatalError);
     }
 }
-#endif
 
 
 void Foam::solidModel::setTraction
@@ -2270,9 +2259,7 @@ void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
-#ifndef FOAMEXTEND
     leastSquaresReconstruction::New(mesh()).clear();
-#endif
 }
 
 

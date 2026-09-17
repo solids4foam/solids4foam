@@ -31,9 +31,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
-#ifndef FOAMEXTEND
-    #include "hofvm.H"
-#endif
+#include "hofvm.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -96,7 +94,6 @@ void nonLinGeomUpdatedLagSolid::predict()
 }
 
 
-#ifndef FOAMEXTEND
 void nonLinGeomUpdatedLagSolid::makeQuadratureKinematics() const
 {
     if (!FQuadOldPtr_.empty() || !gradDTotalQuadPtr_.empty())
@@ -105,8 +102,10 @@ void nonLinGeomUpdatedLagSolid::makeQuadratureKinematics() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -140,9 +139,9 @@ void nonLinGeomUpdatedLagSolid::updateQuadratureKinematics() const
 
     // Displacement increment gradient at the face quadrature points, i.e. the
     // gradient relative to the configuration at the start of the time step
-    const CompactListList<tensor>& gradDDQuad = gradDQuad();
+    auto& gradDDQuad = compactListListCRef(gradDQuad());
 
-    const CompactListList<tensor>& FQuadOld = FQuadOldPtr_();
+    auto& FQuadOld = compactListListCRef(FQuadOldPtr_());
     CompactListList<tensor>& gradDTotalQuad = gradDTotalQuadPtr_();
 
     forAll(gradDTotalQuad, faceI)
@@ -175,7 +174,7 @@ void nonLinGeomUpdatedLagSolid::storeQuadratureKinematicsOldTime() const
         makeQuadratureKinematics();
     }
 
-    const CompactListList<tensor>& gradDTotalQuad = gradDTotalQuadPtr_();
+    auto& gradDTotalQuad = compactListListCRef(gradDTotalQuadPtr_());
     CompactListList<tensor>& FQuadOld = FQuadOldPtr_();
 
     forAll(FQuadOld, faceI)
@@ -189,7 +188,6 @@ void nonLinGeomUpdatedLagSolid::storeQuadratureKinematicsOldTime() const
         }
     }
 }
-#endif
 
 
 void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
@@ -226,10 +224,11 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 
             if (highOrderResidual())
             {
-#ifndef FOAMEXTEND
                 // Face quadrature points weights
-                const CompactListList<scalar>& faceQuadWeights =
-                    displacementLeastSquares().quadrature().faceQuadWeights();
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
 
                 const surfaceScalarField& magSf = mesh().magSf();
 
@@ -237,8 +236,10 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
                 autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
                     tracPatch.evaluateQuadrature();
 
-                const CompactListList<vector>& quadratureValues =
-                    patchQuadraturePointsValue();
+                auto& quadratureValues = compactListListCRef
+                (
+                    patchQuadraturePointsValue()
+                );
 
                 forAll(mesh().boundaryMesh()[patchI], faceI)
                 {
@@ -261,7 +262,6 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
                     tracP[faceI] *=
                         (1.0/(magSf.boundaryField()[patchI][faceI]));
                 }
-#endif
             }
             else
             {
@@ -534,7 +534,6 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update the kinematic fields using the high-order gradient
         gradDD() = displacementLeastSquares().grad(DD());
         relF_ = I + gradDD().T();
@@ -1163,7 +1162,6 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 
 label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
 {
-#ifndef FOAMEXTEND
     if (highOrderJacobian())
     {
         // Note: the non-zero structure is preallocated from the moving least
@@ -1183,7 +1181,6 @@ label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
             blockSize_
         );
     }
-#endif
 
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
@@ -1257,13 +1254,11 @@ label nonLinGeomUpdatedLagSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Update cell-centre displacement increment gradient
         gradDD() = displacementLeastSquares().grad(DD);
 
         // Update displacement increment gradient at the face quadrature points
         mechanical().grad(DD, gradDQuad());
-#endif
     }
     else
     {
@@ -1300,7 +1295,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         // Accumulate the total deformation gradient at the face quadrature
         // points, as the mechanical law expects the total displacement gradient
         updateQuadratureKinematics();
@@ -1405,7 +1399,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
     //surfaceVectorField traction(n & fvc::interpolate(sigma()));
     surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
-#ifndef FOAMEXTEND
     if (highOrderResidual())
     {
         // Replace the Cauchy traction (force per unit deformed area) with the
@@ -1418,7 +1411,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // relative deformation gradient, as required here
         traction = hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), mesh());
     }
-#endif
 
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
@@ -1455,9 +1447,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
 
     if (highOrderResidual())
     {
-#ifndef FOAMEXTEND
         residual -= rho()*hofvc::d2dt2(D());
-#endif
     }
     else
     {
@@ -1577,7 +1567,6 @@ label nonLinGeomUpdatedLagSolid::formJacobian
 
     if (highOrderJacobian())
     {
-#ifndef FOAMEXTEND
         // Note: unlike the fallback fvVectorMatrix approxJ path below, we do
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
@@ -1661,7 +1650,6 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
         );
-#endif
     }
     else
     {
@@ -1782,14 +1770,12 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     // Density
     rho_ = rho_.oldTime()/relJ_;
 
-#ifndef FOAMEXTEND
     if (highOrderResidual())
     {
         // Store the total deformation gradient at the face quadrature points:
         // it is the reference for the accumulation in the next time step
         storeQuadratureKinematicsOldTime();
     }
-#endif
 
     // Move the mesh to the deformed configuration
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1799,7 +1785,6 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #endif
     moveMesh(oldPoints, pointDD());
 
-#ifndef FOAMEXTEND
     if (highOrderResidual() || highOrderJacobian())
     {
         // The least-squares stencils, quadrature points and reconstruction
@@ -1829,7 +1814,6 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
         // cleared, as the quadrature points move with the material
         clearLeastSquaresData();
     }
-#endif
 
     // One or the other, not both. The base call runs the legacy laws'
     // end-of-step work, which is not the no-op it looks like -

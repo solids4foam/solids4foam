@@ -110,12 +110,10 @@ select_approach() {
             ;;
         highOrder)
             echo "Using the highOrder approach"
-            solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "highOrder"
             ;;
         highOrderJacobian)
             echo "Using the highOrderJacobian testing approach"
-            solids4Foam::caseDoesNotRunWithFoamExtend
             link_files_for_suffix "highOrderJacobian"
             ;;
     esac
