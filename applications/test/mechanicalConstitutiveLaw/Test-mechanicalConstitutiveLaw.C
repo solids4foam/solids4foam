@@ -75,6 +75,9 @@ Author
 #include "Switch.H"
 #include "IOmanip.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLaw.H"
+#include "finiteStrainMechanicalConstitutiveLawKinematics.H"
+#include "OFstream.H"
 
 using namespace Foam;
 
@@ -2163,6 +2166,208 @@ int main(int argc, char *argv[])
         }
 
         FatalError.dontThrowExceptions();
+    }
+
+    // ---------------------------------------------------------------------
+    // The convergence scale a plastic law reports to the manager
+    //
+    // A law that normalises its Newton tolerance by a scale over its points
+    // cannot reduce for itself: the manager evaluates a law only where this
+    // rank holds its points, and which points that is depends on the
+    // decomposition, so the reductions would not pair up. The law reports a
+    // local value and the manager reduces once per law.
+    //
+    // These check the value reported, and the property that makes reducing
+    // it with max the right thing to do. The law is constructed directly
+    // rather than through the manager, because no solid model drives the
+    // framework at this point in the stack and the arithmetic is what is at
+    // issue.
+    // ---------------------------------------------------------------------
+    {
+        // More than two points in the hardening table is what makes the law
+        // non-linearly plastic, and so ask for a scale at all
+        const fileName tableName
+        (
+            runTime.constant()/"Test-convergenceScaleHardening"
+        );
+        {
+            OFstream os(tableName);
+            os  << "(" << nl
+                << "    (0      1.0e9)" << nl
+                << "    (0.001  1.1e9)" << nl
+                << "    (0.01   1.3e9)" << nl
+                << ")" << endl;
+        }
+
+        dictionary lawDict;
+        lawDict.add("type", word("neoHookeanElasticMisesPlastic"));
+        lawDict.add("rho", dimensionedScalar("rho", dimDensity, 7800.0));
+        lawDict.add("E", dimensionedScalar("E", dimPressure, 200e9));
+        lawDict.add("nu", dimensionedScalar("nu", dimless, 0.3));
+        lawDict.add("outOfBounds", word("clamp"));
+
+        // Spelled both ways: OpenFOAM.com's interpolationTable reads "file"
+        // and foam-extend's reads "fileName"
+        lawDict.add("file", tableName);
+        lawDict.add("fileName", tableName);
+
+        autoPtr<mechanicalConstitutiveLaw> plasticPtr
+        (
+            mechanicalConstitutiveLaw::New(lawDict)
+        );
+
+        // Two points: the first undeformed, the second stretched by two
+        // along x, so the larger value comes from the second and the checks
+        // see which point was taken as well as what was computed
+        const label nPts = 2;
+
+        List<tensor> Fs(nPts, tensor::I);
+        Fs[1] = tensor(2, 0, 0, 0, 1, 0, 0, 0, 1);
+
+        const List<tensor> F0s(nPts, tensor::I);
+        const List<tensor> Finvs(nPts, tensor::I);
+        const List<tensor> Finv0s(nPts, tensor::I);
+
+        List<scalar> Js(nPts, 1.0);
+        Js[1] = 2.0;
+
+        const List<scalar> J0s(nPts, 1.0);
+
+        mechanicalConstitutiveLawState plasticState(nPts);
+        plasticState.symmTensorField0("bEbar") = symmTensor::I;
+
+        labelList allPts(nPts);
+        forAll(allPts, i)
+        {
+            allPts[i] = i;
+        }
+
+        const labelList firstPt(1, label(0));
+        const labelList secondPt(1, label(1));
+        const labelList noPts;
+
+        scalarList scales(4, 0.0);
+        const labelList* sets[4] =
+        {
+            &allPts, &firstPt, &secondPt, &noPts
+        };
+
+        for (label s = 0; s < 4; ++s)
+        {
+            const labelList& pts = *sets[s];
+
+            const UIndirectList<tensor> FView(Fs, pts);
+            const UIndirectList<tensor> F0View(F0s, pts);
+            const UIndirectList<tensor> FinvView(Finvs, pts);
+            const UIndirectList<tensor> Finv0View(Finv0s, pts);
+            const UIndirectList<scalar> JView(Js, pts);
+            const UIndirectList<scalar> J0View(J0s, pts);
+
+            const finiteStrainMechanicalConstitutiveLawKinematics kin
+            (
+                FView, F0View, JView, J0View, FinvView, Finv0View
+            );
+
+            scales[s] = plasticPtr->localConvergenceScale(kin, plasticState);
+        }
+
+        const scalar scaleAll = scales[0];
+        const scalar scaleFirst = scales[1];
+        const scalar scaleSecond = scales[2];
+        const scalar scaleNone = scales[3];
+
+        // 1. Closed form.
+        //
+        //    bEbar0, F0 and Finv0 are all the identity, so
+        //    relFbar = (J/J0)^(-1/3) F and the quantity is
+        //    |symm(relFbar & relFbar^T)|.
+        //
+        //    Undeformed: relFbar = I, symm(I) = I, |I| = sqrt(3).
+        //    Stretched:  relFbar = 2^(-1/3) diag(2,1,1), so
+        //                relFbar & relFbar^T = 2^(-2/3) diag(4,1,1), whose
+        //                magnitude is 2^(-2/3) sqrt(16 + 1 + 1)
+        const scalar expectedFirst = Foam::sqrt(3.0);
+        const scalar expectedSecond =
+            Foam::pow(2.0, -2.0/3.0)*Foam::sqrt(18.0);
+
+        reportError
+        (
+            "the plastic convergence scale matches the closed form",
+            max
+            (
+                mag(scaleFirst - expectedFirst)/expectedFirst,
+                mag(scaleSecond - expectedSecond)/expectedSecond
+            ),
+            1e-10
+        );
+
+        // The larger value is the stretched point, so this also says which
+        // point the maximum was taken from
+        report
+        (
+            "the plastic convergence scale is taken over all the points",
+            mag(scaleAll - expectedSecond)/expectedSecond < 1e-10
+         && expectedSecond > expectedFirst
+        );
+
+        // 2. The scale over a set of points is the largest of the scales over
+        //    any partition of it. That is what makes reducing with max across
+        //    ranks give the answer a serial run gives, and it is the part a
+        //    serial test can still check
+        report
+        (
+            "the plastic convergence scale reduces by max over a partition",
+            mag(max(scaleFirst, scaleSecond) - scaleAll) < 1e-10*scaleAll
+        );
+
+        // 3. A rank holding none of this law's points reports nothing, rather
+        //    than a value that would win the reduction
+        report
+        (
+            "a law with no points reports no convergence scale",
+            mag(scaleNone) < SMALL
+        );
+
+        // 4. A law that needs no scale reports none, which is what makes
+        //    asking every law harmless
+        {
+            dictionary elasticDict;
+            elasticDict.add("type", word("linearElastic"));
+            elasticDict.add
+            (
+                "rho", dimensionedScalar("rho", dimDensity, 7800.0)
+            );
+            elasticDict.add("E", dimensionedScalar("E", dimPressure, 200e9));
+            elasticDict.add("nu", dimensionedScalar("nu", dimless, 0.3));
+
+            autoPtr<mechanicalConstitutiveLaw> elasticPtr
+            (
+                mechanicalConstitutiveLaw::New(elasticDict)
+            );
+
+            const UIndirectList<tensor> FView(Fs, allPts);
+            const UIndirectList<tensor> F0View(F0s, allPts);
+            const UIndirectList<tensor> FinvView(Finvs, allPts);
+            const UIndirectList<tensor> Finv0View(Finv0s, allPts);
+            const UIndirectList<scalar> JView(Js, allPts);
+            const UIndirectList<scalar> J0View(J0s, allPts);
+
+            const finiteStrainMechanicalConstitutiveLawKinematics kin
+            (
+                FView, F0View, JView, J0View, FinvView, Finv0View
+            );
+
+            mechanicalConstitutiveLawState elasticState(nPts);
+
+            report
+            (
+                "a law that needs no convergence scale reports none",
+                mag(elasticPtr->localConvergenceScale(kin, elasticState))
+              < SMALL
+            );
+        }
+
+        Foam::rm(tableName);
     }
 
     // ---------------------------------------------------------------------
