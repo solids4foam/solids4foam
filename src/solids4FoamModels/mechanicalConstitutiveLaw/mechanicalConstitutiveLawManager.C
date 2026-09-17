@@ -456,11 +456,6 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
             << exit(FatalError);
     }
 
-    // We know this is cell-based compact storage:
-    //  - one sub-list per cell
-    //  - integration-point counts encoded in sub-list sizes
-    const labelList rowSizes(layout.sizes());
-
     // The key names the role, and is a literal, so it is the same word on
     // every rank. That matters because endTimeStep() sorts these keys and
     // reduces per entry: a key built from this rank's cell count or from a

@@ -557,7 +557,6 @@ bool linGeomTotalDispSolid::evolveSnes()
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
         correctStress();
-#endif
     }
     else
     {

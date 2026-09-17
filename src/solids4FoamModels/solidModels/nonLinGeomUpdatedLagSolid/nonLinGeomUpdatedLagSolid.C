@@ -550,7 +550,6 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
         correctStress();
-#endif
     }
 
     // Interpolate cell displacements to vertices
@@ -1307,7 +1306,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // The residual uses the quadrature point stress, but the cell-centre
         // stress is still required by tractionBoundarySnGrad
         correctStress();
-#endif
     }
     else
     {

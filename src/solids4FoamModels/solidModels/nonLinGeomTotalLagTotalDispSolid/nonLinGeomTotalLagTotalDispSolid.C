@@ -731,7 +731,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
         // Calculate the cell centre stress using run-time selectable
         // mechanical law
         correctStress();
-#endif
     }
 
     // Interpolate cell displacements to vertices
@@ -1497,7 +1496,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
         // Calculate sigma at the face quadrature points
         correctStressQuad();
-#endif
     }
     else
     {
