@@ -4257,31 +4257,26 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                 &counts
             );
 
-            if (diagnostics.empty())
-            {
-                continue;
-            }
+            // Not skipped where the law reported nothing. endTimeStep() is
+            // the hook a law commits or rolls over anything storeOldTime()
+            // does not, and nothing in its interface ties that to also
+            // reporting a diagnostic. Returning early here would call it on
+            // the internal points and not on the boundary ones, which is a
+            // wrong answer exactly where it is hardest to see. Only the
+            // reduction and the reporting below depend on there being
+            // anything to report
 
             // The boundary states
             if (tp.boundaryAware_ && lawI < tp.boundaryStates_.size())
             {
                 forAll(tp.boundaryStates_[lawI], patchI)
                 {
-                    // A coupled patch is not counted. Where it is evaluated
-                    // at all - the face-centred topology does, because a
-                    // processor face carries a stress only this rank can
-                    // compute - the face is held by both ranks, so counting
-                    // it here would put the same faces in the total twice,
-                    // once from each side, and make the total depend on how
-                    // the mesh was cut: this case reports 380 integration
-                    // points in serial and would report 458 on four ranks
-                    if (mesh_.boundary()[patchI].coupled())
-                    {
-                        continue;
-                    }
-
                     DynamicList<mechanicalConstitutiveLawDiagnostic> patchDiags;
 
+                    // Every patch, coupled or not. This is the law's hook for
+                    // committing its own end-of-step work, and a coupled
+                    // patch's state is as real as any other where the
+                    // topology evaluates one
                     endTimeStepLaw
                     (
                         laws_[lawI],
@@ -4293,6 +4288,20 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                         nullptr,
                         nullptr
                     );
+
+                    // A coupled patch is not counted, though. Where it is
+                    // evaluated at all - the face-centred topology does,
+                    // because a processor face carries a stress only this
+                    // rank can compute - the face is held by both ranks, so
+                    // counting it here would put the same faces in the total
+                    // twice, once from each side, and make the total depend
+                    // on how the mesh was cut: this case reports 380
+                    // integration points in serial and would report 458 on
+                    // four ranks
+                    if (mesh_.boundary()[patchI].coupled())
+                    {
+                        continue;
+                    }
 
                     if (patchDiags.size() != diagnostics.size())
                     {
@@ -4310,6 +4319,8 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                             << exit(FatalError);
                     }
 
+                    // Nothing to combine where the law reports nothing; the
+                    // hook above has run either way
                     forAll(diagnostics, d)
                     {
                         // Names and operations too, not just the count. Two
