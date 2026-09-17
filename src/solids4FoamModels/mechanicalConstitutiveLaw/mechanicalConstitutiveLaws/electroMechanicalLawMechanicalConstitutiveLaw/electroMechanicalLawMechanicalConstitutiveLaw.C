@@ -188,7 +188,16 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     // alone: the active term is added above, after that tangent was computed,
     // and is itself deformation dependent through F and J. Recomputed here
     // over the whole stress, so that the tangent belongs to the stress the
-    // caller is handed
+    // caller is handed.
+    //
+    // The scalar tangent is not recomputed and so does not see the active
+    // tension. That matches the legacy electroMechanicalLaw, whose impK()
+    // returns the passive law's, and it costs iterations rather than accuracy:
+    // the scalar tangent is the segregated solver's stiffness estimate, not a
+    // quantity the answer depends on. Worth revisiting once the active tension
+    // modelling settles - a single isotropic number for a stress that acts
+    // along the fibre is a crude place to put it, and there is no
+    // finite-difference scalar tangent in the base class to take it from
     if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
     {
         finiteDifferenceFourthOrder(kin, inputs, state, response);
