@@ -27,6 +27,7 @@ License
 #include "mat66.H"
 #include "Switch.H"
 #include "CompactListList.H"
+#include <cstdint>
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -41,6 +42,29 @@ namespace Foam
 
 namespace Foam
 {
+
+// A 64-bit FNV-1a digest of a list of row sizes, used to key a compact
+// integration-point topology on the shape of the layout that produced it.
+// Spelled out rather than taken from a fork's hasher, which the three
+// supported forks do not agree on
+std::uint64_t rowSizesHash(const labelUList& rowSizes)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(rowSizes, i)
+    {
+        const std::uint64_t v = static_cast<std::uint64_t>(rowSizes[i]);
+
+        for (int byteI = 0; byteI < 8; ++byteI)
+        {
+            h ^= (v >> (8*byteI)) & 0xFFULL;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    return h;
+}
+
 
 // Combine one diagnostic into another, by the operation it carries
 void combineDiagnostic
@@ -341,15 +365,21 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
             << exit(FatalError);
     }
 
-    // Unique key per layout instance
+    // We know this is cell-based compact storage:
+    //  - one sub-list per cell
+    //  - integration-point counts encoded in sub-list sizes
+    const labelList rowSizes(layout.sizes());
+
+    // The topology built below is a function of the row sizes alone: the
+    // integration-point indices are just the flat positions those sizes imply.
+    // So the key is the shape, not the address of the layout object. Keying on
+    // the address would hand a later layout the topology of an earlier one
+    // that happened to live at the same place, with no way to notice
     const word key =
-        (cellBased ? "compactCell:" : "compactFace:") + Foam::name
-        (
-            static_cast<std::uint64_t>
-            (
-                reinterpret_cast<std::uintptr_t>(&layout)
-            )
-        );
+        (cellBased ? "compactCell:" : "compactFace:")
+      + Foam::name(rowSizes.size()) + ":"
+      + Foam::name(layout.m().size()) + ":"
+      + Foam::name(rowSizesHash(rowSizes));
 
     // Already constructed?
     if (topologyCache_.found(key))
@@ -359,12 +389,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 
     // Construct topology lazily
 
-    // We know this is cell-based compact storage:
-    //  - one sub-list per cell
-    //  - integration-point counts encoded in sub-list sizes
-
     // Build cell → IP addressing
-    const labelList rowSizes(layout.sizes());
 
     CompactListList<label> cellToIP(rowSizes);
 
