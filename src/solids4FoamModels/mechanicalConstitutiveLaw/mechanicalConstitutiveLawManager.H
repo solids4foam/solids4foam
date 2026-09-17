@@ -984,6 +984,12 @@ public:
         //  lifetime of the manager.
         //  The key shares a namespace with the run-time selectable topology
         //  type names, so it must not collide with one.
+        //  It must also be the same word on every rank. The key is what
+        //  names this topology's state and orders the end-of-step
+        //  reduction, so a key built from something rank-local - a cell
+        //  count, a local digest - would have the ranks reduce in
+        //  different orders. endTimeStep() checks this and stops, but it
+        //  cannot repair it.
         //  The call is idempotent: registering a key that is already present
         //  returns the topology already held and discards the supplied one.
         //  This matters because constitutive state is keyed on the topology
