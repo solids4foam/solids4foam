@@ -34,6 +34,18 @@ Description
     a child state of its own, exactly as poroMechanicalLaw's effective stress
     law does.
 
+    Tangents. The active stress is added after the passive law has run, so a
+    tangent that law wrote describes the passive response only. A
+    fourthOrderFiniteDifference request is therefore recomputed here over the
+    whole stress, and the analytical fourth-order request is refused rather
+    than answered with the passive part of the answer.
+
+    The scalar tangent is the passive law's, and the active tension is not in
+    it. That one is a stiffness estimate for the segregated solver rather than
+    a quantity the answer depends on, so it costs iterations rather than
+    accuracy, and there is no finite-difference scalar tangent in the base
+    class to recompute it with. Said here rather than silently.
+
 SourceFiles
     electroMechanicalLawMechanicalConstitutiveLaw.C
 

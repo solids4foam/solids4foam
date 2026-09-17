@@ -183,6 +183,28 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
         // The active second Piola-Kirchhoff stress pushed forward to Cauchy
         sigma[i] += symm(F[i] & (Ta*f0f0) & F[i].T())/J[i];
     }
+
+    // Whatever tangent the passive law wrote describes the passive stress
+    // alone: the active term is added above, after that tangent was computed,
+    // and is itself deformation dependent through F and J. Recomputed here
+    // over the whole stress, so that the tangent belongs to the stress the
+    // caller is handed
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "The passive law may supply one, but the active tension is "
+            << "added to the stress after it, and depends on the deformation, "
+            << "so that tangent would describe part of this law's response "
+            << "while appearing to describe all of it." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
+    }
 }
 
 
