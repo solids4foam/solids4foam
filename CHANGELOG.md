@@ -30,6 +30,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
+  solver does not currently run: no tutorial selected it, so nothing exercised
+  it, an attempt to give it one failed inside the PETSc solve, and its
+  `useGeometricStiffness`, `compactImplicitStencil` and `tangentEps` entries
+  have no defaults and are set by no case. Selecting that runtime type now
+  fails to construct the solid model rather than failing inside it. Both build
+  lists carry the reason in a comment, and the solver's sources and `README.md`
+  are untouched. It is withdrawn rather than removed: the intention is to
+  revisit it once the mechanical constitutive law framework has landed, at
+  which point restoring it is a matter of uncommenting the entry in both
+  files.
 - Removed `tutorials/fluidSolidInteraction-preCICE`, which held standalone
   `3dTube` and `flexibleOversetCylinder` preCICE cases that were not covered by
   any test. solids4foam's preCICE cases are now maintained upstream in the
