@@ -3152,67 +3152,70 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         {
             forAll(gradD.boundaryField(), patchI)
             {
-                if (!gradD.boundaryField()[patchI].coupled())
+                // Coupled patches are included. A processor face carries a
+                // real stress that only this rank can compute: unlike a
+                // volField, a surface field's coupled patch is not filled in
+                // by correctBoundaryConditions(), so skipping it would leave
+                // the stress there at zero
+
+                // Select all faces on the patch for which the adjacent
+                // cell is in this material
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
                 {
-                    // Select all faces on the patch for which the adjacent
-                    // cell is in this material
-                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                    if
-                    (
-                        faces.empty()
-                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                    )
-                    {
-                        continue;
-                    }
-
-                    // "View" into the kinematic and stress fields for this
-                    // material => does not copy data
-                    const UIndirectList<tensor> gradDView
-                    (
-                        gradD.boundaryField()[patchI], faces
-                    );
-                    const UIndirectList<tensor> gradD0View
-                    (
-                        gradD0.boundaryField()[patchI], faces
-                    );
-                    UIndirectList<symmTensor> stressView
-                    (
-                        Foam::boundaryFieldRef(stress)[patchI], faces
-                    );
-
-                    // Create wrapper for kinematic data: input to material law
-                    // This does not copy data
-                    smallStrainMechanicalConstitutiveLawKinematics kin
-                    (
-                        gradDView, gradD0View
-                    );
-
-                    // No fourth-order tangent is computed on this boundary,
-                    // so a request for one becomes a request for nothing. The
-                    // law must not be told a fourth-order tangent is wanted
-                    // when there is nowhere to put it
-                    const tangentRequest boundaryReq =
-                        scalarTangentPtr && needsScalarTangent(tangentReq)
-                      ? tangentReq
-                      : tangentRequest::none;
-
-                    evaluateResponse
-                    (
-                        laws_[lawI],
-                        kin,
-                        inputs,
-                        tp.boundaryStates_[lawI][patchI],
-                        stressView,
-                        faces,
-                        scalarTangentPtr
-                      ? &scalarTangentPtr->boundaryField()[patchI]
-                      : nullptr,
-                        static_cast<const UList<mat66>*>(nullptr),
-                        boundaryReq
-                    );
+                    continue;
                 }
+
+                // "View" into the kinematic and stress fields for this
+                // material => does not copy data
+                const UIndirectList<tensor> gradDView
+                (
+                    gradD.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> gradD0View
+                (
+                    gradD0.boundaryField()[patchI], faces
+                );
+                UIndirectList<symmTensor> stressView
+                (
+                    Foam::boundaryFieldRef(stress)[patchI], faces
+                );
+
+                // Create wrapper for kinematic data: input to material law
+                // This does not copy data
+                smallStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    gradDView, gradD0View
+                );
+
+                // No fourth-order tangent is computed on this boundary,
+                // so a request for one becomes a request for nothing. The
+                // law must not be told a fourth-order tangent is wanted
+                // when there is nowhere to put it
+                const tangentRequest boundaryReq =
+                    scalarTangentPtr && needsScalarTangent(tangentReq)
+                  ? tangentReq
+                  : tangentRequest::none;
+
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    tp.boundaryStates_[lawI][patchI],
+                    stressView,
+                    faces,
+                    scalarTangentPtr
+                  ? &scalarTangentPtr->boundaryField()[patchI]
+                  : nullptr,
+                    static_cast<const UList<mat66>*>(nullptr),
+                    boundaryReq
+                );
             }
         }
     }
@@ -4030,14 +4033,14 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
             {
                 forAll(tp.boundaryStates_[lawI], patchI)
                 {
-                    // A coupled patch has a state allocated but never
-                    // evaluated - the evaluation loops skip it, because the
-                    // cell on the other side belongs to another rank and
-                    // computes it there. Counting it here would put the same
-                    // faces in the total twice, once from each side, and make
-                    // the total depend on how the mesh was cut: this case
-                    // reports 380 integration points in serial and would
-                    // report 458 on four ranks
+                    // A coupled patch is not counted. Where it is evaluated
+                    // at all - the face-centred topology does, because a
+                    // processor face carries a stress only this rank can
+                    // compute - the face is held by both ranks, so counting
+                    // it here would put the same faces in the total twice,
+                    // once from each side, and make the total depend on how
+                    // the mesh was cut: this case reports 380 integration
+                    // points in serial and would report 458 on four ranks
                     if (mesh_.boundary()[patchI].coupled())
                     {
                         continue;
