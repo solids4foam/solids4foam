@@ -44,6 +44,7 @@ Author
 
 #include "integrationPointTopology.H"
 #include "CompactListList.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

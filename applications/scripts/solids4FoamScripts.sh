@@ -927,7 +927,7 @@ function solids4Foam::runParallel()
     local appArgs="-parallel"
 
     local mpirun="mpirun"
-    if [ "$FOAM_MPI" = msmpi ]
+    if [ "${FOAM_MPI:-}" = msmpi ]
     then
         mpirun="mpiexec"
     fi

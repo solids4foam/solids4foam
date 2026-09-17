@@ -67,7 +67,6 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
-
 #include "mechanicalConstitutiveLawManager.H"
 #include "mechanicalConstitutiveLawInputs.H"
 #include "integrationPointTopologies.H"
@@ -2250,7 +2249,6 @@ int main(int argc, char *argv[])
 
     return 1;
 }
-
 
 
 // ************************************************************************* //

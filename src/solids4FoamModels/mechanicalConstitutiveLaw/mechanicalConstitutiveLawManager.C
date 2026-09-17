@@ -319,7 +319,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Already constructed?
     if (topologyCache_.found(topologyTypeName))
     {
-        return topology(topologyCache_[topologyTypeName]()).topology_;
+        return topology(autoPtrRef(topologyCache_[topologyTypeName])).topology_;
     }
 
     // Lazily construct via OpenFOAM runtime selection
@@ -339,7 +339,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Cache and return
     topologyCache_.insert(topologyTypeName, topoPtr);
 
-    return topology(topologyCache_[topologyTypeName]()).topology_;
+    return topology(autoPtrRef(topologyCache_[topologyTypeName])).topology_;
 }
 
 
@@ -384,7 +384,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     // Already constructed?
     if (topologyCache_.found(key))
     {
-        return topology(topologyCache_[key]()).topology_;
+        return topology(autoPtrRef(topologyCache_[key])).topology_;
     }
 
     // Construct topology lazily
@@ -424,7 +424,7 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     // Cache and return
     topologyCache_.insert(key, topoPtr);
 
-    return topology(topologyCache_[key]()).topology_;
+    return topology(autoPtrRef(topologyCache_[key])).topology_;
 }
 
 
@@ -443,7 +443,7 @@ Foam::mechanicalConstitutiveLawManager::topology
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
     {
-        return topologyEntries_[key]();
+        return autoPtrRef(topologyEntries_[key]);
     }
 
     // ---------------------------------------------------------------------
@@ -455,7 +455,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
     autoPtr<topologyEntry> entryPtr(new topologyEntry(topo));
     topologyEntries_.insert(key, entryPtr);
-    topologyEntry& entry = topologyEntries_[key]();
+    topologyEntry& entry = autoPtrRef(topologyEntries_[key]);
 
     const label nLaws = laws_.size();
 
@@ -1500,7 +1500,7 @@ void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
         // Loop over all topology entries
         forAllIters(topologyEntries_, topoIter)
         {
-            topologyEntry& entry = topoIter()();
+            topologyEntry& entry = autoPtrRef(topoIter());
 
             // Internal states
             forAll(entry.states_, lawI)
@@ -2000,7 +2000,8 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
     // Already registered?
     if (topologyCache_.found(key))
     {
-        const integrationPointTopology& existing = topologyCache_[key]();
+        const integrationPointTopology& existing =
+            autoPtrRef(topologyCache_[key]);
 
         if (existing.type() != topoPtr->type())
         {
@@ -2022,7 +2023,7 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
 
     topologyCache_.insert(key, topoPtr);
 
-    return topology(topologyCache_[key]()).topology_;
+    return topology(autoPtrRef(topologyCache_[key])).topology_;
 }
 
 

@@ -73,7 +73,8 @@ Type movingLeastSquares::evaluateAtPoint
 
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
-    const CompactListList<label>& stencils = stencil().cellsStencil();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
 
     // Construct all coefficient tables collectively before checking for the
     // negative cell marker used by parallel point evaluation.
@@ -154,8 +155,10 @@ tmp<GeometricField<
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<vector>& gradCoeffs = this->cellGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& gradCoeffs =
+        compactListListCRef(this->cellGradCoeffs());
 
     const UList<Type>& vfI = vf.internalField();
     const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
@@ -183,7 +186,7 @@ tmp<GeometricField<
         )
     );
 
-    GeometricField<GradType, fvPatchField, volMesh>& grad = tGrad.ref();
+    GeometricField<GradType, fvPatchField, volMesh>& grad = tmpRef(tGrad);
 
     forAll(stencils, cellI)
     {
@@ -247,9 +250,16 @@ void movingLeastSquares::fGrad
     const fvMesh& mesh = mesh_;
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
-    const CompactListList<point>& faceQuadPts = quadrature().faceQuadPoints();
-    const CompactListList<label>& stencils = faceGradStencil();
+    auto& faceQuadPts =
+        compactListListCRef(quadrature().faceQuadPoints());
+    auto& stencils =
+        compactListListCRef(faceGradStencil());
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& fGradCoeffs =
+        const_cast<List<CompactListList<vector>>&>(this->faceGradCoeffs());
+#else
     const List<CompactListList<vector>>& fGradCoeffs = this->faceGradCoeffs();
+#endif
 
     // Get values from remote processors
     const Field<Type>& vfI = vf.internalField();
@@ -267,7 +277,7 @@ void movingLeastSquares::fGrad
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
         const UList<label>& stencil = stencils[faceI];
-        const auto& coeffs = fGradCoeffs[faceI];
+        auto& coeffs = fGradCoeffs[faceI];
 
         forAll(faceQuadPts[faceI], qpI)
         {
@@ -304,7 +314,9 @@ void movingLeastSquares::fGrad
         if
         (
             isA<symmetryPolyPatch>(pp)
+#ifndef FOAMEXTEND
          || isA<symmetryPlanePolyPatch>(pp)
+#endif
         )
         {
             const vectorField patchNormals(mesh.boundary()[patchI].nf());
@@ -313,7 +325,7 @@ void movingLeastSquares::fGrad
             {
                 const label globalFaceID = patchStart + faceI;
                 const auto stencil = stencils[globalFaceID];
-                const auto& coeffs = fGradCoeffs[globalFaceID];
+                auto& coeffs = fGradCoeffs[globalFaceID];
 
                 const label stencilSize = stencil.size();
                 const vector& faceNormal = patchNormals[faceI];
@@ -352,7 +364,7 @@ void movingLeastSquares::fGrad
             {
                 const label globalFaceID = patchStart + faceI;
                 const auto stencil = stencils[globalFaceID];
-                const auto& coeffs = fGradCoeffs[globalFaceID];
+                auto& coeffs = fGradCoeffs[globalFaceID];
 
                 forAll(faceQuadPts[globalFaceID], qpI)
                 {
@@ -390,13 +402,17 @@ void movingLeastSquares::fGrad
             // Values at patch faces quadrature points
             autoPtr<CompactListList<Type>> patchFaceQuadValsPtr =
                 patchFaceQuadValues(vf, patchI);
+#ifdef FOAMEXTEND
+            CompactListList<Type>& quadVal = autoPtrRef(patchFaceQuadValsPtr);
+#else
             const CompactListList<Type>& quadVal = patchFaceQuadValsPtr();
+#endif
 
             forAll(pf, faceI)
             {
                 const label globalFaceID = patchStart + faceI;
                 const auto stencil = stencils[globalFaceID];
-                const auto& coeffs = fGradCoeffs[globalFaceID];
+                auto& coeffs = fGradCoeffs[globalFaceID];
                 const label ghostPointID = stencil.size();
 
                 forAll(faceQuadPts[globalFaceID], qpI)

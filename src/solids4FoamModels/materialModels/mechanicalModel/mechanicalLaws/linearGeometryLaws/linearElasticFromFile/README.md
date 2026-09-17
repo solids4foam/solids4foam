@@ -11,19 +11,6 @@ Young's modulus field from disk. The runtime type is:
 linearElasticFromFile
 ```
 
-```warning
-The shear term of this law appears to be twice the Hookean value. It sets
-`mu = E/(1 + nu)`, whereas the shear modulus is `E/(2*(1 + nu))`, and then
-forms the stress as `mu*twoSymm(grad(D))`, which is `2*mu*epsilon`. The
-resulting deviatoric stress is therefore `2*E/(1 + nu)*epsilon` rather than
-`E/(1 + nu)*epsilon`. For comparison, `linearElastic` sets
-`mu = E/(2*(1 + nu))` for the same stress expression. The volumetric term and
-the `planeStress` handling are correct. Treat results from this law with
-caution until this is resolved; `linearElasticCt` contains the same
-expression. This is tracked as
-[issue #335](https://github.com/solids4foam/solids4foam/issues/335).
-```
-
 ---
 
 ## User Guide
@@ -34,7 +21,7 @@ The law reads the `E` field and evaluates the elastic coefficients as
 implemented:
 
 ```text
-mu     = E/(1 + nu)
+mu     = E/(2*(1 + nu))
 lambda = E*nu/((1 + nu)*(1 - 2*nu))        // plane strain / 3-D
 lambda = E*nu/((1 + nu)*(1 - nu))          // planeStress yes
 
@@ -110,7 +97,7 @@ distribution used by the law.
 
 - `E`: cell-wise Young's modulus, read from the current time directory and
   marked for automatic writing.
-- `mu`: cell-wise coefficient `E/(1 + nu)`.
+- `mu`: cell-wise shear modulus `E/(2*(1 + nu))`.
 - `lambda`: cell-wise first Lame coefficient, with the plane-stress form used
   when requested.
 - `muf_`, `lambdaf_`: face interpolations of `mu` and `lambda`, calculated

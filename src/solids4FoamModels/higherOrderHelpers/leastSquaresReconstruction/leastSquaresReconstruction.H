@@ -47,12 +47,16 @@ namespace Foam
 
 class leastSquaresReconstruction
 :
+#ifdef FOAMEXTEND
+    public MeshObject<fvMesh, leastSquaresReconstruction>
+#else
     public MeshObject
     <
         fvMesh,
         UpdateableMeshObject,
         leastSquaresReconstruction
     >
+#endif
 {
     // Private data
 
@@ -101,11 +105,23 @@ public:
         //- Clear geometry-dependent data in constructed schemes
         void clear() const;
 
+#ifdef FOAMEXTEND
+        //- Clear geometry-dependent data after mesh motion
+        virtual bool movePoints() const;
+
+        //- Delete constructed schemes after a topology change
+        virtual bool updateMesh(const mapPolyMesh& mpm) const;
+
+        //- Delete from the registry without dispatching through an fvMesh
+        //  whose derived lifetime has ended during polyMesh destruction
+        virtual bool deleteObject() const;
+#else
         //- Clear geometry-dependent data after mesh motion
         virtual bool movePoints();
 
         //- Delete constructed schemes after a topology change
         virtual void updateMesh(const mapPolyMesh& mpm);
+#endif
 };
 
 
