@@ -188,8 +188,9 @@ public:
         virtual dimensionedScalar kappa() const
         {
             FatalErrorInFunction
-                << "Bulk modulus (kapp) not defined for mechanical constitutive "
-                << "law of type " << type() << exit(FatalError);
+                << "Bulk modulus (kapp) not defined for mechanical "
+                << "constitutive law of type " << type()
+                << exit(FatalError);
 
             // Keep the compiler happy.
             // Note: dimensioned<Type> has no default constructor in

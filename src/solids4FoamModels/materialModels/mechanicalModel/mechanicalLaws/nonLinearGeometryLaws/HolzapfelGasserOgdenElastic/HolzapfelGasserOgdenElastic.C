@@ -282,7 +282,8 @@ Foam::HolzapfelGasserOgdenElastic::shearModulus() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::HolzapfelGasserOgdenElastic::bulkModulus() const
+Foam::tmp<Foam::volScalarField>
+Foam::HolzapfelGasserOgdenElastic::bulkModulus() const
 {
     return tmp<volScalarField>
     (
@@ -654,7 +655,10 @@ void Foam::HolzapfelGasserOgdenElastic::calcEffectiveShearModulus()
             tensor newF = FI[cellI] + DF;
 
             symmTensor newDevSigma = symmTensor::zero;
-            calcDevCauchy(newF, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma);
+            calcDevCauchy
+            (
+                newF, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma
+            );
 
             // Trsnform from global to local CS
             newDevSigma = symm(pVectors & newDevSigma & pVectorsT);
@@ -691,7 +695,10 @@ void Foam::HolzapfelGasserOgdenElastic::calcEffectiveShearModulus()
             tensor newFI = FI[cellI] + DF;
 
             symmTensor newDevSigma = symmTensor::zero;
-            calcDevCauchy(newFI, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma);
+            calcDevCauchy
+            (
+                newFI, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma
+            );
 
             // Trsnform from global to local CS
             newDevSigma = symm(pVectors & newDevSigma & pVectorsT);
@@ -727,7 +734,10 @@ void Foam::HolzapfelGasserOgdenElastic::calcEffectiveShearModulus()
             tensor newFI = FI[cellI] + DF;
 
             symmTensor newDevSigma = symmTensor::zero;
-            calcDevCauchy(newFI, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma);
+            calcDevCauchy
+            (
+                newFI, EcI[cellI], EaI[cellI], ErI[cellI], newDevSigma
+            );
 
             // Trsnform from global to local CS
             newDevSigma = symm(pVectors & newDevSigma & pVectorsT);

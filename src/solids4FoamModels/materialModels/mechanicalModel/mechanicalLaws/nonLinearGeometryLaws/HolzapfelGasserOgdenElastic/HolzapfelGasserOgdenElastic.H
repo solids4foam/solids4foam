@@ -115,7 +115,8 @@ class HolzapfelGasserOgdenElastic
 
     // Private Member Functions
 
-        //- Calculate the stress on faces (shared by correct(surfaceSymmTensorField&))
+        //- Calculate the stress on faces
+        //  Shared by correct(surfaceSymmTensorField&)
         void correctF
         (
             surfaceSymmTensorField& sigma,

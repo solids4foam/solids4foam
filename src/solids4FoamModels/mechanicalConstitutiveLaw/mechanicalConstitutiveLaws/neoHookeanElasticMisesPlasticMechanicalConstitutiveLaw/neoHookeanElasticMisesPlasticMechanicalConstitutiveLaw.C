@@ -258,7 +258,8 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy neoHookeanElasticMisesPlastic
+    // Plane stress is not supported, matching the legacy
+    // neoHookeanElasticMisesPlastic
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
@@ -588,7 +589,8 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
 }
 
 
-void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::reportDiagnostics
+void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::
+reportDiagnostics
 (
     const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const

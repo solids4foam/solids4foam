@@ -124,7 +124,8 @@ void reportError
 //- Largest difference between two lists, relative to the largest magnitude in
 //  either of them.
 //  Both are used to set the scale so that a result which wrongly collapses to
-//  zero still reports a relative error of order one rather than of order 1/SMALL
+//  zero still reports a relative error of order one rather than of
+//  order 1/SMALL
 template<class Type>
 scalar relativeDifference(const UList<Type>& a, const UList<Type>& b)
 {
@@ -484,14 +485,28 @@ int main(int argc, char *argv[])
 
         volTensorField Fd
         (
-            IOobject("Fd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            IOobject
+            (
+                "Fd",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
             mesh,
             dimensionedTensor("I", dimless, I)
         );
         volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
         volScalarField Jd
         (
-            IOobject("Jd", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            IOobject
+            (
+                "Jd",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
             mesh,
             dimensionedScalar("one", dimless, 1.0)
         );
@@ -499,13 +514,27 @@ int main(int argc, char *argv[])
 
         volSymmTensorField isoStress
         (
-            IOobject("isoStress", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            IOobject
+            (
+                "isoStress",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
             mesh,
             dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
         );
         volScalarField volResponse
         (
-            IOobject("volResponse", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+            IOobject
+            (
+                "volResponse",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
             mesh,
             dimensionedScalar("0", dimPressure, 0.0)
         );
@@ -676,14 +705,28 @@ int main(int argc, char *argv[])
 
             volTensorField Fd
             (
-                IOobject("Fu", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                IOobject
+                (
+                    "Fu",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
                 mesh,
                 dimensionedTensor("I", dimless, I)
             );
             volTensorField Fd0(Fd), Finvd(Fd), Finvd0(Fd);
             volScalarField Jd
             (
-                IOobject("Ju", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                IOobject
+                (
+                    "Ju",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
                 mesh,
                 dimensionedScalar("one", dimless, 1.0)
             );
@@ -691,13 +734,27 @@ int main(int argc, char *argv[])
 
             volSymmTensorField isoStress
             (
-                IOobject("isoU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                IOobject
+                (
+                    "isoU",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
                 mesh,
                 dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
             );
             volScalarField volResponse
             (
-                IOobject("volU", runTime.timeName(), mesh, IOobject::NO_READ, IOobject::NO_WRITE),
+                IOobject
+                (
+                    "volU",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
                 mesh,
                 dimensionedScalar("0", dimPressure, 0.0)
             );
@@ -993,19 +1050,19 @@ int main(int argc, char *argv[])
         }
 
         Info<< nl
-            << "============================================================"
+            << "========================================================="
             << nl;
 
         if (nFailed_ == 0)
         {
             Info<< "All mechanicalConstitutiveLaw checks passed" << nl
-                << "============================================================"
+                << "========================================================="
                 << nl << nl << "End" << nl << endl;
             return 0;
         }
 
         Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
-            << "============================================================"
+            << "========================================================="
             << nl << endl;
 
         return 1;
@@ -1074,7 +1131,8 @@ int main(int argc, char *argv[])
 
         volSymmTensorField sigmaLong("sigmaLong", sigmaInst);
 
-        const scalar tauMin = min(scalarList(lawDict.lookup("relaxationTimes")));
+        const scalar tauMin =
+            min(scalarList(lawDict.lookup("relaxationTimes")));
 
         manager.updateStressSmallStrain
         (
@@ -1124,13 +1182,13 @@ int main(int argc, char *argv[])
             << "evaluates a small-strain" << nl << "kinematics, so they are "
             << "skipped." << nl;
 
-        Info<< nl << "============================================================"
+        Info<< nl << "========================================================="
             << nl;
 
         if (nFailed_ == 0)
         {
             Info<< "All mechanicalConstitutiveLaw checks passed" << nl
-                << "============================================================"
+                << "========================================================="
                 << nl << endl;
 
             Info<< "End\n" << endl;
@@ -1139,7 +1197,7 @@ int main(int argc, char *argv[])
         }
 
         Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
-            << "============================================================"
+            << "========================================================="
             << nl << endl;
 
         return 1;
@@ -2172,13 +2230,13 @@ int main(int argc, char *argv[])
     // ---------------------------------------------------------------------
 
 
-    Info<< nl << "============================================================"
+    Info<< nl << "========================================================="
         << nl;
 
     if (nFailed_ == 0)
     {
         Info<< "All mechanicalConstitutiveLaw checks passed" << nl
-            << "============================================================"
+            << "========================================================="
             << nl << endl;
 
         Info<< "End\n" << endl;
@@ -2187,7 +2245,7 @@ int main(int argc, char *argv[])
     }
 
     Info<< nFailed_ << " mechanicalConstitutiveLaw check(s) FAILED" << nl
-        << "============================================================"
+        << "========================================================="
         << nl << endl;
 
     return 1;

@@ -46,6 +46,10 @@ Description
 SourceFiles
     poroMechanicalLawMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+    Inspired by Denis Maier, BAW, code design suggestions.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef poroMechanicalLawMechanicalConstitutiveLaw_H

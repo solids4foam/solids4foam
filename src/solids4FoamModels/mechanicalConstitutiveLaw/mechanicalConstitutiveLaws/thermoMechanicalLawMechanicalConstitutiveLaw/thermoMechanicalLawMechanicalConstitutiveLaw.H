@@ -41,6 +41,10 @@ Description
 SourceFiles
     thermoMechanicalLawMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+    Inspired by Denis Maier, BAW, code design suggestions.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef thermoMechanicalLawMechanicalConstitutiveLaw_H

@@ -70,13 +70,19 @@ viscousHookeanElasticMechanicalConstitutiveLaw
     C1_
     (
         williamsLandelFerryShift_
-      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C1"))
+      ? dimensionedScalar
+        (
+            dict.subDict("WilliamsLandelFerryCoeffs").lookup("C1")
+        )
       : dimensionedScalar("C1", dimless, 0.0)
     ),
     C2_
     (
         williamsLandelFerryShift_
-      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C2"))
+      ? dimensionedScalar
+        (
+            dict.subDict("WilliamsLandelFerryCoeffs").lookup("C2")
+        )
       : dimensionedScalar("C2", dimTemperature, 0.0)
     ),
     Tref_
@@ -167,7 +173,10 @@ viscousHookeanElasticMechanicalConstitutiveLaw
     // The deviatoric response is instantaneous and relaxes; the volumetric
     // response is the long-term one. This follows the legacy law exactly,
     // including that lambda is built from EInfinity rather than E0
-    const Switch planeStress(dict.lookupOrDefault<Switch>("planeStress", false));
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
 
     mu_ = E0/(2.0*(1.0 + nu_));
 

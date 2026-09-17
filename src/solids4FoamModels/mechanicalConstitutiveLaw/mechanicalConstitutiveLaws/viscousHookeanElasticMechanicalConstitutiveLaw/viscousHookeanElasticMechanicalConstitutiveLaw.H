@@ -54,6 +54,9 @@ Description
 SourceFiles
     viscousHookeanElasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef viscousHookeanElasticMechanicalConstitutiveLaw_H

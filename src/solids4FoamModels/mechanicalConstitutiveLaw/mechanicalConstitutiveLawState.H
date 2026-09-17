@@ -158,7 +158,6 @@ class mechanicalConstitutiveLawState
             const word& name
         ) const;
 
-
         //- Fatal error if this state is a shadow, for operations that would
         //  write history
         void checkNotShadow(const word& what) const;
@@ -170,10 +169,13 @@ class mechanicalConstitutiveLawState
 
     // No copy
 
+        //- No copy construct
         mechanicalConstitutiveLawState
         (
             const mechanicalConstitutiveLawState&
         ) = delete;
+
+        //- No copy assignment
         void operator=(const mechanicalConstitutiveLawState&) = delete;
 
 
@@ -235,6 +237,8 @@ public:
 
     // Access
 
+        //- Return the number of integration points each state field is
+        //  sized to
         label size() const
         {
             return size_;
@@ -273,7 +277,8 @@ public:
     // than historical. The vector, tensor and symmTensor blocks below repeat
     // the same pattern, so this is the only place it is spelled out.
     //
-    //   xField(name)    creates the field if it is not there
+    //   xField(name)    creates the field if it is not there, when called
+    //                   on a non-const state; the const overload fails
     //   getXField(name) fails if the field is not there
     //
     // A law wants the first when it is declaring what history it keeps -
@@ -290,22 +295,26 @@ public:
     // of the previous step, and are what a history-dependent law integrates
     // from.
     //
-    // On a shadow state - see isShadow() - the old-time accessors read the
-    // parent's fields, while the current-time ones are the shadow's own. That
+    // On a shadow state - see isShadow() - the const old-time accessors read
+    // the parent's fields, while the current-time ones are the shadow's own.
+    // Writing an old-time field through a shadow is a fatal error. That
     // is what lets a tangent query perturb a law without disturbing the
     // history it will be asked to integrate for real afterwards.
 
         //- Current-time scalar field, created zeroed if absent
         Field<scalar>& scalarField(const word& name);
 
-        //- As above, const. Still creates: the state is mutable inside
+        //- As above, const. Does not create: fatal if it was never
+        //  declared
         const Field<scalar>& scalarField(const word& name) const;
 
-        //- Old-time scalar field, created zeroed if absent. On a shadow this
-        //  is the parent's field
+        //- Old-time scalar field, created zeroed if absent.
+        //  Fatal on a shadow: only current-time fields may be written
+        //  through a shadow
         Field<scalar>& scalarField0(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create; on a shadow this reads the
+        //  parent's field
         const Field<scalar>& scalarField0(const word& name) const;
 
         //- Current-time scalar field, fatal if it was never declared
@@ -323,14 +332,17 @@ public:
         //- Current-time vector field, created zeroed if absent
         Field<vector>& vectorField(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create: fatal if it was never
+        //  declared
         const Field<vector>& vectorField(const word& name) const;
 
-        //- Old-time vector field, created zeroed if absent. On a shadow this is
-        //  the parent's field
+        //- Old-time vector field, created zeroed if absent.
+        //  Fatal on a shadow: only current-time fields may be written
+        //  through a shadow
         Field<vector>& vectorField0(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create; on a shadow this reads the
+        //  parent's field
         const Field<vector>& vectorField0(const word& name) const;
 
         //- Current-time vector field, fatal if it was never declared
@@ -348,14 +360,17 @@ public:
         //- Current-time tensor field, created zeroed if absent
         Field<tensor>& tensorField(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create: fatal if it was never
+        //  declared
         const Field<tensor>& tensorField(const word& name) const;
 
-        //- Old-time tensor field, created zeroed if absent. On a shadow this is
-        //  the parent's field
+        //- Old-time tensor field, created zeroed if absent.
+        //  Fatal on a shadow: only current-time fields may be written
+        //  through a shadow
         Field<tensor>& tensorField0(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create; on a shadow this reads the
+        //  parent's field
         const Field<tensor>& tensorField0(const word& name) const;
 
         //- Current-time tensor field, fatal if it was never declared
@@ -373,14 +388,17 @@ public:
         //- Current-time symmTensor field, created zeroed if absent
         Field<symmTensor>& symmTensorField(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create: fatal if it was never
+        //  declared
         const Field<symmTensor>& symmTensorField(const word& name) const;
 
-        //- Old-time symmTensor field, created zeroed if absent. On a shadow this is
-        //  the parent's field
+        //- Old-time symmTensor field, created zeroed if absent.
+        //  Fatal on a shadow: only current-time fields may be written
+        //  through a shadow
         Field<symmTensor>& symmTensorField0(const word& name);
 
-        //- As above, const
+        //- As above, const. Does not create; on a shadow this reads the
+        //  parent's field
         const Field<symmTensor>& symmTensorField0(const word& name) const;
 
         //- Current-time symmTensor field, fatal if it was never declared

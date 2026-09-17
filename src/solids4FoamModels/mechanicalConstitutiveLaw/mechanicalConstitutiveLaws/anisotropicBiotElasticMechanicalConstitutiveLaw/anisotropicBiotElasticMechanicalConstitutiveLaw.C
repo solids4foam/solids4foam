@@ -185,10 +185,9 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
             sigma[i][symmTensor::XY] = A44_*e12;
 
             // The reduced constants above are the plane stress ones, so the
-            // out-of-plane components are zero by construction. The legacy law
-            // left them untouched instead, which did not come to the same
-            // thing: under poroMechanicalLaw the value standing there is the
-            // seeded effective stress, not zero
+            // out-of-plane components are zero by construction. Written
+            // rather than left: under poroMechanicalLaw the value standing
+            // there is the seeded effective stress, not zero
             sigma[i][symmTensor::ZZ] = 0.0;
             sigma[i][symmTensor::YZ] = 0.0;
             sigma[i][symmTensor::XZ] = 0.0;

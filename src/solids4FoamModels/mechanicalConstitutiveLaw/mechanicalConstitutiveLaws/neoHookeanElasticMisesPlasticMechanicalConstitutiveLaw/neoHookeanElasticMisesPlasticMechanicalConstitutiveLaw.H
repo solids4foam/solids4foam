@@ -75,6 +75,9 @@ Description
 SourceFiles
     neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw_H
@@ -92,7 +95,7 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-             Class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw Declaration
+   Class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw Declaration
 \*---------------------------------------------------------------------------*/
 
 class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw

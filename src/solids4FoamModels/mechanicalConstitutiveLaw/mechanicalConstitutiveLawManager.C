@@ -3255,9 +3255,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 // This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
 // has no evaluate(), so correctBoundaryConditions() does not compile for a
-// SURFACE field there. It compiles and is needed for volFields, where the
-// guard was previously applied too and silently left the boundary values
-// uncorrected on that fork
+// SURFACE field there. It compiles and is needed for volFields
 #ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
@@ -3627,43 +3625,43 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     }
 
 
-                    // "View" into the J for this material => does not copy data
+                    // View into J for this material => does not copy data
                     const UIndirectList<scalar> JView
                     (
                         J.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the J0 for this material => does not copy data
+                    // View into J0 for this material => does not copy data
                     const UIndirectList<scalar> J0View
                     (
                         J0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the F for this material => does not copy data
+                    // View into F for this material => does not copy data
                     const UIndirectList<tensor> FView
                     (
                         F.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the F0 for this material => does not copy data
+                    // View into F0 for this material => does not copy data
                     const UIndirectList<tensor> F0View
                     (
                         F0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the Finv for this material => does not copy data
+                    // View into Finv for this material => does not copy data
                     const UIndirectList<tensor> FinvView
                     (
                         Finv.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the Finv0 for this material => does not copy data
+                    // View into Finv0 for this material => does not copy data
                     const UIndirectList<tensor> Finv0View
                     (
                         Finv0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the stress for this material => does not copy data
+                    // View into stress for this material => does not copy data
                     UIndirectList<symmTensor> stressView
                     (
                         Foam::boundaryFieldRef(stress)[patchI], faces
@@ -4027,9 +4025,7 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                 continue;
             }
 
-            // The boundary states, which used to be skipped entirely because
-            // the laws reduced for themselves and could not be called once
-            // per patch without hanging
+            // The boundary states
             if (tp.boundaryAware_ && lawI < tp.boundaryStates_.size())
             {
                 forAll(tp.boundaryStates_[lawI], patchI)

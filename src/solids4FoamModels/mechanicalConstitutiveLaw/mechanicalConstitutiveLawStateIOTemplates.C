@@ -609,7 +609,8 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
                     << "The constitutive state was written with collated file "
                     << "handling, into " << dirs[i] << '.' << nl
                     << "This reads the state from a processorN directory per "
-                    << "rank, which is what the uncollated handler writes." << nl
+                    << "rank, which is what the uncollated handler writes."
+                    << nl
                     << "Re-run the parallel leg with"
                     << " -fileHandler uncollated, or reconstruct it with a "
                     << "handler that writes the state where this can find it."

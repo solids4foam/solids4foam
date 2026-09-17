@@ -34,11 +34,6 @@ Description
     to field location, mesh topology, and region selection are handled
     exclusively at this level.
 
-    In its initial form, the manager supports a single constitutive law
-    applied to the entire domain. This functionality may be extended
-    incrementally to support multiple laws, multiple regions, boundary
-    contributions, and tangent-related quantities.
-
     Notes:
     - Constitutive laws are stateless; all history variables are stored
       in mechanicalConstitutiveLawState objects owned by the manager.
@@ -122,20 +117,22 @@ class mechanicalConstitutiveLawManager
 
         //- Cell indices defining the material support for each mechanical
         //  constitutive law.
-        //  Materials in solids4foam are always defined per cell (via cellZones),
-        //  independent of the discretisation order or the locations at which
-        //  stresses or strains are evaluated.
-        //  These lists are used to construct integration-point mappings and to
-        //  assemble cell-based material properties (e.g. density, bulk modulus).
+        //  Materials in solids4foam are always defined per cell (via
+        //  cellZones), independent of the discretisation order or the
+        //  locations at which stresses or strains are evaluated.
+        //  These lists are used to construct integration-point mappings and
+        //  to assemble cell-based material properties (e.g. density, bulk
+        //  modulus).
         List<labelList> lawCells_;
 
         //- Boundary patch face indices per mechanical constitutive law.
-        //  For each mechanicalConstitutiveLaw, this stores a list over boundary
-        //  patches, where each entry contains the local face indices (within that
-        //  patch) whose owner cell belongs to the corresponding law.
+        //  For each mechanicalConstitutiveLaw, this stores a list over
+        //  boundary patches, where each entry contains the local face indices
+        //  (within that patch) whose owner cell belongs to the corresponding
+        //  law.
         //  In other words:
-        //    lawBoundaryFaces_[lawI][patchI] gives the list of boundary faces on
-        //    patch patchI whose adjacent cell is assigned to law lawI.
+        //    lawBoundaryFaces_[lawI][patchI] gives the list of boundary faces
+        //    on patch patchI whose adjacent cell is assigned to law lawI.
         List<List<labelList>> lawBoundaryFaces_;
 
         //- Scratch fields for stress accumulation on surface fields
@@ -170,21 +167,21 @@ class mechanicalConstitutiveLawManager
         mutable HashTable<autoPtr<integrationPointTopology>> topologyCache_;
 
         //- Topology-specific constitutive data owned by the manager.
-        //  A topologyEntry groups together all data that depends on the *location*
-        //  of integration points (e.g. cell-centred, face-centred, vertex-centred,
-        //  or higher-order multi-point layouts).
+        //  A topologyEntry groups together all data that depends on the
+        //  *location* of integration points (e.g. cell-centred, face-centred,
+        //  vertex-centred, or higher-order multi-point layouts).
         //  For a given integrationPointTopology, this includes:
         //    - the mapping from mechanical laws to integration-point indices
         //      (lawIntegrationPointIDs),
-        //    - the constitutive state objects storing history variables at those
-        //      integration points, and
+        //    - the constitutive state objects storing history variables at
+        //      those integration points, and
         //    - optional boundary constitutive states where applicable.
         //  This indirection allows a single mechanicalConstitutiveLawManager to
         //  evaluate stresses at multiple locations (cells, faces, points, etc.)
         //  using the same material definitions, while keeping state variables
         //  strictly separated per topology.
-        //  Topology entries are constructed lazily on first use and cached for the
-        //  lifetime of the manager.
+        //  Topology entries are constructed lazily on first use and cached
+        //  for the lifetime of the manager.
         struct topologyEntry
         {
             //- The topology that defines this entry (non-owning)
@@ -1163,14 +1160,15 @@ public:
         //  gradients and the supplied time increment, and written in-place to
         //  the packed integration-point storage.
         //  Constitutive history variables are updated internally via
-        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  mechanicalConstitutiveLawState objects associated with each
+        //  material.
         //  This interface is intended for higher-order or multi-point
         //  formulations, e.g. Gauss-point-based discretisations.
         //  Optionally computes an approximate scalar material tangent defined
         //  per integration point when requested.
         //  Requirement:
-        //    - All CompactListList inputs must share identical offsets and total
-        //      size.
+        //    - All CompactListList inputs must share identical offsets and
+        //      total size.
         void updateStressSmallStrain
         (
             const CompactListList<tensor>& gradD,
@@ -1214,7 +1212,8 @@ public:
         //  increment, and written in-place to the packed integration-point
         //  storage.
         //  Constitutive history variables are updated internally via
-        //  mechanicalConstitutiveLawState objects associated with each material.
+        //  mechanicalConstitutiveLawState objects associated with each
+        //  material.
         //  This interface is intended for higher-order or multi-point
         //  formulations, e.g. Gauss-point-based discretisations.
         //  Optionally computes an approximate scalar material tangent defined

@@ -211,7 +211,8 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy linearElasticMisesPlastic
+    // Plane stress is not supported, matching the legacy
+    // linearElasticMisesPlastic
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary

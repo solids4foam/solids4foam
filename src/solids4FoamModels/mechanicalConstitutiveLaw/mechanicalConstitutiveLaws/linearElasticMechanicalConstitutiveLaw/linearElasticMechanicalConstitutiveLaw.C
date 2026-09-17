@@ -125,7 +125,10 @@ linearElasticMechanicalConstitutiveLaw
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
-    const Switch planeStress(dict.lookupOrDefault<Switch>("planeStress", false));
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
 
     mu_ = E_/(2.0*(1.0 + nu_));
 

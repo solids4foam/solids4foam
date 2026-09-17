@@ -25,7 +25,10 @@ License
 
 namespace Foam
 {
-    defineTypeNameAndDebug(StVenantKirchhoffElasticMechanicalConstitutiveLaw, 0);
+    defineTypeNameAndDebug
+    (
+        StVenantKirchhoffElasticMechanicalConstitutiveLaw, 0
+    );
     addToRunTimeSelectionTable
     (
         mechanicalConstitutiveLaw,
@@ -52,7 +55,8 @@ StVenantKirchhoffElasticMechanicalConstitutiveLaw
     kappa_("kappa", dimPressure, 0.0)
 {
     // The material may be given either as E and nu or as mu and K, matching
-    // the legacy StVenantKirchhoffElastic law, so that an existing case dictionary
+    // the legacy StVenantKirchhoffElastic law, so that an existing case
+    // dictionary
     // needs no change. Exactly one of the two pairs must be present
     const bool haveENu = dict.found("E") && dict.found("nu");
     const bool haveMuK = dict.found("mu") && dict.found("K");
@@ -125,7 +129,10 @@ StVenantKirchhoffElasticMechanicalConstitutiveLaw
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
-    const Switch planeStress(dict.lookupOrDefault<Switch>("planeStress", false));
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
 
     mu_ = E_/(2.0*(1.0 + nu_));
 

@@ -28,15 +28,12 @@ Description
     because a mechanical constitutive law is constructed from a dictionary and
     cannot ask the mesh itself.
 
-    Note two things carried over from the legacy law deliberately, because this
-    reproduces it rather than corrects it. The flag that selects between the
-    two forms is true when the z direction *is* solved, which is the opposite
-    of what its legacy name suggests; and in that branch the zz, yz and xz
-    components of the stress are not written at all, so they keep whatever the
-    caller's storage held.
-
 SourceFiles
     anisotropicBiotElasticMechanicalConstitutiveLaw.C
+
+Author
+    Original author: Tian Tang, DTU.
+    Ported to solids4foam by: Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
