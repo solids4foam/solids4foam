@@ -4,6 +4,20 @@ This changelog highlights significant user-facing changes in each solids4foam
 release. For complete commit-level details and contributor information, see the
 [GitHub Releases](https://github.com/solids4foam/solids4foam/releases) page.
 
+## [Unreleased]
+
+### Changed in Unreleased
+
+- `linearGeometryTotalDisplacement` with `solvePressure yes` now uses an
+  implicit stiffness of `(4/3)*mu` rather than `2*mu`. The mixed
+  displacement-pressure formulation solves `div(dev(sigma))`, whose scalar
+  Laplacian surrogate is `mu*lap(D) + (1/3)*mu*grad(div(D))`, so `(4/3)*mu` is
+  the consistent coefficient and `2*mu` had no derivation behind it. The
+  implicit operator is the iteration path rather than the equation being
+  solved, so converged results are unchanged within tolerance, but the
+  iteration count and the path taken to get there move for every case that
+  selects this option.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4
