@@ -61,6 +61,7 @@ Author
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
+#include "integrationPointTopology.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
