@@ -202,7 +202,8 @@ namespace Foam
     // Non-const field → modifiable Boundary&
     template<class Type, template<class> class PatchField, class GeoMesh>
 #ifdef FOAMEXTEND
-    inline typename GeometricField<Type, PatchField, GeoMesh>::GeometricBoundaryField&
+    inline typename
+    GeometricField<Type, PatchField, GeoMesh>::GeometricBoundaryField&
 #else
     inline typename GeometricField<Type, PatchField, GeoMesh>::Boundary&
 #endif
