@@ -131,6 +131,12 @@ Foam::string Foam::mechanicalConstitutiveLawStateIO::decompositionIdentity
     // on everything else, and it is the disagreement that has to be caught
     const labelList addr(cellProcAddressing(mesh));
 
+    // The faces as well as the cells. The state carries a boundary part per
+    // patch, restored by position, so a mesh whose cells are unchanged and
+    // whose boundary faces are ordered differently - a patch split, say -
+    // would pass a cell-only check and then hand each face another's history
+    const labelList faceAddr(faceProcAddressing(mesh));
+
     // Order matters as much as membership: the state is written in cell
     // order, so a permutation is as wrong as a different set.
     //
@@ -150,12 +156,21 @@ Foam::string Foam::mechanicalConstitutiveLawStateIO::decompositionIdentity
         hashB = hashB*1000003UL + (v ^ (unsigned long)(i));
     }
 
+    forAll(faceAddr, i)
+    {
+        const unsigned long v = (unsigned long)(faceAddr[i]);
+
+        hashA = ((hashA << 5) + hashA) + v;
+        hashB = hashB*1000003UL + (v ^ (unsigned long)(i));
+    }
+
     const label hash = label(hashA & 0x7FFFFFFF);
     const label hash2 = label((hashB >> 7) & 0x7FFFFFFF);
 
     os  << "procs=" << Pstream::nProcs()
         << " rank=" << Pstream::myProcNo()
         << " nCells=" << mesh.nCells()
+        << " nFaces=" << mesh.nFaces()
         << " addr=" << hash << ',' << hash2;
 
     return os.str();
