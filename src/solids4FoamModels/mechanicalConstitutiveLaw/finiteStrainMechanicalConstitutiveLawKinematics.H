@@ -104,8 +104,6 @@ class finiteStrainMechanicalConstitutiveLawKinematics
         //- Inverse deformation gradient at previous time
         const UIndirectList<tensor>& Finv0_;
 
-        //- Time step
-        const scalar dt_;
 
 
     // Private Member Functions
@@ -128,7 +126,7 @@ public:
 
     // Constructors
 
-        //- Construct from current and old displacement gradients
+        //- Construct from current and old deformation gradients
         finiteStrainMechanicalConstitutiveLawKinematics
         (
             const UIndirectList<tensor>& F,
@@ -136,8 +134,7 @@ public:
             const UIndirectList<scalar>& J,
             const UIndirectList<scalar>& J0,
             const UIndirectList<tensor>& Finv,
-            const UIndirectList<tensor>& Finv0,
-            const scalar dt
+            const UIndirectList<tensor>& Finv0
         )
         :
             F_(F),
@@ -145,8 +142,7 @@ public:
             J_(J),
             J0_(J0),
             Finv_(Finv),
-            Finv0_(Finv0),
-            dt_(dt)
+            Finv0_(Finv0)
         {}
 
 
@@ -159,47 +155,42 @@ public:
 
     // Access
 
-        //- Access current displacement gradient
+        //- Access current deformation gradient
         const UIndirectList<tensor>& F() const
         {
             return F_;
         }
 
-        //- Access previous time displacement gradient
+        //- Access previous time deformation gradient
         const UIndirectList<tensor>& F0() const
         {
             return F0_;
         }
 
-        //- Access current displacement gradient determinant
+        //- Access current deformation gradient determinant
         const UIndirectList<scalar>& J() const
         {
             return J_;
         }
 
-        //- Access previous time displacement gradient determinant
+        //- Access previous time deformation gradient determinant
         const UIndirectList<scalar>& J0() const
         {
             return J0_;
         }
 
-        //- Access current displacement gradient inverse
+        //- Access current deformation gradient inverse
         const UIndirectList<tensor>& Finv() const
         {
             return Finv_;
         }
 
-        //- Access previous time displacement gradient inverse
+        //- Access previous time deformation gradient inverse
         const UIndirectList<tensor>& Finv0() const
         {
             return Finv0_;
         }
 
-        //- Time increment
-        scalar dt() const
-        {
-            return dt_;
-        }
 
     // Edit
 
@@ -207,6 +198,60 @@ public:
         inline tensor relativeF(const label i) const
         {
             return F_[i] & inv(F0_[i]);
+        }
+
+        //- Return F at integration point ipI with Voigt component j of the
+        //  displacement gradient perturbed by h.
+        //  F = I + gradD, so perturbing F is perturbing the displacement
+        //  gradient. The perturbation is defined on the Voigt strain vector,
+        //  which uses engineering shear, so a shear component moves each
+        //  off-diagonal by h/2 and the corresponding Voigt component by
+        //  exactly h. This matches gradDPerturbed in the small-strain
+        //  kinematics, so a finite-difference tangent taken here is directly
+        //  comparable with a small-strain one
+        inline tensor FPerturbed
+        (
+            const label ipI, const label j, const scalar h
+        ) const
+        {
+            tensor F = F_[ipI];
+
+            switch (j)
+            {
+                case symmTensor::XX:
+                    F.xx() += h;
+                    break;
+
+                case symmTensor::YY:
+                    F.yy() += h;
+                    break;
+
+                case symmTensor::ZZ:
+                    F.zz() += h;
+                    break;
+
+                case symmTensor::YZ:
+                    F.yz() += 0.5*h;
+                    F.zy() += 0.5*h;
+                    break;
+
+                case symmTensor::XZ:
+                    F.xz() += 0.5*h;
+                    F.zx() += 0.5*h;
+                    break;
+
+                case symmTensor::XY:
+                    F.xy() += 0.5*h;
+                    F.yx() += 0.5*h;
+                    break;
+
+                default:
+                    FatalErrorInFunction
+                        << "Invalid Voigt component index j = " << j
+                        << exit(FatalError);
+            }
+
+            return F;
         }
 };
 

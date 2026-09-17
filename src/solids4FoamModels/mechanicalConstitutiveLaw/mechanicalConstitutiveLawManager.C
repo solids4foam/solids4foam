@@ -18,11 +18,16 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "mechanicalConstitutiveLawManager.H"
+#include "mechanicalConstitutiveLawStateIO.H"
+#include "IFstream.H"
+#include "labelIOList.H"
 #include "compatibilityFunctions.H"
 #include "integrationPointTopologies.H"
 #include "emptyFvPatch.H"
 #include "mat66.H"
 #include "Switch.H"
+#include "CompactListList.H"
+#include <cstdint>
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -32,7 +37,307 @@ namespace Foam
     defineTypeNameAndDebug(mechanicalConstitutiveLawManager, 0);
 }
 
+
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// A 64-bit FNV-1a digest of a list of row sizes, used to key a compact
+// integration-point topology on the shape of the layout that produced it.
+// Spelled out rather than taken from a fork's hasher, which the three
+// supported forks do not agree on
+std::uint64_t rowSizesHash(const labelUList& rowSizes)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(rowSizes, i)
+    {
+        const std::uint64_t v = static_cast<std::uint64_t>(rowSizes[i]);
+
+        for (int byteI = 0; byteI < 8; ++byteI)
+        {
+            h ^= (v >> (8*byteI)) & 0xFFULL;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    return h;
+}
+
+
+// A checksum of an ordered list of keys, folded into a label so it can be
+// compared across ranks with the reductions every fork provides
+label keyListChecksum(const wordList& keys)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(keys, i)
+    {
+        const word& k = keys[i];
+
+        for (label c = 0; c < k.size(); ++c)
+        {
+            h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(k[c]));
+            h *= 1099511628211ULL;
+        }
+
+        // Separator, so {"ab","c"} and {"a","bc"} do not agree
+        h ^= 0xFFULL;
+        h *= 1099511628211ULL;
+    }
+
+    return static_cast<label>(h & 0x7FFFFFFFULL);
+}
+
+
+// Combine one diagnostic into another, by the operation it carries
+void combineDiagnostic
+(
+    mechanicalConstitutiveLawDiagnostic& into,
+    const mechanicalConstitutiveLawDiagnostic& from
+)
+{
+    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
+
+    if (into.op() == diagnostic::combineOperation::sum)
+    {
+        into.value() += from.value();
+    }
+    else
+    {
+        into.value() = max(into.value(), from.value());
+    }
+}
+
+
+//- Build the response a law writes into, and evaluate the law.
+//
+//  Every evaluation in this file ends in the same three lines: work out which
+//  tangent storage was supplied, wrap it and the stress in a response, and
+//  call the law. That was written out at each of the twenty-odd places a law
+//  is evaluated, which is why the file is as long as it is.
+//
+//  What the caller keeps is everything that actually differs between those
+//  places: which state to evaluate against - real, shadow or scratch - which
+//  points to address, whether to evaluate at all, and what happens to the
+//  stress afterwards. Those are not incidental, and folding any of them in
+//  here would change results.
+//
+//  Three things are deliberate. The tangent storage is passed rather than a
+//  view, so that a view is built only when one is wanted and a null pointer is
+//  never dereferenced: some callers guard on the pointer and some on the
+//  request, and both stay correct. The request passed is the *effective* one,
+//  which is not always the caller's own: the surface boundary path asks for no
+//  tangent whatever was requested elsewhere, because it computes none.
+//
+//  And the storage is const, which looks wrong for something a law writes
+//  into. UIndirectList takes a const reference and casts it away itself, so
+//  this is what the callers were already doing when they built the view
+//  inline. Taking non-const here would push callers onto boundaryFieldRef and
+//  primitiveFieldRef, and those are not the same thing: they call
+//  setUpToDate() and storeOldTimes(), so merely reaching for the pointer would
+//  snapshot an old time that nothing asked for.
+template<class KinematicsType>
+void evaluateResponse
+(
+    const mechanicalConstitutiveLaw& law,
+    const KinematicsType& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    UIndirectList<symmTensor>& stressView,
+    const labelUList& tangentIDs,
+    const UList<scalar>* scalarTangentStore,
+    const UList<mat66>* fourthOrderTangentStore,
+    const tangentRequest tangentReq,
+    const UList<scalar>* volumetricStore = nullptr
+)
+{
+    // One place, because every law is reached through here.
+    //
+    // A law that needs the stress already standing at its points is handed it
+    // as a declared input. Every other law has its output cleared first, so
+    // reading it yields zero rather than whatever the last caller left - which
+    // turns a silent dependence on buffer contents into an obvious one
+    List<symmTensor> incoming;
+
+    if (law.requiresIncomingStress())
+    {
+        // Copied in the law's own loop order, so that it indexes the same way
+        // as the stress it is writing
+        incoming.setSize(stressView.size());
+
+        forAll(stressView, i)
+        {
+            incoming[i] = stressView[i];
+        }
+
+        inputs.setIncomingStress(incoming);
+    }
+
+    forAll(stressView, i)
+    {
+        stressView[i] = symmTensor::zero;
+    }
+
+    if
+    (
+        scalarTangentStore
+     && mechanicalConstitutiveLawManager::needsScalarTangent(tangentReq)
+    )
+    {
+        UIndirectList<scalar> tangentView(*scalarTangentStore, tangentIDs);
+
+        mechanicalConstitutiveLawResponse response
+        (
+            stressView, tangentView, tangentReq
+        );
+
+        if (volumetricStore)
+        {
+            // Declared inside, so that the view outlives the evaluation using
+            // it and is not built when it is not wanted
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
+
+        law.evaluate(kin, inputs, state, response);
+    }
+    else if
+    (
+        fourthOrderTangentStore
+     && mechanicalConstitutiveLawManager::needsFourthOrderTangent(tangentReq)
+    )
+    {
+        UIndirectList<mat66> tangentView(*fourthOrderTangentStore, tangentIDs);
+
+        mechanicalConstitutiveLawResponse response
+        (
+            stressView, tangentView, tangentReq
+        );
+
+        if (volumetricStore)
+        {
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
+
+        law.evaluate(kin, inputs, state, response);
+    }
+    else
+    {
+        mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+
+        if (volumetricStore)
+        {
+            UIndirectList<scalar> volumetricView(*volumetricStore, tangentIDs);
+            response.requestVolumetricSplit(volumetricView);
+
+            law.evaluate(kin, inputs, state, response);
+
+            return;
+        }
+
+        law.evaluate(kin, inputs, state, response);
+    }
+
+    // The standing stress lived only for this evaluation, so it is detached
+    // before the next law is reached
+    inputs.clearIncomingStress();
+}
+
+
+
+} // End namespace Foam
+
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
+
+
+void Foam::mechanicalConstitutiveLawManager::checkCompactRowSizes
+(
+    const labelList& ref,
+    const word& refName,
+    const labelList& other,
+    const word& otherName,
+    const word& context
+)
+{
+    if (other.size() != ref.size())
+    {
+        FatalErrorInFunction
+            << "Inconsistent compact layouts in " << context << nl << nl
+            << "    " << refName << " has " << ref.size() << " rows and "
+            << otherName << " has " << other.size() << '.' << nl << nl
+            << "    The rows are the integration points of one mesh entity, "
+            << "so two layouts with different row counts describe different "
+            << "meshes."
+            << exit(FatalError);
+    }
+
+    forAll(ref, rowI)
+    {
+        if (other[rowI] != ref[rowI])
+        {
+            FatalErrorInFunction
+                << "Inconsistent compact layouts in " << context << nl << nl
+                << "    Row " << rowI << " holds " << ref[rowI]
+                << " integration points in " << refName << " and "
+                << other[rowI] << " in " << otherName << '.' << nl << nl
+                << "    The two hold the same number of values in total, so "
+                << "every list is the length it should be, but the flat index "
+                << "of a point differs between them: values from one entity "
+                << "would be read as another's."
+                << exit(FatalError);
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
+(
+    const CompactListList<tensor>& a,
+    const CompactListList<tensor>& b,
+    const CompactListList<symmTensor>& out,
+    const List<scalar>* tangentPtr,
+    const word& context
+)
+{
+    const label nIP = out.m().size();
+
+    if (a.m().size() != nIP || b.m().size() != nIP)
+    {
+        FatalError
+            << "Inconsistent CompactListList sizes in " << context << nl
+            << "Expected size = " << nIP << nl
+            << "Got: grad = " << a.m().size()
+            << ", grad0 = " << b.m().size()
+            << exit(FatalError);
+    }
+
+    if (tangentPtr && tangentPtr->size() != nIP)
+    {
+        FatalError
+            << "Scalar tangent list has incorrect size in " << context
+            << nl
+            << "Expected: " << nIP
+            << ", got: " << tangentPtr->size()
+            << exit(FatalError);
+    }
+
+    // The lengths agreeing does not make the layouts the same
+    const labelList refRows(out.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", a.sizes(), "grad", context);
+    checkCompactRowSizes(refRows, "the stress", b.sizes(), "grad0", context);
+}
 
 
 void Foam::mechanicalConstitutiveLawManager::checkTangentStorage
@@ -115,49 +420,204 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     const CompactListList<tensor>& layout
 ) const
 {
-    // Unique key per layout instance
-    const word key =
-        "compactCell:" + Foam::name
-        (
-            static_cast<std::uint64_t>
-            (
-                reinterpret_cast<std::uintptr_t>(&layout)
-            )
-        );
+    // Which entity indexes the rows is decided by the row count, and checked.
+    // A mesh never has as many cells as faces, so the two cases cannot be
+    // confused, and anything else is an error rather than a guess
+    const bool cellBased = (layout.size() == mesh_.nCells());
+    const bool faceBased = (layout.size() == mesh_.nFaces());
 
-    // Already constructed?
-    if (topologyCache_.found(key))
+    if (!cellBased && !faceBased)
     {
-        return topology(autoPtrRef(topologyCache_[key])).topology_;
+        FatalErrorInFunction
+            << "A compact integration-point layout must have one row per cell "
+            << "or one row per face." << nl
+            << "This one has " << layout.size() << " rows, while the mesh has "
+            << mesh_.nCells() << " cells and " << mesh_.nFaces() << " faces."
+            << exit(FatalError);
     }
-
-    // Construct topology lazily
 
     // We know this is cell-based compact storage:
     //  - one sub-list per cell
     //  - integration-point counts encoded in sub-list sizes
+    const labelList rowSizes(layout.sizes());
+
+    // The key names the role, and is a literal, so it is the same word on
+    // every rank. That matters because endTimeStep() sorts these keys and
+    // reduces per entry: a key built from this rank's cell count or from a
+    // digest of this rank's row sizes would sort differently on each rank and
+    // pair one topology's quantity against another's.
+    //
+    // The shape is not identity, then, but it is still worth checking. The
+    // digest below is a local fingerprint: it says whether the layout handed
+    // in now has the same addressing as the one this topology was built from.
+    // One compact cell layout and one compact face layout are supported per
+    // manager, which is what the flat-list API uses; a second layout of the
+    // same kind is a different topology and must be registered by name
+    const word key(cellBased ? "compactCell" : "compactFace");
+
+    const word fingerprint =
+        Foam::name(rowSizes.size()) + ":"
+      + Foam::name(layout.m().size()) + ":"
+      + Foam::name(rowSizesHash(rowSizes));
+
+    // Already constructed?
+    if (topologyCache_.found(key))
+    {
+        if (!compactFingerprints_.found(key))
+        {
+            FatalErrorInFunction
+                << "The name '" << key << "' is already registered, but not "
+                << "by a compact layout." << nl << nl
+                << "    That name is reserved for the topology the flat-list "
+                << "CompactListList interface builds. Register other "
+                << "topologies under a name of their own."
+                << exit(FatalError);
+        }
+
+        const word& seen = compactFingerprints_[key];
+
+        if (seen != fingerprint)
+        {
+            FatalErrorInFunction
+                << "A second compact integration-point layout was passed to "
+                << "the manager under the role '" << key << "'." << nl << nl
+                << "    The layout first seen had shape " << seen
+                << " and this one has " << fingerprint
+                << " (rows:values:digest)." << nl << nl
+                << "    The constitutive state is held per topology, so "
+                << "returning the first topology for the second layout would "
+                << "read one layout's history through the other's addressing."
+                << nl << nl
+                << "    Register the second layout under its own name with "
+                << "registerTopology(), choosing a name that every rank "
+                << "supplies identically."
+                << exit(FatalError);
+        }
+
+        return topology(key).topology_;
+    }
+
+    // Construct topology lazily
 
     // Build cell → IP addressing
-    CompactListList<label> cellToIP(layout.sizes());
+
+    CompactListList<label> cellToIP(rowSizes);
 
     for (label cellI = 0; cellI < layout.size(); ++cellI)
     {
-        const label n = compactListListCRef(layout)[cellI].size();
+        // sizes() rather than layout[cellI].size(): the const operator[] does
+        // not compile on foam-extend
+        const label n = rowSizes[cellI];
         for (label j = 0; j < n; ++j)
         {
             cellToIP(cellI, j) = layout.index(cellI, j);
         }
     }
 
-    autoPtr<integrationPointTopology> topoPtr
-    (
-        new compactCellIntegrationPointTopology(mesh_, std::move(cellToIP))
-    );
+    autoPtr<integrationPointTopology> topoPtr;
+
+    if (cellBased)
+    {
+        topoPtr.set
+        (
+            new compactCellIntegrationPointTopology(mesh_, std::move(cellToIP))
+        );
+    }
+    else
+    {
+        topoPtr.set
+        (
+            new compactFaceIntegrationPointTopology(mesh_, std::move(cellToIP))
+        );
+    }
 
     // Cache and return
     topologyCache_.insert(key, topoPtr);
+    compactFingerprints_.set(key, fingerprint);
 
-    return topology(autoPtrRef(topologyCache_[key])).topology_;
+    return topology(key).topology_;
+}
+
+
+Foam::scalarList
+Foam::mechanicalConstitutiveLawManager::finiteStrainConvergenceScales
+(
+    topologyEntry& tp,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0
+) const
+{
+    scalarList scales(laws_.size(), 0.0);
+
+    // Every law, on every rank, whether or not this rank holds any of its
+    // points. That is the point of doing it here: the evaluation loops skip a
+    // law with no points, so a law reducing for itself would reduce a
+    // different number of times on each rank
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> FView(F, ipIDs);
+        const UIndirectList<tensor> F0View(F0, ipIDs);
+        const UIndirectList<tensor> FinvView(Finv, ipIDs);
+        const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+        const UIndirectList<scalar> JView(J, ipIDs);
+        const UIndirectList<scalar> J0View(J0, ipIDs);
+
+        const finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView, F0View, JView, J0View, FinvView, Finv0View
+        );
+
+        scales[lawI] =
+            laws_[lawI].localConvergenceScale(kin, tp.states_[lawI]);
+    }
+
+    // One reduction per law, in law order, which every rank shares
+    forAll(scales, lawI)
+    {
+        reduce(scales[lawI], maxOp<scalar>());
+    }
+
+    // Kept so that the boundary evaluations use the same scale as the
+    // internal ones
+    tp.lawConvergenceScales_ = scales;
+
+    return scales;
+}
+
+
+const Foam::word&
+Foam::mechanicalConstitutiveLawManager::topologyKeyFor
+(
+    const integrationPointTopology& topo
+) const
+{
+    forAllIters(topologyCache_, iter)
+    {
+        if (&autoPtrRef(iter()) == &topo)
+        {
+            return iter.key();
+        }
+    }
+
+    FatalErrorInFunction
+        << "The integration-point topology of type " << topo.type()
+        << " was not registered with this manager." << nl << nl
+        << "    Its constitutive state, boundary state and restart entries "
+        << "are all held against the key it was registered under, so a "
+        << "topology the manager does not own has no state to find and "
+        << "would silently be given a fresh one." << nl << nl
+        << "    Obtain the topology from topologyFor(), registerTopology() "
+        << "or compactCellTopologyFor() rather than constructing one and "
+        << "passing it in."
+        << exit(FatalError);
+
+    return word::null;
 }
 
 
@@ -167,11 +627,17 @@ Foam::mechanicalConstitutiveLawManager::topology
     const integrationPointTopology& topo
 ) const
 {
-    // Use the address of the topology object as a unique key
-    const word key = Foam::name
-    (
-        static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&topo))
-    );
+    return topology(topologyKeyFor(topo));
+}
+
+
+Foam::mechanicalConstitutiveLawManager::topologyEntry&
+Foam::mechanicalConstitutiveLawManager::topology
+(
+    const word& key
+) const
+{
+    const integrationPointTopology& topo = autoPtrRef(topologyCache_[key]);
 
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
@@ -252,8 +718,15 @@ Foam::mechanicalConstitutiveLawManager::topology
             )
         );
 
-        // Law-specific state initialisation
-        laws_[lawI].initialiseState(entry.states_[lawI]);
+        // Apply whatever the law declared and let it initialise its own
+        // state, in that order. See applyStateSpec
+        applyStateSpec
+        (
+            lawI,
+            topo,
+            entry.lawIntegrationPointIDs_[lawI],
+            entry.states_[lawI]
+        );
     }
 
     // ---------------------------------------------------------------------
@@ -284,13 +757,17 @@ Foam::mechanicalConstitutiveLawManager::topology
                     new mechanicalConstitutiveLawState(nFaces)
                 );
 
-                laws_[lawI].initialiseState
+                applyStateSpecPatch
                 (
-                    entry.boundaryStates_[lawI][patchI]
+                    lawI, patchI, entry.boundaryStates_[lawI][patchI]
                 );
             }
         }
     }
+
+    // Last, so that a restart overwrites the cold start defaults applied above
+    // rather than the other way round
+    setupStateRestart(entry, topo, key);
 
     return entry;
 }
@@ -333,6 +810,889 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
             << "and displacement matching problem, not an average."
             << exit(FatalError);
     }
+}
+
+
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::lawInputsPatch
+(
+    const label lawI,
+    const label patchI,
+    const labelList& faces,
+    const scalar dt,
+    topologyEntry& tp
+) const
+{
+    mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
+
+    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+
+    if (names.empty())
+    {
+        return inputs;
+    }
+
+    if (tp.lawScalarInputs_.empty())
+    {
+        tp.lawScalarInputs_.setSize(laws_.size());
+    }
+
+    HashTable<autoPtr<scalarField>>& store = tp.lawScalarInputs_[lawI];
+
+    forAll(names, i)
+    {
+        const word& name = names[i];
+
+        // The boundary values are a different set from the internal ones, so
+        // they get storage of their own rather than sharing it and being
+        // overwritten by whichever was gathered last
+        const word key(name + "@patch");
+
+        if (!store.found(key))
+        {
+            store.insert(key, autoPtr<scalarField>(new scalarField()));
+        }
+
+        scalarField& fld = store[key]();
+        fld.setSize(faces.size(), 0.0);
+
+        tmp<volScalarField> tsrc;
+
+        if (mesh_.foundObject<volScalarField>(name))
+        {
+            tsrc = tmp<volScalarField>
+            (
+                mesh_.lookupObject<volScalarField>(name)
+            );
+        }
+        else
+        {
+            tsrc = prescribedField<scalar>(name);
+        }
+
+        if (!tsrc.valid())
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << laws_[lawI].type()
+                << "' reads the coupling input '" << name
+                << "', which is neither registered nor present as a field in "
+                << "the current or initial time directory."
+                << exit(FatalError);
+        }
+
+        const fvPatchField<scalar>& psrc = tsrc().boundaryField()[patchI];
+
+        forAll(faces, faceI)
+        {
+            fld[faceI] = psrc[faces[faceI]];
+        }
+
+        inputs.setScalar(name, fld);
+    }
+
+    return inputs;
+}
+
+
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::inputsWithoutCoupling
+(
+    const scalar dt,
+    const word& path
+) const
+{
+    forAll(laws_, lawI)
+    {
+        const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+
+        if (!names.empty())
+        {
+            FatalErrorInFunction
+                << "Mechanical constitutive law '" << laws_[lawI].type()
+                << "' reads the coupling input(s) " << names
+                << ", but the evaluation path '" << path
+                << "' does not gather them yet." << nl
+                << "Use a solid model that evaluates through a path which "
+                << "does, or add the gather to this one."
+                << exit(FatalError);
+        }
+    }
+
+    return mechanicalConstitutiveLawInputs(dt, mesh_.time().value());
+}
+
+
+Foam::mechanicalConstitutiveLawInputs
+Foam::mechanicalConstitutiveLawManager::lawInputs
+(
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    const scalar dt,
+    topologyEntry& tp
+) const
+{
+    mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
+
+    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+
+    if (names.empty())
+    {
+        // Which is every law that does not couple to another field, so this
+        // costs them nothing
+        return inputs;
+    }
+
+    if (tp.lawScalarInputs_.empty())
+    {
+        tp.lawScalarInputs_.setSize(laws_.size());
+    }
+
+    HashTable<autoPtr<scalarField>>& store = tp.lawScalarInputs_[lawI];
+
+    forAll(names, i)
+    {
+        const word& name = names[i];
+
+        if (!store.found(name))
+        {
+            store.insert(name, autoPtr<scalarField>(new scalarField()));
+        }
+
+        scalarField& fld = store[name]();
+        fld.setSize(ipIDs.size(), 0.0);
+
+        // The registry first, and only then the file. This is the opposite
+        // order from a prescribed field, and deliberately so: a coupling input
+        // is solved for, so the live field must always win and a file must
+        // never shadow it.
+        //
+        // The file is still needed, because of when the first evaluation
+        // happens. A solid model builds its implicit stiffness while it is
+        // being constructed, and a derived model that solves for the coupling
+        // field has not reached its own members yet - the base class runs
+        // first. At that moment the field exists only as the initial condition
+        // on disk, which is the right value to evaluate against anyway
+        if (mesh_.foundObject<volScalarField>(name))
+        {
+            gatherToIntegrationPoints
+            (
+                mesh_.lookupObject<volScalarField>(name),
+                lawI,
+                topo,
+                ipIDs,
+                fld
+            );
+        }
+        else
+        {
+            const tmp<volScalarField> tsrc(prescribedField<scalar>(name));
+
+            if (!tsrc.valid())
+            {
+                FatalErrorInFunction
+                    << "Mechanical constitutive law '" << laws_[lawI].type()
+                    << "' reads the coupling input '" << name
+                    << "', which is neither registered nor present as a field "
+                    << "in the current or initial time directory." << nl
+                    << "It is produced by another model, so the solid model "
+                    << "has to solve for it, or the case has to supply it."
+                    << exit(FatalError);
+            }
+
+            gatherToIntegrationPoints(tsrc(), lawI, topo, ipIDs, fld);
+        }
+
+        inputs.setScalar(name, fld);
+    }
+
+    return inputs;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::readPrescribedFields
+(
+    const mechanicalConstitutiveLawStateSpec& spec,
+    mechanicalConstitutiveLawState& state,
+    const prescribedSource source,
+    const label lawI,
+    const integrationPointTopology* topoPtr,
+    const labelList* ipIDsPtr,
+    const label patchI
+) const
+{
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::prescribed)
+        {
+            continue;
+        }
+
+        // A prescribed field is read from a field the case supplied. Its
+        // absence is not an error: the declared default stands, which is what
+        // lets a law declare one without changing any existing case.
+        //
+        // The old time is set to match, because a prescribed field is never
+        // written and a law reads it at old time so that a tangent query
+        // evaluated into a shadow state sees it
+        if (e.typeName == "scalar")
+        {
+            Field<scalar>& f = state.scalarField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<scalar>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<scalar>(e.name, lawI, patchI, f);
+            }
+
+            state.scalarField0(e.name) = f;
+        }
+        else if (e.typeName == "vector")
+        {
+            Field<vector>& f = state.vectorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<vector>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<vector>(e.name, lawI, patchI, f);
+            }
+
+            state.vectorField0(e.name) = f;
+        }
+        else if (e.typeName == "tensor")
+        {
+            Field<tensor>& f = state.tensorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<tensor>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<tensor>(e.name, lawI, patchI, f);
+            }
+
+            state.tensorField0(e.name) = f;
+        }
+        else
+        {
+            Field<symmTensor>& f = state.symmTensorField(e.name);
+
+            if (source == prescribedSource::internalPoints)
+            {
+                readPrescribed<symmTensor>
+                (
+                    e.name, lawI, *topoPtr, *ipIDsPtr, f
+                );
+            }
+            else
+            {
+                readPrescribedPatch<symmTensor>(e.name, lawI, patchI, f);
+            }
+
+            state.symmTensorField0(e.name) = f;
+        }
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateDefaults
+(
+    const mechanicalConstitutiveLawStateSpec& spec,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        if (e.typeName == "scalar")
+        {
+            state.scalarField(e.name) = e.scalarDefault;
+            state.scalarField0(e.name) = e.scalarDefault;
+        }
+        else if (e.typeName == "vector")
+        {
+            state.vectorField(e.name) = e.vectorDefault;
+            state.vectorField0(e.name) = e.vectorDefault;
+        }
+        else if (e.typeName == "tensor")
+        {
+            state.tensorField(e.name) = e.tensorDefault;
+            state.tensorField0(e.name) = e.tensorDefault;
+        }
+        else if (e.typeName == "symmTensor")
+        {
+            state.symmTensorField(e.name) = e.symmTensorDefault;
+            state.symmTensorField0(e.name) = e.symmTensorDefault;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "State field '" << e.name << "' has unsupported type '"
+                << e.typeName << "'." << exit(FatalError);
+        }
+    }
+}
+
+
+bool Foam::mechanicalConstitutiveLawManager::declaresPersistentState
+(
+    const mechanicalConstitutiveLaw& law
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        if
+        (
+            es[i].role
+         == mechanicalConstitutiveLawStateSpec::stateRole::persistent
+        )
+        {
+            return true;
+        }
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        if (declaresPersistentState(law.childLaw(childNames[i])))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::checkRestartKinematics() const
+{
+    bool anyPersistent = false;
+
+    forAll(laws_, lawI)
+    {
+        if (declaresPersistentState(laws_[lawI]))
+        {
+            anyPersistent = true;
+            break;
+        }
+    }
+
+    if (!anyPersistent)
+    {
+        return;
+    }
+
+    // History is measured against the displacement gradient of the step it
+    // began in, so restoring one without the other is half a restart. An
+    // incremental law then takes the strain accumulated since the beginning of
+    // the run as though it happened in one step, which is not a small error
+    // and does not announce itself: the run continues and the answer is wrong.
+    //
+    // The solid model writes the kinematic history only when asked, so the
+    // presence of grad(D) at old time is what says whether it was
+    IOobject gradD0IO
+    (
+        "grad(D)_0",
+        mesh_.time().timeName(),
+        mesh_,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+    const bool present = gradD0IO.headerOk();
+#endif
+
+    if (!present)
+    {
+        FatalErrorInFunction
+            << "Restarting from time " << mesh_.time().timeName()
+            << " with a material that keeps history, but the displacement "
+            << "gradient at old time was never written." << nl << nl
+            << "Set" << nl << nl
+            << "    restart yes;" << nl << nl
+            << "in the solidModel's coefficients dictionary and run the case "
+            << "again from the start. It makes the solid model write the "
+            << "kinematic history a constitutive history is measured against."
+            << nl << nl
+            << "Without it the constitutive state would come back and the "
+            << "strain it is measured against would not, and an incremental "
+            << "law would read the whole run's strain as one step's."
+            << exit(FatalError);
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::setupStateRestart
+(
+    topologyEntry& entry,
+    const integrationPointTopology& topo,
+    const word& topologyKey
+) const
+{
+    // A run that begins at a time other than the first is continuing, and a
+    // history dependent law must pick its history back up. A run beginning at
+    // the start has none to pick up and writes from its first output.
+    //
+    // Asked of the time the run *started* at, not the time it has reached. A
+    // topology is created the first time something asks for it, which can be
+    // well after the run has advanced, and judging by the current index would
+    // call an ordinary run a restart the moment it took a step and then refuse
+    // to find files it never wrote
+    const bool isRestart = mesh_.time().startTimeIndex() > 0;
+
+    if (isRestart)
+    {
+        checkRestartKinematics();
+    }
+
+    forAll(laws_, lawI)
+    {
+        // The pieces of this law's state, in the order they are written: the
+        // law's own integration points, then its points on each patch. A
+        // topology with no boundary points contributes the first alone
+        List<mechanicalConstitutiveLawState*> parts(1);
+        parts[0] = &entry.states_[lawI];
+
+        if (entry.boundaryAware_)
+        {
+            parts.setSize(1 + entry.boundaryStates_[lawI].size());
+
+            forAll(entry.boundaryStates_[lawI], patchI)
+            {
+                parts[1 + patchI] = &entry.boundaryStates_[lawI][patchI];
+            }
+        }
+
+        // Where each of this law's points sits on the mesh, in the order the
+        // state is written. Written alongside the state so that a run on a
+        // different decomposition can match entry to entry by mesh entity
+        // instead of by position - the state's own order comes from a hash set
+        // for the boundary part and means nothing across decompositions.
+        //
+        // Only the cell-centred topology for now: a cell maps through
+        // decomposePar's addressing directly, whereas a point- or dual-based
+        // one needs its own translation that is not written yet. The others
+        // write no locations, and a restart on a changed decomposition then
+        // refuses rather than guessing
+        labelList entities;
+
+        const bool topologyRecordsLocations =
+            (topo.type() == cellCentredIntegrationPointTopology::typeName);
+
+        if (topologyRecordsLocations)
+        {
+            const labelList& ipIDs = entry.lawIntegrationPointIDs_[lawI];
+
+            label nEntities = ipIDs.size();
+
+            if (entry.boundaryAware_)
+            {
+                forAll(mesh_.boundary(), patchI)
+                {
+                    nEntities += lawBoundaryFaces_[lawI][patchI].size();
+                }
+            }
+
+            entities.setSize(nEntities);
+
+            label k = 0;
+
+            forAll(ipIDs, i)
+            {
+                entities[k++] =
+                    mechanicalConstitutiveLawStateIO::cellEntity(ipIDs[i]);
+            }
+
+            if (entry.boundaryAware_)
+            {
+                forAll(mesh_.boundary(), patchI)
+                {
+                    const labelList& pf = lawBoundaryFaces_[lawI][patchI];
+                    const label start = mesh_.boundaryMesh()[patchI].start();
+
+                    forAll(pf, i)
+                    {
+                        entities[k++] =
+                            mechanicalConstitutiveLawStateIO::faceEntity
+                            (
+                                start + pf[i]
+                            );
+                    }
+                }
+            }
+        }
+
+        const word entityName
+        (
+            mechanicalConstitutiveLawStateIO::fieldName
+            (
+                lawNames_[lawI], topologyKey, wordList(), "integrationPoints"
+            )
+        );
+
+        // On whether this topology records locations, not on whether this
+        // rank has any. A rank holding no cells of this material has an empty
+        // list, and that is a statement about the decomposition rather than an
+        // absence of information: the file still has to be written, because
+        // reconstructing a decomposed state requires the pair of files from
+        // every processor directory and refuses the lot if one is missing.
+        // A topology that records no locations at all writes neither file, and
+        // a restart on a changed decomposition then refuses rather than
+        // guessing, which is the intended behaviour
+        if (topologyRecordsLocations)
+        {
+            // Written in the numbering of the undecomposed mesh, whichever way
+            // this run is being run. A serial run's locations are what a
+            // decomposed one needs to distribute the state; a decomposed run's
+            // are what a reconstructed one needs to put it back together. Said
+            // in the same numbering, one list serves both
+            const labelList written
+            (
+                mechanicalConstitutiveLawStateIO::toSerialEntities
+                (
+                    mesh_, entities, entityName
+                )
+            );
+
+            const label proxyI = stateWriteProxies_.size();
+            stateWriteProxies_.setSize(proxyI + 1);
+
+            stateWriteProxies_.set
+            (
+                proxyI,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        entityName,
+                        mesh_.time().timeName(),
+                        mesh_,
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    written
+                )
+            );
+
+            stateWriteProxies_[proxyI].note() =
+                mechanicalConstitutiveLawStateIO::decompositionIdentity(mesh_);
+        }
+
+        setupStateRestartLaw
+        (
+            laws_[lawI],
+            lawNames_[lawI],
+            topologyKey,
+            wordList(),
+            entityName,
+            entities,
+            parts,
+            isRestart
+        );
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::setupStateRestartLaw
+(
+    const mechanicalConstitutiveLaw& law,
+    const word& lawName,
+    const word& topologyName,
+    const wordList& childPath,
+    const word& entityName,
+    const labelUList& entities,
+    const List<mechanicalConstitutiveLawState*>& parts,
+    const bool isRestart
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    const UList<mechanicalConstitutiveLawStateSpec::entry>& es = spec.entries();
+
+    forAll(es, i)
+    {
+        const mechanicalConstitutiveLawStateSpec::entry& e = es[i];
+
+        // Only history is written. A prescribed field is the user's input and
+        // is read again from where it came; a fixed one cannot change
+        if (e.role != mechanicalConstitutiveLawStateSpec::stateRole::persistent)
+        {
+            continue;
+        }
+
+        const word name
+        (
+            mechanicalConstitutiveLawStateIO::fieldName
+            (
+                lawName, topologyName, childPath, e.name
+            )
+        );
+
+        if (e.typeName == "scalar")
+        {
+            mechanicalConstitutiveLawStateIO::restartField<scalar>
+            (
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "vector")
+        {
+            mechanicalConstitutiveLawStateIO::restartField<vector>
+            (
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "tensor")
+        {
+            mechanicalConstitutiveLawStateIO::restartField<tensor>
+            (
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
+            );
+        }
+        else if (e.typeName == "symmTensor")
+        {
+            mechanicalConstitutiveLawStateIO::restartField<symmTensor>
+            (
+                mesh_, name, entityName, entities, parts, e.name, isRestart,
+                stateWriteProxies_
+            );
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "State field '" << e.name << "' has unsupported type '"
+                << e.typeName << "'." << exit(FatalError);
+        }
+    }
+
+    // A composite keeps its sub-laws' history in child states. Without this
+    // the composite would restart and its sub-laws would not, which is the
+    // failure that is hardest to see: the run continues and only the part of
+    // the answer the sub-law owns is wrong
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        wordList path(childPath.size() + 1);
+
+        forAll(childPath, j)
+        {
+            path[j] = childPath[j];
+        }
+
+        path[childPath.size()] = childNames[i];
+
+        List<mechanicalConstitutiveLawState*> childParts(parts.size());
+
+        forAll(parts, partI)
+        {
+            childParts[partI] = &parts[partI]->child(childNames[i]);
+        }
+
+        setupStateRestartLaw
+        (
+            law.childLaw(childNames[i]),
+            lawName,
+            topologyName,
+            path,
+            entityName,
+            entities,
+            childParts,
+            isRestart
+        );
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpec
+(
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    applyStateSpec(laws_[lawI], lawI, topo, ipIDs, state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpec
+(
+    const mechanicalConstitutiveLaw& law,
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    // Order matters. The declared default goes down first, then the law is
+    // given the chance to initialise state of its own over it, and only then
+    // is a prescribed field read. A law that both declares a field and fills
+    // it in initialiseState would otherwise have its work overwritten
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpec
+        (
+            law.childLaw(childNames[i]),
+            lawI,
+            topo,
+            ipIDs,
+            state.child(childNames[i])
+        );
+    }
+
+    readPrescribedFields
+    (
+        spec,
+        state,
+        prescribedSource::internalPoints,
+        lawI,
+        &topo,
+        &ipIDs,
+        -1
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecScratch
+(
+    const label lawI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    applyStateSpecScratch(laws_[lawI], state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecScratch
+(
+    const mechanicalConstitutiveLaw& law,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpecScratch
+        (
+            law.childLaw(childNames[i]),
+            state.child(childNames[i])
+        );
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
+(
+    const label lawI,
+    const label patchI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    applyStateSpecPatch(laws_[lawI], lawI, patchI, state);
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
+(
+    const mechanicalConstitutiveLaw& law,
+    const label lawI,
+    const label patchI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    applyStateDefaults(spec, state);
+
+    law.initialiseState(state);
+
+    // A composite's sub-laws each get a child state of their own, prepared
+    // exactly as this one was. Without this a sub-law's declared defaults and
+    // prescribed fields would be missing and it would silently read zeros
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        applyStateSpecPatch
+        (
+            law.childLaw(childNames[i]),
+            lawI,
+            patchI,
+            state.child(childNames[i])
+        );
+    }
+
+    readPrescribedFields
+    (
+        spec,
+        state,
+        prescribedSource::patchFaces,
+        lawI,
+        nullptr,
+        nullptr,
+        patchI
+    );
 }
 
 
@@ -581,7 +1941,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     rhoPtr_(),
     kappaPtr_(),
     topologyCache_(),
-    topologyEntries_()
+    topologyEntries_(),
+    compactFingerprints_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -597,8 +1958,12 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         lawNames[lawI] = lawEntries[lawI].keyword();
     }
 
+    // Kept, because the state written for restart is named after the material
+    lawNames_ = lawNames;
+
     // Create a map for each cell to its mechanical law
-    labelList cellToLaw(mesh_.nCells(), -1);
+    cellToLaw_.setSize(mesh_.nCells(), -1);
+    labelList& cellToLaw = cellToLaw_;
 
     // Plane stress is defined once for the whole mechanicalProperties
     // dictionary. It is injected into each law's sub-dictionary below rather
@@ -626,6 +1991,21 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         }
 
         lawDict.add("planeStress", planeStress);
+
+        // Which directions the mesh actually solves in. A law that behaves
+        // differently in two dimensions needs this and cannot ask the mesh
+        // itself: a mechanical constitutive law is constructed from a
+        // dictionary and nothing else. Injected for the same reason as
+        // planeStress, and named as the mesh names it
+        if (lawDict.found("solutionD"))
+        {
+            FatalIOErrorInFunction(lawDict)
+                << "'solutionD' is supplied by the mesh and must not be given "
+                << "inside the '" << lawName << "' sub-dictionary."
+                << exit(FatalIOError);
+        }
+
+        lawDict.add("solutionD", mesh_.solutionD());
 
         // Construct law
         laws_.set
@@ -788,6 +2168,9 @@ Foam::mechanicalConstitutiveLawManager::kappa() const
                     IOobject::NO_WRITE
                 ),
                 mesh_,
+                // A bulk modulus, not a density. This was dimDensity,
+                // copied from rho() directly above, and every consumer then
+                // used it as a pressure
                 dimensionedScalar("kappa", dimPressure, 0.0),
                 "zeroGradient"
             )
@@ -864,7 +2247,129 @@ void Foam::mechanicalConstitutiveLawManager::resetMaterialPropertyFields()
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+bool Foam::mechanicalConstitutiveLawManager::resolveBoundaryEvaluation
+(
+    const integrationPointTopology& topo,
+    topologyEntry& tp,
+    const label lawI,
+    const label patchI,
+    const bool preserveState,
+    labelList& ipIDs,
+    autoPtr<mechanicalConstitutiveLawState>& bScratchPtr,
+    autoPtr<mechanicalConstitutiveLawState>& bShadowPtr,
+    mechanicalConstitutiveLawState*& bState
+) const
+{
+    const labelList patchIPs
+    (
+        topo.boundaryIntegrationPointIDs(patchI)
+    );
+
+    if (patchIPs.empty())
+    {
+        return false;
+    }
+
+    // An empty patch has no fvPatch faces, so lawBoundaryFaces_
+    // is empty for it, yet its polyPatch faces still occupy slots
+    // in this topology's index space. Skipping it would leave
+    // those slots unwritten, which is what a caller sizing its
+    // list to nIntegrationPoints() then reads. So address them
+    // through the polyPatch instead, and take the law from the
+    // owner cell.
+    //
+    // These faces take no part in the finite volume
+    // discretisation - that is what empty means - so they are
+    // evaluated against a shadow of the law's state. They get a
+    // well-defined value without committing history for a face
+    // the discretisation does not have
+    const bool viaPolyPatch =
+        isA<emptyFvPatch>(mesh_.boundary()[patchI]);
+
+
+    if (viaPolyPatch)
+    {
+        const labelUList& ownCells =
+            mesh_.boundaryMesh()[patchI].faceCells();
+
+        DynamicList<label> ids(ownCells.size());
+        forAll(ownCells, faceI)
+        {
+            if (cellToLaw_[ownCells[faceI]] == lawI)
+            {
+                ids.append(patchIPs[faceI]);
+            }
+        }
+
+        ipIDs.transfer(ids);
+    }
+    else
+    {
+        const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+        // This law's faces on this patch, as integration-point
+        // indices
+        ipIDs.setSize(faces.size());
+        forAll(faces, i)
+        {
+            ipIDs[i] = patchIPs[faces[i]];
+        }
+    }
+
+    if (ipIDs.empty())
+    {
+        return false;
+    }
+
+    // sized to the fvPatch, which has no faces there. Its faces
+    // take no part in the discretisation, so give them a scratch
+    // state of the right size rather than a shadow of a state
+    // that is the wrong length. Nothing reads it afterwards
+
+    if (viaPolyPatch)
+    {
+        bScratchPtr.set
+        (
+            new mechanicalConstitutiveLawState(ipIDs.size())
+        );
+
+        // The law must be given the chance to register the state
+        // fields it reads, exactly as for a real state. Without
+        // this a history-dependent law fails looking up its own
+        // history, e.g. epsilonP for the plastic law, and a
+        // declared field would be created empty on first access.
+        //
+        // A prescribed field keeps its declared default here. The
+        // faces are addressed through the polyPatch because the
+        // fvPatch has none, so there is no patch field to read
+        // them from; they take no part in the discretisation, so
+        // nothing downstream depends on the difference
+        applyStateSpecScratch(lawI, bScratchPtr());
+    }
+    else if (preserveState)
+    {
+        bShadowPtr.set
+        (
+            new mechanicalConstitutiveLawState
+            (
+                tp.boundaryStates_[lawI][patchI],
+                mechanicalConstitutiveLawState::SHADOW
+            )
+        );
+    }
+
+    bState =
+        viaPolyPatch
+      ? &bScratchPtr()
+      : preserveState
+      ? &bShadowPtr()
+      : &tp.boundaryStates_[lawI][patchI];
+
+    return true;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
 (
     const integrationPointTopology& topo,
     const UList<tensor>& gradD,
@@ -873,7 +2378,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     UList<symmTensor>& stress,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool preserveState,
+    const bool coldState,
+    UList<scalar>* volumetricPtr
 )
 {
     const word context = "updateStressSmallStrain (flat list)";
@@ -909,13 +2417,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         );
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
     {
         FatalErrorInFunction
             << "The flat-list update does not perform stress collapse, but "
             << "topology " << topo.type() << " shares integration points "
-            << "between cells, so an integration point on a material interface "
-            << "would be written more than once." << nl
+            << "between cells, and there are " << laws_.size()
+            << " mechanical constitutive laws, so an integration point on a "
+            << "material interface would be written more than once." << nl
             << "Use the surfaceField or pointField overload, which takes a "
             << "stressCollapseRule."
             << exit(FatalError);
@@ -936,6 +2445,53 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             continue;
         }
 
+        // Live inputs for this law's evaluation. Built per law, because a
+        // coupling input is handed over as a view of that law's own
+        // integration points, and built here so that it is passed through
+        // every evaluation below, including each finite-difference
+        // perturbation, with no per-call forwarding to get wrong
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
+
+        // A tangent query evaluates against a shadow of the law's state: the
+        // shadow aliases the old-time fields, so history is read but never
+        // written, and the law's outputs land where they are discarded
+        autoPtr<mechanicalConstitutiveLawState> shadowPtr;
+        if (preserveState && !coldState)
+        {
+            shadowPtr.set
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    tp.states_[lawI],
+                    mechanicalConstitutiveLawState::SHADOW
+                )
+            );
+        }
+
+        // A caller that wants a tangent independent of history gets a state
+        // prepared exactly as a fresh run prepares one: declared defaults, the
+        // law's own initialisation, and any prescribed field. That is what the
+        // material looked like before it was loaded, so the tangent is the
+        // same whether the run started here or was continued
+        autoPtr<mechanicalConstitutiveLawState> coldPtr;
+        if (coldState)
+        {
+            coldPtr.set
+            (
+                new mechanicalConstitutiveLawState(tp.states_[lawI].size())
+            );
+
+            applyStateSpec(lawI, topo, ipIDs, coldPtr());
+        }
+
+        mechanicalConstitutiveLawState& lawState =
+            coldState
+          ? coldPtr()
+          : (preserveState ? shadowPtr() : tp.states_[lawI]);
+
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> gradDView(gradD, ipIDs);
         const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
@@ -944,43 +2500,103 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         // Kinematics wrapper
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
         // Constitutive response
-        if (needsScalarTangent(tangentReq))
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            lawState,
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq,
+            volumetricPtr
+        );
+    }
+
+    // Boundary integration points.
+    // The topology's cell-to-integration-point map covers internal points
+    // only, so without this every boundary entry of the caller's storage is
+    // left exactly as it was found - which, for a caller that sized its list
+    // to nIntegrationPoints(), means unwritten memory.
+    // A topology with no boundary slots in its flat index space returns an
+    // empty list per patch below and nothing happens, which is the right
+    // outcome for a cell-centred topology: it is boundaryAware because it
+    // keeps a state per patch, not because its index space extends past the
+    // cells
+    if (tp.boundaryAware_)
+    {
+        forAll(laws_, lawI)
         {
-            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
+            forAll(mesh_.boundary(), patchI)
+            {
+                labelList ipIDs;
+                autoPtr<mechanicalConstitutiveLawState> bScratchPtr;
+                autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
+                mechanicalConstitutiveLawState* bStatePtr = nullptr;
 
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
+                if
+                (
+                   !resolveBoundaryEvaluation
+                    (
+                        topo,
+                        tp,
+                        lawI,
+                        patchI,
+                        preserveState,
+                        ipIDs,
+                        bScratchPtr,
+                        bShadowPtr,
+                        bStatePtr
+                    )
+                )
+                {
+                    continue;
+                }
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else if (needsFourthOrderTangent(tangentReq))
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
+                mechanicalConstitutiveLawState& bState = *bStatePtr;
 
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
+                // Live inputs for this law on this patch. The boundary points
+                // are a different set from the internal ones, so the coupling
+                // input has to be gathered for them rather than reused
+                const mechanicalConstitutiveLawInputs inputs
+                (
+                    lawInputs(lawI, topo, ipIDs, dt, tp)
+                );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+                const UIndirectList<tensor> gradDView(gradD, ipIDs);
+                const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
+                UIndirectList<symmTensor> stressView(stress, ipIDs);
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+                smallStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    gradDView, gradD0View
+                );
+
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    bState,
+                    stressView,
+                    ipIDs,
+                    scalarTangentPtr,
+                    fourthOrderTangentPtr,
+                    tangentReq
+                );
+            }
         }
     }
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
 (
     const integrationPointTopology& topo,
     const UList<tensor>& F,
@@ -993,7 +2609,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     UList<symmTensor>& stress,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool preserveState,
+    UList<scalar>* volumetricPtr
 )
 {
     const word context = "updateStressFiniteStrain (flat list)";
@@ -1033,20 +2651,41 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         );
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial())
+    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
     {
         FatalErrorInFunction
             << "The flat-list update does not perform stress collapse, but "
             << "topology " << topo.type() << " shares integration points "
-            << "between cells, so an integration point on a material interface "
-            << "would be written more than once."
+            << "between cells, and there are " << laws_.size()
+            << " mechanical constitutive laws, so an integration point on a "
+            << "material interface would be written more than once."
             << exit(FatalError);
     }
 
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "evaluateFiniteStrain")
+    );
+
     topologyEntry& tp = topology(topo);
+
+    // One collective per law, before any of them is evaluated.
+    //
+    // A law that normalises its convergence test by a scale over its points
+    // needs that scale to be the same everywhere, and cannot reduce for
+    // itself: the loop below skips a law where this rank holds none of its
+    // points, so the reductions would not pair up. Asked of every law on
+    // every rank, including where it has no points, the count matches
+    const scalarList lawScales
+    (
+        finiteStrainConvergenceScales(tp, F, F0, Finv, Finv0, J, J0)
+    );
 
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
@@ -1057,6 +2696,27 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         {
             continue;
         }
+
+        inputs.setConvergenceScale(lawScales[lawI]);
+
+        // A tangent query evaluates against a shadow of the law's state: the
+        // shadow aliases the old-time fields, so history is read but never
+        // written, and the law's outputs land where they are discarded
+        autoPtr<mechanicalConstitutiveLawState> shadowPtr;
+        if (preserveState)
+        {
+            shadowPtr.set
+            (
+                new mechanicalConstitutiveLawState
+                (
+                    tp.states_[lawI],
+                    mechanicalConstitutiveLawState::SHADOW
+                )
+            );
+        }
+
+        mechanicalConstitutiveLawState& lawState =
+            preserveState ? shadowPtr() : tp.states_[lawI];
 
         // Views into integration-point data (no copies)
         const UIndirectList<tensor> FView(F, ipIDs);
@@ -1075,40 +2735,157 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             JView,
             J0View,
             FinvView,
-            Finv0View,
-            dt
+            Finv0View
         );
 
         // Constitutive response
-        if (needsScalarTangent(tangentReq))
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            lawState,
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq,
+            volumetricPtr
+        );
+    }
+
+    // Boundary integration points.
+    // The topology's cell-to-integration-point map covers internal points
+    // only, so without this every boundary entry of the caller's storage is
+    // left exactly as it was found - which, for a caller that sized its list
+    // to nIntegrationPoints(), means unwritten memory.
+    // A topology with no boundary slots in its flat index space returns an
+    // empty list per patch below and nothing happens, which is the right
+    // outcome for a cell-centred topology: it is boundaryAware because it
+    // keeps a state per patch, not because its index space extends past the
+    // cells
+    if (tp.boundaryAware_)
+    {
+        forAll(laws_, lawI)
         {
-            UIndirectList<scalar> tangentView(*scalarTangentPtr, ipIDs);
+            forAll(mesh_.boundary(), patchI)
+            {
+                labelList ipIDs;
+                autoPtr<mechanicalConstitutiveLawState> bScratchPtr;
+                autoPtr<mechanicalConstitutiveLawState> bShadowPtr;
+                mechanicalConstitutiveLawState* bStatePtr = nullptr;
 
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
+                if
+                (
+                   !resolveBoundaryEvaluation
+                    (
+                        topo,
+                        tp,
+                        lawI,
+                        patchI,
+                        preserveState,
+                        ipIDs,
+                        bScratchPtr,
+                        bShadowPtr,
+                        bStatePtr
+                    )
+                )
+                {
+                    continue;
+                }
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else if (needsFourthOrderTangent(tangentReq))
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
+                mechanicalConstitutiveLawState& bState = *bStatePtr;
 
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
+                const UIndirectList<tensor> FView(F, ipIDs);
+                const UIndirectList<tensor> F0View(F0, ipIDs);
+                const UIndirectList<tensor> FinvView(Finv, ipIDs);
+                const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+                const UIndirectList<scalar> JView(J, ipIDs);
+                const UIndirectList<scalar> J0View(J0, ipIDs);
+                UIndirectList<symmTensor> stressView(stress, ipIDs);
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response(stressView, tangentReq);
+                finiteStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    FView, F0View, JView, J0View, FinvView, Finv0View
+                );
 
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    bState,
+                    stressView,
+                    ipIDs,
+                    scalarTangentPtr,
+                    fourthOrderTangentPtr,
+                    tangentReq
+                );
+            }
         }
     }
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& gradD,
+    const UList<tensor>& gradD0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    evaluateSmallStrain
+    (
+        topo,
+        gradD,
+        gradD0,
+        dt,
+        stress,
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq,
+        false           // commit the constitutive state
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+(
+    const integrationPointTopology& topo,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0,
+    const scalar dt,
+    UList<symmTensor>& stress,
+    UList<scalar>* scalarTangentPtr,
+    UList<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq
+)
+{
+    evaluateFiniteStrain
+    (
+        topo,
+        F,
+        F0,
+        Finv,
+        Finv0,
+        J,
+        J0,
+        dt,
+        stress,
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq,
+        false           // commit the constitutive state
+    );
 }
 
 
@@ -1120,7 +2897,8 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
     const scalar dt,
     UList<scalar>* scalarTangentPtr,
     UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    const bool coldState
 )
 {
     if (tangentReq == tangentRequest::none)
@@ -1133,7 +2911,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    updateStressSmallStrain
+    evaluateSmallStrain
     (
         topo,
         gradD,
@@ -1142,7 +2920,9 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
-        tangentReq
+        tangentReq,
+        true,           // preserve the constitutive state
+        coldState
     );
 }
 
@@ -1172,7 +2952,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    updateStressFiniteStrain
+    evaluateFiniteStrain
     (
         topo,
         F,
@@ -1185,8 +2965,139 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
+        tangentReq,
+        true            // preserve the constitutive state
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
+(
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    volScalarField& scalarTangent,
+    const tangentRequest tangentReq,
+    const bool coldState
+)
+{
+    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
+    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
+    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
+
+    if (!needsScalarTangent(tangentReq))
+    {
+        FatalErrorInFunction
+            << "updateScalarTangent was asked for a "
+            << tangentRequestName(tangentReq) << " tangent." << nl
+            << "This interface returns a scalar tangent at cell centres, so "
+            << "the request must be scalar or scalarDeviatoric."
+            << exit(FatalError);
+    }
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
+
+    updateTangentSmallStrain
+    (
+        topo,
+        Foam::primitiveField(gradD),
+        Foam::primitiveField(gradD0),
+        dt,
+        &tangent,
+        nullptr,
+        tangentReq,
+        coldState
+    );
+
+    // The flat-list primitive fills internal integration points only, so give
+    // the boundary usable values. A scalar tangent is a per-cell material
+    // property, and a boundary face belongs to the material of its owner cell,
+    // so taking the patch-internal value is exact rather than an
+    // approximation. Without this the boundary stays at whatever the field was
+    // constructed with, which a caller forming 1/tangent then divides by
+    forAll(scalarTangent.boundaryField(), patchI)
+    {
+        if (!scalarTangent.boundaryField()[patchI].coupled())
+        {
+            Foam::boundaryFieldRef(scalarTangent)[patchI] =
+                scalarTangent.boundaryField()[patchI].patchInternalField();
+        }
+    }
+
+    // Sync the coupled patches
+    scalarTangent.correctBoundaryConditions();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
+(
+    const volTensorField& F,
+    const volTensorField& F0,
+    const volTensorField& Finv,
+    const volTensorField& Finv0,
+    const volScalarField& J,
+    const volScalarField& J0,
+    const scalar dt,
+    volScalarField& scalarTangent,
+    const tangentRequest tangentReq
+)
+{
+    checkMeshConsistency(mesh_, F.mesh(), F.name());
+    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
+    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
+    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
+    checkMeshConsistency(mesh_, J.mesh(), J.name());
+    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
+    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
+
+    if (!needsScalarTangent(tangentReq))
+    {
+        FatalErrorInFunction
+            << "updateScalarTangentFiniteStrain was asked for a "
+            << tangentRequestName(tangentReq) << " tangent." << nl
+            << "This interface returns a scalar tangent at cell centres, so "
+            << "the request must be scalar or scalarDeviatoric."
+            << exit(FatalError);
+    }
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
+
+    updateTangentFiniteStrain
+    (
+        topo,
+        Foam::primitiveField(F),
+        Foam::primitiveField(F0),
+        Foam::primitiveField(Finv),
+        Foam::primitiveField(Finv0),
+        Foam::primitiveField(J),
+        Foam::primitiveField(J0),
+        dt,
+        &tangent,
+        nullptr,
         tangentReq
     );
+
+    // As in updateScalarTangent: a boundary face belongs to the material of
+    // its owner cell, so the patch-internal value is exact, and a caller
+    // forming 1/tangent must not be handed whatever the field was constructed
+    // with
+    forAll(scalarTangent.boundaryField(), patchI)
+    {
+        if (!scalarTangent.boundaryField()[patchI].coupled())
+        {
+            Foam::boundaryFieldRef(scalarTangent)[patchI] =
+                scalarTangent.boundaryField()[patchI].patchInternalField();
+        }
+    }
+
+    // Sync the coupled patches
+    scalarTangent.correctBoundaryConditions();
 }
 
 
@@ -1197,7 +3108,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
 )
 {
     // Check gradD is defined on the correct mesh
@@ -1212,6 +3124,19 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         );
     }
 
+    if (volumetricResponsePtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_,
+            volumetricResponsePtr->mesh(),
+            volumetricResponsePtr->name()
+        );
+
+        // Checked where the request is made, as on the finite-strain path
+        checkVolumetricSplitSupported("updateStressSmallStrain");
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -1222,7 +3147,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    updateStressSmallStrain
+    evaluateSmallStrain
     (
         topo,
         Foam::primitiveField(gradD),
@@ -1233,7 +3158,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
       ? &Foam::primitiveFieldRef(*scalarTangentPtr)
       : nullptr,
         nullptr,
-        tangentReq
+        tangentReq,
+        false,          // commit the constitutive state
+        false,          // not a cold-state query
+        volumetricResponsePtr
+      ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
+      : nullptr
     );
 
     topologyEntry& tp = topology(topo);
@@ -1262,6 +3192,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                         continue;
                     }
 
+                    // Live inputs for this law on this patch. The patch
+                    // values are what a boundary face sees, not the values
+                    // in the cells behind it
+                    const mechanicalConstitutiveLawInputs inputs
+                    (
+                        lawInputsPatch(lawI, patchI, faces, dt, tp)
+                    );
+
                     // "View" into the kinematic and stress fields for this
                     // material => does not copy data
                     const UIndirectList<tensor> gradDView
@@ -1274,69 +3212,56 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     );
                     UIndirectList<symmTensor> stressView
                     (
-                        boundaryFieldRef(stress)[patchI], faces
+                        Foam::boundaryFieldRef(stress)[patchI], faces
                     );
 
                     // Create wrapper for kinematic data: input to material law
                     // This does not copy data
                     smallStrainMechanicalConstitutiveLawKinematics kin
                     (
-                        gradDView, gradD0View, dt
+                        gradDView, gradD0View
                     );
 
                     // Create wrapper for output
-                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                    {
-                        // "View" into the tangent for this material: no
-                        // data copy
-                        UIndirectList<scalar> tangentView
-                        (
-                            scalarTangentPtr->boundaryField()[patchI],
-                            faces
-                        );
-
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
-                    else // Note: no tangent is evaluated on the boundary
-                    {
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentRequest::none
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
+                    // This path computes no fourth-order tangent, so none is
+                    // offered
+                    evaluateResponse
+                    (
+                        laws_[lawI],
+                        kin,
+                        inputs,
+                        tp.boundaryStates_[lawI][patchI],
+                        stressView,
+                        faces,
+                        scalarTangentPtr
+                      ? &scalarTangentPtr->boundaryField()[patchI]
+                      : nullptr,
+                        static_cast<const UList<mat66>*>(nullptr),
+                        tangentReq
+                    );
                 }
             }
         }
     }
 
     // Update boundaries including syncing coupled boundaries
-#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
-#endif
+
+    // The volumetric response is corrected with the others. Coupled patches
+    // are skipped when it is evaluated, exactly as the stress is, so without
+    // this its processor values are whatever the field was constructed with.
+    // Only the internal field is read today, which makes that harmless rather
+    // than correct - and harmless-for-now is a poor thing to leave for
+    // whoever next reads a boundary value
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
 }
 
 
@@ -1384,6 +3309,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressSmallStrain")
+    );
+
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
 
@@ -1423,46 +3356,21 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                *scalarTangentPtr, ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else if
+        evaluateResponse
         (
-            fourthOrderTangentPtr && needsFourthOrderTangent(tangentReq)
-        )
-        {
-            UIndirectList<mat66> tangentView(*fourthOrderTangentPtr, ipIDs);
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
+            laws_[lawI],
+            kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq
+        );
 
         // Update stress accumulation fields used for stress collapse
         forAll(ipIDs, i)
@@ -1497,85 +3405,70 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         {
             forAll(gradD.boundaryField(), patchI)
             {
-                if (!gradD.boundaryField()[patchI].coupled())
+                // Coupled patches are included. A processor face carries a
+                // real stress that only this rank can compute: unlike a
+                // volField, a surface field's coupled patch is not filled in
+                // by correctBoundaryConditions(), so skipping it would leave
+                // the stress there at zero
+
+                // Select all faces on the patch for which the adjacent
+                // cell is in this material
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
                 {
-                    // Select all faces on the patch for which the adjacent
-                    // cell is in this material
-                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                    if
-                    (
-                        faces.empty()
-                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                    )
-                    {
-                        continue;
-                    }
-
-                    // "View" into the kinematic and stress fields for this
-                    // material => does not copy data
-                    const UIndirectList<tensor> gradDView
-                    (
-                        gradD.boundaryField()[patchI], faces
-                    );
-                    const UIndirectList<tensor> gradD0View
-                    (
-                        gradD0.boundaryField()[patchI], faces
-                    );
-                    UIndirectList<symmTensor> stressView
-                    (
-                        boundaryFieldRef(stress)[patchI], faces
-                    );
-
-                    // Create wrapper for kinematic data: input to material law
-                    // This does not copy data
-                    smallStrainMechanicalConstitutiveLawKinematics kin
-                    (
-                        gradDView, gradD0View, dt
-                    );
-
-                    // Create wrapper for output
-                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                    {
-                        // "View" into the tangent for this material: no
-                        // data copy
-                        UIndirectList<scalar> tangentView
-                        (
-                            scalarTangentPtr->boundaryField()[patchI],
-                            faces
-                        );
-
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
-                    // Note: fourth order tangents are not needed on the
-                    // boundary
-                    else
-                    {
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentRequest::none
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
+                    continue;
                 }
+
+                // "View" into the kinematic and stress fields for this
+                // material => does not copy data
+                const UIndirectList<tensor> gradDView
+                (
+                    gradD.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> gradD0View
+                (
+                    gradD0.boundaryField()[patchI], faces
+                );
+                UIndirectList<symmTensor> stressView
+                (
+                    Foam::boundaryFieldRef(stress)[patchI], faces
+                );
+
+                // Create wrapper for kinematic data: input to material law
+                // This does not copy data
+                smallStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    gradDView, gradD0View
+                );
+
+                // No fourth-order tangent is computed on this boundary,
+                // so a request for one becomes a request for nothing. The
+                // law must not be told a fourth-order tangent is wanted
+                // when there is nowhere to put it
+                const tangentRequest boundaryReq =
+                    scalarTangentPtr && needsScalarTangent(tangentReq)
+                  ? tangentReq
+                  : tangentRequest::none;
+
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    tp.boundaryStates_[lawI][patchI],
+                    stressView,
+                    faces,
+                    scalarTangentPtr
+                  ? &scalarTangentPtr->boundaryField()[patchI]
+                  : nullptr,
+                    static_cast<const UList<mat66>*>(nullptr),
+                    boundaryReq
+                );
             }
         }
     }
@@ -1616,6 +3509,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
+// This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
+// has no evaluate(), so correctBoundaryConditions() does not compile for a
+// SURFACE field there. It compiles and is needed for volFields
 #ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
@@ -1661,6 +3557,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     updateOldTimeIfNeeded();
 
+    // Live inputs for this evaluation, passed through unchanged
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressSmallStrain")
+    );
+
     // Accumulation fields
 
     pointSymmTensorField& stressSum = pointStressSum();
@@ -1701,32 +3603,24 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
         smallStrainMechanicalConstitutiveLawKinematics kin
         (
-            gradDView, gradD0View, dt
+            gradDView, gradD0View
         );
 
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            UIndirectList<scalar> tangentView
-            (
-                scalarTangentPtr->internalField(), ipIDs
-            );
-
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
-        else
-        {
-            mechanicalConstitutiveLawResponse response
-            (
-                stressView, tangentReq
-            );
-
-            laws_[lawI].evaluate(kin, tp.states_[lawI], response);
-        }
+        // This path computes no fourth-order tangent, so none is offered
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            scalarTangentPtr
+          ? &scalarTangentPtr->internalField()
+          : nullptr,
+            static_cast<const UList<mat66>*>(nullptr),
+            tangentReq
+        );
 
         // Accumulate per point
 
@@ -1755,7 +3649,47 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         }
     }
 
+    // A point on a processor boundary is held by every rank that touches it,
+    // and each rank has accumulated only what it can see, so the collapsed
+    // value differs between ranks and matches a serial run on none of them.
+    //
+    // Summing the accumulators across ranks is NOT the fix, and was tried:
+    // this topology asks for unique integration points per material, so a
+    // point receives one contribution per material present on the rank rather
+    // than one per cell. Summing then counts a material once for every rank
+    // that holds it. Take a point shared by materials A and B with stresses
+    // 10 and 40. In serial the collapse is 25. Decomposed so that rank 0 has
+    // both materials and rank 1 has A as well, summing gives (10 + 40 + 10)/3
+    // = 20 - a different wrong answer, and one that changes with the
+    // decomposition just as the unsynchronised version does.
+    //
+    // What this needs is per-material contributions and multiplicities
+    // reconciled across ranks before the materials are combined, or weights
+    // that are genuinely additive. Neither is written, and nothing calls
+    // either collapse overload today - no solid model does, and the
+    // vertex-centred models evaluate on dual-mesh faces with no collapse - so
+    // this refuses rather than guessing
+    if (Pstream::parRun())
+    {
+        FatalErrorInFunction
+            << "Point-centred stress collapse is not implemented for a "
+            << "decomposed mesh." << nl << nl
+            << "    A point on a processor boundary is held by several ranks "
+            << "and each has accumulated only its own contributions, so the "
+            << "collapsed value would depend on the decomposition. Summing "
+            << "the accumulators does not fix it: this topology contributes "
+            << "once per material rather than once per cell, so a sum counts "
+            << "each material once per rank that holds it." << nl << nl
+            << "    Run this case in serial, or use a topology that does not "
+            << "collapse."
+            << exit(FatalError);
+    }
+
     // Collapse
+    //
+    // Both rules divide plain sums: the harmonic rule sums reciprocals, so
+    // what makes it harmonic is what was accumulated rather than how it is
+    // reduced. That is why one sum per accumulator serves both
 
     forAll(stress.internalField(), pointI)
     {
@@ -1843,7 +3777,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
-    const tangentRequest tangentReq
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
 )
 {
     // Check F is defined on the correct mesh
@@ -1862,8 +3797,33 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         );
     }
 
+    if (volumetricResponsePtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_,
+            volumetricResponsePtr->mesh(),
+            volumetricResponsePtr->name()
+        );
+
+        // The split is reachable through this overload as well as through
+        // updateStressFiniteStrainSplit, so the capability is checked where
+        // it is asked for rather than at one of the ways of asking. A law
+        // that cannot separate the two would otherwise ignore the request and
+        // hand back a total stress the caller would treat as isochoric
+        checkVolumetricSplitSupported("updateStressFiniteStrain");
+    }
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
+
+    // Live inputs for this evaluation. Built once and passed through
+    // every evaluation, including each finite-difference perturbation,
+    // so there is no per-call forwarding to get wrong
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressFiniteStrain")
+    );
 
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
@@ -1872,7 +3832,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    updateStressFiniteStrain
+    evaluateFiniteStrain
     (
         topo,
         Foam::primitiveField(F),
@@ -1887,7 +3847,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
       ? &Foam::primitiveFieldRef(*scalarTangentPtr)
       : nullptr,
         nullptr,
-        tangentReq
+        tangentReq,
+        false,          // commit the constitutive state
+        volumetricResponsePtr
+      ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
+      : nullptr
     );
 
     topologyEntry& tp = topology(topo);
@@ -1899,6 +3863,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     {
         forAll(laws_, lawI)
         {
+            // The same scale the internal points were evaluated with. Taking
+            // it over this rank's faces instead would make the convergence
+            // tolerance depend on where the mesh was cut
+            if (lawI < tp.lawConvergenceScales_.size())
+            {
+                inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
+            }
+
             forAll(F.boundaryField(), patchI)
             {
                 if (!F.boundaryField()[patchI].coupled())
@@ -1916,108 +3888,98 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                         continue;
                     }
 
-                    // "View" into the J for this material => does not copy data
+
+                    // View into J for this material => does not copy data
                     const UIndirectList<scalar> JView
                     (
                         J.boundaryField()[patchI], faces
                     );
 
-                    // "View" into J0 for this material => does not copy data
+                    // View into J0 for this material => does not copy data
                     const UIndirectList<scalar> J0View
                     (
                         J0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the F for this material => does not copy data
+                    // View into F for this material => does not copy data
                     const UIndirectList<tensor> FView
                     (
                         F.boundaryField()[patchI], faces
                     );
 
-                    // "View" into F0 for this material => does not copy data
+                    // View into F0 for this material => does not copy data
                     const UIndirectList<tensor> F0View
                     (
                         F0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into Finv for this material => does not copy data
+                    // View into Finv for this material => does not copy data
                     const UIndirectList<tensor> FinvView
                     (
                         Finv.boundaryField()[patchI], faces
                     );
 
-                    // "View" into Finv0 for this material => does not copy data
+                    // View into Finv0 for this material => does not copy data
                     const UIndirectList<tensor> Finv0View
                     (
                         Finv0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the stress for this material: no data copy
+                    // View into stress for this material => does not copy data
                     UIndirectList<symmTensor> stressView
                     (
-                        boundaryFieldRef(stress)[patchI], faces
+                        Foam::boundaryFieldRef(stress)[patchI], faces
                     );
 
                     // Create wrapper for kinematic data: input to material law
                     // This does not copy data
                     finiteStrainMechanicalConstitutiveLawKinematics kin
                     (
-                        FView, F0View, JView, J0View, FinvView, Finv0View, dt
+                        FView, F0View, JView, J0View, FinvView, Finv0View
                     );
 
-                    // Create wrapper for output
-                    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-                    {
-                        // "View" into the tangent for this material: no
-                        // data copy
-                        UIndirectList<scalar> tangentView
-                        (
-                            scalarTangentPtr->boundaryField()[patchI],
-                            faces
-                        );
-
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentView, tangentReq
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
-                    else // Note: no tangent is evaluated on the boundary
-                    {
-                        // Create wrapper for material: output from material law
-                        // This does not copy data
-                        mechanicalConstitutiveLawResponse response
-                        (
-                            stressView, tangentRequest::none
-                        );
-
-                        // Update the material response, e.g. update the stress
-                        laws_[lawI].evaluate
-                        (
-                            kin, tp.boundaryStates_[lawI][patchI], response
-                        );
-                    }
+                    // This path computes no fourth-order tangent, so none is
+                    // offered
+                    evaluateResponse
+                    (
+                        laws_[lawI],
+                        kin,
+                        inputs,
+                        tp.boundaryStates_[lawI][patchI],
+                        stressView,
+                        faces,
+                        scalarTangentPtr
+                      ? &scalarTangentPtr->boundaryField()[patchI]
+                      : nullptr,
+                        static_cast<const UList<mat66>*>(nullptr),
+                        tangentReq,
+                        volumetricResponsePtr
+                      ? &volumetricResponsePtr->boundaryField()[patchI]
+                      : nullptr
+                    );
                 }
             }
         }
     }
 
     // Update boundaries including syncing coupled boundaries
-#ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
     if (scalarTangentPtr && needsScalarTangent(tangentReq))
     {
         scalarTangentPtr->correctBoundaryConditions();
     }
-#endif
+
+    // The volumetric response is corrected with the others. Coupled patches
+    // are skipped when it is evaluated, exactly as the stress is, so without
+    // this its processor values are whatever the field was constructed with.
+    // Only the internal field is read today, which makes that harmless rather
+    // than correct - and harmless-for-now is a poor thing to leave for
+    // whoever next reads a boundary value
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
 }
 
 
@@ -2036,14 +3998,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 )
 {
     // Check field sizes are consistent
-    checkCompactLayoutConsistency
+    const word context("updateStressFiniteStrain (CompactListList)");
+
+    checkCompactLayoutConsistency(F, F0, stress, scalarTangentPtr, context);
+
+    // The four the check above does not see. They are addressed by the same
+    // flat index as F, so a different row shape puts one entity's inverse or
+    // Jacobian against another's deformation gradient
+    const labelList refRows(stress.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", Finv.sizes(), "Finv", context);
+    checkCompactRowSizes
     (
-        F,
-        F0,
-        stress,
-        scalarTangentPtr,
-        "updateStressFiniteStrain (CompactListList)"
+        refRows, "the stress", Finv0.sizes(), "Finv0", context
     );
+    checkCompactRowSizes(refRows, "the stress", J.sizes(), "J", context);
+    checkCompactRowSizes(refRows, "the stress", J0.sizes(), "J0", context);
 
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(F);
@@ -2069,23 +4039,437 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 }
 
 
+void Foam::mechanicalConstitutiveLawManager::checkVolumetricSplitSupported
+(
+    const word& context
+) const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesVolumetricSplit())
+        {
+            FatalErrorInFunction
+                << context << " asked for the isochoric stress and the "
+                << "volumetric response separately, and the law for material '"
+                << lawNames_[lawI] << "', of type " << laws_[lawI].type()
+                << ", cannot supply them." << nl << nl
+                << "    A mixed displacement-pressure formulation replaces the "
+                << "volumetric part of the stress with a solved pressure, so "
+                << "it needs the law's isochoric stress rather than the "
+                << "trace-free part of its total. The two are the same only "
+                << "when the law's energy is written on an isochoric measure; "
+                << "otherwise they differ, and the difference is a different "
+                << "material rather than a visible error." << nl << nl
+                << "    Either use a law that separates them, or solve this "
+                << "case in the displacement formulation."
+                << exit(FatalError);
+        }
+    }
+}
+
+
+bool Foam::mechanicalConstitutiveLawManager::allLawsProvideVolumetricSplit
+() const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesVolumetricSplit())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+bool Foam::mechanicalConstitutiveLawManager::
+allLawsHaveDilationInvariantIsochoricStress() const
+{
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].isochoricStressIsDilationInvariant())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrainSplit
+(
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    volSymmTensorField& deviatoricStress,
+    volScalarField& volumetricResponse
+)
+{
+    // The small-strain twin of updateStressFiniteStrainSplit, and the same
+    // path as the ordinary update with somewhere to put the volumetric
+    // response, so boundary faces are covered rather than left holding a
+    // total stress while the interior holds a deviatoric one
+    updateStressSmallStrain
+    (
+        gradD,
+        gradD0,
+        dt,
+        deviatoricStress,
+        nullptr,
+        tangentRequest::none,
+        &volumetricResponse
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
+(
+    const volTensorField& F,
+    const volTensorField& F0,
+    const volTensorField& Finv,
+    const volTensorField& Finv0,
+    const volScalarField& J,
+    const volScalarField& J0,
+    const scalar dt,
+    volSymmTensorField& isochoricStress,
+    volScalarField& volumetricResponse
+)
+{
+    // The same path as the ordinary finite-strain update, with somewhere to
+    // put the volumetric response. Sharing it is the point: the boundary
+    // faces carry their own constitutive state and their own stress, and a
+    // split that filled only the internal field would leave the boundary
+    // holding a total stress while the interior held an isochoric one. The
+    // traction is built from the boundary values, so that would be wrong
+    // where it is least visible
+    updateStressFiniteStrain
+    (
+        F,
+        F0,
+        J,
+        J0,
+        Finv,
+        Finv0,
+        dt,
+        isochoricStress,
+        nullptr,
+        tangentRequest::none,
+        &volumetricResponse
+    );
+}
+
+
+Foam::wordList
+Foam::mechanicalConstitutiveLawManager::requiredScalarInputsRecursive
+(
+    const mechanicalConstitutiveLaw& law
+) const
+{
+    // Deduplicated, because the same field may be wanted at more than one
+    // level of the tree and is gathered once
+    HashSet<word> names(law.requiredScalarInputs());
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        const wordList childInputs
+        (
+            requiredScalarInputsRecursive(law.childLaw(childNames[i]))
+        );
+
+        forAll(childInputs, j)
+        {
+            names.insert(childInputs[j]);
+        }
+    }
+
+    return names.toc();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::endTimeStepLaw
+(
+    const mechanicalConstitutiveLaw& law,
+    mechanicalConstitutiveLawState& state,
+    const scalar time,
+    const label timeIndex,
+    DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics,
+    DynamicList<const mechanicalConstitutiveLaw*>* reporters,
+    DynamicList<label>* firsts,
+    DynamicList<label>* counts
+) const
+{
+    const label before = diagnostics.size();
+
+    law.endTimeStep(state, time, timeIndex, diagnostics);
+
+    // Who said what. A composite's sub-law reports its own quantities, and
+    // without this the wrapper would be handed them and drop them on the
+    // floor - it inherits the empty reporting hook, so a nested plastic law's
+    // numbers would be reduced and then silently discarded
+    if (reporters && diagnostics.size() > before)
+    {
+        reporters->append(&law);
+        firsts->append(before);
+        counts->append(diagnostics.size() - before);
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        endTimeStepLaw
+        (
+            law.childLaw(childNames[i]),
+            state.child(childNames[i]),
+            time,
+            timeIndex,
+            diagnostics,
+            reporters,
+            firsts,
+            counts
+        );
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 {
     const scalar time = mesh_.time().value();
     const label timeIndex = mesh_.time().timeIndex();
 
-    // Loop over all topology entries
-    forAllIters(topologyEntries_, topoIter)
+    // Gather, then reduce. The laws report locally and communicate nothing,
+    // so this is where the collectives happen and where their count is made
+    // the same on every rank.
+    //
+    // The shape comes from the internal state, which every rank has for every
+    // law whether or not any of its integration points live here. A law
+    // appends the same quantities in the same order every time it is asked,
+    // so that first call fixes how many values there are and what they are
+    // called; the boundary states then combine into those same slots. The
+    // number of boundary states differs from rank to rank - processor patches
+    // exist only where the mesh was cut - and that is exactly why they cannot
+    // be allowed to influence how many collectives are called.
+    //
+    // The topologies are visited by name, in sorted order.
+    //
+    // Both tables are keyed by the name the topology was registered under,
+    // which every rank supplies identically - a type name, a caller's word,
+    // or the role a compact layout fills - so sorting them gives one order
+    // that all ranks agree on. An address would not: it differs between
+    // ranks, so sorting would make each rank's order stable without making
+    // the orders agree
+    wordList topologyKeys(topologyCache_.toc());
+    Foam::sort(topologyKeys);
+
+    // Agreeing on the order of the keys a rank has is not the same as having
+    // the same keys. A topology is built on first use, so a rank that has not
+    // reached that use holds one fewer. The reductions below are per topology,
+    // so that rank calls fewer collectives than the others and the run stops
+    // dead with no indication of why. Say what happened instead.
+    //
+    // The type registered under each key goes into the digest as well as the
+    // key. registerTopology() takes the name from the caller, so two ranks can
+    // supply the same word for different topologies; the keys would then agree
+    // while the point sets behind them do not, and the reductions would pair
+    // one rank's quantity with another's
+    if (Pstream::parRun())
     {
-        topologyEntry& tp = autoPtrRef(topoIter());
+        wordList keysAndTypes(2*topologyKeys.size());
+
+        forAll(topologyKeys, keyI)
+        {
+            const word& key = topologyKeys[keyI];
+
+            keysAndTypes[2*keyI] = key;
+            keysAndTypes[2*keyI + 1] = autoPtrRef(topologyCache_[key]).type();
+        }
+
+        const label check = keyListChecksum(keysAndTypes);
+
+        if
+        (
+            returnReduce(check, minOp<label>())
+         != returnReduce(check, maxOp<label>())
+        )
+        {
+            FatalErrorInFunction
+                << "The ranks of this run do not hold the same set of "
+                << "integration-point topologies." << nl << nl
+                << "    This rank holds " << topologyKeys.size() << ": "
+                << topologyKeys << nl << nl
+                << "    The type registered under each key is compared too, "
+                << "so this also fires where the names agree and the "
+                << "topologies behind them do not." << nl << nl
+                << "    Topologies are created when they are first used, so "
+                << "this means some rank reached an evaluation that the "
+                << "others did not. The end-of-step diagnostics reduce once "
+                << "per topology, so the ranks would call different numbers "
+                << "of collectives and the run would hang here rather than "
+                << "report anything." << nl << nl
+                << "    Every rank must register the same topologies, in the "
+                << "sense of reaching the same evaluation calls, even where "
+                << "it owns no cells of the material concerned."
+                << exit(FatalError);
+        }
+    }
+
+    forAll(topologyKeys, keyI)
+    {
+        topologyEntry& tp = topology(topologyCache_[topologyKeys[keyI]]());
 
         forAll(laws_, lawI)
         {
-            // Call endTimeStep with each topo type for each law
-            laws_[lawI].endTimeStep(tp.states_[lawI], time, timeIndex);
+            DynamicList<mechanicalConstitutiveLawDiagnostic> diagnostics;
+            DynamicList<const mechanicalConstitutiveLaw*> reporters;
+            DynamicList<label> firsts;
+            DynamicList<label> counts;
+
+            // The law and every law below it. A composite's sub-law keeps its
+            // own history and was never told the step had ended
+            endTimeStepLaw
+            (
+                laws_[lawI],
+                tp.states_[lawI],
+                time,
+                timeIndex,
+                diagnostics,
+                &reporters,
+                &firsts,
+                &counts
+            );
+
+            // Not skipped where the law reported nothing. endTimeStep() is
+            // the hook a law commits or rolls over anything storeOldTime()
+            // does not, and nothing in its interface ties that to also
+            // reporting a diagnostic. Returning early here would call it on
+            // the internal points and not on the boundary ones, which is a
+            // wrong answer exactly where it is hardest to see. Only the
+            // reduction and the reporting below depend on there being
+            // anything to report
+
+            // The boundary states
+            if (tp.boundaryAware_ && lawI < tp.boundaryStates_.size())
+            {
+                forAll(tp.boundaryStates_[lawI], patchI)
+                {
+                    DynamicList<mechanicalConstitutiveLawDiagnostic> patchDiags;
+
+                    // Every patch, coupled or not. This is the law's hook for
+                    // committing its own end-of-step work, and a coupled
+                    // patch's state is as real as any other where the
+                    // topology evaluates one
+                    endTimeStepLaw
+                    (
+                        laws_[lawI],
+                        tp.boundaryStates_[lawI][patchI],
+                        time,
+                        timeIndex,
+                        patchDiags,
+                        nullptr,
+                        nullptr,
+                        nullptr
+                    );
+
+                    // A coupled patch is not counted, though. Where it is
+                    // evaluated at all - the face-centred topology does,
+                    // because a processor face carries a stress only this
+                    // rank can compute - the face is held by both ranks, so
+                    // counting it here would put the same faces in the total
+                    // twice, once from each side, and make the total depend
+                    // on how the mesh was cut: this case reports 380
+                    // integration points in serial and would report 458 on
+                    // four ranks
+                    if (mesh_.boundary()[patchI].coupled())
+                    {
+                        continue;
+                    }
+
+                    if (patchDiags.size() != diagnostics.size())
+                    {
+                        FatalErrorInFunction
+                            << "The law for material '" << lawNames_[lawI]
+                            << "' reported " << patchDiags.size()
+                            << " quantities on patch " << patchI << " and "
+                            << diagnostics.size() << " on the internal points."
+                            << nl << nl
+                            << "    A law must report the same quantities in "
+                            << "the same order every time it is asked, "
+                            << "because the number of them fixes how many "
+                            << "collectives are called and that has to match "
+                            << "on every rank."
+                            << exit(FatalError);
+                    }
+
+                    // Nothing to combine where the law reports nothing; the
+                    // hook above has run either way
+                    forAll(diagnostics, d)
+                    {
+                        // Names and operations too, not just the count. Two
+                        // quantities that arrive in a different order, or one
+                        // that is summed here and maximised there, would
+                        // combine silently and give a number that means
+                        // nothing
+                        if
+                        (
+                            patchDiags[d].name() != diagnostics[d].name()
+                         || patchDiags[d].op() != diagnostics[d].op()
+                        )
+                        {
+                            FatalErrorInFunction
+                                << "The law for material '" << lawNames_[lawI]
+                                << "' reported '" << patchDiags[d].name()
+                                << "' where the internal points reported '"
+                                << diagnostics[d].name() << "'." << nl << nl
+                                << "    A law must report the same quantities "
+                                << "in the same order every time it is asked."
+                                << exit(FatalError);
+                        }
+
+                        combineDiagnostic(diagnostics[d], patchDiags[d]);
+                    }
+                }
+            }
+
+            // One collective per quantity, in an order fixed by the law
+            forAll(diagnostics, d)
+            {
+                mechanicalConstitutiveLawDiagnostic& diag = diagnostics[d];
+
+                if
+                (
+                    diag.op()
+                 == mechanicalConstitutiveLawDiagnostic::combineOperation::sum
+                )
+                {
+                    reduce(diag.value(), sumOp<scalar>());
+                }
+                else
+                {
+                    reduce(diag.value(), maxOp<scalar>());
+                }
+            }
+
+            // Each law that reported says what it did, and is handed back
+            // only its own quantities. The manager knows how to combine the
+            // numbers but not what they mean, and the switch that decides
+            // whether anyone wants to hear it belongs to the law
+            forAll(reporters, r)
+            {
+                const SubList<mechanicalConstitutiveLawDiagnostic> slice
+                (
+                    diagnostics, counts[r], firsts[r]
+                );
+
+                reporters[r]->reportDiagnostics(slice);
+            }
         }
     }
 }
+
 
 
 // ************************************************************************* //
