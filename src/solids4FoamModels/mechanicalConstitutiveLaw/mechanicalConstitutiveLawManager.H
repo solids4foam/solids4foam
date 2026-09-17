@@ -222,6 +222,14 @@ class mechanicalConstitutiveLawManager
         //  Keyed by the address of the integrationPointTopology instance
         mutable HashTable<autoPtr<topologyEntry>> topologyEntries_;
 
+        //- Shape of the compact layout each compact topology was built
+        //  from, keyed as topologyCache_ is.
+        //  The key names the role and is identical on every rank; this
+        //  records the addressing behind it, so a second layout arriving
+        //  under the same role is refused rather than silently given the
+        //  first one's history
+        mutable HashTable<word> compactFingerprints_;
+
 
     // Private Member Functions
 
@@ -333,11 +341,36 @@ class mechanicalConstitutiveLawManager
             const CompactListList<tensor>& layout
         ) const;
 
+        //- The key a topology is registered under in topologyCache_.
+        //
+        //  Identity is the registration key, not the object's address. The
+        //  address is not identity: it is reused once an object dies, and it
+        //  differs between ranks, so anything ordered by it - the collective
+        //  reduction in endTimeStep(), the restart file names - would order
+        //  differently on each rank and could pair one topology's history with
+        //  another's after a free and reallocate.
+        //
+        //  The address is still the right way to *find* the entry, because a
+        //  registered topology lives as long as the manager: comparing
+        //  addresses here is a membership test, which is sound, rather than a
+        //  persistent name, which is not.
+        //
+        //  Fatal if the topology is not one this manager owns. Every topology
+        //  reaches the manager through topologyFor(), registerTopology() or
+        //  compactCellTopologyFor(), all of which register it, so a topology
+        //  that is not in the cache is a caller holding an object the manager
+        //  never took ownership of, and its state would be silently unrelated
+        //  to any other
+        const word& topologyKeyFor(const integrationPointTopology& topo) const;
+
         //- Ensure a topology entry exists and return it
         topologyEntry& topology
         (
             const integrationPointTopology& topo
         ) const;
+
+        //- As above, by registration key
+        topologyEntry& topology(const word& key) const;
 
         //- Commit old-time state for all topology entries if needed
         //- Where a prescribed field is read from.
@@ -464,10 +497,15 @@ class mechanicalConstitutiveLawManager
 
         //- Register the persistent state of every law on this topology for
         //  writing, and on a restart read it back
+        //  Named by the key the topology was registered under, not by its
+        //  class name: two topologies of one class under different keys keep
+        //  their own history, and naming the files by class would have them
+        //  overwrite and then restore each other's
         void setupStateRestart
         (
             topologyEntry& entry,
-            const integrationPointTopology& topo
+            const integrationPointTopology& topo,
+            const word& topologyKey
         ) const;
 
         //- One law's persistent state, recursing into any child states

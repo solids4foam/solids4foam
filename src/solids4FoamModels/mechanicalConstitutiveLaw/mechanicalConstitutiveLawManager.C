@@ -66,6 +66,31 @@ std::uint64_t rowSizesHash(const labelUList& rowSizes)
 }
 
 
+// A checksum of an ordered list of keys, folded into a label so it can be
+// compared across ranks with the reductions every fork provides
+label keyListChecksum(const wordList& keys)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(keys, i)
+    {
+        const word& k = keys[i];
+
+        for (label c = 0; c < k.size(); ++c)
+        {
+            h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(k[c]));
+            h *= 1099511628211ULL;
+        }
+
+        // Separator, so {"ab","c"} and {"a","bc"} do not agree
+        h ^= 0xFFULL;
+        h *= 1099511628211ULL;
+    }
+
+    return static_cast<label>(h & 0x7FFFFFFFULL);
+}
+
+
 // Combine one diagnostic into another, by the operation it carries
 void combineDiagnostic
 (
@@ -370,21 +395,60 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     //  - integration-point counts encoded in sub-list sizes
     const labelList rowSizes(layout.sizes());
 
-    // The topology built below is a function of the row sizes alone: the
-    // integration-point indices are just the flat positions those sizes imply.
-    // So the key is the shape, not the address of the layout object. Keying on
-    // the address would hand a later layout the topology of an earlier one
-    // that happened to live at the same place, with no way to notice
-    const word key =
-        (cellBased ? "compactCell:" : "compactFace:")
-      + Foam::name(rowSizes.size()) + ":"
+    // The key names the role, and is a literal, so it is the same word on
+    // every rank. That matters because endTimeStep() sorts these keys and
+    // reduces per entry: a key built from this rank's cell count or from a
+    // digest of this rank's row sizes would sort differently on each rank and
+    // pair one topology's quantity against another's.
+    //
+    // The shape is not identity, then, but it is still worth checking. The
+    // digest below is a local fingerprint: it says whether the layout handed
+    // in now has the same addressing as the one this topology was built from.
+    // One compact cell layout and one compact face layout are supported per
+    // manager, which is what the flat-list API uses; a second layout of the
+    // same kind is a different topology and must be registered by name
+    const word key(cellBased ? "compactCell" : "compactFace");
+
+    const word fingerprint =
+        Foam::name(rowSizes.size()) + ":"
       + Foam::name(layout.m().size()) + ":"
       + Foam::name(rowSizesHash(rowSizes));
 
     // Already constructed?
     if (topologyCache_.found(key))
     {
-        return topology(autoPtrRef(topologyCache_[key])).topology_;
+        if (!compactFingerprints_.found(key))
+        {
+            FatalErrorInFunction
+                << "The name '" << key << "' is already registered, but not "
+                << "by a compact layout." << nl << nl
+                << "    That name is reserved for the topology the flat-list "
+                << "CompactListList interface builds. Register other "
+                << "topologies under a name of their own."
+                << exit(FatalError);
+        }
+
+        const word& seen = compactFingerprints_[key];
+
+        if (seen != fingerprint)
+        {
+            FatalErrorInFunction
+                << "A second compact integration-point layout was passed to "
+                << "the manager under the role '" << key << "'." << nl << nl
+                << "    The layout first seen had shape " << seen
+                << " and this one has " << fingerprint
+                << " (rows:values:digest)." << nl << nl
+                << "    The constitutive state is held per topology, so "
+                << "returning the first topology for the second layout would "
+                << "read one layout's history through the other's addressing."
+                << nl << nl
+                << "    Register the second layout under its own name with "
+                << "registerTopology(), choosing a name that every rank "
+                << "supplies identically."
+                << exit(FatalError);
+        }
+
+        return topology(key).topology_;
     }
 
     // Construct topology lazily
@@ -423,8 +487,39 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 
     // Cache and return
     topologyCache_.insert(key, topoPtr);
+    compactFingerprints_.set(key, fingerprint);
 
-    return topology(autoPtrRef(topologyCache_[key])).topology_;
+    return topology(key).topology_;
+}
+
+
+const Foam::word&
+Foam::mechanicalConstitutiveLawManager::topologyKeyFor
+(
+    const integrationPointTopology& topo
+) const
+{
+    forAllIters(topologyCache_, iter)
+    {
+        if (&autoPtrRef(iter()) == &topo)
+        {
+            return iter.key();
+        }
+    }
+
+    FatalErrorInFunction
+        << "The integration-point topology of type " << topo.type()
+        << " was not registered with this manager." << nl << nl
+        << "    Its constitutive state, boundary state and restart entries "
+        << "are all held against the key it was registered under, so a "
+        << "topology the manager does not own has no state to find and "
+        << "would silently be given a fresh one." << nl << nl
+        << "    Obtain the topology from topologyFor(), registerTopology() "
+        << "or compactCellTopologyFor() rather than constructing one and "
+        << "passing it in."
+        << exit(FatalError);
+
+    return word::null;
 }
 
 
@@ -434,11 +529,17 @@ Foam::mechanicalConstitutiveLawManager::topology
     const integrationPointTopology& topo
 ) const
 {
-    // Use the address of the topology object as a unique key
-    const word key = Foam::name
-    (
-        static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&topo))
-    );
+    return topology(topologyKeyFor(topo));
+}
+
+
+Foam::mechanicalConstitutiveLawManager::topologyEntry&
+Foam::mechanicalConstitutiveLawManager::topology
+(
+    const word& key
+) const
+{
+    const integrationPointTopology& topo = autoPtrRef(topologyCache_[key]);
 
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
@@ -568,7 +669,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
     // Last, so that a restart overwrites the cold start defaults applied above
     // rather than the other way round
-    setupStateRestart(entry, topo);
+    setupStateRestart(entry, topo, key);
 
     return entry;
 }
@@ -1058,7 +1159,8 @@ void Foam::mechanicalConstitutiveLawManager::checkRestartKinematics() const
 void Foam::mechanicalConstitutiveLawManager::setupStateRestart
 (
     topologyEntry& entry,
-    const integrationPointTopology& topo
+    const integrationPointTopology& topo,
+    const word& topologyKey
 ) const
 {
     // A run that begins at a time other than the first is continuing, and a
@@ -1155,7 +1257,7 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         (
             mechanicalConstitutiveLawStateIO::fieldName
             (
-                lawNames_[lawI], topo.type(), wordList(), "integrationPoints"
+                lawNames_[lawI], topologyKey, wordList(), "integrationPoints"
             )
         );
 
@@ -1202,7 +1304,7 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         (
             laws_[lawI],
             lawNames_[lawI],
-            topo.type(),
+            topologyKey,
             wordList(),
             entityName,
             entities,
@@ -1729,7 +1831,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     rhoPtr_(),
     kappaPtr_(),
     topologyCache_(),
-    topologyEntries_()
+    topologyEntries_(),
+    compactFingerprints_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -4013,16 +4116,47 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     //
     // The topologies are visited by name, in sorted order.
     //
-    // Not through topologyEntries_, which is keyed on the address of the
-    // topology object rendered as text: those differ between ranks, so its
-    // hash order can differ too, and sorting them would only make each rank's
-    // own order stable rather than making the orders agree. With more than
-    // one topology registered that would pair one rank's quantity against
-    // another rank's in a reduction that completes and returns nonsense.
-    // topologyCache_ is keyed by the name the caller registered, which every
-    // rank supplies identically, so sorting those does give one order
+    // Both tables are keyed by the name the topology was registered under,
+    // which every rank supplies identically - a type name, a caller's word,
+    // or the role a compact layout fills - so sorting them gives one order
+    // that all ranks agree on. An address would not: it differs between
+    // ranks, so sorting would make each rank's order stable without making
+    // the orders agree
     wordList topologyKeys(topologyCache_.toc());
     Foam::sort(topologyKeys);
+
+    // Agreeing on the order of the keys a rank has is not the same as having
+    // the same keys. A topology is built on first use, so a rank that has not
+    // reached that use holds one fewer. The reductions below are per topology,
+    // so that rank calls fewer collectives than the others and the run stops
+    // dead with no indication of why. Say what happened instead
+    if (Pstream::parRun())
+    {
+        const label check = keyListChecksum(topologyKeys);
+
+        if
+        (
+            returnReduce(check, minOp<label>())
+         != returnReduce(check, maxOp<label>())
+        )
+        {
+            FatalErrorInFunction
+                << "The ranks of this run do not hold the same set of "
+                << "integration-point topologies." << nl << nl
+                << "    This rank holds " << topologyKeys.size() << ": "
+                << topologyKeys << nl << nl
+                << "    Topologies are created when they are first used, so "
+                << "this means some rank reached an evaluation that the "
+                << "others did not. The end-of-step diagnostics reduce once "
+                << "per topology, so the ranks would call different numbers "
+                << "of collectives and the run would hang here rather than "
+                << "report anything." << nl << nl
+                << "    Every rank must register the same topologies, in the "
+                << "sense of reaching the same evaluation calls, even where "
+                << "it owns no cells of the material concerned."
+                << exit(FatalError);
+        }
+    }
 
     forAll(topologyKeys, keyI)
     {

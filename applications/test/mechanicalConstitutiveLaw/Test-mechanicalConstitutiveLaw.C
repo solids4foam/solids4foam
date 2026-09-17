@@ -2121,6 +2121,47 @@ int main(int argc, char *argv[])
             report("a clashing registerTopology key is rejected", threw);
         }
 
+        // A topology the manager never took ownership of. Its state is held
+        // against the key it was registered under, so one that was never
+        // registered has no state to find; it must be refused rather than
+        // quietly given a fresh set of history variables
+        {
+            bool threw = false;
+
+            const faceCentredIntegrationPointTopology foreign(mesh);
+
+            List<tensor> foreignGradD
+            (
+                foreign.nIntegrationPoints(), tensor::zero
+            );
+            List<tensor> foreignGradD0(foreignGradD);
+            List<symmTensor> foreignSigma
+            (
+                foreignGradD.size(), symmTensor::zero
+            );
+
+            try
+            {
+                manager.updateStressSmallStrain
+                (
+                    foreign,
+                    foreignGradD,
+                    foreignGradD0,
+                    dt,
+                    foreignSigma
+                );
+            }
+            catch (const Foam::error&)
+            {
+                threw = true;
+            }
+
+            report
+            (
+                "a topology the manager does not own is rejected", threw
+            );
+        }
+
         FatalError.dontThrowExceptions();
     }
 
