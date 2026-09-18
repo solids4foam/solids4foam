@@ -304,5 +304,5 @@ and exits nonzero on failure. Optional `-symbolSweep` exports raw analytical
 curves/maps, `-writeFields` writes uniquely named pressure/stabilisation
 fields, and `-constructOnly` supports focused constructor rejection tests.
 
-See the build instructions, example dictionary and plotting script in
-[tutorial case](../../tutorials/solids/verification/pressureStabilisationFourier/README.md).
+The Paper-1 verification case lives in the solid-benchmarks repository under
+`papers/JFNK_mixed/fourierVerification/pressureStabilisationFourier/`.
