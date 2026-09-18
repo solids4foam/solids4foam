@@ -111,6 +111,33 @@ void combineDiagnostic
 }
 
 
+// Detaches the standing stress from the inputs however evaluateResponse()
+// exits. The volumetric branches there return early, so that the view they
+// build outlives the evaluation that uses it, and a detach written at the end
+// of the function would be stepped over on exactly those paths - leaving
+// inputs holding a pointer to a list that has gone out of scope, for the next
+// law to read
+class incomingStressGuard
+{
+    const mechanicalConstitutiveLawInputs& inputs_;
+
+public:
+
+    explicit incomingStressGuard
+    (
+        const mechanicalConstitutiveLawInputs& inputs
+    )
+    :
+        inputs_(inputs)
+    {}
+
+    ~incomingStressGuard()
+    {
+        inputs_.clearIncomingStress();
+    }
+};
+
+
 //- Build the response a law writes into, and evaluate the law.
 //
 //  Every evaluation in this file ends in the same three lines: work out which
@@ -160,6 +187,10 @@ void evaluateResponse
     // reading it yields zero rather than whatever the last caller left - which
     // turns a silent dependence on buffer contents into an obvious one
     List<symmTensor> incoming;
+
+    // Armed before anything can return, and for every law: detaching a stress
+    // that was never attached is a no-op
+    const incomingStressGuard guard(inputs);
 
     if (law.requiresIncomingStress())
     {
@@ -249,9 +280,8 @@ void evaluateResponse
         law.evaluate(kin, inputs, state, response);
     }
 
-    // The standing stress lived only for this evaluation, so it is detached
-    // before the next law is reached
-    inputs.clearIncomingStress();
+    // The detach is the guard's, above: it happens on every path out of here,
+    // including the early returns in the volumetric branches
 }
 
 
@@ -2420,6 +2450,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         context
     );
 
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
+
     if (scalarTangentPtr)
     {
         checkIntegrationPointListSize
@@ -2607,7 +2653,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -2653,6 +2700,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         tangentReq,
         context
     );
+
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
 
     if (scalarTangentPtr)
     {
@@ -2838,7 +2901,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -3256,7 +3320,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                       ? &scalarTangentPtr->boundaryField()[patchI]
                       : nullptr,
                         static_cast<const UList<mat66>*>(nullptr),
-                        tangentReq
+                        tangentReq,
+                        volumetricResponsePtr
+                      ? &volumetricResponsePtr->boundaryField()[patchI]
+                      : nullptr
                     );
                 }
             }
