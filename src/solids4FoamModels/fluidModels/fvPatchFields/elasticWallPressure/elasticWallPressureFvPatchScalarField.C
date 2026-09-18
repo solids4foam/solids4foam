@@ -158,6 +158,7 @@ const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
         );
 
         // Initialise the rhoHs field for the fluid patch and map zone to patch
+        rhoSolidHsPtr_.clear();
         rhoSolidHsPtr_.set
         (
             new scalarField
