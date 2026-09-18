@@ -67,8 +67,9 @@ sample_file() {
 
 # Exercise the mechanicalConstitutiveLawManager evaluation paths on this case.
 # This tutorial is used because it is the only one with more than one material,
-# and the manager's integration-point addressing is per material. The framework
-# is not yet used by any solid model, so this is its only runtime coverage
+# and the manager's integration-point addressing is per material. The solid
+# models can now take their stress from the framework, so this is no longer its
+# only runtime coverage, but it remains the only multi-material coverage
 run_constitutive_test() {
     if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
         echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"

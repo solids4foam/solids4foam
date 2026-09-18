@@ -55,6 +55,7 @@ SourceFiles
 #define poroLinGeomSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
@@ -119,6 +120,24 @@ class poroLinGeomSolid
         dimensionedScalar rKprime_;
 
     // Private Member Functions
+
+        //- Update the stress, from the framework when
+        //  the framework is in use and from the legacy
+        //  mechanicalModel otherwise
+        void correctStress();
+
+        //- Construct impK from whichever of the two is in use
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf from whichever of the two is in use
+        tmp<surfaceScalarField> makeImpKf() const;
+
+        //- The material residual. The framework rolls its own state over and
+        //  reports no residual of its own, so it contributes nothing here
+        virtual scalar materialResidual() override;
+
+        //- End-of-step bookkeeping, including the framework's own
+        virtual void updateTotalFields() override;
 
         //- Check if the momentum and pressure equations are converged
         bool converged

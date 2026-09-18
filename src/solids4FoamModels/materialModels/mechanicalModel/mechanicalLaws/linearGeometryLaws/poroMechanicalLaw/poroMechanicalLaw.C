@@ -188,7 +188,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     ),
     pName_
     (
-        mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")
+        mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "porePressure")
     ),
     pRegion_
     (
