@@ -1,0 +1,25 @@
+{
+  "default_levels": [1, 2, 3],
+  "default_variants": ["petsc"],
+  "base_divisions": [15, 3, 1],
+  "base_extrude_layers": 36,
+  "variants": {
+    "petsc": {"approach": "petsc"}
+  },
+  "mid_line": {
+    "short_axis_radii_m": [0.007, 0.010],
+    "long_axis_radii_m": [0.017, 0.020],
+    "truncation_ratio": 0.25,
+    "samples": 100
+  },
+  "diagnostics": {
+    "apex_z_m": {
+      "value": -0.0270451,
+      "tolerance": 0.05,
+      "source": "Independent solids4foam block-coupled mixed pressure-displacement solution of the same Land et al. (2015) Problem 2 configuration. Informational only; it is not a pass criterion."
+    }
+  },
+  "acceptance": {
+    "minimum_net_order": 0.0
+  }
+}

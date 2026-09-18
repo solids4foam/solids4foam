@@ -20,8 +20,6 @@ fi
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
-solids4Foam::runApplication solids4Foam
-
 # Run solver
 if [[ "$1" == "parallel" ]]; then
     # Run parallel

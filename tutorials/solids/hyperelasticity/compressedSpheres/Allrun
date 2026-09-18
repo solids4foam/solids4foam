@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [contact]
+
+Where [contact] is one of:
+  frictionless      (default) frictionless contact between the spheres
+  friction          Coulomb friction (mu = 0.5) between the spheres
+
+Examples:
+  ./Allrun
+  ./Allrun frictionless
+  ./Allrun friction
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+CONTACT=frictionless
+
+for arg in "$@"
+do
+    case "$arg" in
+        frictionless|friction)
+            CONTACT="$arg"
+            ;;
+        *)
+            echo "Error: Unknown argument '$arg'"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Check version
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+
+    while IFS= read -r -d '' f
+    do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found ))
+    then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+echo "Using the ${CONTACT} contact settings"
+link_files_for_suffix "${CONTACT}"
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Extract the mesh (coarse quarter-symmetry mesh, dimensions in m)
+echo "Extracting the mesh from coarseMesh.tar.xz"
+rm -rf constant/polyMesh
+tar -xJf coarseMesh.tar.xz -C constant
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating force-displacement.png using gnuplot"
+    gnuplot -e "contact='${CONTACT}'" plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

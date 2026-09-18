@@ -1,0 +1,23 @@
+{
+  "case_name": "spherical cavity under uniaxial tension",
+  "approach": "petscSnes",
+  "mesh_types": ["tet", "poly"],
+  "default_min_spacings_m_by_mesh": {
+    "tet": [0.02, 0.01, 0.005],
+    "poly": [0.02, 0.01, 0.005, 0.0025]
+  },
+  "max_to_min_spacing_ratio": 5.0,
+  "legacy_study": {
+    "repository": "solid-benchmarks/linearElasticity/sphericalCavity",
+    "min_spacings_m": [0.02, 0.01, 0.005, 0.0025, 0.00125, 0.000625]
+  },
+  "acceptance": {
+    "required_metrics": [
+      "displacement_l2_m",
+      "displacement_linf_m",
+      "stress_zz_l2_pa",
+      "stress_zz_linf_pa"
+    ],
+    "minimum_net_order": 0.0
+  }
+}

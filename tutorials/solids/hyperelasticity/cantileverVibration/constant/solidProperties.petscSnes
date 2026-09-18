@@ -1,0 +1,34 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
+{
+    // Solve the momentum equation monolithically using a Jacobian-free
+    // Newton-Krylov method via PETSc SNES; the PETSc options are specified in
+    // system/fvSolution
+    solutionAlgorithm   PETScSNES;
+
+    // Predict D at the start of each time step using the velocity and
+    // acceleration from the previous time step
+    predictor           yes;
+}
+
+// ************************************************************************* //
