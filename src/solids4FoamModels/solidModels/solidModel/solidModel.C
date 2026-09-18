@@ -1805,8 +1805,8 @@ void Foam::solidModel::updateTotalFields()
 }
 
 
-// The high-order face quadrature does not exist on foam-extend
-#ifndef FOAMEXTEND
+// The high-order face quadrature does not run on foam-extend, but these
+// helpers are portable and the models that call them are compiled there
 void Foam::solidModel::quadDeformationGradient
 (
     const CompactListList<tensor>& gradD,
@@ -1859,7 +1859,6 @@ void Foam::solidModel::quadInverseAndJacobian
         J[i] = det(Fv[i]);
     }
 }
-#endif
 
 
 Foam::mechanicalConstitutiveLawManager&
