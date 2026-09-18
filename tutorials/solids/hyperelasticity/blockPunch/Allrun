@@ -41,7 +41,7 @@ MESH=hex
 for arg in "$@"
 do
     case "$arg" in
-        segregated|petscSnes|highOrder)
+        segregated|segregatedManager|petscSnes|highOrder)
             APPROACH="$arg"
             ;;
         hex|tet)
@@ -76,6 +76,12 @@ case "$APPROACH" in
     segregated)
         echo "Using the segregated approach"
         link_files_for_suffix segregated
+        ;;
+    segregatedManager)
+        echo "Using the segregated approach with the constitutive law manager"
+        link_files_for_suffix segregated
+        rm -f constant/solidProperties
+        ln -s solidProperties.segregatedManager constant/solidProperties
         ;;
     petscSnes)
         echo "Using the petscSnes approach"

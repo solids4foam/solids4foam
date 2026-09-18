@@ -1,0 +1,116 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    t
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-12;
+        relTol          0.0;
+        maxIter         1000;
+    }
+
+    D
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-6";
+            snes_monitor;
+            snes_converged_reason;
+            snes_max_linear_solve_fail "100000";
+
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "200";
+            ksp_rtol "1e-3";
+            ksp_converged_reason;
+            ksp_max_it "100";
+
+            // pc_type hypre;
+            // pc_hypre_type boomeramg;
+            // pc_hypre_boomeramg_max_iter "1";
+            // pc_hypre_boomeramg_strong_threshold "0.6";
+            // pc_hypre_boomeramg_grid_sweeps_up "1";
+            // pc_hypre_boomeramg_grid_sweeps_down "1";
+            // pc_hypre_boomeramg_agg_nl "1";
+            // pc_hypre_boomeramg_agg_num_paths "1";
+            // pc_hypre_boomeramg_max_levels "25";
+            // pc_hypre_boomeramg_coarsen_type HMIS;
+            // pc_hypre_boomeramg_interp_type ext+i;
+            // pc_hypre_boomeramg_P_max "1";
+            // pc_hypre_boomeramg_truncfactor "0.3";
+
+            // Split preconditioner below for mixed (pressure-displacement) solver
+
+            // Fluid: nested velocity/pressure Schur (3-D: block_size 4)
+            pc_type fieldsplit;
+            pc_fieldsplit_type schur;
+            pc_fieldsplit_schur_fact_type lower;
+            pc_fieldsplit_schur_precondition a11;
+            pc_fieldsplit_block_size "4";
+            pc_fieldsplit_0_fields "0,1,2";
+            pc_fieldsplit_1_fields "3";
+
+            // Velocity sub-block: bjacobi + ILU(0) (or + AMG)
+            fieldsplit_0_ksp_type preonly;
+            //fieldsplit_0_pc_type bjacobi;
+            // fieldsplit_0_sub_pc_type ilu;
+            // fieldsplit_0_sub_pc_factor_levels "0";
+            fieldsplit_0_pc_type hypre;
+            fieldsplit_0_pc_hypre_type boomeramg;
+            fieldsplit_0_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_0_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_0_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_0_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_0_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_0_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_0_pc_hypre_boomeramg_truncfactor "0.3";
+
+            // Pressure Schur complement: HYPRE BoomerAMG
+            fieldsplit_1_ksp_type preonly;
+            fieldsplit_1_pc_type hypre;
+            fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
+        }
+    }
+}
+
+// ************************************************************************* //
