@@ -451,7 +451,6 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
 }
 
 
-#ifndef FOAMEXTEND
 const Foam::leastSquaresScheme&
 Foam::solidModel::displacementLeastSquares() const
 {
@@ -493,8 +492,10 @@ void Foam::solidModel::makeSigmaQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -513,10 +514,8 @@ void Foam::solidModel::makeSigmaQuad() const
         }
     }
 }
-#endif
 
 
-#ifndef FOAMEXTEND
 void Foam::solidModel::makeGradDQuad() const
 {
     if (!gradDQuadPtr_.empty())
@@ -525,8 +524,10 @@ void Foam::solidModel::makeGradDQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -545,7 +546,6 @@ void Foam::solidModel::makeGradDQuad() const
         }
     }
 }
-#endif
 
 
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
@@ -1364,15 +1364,6 @@ Foam::solidModel::solidModel
         highOrderResidual_ =
             hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
 
-#ifdef FOAMEXTEND
-        if (highOrderJacobian_ || highOrderResidual_)
-        {
-            FatalErrorInFunction
-                << "High-order MLS discretisation is not supported on "
-                << "foam-extend." << abort(FatalError);
-        }
-#endif
-
         if
         (
             (highOrderJacobian_ || highOrderResidual_)
@@ -1787,13 +1778,8 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 }
 
 
-void Foam::solidModel::updateTotalFields()
+void Foam::solidModel::rollOverQuadratureHistory()
 {
-    mechanical().updateTotalFields();
-
-    // Take the old-time copy of the quadrature gradient now, at the end of the
-    // step, while the current field holds the converged value. It is rebuilt
-    // on each evaluation, so there is nothing else to take it from.
     // The high-order discretisation, and hence gradDQuad(), does not exist on
     // foam-extend
 #ifndef FOAMEXTEND
@@ -1810,8 +1796,17 @@ void Foam::solidModel::updateTotalFields()
 }
 
 
-// The high-order face quadrature does not exist on foam-extend
-#ifndef FOAMEXTEND
+void Foam::solidModel::updateTotalFields()
+{
+    mechanical().updateTotalFields();
+
+    // A model overriding this must call rollOverQuadratureHistory() itself
+    rollOverQuadratureHistory();
+}
+
+
+// The high-order face quadrature does not run on foam-extend, but these
+// helpers are portable and the models that call them are compiled there
 void Foam::solidModel::quadDeformationGradient
 (
     const CompactListList<tensor>& gradD,
@@ -1864,7 +1859,6 @@ void Foam::solidModel::quadInverseAndJacobian
         J[i] = det(Fv[i]);
     }
 }
-#endif
 
 
 Foam::mechanicalConstitutiveLawManager&
@@ -1874,6 +1868,13 @@ Foam::solidModel::mechanicalManager() const
     {
         // mechanicalModel is itself the mechanicalProperties IOdictionary, so
         // both frameworks are built from exactly the same entries
+        //
+        // TODO: this also means a framework run constructs the whole legacy
+        // model and every legacy law, so the framework cannot yet exist
+        // without the thing it replaces. Breaking that is stage 5 work:
+        // solidModel should read mechanicalProperties itself and hand the
+        // dictionary to whichever implementation is in use, leaving
+        // mechanicalModel as one consumer of it rather than the owner
         mechanicalManagerPtr_.set
         (
             new mechanicalConstitutiveLawManager(mesh(), mechanical())
@@ -1892,6 +1893,43 @@ void Foam::solidModel::frameworkGrad
 {
     // See the header for why this does not call mechanical().grad()
     gradD = fvc::grad(D);
+}
+
+
+void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return;
+    }
+
+    if (mechanicalManager().nLaws() < 2)
+    {
+        return;
+    }
+
+    const word gradScheme
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh().gradScheme("grad(" + fieldName + ')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + fieldName + ')')
+#endif
+    );
+
+    if (gradScheme != "leastSquaresS4f")
+    {
+        FatalErrorInFunction
+            << "More than one material on the mechanicalConstitutiveLaw "
+            << "framework needs a material-aware gradient for grad("
+            << fieldName << "), and `" << gradScheme << "` is not one."
+            << nl << nl
+            << "    The framework computes one gradient on one mesh in place "
+            << "of the legacy per-material subMeshes, which only works if the "
+            << "scheme keeps a cell's stencil within its own material. Set "
+            << "`grad(" << fieldName << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
 }
 
 
@@ -2154,7 +2192,6 @@ void Foam::solidModel::setTraction
     }
 }
 
-#ifndef FOAMEXTEND
 void Foam::solidModel::setTractionQuadrature
 (
     fvPatchVectorField& tractionPatch,
@@ -2176,7 +2213,6 @@ void Foam::solidModel::setTractionQuadrature
             << solidTractionFvPatchVectorField::typeName << abort(FatalError);
     }
 }
-#endif
 
 
 void Foam::solidModel::setTraction
@@ -2270,9 +2306,7 @@ void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
-#ifndef FOAMEXTEND
     leastSquaresReconstruction::New(mesh()).clear();
-#endif
 }
 
 

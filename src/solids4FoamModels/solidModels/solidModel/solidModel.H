@@ -64,9 +64,7 @@ SourceFiles
     #include "NamedEnum.H"
 #endif
 
-#ifndef FOAMEXTEND
-    #include "leastSquaresReconstruction.H"
-#endif
+#include "leastSquaresReconstruction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -357,14 +355,11 @@ private:
         //- Make the p field
         void makeP() const;
 
-#ifndef FOAMEXTEND
         //- Make the sigma at face quadrature points field
         void makeSigmaQuad() const;
 
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
-
-#endif
 
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
@@ -430,6 +425,31 @@ protected:
             const volVectorField& D,
             volTensorField& gradD
         ) const;
+
+        //- Refuse a multi-material framework run whose gradient scheme is not
+        //  material-aware.
+        //
+        //  frameworkGrad() computes one gradient on one mesh in place of the
+        //  legacy per-material subMeshes, which is only right if the scheme
+        //  keeps a cell's stencil within its own material. leastSquaresS4f
+        //  does; the ordinary schemes do not, and the answer is then wrong by
+        //  more than the case's own tolerance and silently so, which is why
+        //  this refuses rather than warns.
+        //
+        //  Here rather than in each solid model because every model that
+        //  offers the framework has the same requirement, and four of them
+        //  did not check it
+        void checkFrameworkGradScheme(const word& fieldName) const;
+
+        //- Copy the quadrature gradient into its old-time store, at the end
+        //  of the time step, while the current field holds the converged
+        //  value. It is rebuilt on each evaluation, so there is nothing else
+        //  to take it from.
+        //
+        //  Separate from updateTotalFields() so that a model overriding that
+        //  can still roll the history over: the two do unrelated work, and a
+        //  model wanting one does not necessarily want the other
+        void rollOverQuadratureHistory();
 
         //- The implicit stiffness taken from the mechanicalConstitutiveLaw
         //  framework.
@@ -822,7 +842,6 @@ public:
                 return gradD_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to gradD at face quadrature points
             virtual CompactListList<tensor>& gradDQuad()
             {
@@ -859,7 +878,6 @@ public:
 
                 return autoPtrRef(gradDQuadPtr_);
             }
-#endif
 
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
@@ -885,7 +903,6 @@ public:
                 return sigma_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to sigma at face quarature points
             virtual CompactListList<symmTensor>& sigmaQuad()
             {
@@ -907,7 +924,6 @@ public:
 
                 return autoPtrRef(sigmaQuadPtr_);
             }
-#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
@@ -939,7 +955,6 @@ public:
             {
                 return twoD_;
             }
-#ifndef FOAMEXTEND
             //- Return the displacement least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& displacementLeastSquares() const;
@@ -947,7 +962,7 @@ public:
             //- Return the pressure least-squares reconstruction scheme
             //  for the high order discretisation
             const leastSquaresScheme& pressureLeastSquares() const;
-#endif
+
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -1080,14 +1095,12 @@ public:
                 const vectorField& traction
             );
 
-#ifndef FOAMEXTEND
             //- Set traction component at specified patch quadrature points
             virtual void setTractionQuadrature
             (
                 fvPatchVectorField& tractionPatch,
                 const CompactListList<vector>& traction
             );
-#endif
 
             //- Set traction at specified patch
             virtual void setTraction

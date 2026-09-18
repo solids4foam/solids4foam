@@ -188,8 +188,9 @@ public:
         virtual dimensionedScalar kappa() const
         {
             FatalErrorInFunction
-                << "Bulk modulus (kapp) not defined for mechanical constitutive "
-                << "law of type " << type() << exit(FatalError);
+                << "Bulk modulus (kapp) not defined for mechanical "
+                << "constitutive law of type " << type()
+                << exit(FatalError);
 
             // Keep the compiler happy.
             // Note: dimensioned<Type> has no default constructor in
@@ -362,6 +363,27 @@ public:
             FatalErrorInFunction
                 << "Finite-strain evaluation is not implemented for this "
                 << "mechanicalConstitutiveLaw." << exit(FatalError);
+        }
+
+        //- The scale this law normalises its convergence test by, over the
+        //  points it is about to be given. Zero for a law that needs none,
+        //  which is all of them but the non-linear plastic ones.
+        //
+        //  Returned rather than reduced here. The manager evaluates a law
+        //  only where it has integration points, and which points a rank
+        //  holds depends on the decomposition, so a law reducing inside
+        //  evaluate() would call a different number of collectives on each
+        //  rank and the run would hang. The manager instead asks every law
+        //  for this on every rank, including where it has no points, reduces
+        //  once per law, and supplies the result through
+        //  mechanicalConstitutiveLawInputs::convergenceScale()
+        virtual scalar localConvergenceScale
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics&,
+            const mechanicalConstitutiveLawState&
+        ) const
+        {
+            return 0;
         }
 
         //- Optional hook called once at the end of each time step.

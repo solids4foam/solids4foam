@@ -67,8 +67,9 @@ sample_file() {
 
 # Exercise the mechanicalConstitutiveLawManager evaluation paths on this case.
 # This tutorial is used because it is the only one with more than one material,
-# and the manager's integration-point addressing is per material. The framework
-# is not yet used by any solid model, so this is its only runtime coverage
+# and the manager's integration-point addressing is per material. The solid
+# models can now take their stress from the framework, so this is no longer its
+# only runtime coverage, but it remains the only multi-material coverage
 run_constitutive_test() {
     if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
         echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
@@ -87,8 +88,10 @@ run_constitutive_test() {
         n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
 
         if (( n_passed == 0 )); then
-            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
-            return 0
+            # The test exited zero but reported nothing: it did not run the
+            # checks it is here for, so this is a failure, not a skip
+            echo "FAIL: mechanicalConstitutiveLaw checks (no checks reported)"
+            return 1
         fi
 
         echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"

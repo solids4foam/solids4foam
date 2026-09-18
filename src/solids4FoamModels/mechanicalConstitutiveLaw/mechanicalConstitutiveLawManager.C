@@ -27,6 +27,7 @@ License
 #include "mat66.H"
 #include "Switch.H"
 #include "CompactListList.H"
+#include <cstdint>
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -41,6 +42,54 @@ namespace Foam
 
 namespace Foam
 {
+
+// A 64-bit FNV-1a digest of a list of row sizes, used to key a compact
+// integration-point topology on the shape of the layout that produced it.
+// Spelled out rather than taken from a fork's hasher, which the three
+// supported forks do not agree on
+std::uint64_t rowSizesHash(const labelUList& rowSizes)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(rowSizes, i)
+    {
+        const std::uint64_t v = static_cast<std::uint64_t>(rowSizes[i]);
+
+        for (int byteI = 0; byteI < 8; ++byteI)
+        {
+            h ^= (v >> (8*byteI)) & 0xFFULL;
+            h *= 1099511628211ULL;
+        }
+    }
+
+    return h;
+}
+
+
+// A checksum of an ordered list of keys, folded into a label so it can be
+// compared across ranks with the reductions every fork provides
+label keyListChecksum(const wordList& keys)
+{
+    std::uint64_t h = 14695981039346656037ULL;
+
+    forAll(keys, i)
+    {
+        const word& k = keys[i];
+
+        for (label c = 0; c < k.size(); ++c)
+        {
+            h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(k[c]));
+            h *= 1099511628211ULL;
+        }
+
+        // Separator, so {"ab","c"} and {"a","bc"} do not agree
+        h ^= 0xFFULL;
+        h *= 1099511628211ULL;
+    }
+
+    return static_cast<label>(h & 0x7FFFFFFFULL);
+}
+
 
 // Combine one diagnostic into another, by the operation it carries
 void combineDiagnostic
@@ -60,6 +109,33 @@ void combineDiagnostic
         into.value() = max(into.value(), from.value());
     }
 }
+
+
+// Detaches the standing stress from the inputs however evaluateResponse()
+// exits. The volumetric branches there return early, so that the view they
+// build outlives the evaluation that uses it, and a detach written at the end
+// of the function would be stepped over on exactly those paths - leaving
+// inputs holding a pointer to a list that has gone out of scope, for the next
+// law to read
+class incomingStressGuard
+{
+    const mechanicalConstitutiveLawInputs& inputs_;
+
+public:
+
+    explicit incomingStressGuard
+    (
+        const mechanicalConstitutiveLawInputs& inputs
+    )
+    :
+        inputs_(inputs)
+    {}
+
+    ~incomingStressGuard()
+    {
+        inputs_.clearIncomingStress();
+    }
+};
 
 
 //- Build the response a law writes into, and evaluate the law.
@@ -111,6 +187,10 @@ void evaluateResponse
     // reading it yields zero rather than whatever the last caller left - which
     // turns a silent dependence on buffer contents into an obvious one
     List<symmTensor> incoming;
+
+    // Armed before anything can return, and for every law: detaching a stress
+    // that was never attached is a no-op
+    const incomingStressGuard guard(inputs);
 
     if (law.requiresIncomingStress())
     {
@@ -200,9 +280,8 @@ void evaluateResponse
         law.evaluate(kin, inputs, state, response);
     }
 
-    // The standing stress lived only for this evaluation, so it is detached
-    // before the next law is reached
-    inputs.clearIncomingStress();
+    // The detach is the guard's, above: it happens on every path out of here,
+    // including the early returns in the volumetric branches
 }
 
 
@@ -210,6 +289,46 @@ void evaluateResponse
 } // End namespace Foam
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
+
+
+void Foam::mechanicalConstitutiveLawManager::checkCompactRowSizes
+(
+    const labelList& ref,
+    const word& refName,
+    const labelList& other,
+    const word& otherName,
+    const word& context
+)
+{
+    if (other.size() != ref.size())
+    {
+        FatalErrorInFunction
+            << "Inconsistent compact layouts in " << context << nl << nl
+            << "    " << refName << " has " << ref.size() << " rows and "
+            << otherName << " has " << other.size() << '.' << nl << nl
+            << "    The rows are the integration points of one mesh entity, "
+            << "so two layouts with different row counts describe different "
+            << "meshes."
+            << exit(FatalError);
+    }
+
+    forAll(ref, rowI)
+    {
+        if (other[rowI] != ref[rowI])
+        {
+            FatalErrorInFunction
+                << "Inconsistent compact layouts in " << context << nl << nl
+                << "    Row " << rowI << " holds " << ref[rowI]
+                << " integration points in " << refName << " and "
+                << other[rowI] << " in " << otherName << '.' << nl << nl
+                << "    The two hold the same number of values in total, so "
+                << "every list is the length it should be, but the flat index "
+                << "of a point differs between them: values from one entity "
+                << "would be read as another's."
+                << exit(FatalError);
+        }
+    }
+}
 
 
 void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
@@ -242,6 +361,12 @@ void Foam::mechanicalConstitutiveLawManager::checkCompactLayoutConsistency
             << ", got: " << tangentPtr->size()
             << exit(FatalError);
     }
+
+    // The lengths agreeing does not make the layouts the same
+    const labelList refRows(out.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", a.sizes(), "grad", context);
+    checkCompactRowSizes(refRows, "the stress", b.sizes(), "grad0", context);
 }
 
 
@@ -295,7 +420,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Already constructed?
     if (topologyCache_.found(topologyTypeName))
     {
-        return topology(topologyCache_[topologyTypeName]()).topology_;
+        return topology(autoPtrRef(topologyCache_[topologyTypeName])).topology_;
     }
 
     // Lazily construct via OpenFOAM runtime selection
@@ -315,7 +440,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     // Cache and return
     topologyCache_.insert(topologyTypeName, topoPtr);
 
-    return topology(topologyCache_[topologyTypeName]()).topology_;
+    return topology(autoPtrRef(topologyCache_[topologyTypeName])).topology_;
 }
 
 
@@ -361,27 +486,63 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
             << exit(FatalError);
     }
 
-    // Unique key per layout instance
-    const word key =
-        (cellBased ? "compactCell:" : "compactFace:") + Foam::name
-        (
-            static_cast<std::uint64_t>
-            (
-                reinterpret_cast<std::uintptr_t>(&layout)
-            )
-        );
+    // The key names the role, and is a literal, so it is the same word on
+    // every rank. That matters because endTimeStep() sorts these keys and
+    // reduces per entry: a key built from this rank's cell count or from a
+    // digest of this rank's row sizes would sort differently on each rank and
+    // pair one topology's quantity against another's.
+    //
+    // The shape is not identity, then, but it is still worth checking. The
+    // digest below is a local fingerprint: it says whether the layout handed
+    // in now has the same addressing as the one this topology was built from.
+    // One compact cell layout and one compact face layout are supported per
+    // manager, which is what the flat-list API uses; a second layout of the
+    // same kind is a different topology and must be registered by name
+    const word key(cellBased ? "compactCell" : "compactFace");
+
+    const word fingerprint =
+        Foam::name(rowSizes.size()) + ":"
+      + Foam::name(layout.m().size()) + ":"
+      + Foam::name(rowSizesHash(rowSizes));
 
     // Already constructed?
     if (topologyCache_.found(key))
     {
-        return topology(topologyCache_[key]()).topology_;
+        if (!compactFingerprints_.found(key))
+        {
+            FatalErrorInFunction
+                << "The name '" << key << "' is already registered, but not "
+                << "by a compact layout." << nl << nl
+                << "    That name is reserved for the topology the flat-list "
+                << "CompactListList interface builds. Register other "
+                << "topologies under a name of their own."
+                << exit(FatalError);
+        }
+
+        const word& seen = compactFingerprints_[key];
+
+        if (seen != fingerprint)
+        {
+            FatalErrorInFunction
+                << "A second compact integration-point layout was passed to "
+                << "the manager under the role '" << key << "'." << nl << nl
+                << "    The layout first seen had shape " << seen
+                << " and this one has " << fingerprint
+                << " (rows:values:digest)." << nl << nl
+                << "    The constitutive state is held per topology, so "
+                << "returning the first topology for the second layout would "
+                << "read one layout's history through the other's addressing."
+                << nl << nl
+                << "    Register the second layout under its own name with "
+                << "registerTopology(), choosing a name that every rank "
+                << "supplies identically."
+                << exit(FatalError);
+        }
+
+        return topology(key).topology_;
     }
 
     // Construct topology lazily
-
-    // We know this is cell-based compact storage:
-    //  - one sub-list per cell
-    //  - integration-point counts encoded in sub-list sizes
 
     // Build cell → IP addressing
     // rowSizes rather than layout[cellI].size(): the const operator[] does
@@ -420,8 +581,91 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 
     // Cache and return
     topologyCache_.insert(key, topoPtr);
+    compactFingerprints_.set(key, fingerprint);
 
-    return topology(topologyCache_[key]()).topology_;
+    return topology(key).topology_;
+}
+
+
+Foam::scalarList
+Foam::mechanicalConstitutiveLawManager::finiteStrainConvergenceScales
+(
+    topologyEntry& tp,
+    const UList<tensor>& F,
+    const UList<tensor>& F0,
+    const UList<tensor>& Finv,
+    const UList<tensor>& Finv0,
+    const UList<scalar>& J,
+    const UList<scalar>& J0
+) const
+{
+    scalarList scales(laws_.size(), 0.0);
+
+    // Every law, on every rank, whether or not this rank holds any of its
+    // points. That is the point of doing it here: the evaluation loops skip a
+    // law with no points, so a law reducing for itself would reduce a
+    // different number of times on each rank
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> FView(F, ipIDs);
+        const UIndirectList<tensor> F0View(F0, ipIDs);
+        const UIndirectList<tensor> FinvView(Finv, ipIDs);
+        const UIndirectList<tensor> Finv0View(Finv0, ipIDs);
+        const UIndirectList<scalar> JView(J, ipIDs);
+        const UIndirectList<scalar> J0View(J0, ipIDs);
+
+        const finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView, F0View, JView, J0View, FinvView, Finv0View
+        );
+
+        scales[lawI] =
+            laws_[lawI].localConvergenceScale(kin, tp.states_[lawI]);
+    }
+
+    // One reduction per law, in law order, which every rank shares
+    forAll(scales, lawI)
+    {
+        reduce(scales[lawI], maxOp<scalar>());
+    }
+
+    // Kept so that the boundary evaluations use the same scale as the
+    // internal ones
+    tp.lawConvergenceScales_ = scales;
+
+    return scales;
+}
+
+
+const Foam::word&
+Foam::mechanicalConstitutiveLawManager::topologyKeyFor
+(
+    const integrationPointTopology& topo
+) const
+{
+    forAllIters(topologyCache_, iter)
+    {
+        if (&autoPtrRef(iter()) == &topo)
+        {
+            return iter.key();
+        }
+    }
+
+    FatalErrorInFunction
+        << "The integration-point topology of type " << topo.type()
+        << " was not registered with this manager." << nl << nl
+        << "    Its constitutive state, boundary state and restart entries "
+        << "are all held against the key it was registered under, so a "
+        << "topology the manager does not own has no state to find and "
+        << "would silently be given a fresh one." << nl << nl
+        << "    Obtain the topology from topologyFor(), registerTopology() "
+        << "or compactCellTopologyFor() rather than constructing one and "
+        << "passing it in."
+        << exit(FatalError);
+
+    return word::null;
 }
 
 
@@ -431,16 +675,22 @@ Foam::mechanicalConstitutiveLawManager::topology
     const integrationPointTopology& topo
 ) const
 {
-    // Use the address of the topology object as a unique key
-    const word key = Foam::name
-    (
-        static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&topo))
-    );
+    return topology(topologyKeyFor(topo));
+}
+
+
+Foam::mechanicalConstitutiveLawManager::topologyEntry&
+Foam::mechanicalConstitutiveLawManager::topology
+(
+    const word& key
+) const
+{
+    const integrationPointTopology& topo = autoPtrRef(topologyCache_[key]);
 
     // Return existing entry if already constructed
     if (topologyEntries_.found(key))
     {
-        return topologyEntries_[key]();
+        return autoPtrRef(topologyEntries_[key]);
     }
 
     // ---------------------------------------------------------------------
@@ -452,7 +702,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
     autoPtr<topologyEntry> entryPtr(new topologyEntry(topo));
     topologyEntries_.insert(key, entryPtr);
-    topologyEntry& entry = topologyEntries_[key]();
+    topologyEntry& entry = autoPtrRef(topologyEntries_[key]);
 
     const label nLaws = laws_.size();
 
@@ -565,7 +815,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
     // Last, so that a restart overwrites the cold start defaults applied above
     // rather than the other way round
-    setupStateRestart(entry, topo);
+    setupStateRestart(entry, topo, key);
 
     return entry;
 }
@@ -1056,7 +1306,8 @@ void Foam::mechanicalConstitutiveLawManager::checkRestartKinematics() const
 void Foam::mechanicalConstitutiveLawManager::setupStateRestart
 (
     topologyEntry& entry,
-    const integrationPointTopology& topo
+    const integrationPointTopology& topo,
+    const word& topologyKey
 ) const
 {
     // A run that begins at a time other than the first is continuing, and a
@@ -1106,7 +1357,10 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         // refuses rather than guessing
         labelList entities;
 
-        if (topo.type() == cellCentredIntegrationPointTopology::typeName)
+        const bool topologyRecordsLocations =
+            (topo.type() == cellCentredIntegrationPointTopology::typeName);
+
+        if (topologyRecordsLocations)
         {
             const labelList& ipIDs = entry.lawIntegrationPointIDs_[lawI];
 
@@ -1153,11 +1407,20 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         (
             mechanicalConstitutiveLawStateIO::fieldName
             (
-                lawNames_[lawI], topo.type(), wordList(), "integrationPoints"
+                lawNames_[lawI], topologyKey, wordList(), "integrationPoints"
             )
         );
 
-        if (!entities.empty())
+        // On whether this topology records locations, not on whether this
+        // rank has any. A rank holding no cells of this material has an empty
+        // list, and that is a statement about the decomposition rather than an
+        // absence of information: the file still has to be written, because
+        // reconstructing a decomposed state requires the pair of files from
+        // every processor directory and refuses the lot if one is missing.
+        // A topology that records no locations at all writes neither file, and
+        // a restart on a changed decomposition then refuses rather than
+        // guessing, which is the intended behaviour
+        if (topologyRecordsLocations)
         {
             // Written in the numbering of the undecomposed mesh, whichever way
             // this run is being run. A serial run's locations are what a
@@ -1200,7 +1463,7 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         (
             laws_[lawI],
             lawNames_[lawI],
-            topo.type(),
+            topologyKey,
             wordList(),
             entityName,
             entities,
@@ -1498,7 +1761,7 @@ void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
         // Loop over all topology entries
         forAllIters(topologyEntries_, topoIter)
         {
-            topologyEntry& entry = topoIter()();
+            topologyEntry& entry = autoPtrRef(topoIter());
 
             // Internal states
             forAll(entry.states_, lawI)
@@ -1727,7 +1990,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     rhoPtr_(),
     kappaPtr_(),
     topologyCache_(),
-    topologyEntries_()
+    topologyEntries_(),
+    compactFingerprints_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -1998,7 +2262,8 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
     // Already registered?
     if (topologyCache_.found(key))
     {
-        const integrationPointTopology& existing = topologyCache_[key]();
+        const integrationPointTopology& existing =
+            autoPtrRef(topologyCache_[key]);
 
         if (existing.type() != topoPtr->type())
         {
@@ -2020,7 +2285,7 @@ Foam::mechanicalConstitutiveLawManager::registerTopology
 
     topologyCache_.insert(key, topoPtr);
 
-    return topology(topologyCache_[key]()).topology_;
+    return topology(autoPtrRef(topologyCache_[key])).topology_;
 }
 
 
@@ -2184,6 +2449,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         tangentReq,
         context
     );
+
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
 
     if (scalarTangentPtr)
     {
@@ -2372,7 +2653,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -2419,6 +2701,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         context
     );
 
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
+
     if (scalarTangentPtr)
     {
         checkIntegrationPointListSize
@@ -2459,6 +2757,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
 
     topologyEntry& tp = topology(topo);
 
+    // One collective per law, before any of them is evaluated.
+    //
+    // A law that normalises its convergence test by a scale over its points
+    // needs that scale to be the same everywhere, and cannot reduce for
+    // itself: the loop below skips a law where this rank holds none of its
+    // points, so the reductions would not pair up. Asked of every law on
+    // every rank, including where it has no points, the count matches
+    const scalarList lawScales
+    (
+        finiteStrainConvergenceScales(tp, F, F0, Finv, Finv0, J, J0)
+    );
+
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
@@ -2468,6 +2778,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         {
             continue;
         }
+
+        inputs.setConvergenceScale(lawScales[lawI]);
 
         // A tangent query evaluates against a shadow of the law's state: the
         // shadow aliases the old-time fields, so history is read but never
@@ -2589,7 +2901,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -3007,7 +3320,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                       ? &scalarTangentPtr->boundaryField()[patchI]
                       : nullptr,
                         static_cast<const UList<mat66>*>(nullptr),
-                        tangentReq
+                        tangentReq,
+                        volumetricResponsePtr
+                      ? &volumetricResponsePtr->boundaryField()[patchI]
+                      : nullptr
                     );
                 }
             }
@@ -3175,67 +3491,70 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         {
             forAll(gradD.boundaryField(), patchI)
             {
-                if (!gradD.boundaryField()[patchI].coupled())
+                // Coupled patches are included. A processor face carries a
+                // real stress that only this rank can compute: unlike a
+                // volField, a surface field's coupled patch is not filled in
+                // by correctBoundaryConditions(), so skipping it would leave
+                // the stress there at zero
+
+                // Select all faces on the patch for which the adjacent
+                // cell is in this material
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
                 {
-                    // Select all faces on the patch for which the adjacent
-                    // cell is in this material
-                    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                    if
-                    (
-                        faces.empty()
-                     || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                    )
-                    {
-                        continue;
-                    }
-
-                    // "View" into the kinematic and stress fields for this
-                    // material => does not copy data
-                    const UIndirectList<tensor> gradDView
-                    (
-                        gradD.boundaryField()[patchI], faces
-                    );
-                    const UIndirectList<tensor> gradD0View
-                    (
-                        gradD0.boundaryField()[patchI], faces
-                    );
-                    UIndirectList<symmTensor> stressView
-                    (
-                        Foam::boundaryFieldRef(stress)[patchI], faces
-                    );
-
-                    // Create wrapper for kinematic data: input to material law
-                    // This does not copy data
-                    smallStrainMechanicalConstitutiveLawKinematics kin
-                    (
-                        gradDView, gradD0View
-                    );
-
-                    // No fourth-order tangent is computed on this boundary,
-                    // so a request for one becomes a request for nothing. The
-                    // law must not be told a fourth-order tangent is wanted
-                    // when there is nowhere to put it
-                    const tangentRequest boundaryReq =
-                        scalarTangentPtr && needsScalarTangent(tangentReq)
-                      ? tangentReq
-                      : tangentRequest::none;
-
-                    evaluateResponse
-                    (
-                        laws_[lawI],
-                        kin,
-                        inputs,
-                        tp.boundaryStates_[lawI][patchI],
-                        stressView,
-                        faces,
-                        scalarTangentPtr
-                      ? &scalarTangentPtr->boundaryField()[patchI]
-                      : nullptr,
-                        static_cast<const UList<mat66>*>(nullptr),
-                        boundaryReq
-                    );
+                    continue;
                 }
+
+                // "View" into the kinematic and stress fields for this
+                // material => does not copy data
+                const UIndirectList<tensor> gradDView
+                (
+                    gradD.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> gradD0View
+                (
+                    gradD0.boundaryField()[patchI], faces
+                );
+                UIndirectList<symmTensor> stressView
+                (
+                    Foam::boundaryFieldRef(stress)[patchI], faces
+                );
+
+                // Create wrapper for kinematic data: input to material law
+                // This does not copy data
+                smallStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    gradDView, gradD0View
+                );
+
+                // No fourth-order tangent is computed on this boundary,
+                // so a request for one becomes a request for nothing. The
+                // law must not be told a fourth-order tangent is wanted
+                // when there is nowhere to put it
+                const tangentRequest boundaryReq =
+                    scalarTangentPtr && needsScalarTangent(tangentReq)
+                  ? tangentReq
+                  : tangentRequest::none;
+
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    tp.boundaryStates_[lawI][patchI],
+                    stressView,
+                    faces,
+                    scalarTangentPtr
+                  ? &scalarTangentPtr->boundaryField()[patchI]
+                  : nullptr,
+                    static_cast<const UList<mat66>*>(nullptr),
+                    boundaryReq
+                );
             }
         }
     }
@@ -3278,9 +3597,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 // This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
 // has no evaluate(), so correctBoundaryConditions() does not compile for a
-// SURFACE field there. It compiles and is needed for volFields, where the
-// guard was previously applied too and silently left the boundary values
-// uncorrected on that fork
+// SURFACE field there. It compiles and is needed for volFields
 #ifndef OPENFOAM_ORG
     stress.correctBoundaryConditions();
 
@@ -3632,6 +3949,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     {
         forAll(laws_, lawI)
         {
+            // The same scale the internal points were evaluated with. Taking
+            // it over this rank's faces instead would make the convergence
+            // tolerance depend on where the mesh was cut
+            if (lawI < tp.lawConvergenceScales_.size())
+            {
+                inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
+            }
+
             forAll(F.boundaryField(), patchI)
             {
                 if (!F.boundaryField()[patchI].coupled())
@@ -3650,43 +3975,43 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     }
 
 
-                    // "View" into the J for this material => does not copy data
+                    // View into J for this material => does not copy data
                     const UIndirectList<scalar> JView
                     (
                         J.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the J0 for this material => does not copy data
+                    // View into J0 for this material => does not copy data
                     const UIndirectList<scalar> J0View
                     (
                         J0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the F for this material => does not copy data
+                    // View into F for this material => does not copy data
                     const UIndirectList<tensor> FView
                     (
                         F.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the F0 for this material => does not copy data
+                    // View into F0 for this material => does not copy data
                     const UIndirectList<tensor> F0View
                     (
                         F0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the Finv for this material => does not copy data
+                    // View into Finv for this material => does not copy data
                     const UIndirectList<tensor> FinvView
                     (
                         Finv.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the Finv0 for this material => does not copy data
+                    // View into Finv0 for this material => does not copy data
                     const UIndirectList<tensor> Finv0View
                     (
                         Finv0.boundaryField()[patchI], faces
                     );
 
-                    // "View" into the stress for this material => does not copy data
+                    // View into stress for this material => does not copy data
                     UIndirectList<symmTensor> stressView
                     (
                         Foam::boundaryFieldRef(stress)[patchI], faces
@@ -3759,14 +4084,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 )
 {
     // Check field sizes are consistent
-    checkCompactLayoutConsistency
+    const word context("updateStressFiniteStrain (CompactListList)");
+
+    checkCompactLayoutConsistency(F, F0, stress, scalarTangentPtr, context);
+
+    // The four the check above does not see. They are addressed by the same
+    // flat index as F, so a different row shape puts one entity's inverse or
+    // Jacobian against another's deformation gradient
+    const labelList refRows(stress.sizes());
+
+    checkCompactRowSizes(refRows, "the stress", Finv.sizes(), "Finv", context);
+    checkCompactRowSizes
     (
-        F,
-        F0,
-        stress,
-        scalarTangentPtr,
-        "updateStressFiniteStrain (CompactListList)"
+        refRows, "the stress", Finv0.sizes(), "Finv0", context
     );
+    checkCompactRowSizes(refRows, "the stress", J.sizes(), "J", context);
+    checkCompactRowSizes(refRows, "the stress", J0.sizes(), "J0", context);
 
     // Look up the map and state for compact list cell-based topologies
     const integrationPointTopology& topo = compactCellTopologyFor(F);
@@ -4009,16 +4342,66 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
     //
     // The topologies are visited by name, in sorted order.
     //
-    // Not through topologyEntries_, which is keyed on the address of the
-    // topology object rendered as text: those differ between ranks, so its
-    // hash order can differ too, and sorting them would only make each rank's
-    // own order stable rather than making the orders agree. With more than
-    // one topology registered that would pair one rank's quantity against
-    // another rank's in a reduction that completes and returns nonsense.
-    // topologyCache_ is keyed by the name the caller registered, which every
-    // rank supplies identically, so sorting those does give one order
+    // Both tables are keyed by the name the topology was registered under,
+    // which every rank supplies identically - a type name, a caller's word,
+    // or the role a compact layout fills - so sorting them gives one order
+    // that all ranks agree on. An address would not: it differs between
+    // ranks, so sorting would make each rank's order stable without making
+    // the orders agree
     wordList topologyKeys(topologyCache_.toc());
     Foam::sort(topologyKeys);
+
+    // Agreeing on the order of the keys a rank has is not the same as having
+    // the same keys. A topology is built on first use, so a rank that has not
+    // reached that use holds one fewer. The reductions below are per topology,
+    // so that rank calls fewer collectives than the others and the run stops
+    // dead with no indication of why. Say what happened instead.
+    //
+    // The type registered under each key goes into the digest as well as the
+    // key. registerTopology() takes the name from the caller, so two ranks can
+    // supply the same word for different topologies; the keys would then agree
+    // while the point sets behind them do not, and the reductions would pair
+    // one rank's quantity with another's
+    if (Pstream::parRun())
+    {
+        wordList keysAndTypes(2*topologyKeys.size());
+
+        forAll(topologyKeys, keyI)
+        {
+            const word& key = topologyKeys[keyI];
+
+            keysAndTypes[2*keyI] = key;
+            keysAndTypes[2*keyI + 1] = autoPtrRef(topologyCache_[key]).type();
+        }
+
+        const label check = keyListChecksum(keysAndTypes);
+
+        if
+        (
+            returnReduce(check, minOp<label>())
+         != returnReduce(check, maxOp<label>())
+        )
+        {
+            FatalErrorInFunction
+                << "The ranks of this run do not hold the same set of "
+                << "integration-point topologies." << nl << nl
+                << "    This rank holds " << topologyKeys.size() << ": "
+                << topologyKeys << nl << nl
+                << "    The type registered under each key is compared too, "
+                << "so this also fires where the names agree and the "
+                << "topologies behind them do not." << nl << nl
+                << "    Topologies are created when they are first used, so "
+                << "this means some rank reached an evaluation that the "
+                << "others did not. The end-of-step diagnostics reduce once "
+                << "per topology, so the ranks would call different numbers "
+                << "of collectives and the run would hang here rather than "
+                << "report anything." << nl << nl
+                << "    Every rank must register the same topologies, in the "
+                << "sense of reaching the same evaluation calls, even where "
+                << "it owns no cells of the material concerned."
+                << exit(FatalError);
+        }
+    }
 
     forAll(topologyKeys, keyI)
     {
@@ -4045,33 +4428,26 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                 &counts
             );
 
-            if (diagnostics.empty())
-            {
-                continue;
-            }
+            // Not skipped where the law reported nothing. endTimeStep() is
+            // the hook a law commits or rolls over anything storeOldTime()
+            // does not, and nothing in its interface ties that to also
+            // reporting a diagnostic. Returning early here would call it on
+            // the internal points and not on the boundary ones, which is a
+            // wrong answer exactly where it is hardest to see. Only the
+            // reduction and the reporting below depend on there being
+            // anything to report
 
-            // The boundary states, which used to be skipped entirely because
-            // the laws reduced for themselves and could not be called once
-            // per patch without hanging
+            // The boundary states
             if (tp.boundaryAware_ && lawI < tp.boundaryStates_.size())
             {
                 forAll(tp.boundaryStates_[lawI], patchI)
                 {
-                    // A coupled patch has a state allocated but never
-                    // evaluated - the evaluation loops skip it, because the
-                    // cell on the other side belongs to another rank and
-                    // computes it there. Counting it here would put the same
-                    // faces in the total twice, once from each side, and make
-                    // the total depend on how the mesh was cut: this case
-                    // reports 380 integration points in serial and would
-                    // report 458 on four ranks
-                    if (mesh_.boundary()[patchI].coupled())
-                    {
-                        continue;
-                    }
-
                     DynamicList<mechanicalConstitutiveLawDiagnostic> patchDiags;
 
+                    // Every patch, coupled or not. This is the law's hook for
+                    // committing its own end-of-step work, and a coupled
+                    // patch's state is as real as any other where the
+                    // topology evaluates one
                     endTimeStepLaw
                     (
                         laws_[lawI],
@@ -4083,6 +4459,20 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                         nullptr,
                         nullptr
                     );
+
+                    // A coupled patch is not counted, though. Where it is
+                    // evaluated at all - the face-centred topology does,
+                    // because a processor face carries a stress only this
+                    // rank can compute - the face is held by both ranks, so
+                    // counting it here would put the same faces in the total
+                    // twice, once from each side, and make the total depend
+                    // on how the mesh was cut: this case reports 380
+                    // integration points in serial and would report 458 on
+                    // four ranks
+                    if (mesh_.boundary()[patchI].coupled())
+                    {
+                        continue;
+                    }
 
                     if (patchDiags.size() != diagnostics.size())
                     {
@@ -4100,6 +4490,8 @@ void Foam::mechanicalConstitutiveLawManager::endTimeStep()
                             << exit(FatalError);
                     }
 
+                    // Nothing to combine where the law reports nothing; the
+                    // hook above has run either way
                     forAll(diagnostics, d)
                     {
                         // Names and operations too, not just the count. Two

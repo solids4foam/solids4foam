@@ -5,6 +5,7 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+BACKWARD_CASE_DIR="${REGRESSION_ROOT}/backwardRestart"
 
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
@@ -22,6 +23,8 @@ FORCE_MEAN_TOL=2.6e-2   # mean force tolerance
 
 # Regression end time for the copied case only
 REG_END_TIME=0.0015
+BACKWARD_END_TIME=5e-5
+BACKWARD_WRITE_INTERVAL=2.5e-5
 
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=50
@@ -45,19 +48,55 @@ echo "Mean force difference       < ${FORCE_MEAN_TOL}"
 echo "============================================================"
 echo
 
-prepare_case() {
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
+copy_case() {
+    local destination="$1"
+
+    rm -rf "${destination}"
+    mkdir -p "${destination}"
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-        cp -a "${item}" "${CASE_DIR}/"
+        cp -a "${item}" "${destination}/"
     done
+}
+
+prepare_case() {
+    copy_case "${CASE_DIR}"
 
     sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+}
+
+prepare_backward_case() {
+    copy_case "${BACKWARD_CASE_DIR}"
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${BACKWARD_END_TIME};/" \
+        "${BACKWARD_CASE_DIR}/system/controlDict"
+    sed -i "s/^\(writeInterval[[:space:]]*\).*/\1${BACKWARD_WRITE_INTERVAL};/" \
+        "${BACKWARD_CASE_DIR}/system/controlDict"
+    sed -i "s/^\(startFrom[[:space:]]*\).*/\1latestTime;/" \
+        "${BACKWARD_CASE_DIR}/system/controlDict"
+    sed -i "s/default[[:space:]]*Euler;/default            backward;/" \
+        "${BACKWARD_CASE_DIR}/system/fluid/fvSchemes"
+}
+
+run_backward_restart_test() {
+    prepare_backward_case
+    (
+        cd "${BACKWARD_CASE_DIR}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun > log.Allrun 2>&1
+    )
+}
+
+check_backward_restart() {
+    (
+        cd "${BACKWARD_CASE_DIR}"
+        Test-fluxCorrectedVelocityRestart \
+            > log.Test-fluxCorrectedVelocityRestart 2>&1
+    )
 }
 
 latest_numeric_time() {
@@ -134,6 +173,11 @@ if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
     echo "Skipping regression checks because the force history did not reach the requested end time"
     exit 0
 fi
+
+if [ "$CHECK_ONLY" = false ]; then
+    run_backward_restart_test
+fi
+check_backward_restart
 
 # OpenFOAM variant compatibility
 mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"

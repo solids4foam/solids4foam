@@ -27,7 +27,7 @@ Description
     The Cauchy stress tensor for the compressible case is then given by:
 
         J*sigma =   0.5*K*(J^2 - 1)*I
-                  + c1*exp(c2*(isoI1 - 3))*dev(isoB)
+                  + c1*exp(0.5*c2*(isoI1 - 3))*dev(isoB)
 
     where:
 

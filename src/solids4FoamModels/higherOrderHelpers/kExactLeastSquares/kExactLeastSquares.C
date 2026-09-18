@@ -143,7 +143,10 @@ void kExactLeastSquares::cellGradCoeffsAtPoint
     UList<vector>& coeffs
 ) const
 {
-    const CompactListList<label>& stencils = stencil().cellsStencil();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& gradCoeffsTable =
+        compactListListCRef(cellGradCoeffs());
     const labelUList& cellStencil = stencils[cellI];
 
     if (coeffs.size() != cellStencil.size())
@@ -155,19 +158,16 @@ void kExactLeastSquares::cellGradCoeffsAtPoint
     }
 
     const vector r = x - mesh_.C()[cellI];
-    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
+    const UList<vector>& gradCoeffs = gradCoeffsTable[cellI];
 
-    const CompactListList<symmTensor>* secondGradCoeffsPtr = nullptr;
-    const CompactListList<symmTensor3rdOrder>* thirdGradCoeffsPtr = nullptr;
-
-    if (polynomialOrder() >= 2)
-    {
-        secondGradCoeffsPtr = &cellSecondGradCoeffs();
-    }
-    if (polynomialOrder() >= 3)
-    {
-        thirdGradCoeffsPtr = &cellThirdGradCoeffs();
-    }
+    auto* secondGradCoeffsPtr =
+        polynomialOrder() >= 2
+      ? &compactListListCRef(cellSecondGradCoeffs())
+      : nullptr;
+    auto* thirdGradCoeffsPtr =
+        polynomialOrder() >= 3
+      ? &compactListListCRef(cellThirdGradCoeffs())
+      : nullptr;
 
     forAll(coeffs, cI)
     {
@@ -193,7 +193,11 @@ void kExactLeastSquares::cellValueCoeffsAtPoint
     UList<scalar>& coeffs
 ) const
 {
-    const UList<label>& cellStencil = stencil().cellsStencil()[cellI];
+    auto& cellsStencil =
+        compactListListCRef(stencil().cellsStencil());
+    auto& gradCoeffsTable =
+        compactListListCRef(cellGradCoeffs());
+    const UList<label>& cellStencil = cellsStencil[cellI];
 
     if (coeffs.size() != cellStencil.size() + 1)
     {
@@ -205,23 +209,19 @@ void kExactLeastSquares::cellValueCoeffsAtPoint
     }
 
     const vector r = x - mesh_.C()[cellI];
-    const UList<vector>& gradCoeffs = cellGradCoeffs()[cellI];
-    const CompactListList<symmTensor>* secondDerivativeCoeffsPtr = nullptr;
-    const CompactListList<symmTensor3rdOrder>*
-        thirdDerivativeCoeffsPtr = nullptr;
-    const List<symmTensor>* secondMomentsPtr = nullptr;
-    const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
-
-    if (polynomialOrder() >= 2)
-    {
-        secondDerivativeCoeffsPtr = &cellSecondGradCoeffs();
-        secondMomentsPtr = &secondOrderCellMoments();
-    }
-    if (polynomialOrder() >= 3)
-    {
-        thirdDerivativeCoeffsPtr = &cellThirdGradCoeffs();
-        thirdMomentsPtr = &thirdOrderCellMoments();
-    }
+    const UList<vector>& gradCoeffs = gradCoeffsTable[cellI];
+    auto* secondDerivativeCoeffsPtr =
+        polynomialOrder() >= 2
+      ? &compactListListCRef(cellSecondGradCoeffs())
+      : nullptr;
+    auto* thirdDerivativeCoeffsPtr =
+        polynomialOrder() >= 3
+      ? &compactListListCRef(cellThirdGradCoeffs())
+      : nullptr;
+    const List<symmTensor>* secondMomentsPtr =
+        polynomialOrder() >= 2 ? &secondOrderCellMoments() : nullptr;
+    const List<symmTensor3rdOrder>* thirdMomentsPtr =
+        polynomialOrder() >= 3 ? &thirdOrderCellMoments() : nullptr;
 
     scalar stencilCoeffSum = 0.0;
 
@@ -316,7 +316,9 @@ void kExactLeastSquares::generateExponents
             for (label i = n; i >= 0; --i)
             {
                 const label j = n - i;
-                FixedList<label, 3> exponent = {i, j, 0};
+                FixedList<label, 3> exponent(0);
+                exponent[0] = i;
+                exponent[1] = j;
                 exponents.append(exponent);
             }
         }
@@ -330,7 +332,10 @@ void kExactLeastSquares::generateExponents
                 for (label j = n - i; j >= 0; --j)
                 {
                     const label k = n - i - j;
-                    FixedList<label, 3> exponent = {i, j, k};
+                    FixedList<label, 3> exponent(0);
+                    exponent[0] = i;
+                    exponent[1] = j;
+                    exponent[2] = k;
                     exponents.append(exponent);
                 }
             }
@@ -461,8 +466,8 @@ void kExactLeastSquares::makeFaceGradStencil() const
 
     const fvMesh& mesh = mesh_;
     const globalIndex& globalCells = stencil().globalCells();
-    const CompactListList<label>& cellStencils =
-        stencil().cellsStencil();
+    auto& cellStencils =
+        compactListListCRef(stencil().cellsStencil());
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
 
@@ -549,7 +554,8 @@ void kExactLeastSquares::makeFaceGradStencil() const
     }
 
     faceGradStencilPtr_.set(new CompactListList<label>(rowSizes));
-    CompactListList<label>& faceGradStencils = *faceGradStencilPtr_;
+    CompactListList<label>& faceGradStencils =
+        autoPtrRef(faceGradStencilPtr_);
 
     forAll(faceStencils, faceI)
     {
@@ -585,10 +591,12 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     // Preliminaries
     const fvMesh& mesh = mesh_;
     const globalIndex& globalCells = stencil().globalCells();
-    const CompactListList<label>& cellStencils =  stencil().cellsStencil();
-    const CompactListList<label>& faceStencils = faceGradStencil();
-    const CompactListList<point>& faceQuadPoints =
-        quadrature().faceQuadPoints();
+    auto& cellStencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& faceStencils =
+        compactListListCRef(faceGradStencil());
+    auto& faceQuadPoints =
+        compactListListCRef(quadrature().faceQuadPoints());
 
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
@@ -599,21 +607,22 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     (
         new List<CompactListList<vector>>(mesh.nFaces())
     );
-    List<CompactListList<vector>>& faceGradCoeffs = *faceGradCoeffsPtr_;
+    List<CompactListList<vector>>& faceGradCoeffs =
+        autoPtrRef(faceGradCoeffsPtr_);
 
     faceBoundaryDataStencilPtr_.set
     (
         new List<List<FixedList<label, 2>>>(mesh.nFaces())
     );
     List<List<FixedList<label, 2>>>& faceBoundaryDataStencil =
-        *faceBoundaryDataStencilPtr_;
+        autoPtrRef(faceBoundaryDataStencilPtr_);
 
     faceBoundaryDataCoeffsPtr_.set
     (
         new List<CompactListList<vector>>(mesh.nFaces())
     );
     List<CompactListList<vector>>& faceBoundaryDataCoeffs =
-        *faceBoundaryDataCoeffsPtr_;
+        autoPtrRef(faceBoundaryDataCoeffsPtr_);
 
     // Loop over internal faces
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
@@ -931,7 +940,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             {
                 for (direction c = 0; c < thirdIndexSize; ++c)
                 {
-                    FixedList<label, 3> sourceExponent = {0, 0, 0};
+                    FixedList<label, 3> sourceExponent(0);
                     ++sourceExponent[a];
                     ++sourceExponent[b];
 
@@ -1023,7 +1032,9 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         if
         (
            !isA<symmetryPolyPatch>(pp)
+#ifndef FOAMEXTEND
         && !isA<symmetryPlanePolyPatch>(pp)
+#endif
         )
         {
             continue;
@@ -1508,7 +1519,10 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         const polyPatch& pp = mesh.boundaryMesh()[patchI];
         const bool symmetryPatch =
             isA<symmetryPolyPatch>(pp)
-         || isA<symmetryPlanePolyPatch>(pp);
+#ifndef FOAMEXTEND
+         || isA<symmetryPlanePolyPatch>(pp)
+#endif
+        ;
 
         if
         (
@@ -1729,7 +1743,8 @@ void kExactLeastSquares::calcCellCoeffs() const
     const bool twoD = mesh.nGeometricD() == 2;
     const globalIndex& globalCells = stencil().globalCells();
     const vectorField& CI = mesh.C().internalField();
-    const CompactListList<label>& stencils = stencil().cellsStencil();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
 
     // Allocate CompactListList, size is stencil
     labelList rowSizes(mesh.nCells());
@@ -1740,7 +1755,8 @@ void kExactLeastSquares::calcCellCoeffs() const
 
     // Allocate CompactListList for gradient interpolation coefficients
     cellGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
-    CompactListList<vector>& cellGradCoeffs = *cellGradCoeffsPtr_;
+    CompactListList<vector>& cellGradCoeffs =
+        autoPtrRef(cellGradCoeffsPtr_);
 
     if (polynomialOrder() >= 2)
     {
@@ -2066,7 +2082,7 @@ void kExactLeastSquares::calcCellCoeffs() const
             // Store second-derivative tensor
             for (label i = 0; i < A.cols(); ++i)
             {
-                (*cellSecondGradCoeffsPtr_)[cellI][i] =
+                autoPtrRef(cellSecondGradCoeffsPtr_)[cellI][i] =
                     symmTensor
                     (
                         cxxRow(i),
@@ -2114,7 +2130,7 @@ void kExactLeastSquares::calcCellCoeffs() const
 
             for (label i = 0; i < A.cols(); ++i)
             {
-                (*cellThirdGradCoeffsPtr_)[cellI][i] =
+                autoPtrRef(cellThirdGradCoeffsPtr_)[cellI][i] =
                     symmTensor3rdOrder
                     (
                         cxxxRow(i),
@@ -2240,7 +2256,7 @@ const leastSquaresStencil& kExactLeastSquares::stencil() const
         makeStencils();
     }
 
-    return *stencilPtr_;
+    return autoPtrRef(stencilPtr_);
 }
 
 
@@ -2411,9 +2427,10 @@ tmp<volSymmTensorField> kExactLeastSquares::secondGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<symmTensor>& secondGradCoeffs =
-        this->cellSecondGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& secondGradCoeffs =
+        compactListListCRef(this->cellSecondGradCoeffs());
 
     const scalarField& sI = s.internalField();
     const List<Field<scalar>> remoteField = stencil().remoteFieldPerProc(sI);
@@ -2441,7 +2458,7 @@ tmp<volSymmTensorField> kExactLeastSquares::secondGrad
         )
     );
 
-    volSymmTensorField& secondGrad = tSecondGrad.ref();
+    volSymmTensorField& secondGrad = tmpRef(tSecondGrad);
 
     forAll(stencils, cellI)
     {
@@ -2483,9 +2500,10 @@ autoPtr<List<symmTensor3rdOrder>> kExactLeastSquares::thirdGrad
     const globalIndex& globalCells = stencil().globalCells();
     const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
 
-    const CompactListList<label>& stencils = stencil().cellsStencil();
-    const CompactListList<symmTensor3rdOrder>& thirdGradCoeffs =
-        cellThirdGradCoeffs();
+    auto& stencils =
+        compactListListCRef(stencil().cellsStencil());
+    auto& thirdGradCoeffs =
+        compactListListCRef(cellThirdGradCoeffs());
 
     const scalarField& sI = s.internalField();
     const List<Field<scalar>> remoteField = stencil().remoteFieldPerProc(sI);

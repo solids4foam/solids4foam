@@ -49,6 +49,9 @@ Description
 SourceFiles
     linearElasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef linearElasticMechanicalConstitutiveLaw_H

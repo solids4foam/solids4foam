@@ -160,6 +160,24 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
             K[i] = Keff;
         }
     }
+
+    // Fourth-order tangent.
+    // No analytical consistent tangent has been derived for this law. The
+    // finite-difference one of the base class is well defined for any law and
+    // is evaluated against a shadow state, so it disturbs neither the stress
+    // just computed nor the history it started from
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
+    }
 }
 
 

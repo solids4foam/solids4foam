@@ -158,11 +158,9 @@ public:
         //- Update the coefficients associated with the patch field
         virtual void updateCoeffs();
 
-#ifndef FOAMEXTEND
         //- Return face quadrature values, used for high order solvers
         virtual autoPtr<CompactListList<vector>>
            evaluateQuadrature() const;
-#endif
 
         //- Write
         virtual void write(Ostream&) const;

@@ -16,8 +16,6 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-
-Class
     Foam::mechanicalConstitutiveLawStateSpec
 
 Description

@@ -14,8 +14,12 @@ The tutorials are organised into the following subdirectories:
 - `solids/` – solid mechanics cases
 - `fluids/` – fluid mechanics cases
 - `fluidSolidInteraction/` – monolithic FSI cases
-- `fluidSolidInteraction-preCICE/` – partitioned FSI cases using preCICE
 - `thermoFluidSolidInteraction/` – thermo-mechanical and coupled problems
+
+Partitioned FSI cases coupled through [preCICE](https://precice.org) are
+maintained in the [preCICE tutorials](https://precice.org/tutorials.html)
+rather than here. They are run against the current source by `tests/precice`;
+see `tests/precice/README.md`.
 
 ---
 
@@ -100,6 +104,15 @@ Regression tests are:
 
 Not all tutorials are covered by regression tests; coverage is expected to grow
 incrementally over time.
+
+### Opt-in Validation and Convergence Studies
+
+Selected tutorials may also provide an opt-in `verification/` directory for
+expensive mesh/time refinement studies against analytical or published
+benchmarks. These are deliberately not included in `Alltest` or
+`Alltest-regression`. For example, `fluidSolidInteraction/beamInCrossFlow`
+provides `verification/Allverify`; see its local README for usage and resource
+requirements.
 
 ---
 

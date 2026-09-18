@@ -171,12 +171,11 @@ void Foam::poroMechanicalLawMechanicalConstitutiveLaw::evaluate
     }
 
     // What the sub-law finds already standing at these points is the effective
-    // stress, not the total. It used to learn that by reading the caller's
-    // storage, which this law had first written sigmaEff into; it is now said
-    // explicitly, because a law reading its own output buffer is the thing
-    // being removed. The buffer is deliberately left as the manager cleared
-    // it, so a sub-law that fails to write every component is a bug that shows
-    // up rather than one masked by a helpful pre-seed
+    // stress, not the total. This is said explicitly rather than being left
+    // for the sub-law to infer from the caller's storage. The buffer is
+    // deliberately left as the manager cleared it, so a sub-law that fails to
+    // write every component is a bug that shows up rather than one masked by
+    // a helpful pre-seed
     //
     // The parent's own incoming stress is put back afterwards. It means
     // something different from the child's - total rather than effective - and

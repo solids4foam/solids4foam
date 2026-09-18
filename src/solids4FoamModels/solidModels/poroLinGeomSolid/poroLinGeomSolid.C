@@ -238,6 +238,9 @@ poroLinGeomSolid::poroLinGeomSolid
 {
     // Store old time of p
     p_.oldTime();
+
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 }
 
 
@@ -305,13 +308,23 @@ Foam::scalar poroLinGeomSolid::materialResidual()
 
 void poroLinGeomSolid::updateTotalFields()
 {
-    solidModel::updateTotalFields();
-
-    // The framework keeps its own state, and its laws may have end-of-step
-    // work or diagnostics
+    // One or the other, not both. The base call runs the legacy laws'
+    // end-of-step work, which is not the no-op it looks like -
+    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
+    // diagnostics there, and others recompute an effective stiffness. On a
+    // framework run those laws are never evaluated, so that work is done on
+    // stale inputs and read by nothing
     if (useMechanicalConstitutiveLawManager())
     {
         mechanicalManager().endTimeStep();
+
+        // The base call is skipped on this branch, so the quadrature history
+        // it would have rolled over is rolled over here
+        rollOverQuadratureHistory();
+    }
+    else
+    {
+        solidModel::updateTotalFields();
     }
 }
 

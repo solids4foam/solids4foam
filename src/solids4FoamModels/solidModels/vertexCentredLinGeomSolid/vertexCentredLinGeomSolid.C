@@ -512,6 +512,8 @@ void vertexCentredLinGeomSolid::makeFixedDofRowsIS() const
 #endif // USE_PETSC
 
 
+// Not reached while the constructor refuses the framework for this model.
+// Kept for when the stress moves onto it, which is when that refusal goes
 const integrationPointTopology&
 vertexCentredLinGeomSolid::dualFaceTopology() const
 {
@@ -973,6 +975,37 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         notImplemented("Not implemented when solvePressure is active");
     }
 
+    // This model is not on the mechanicalConstitutiveLaw framework yet, and
+    // half-using it is worse than not using it at all: the residual comes from
+    // mechanical().correct(), which is the legacy path, while the tangent
+    // would come from mechanicalManager().updateTangentSmallStrain(). Residual
+    // and Jacobian would then describe different materials - converging to the
+    // legacy answer where it converges at all, and stalling without saying why
+    // where the two disagree enough.
+    //
+    // TODO: this refusal has to go when the legacy mechanicalModel is
+    // deprecated or removed, because there will then be no legacy path for the
+    // residual to come from.
+    //
+    // The dual-face topology plumbing is already here: dualFaceTopology()
+    // builds it and registers it with the manager as "dualFaces". What is
+    // missing is the residual itself - routing dualSigmaf_, and so
+    // updatePointDivSigma(), through the manager rather than
+    // dualMechanicalModel; committing the manager's state at the end of the
+    // step; covering the explicit and SNES paths the same way; and dropping
+    // dualMechanicalModel ownership once nothing reads it
+    if (useMechanicalConstitutiveLawManager())
+    {
+        FatalErrorInFunction
+            << type() << " does not support the mechanicalConstitutiveLaw "
+            << "framework." << nl << nl
+            << "    It would take its stress from the legacy mechanicalModel "
+            << "and its tangent from the framework, which are not required to "
+            << "agree. Set `useMechanicalConstitutiveLawManager no;`, or use "
+            << "a cell-centred solid model."
+            << abort(FatalError);
+    }
+
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
 
@@ -1347,6 +1380,7 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (jacTangent == tangentRequest::scalar)
     {
+        // Not reached while the constructor refuses the framework here
         if (useMechanicalConstitutiveLawManager())
         {
             // Scalar tangent at the internal dual faces, taken from the

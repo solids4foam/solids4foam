@@ -185,10 +185,9 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
             sigma[i][symmTensor::XY] = A44_*e12;
 
             // The reduced constants above are the plane stress ones, so the
-            // out-of-plane components are zero by construction. The legacy law
-            // left them untouched instead, which did not come to the same
-            // thing: under poroMechanicalLaw the value standing there is the
-            // seeded effective stress, not zero
+            // out-of-plane components are zero by construction. Written
+            // rather than left: under poroMechanicalLaw the value standing
+            // there is the seeded effective stress, not zero
             sigma[i][symmTensor::ZZ] = 0.0;
             sigma[i][symmTensor::YZ] = 0.0;
             sigma[i][symmTensor::XZ] = 0.0;
@@ -216,6 +215,24 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
         {
             K[i] = Keff;
         }
+    }
+
+    // Fourth-order tangent.
+    // No analytical consistent tangent has been derived for this law. The
+    // finite-difference one of the base class is well defined for any law and
+    // is evaluated against a shadow state, so it disturbs neither the stress
+    // just computed nor the history it started from
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
     }
 }
 

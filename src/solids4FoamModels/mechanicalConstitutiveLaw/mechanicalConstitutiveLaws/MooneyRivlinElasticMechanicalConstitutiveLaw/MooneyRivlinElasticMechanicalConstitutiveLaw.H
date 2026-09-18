@@ -75,7 +75,8 @@ SourceFiles
     MooneyRivlinElasticMechanicalConstitutiveLaw.C
 
 Author
-    Philip Cardiff, UCD.
+    Iago Oliveira, based on code of Philip Cardiff, UCD.
+    Ported by Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 

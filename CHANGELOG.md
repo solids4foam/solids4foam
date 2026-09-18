@@ -4,6 +4,69 @@ This changelog highlights significant user-facing changes in each solids4foam
 release. For complete commit-level details and contributor information, see the
 [GitHub Releases](https://github.com/solids4foam/solids4foam/releases) page.
 
+## [Unreleased]
+
+### Added
+
+- Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
+  the [preCICE tutorials](https://github.com/precice/tutorials) against the
+  current source and checks them against stored reference values. The preCICE
+  team's own system tests pin a released solids4foam image, so they cannot
+  catch a regression introduced on a branch; this closes that gap. Run by the
+  `preCICE coupling test` workflow for pull requests targeting `master`, for
+  any pull request labelled `test-precice`, and on request.
+
+### Changed
+
+- **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
+  pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
+  than `p`. An existing case carrying `0/p` fails at construction with a
+  `MUST_READ` error and must rename the field; the bundled tutorials are
+  already migrated. The rename is needed because a solid model solving the
+  mixed displacement-pressure formulation has its own `p`, which is a different
+  quantity, and the two collided in the same registry. The old name is not
+  accepted as a fallback: the two fields are not interchangeable, so silently
+  reading one where the other was meant would be worse than a clear failure.
+  This applies whether or not the `mechanicalConstitutiveLaw` framework is in
+  use.
+- `linearGeometryTotalDisplacement` with `solvePressure yes` now uses an
+  implicit stiffness of `(4/3)*mu` rather than `2*mu`. The mixed
+  displacement-pressure formulation solves `div(dev(sigma))`, whose scalar
+  Laplacian surrogate is `mu*lap(D) + (1/3)*mu*grad(div(D))`, so `(4/3)*mu` is
+  the consistent coefficient and `2*mu` had no derivation behind it. The
+  implicit operator is the iteration path rather than the equation being
+  solved, so converged results are unchanged within tolerance, but the
+  iteration count and the path taken to get there move for every case that
+  selects this option.
+
+### Removed
+
+- **Breaking:** the public virtual `solidModel::newDeltaT()`, which forwarded to
+  `mechanicalModel::newDeltaT()`, is removed. Its purpose was to let a
+  constitutive law ask for a smaller time step, but nothing in solids4foam
+  called it: the `solids4Foam` solver never consulted it, so no law could
+  actually influence the time step through it. The `mechanicalConstitutiveLaw`
+  framework provides no equivalent, and adding one is left until there is a
+  caller to justify its shape. An external driver calling
+  `solidModel::newDeltaT()` no longer compiles, and adaptive time stepping
+  driven by material state will need a new interface rather than this one.
+- `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
+  solver does not currently run: no tutorial selected it, so nothing exercised
+  it, an attempt to give it one failed inside the PETSc solve, and its
+  `useGeometricStiffness`, `compactImplicitStencil` and `tangentEps` entries
+  have no defaults and are set by no case. Selecting that runtime type now
+  fails to construct the solid model rather than failing inside it. Both build
+  lists carry the reason in a comment, and the solver's sources and `README.md`
+  are untouched. It is withdrawn rather than removed: the intention is to
+  revisit it once the mechanical constitutive law framework has landed, at
+  which point restoring it is a matter of uncommenting the entry in both
+  files.
+- Removed `tutorials/fluidSolidInteraction-preCICE`, which held standalone
+  `3dTube` and `flexibleOversetCylinder` preCICE cases that were not covered by
+  any test. solids4foam's preCICE cases are now maintained upstream in the
+  preCICE tutorials and tested by `tests/precice`. The removed cases remain
+  available as an archive from the solids4foam website.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4
@@ -71,6 +134,13 @@ release. For complete commit-level details and contributor information, see the
   which previously discarded its face-centre history and so restarted with a
   zero interface velocity. The history is now written to, and read from, the
   time directories, and is mapped by `decomposePar` and `reconstructPar`.
+- Fixed the restart behaviour of `fluxCorrectedVelocity` boundaries in
+  `fluidModel`. As the condition is derived from `zeroGradient`, it does not
+  read the `value` entry that it writes, so the normal component of the
+  velocity was replaced by a zero-gradient extrapolation on restart. The
+  current boundary values of `U` are now re-derived from `phi`, and those of
+  its old-time levels, for which `phi` is not written, are read back from the
+  time directories.
 
 ### Removed in v2.4
 

@@ -54,6 +54,9 @@ Description
 SourceFiles
     viscousHookeanElasticMechanicalConstitutiveLaw.C
 
+Author
+    Philip Cardiff, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef viscousHookeanElasticMechanicalConstitutiveLaw_H
@@ -179,6 +182,21 @@ public:
         (
             mechanicalConstitutiveLawStateSpec& spec
         ) const override;
+
+        //- The temperature, where the relaxation times are shifted with it.
+        //  Declared so the manager gathers it: evaluate() asks for "T"
+        //  through inputs, and an input the manager was never told about is
+        //  not gathered, so the evaluation would fail on a law that is
+        //  otherwise correctly configured
+        virtual wordList requiredScalarInputs() const override
+        {
+            if (williamsLandelFerryShift_)
+            {
+                return wordList(1, word("T"));
+            }
+
+            return wordList();
+        }
 
         virtual void evaluate
         (

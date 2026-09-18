@@ -47,7 +47,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::calculateEigens
+void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::
+calculateEigens
 (
     vector& sigma_prin,
     tensor& ev,
@@ -133,10 +134,12 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::calculateEi
                 i = m2SqrtQ*Foam::cos(theta/3) - aBy3;
 #ifdef OPENFOAM_NOT_EXTEND
                 ii =
-                    m2SqrtQ*Foam::cos((theta + constant::mathematical::twoPi)/3.0)
+                    m2SqrtQ
+                   *Foam::cos((theta + constant::mathematical::twoPi)/3.0)
                   - aBy3;
                 iii =
-                    m2SqrtQ*Foam::cos((theta - constant::mathematical::twoPi)/3.0)
+                    m2SqrtQ
+                   *Foam::cos((theta - constant::mathematical::twoPi)/3.0)
                   - aBy3;
 #else
                 ii =
@@ -297,7 +300,8 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::calculateEi
 }
 
 
-void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::calculateStress
+void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::
+calculateStress
 (
     symmTensor& sigma,
     scalar& activeYield
@@ -452,7 +456,10 @@ linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
     // planeStress is injected into this dictionary by the manager from the
     // top-level entry in mechanicalProperties; it is not given by the user in
     // this sub-dictionary
-    const Switch planeStress(dict.lookupOrDefault<Switch>("planeStress", false));
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
 
     lambda_ =
         planeStress
@@ -602,6 +609,24 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::evaluate
         {
             K[i] = Keff;
         }
+    }
+
+    // Fourth-order tangent.
+    // No analytical consistent tangent has been derived for this law. The
+    // finite-difference one of the base class is well defined for any law and
+    // is evaluated against a shadow state, so it disturbs neither the stress
+    // just computed nor the history it started from
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
     }
 }
 

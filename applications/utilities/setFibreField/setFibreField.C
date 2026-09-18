@@ -33,9 +33,9 @@ Author
 #include "unitConversion.H"
 
 // Rotation tensor for a rotation of omega about the axis a, by Rodrigues'
-// formula. OpenFOAM.com and .org provide this as rotationAboutAxis() in transform.H;
-// foam-extend does not, so it is spelled out here rather than the utility
-// being excluded from that build
+// formula. OpenFOAM.com and .org provide this as rotationAboutAxis() in
+// transform.H; foam-extend does not, so it is spelled out here rather than
+// the utility being excluded from that build
 namespace Foam
 {
     static inline tensor rotationAboutAxis

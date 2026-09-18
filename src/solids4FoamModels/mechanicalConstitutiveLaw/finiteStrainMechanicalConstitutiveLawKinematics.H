@@ -126,7 +126,7 @@ public:
 
     // Constructors
 
-        //- Construct from current and old displacement gradients
+        //- Construct from current and old deformation gradients
         finiteStrainMechanicalConstitutiveLawKinematics
         (
             const UIndirectList<tensor>& F,
@@ -155,37 +155,37 @@ public:
 
     // Access
 
-        //- Access current displacement gradient
+        //- Access current deformation gradient
         const UIndirectList<tensor>& F() const
         {
             return F_;
         }
 
-        //- Access previous time displacement gradient
+        //- Access previous time deformation gradient
         const UIndirectList<tensor>& F0() const
         {
             return F0_;
         }
 
-        //- Access current displacement gradient determinant
+        //- Access current deformation gradient determinant
         const UIndirectList<scalar>& J() const
         {
             return J_;
         }
 
-        //- Access previous time displacement gradient determinant
+        //- Access previous time deformation gradient determinant
         const UIndirectList<scalar>& J0() const
         {
             return J0_;
         }
 
-        //- Access current displacement gradient inverse
+        //- Access current deformation gradient inverse
         const UIndirectList<tensor>& Finv() const
         {
             return Finv_;
         }
 
-        //- Access previous time displacement gradient inverse
+        //- Access previous time deformation gradient inverse
         const UIndirectList<tensor>& Finv0() const
         {
             return Finv0_;
