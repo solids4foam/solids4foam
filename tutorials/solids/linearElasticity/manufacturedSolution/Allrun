@@ -1,0 +1,90 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+usage()
+{
+    cat <<'EOF'
+Usage: ./Allrun [approach] [mesh]
+
+approach: segregated (default), petscSnes
+mesh:     hex (default), tet, poly, distHex
+EOF
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-segregated}"
+MESH="${2:-hex}"
+
+case "$APPROACH" in
+    segregated|petscSnes) ;;
+    *)
+        echo "Error: unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+case "$MESH" in
+    hex|tet|poly|distHex) ;;
+    *)
+        echo "Error: unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+if [[ "$APPROACH" == "petscSnes" ]]; then
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+for file in constant/solidProperties."${APPROACH}" \
+            system/fvSolution."${APPROACH}"
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+solids4Foam::convertCaseFormat .
+
+echo
+echo "Compiling tutorial library..."
+(cd src && ./Allwmake -s)
+
+case "$MESH" in
+    hex|distHex)
+        solids4Foam::runApplication blockMesh
+        if [[ "$MESH" == "distHex" ]]; then
+            solids4Foam::runApplication perturbMeshPoints
+        fi
+        ;;
+    tet|poly)
+        if ! command -v gmsh >/dev/null 2>&1; then
+            echo "Gmsh is required for the $MESH mesh"
+            exit 1
+        fi
+        mv 0 0.tmp
+        solids4Foam::runApplication gmsh -3 -format msh2 gmsh/cube.geo
+        solids4Foam::runApplication gmshToFoam gmsh/cube.msh
+        solids4Foam::runApplication createPatch -overwrite
+        if [[ "$MESH" == "poly" ]]; then
+            solids4Foam::runApplication polyDualMesh 30 -overwrite
+            solids4Foam::runApplication combinePatchFaces 45 -overwrite
+        fi
+        mv 0.tmp 0
+        ;;
+esac
+
+solids4Foam::runApplication solids4Foam
