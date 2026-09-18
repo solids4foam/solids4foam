@@ -57,6 +57,53 @@ The currently available model types in this directory are:
 `RhieChow` is implemented as a helper under
 [`diffStencilLaplacianStab/RhieChowStab`](./diffStencilLaplacianStab/RhieChowStab).
 
+## Spectral Normalisation
+
+The Laplacian-family models support optional reference-mode normalisation:
+
+```text
+normalise                    true;
+referenceNyquistDirections   2;
+```
+
+`normalise` defaults to `false`, preserving the legacy formulas and dictionary
+behaviour. `referenceNyquistDirections` is required when normalisation is
+enabled and must be in the range `1 .. min(3, mesh.nSolutionD())`. It specifies
+`rStar`, the number of Nyquist directions in the isotropic orthogonal reference
+mode.
+
+The user-provided `scaleFactor` remains the stabilisation strength. The
+effective residual scale and reference symbol are:
+
+<!-- markdownlint-disable MD013 -->
+
+| Model | Paper order | Spectral relation | Raw reference response | Normalisation |
+| --- | ---: | --- | ---: | ---: |
+| `laplacian` | 1 | Coupled repeated-Laplacian | `4*rStar` | `1/(4*rStar)` |
+| `generalisedEvenOrderLaplacian` | `laplacianPower + 1` | Coupled repeated-Laplacian | `(4*rStar)^m` | `(4*rStar)^(-m)` |
+| `JamesonSchmidtTurkel` | 2 | Coupled repeated-Laplacian | `(4*rStar)^2` | `(4*rStar)^(-2)` |
+| `diffStencilLaplacian`, `RhieChow` | — | Split-m=2 shape, `sum_q a_q^2` | `4*rStar` | `1/(4*rStar)` |
+
+<!-- markdownlint-enable MD013 -->
+
+For `laplacian` and `generalisedEvenOrderLaplacian` with
+`laplacianPower 0`, the legacy operator contains an additional face-local
+`|d|^2` numerical scaling. A scalar coefficient cannot remove this
+mesh-dependent factor. Therefore, normalisation switches this paper-`m=1`
+branch to the ideal form
+`scaleFactor/(4*rStar) * orthogonalSnGrad(field)`. With normalisation disabled,
+the legacy expression is unchanged. Consequently, a `scaleFactor` tuned with
+`normalise false` does not carry over to `normalise true` because the
+operator's mesh-size scaling changes (on a uniform mesh,
+`s_normalised ≈ 4*rStar*h^2*s_legacy`).
+
+The coupled formulas are exact for the audited isotropic, orthogonal reference
+mesh. On a uniform orthogonal Cartesian mesh, with a centred cell gradient and
+linear interpolation, the implemented `diffStencilLaplacian`/`RhieChow`
+operator has a normalised spectral shape matching the directionally split
+`m=2` family. Its raw prefactor differs, and no higher-order directionally
+split generalisation is implemented here.
+
 ## Usage Pattern
 
 The intended solver-side usage is:
@@ -130,6 +177,12 @@ The optional `scaleFactorJacobian` entry defaults to `1.0`, not to the
 explicit stabilisation `scaleFactor`. This lets the approximate Jacobian act
 as an independently tuned implicit contribution when needed.
 
+Spectral normalisation applies only to the residual. It does not modify
+`scaleFactorJacobian`, which remains an independent preconditioner control.
+To match the reference-mode scale approximately, a useful starting point is
+`scaleFactorJacobian = scaleFactor/(4*rStar)`; this is a guideline rather than
+an automatic setting.
+
 The default is `false`, which preserves the existing behaviour and reuses the
 cached matrix. If a solver needs the approximate Jacobian to be reconstructed
 because the relevant coefficients or matrix structure have changed, it can pass
@@ -185,13 +238,14 @@ strain `tr(gradD)` rather than spatial oscillations.  The face stabilisation
 vector is:
 
 ```text
-faceVector_f = scaleFactor * C(mode) * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
+faceVector_f = scaleFactor * C(mode)
+             * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
 ```
 
 Four modes are available, selected via the `mode` entry:
 
 | mode | C(mode) | Vanishes as |
-|---|---|---|
+| --- | --- | --- |
 | `physicalDamping` | `tau/deltaT` | never — permanent physical damping |
 | `firstOrderTemporal` | `1` | O(deltaT) |
 | `secondOrderTemporal` | `deltaT` | O(deltaT^2) |

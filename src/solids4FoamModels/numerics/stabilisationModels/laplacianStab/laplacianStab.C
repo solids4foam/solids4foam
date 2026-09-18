@@ -45,7 +45,9 @@ Foam::laplacianStab::laplacianStab
 )
 :
     stabilisationModel(mesh, dict, dims)
-{}
+{
+    writeSpectralNormalisationInfo(1, true);
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -86,7 +88,15 @@ void Foam::laplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, autoPtrRef(faceScalarPtr()), scaleFactor());
+    const scalar effectiveScaleFactor =
+        scaleFactor()*nyquistNormalisation(1);
+
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceScalarPtr()),
+        effectiveScaleFactor
+    );
 }
 
 
@@ -120,7 +130,15 @@ void Foam::laplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, autoPtrRef(faceVectorPtr()), scaleFactor());
+    const scalar effectiveScaleFactor =
+        scaleFactor()*nyquistNormalisation(1);
+
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceVectorPtr()),
+        effectiveScaleFactor
+    );
 }
 
 
