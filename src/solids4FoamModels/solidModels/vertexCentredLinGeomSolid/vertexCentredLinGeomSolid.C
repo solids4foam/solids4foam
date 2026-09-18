@@ -985,10 +985,15 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     //
     // TODO: this refusal has to go when the legacy mechanicalModel is
     // deprecated or removed, because there will then be no legacy path for the
-    // residual to come from. Putting the stress on the framework here means
-    // giving the dual-mesh integration points their own topology registration
-    // and their own constitutive state, since they are a different set of
-    // points from the cell centres
+    // residual to come from.
+    //
+    // The dual-face topology plumbing is already here: dualFaceTopology()
+    // builds it and registers it with the manager as "dualFaces". What is
+    // missing is the residual itself - routing dualSigmaf_, and so
+    // updatePointDivSigma(), through the manager rather than
+    // dualMechanicalModel; committing the manager's state at the end of the
+    // step; covering the explicit and SNES paths the same way; and dropping
+    // dualMechanicalModel ownership once nothing reads it
     if (useMechanicalConstitutiveLawManager())
     {
         FatalErrorInFunction
