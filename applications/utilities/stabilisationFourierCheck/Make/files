@@ -1,0 +1,3 @@
+stabilisationFourierCheck.C
+
+EXE = $(FOAM_MODULE_APPBIN)/stabilisationFourierCheck
