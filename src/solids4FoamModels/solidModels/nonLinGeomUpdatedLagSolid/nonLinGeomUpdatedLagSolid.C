@@ -913,6 +913,9 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 {
     DDisRequired();
 
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(DD().name());
+
     // Force all required old-time fields to be created
     fvm::d2dt2(rho_, DD());
     fvc::d2dt2(rho_, D().oldTime());

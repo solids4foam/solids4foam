@@ -255,6 +255,9 @@ thermalLinGeomSolid::thermalLinGeomSolid
 {
     DisRequired();
 
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
+
     // Store T old time
     T_.oldTime();
 }

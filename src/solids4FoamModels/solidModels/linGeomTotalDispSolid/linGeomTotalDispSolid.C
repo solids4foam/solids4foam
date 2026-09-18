@@ -1062,36 +1062,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 #endif
     );
 
-    // A multi-material framework run needs a material-aware gradient, and
-    // this refuses rather than warns.
-    //
-    // The framework replaces the legacy per-material subMesh machinery, so it
-    // computes one gradient on one mesh - which is only right if the scheme
-    // knows not to draw a cell's stencil across a material interface.
-    // leastSquaresS4f does; the ordinary schemes do not, and layeredPipe then
-    // puts the radial stress 0.0494 from the analytical solution against a
-    // tolerance of 0.03, where the material-aware scheme gives 0.0192.
-    //
-    // A warning would not do: the answer is wrong by more than the case's own
-    // tolerance, and silently so
-    if
-    (
-        useMechanicalConstitutiveLawManager()
-     && mechanicalManager().nLaws() > 1
-     && gradDScheme != "leastSquaresS4f"
-    )
-    {
-        FatalErrorIn(type() + "::" + type())
-            << "More than one material on the mechanicalConstitutiveLaw "
-            << "framework needs a material-aware gradient for grad("
-            << D().name() << "), and `" << gradDScheme << "` is not one."
-            << nl << nl
-            << "    The framework computes one gradient on one mesh in place "
-            << "of the legacy per-material subMeshes, which only works if the "
-            << "scheme keeps a cell's stencil within its own material. Set "
-            << "`grad(" << D().name() << ") leastSquaresS4f;` in fvSchemes."
-            << abort(FatalError);
-    }
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 
     if
     (

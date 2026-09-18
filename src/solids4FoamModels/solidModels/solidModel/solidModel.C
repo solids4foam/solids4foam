@@ -1886,6 +1886,43 @@ void Foam::solidModel::frameworkGrad
 }
 
 
+void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return;
+    }
+
+    if (mechanicalManager().nLaws() < 2)
+    {
+        return;
+    }
+
+    const word gradScheme
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh().gradScheme("grad(" + fieldName + ')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + fieldName + ')')
+#endif
+    );
+
+    if (gradScheme != "leastSquaresS4f")
+    {
+        FatalErrorInFunction
+            << "More than one material on the mechanicalConstitutiveLaw "
+            << "framework needs a material-aware gradient for grad("
+            << fieldName << "), and `" << gradScheme << "` is not one."
+            << nl << nl
+            << "    The framework computes one gradient on one mesh in place "
+            << "of the legacy per-material subMeshes, which only works if the "
+            << "scheme keeps a cell's stencil within its own material. Set "
+            << "`grad(" << fieldName << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
 (
     mechanicalConstitutiveLawManager& manager,

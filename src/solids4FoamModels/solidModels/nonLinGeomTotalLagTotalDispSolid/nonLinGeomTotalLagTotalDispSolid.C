@@ -1080,6 +1080,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 {
     DisRequired();
 
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
+
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
 

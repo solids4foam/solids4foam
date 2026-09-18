@@ -238,6 +238,9 @@ poroLinGeomSolid::poroLinGeomSolid
 {
     // Store old time of p
     p_.oldTime();
+
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 }
 
 

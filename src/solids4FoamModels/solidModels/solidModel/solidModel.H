@@ -426,6 +426,21 @@ protected:
             volTensorField& gradD
         ) const;
 
+        //- Refuse a multi-material framework run whose gradient scheme is not
+        //  material-aware.
+        //
+        //  frameworkGrad() computes one gradient on one mesh in place of the
+        //  legacy per-material subMeshes, which is only right if the scheme
+        //  keeps a cell's stencil within its own material. leastSquaresS4f
+        //  does; the ordinary schemes do not, and the answer is then wrong by
+        //  more than the case's own tolerance and silently so, which is why
+        //  this refuses rather than warns.
+        //
+        //  Here rather than in each solid model because every model that
+        //  offers the framework has the same requirement, and four of them
+        //  did not check it
+        void checkFrameworkGradScheme(const word& fieldName) const;
+
         //- The implicit stiffness taken from the mechanicalConstitutiveLaw
         //  framework.
         //
