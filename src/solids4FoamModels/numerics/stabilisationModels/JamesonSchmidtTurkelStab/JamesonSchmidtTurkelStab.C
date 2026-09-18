@@ -46,7 +46,9 @@ Foam::JamesonSchmidtTurkelStab::JamesonSchmidtTurkelStab
 :
     stabilisationModel(mesh, dict, dims),
     scaleFactor_(readScalar(dict.lookup("scaleFactor")))
-{}
+{
+    writeSpectralNormalisationInfo(2);
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -87,7 +89,15 @@ void Foam::JamesonSchmidtTurkelStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, autoPtrRef(faceScalarPtr()), scaleFactor_);
+    const scalar effectiveScaleFactor =
+        scaleFactor_*nyquistNormalisation(2);
+
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceScalarPtr()),
+        effectiveScaleFactor
+    );
 }
 
 
@@ -121,7 +131,15 @@ void Foam::JamesonSchmidtTurkelStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, autoPtrRef(faceVectorPtr()), scaleFactor_);
+    const scalar effectiveScaleFactor =
+        scaleFactor_*nyquistNormalisation(2);
+
+    computeDiffStencil
+    (
+        p,
+        autoPtrRef(faceVectorPtr()),
+        effectiveScaleFactor
+    );
 }
 
 
