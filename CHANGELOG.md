@@ -18,6 +18,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
+  one material is refused rather than run. `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian` all abort with an explanation when the
+  framework is enabled alongside multiple materials on that fork. The
+  displacement-to-point interpolation there has no gradient-corrected form, so
+  the run would otherwise fall back to the legacy per-material subMesh path -
+  the machinery the framework exists to replace - and quietly return the answer
+  that path gives. The combination is supported on OpenFOAM.com and
+  OpenFOAM.org; single-material framework runs are unaffected on every fork.
 - **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
   pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
   than `p`. An existing case carrying `0/p` fails at construction with a
