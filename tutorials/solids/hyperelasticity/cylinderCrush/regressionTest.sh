@@ -214,8 +214,27 @@ run_framework_comparison() {
                 }
             }
         }
-        END { printf "%.10g\n", (maxv > 0 ? maxd/maxv : maxd) }
+        END {
+            # Without this the comparison is trivially satisfied when nothing
+            # was read: no matching line leaves maxd and maxv at zero, and a
+            # relative difference of zero reads as perfect agreement. A
+            # uniform-form field, or a change in how fields are written, does
+            # exactly that
+            if (n == 0 || k == 0) { print "NODATA"; exit }
+            if (n != k)           { print "MISMATCH"; exit }
+            printf "%.10g\n", (maxv > 0 ? maxd/maxv : maxd)
+        }
     ' "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D")
+
+    if [[ -z "${rel}" || "${rel}" == "NODATA" ]]; then
+        echo "FAIL: neither D field yielded any values to compare"
+        return 1
+    fi
+
+    if [[ "${rel}" == "MISMATCH" ]]; then
+        echo "FAIL: the two D fields hold different numbers of values"
+        return 1
+    fi
 
     if awk "BEGIN {exit !(${rel} < 1e-10)}"; then
         printf "PASS: framework and legacy agree to round-off, %.3g\n" "${rel}"
