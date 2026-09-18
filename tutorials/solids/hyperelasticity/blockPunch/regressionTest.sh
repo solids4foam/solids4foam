@@ -249,9 +249,28 @@ done
 # segregatedManager is solidProperties.segregated plus the framework switch and
 # nothing else, so the two must agree. This is the only end-to-end comparison
 # of the framework's neoHookeanElastic against the legacy law
+#
+# The comparison is only worth anything if each arm took the path it is named
+# for. If segregatedManager quietly lost its switch it would run the legacy law
+# twice and agree perfectly, which is the most convincing possible way for this
+# test to be worthless
 if [[ -n "${RESULT_DISP[segregated]:-}" \
    && -n "${RESULT_DISP[segregatedManager]:-}" ]]
 then
+    manager_log="${REGRESSION_ROOT}/segregatedManager/${SOLVER_LOGFILE}"
+    legacy_log="${REGRESSION_ROOT}/segregated/${SOLVER_LOGFILE}"
+
+    if ! grep -q "Selecting mechanical constitutive law" "${manager_log}"
+    then
+        echo "FAIL: segregatedManager did not use the framework"
+        failures=$((failures + 1))
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" "${legacy_log}"; then
+        echo "FAIL: segregated used the framework"
+        failures=$((failures + 1))
+    fi
+
     a="${RESULT_DISP[segregated]}"
     b="${RESULT_DISP[segregatedManager]}"
 

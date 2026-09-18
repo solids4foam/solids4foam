@@ -219,6 +219,50 @@ check_less_than() {
     fi
 }
 
+# The arms whose solidProperties carries useMechanicalConstitutiveLawManager.
+# Every other arm must run the legacy path
+FRAMEWORK_APPROACHES=(
+    segregatedManager
+    petscSnesPressureManager
+    highOrderFourthOrder
+)
+
+is_framework_approach() {
+    local a="$1"
+    local f
+    for f in "${FRAMEWORK_APPROACHES[@]}"; do
+        [[ "${a}" == "${f}" ]] && return 0
+    done
+    return 1
+}
+
+# An arm that silently ran the other path still satisfies every tolerance
+# below, because both paths solve the same problem correctly. Without this the
+# framework arms prove nothing: losing the switch from the dictionary, or
+# linking the wrong file, would read as a pass
+check_took_its_path() {
+    local approach="$1"
+    local log="${2}/${SOLVER_LOGFILE}"
+
+    if [[ ! -f "${log}" ]]; then
+        echo "FAIL: ${approach}: no solver log to check the path taken"
+        failures=$((failures + 1))
+        return
+    fi
+
+    if is_framework_approach "${approach}"; then
+        if ! grep -q "Selecting mechanical constitutive law" "${log}"; then
+            echo "FAIL: ${approach}: framework arm did not use the framework"
+            failures=$((failures + 1))
+        fi
+    else
+        if grep -q "Selecting mechanical constitutive law" "${log}"; then
+            echo "FAIL: ${approach}: legacy arm used the framework"
+            failures=$((failures + 1))
+        fi
+    fi
+}
+
 failures=0
 
 for approach in "${APPROACHES[@]}"; do
@@ -227,6 +271,7 @@ for approach in "${APPROACHES[@]}"; do
         echo "SKIP: ${approach}"
         continue
     fi
+    check_took_its_path "${approach}" "${case_dir}"
     check_less_than \
         "${approach}" "DDifference LInf" \
         "$(extract_disp_linf "${case_dir}" "DDifference")" \
@@ -239,6 +284,55 @@ for approach in "${APPROACHES[@]}"; do
         "${approach}" "stress component-0 LInf" \
         "$(extract_stress_linf_comp0 "${case_dir}")" \
         "${STRESS_TOL}"
+done
+
+# ------------------------------------------------------------
+# Each framework arm against the legacy arm it mirrors
+# ------------------------------------------------------------
+# Checking both arms against the analytical tolerances separately does not
+# compare them with each other: both paths solve this problem well within
+# tolerance, so both would pass even if they disagreed. For isotropic linear
+# elasticity a deviatoric projection and the declared volumetric split are the
+# same operation, so the two arms must agree exactly, not merely closely.
+#
+# highOrderFourthOrder has no legacy twin here - the other high-order arms are
+# different discretisations rather than the same one on the legacy path - so it
+# is covered by its tolerances and its path assertion only
+FRAMEWORK_PAIRS=(
+    "segregated segregatedManager"
+    "petscSnesPressure petscSnesPressureManager"
+)
+
+for pair in "${FRAMEWORK_PAIRS[@]}"; do
+    IFS=' ' read -r legacy_arm framework_arm <<< "${pair}"
+    legacy_case="${REGRESSION_ROOT}/${legacy_arm}"
+    framework_case="${REGRESSION_ROOT}/${framework_arm}"
+
+    if solids4Foam::regressionCaseSkipped "${legacy_case}/${ALLRUN_LOGFILE}" \
+        || solids4Foam::regressionCaseSkipped \
+            "${framework_case}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${framework_arm} against ${legacy_arm}"
+        continue
+    fi
+
+    t=$(solids4Foam::latestTime "${framework_case}")
+
+    if [[ -z "${t}" || ! -f "${framework_case}/${t}/D" \
+        || ! -f "${legacy_case}/${t}/D" ]]
+    then
+        echo "FAIL: ${framework_arm}: no D field to compare with ${legacy_arm}"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if diff -q "${legacy_case}/${t}/D" "${framework_case}/${t}/D" > /dev/null
+    then
+        echo "PASS: ${framework_arm} and ${legacy_arm} agree exactly"
+    else
+        echo "FAIL: ${framework_arm} and ${legacy_arm} differ"
+        failures=$((failures + 1))
+    fi
 done
 
 for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do

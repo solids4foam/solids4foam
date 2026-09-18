@@ -341,6 +341,18 @@ run_sigma0_restart_check() {
         solids4Foam > log.solids4Foam 2>&1
     ) || { echo "FAIL: sigma0 restart check could not restart"; return 1; }
 
+    # All three arms are framework arms, by a sed that has to match. If that
+    # anchor ever stops matching they all run legacy, and the comparison below
+    # still passes - it would be comparing legacy against legacy
+    for d in restartContinuous restartRestarted restartNone; do
+        if ! grep -q "Selecting mechanical constitutive law" \
+            "${root}/${d}/log.solids4Foam"
+        then
+            echo "FAIL: sigma0 restart arm ${d} did not use the framework"
+            return 1
+        fi
+    done
+
     # The restart has to be a real one: the time it resumes from must not
     # itself contain sigma0, or the fallback is never exercised
     if [[ -f "${root}/restartRestarted/1/sigma0" ]]; then
