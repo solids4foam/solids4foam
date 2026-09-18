@@ -1868,6 +1868,13 @@ Foam::solidModel::mechanicalManager() const
     {
         // mechanicalModel is itself the mechanicalProperties IOdictionary, so
         // both frameworks are built from exactly the same entries
+        //
+        // TODO: this also means a framework run constructs the whole legacy
+        // model and every legacy law, so the framework cannot yet exist
+        // without the thing it replaces. Breaking that is stage 5 work:
+        // solidModel should read mechanicalProperties itself and hand the
+        // dictionary to whichever implementation is in use, leaving
+        // mechanicalModel as one consumer of it rather than the owner
         mechanicalManagerPtr_.set
         (
             new mechanicalConstitutiveLawManager(mesh(), mechanical())
