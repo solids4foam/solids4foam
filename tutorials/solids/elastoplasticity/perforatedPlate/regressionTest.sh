@@ -448,9 +448,13 @@ EOD
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 
+    # Not a skip: mpirun was found above, so decomposePar is installed too and
+    # failing here is a real fault - a malformed dictionary, a compatibility
+    # regression, or the case not being set up as this test assumes
     if ! ( cd "${d}" && decomposePar -time 10 > log.decomposePar 2>&1 ); then
-        echo "SKIP: parallel restart (decomposePar failed)"
-        return 0
+        echo "FAIL: parallel restart (decomposePar failed)"
+        echo "      (see ${d}/log.decomposePar)"
+        return 1
     fi
 
     # The premise of the whole test: decomposePar leaves the state behind. If
@@ -544,11 +548,14 @@ EOD
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
     rm -rf "${d}"/processor* "${d}"/[1-9]*
 
+    # As above: reaching here means mpirun exists, so a blockMesh or
+    # decomposePar failure is a fault rather than an absent tool
     if ! ( cd "${d}" && blockMesh > log.blockMesh 2>&1 \
         && decomposePar > log.decomposePar 2>&1 )
     then
-        echo "SKIP: reconstructed restart (decomposePar failed)"
-        return 0
+        echo "FAIL: reconstructed restart (blockMesh or decomposePar failed)"
+        echo "      (see ${d}/log.blockMesh and ${d}/log.decomposePar)"
+        return 1
     fi
 
     if ! ( cd "${d}" && mpirun -np "${PARALLEL_N_PROCS}" solids4Foam -parallel > log.par1 2>&1 )

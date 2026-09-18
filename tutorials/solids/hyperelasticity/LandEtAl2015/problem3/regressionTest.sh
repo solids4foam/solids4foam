@@ -61,9 +61,16 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
+# Not a skip. regressionCaseSkipped() above already reports the environments
+# this case is not expected to run in - an unsupported fork, or PETSc missing.
+# Reaching here without a displacement history means the case was expected to
+# run and did not: a failure in meshing, a utility, a dictionary or the solver
+# itself. Treating that as a skip passed the whole regression, framework arms
+# included, on a machine where everything is installed
 if [[ ! -f "${CASE_DIR}/${DISP_FILE}" ]]; then
-    echo "SKIP: no displacement history (the case did not run here)"
-    exit 0
+    echo "FAIL: no displacement history, and the tutorial did not report a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 failures=0
