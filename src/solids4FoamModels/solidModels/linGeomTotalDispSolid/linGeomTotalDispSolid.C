@@ -747,7 +747,6 @@ void Foam::solidModels::linGeomTotalDispSolid::updateTotalFields()
 
 
 // The high-order face quadrature does not exist on foam-extend
-#ifndef FOAMEXTEND
 void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
 {
     if (!useMechanicalConstitutiveLawManager())
@@ -770,7 +769,6 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
         sigmaQuad()
     );
 }
-#endif
 
 
 void Foam::solidModels::linGeomTotalDispSolid::correctStress()

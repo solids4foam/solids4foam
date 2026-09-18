@@ -129,7 +129,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //  when the framework is in use and from the
         //  legacy mechanicalModel otherwise.
         //  The high-order face quadrature does not exist on foam-extend
-#ifndef FOAMEXTEND
         void correctStressQuad();
 
         //- Finite-strain kinematics at the face quadrature points, held here
@@ -141,7 +140,6 @@ class nonLinGeomTotalLagTotalDispSolid
         mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
-#endif
 
         //- Construct impK from the framework when
         //  the framework is in use, and from the legacy

@@ -126,9 +126,7 @@ class linGeomTotalDispSolid
         //- Update the stress at the face quadrature points of the high-order
         //  discretisation, from the same source as correctStress().
         //  The high-order discretisation does not exist on foam-extend
-#ifndef FOAMEXTEND
         void correctStressQuad();
-#endif
 
         //- Somewhere for the laws to put their volumetric response
         volScalarField& volumetricResponse() const;
