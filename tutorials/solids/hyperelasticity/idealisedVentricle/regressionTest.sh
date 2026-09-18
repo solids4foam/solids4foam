@@ -42,11 +42,18 @@ fi
 # Regression tolerances
 # ------------------------------------------------------------
 
-# The case is run to a small fraction of the full ramp time, so
-# the resulting peak von Mises stress is well below the case
-# maximum but still well above zero.
-SIGMA_MIN=1.0e0
-SIGMA_MAX=1.0e7
+# The case is run to a small fraction of the full ramp time, so the resulting
+# peak von Mises stress is well below the case maximum but still well above
+# zero. Both arms land near 155 Pa - legacy 154.986, framework 154.725 at the
+# time of writing - so the band below is wide enough to absorb the difference
+# between forks and solvers while still being an oracle: [1, 1e7] admitted
+# almost any number a run could produce, and so tested nothing on its own.
+#
+# The arms are also required to agree with each other within 1% further down,
+# which is the sharper of the two checks. This one catches the case where both
+# arms move together.
+SIGMA_MIN=1.0e2
+SIGMA_MAX=2.5e2
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
