@@ -290,3 +290,19 @@ The mesh is overwritten!
   ```
 
 ---
+
+## `stabilisationFourierCheck`
+
+Verifies production runtime-selected pressure stabilisation models on a
+uniform periodic Cartesian mesh against independent raw and spectrally
+normalised Fourier symbols.
+Supported models are Laplacian, JamesonSchmidtTurkel, generalised even-order
+Laplacian powers 0/1/2, diffStencilLaplacian and its RhieChow subclass.
+It reports volume-weighted eigenvalues and residuals, writes CSV results,
+checks equivalent model pairs, constant gamma and invalid configurations,
+and exits nonzero on failure. Optional `-symbolSweep` exports raw analytical
+curves/maps, `-writeFields` writes uniquely named pressure/stabilisation
+fields, and `-constructOnly` supports focused constructor rejection tests.
+
+See the build instructions, example dictionary and plotting script in
+[tutorial case](../../tutorials/solids/verification/pressureStabilisationFourier/README.md).
