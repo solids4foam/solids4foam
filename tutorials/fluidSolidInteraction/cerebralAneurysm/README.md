@@ -79,7 +79,9 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   system [2]. The case uses `constantHs 5e-4` and permits up to 30 FSI
   correctors per time step. The `fixedRelaxation` coupling uses a relaxation
   factor of 1.0, i.e. no additional under-relaxation is applied, as the Robin
-  condition already provides the required stability.
+  condition already provides the required stability; the Robin-Neumann
+  coupling is designed for such unrelaxed iterations, and Aitken or IQN-ILS
+  acceleration is not recommended with it.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 
@@ -187,6 +189,14 @@ The number of FSI (outer) iterations performed in each time step is recorded in
 `postProcessing/fsiResiduals.dat`. `Allrun` post-processes this file with
 `fsiIterations.gnuplot` to produce `fsiIterations.pdf` and `fsiIterations.png`
 (this step is skipped if `gnuplot` is not installed).
+
+The `surfaceFieldValue` function objects in `system/controlDict` also record
+the signed mass flow through the two inlets, the four outlets, and the fluid
+FSI patch. `interfaceAbsoluteMassFlowRate` records the sum of the magnitudes of
+the face fluxes on the FSI patch, so local leakage cannot be hidden by
+cancellation in the signed interface flow. The values are calculated from the
+mesh-relative volumetric flux `phi` and scaled by the blood density of
+$$1050\,\mathrm{kg\,m^{-3}}$$ to give mass flow in $$\mathrm{kg\,s^{-1}}$$.
 
 ![FSI iterations per time step](images/fsiIterations.png)
 

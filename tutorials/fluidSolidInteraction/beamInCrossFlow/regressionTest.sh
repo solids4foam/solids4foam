@@ -156,6 +156,13 @@ prepare_case() {
     local coupling="$1"
     local case_name="${2:-${coupling}}"
     local case_dir="${REGRESSION_ROOT}/${case_name}"
+    local solution_setup="${coupling}"
+    local interface_condition="dirichletNeumann"
+
+    if [[ "${coupling}" == "robin" ]]; then
+        solution_setup="iqnils"
+        interface_condition="robin"
+    fi
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -175,17 +182,19 @@ prepare_case() {
         cd "${case_dir}"
 
         ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-        ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
-        ln -vnsf "controlDict.${coupling}" system/controlDict
-        ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
+        ln -vnsf "solidProperties.${solution_setup}" constant/solid/solidProperties
+        ln -vnsf "controlDict.${solution_setup}" system/controlDict
+        ln -vnsf "fvSolution.${solution_setup}" system/fluid/fvSolution
+        ln -vnsf "U.${interface_condition}" 0/fluid/U
+        ln -vnsf "p.${interface_condition}" 0/fluid/p
 
 if [[ "${variant}" == "foamextend" ]]; then
-            ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
+            ln -vnsf "fvSolution.${solution_setup}.foamextend" system/fluid/fvSolution
         elif [[ "${variant}" == "openfoamorg" ]]; then
-            ln -vnsf "fvSolution.${coupling}.openfoamorg" system/fluid/fvSolution
+            ln -vnsf "fvSolution.${solution_setup}.openfoamorg" system/fluid/fvSolution
         fi
 
-        patch_end_time "system/controlDict.${coupling}"
+        patch_end_time "system/controlDict.${solution_setup}"
     ) > /dev/null
 
     echo "${case_dir}"
@@ -333,6 +342,9 @@ run_case "${aitken_case}" aitken
 iqnils_case=$(prepare_case iqnils)
 run_case "${iqnils_case}" iqnils
 
+robin_case=$(prepare_case robin)
+run_case "${robin_case}" robin
+
 if [[ "${variant}" != "foamextend" ]]; then
     high_order_case=$(prepare_case iqnils highOrder)
     run_high_order_case "${high_order_case}"
@@ -347,6 +359,10 @@ check_case aitken "${aitken_case}" \
     || failures=$((failures + $?))
 
 check_case iqnils "${iqnils_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
+
+check_case robin "${robin_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
 

@@ -86,6 +86,78 @@ functions
         region          fluid;
     }
 
+    inletMassFlowRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        regionType      patch;
+        names           (inlet1 inlet2);
+        operation       sum;
+        fields          (phi);
+        scaleFactor     1050;
+        writeFields     false;
+        log             false;
+
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
+    outletMassFlowRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        regionType      patch;
+        names           (outlet1 outlet2 outlet3 outlet4);
+        operation       sum;
+        fields          (phi);
+        scaleFactor     1050;
+        writeFields     false;
+        log             false;
+
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
+    interfaceMassFlowRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        regionType      patch;
+        name            wall;
+        operation       sum;
+        fields          (phi);
+        scaleFactor     1050;
+        writeFields     false;
+        log             false;
+
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
+    interfaceAbsoluteMassFlowRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+
+        regionType      patch;
+        name            wall;
+        operation       sumMag;
+        fields          (phi);
+        scaleFactor     1050;
+        writeFields     false;
+        log             false;
+
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
     courantNo
     {
         type            CourantNo;
