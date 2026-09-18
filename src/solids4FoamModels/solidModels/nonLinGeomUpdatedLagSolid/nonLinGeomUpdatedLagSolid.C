@@ -1823,6 +1823,10 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     if (useMechanicalConstitutiveLawManager())
     {
         mechanicalManager().endTimeStep();
+
+        // The base call is skipped on this branch, so the quadrature history
+        // it would have rolled over is rolled over here
+        rollOverQuadratureHistory();
     }
     else
     {

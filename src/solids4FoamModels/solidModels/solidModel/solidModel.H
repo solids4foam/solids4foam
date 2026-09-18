@@ -441,6 +441,16 @@ protected:
         //  did not check it
         void checkFrameworkGradScheme(const word& fieldName) const;
 
+        //- Copy the quadrature gradient into its old-time store, at the end
+        //  of the time step, while the current field holds the converged
+        //  value. It is rebuilt on each evaluation, so there is nothing else
+        //  to take it from.
+        //
+        //  Separate from updateTotalFields() so that a model overriding that
+        //  can still roll the history over: the two do unrelated work, and a
+        //  model wanting one does not necessarily want the other
+        void rollOverQuadratureHistory();
+
         //- The implicit stiffness taken from the mechanicalConstitutiveLaw
         //  framework.
         //

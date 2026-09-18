@@ -1778,13 +1778,8 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 }
 
 
-void Foam::solidModel::updateTotalFields()
+void Foam::solidModel::rollOverQuadratureHistory()
 {
-    mechanical().updateTotalFields();
-
-    // Take the old-time copy of the quadrature gradient now, at the end of the
-    // step, while the current field holds the converged value. It is rebuilt
-    // on each evaluation, so there is nothing else to take it from.
     // The high-order discretisation, and hence gradDQuad(), does not exist on
     // foam-extend
 #ifndef FOAMEXTEND
@@ -1798,6 +1793,15 @@ void Foam::solidModel::updateTotalFields()
         copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
     }
 #endif
+}
+
+
+void Foam::solidModel::updateTotalFields()
+{
+    mechanical().updateTotalFields();
+
+    // A model overriding this must call rollOverQuadratureHistory() itself
+    rollOverQuadratureHistory();
 }
 
 
