@@ -17,9 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-#include "enhancedVolPointInterpolation.H"
-#endif
 #include "nonLinGeomTotalLagTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -742,8 +739,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     {
         mechanical().interpolate(D(), gradD(), pointD());
     }
-    pointD().correctBoundaryConditions();
-
     // Increment of displacement
     DD() = D() - D().oldTime();
 
@@ -1292,42 +1287,6 @@ const volScalarField& nonLinGeomTotalLagTotalDispSolid::rKappa() const
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::frameworkInterpolate
-(
-    const volVectorField& D,
-    const volTensorField& gradD,
-    pointVectorField& pointD
-)
-{
-    // As above: the legacy interpolate() routes multiple materials through
-    // subMeshes. The interpolator itself is not legacy - it is a
-    // mesh-registered singleton that mechanicalModel merely looks up - so it
-    // is fetched here directly rather than through that accessor.
-    //
-    // foam-extend's has no gradient-corrected form, so there the legacy call
-    // is kept. That is a real limitation rather than a tidy fallback: on
-    // foam-extend a multi-material framework run would take this route and
-    // get the subMesh interpolation, so the combination is refused below
-#ifdef OPENFOAM_NOT_EXTEND
-    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
-#else
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    {
-        FatalErrorInFunction
-            << "The constitutive-law framework does not support more than one "
-            << "material on foam-extend in this solid model." << nl << nl
-            << "    The point interpolation would fall back to the legacy "
-            << "per-material subMesh path, which is what the framework "
-            << "replaces, and this fork's interpolator has no "
-            << "gradient-corrected form to use instead."
-            << exit(FatalError);
-    }
-
-    mechanical().interpolate(D, gradD, pointD);
-#endif
-}
 
 
 bool nonLinGeomTotalLagTotalDispSolid::evolve()

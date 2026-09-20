@@ -35,6 +35,10 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "hofvc.H"
+    #include "enhancedVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -545,6 +549,79 @@ void Foam::solidModel::makeGradDQuad() const
             gradDQ[faceI][qpI] = tensor::zero;
         }
     }
+}
+
+
+const Foam::CompactListList<Foam::tensor>&
+Foam::solidModel::gradDQuad0() const
+{
+    if (gradDQuad0Ptr_.empty())
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        if (gradDQuadPtr_.empty())
+        {
+            makeGradDQuad();
+        }
+
+        gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        gradDQuad0Ptr_().offsets() = gradDQuadPtr_().offsets();
+        gradDQuad0Ptr_().m().setSize(gradDQuadPtr_().m().size());
+        hofvc::fGrad(D_.oldTime(), gradDQuad0Ptr_());
+#else
+        gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+#endif
+    }
+
+    return autoPtrRef(gradDQuad0Ptr_);
+}
+
+
+void Foam::solidModel::correctPointDisplacement
+(
+    pointVectorField& pointD
+) const
+{
+    pointD.correctBoundaryConditions();
+
+    const polyMesh& pMesh = pointD.mesh().mesh();
+    vectorField& pointDI = pointD;
+
+    forAll(pMesh.boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(pMesh.boundaryMesh()[patchI]))
+        {
+            const polyPatch& patch = pMesh.boundaryMesh()[patchI];
+
+            if (returnReduce(patch.size(), sumOp<int>()) == 0)
+            {
+                continue;
+            }
+
+            const labelList& meshPoints = patch.meshPoints();
+            const vector avgN = gAverage(patch.pointNormals());
+
+            forAll(meshPoints, pointI)
+            {
+                vector& pointValue = pointDI[meshPoints[pointI]];
+
+                if (mag(avgN.x()) > 0.95)
+                {
+                    pointValue.x() = 0;
+                }
+                else if (mag(avgN.y()) > 0.95)
+                {
+                    pointValue.y() = 0;
+                }
+                else if (mag(avgN.z()) > 0.95)
+                {
+                    pointValue.z() = 0;
+                }
+            }
+        }
+    }
+
+    twoDCorrector_.correctPoints(pointDI);
 }
 
 
@@ -1149,6 +1226,8 @@ Foam::solidModel::solidModel
         )
     ),
     mechanicalManagerPtr_(),
+    jacobianTangentCached_(false),
+    jacobianTangent_(tangentRequest::none),
     restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
@@ -1896,6 +1975,34 @@ void Foam::solidModel::frameworkGrad
 }
 
 
+void Foam::solidModel::frameworkInterpolate
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD
+)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
+#else
+    if (mechanicalManager().nLaws() > 1)
+    {
+        FatalErrorInFunction
+            << "The constitutive-law framework does not support more than one "
+            << "material on foam-extend in this solid model." << nl << nl
+            << "    The point interpolation would fall back to the legacy "
+            << "per-material sub-mesh path, which the framework replaces, and "
+            << "this fork's interpolator has no gradient-corrected form."
+            << exit(FatalError);
+    }
+
+    mechanical().interpolate(D, gradD, pointD);
+#endif
+
+    correctPointDisplacement(pointD);
+}
+
+
 void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 {
     if (!useMechanicalConstitutiveLawManager())
@@ -1963,26 +2070,10 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
     volScalarField& impK = tImpK();
 #endif
 
-    // A tangent query, so it neither writes a stress nor disturbs history.
-    //
-    // Evaluated at zero gradient against a state with no history, which makes
-    // this the elastic tangent. Two reasons, and the first is a correctness
-    // one. impK is formed once and kept, so on a cold start it is formed
-    // before anything has happened, while on a restart it would be formed
-    // against restored history and come out different - and since the solver
-    // stops on a residual measured relative to its first one, a different impK
-    // moves where the step stops and the run no longer reproduces the
-    // uninterrupted one. Evaluating it cold makes it the same either way.
-    //
-    // The legacy impK() reaches the same value by a longer road: it scales by
-    // 1 - 2*mu*DLambda/magSTrial, but DLambda is NO_READ and starts at zero,
-    // so the factor is exactly one and the result is elastic whether the run
-    // was restarted or not. What looks like a state dependence there is not
-    // one, which is worth saying because the comment here used to claim the
-    // opposite.
-    //
-    // Nothing is lost. This is a scalar preconditioner for an approximate
-    // Jacobian, and the elastic value is in practice as good as a scaled one
+    // Evaluate the tangent at zero gradient against a state with no history.
+    // impK is formed once and kept, so this gives the same elastic
+    // preconditioner on a cold start and on a restart without disturbing the
+    // stored constitutive state
     const volTensorField zeroGradD
     (
         IOobject
@@ -2467,6 +2558,11 @@ Foam::tangentRequest Foam::solidModel::jacobianTangent
     const tangentRequest deflt
 ) const
 {
+    if (jacobianTangentCached_)
+    {
+        return jacobianTangent_;
+    }
+
     const dictionary& dict = solidModelDict();
 
     if (dict.found("approximateJacobian"))
@@ -2483,24 +2579,29 @@ Foam::tangentRequest Foam::solidModel::jacobianTangent
 
         const Switch approximate(dict.lookup("approximateJacobian"));
 
-        const tangentRequest req =
+        jacobianTangent_ =
             approximate
           ? tangentRequest::scalar
           : tangentRequest::fourthOrder;
 
         WarningInFunction
             << "'approximateJacobian' is deprecated. Replace it with "
-            << "'jacobianTangent " << tangentRequestName(req) << ";'" << endl;
-
-        return req;
+            << "'jacobianTangent " << tangentRequestName(jacobianTangent_)
+            << ";'" << endl;
     }
-
-    if (!dict.found("jacobianTangent"))
+    else if (dict.found("jacobianTangent"))
     {
-        return deflt;
+        jacobianTangent_ =
+            tangentRequestNamed(word(dict.lookup("jacobianTangent")));
+    }
+    else
+    {
+        jacobianTangent_ = deflt;
     }
 
-    return tangentRequestNamed(word(dict.lookup("jacobianTangent")));
+    jacobianTangentCached_ = true;
+
+    return jacobianTangent_;
 }
 
 // ************************************************************************* //

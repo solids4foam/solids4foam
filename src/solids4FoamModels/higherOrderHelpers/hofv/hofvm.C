@@ -208,6 +208,14 @@ static label hofvmLaplacianPETSc
 {
     const fvMesh& mesh = D.mesh();
 
+    if (bool(diffusivityPtr) == bool(materialTangentPtr))
+    {
+        FatalErrorInFunction
+            << "Supply exactly one of a scalar diffusivity and a material "
+            << "tangent."
+            << abort(FatalError);
+    }
+
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
@@ -223,6 +231,9 @@ static label hofvmLaplacianPETSc
     {
         gammaPtr.set(new surfaceScalarField(fvc::interpolate(*diffusivityPtr)));
     }
+
+    const scalarField* gammaIPtr =
+        diffusivityPtr ? &Foam::primitiveField(gammaPtr()) : nullptr;
 
     // Coefficient at one quadrature point.
     // Either one of the three isotropic kernels scaled by a scalar
@@ -294,8 +305,8 @@ static label hofvmLaplacianPETSc
     {
         const vector& faceNormal = n[faceI];
         const scalar gammaFace =
-            diffusivityPtr
-          ? Foam::primitiveField(gammaPtr())[faceI]
+            gammaIPtr
+          ? (*gammaIPtr)[faceI]
           : 0.0;
         const label ownCellID = owner[faceI];
         const label neiCellID = neighbour[faceI];
@@ -364,12 +375,10 @@ static label hofvmLaplacianPETSc
 
         if (isA<processorPolyPatch>(pp))
         {
-            const scalarField pGamma
-            (
+            const scalarField* pGammaPtr =
                 diffusivityPtr
-              ? scalarField(gammaPtr().boundaryField()[patchI])
-              : scalarField(pp.size(), 0.0)
-            );
+              ? &gammaPtr().boundaryField()[patchI]
+              : nullptr;
             const vectorField patchNormal(mesh.boundary()[patchI].nf());
             const label start = pp.start();
 
@@ -380,7 +389,9 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaFace = pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)
@@ -428,12 +439,10 @@ static label hofvmLaplacianPETSc
                 << abort(FatalError);
         }
 
-        const scalarField pGamma
-        (
+        const scalarField* pGammaPtr =
             diffusivityPtr
-          ? scalarField(gammaPtr().boundaryField()[patchI])
-          : scalarField(pp.size(), 0.0)
-        );
+          ? &gammaPtr().boundaryField()[patchI]
+          : nullptr;
         const vectorField patchNormal(mesh.boundary()[patchI].nf());
         const label start = pp.start();
 
@@ -456,7 +465,9 @@ static label hofvmLaplacianPETSc
                 const vector& faceNormal = patchNormal[faceI];
                 const tensor R = I - 2.0*sqr(faceNormal);
 
-                const scalar gammaFace = pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
                 const label stencilSize = stencil.size();
 
@@ -529,7 +540,9 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaFace = pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)

@@ -215,7 +215,7 @@ poroLinGeomSolid::poroLinGeomSolid
     (
         IOobject
         (
-            "grad(p)",
+            "grad(" + p_.name() + ")",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -449,7 +449,14 @@ bool poroLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    if (useMechanicalConstitutiveLawManager())
+    {
+        frameworkInterpolate(D(), gradD(), pointD());
+    }
+    else
+    {
+        mechanical().interpolate(D(), pointD());
+    }
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

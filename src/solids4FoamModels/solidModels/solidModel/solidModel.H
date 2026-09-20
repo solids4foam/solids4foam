@@ -182,8 +182,8 @@ private:
         //- Gradient of total displacement at face quadrature points, at the
         //  previous time step.
         //  A history-dependent law evaluated at quadrature points needs this,
-        //  and the current field is rebuilt each call, so it is copied here at
-        //  the end of every time step
+        //  and the current field is rebuilt each call, so this is reconstructed
+        //  from D.oldTime() on first use and copied at the end of every step
         mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
 
         //- Copy one compact list-list onto another.
@@ -296,6 +296,12 @@ private:
         //- The mechanicalConstitutiveLaw framework, built on first use
         mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
+        //- Whether the Jacobian tangent request has been resolved
+        mutable bool jacobianTangentCached_;
+
+        //- Cached Jacobian tangent request
+        mutable tangentRequest jacobianTangent_;
+
         //- Whether the case said anything about restart at all.
         //  Read before restart_ below, because looking that up adds it to the
         //  dictionary and the silence cannot be recovered afterwards. Silence
@@ -361,6 +367,10 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
+        //- Correct point displacement boundary conditions, symmetry planes and
+        //  empty directions after interpolation
+        void correctPointDisplacement(pointVectorField& pointD) const;
+
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
 
@@ -403,42 +413,29 @@ protected:
         //- The mechanicalConstitutiveLaw framework, constructed on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
-        //- Displacement gradient for a solid model on the framework,
-        //  computed directly rather than through the legacy mechanicalModel.
-        //
-        //  That is not a preference. For more than one material the legacy
-        //  grad() splits the mesh into per-material subMeshes, interpolates
-        //  the displacement onto each, takes a gradient there and maps the
-        //  result back, with a stress-based correction at the interface.
-        //  Replacing that machinery is a large part of what the framework is
-        //  for: the material-aware least-squares gradient does the same job
-        //  on one mesh, by drawing a cell's stencil only from cells of its
-        //  own material.
-        //
-        //  Routing the framework through the subMesh path anyway is not
-        //  merely redundant, it is worse: on layeredPipe it puts the radial
-        //  stress 0.0305 from the analytical solution against a tolerance of
-        //  0.03, where the legacy path gives 0.0192. Computed directly it
-        //  gives 0.0192 too
+        //- Displacement gradient for a solid model on the framework, computed
+        //  on the primary mesh so that a material-aware scheme can keep each
+        //  cell's stencil within its material
         void frameworkGrad
         (
             const volVectorField& D,
             volTensorField& gradD
         ) const;
 
+        //- Interpolate displacement to points on the primary mesh rather than
+        //  through the legacy per-material sub-meshes
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
         //- Refuse a multi-material framework run whose gradient scheme is not
         //  material-aware.
         //
-        //  frameworkGrad() computes one gradient on one mesh in place of the
-        //  legacy per-material subMeshes, which is only right if the scheme
-        //  keeps a cell's stencil within its own material. leastSquaresS4f
-        //  does; the ordinary schemes do not, and the answer is then wrong by
-        //  more than the case's own tolerance and silently so, which is why
-        //  this refuses rather than warns.
-        //
-        //  Here rather than in each solid model because every model that
-        //  offers the framework has the same requirement, and four of them
-        //  did not check it
+        //  The primary-mesh gradient is valid only if a cell's stencil stays
+        //  within its own material; leastSquaresS4f provides that guarantee
         void checkFrameworkGradScheme(const word& fieldName) const;
 
         //- Copy the quadrature gradient into its old-time store, at the end
@@ -854,19 +851,8 @@ public:
             }
 
             //- Gradient of total displacement at face quadrature points at
-            //  the previous time step. Equal to the current field until the
-            //  first time step has been completed
-            virtual const CompactListList<tensor>& gradDQuad0() const
-            {
-                if (gradDQuad0Ptr_.empty())
-                {
-                    gradDQuad0Ptr_.set(new CompactListList<tensor>());
-
-                    copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
-                }
-
-                return autoPtrRef(gradDQuad0Ptr_);
-            }
+            //  the previous time step
+            virtual const CompactListList<tensor>& gradDQuad0() const;
 
             //- Return const reference to gradD at face quadrature points
             virtual const CompactListList<tensor>& gradDQuad() const

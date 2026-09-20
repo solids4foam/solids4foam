@@ -17,9 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-#include "enhancedVolPointInterpolation.H"
-#endif
 #include "linGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -579,8 +576,6 @@ bool linGeomTotalDispSolid::evolveSnes()
     {
         mechanical().interpolate(D(), gradD(), pointD());
     }
-    pointD().correctBoundaryConditions();
-
     // Increment of displacement
     DD() = D() - D().oldTime();
 
@@ -849,13 +844,17 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 
 
 const Foam::List<Foam::mat66>&
-Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
+Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent
+(
+    const tangentRequest req
+) const
 {
     if (!useMechanicalConstitutiveLawManager())
     {
         FatalErrorInFunction
-            << "'jacobianTangent fourthOrder' needs the material tangent from "
-            << "the mechanical constitutive law framework, but "
+            << "'jacobianTangent " << tangentRequestName(req)
+            << "' needs the material tangent from the mechanical constitutive "
+            << "law framework, but "
             << "'useMechanicalConstitutiveLawManager' is not set." << nl
             << "The legacy mechanicalModel cannot supply one on the primary "
             << "mesh."
@@ -910,7 +909,7 @@ Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent() const
         mesh().time().deltaTValue(),
         nullptr,
         &faceMaterialTangent_,
-        tangentRequest::fourthOrder
+        req
     );
 
     return faceMaterialTangent_;
@@ -999,6 +998,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 {
     DisRequired();
 
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
+
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
 
@@ -1066,9 +1068,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 #endif
     );
 
-    // A multi-material framework run needs a material-aware gradient
-    checkFrameworkGradScheme(D().name());
-
     if
     (
         solutionAlg() == solutionAlgorithm::PETSC_SNES
@@ -1125,42 +1124,6 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void Foam::solidModels::linGeomTotalDispSolid::frameworkInterpolate
-(
-    const volVectorField& D,
-    const volTensorField& gradD,
-    pointVectorField& pointD
-)
-{
-    // As above: the legacy interpolate() routes multiple materials through
-    // subMeshes. The interpolator itself is not legacy - it is a
-    // mesh-registered singleton that mechanicalModel merely looks up - so it
-    // is fetched here directly rather than through that accessor.
-    //
-    // foam-extend's has no gradient-corrected form, so there the legacy call
-    // is kept. That is a real limitation rather than a tidy fallback: on
-    // foam-extend a multi-material framework run would take this route and
-    // get the subMesh interpolation, so the combination is refused below
-#ifdef OPENFOAM_NOT_EXTEND
-    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
-#else
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    {
-        FatalErrorInFunction
-            << "The constitutive-law framework does not support more than one "
-            << "material on foam-extend in this solid model." << nl << nl
-            << "    The point interpolation would fall back to the legacy "
-            << "per-material subMesh path, which is what the framework "
-            << "replaces, and this fork's interpolator has no "
-            << "gradient-corrected form to use instead."
-            << exit(FatalError);
-    }
-
-    mechanical().interpolate(D, gradD, pointD);
-#endif
-}
 
 
 void linGeomTotalDispSolid::setDeltaT(Time& runTime)
@@ -1609,7 +1572,9 @@ label linGeomTotalDispSolid::formJacobian
         // for robustness, an equivalent relaxation step may need to be added.
         const leastSquaresScheme& reconstruction = displacementLeastSquares();
 
-        if (jacobianTangent(tangentRequest::scalar) == tangentRequest::fourthOrder)
+        const tangentRequest req = jacobianTangent(tangentRequest::scalar);
+
+        if (mechanicalConstitutiveLawManager::needsFourthOrderTangent(req))
         {
             // Assemble from the full material tangent
             hofvm::divSigmaIntoPETScMatrix
@@ -1618,7 +1583,7 @@ label linGeomTotalDispSolid::formJacobian
                 *this,
                 reconstruction,
                 D,
-                faceMaterialTangent()
+                faceMaterialTangent(req)
             );
         }
         else

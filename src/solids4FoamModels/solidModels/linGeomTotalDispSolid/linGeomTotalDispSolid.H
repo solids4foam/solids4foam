@@ -144,7 +144,10 @@ class linGeomTotalDispSolid
 
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
-        const List<mat66>& faceMaterialTangent() const;
+        const List<mat66>& faceMaterialTangent
+        (
+            const tangentRequest req
+        ) const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
@@ -169,15 +172,6 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
-        //- Point interpolation, likewise on the base mesh
-        void frameworkInterpolate
-        (
-            const volVectorField& D,
-            const volTensorField& gradD,
-            pointVectorField& pointD
-        );
-
-
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
 

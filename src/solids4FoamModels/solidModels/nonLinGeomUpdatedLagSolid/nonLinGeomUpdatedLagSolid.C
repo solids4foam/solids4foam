@@ -17,9 +17,6 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
-#include "enhancedVolPointInterpolation.H"
-#endif
 #include "nonLinGeomUpdatedLagSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -561,8 +558,6 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     {
         mechanical().interpolate(DD(), gradDD(), pointDD());
     }
-    pointDD().correctBoundaryConditions();
-
     // Total point displacement
     pointD() = pointD().oldTime() + pointDD();;
 
@@ -649,20 +644,10 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
         return;
     }
 
-    // The framework needs the inverse of the total deformation gradient at
-    // both the current and the previous time, and this solver keeps neither.
-    //
-    // Both are derived from F_ here rather than kept as a field with its own
-    // old time. That was the first approach and it is WRONG: this solver
-    // updates F_ again in updateTotalFields(), after the last stress
-    // evaluation of the step, so a derived field's stored old time is the
-    // inverse of a mid-iteration F_ rather than of the converged end-of-step
-    // one. The relative deformation gradient F & Finv0 was then slightly
-    // wrong, which no elastic law notices, because none of them reads Finv0,
-    // and which a history-dependent law gets wrong on every step.
-    //
-    // Deriving Finv0 from F_.oldTime() instead is correct by construction:
-    // F_'s own old time is maintained by the solver
+    // Derive the previous inverse from F_.oldTime() so that it corresponds to
+    // the converged previous configuration. A separately stored old time of
+    // inv(F_) can capture a mid-iteration value because F_ is updated again at
+    // the end of the time step
     if (FinvPtr_.empty())
     {
         FinvPtr_.set
@@ -1075,42 +1060,6 @@ const volScalarField& nonLinGeomUpdatedLagSolid::rKappa() const
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void Foam::solidModels::nonLinGeomUpdatedLagSolid::frameworkInterpolate
-(
-    const volVectorField& D,
-    const volTensorField& gradD,
-    pointVectorField& pointD
-)
-{
-    // As above: the legacy interpolate() routes multiple materials through
-    // subMeshes. The interpolator itself is not legacy - it is a
-    // mesh-registered singleton that mechanicalModel merely looks up - so it
-    // is fetched here directly rather than through that accessor.
-    //
-    // foam-extend's has no gradient-corrected form, so there the legacy call
-    // is kept. That is a real limitation rather than a tidy fallback: on
-    // foam-extend a multi-material framework run would take this route and
-    // get the subMesh interpolation, so the combination is refused below
-#ifdef OPENFOAM_NOT_EXTEND
-    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
-#else
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    {
-        FatalErrorInFunction
-            << "The constitutive-law framework does not support more than one "
-            << "material on foam-extend in this solid model." << nl << nl
-            << "    The point interpolation would fall back to the legacy "
-            << "per-material subMesh path, which is what the framework "
-            << "replaces, and this fork's interpolator has no "
-            << "gradient-corrected form to use instead."
-            << exit(FatalError);
-    }
-
-    mechanical().interpolate(D, gradD, pointD);
-#endif
-}
 
 
 bool nonLinGeomUpdatedLagSolid::evolve()

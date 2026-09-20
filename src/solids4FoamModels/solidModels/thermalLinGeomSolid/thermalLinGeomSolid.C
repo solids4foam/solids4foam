@@ -466,7 +466,14 @@ bool thermalLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    if (useMechanicalConstitutiveLawManager())
+    {
+        frameworkInterpolate(D(), gradD(), pointD());
+    }
+    else
+    {
+        mechanical().interpolate(D(), pointD());
+    }
 
     // Increment of displacement
     DD() = D() - D().oldTime();

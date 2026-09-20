@@ -188,15 +188,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-        //- Point interpolation, likewise on the base mesh
-        void frameworkInterpolate
-        (
-            const volVectorField& D,
-            const volTensorField& gradD,
-            pointVectorField& pointD
-        );
-
-
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid
         (

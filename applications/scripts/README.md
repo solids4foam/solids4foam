@@ -559,6 +559,27 @@ solids4Foam::removeEmptyDirs
 
 ---
 
+## `solids4Foam::latestTime()`
+
+This function prints the latest non-zero time-directory name in a case. It
+provides the behaviour of `foamListTimes -latestTime` on all supported forks,
+including foam-extend. It prints nothing when the case has no non-zero time
+directory and always returns successfully.
+
+- **Function argument** Path to the case directory.
+- **Function output** Latest non-zero time-directory name, without the case
+  path.
+- **Example of usage**
+
+  ```bash
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+
+  latestTime=$(solids4Foam::latestTime .)
+  ```
+
+---
+
 ## `solids4foam::err()`
 
 It will construct a message string with the current date time and timezone
