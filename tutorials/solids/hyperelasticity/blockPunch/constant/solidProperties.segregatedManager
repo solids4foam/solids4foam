@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of OpenFOAM software via              |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
+{
+    // Take the stress and implicit stiffness from the
+    // mechanicalConstitutiveLaw framework rather than the legacy
+    // mechanicalModel. Everything else is identical to
+    // solidProperties.segregated, so the two approaches must agree
+    useMechanicalConstitutiveLawManager yes;
+
+    // Maximum number of momentum correctors
+    nCorrectors             5000;
+
+    stabilisation
+    {
+        momentum
+        {
+            type        RhieChow;
+            scaleFactor 0.1;
+        }
+    }
+}
+
+// ************************************************************************* //
