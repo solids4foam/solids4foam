@@ -188,15 +188,15 @@ private:
 
         //- Copy one compact list-list onto another.
         //  OpenFOAM.org gives CompactListList no copy constructor and no copy
-        //  assignment, so the two pieces of storage are copied by hand. The
-        //  row offsets and the flat values are the whole of it
+        //  assignment. setSize() must be used rather than assigning offsets:
+        //  OpenFOAM.org also stores the row count separately
         static void copyQuadGradient
         (
             const CompactListList<tensor>& src,
             CompactListList<tensor>& dst
         )
         {
-            dst.offsets() = src.offsets();
+            dst.setSize(src.sizes());
             dst.m() = src.m();
         }
 

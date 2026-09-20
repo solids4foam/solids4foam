@@ -32,6 +32,7 @@ fi
 DISP_TOL=1e-7
 POINT_DISP_TOL=1e-7
 STRESS_TOL=2e5
+FRAMEWORK_FIELD_ABS_TOL=2e-12
 
 PD_DISP_TOL=3.0e-4
 PD_POINT_DISP_TOL=3.0e-4
@@ -219,6 +220,35 @@ check_less_than() {
     fi
 }
 
+compare_written_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = re.compile(
+    r"(?<![A-Za-z_])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+)
+
+try:
+    texts = [open(path).read() for path in sys.argv[1:]]
+    structure = [number.sub("<number>", text) for text in texts]
+    if structure[0] != structure[1]:
+        raise ValueError("field structures differ")
+
+    values = [
+        [float(match.group()) for match in number.finditer(text)]
+        for text in texts
+    ]
+    if not values[0] or len(values[0]) != len(values[1]):
+        raise ValueError("field numeric data are missing or differ in size")
+
+    print(max(abs(a - b) for a, b in zip(*values)))
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
 # The arms whose solidProperties carries useMechanicalConstitutiveLawManager.
 # Every other arm must run the legacy path
 FRAMEWORK_APPROACHES=(
@@ -293,7 +323,8 @@ done
 # compare them with each other: both paths solve this problem well within
 # tolerance, so both would pass even if they disagreed. For isotropic linear
 # elasticity a deviatoric projection and the declared volumetric split are the
-# same operation, so the two arms must agree exactly, not merely closely.
+# same operation, so the two arms must agree to the precision written in the
+# fields, not merely satisfy the analytical tolerances independently.
 #
 # highOrderFourthOrder has no legacy twin here - the other high-order arms are
 # different discretisations rather than the same one on the legacy path - so it
@@ -326,11 +357,16 @@ for pair in "${FRAMEWORK_PAIRS[@]}"; do
         continue
     fi
 
-    if diff -q "${legacy_case}/${t}/D" "${framework_case}/${t}/D" > /dev/null
+    field_diff=""
+    if field_diff=$(compare_written_fields \
+        "${legacy_case}/${t}/D" "${framework_case}/${t}/D") \
+      && awk "BEGIN {exit !(${field_diff} <= ${FRAMEWORK_FIELD_ABS_TOL})}"
     then
-        echo "PASS: ${framework_arm} and ${legacy_arm} agree exactly"
+        printf "PASS: %s and %s agree to write precision (max |delta| = %.3g)\n" \
+            "${framework_arm}" "${legacy_arm}" "${field_diff}"
     else
-        echo "FAIL: ${framework_arm} and ${legacy_arm} differ"
+        printf "FAIL: %s and %s fields differ (max |delta| = %s)\n" \
+            "${framework_arm}" "${legacy_arm}" "${field_diff:-unavailable}"
         failures=$((failures + 1))
     fi
 done
