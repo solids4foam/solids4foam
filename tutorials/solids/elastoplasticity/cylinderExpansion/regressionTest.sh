@@ -45,8 +45,8 @@ run_constitutive_test() {
         n_passed=$(grep -c 'PASS:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true)
 
         if (( n_passed == 0 )); then
-            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
-            return 0
+            echo "FAIL: mechanicalConstitutiveLaw checks reported no checks"
+            return 1
         fi
 
         echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"

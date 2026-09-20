@@ -35,6 +35,13 @@ else
     solids4Foam::requirePetscOrExitSilently
 fi
 
+# A previous framework run may have left the active dictionaries as symlinks.
+# Restore the preprocessing/legacy dictionaries before running utilities.
+rm -f constant/solidProperties system/fvSchemes system/fvSolution
+cp constant/solidProperties.legacy constant/solidProperties
+cp system/fvSchemes.preprocess system/fvSchemes
+cp system/fvSolution.legacy system/fvSolution
+
 # Compile case-local utilities
 (cd src && bash ./Allwmake -s) || exit 1
 
@@ -71,11 +78,10 @@ fi
 # scheme that the solver's fvSchemes does not carry
 runApplication calcLocCoordinates
 
-if [[ "${APPROACH}" != "legacy" ]]
-then
-    ln -sf solidProperties.framework constant/solidProperties
-    ln -sf fvSolution.framework system/fvSolution
-    ln -sf fvSchemes.framework system/fvSchemes
+if [[ "${APPROACH}" == "framework" ]]; then
+    cp constant/solidProperties.framework constant/solidProperties
+    cp system/fvSolution.framework system/fvSolution
+    cp system/fvSchemes.framework system/fvSchemes
 fi
 
 # Run solver

@@ -44,9 +44,7 @@ laplacianSchemes
 
 snGradSchemes
 {
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
+    default            corrected;
 }
 
 interpolationSchemes

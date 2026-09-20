@@ -120,6 +120,56 @@ extract_max_sigma() {
 # to 1e-10 takes it to 1e-8. The threshold here is well above that and far
 # below anything physical
 FRAMEWORK_D_REL_TOL=1e-6
+COMPARISON_END_TIME=5
+
+compare_internal_vector_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+def read_internal(path):
+    text = open(path).read()
+    uniform = re.search(
+        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
+        text,
+    )
+    if uniform:
+        return [tuple(map(float, uniform.groups()))]
+
+    nonuniform = re.search(
+        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not nonuniform:
+        raise ValueError(f"cannot parse internalField in {path}")
+
+    values = re.findall(
+        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
+    )
+    if not values:
+        raise ValueError(f"empty internalField in {path}")
+    return [tuple(map(float, value)) for value in values]
+
+try:
+    a = read_internal(sys.argv[1])
+    b = read_internal(sys.argv[2])
+    if len(a) == 1 and len(b) > 1:
+        a *= len(b)
+    if len(b) == 1 and len(a) > 1:
+        b *= len(a)
+    if len(a) != len(b):
+        raise ValueError("different internalField sizes")
+    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
+    max_value = max(abs(x) for av in a for x in av)
+    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
 
 run_framework_comparison() {
     # Not on foam-extend, where the two arms are known to differ, by 0.6 % in D.
@@ -197,6 +247,16 @@ run_framework_comparison() {
         return 1
     fi
 
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        if ! grep -q "^End" "${dir}/${SOLVER_LOGFILE}" \
+          || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
+              "${dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${dir} did not complete and converge"
+            return 1
+        fi
+    done
+
     local tL tF
     tL=$(solids4Foam::latestTime "${legacy_dir}")
     tF=$(solids4Foam::latestTime "${framework_dir}")
@@ -206,59 +266,23 @@ run_framework_comparison() {
         return 1
     fi
 
+    if ! awk "BEGIN {exit !((${tL} - ${COMPARISON_END_TIME})^2 <= 1e-20)}"
+    then
+        echo "FAIL: comparison stopped at ${tL}; expected ${COMPARISON_END_TIME}"
+        return 1
+    fi
+
     if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
     then
         echo "FAIL: the framework comparison produced no D field"
         return 1
     fi
 
-    # Largest component-wise difference, relative to the largest component
     local rel
-    rel=$(awk '
-        function abs(x) { return x < 0 ? -x : x }
-        FNR == NR {
-            if ($0 ~ /^\(/)
-            {
-                gsub(/[()]/, ""); n++
-                for (i = 1; i <= NF; i++) a[n, i] = $i
-            }
-            next
-        }
-        {
-            if ($0 ~ /^\(/)
-            {
-                gsub(/[()]/, ""); k++
-                for (i = 1; i <= NF; i++)
-                {
-                    d = abs($i - a[k, i]); if (d > maxd) maxd = d
-                    v = abs(a[k, i]);      if (v > maxv) maxv = v
-                }
-            }
-        }
-        END {
-            # Without this the comparison is trivially satisfied when nothing
-            # was read: no matching line leaves maxd and maxv at zero, and a
-            # relative difference of zero reads as perfect agreement. A
-            # uniform-form field, or a change in how fields are written, does
-            # exactly that
-            if (n == 0 || k == 0) { print "NODATA"; exit }
-            if (n != k)           { print "MISMATCH"; exit }
-            printf "%.10g\n", (maxv > 0 ? maxd/maxv : maxd)
-        }
-    ' "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D")
-
-    if [[ -z "${rel}" ]]; then
-        echo "FAIL: could not compare the two arms"
-        return 1
-    fi
-
-    if [[ "${rel}" == "NODATA" ]]; then
-        echo "FAIL: neither D field yielded any values to compare"
-        return 1
-    fi
-
-    if [[ "${rel}" == "MISMATCH" ]]; then
-        echo "FAIL: the two D fields hold different numbers of values"
+    if ! rel=$(compare_internal_vector_fields \
+        "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D")
+    then
+        echo "FAIL: could not compare the two D internal fields"
         return 1
     fi
 

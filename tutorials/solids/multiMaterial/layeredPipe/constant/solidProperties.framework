@@ -23,6 +23,8 @@ solidModel     linearGeometryTotalDisplacement;
 
 "linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
+    useMechanicalConstitutiveLawManager yes;
+
     // Maximum number of momentum correctors
     //nCorrectors     10000;
 
@@ -40,8 +42,3 @@ solidModel     linearGeometryTotalDisplacement;
 }
 
 // ************************************************************************* //
-
-linearGeometryTotalDisplacementCoeffs
-{
-    useMechanicalConstitutiveLawManager yes;
-}

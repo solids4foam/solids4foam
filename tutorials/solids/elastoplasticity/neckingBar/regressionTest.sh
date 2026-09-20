@@ -172,17 +172,24 @@ echo
 run_restart_test() {
     local d="${REGRESSION_ROOT}/frameworkRestart"
 
-    prepare_case "frameworkRestart"
+    if [ "$CHECK_ONLY" = false ]; then
+        prepare_case "frameworkRestart"
 
-    sed -i.bak \
-        's/^writePrecision.*/writePrecision  14;/; s/^endTime         1;/endTime         0.1;/; s/^deltaT          0.002;/deltaT          0.01;/; s/^writeInterval   10;/writeInterval   5;/' \
-        "${d}/system/controlDict"
-    rm -f "${d}/system/controlDict.bak"
+        sed -i.bak \
+            's/^writePrecision.*/writePrecision  14;/; s/^endTime         1;/endTime         0.1;/; s/^deltaT          0.002;/deltaT          0.01;/; s/^writeInterval   10;/writeInterval   5;/' \
+            "${d}/system/controlDict"
+        rm -f "${d}/system/controlDict.bak"
 
-    ( cd "${d}" && ./Allrun > log.Allrun 2>&1 ) || {
-        echo "FAIL: finite-strain restart: the reference run did not finish"
+        ( cd "${d}" && ./Allrun > log.Allrun 2>&1 ) || {
+            echo "FAIL: finite-strain restart: the reference run did not finish"
+            return 1
+        }
+    elif [[ ! -d "${d}" ]]; then
+        echo "FAIL: no existing finite-strain restart result to check"
         return 1
-    }
+    else
+        echo "Check-only: checking existing finite-strain restart results"
+    fi
 
     local ref
     local reffile
@@ -239,19 +246,21 @@ PYEOF
     # framework, and a tolerance wide enough to pass would also be wide enough
     # to hide a lost state if nothing else were checked
     local m="${REGRESSION_ROOT}/frameworkRestartMissing"
-    rm -rf "${m}"; cp -a "${d}" "${m}"
-    rm -rf "${m}"/0.0[6-9] "${m}"/0.1 "${m}"/postProcessing
-    rm -f "${m}"/0.05/*:*:bEbar
-    sed -i.bak 's/^startFrom       startTime;/startFrom       latestTime;/' \
-        "${m}/system/controlDict"
-    rm -f "${m}/system/controlDict.bak"
+    if [ "$CHECK_ONLY" = false ]; then
+        rm -rf "${m}"; cp -a "${d}" "${m}"
+        rm -rf "${m}"/0.0[6-9] "${m}"/0.1 "${m}"/postProcessing
+        rm -f "${m}"/0.05/*:*:bEbar
+        sed -i.bak 's/^startFrom       startTime;/startFrom       latestTime;/' \
+            "${m}/system/controlDict"
+        rm -f "${m}/system/controlDict.bak"
 
-    if ( cd "${m}" && solids4Foam > log.solids4Foam 2>&1 ); then
-        echo "FAIL: finite-strain restart: continued without its bEbar"
-        return 1
+        if ( cd "${m}" && solids4Foam > log.solids4Foam 2>&1 ); then
+            echo "FAIL: finite-strain restart: continued without its bEbar"
+            return 1
+        fi
     fi
 
-    if grep -q "bEbar.*is not there" "${m}/log.solids4Foam"; then
+    if grep -q "bEbar.*is not there" "${m}/log.solids4Foam" 2>/dev/null; then
         echo "PASS: finite-strain restart: refuses when bEbar is missing"
     else
         echo "FAIL: finite-strain restart: stopped, but not for missing bEbar"
@@ -260,17 +269,19 @@ PYEOF
 
     # Continue from halfway in a copy, so the reference stays intact
     local g="${REGRESSION_ROOT}/frameworkRestartLeg"
-    rm -rf "${g}"; cp -a "${d}" "${g}"
-    rm -rf "${g}"/0.0[6-9] "${g}"/0.1 "${g}"/postProcessing
-    sed -i.bak \
-        's/^startFrom       startTime;/startFrom       latestTime;/' \
-        "${g}/system/controlDict"
-    rm -f "${g}/system/controlDict.bak"
+    if [ "$CHECK_ONLY" = false ]; then
+        rm -rf "${g}"; cp -a "${d}" "${g}"
+        rm -rf "${g}"/0.0[6-9] "${g}"/0.1 "${g}"/postProcessing
+        sed -i.bak \
+            's/^startFrom       startTime;/startFrom       latestTime;/' \
+            "${g}/system/controlDict"
+        rm -f "${g}/system/controlDict.bak"
 
-    if ! ( cd "${g}" && solids4Foam > log.solids4Foam 2>&1 ); then
-        echo "FAIL: finite-strain restart did not run"
-        grep -m1 "FOAM FATAL" -A4 "${g}/log.solids4Foam" || true
-        return 1
+        if ! ( cd "${g}" && solids4Foam > log.solids4Foam 2>&1 ); then
+            echo "FAIL: finite-strain restart did not run"
+            grep -m1 "FOAM FATAL" -A4 "${g}/log.solids4Foam" || true
+            return 1
+        fi
     fi
 
     local got

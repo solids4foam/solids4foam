@@ -156,8 +156,8 @@ run_constitutive_test() {
         n_passed=$(grep -c 'PASS:' "${case_dir}/${CONSTITUTIVE_LOGFILE}" || true)
 
         if (( n_passed == 0 )); then
-            echo "SKIP: mechanicalConstitutiveLaw checks (no checks reported)"
-            return 0
+            echo "FAIL: mechanicalConstitutiveLaw checks reported no checks"
+            return 1
         fi
 
         echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
@@ -232,6 +232,21 @@ for approach in "${APPROACHES[@]}"; do
 
     RESULT_DISP["${approach}"]=$(extract_final_disp_z "${CASE_DIR}")
 
+    if [[ "${approach}" == "segregatedManager" ]]; then
+        if ! grep -q "Selecting mechanical constitutive law" \
+            "${CASE_DIR}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: segregatedManager did not use the framework"
+            failures=$((failures + 1))
+        fi
+    elif [[ "${approach}" == "segregated" ]] \
+      && grep -q "Selecting mechanical constitutive law" \
+          "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: segregated used the framework"
+        failures=$((failures + 1))
+    fi
+
     # Before the Allclean below, which removes the mesh
     if [ "${constitutive_tested}" = false ]; then
         constitutive_tested=true
@@ -257,20 +272,6 @@ done
 if [[ -n "${RESULT_DISP[segregated]:-}" \
    && -n "${RESULT_DISP[segregatedManager]:-}" ]]
 then
-    manager_log="${REGRESSION_ROOT}/segregatedManager/${SOLVER_LOGFILE}"
-    legacy_log="${REGRESSION_ROOT}/segregated/${SOLVER_LOGFILE}"
-
-    if ! grep -q "Selecting mechanical constitutive law" "${manager_log}"
-    then
-        echo "FAIL: segregatedManager did not use the framework"
-        failures=$((failures + 1))
-    fi
-
-    if grep -q "Selecting mechanical constitutive law" "${legacy_log}"; then
-        echo "FAIL: segregated used the framework"
-        failures=$((failures + 1))
-    fi
-
     a="${RESULT_DISP[segregated]}"
     b="${RESULT_DISP[segregatedManager]}"
 

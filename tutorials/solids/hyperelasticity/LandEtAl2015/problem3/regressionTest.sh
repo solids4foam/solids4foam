@@ -241,18 +241,11 @@ fi
 # ------------------------------------------------------------
 # The mixed displacement-pressure arm, on the framework
 # ------------------------------------------------------------
-# This is the arm the volumetric split exists for. The pressure is solved as
-# its own unknown and replaces the law's volumetric response, so the law is
-# asked for its stress without that response rather than being asked for the
-# total and having a deviatoric projection taken of it.
-#
-# The two are not the same here, and this case is why. Guccione's isochoric
-# stress is trace free, so a projection would recover it exactly; the active
-# tension along the fibre direction is not, and a projection discards its
-# spherical part while the pressure - which knows only about dU/dJ - does not
-# put it back. That is a 1.6% difference in the final displacement of this
-# case, and it is a different material rather than a visible error, which is
-# why the framework refuses a law that cannot separate the two
+# This is the arm the volumetric split exists for. It checks that the framework
+# follows the declared split path, uses the deviatoric implicit stiffness, and
+# retains its established result. It deliberately does not compare against a
+# legacy mixed arm: the old and new Guccione implementations differ, so that
+# comparison would not isolate the effect of the split.
 run_mixed_framework() {
     local d="${REGRESSION_ROOT}/frameworkPressure"
 
@@ -309,16 +302,12 @@ run_mixed_framework() {
         return 1
     fi
 
-    # The nonlinear outcome, not the linear one. A healthy run of this case
-    # still reports about fifty DIVERGED_ITS lines: those are linear solves
-    # reaching their iteration limit inside a Newton step that goes on to
-    # converge, and treating them as failures fails every passing run
+    # Linear DIVERGED_ITS messages are allowed inside a converged Newton solve;
+    # only the nonlinear outcome and normal solver end matter.
     if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
         "${d}/${SOLVER_LOGFILE}"
     then
         echo "FAIL: the mixed arm did not converge"
-        grep -m2 -E "Nonlinear solve did not converge|SNES convergence error" \
-            "${d}/${SOLVER_LOGFILE}"
         return 1
     fi
 
@@ -337,7 +326,6 @@ run_mixed_framework() {
         return 1
     fi
     echo "PASS: the mixed arm solved a pressure on the framework"
-
 
     local mref=1.15475e-3
 

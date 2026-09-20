@@ -36,7 +36,7 @@ fi
 #
 # An artery wall, two symmetric fibre families, inflated to 25 kPa.
 #
-# Two formulations, and only one of them works.
+# Two formulations, and only one of them currently completes.
 #
 # The legacy one - coupledPressureDisplacementSolid with the legacy
 # HolzapfelGasserOgdenElastic - is foam-extend only and does not reach the end
@@ -48,26 +48,12 @@ fi
 # solvePressure, taking its stress from the mechanicalConstitutiveLaw
 # framework - runs to completion on any fork, which is what this checks.
 #
-# Over the range where the legacy run survives the two agree to 0.07 per cent
-# at the last time they share, and to about 1 per cent at t = 0.6. They are
-# further apart mid-ramp, around 7 per cent at t = 0.4, and that is not
-# explained.
-#
-# Most of what looked like disagreement was the momentum stabilisation. This
-# arm was first written with scaleFactor 100, copied from another case without
-# thought, against 0 in the legacy arm; at that value the two sat 2 per cent
-# apart at the last shared time and 25 per cent apart mid-ramp. The
-# stabilisation is a difference between the face gradient and the interpolated
-# cell gradient and does not vanish on convergence, so its size is part of the
-# answer. At 1 the answer is converged in the parameter - 1 and 3 differ by
-# 0.04 per cent - and agreement is what it is above.
-#
-# Ruled out as causes: compressibility, since the bulk modulus is a penalty
-# here where the legacy law is exactly incompressible and raising it a
-# hundredfold moves the answer 0.1 per cent; and the pressure stabilisation,
-# 4 per cent over a sixteenfold sweep. What is left of the mid-ramp difference
-# is unestablished. It is not attributed to the formulations here, because
-# nothing measured says so.
+# The framework arm requires pressure stabilisation. With momentum
+# stabilisation disabled it reaches t = 0.12 before the nonlinear solve stalls.
+# A representative momentum scale of 1 completes the case; the previous value
+# of 100 was unnecessarily large. These terms affect the discrete equations,
+# so this test makes no quantitative legacy-versus-framework equivalence claim.
+# It instead pins the framework result and verifies the constitutive-law checks.
 # ============================================================
 
 echo "============================================================"

@@ -55,8 +55,10 @@ restore0Dir
 #     1. Create slice of a circle
 #     2. Rotationally extrude the slice
 #     3. Remove empty patches
-runApplication blockMesh -dict system/blockMeshDict.$MESH_NUMBER
-runApplication extrudeMesh -dict system/extrudeMeshDict.$MESH_NUMBER
+runApplication blockMesh \
+    -dict verification/mesh/blockMeshDict.$MESH_NUMBER
+runApplication extrudeMesh \
+    -dict verification/mesh/extrudeMeshDict.$MESH_NUMBER
 runApplication createPatch -overwrite
 
 # Set the fibre field

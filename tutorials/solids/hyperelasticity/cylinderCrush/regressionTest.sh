@@ -113,14 +113,85 @@ latest_time_dir() {
         | tail -n 1
 }
 
+check_completed() {
+    local case_dir="$1"
+    local expected_time="$2"
+    local actual_time
+
+    if ! grep -q "^End" "${case_dir}/${SOLVER_LOGFILE}" \
+      || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
+          "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${case_dir} did not complete and converge"
+        return 1
+    fi
+
+    actual_time=$(latest_time_dir "${case_dir}")
+    if ! awk "BEGIN {exit !((${actual_time:-0} - ${expected_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: ${case_dir} stopped at ${actual_time:-none}; expected ${expected_time}"
+        return 1
+    fi
+}
+
+compare_internal_vector_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+def read_internal(path):
+    text = open(path).read()
+    uniform = re.search(
+        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
+        text,
+    )
+    if uniform:
+        return [tuple(map(float, uniform.groups()))]
+
+    nonuniform = re.search(
+        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not nonuniform:
+        raise ValueError(f"cannot parse internalField in {path}")
+
+    values = re.findall(
+        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
+    )
+    if not values:
+        raise ValueError(f"empty internalField in {path}")
+    return [tuple(map(float, value)) for value in values]
+
+try:
+    a = read_internal(sys.argv[1])
+    b = read_internal(sys.argv[2])
+    if len(a) == 1 and len(b) > 1:
+        a *= len(b)
+    if len(b) == 1 and len(a) > 1:
+        b *= len(a)
+    if len(a) != len(b):
+        raise ValueError("different internalField sizes")
+    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
+    max_value = max(abs(x) for av in a for x in av)
+    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
 run_framework_comparison() {
     local legacy_dir="${REGRESSION_ROOT}/comparisonLegacy"
     local framework_dir="${REGRESSION_ROOT}/comparisonFramework"
     local dir
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        rm -rf "${dir}"
-        mkdir -p "${dir}"
+    if [ "$CHECK_ONLY" = false ]; then
+        for dir in "${legacy_dir}" "${framework_dir}"; do
+            rm -rf "${dir}"
+            mkdir -p "${dir}"
 
         local item base_item
         for item in "${SCRIPT_DIR}"/*; do
@@ -143,18 +214,21 @@ run_framework_comparison() {
         else
             echo "writePrecision  14;" >> "${dir}/system/controlDict"
         fi
-    done
+        done
 
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${framework_dir}/constant/solidProperties"
+        sed -i \
+            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+            "${framework_dir}/constant/solidProperties"
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-            echo "FAIL: the comparison could not run ${dir}"
-            return 1
-        }
-    done
+        for dir in "${legacy_dir}" "${framework_dir}"; do
+            ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+                echo "FAIL: the comparison could not run ${dir}"
+                return 1
+            }
+        done
+    else
+        echo "Check-only: checking existing framework comparison"
+    fi
 
     if solids4Foam::regressionCaseSkipped "${legacy_dir}/${ALLRUN_LOGFILE}"; then
         echo "Skipping the framework comparison: the case skipped here"
@@ -175,6 +249,12 @@ run_framework_comparison() {
         return 1
     fi
 
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        if ! check_completed "${dir}" "${COMPARISON_END_TIME}"; then
+            return 1
+        fi
+    done
+
     local t
     t=$(latest_time_dir "${legacy_dir}")
 
@@ -190,49 +270,11 @@ run_framework_comparison() {
         return 1
     fi
 
-    # Round-off rather than bit-identical: the two arms reach the same answer
-    # by different orderings of the same arithmetic
     local rel
-    rel=$(awk '
-        function abs(x) { return x < 0 ? -x : x }
-        FNR == NR {
-            if ($0 ~ /^\(/)
-            {
-                gsub(/[()]/, ""); n++
-                for (i = 1; i <= NF; i++) a[n, i] = $i
-            }
-            next
-        }
-        {
-            if ($0 ~ /^\(/)
-            {
-                gsub(/[()]/, ""); k++
-                for (i = 1; i <= NF; i++)
-                {
-                    d = abs($i - a[k, i]); if (d > maxd) maxd = d
-                    v = abs(a[k, i]);      if (v > maxv) maxv = v
-                }
-            }
-        }
-        END {
-            # Without this the comparison is trivially satisfied when nothing
-            # was read: no matching line leaves maxd and maxv at zero, and a
-            # relative difference of zero reads as perfect agreement. A
-            # uniform-form field, or a change in how fields are written, does
-            # exactly that
-            if (n == 0 || k == 0) { print "NODATA"; exit }
-            if (n != k)           { print "MISMATCH"; exit }
-            printf "%.10g\n", (maxv > 0 ? maxd/maxv : maxd)
-        }
-    ' "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D")
-
-    if [[ -z "${rel}" || "${rel}" == "NODATA" ]]; then
-        echo "FAIL: neither D field yielded any values to compare"
-        return 1
-    fi
-
-    if [[ "${rel}" == "MISMATCH" ]]; then
-        echo "FAIL: the two D fields hold different numbers of values"
+    if ! rel=$(compare_internal_vector_fields \
+        "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D")
+    then
+        echo "FAIL: could not compare the two D internal fields"
         return 1
     fi
 

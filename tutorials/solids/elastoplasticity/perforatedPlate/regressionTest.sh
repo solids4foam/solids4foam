@@ -153,8 +153,8 @@ run_constitutive_test() {
             "${CASE_DIR}/log.Test-mechanicalConstitutiveLaw" || true)
 
         if (( n_passed == 0 )); then
-            echo "SKIP: mechanicalConstitutiveLaw checks (not built on this fork)"
-            return 0
+            echo "FAIL: mechanicalConstitutiveLaw checks reported no checks"
+            return 1
         fi
 
         echo "PASS: mechanicalConstitutiveLaw checks (${n_passed} checks)"
@@ -305,6 +305,24 @@ fi
 # being tested: restarting an elastic case is exact even with no state IO at
 # all, since the history being restored is zero either way. t = 10 is chosen
 # for that reason, and check 3 asserts the yielding rather than assuming it
+prepare_written_traction_series_for_restart() {
+    local time_dir="$1"
+    local field_file
+
+    # The shared input uses the regex "fileName|file" because OpenFOAM.com
+    # expects fileName and foam-extend expects file. foam-extend writes the
+    # matched entry back as fileName, which it then cannot read on restart.
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        for field_file in "${time_dir}"/D*; do
+            [[ -f "${field_file}" ]] || continue
+            if grep -q 'fileName' "${field_file}"; then
+                sed -i.bak 's/fileName/file/' "${field_file}"
+                rm -f "${field_file}.bak"
+            fi
+        done
+    fi
+}
+
 run_restart_test() {
     local base="${REGRESSION_ROOT}/frameworkRestart"
 
@@ -318,6 +336,7 @@ run_restart_test() {
     rm -f "${CASE_DIR}/system/controlDict.bak"
 
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    prepare_written_traction_series_for_restart "${CASE_DIR}/10"
 
     # 3. the state must be on disk, and the material must have yielded
     local state_file
@@ -436,6 +455,7 @@ run_parallel_restart_test() {
     rm -f "${d}/system/controlDict.bak"
 
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+    prepare_written_traction_series_for_restart "${d}/10"
 
     cat > "${d}/system/decomposeParDict" << EOD
 FoamFile { version 2.0; format ascii; class dictionary; object decomposeParDict; }
@@ -451,7 +471,14 @@ EOD
     # Not a skip: mpirun was found above, so decomposePar is installed too and
     # failing here is a real fault - a malformed dictionary, a compatibility
     # regression, or the case not being set up as this test assumes
-    if ! ( cd "${d}" && decomposePar -time 10 > log.decomposePar 2>&1 ); then
+    local decompose_args=(-time 10)
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        decompose_args=()
+    fi
+
+    if ! ( cd "${d}" \
+        && decomposePar "${decompose_args[@]}" > log.decomposePar 2>&1 )
+    then
         echo "FAIL: parallel restart (decomposePar failed)"
         echo "      (see ${d}/log.decomposePar)"
         return 1
