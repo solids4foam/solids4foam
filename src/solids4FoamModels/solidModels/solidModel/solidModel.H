@@ -54,6 +54,7 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
 #ifdef OPENFOAM_COM
@@ -69,6 +70,9 @@ SourceFiles
 
 namespace Foam
 {
+
+// Forward declaration
+class mechanicalConstitutiveLawManager;
 
 /*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
@@ -175,6 +179,27 @@ private:
         //  In use by high-order discretisation
         mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
 
+        //- Gradient of total displacement at face quadrature points, at the
+        //  previous time step.
+        //  A history-dependent law evaluated at quadrature points needs this,
+        //  and the current field is rebuilt each call, so this is reconstructed
+        //  from D.oldTime() on first use and copied at the end of every step
+        mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
+
+        //- Copy one compact list-list onto another.
+        //  OpenFOAM.org gives CompactListList no copy constructor and no copy
+        //  assignment. setSize() must be used rather than assigning offsets:
+        //  OpenFOAM.org also stores the row count separately
+        static void copyQuadGradient
+        (
+            const CompactListList<tensor>& src,
+            CompactListList<tensor>& dst
+        )
+        {
+            dst.setSize(src.sizes());
+            dst.m() = src.m();
+        }
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -259,6 +284,31 @@ private:
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
+        //- Take the stress, and the implicit stiffness built from it, from
+        //  the mechanicalConstitutiveLaw framework rather than from the
+        //  legacy mechanicalModel.
+        //  Held here rather than in each solid model both because they all
+        //  need it and because a base member is constructed before any
+        //  derived one, so it is set by the time a derived impK_ is built
+        //  from it
+        const Switch useMechanicalConstitutiveLawManager_;
+
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
+        //- Whether the Jacobian tangent request has been resolved
+        mutable bool jacobianTangentCached_;
+
+        //- Cached Jacobian tangent request
+        mutable tangentRequest jacobianTangent_;
+
+        //- Whether the case said anything about restart at all.
+        //  Read before restart_ below, because looking that up adds it to the
+        //  dictionary and the silence cannot be recovered afterwards. Silence
+        //  and a deliberate 'no' are different things: one is a user who has
+        //  not thought about restarting, and the other is one who has
+        const Switch restartSpecified_;
+
         //- Optional: restart flag
         //  Write out all fields required for a consistent restart
         const Switch restart_;
@@ -317,6 +367,10 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
+        //- Correct point displacement boundary conditions, symmetry planes and
+        //  empty directions after interpolation
+        void correctPointDisplacement(pointVectorField& pointD) const;
+
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
 
@@ -348,6 +402,84 @@ private:
 
 
 protected:
+
+        //- Is the stress taken from the mechanicalConstitutiveLaw framework
+        //  rather than from the legacy mechanicalModel?
+        bool useMechanicalConstitutiveLawManager() const
+        {
+            return useMechanicalConstitutiveLawManager_;
+        }
+
+        //- The mechanicalConstitutiveLaw framework, constructed on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- Displacement gradient for a solid model on the framework, computed
+        //  on the primary mesh so that a material-aware scheme can keep each
+        //  cell's stencil within its material
+        void frameworkGrad
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
+        //- Interpolate displacement to points on the primary mesh rather than
+        //  through the legacy per-material sub-meshes
+        void frameworkInterpolate
+        (
+            const volVectorField& D,
+            const volTensorField& gradD,
+            pointVectorField& pointD
+        );
+
+        //- Refuse a multi-material framework run whose gradient scheme is not
+        //  material-aware.
+        //
+        //  The primary-mesh gradient is valid only if a cell's stencil stays
+        //  within its own material; leastSquaresS4f provides that guarantee
+        void checkFrameworkGradScheme(const word& fieldName) const;
+
+        //- Copy the quadrature gradient into its old-time store, at the end
+        //  of the time step, while the current field holds the converged
+        //  value. It is rebuilt on each evaluation, so there is nothing else
+        //  to take it from.
+        //
+        //  Separate from updateTotalFields() so that a model overriding that
+        //  can still roll the history over: the two do unrelated work, and a
+        //  model wanting one does not necessarily want the other
+        void rollOverQuadratureHistory();
+
+        //- The implicit stiffness taken from the mechanicalConstitutiveLaw
+        //  framework.
+        //
+        //  Shared by the solid models that offer the framework, because the
+        //  field has to match the legacy one exactly: it is registered under
+        //  "impK" and looked up by that name by the contact and cohesive zone
+        //  models, so its name, dimensions and boundary types are not free
+        tmp<volScalarField> frameworkImpK
+        (
+            mechanicalConstitutiveLawManager& manager,
+            const tangentRequest req
+        ) const;
+
+        //- Deformation gradient at the quadrature points, F = I + gradD.T(),
+        //  from a total displacement gradient there. Sized and offset to
+        //  match the gradient, so every list handed to the constitutive
+        //  framework shares one row structure, as it requires
+        static void quadDeformationGradient
+        (
+            const CompactListList<tensor>& gradD,
+            autoPtr<CompactListList<tensor>>& FPtr
+        );
+
+        //- Inverse and determinant of a deformation gradient at the
+        //  quadrature points
+        static void quadInverseAndJacobian
+        (
+            const CompactListList<tensor>& F,
+            autoPtr<CompactListList<tensor>>& FinvPtr,
+            autoPtr<CompactListList<scalar>>& JPtr
+        );
+
 
     // Protected member functions
 
@@ -581,6 +713,22 @@ public:
                  && highOrderJacobian_;
             }
 
+            //- Requested fidelity of the material tangent used to build the
+            //  Jacobian, from the 'jacobianTangent' entry of the solid model
+            //  coefficients dictionary.
+            //  Each solid model supplies its own default, because today's
+            //  defaults differ: the cell-centred models want a scalar tangent,
+            //  the vertex-centred ones a fourth-order one. Existing cases
+            //  therefore keep their behaviour without dictionary changes.
+            //  This entry is orthogonal to highOrderJacobian(), which selects
+            //  a different discrete operator rather than a tangent fidelity.
+            //  The deprecated 'approximateJacobian' switch is still read, and
+            //  maps yes to scalar and no to fourthOrder
+            tangentRequest jacobianTangent
+            (
+                const tangentRequest deflt
+            ) const;
+
             //- Is it a new time step? This function return true the first time
             //  it is called in a time step
             bool newTimeStep() const;
@@ -701,6 +849,10 @@ public:
 
                 return autoPtrRef(gradDQuadPtr_);
             }
+
+            //- Gradient of total displacement at face quadrature points at
+            //  the previous time step
+            virtual const CompactListList<tensor>& gradDQuad0() const;
 
             //- Return const reference to gradD at face quadrature points
             virtual const CompactListList<tensor>& gradDQuad() const
@@ -1013,14 +1165,23 @@ public:
                 const fvPatch& patch
             ) const = 0;
 
+            //- Residual of the material update between outer iterations.
+            //  The legacy mechanicalModel under-relaxes its plastic strain
+            //  increment, so its constitutive update lags the displacement
+            //  solution and has to be checked for convergence. A solid model
+            //  taking its stress from the mechanicalConstitutiveLaw framework
+            //  overrides this, because a framework law is a pure function of
+            //  the kinematics and the old-time state and so does not lag
+            virtual scalar materialResidual()
+            {
+                return mechanical().residual();
+            }
+
             //- Update total accumulated fields
             virtual void updateTotalFields();
 
             //- Write fields
             virtual void writeFields(const Time& runTime);
-
-            //- Return the desired new time-step size
-            virtual scalar newDeltaT();
 
             //- Move the mesh by the provided point displacement field
             //  Note: any global patches must be synchronised before this is

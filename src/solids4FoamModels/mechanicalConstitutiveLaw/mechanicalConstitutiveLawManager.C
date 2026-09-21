@@ -111,6 +111,33 @@ void combineDiagnostic
 }
 
 
+// Detaches the standing stress from the inputs however evaluateResponse()
+// exits. The volumetric branches there return early, so that the view they
+// build outlives the evaluation that uses it, and a detach written at the end
+// of the function would be stepped over on exactly those paths - leaving
+// inputs holding a pointer to a list that has gone out of scope, for the next
+// law to read
+class incomingStressGuard
+{
+    const mechanicalConstitutiveLawInputs& inputs_;
+
+public:
+
+    explicit incomingStressGuard
+    (
+        const mechanicalConstitutiveLawInputs& inputs
+    )
+    :
+        inputs_(inputs)
+    {}
+
+    ~incomingStressGuard()
+    {
+        inputs_.clearIncomingStress();
+    }
+};
+
+
 //- Build the response a law writes into, and evaluate the law.
 //
 //  Every evaluation in this file ends in the same three lines: work out which
@@ -160,6 +187,10 @@ void evaluateResponse
     // reading it yields zero rather than whatever the last caller left - which
     // turns a silent dependence on buffer contents into an obvious one
     List<symmTensor> incoming;
+
+    // Armed before anything can return, and for every law: detaching a stress
+    // that was never attached is a no-op
+    const incomingStressGuard guard(inputs);
 
     if (law.requiresIncomingStress())
     {
@@ -249,9 +280,8 @@ void evaluateResponse
         law.evaluate(kin, inputs, state, response);
     }
 
-    // The standing stress lived only for this evaluation, so it is detached
-    // before the next law is reached
-    inputs.clearIncomingStress();
+    // The detach is the guard's, above: it happens on every path out of here,
+    // including the early returns in the volumetric branches
 }
 
 
@@ -420,26 +450,41 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     const CompactListList<tensor>& layout
 ) const
 {
+    // OpenFOAM.org keeps size() in a member of its own, which a layout filled
+    // in through offsets() and m() - as the quadrature layouts are - leaves at
+    // zero, so there the rows are counted from the offset table, which holds
+    // one more entry than there are rows. The other forks derive size() from
+    // their offsets, and foam-extend's hold row ends rather than row starts,
+    // so they keep size(), sizes() and index()
+#ifdef OPENFOAM_ORG
+    const labelUList& offsets = layout.offsets();
+    const label nRows = max(offsets.size() - 1, label(0));
+
+    labelList rowSizes(nRows);
+    forAll(rowSizes, rowI)
+    {
+        rowSizes[rowI] = offsets[rowI + 1] - offsets[rowI];
+    }
+#else
+    const label nRows = layout.size();
+    const labelList rowSizes(layout.sizes());
+#endif
+
     // Which entity indexes the rows is decided by the row count, and checked.
     // A mesh never has as many cells as faces, so the two cases cannot be
     // confused, and anything else is an error rather than a guess
-    const bool cellBased = (layout.size() == mesh_.nCells());
-    const bool faceBased = (layout.size() == mesh_.nFaces());
+    const bool cellBased = (nRows == mesh_.nCells());
+    const bool faceBased = (nRows == mesh_.nFaces());
 
     if (!cellBased && !faceBased)
     {
         FatalErrorInFunction
             << "A compact integration-point layout must have one row per cell "
             << "or one row per face." << nl
-            << "This one has " << layout.size() << " rows, while the mesh has "
+            << "This one has " << nRows << " rows, while the mesh has "
             << mesh_.nCells() << " cells and " << mesh_.nFaces() << " faces."
             << exit(FatalError);
     }
-
-    // We know this is cell-based compact storage:
-    //  - one sub-list per cell
-    //  - integration-point counts encoded in sub-list sizes
-    const labelList rowSizes(layout.sizes());
 
     // The key names the role, and is a literal, so it is the same word on
     // every rank. That matters because endTimeStep() sorts these keys and
@@ -500,17 +545,20 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     // Construct topology lazily
 
     // Build cell → IP addressing
-
+    // rowSizes rather than layout[cellI].size(): the const operator[] does
+    // not compile on foam-extend
     CompactListList<label> cellToIP(rowSizes);
 
-    for (label cellI = 0; cellI < layout.size(); ++cellI)
+    for (label cellI = 0; cellI < nRows; ++cellI)
     {
-        // sizes() rather than layout[cellI].size(): the const operator[] does
-        // not compile on foam-extend
         const label n = rowSizes[cellI];
         for (label j = 0; j < n; ++j)
         {
+#ifdef OPENFOAM_ORG
+            cellToIP(cellI, j) = offsets[cellI] + j;
+#else
             cellToIP(cellI, j) = layout.index(cellI, j);
+#endif
         }
     }
 
@@ -856,21 +904,19 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
         scalarField& fld = store[key]();
         fld.setSize(faces.size(), 0.0);
 
-        tmp<volScalarField> tsrc;
+        // A registered field is used where it is; only a missing one is built.
+        // The two are kept apart rather than put through one tmp, because
+        // foam-extend's tmp refuses to be assigned one that holds a reference
+        const bool registered = mesh_.foundObject<volScalarField>(name);
 
-        if (mesh_.foundObject<volScalarField>(name))
-        {
-            tsrc = tmp<volScalarField>
-            (
-                mesh_.lookupObject<volScalarField>(name)
-            );
-        }
-        else
-        {
-            tsrc = prescribedField<scalar>(name);
-        }
+        const tmp<volScalarField> tsrc
+        (
+            registered
+          ? tmp<volScalarField>()
+          : prescribedField<scalar>(name)
+        );
 
-        if (!tsrc.valid())
+        if (!registered && !tsrc.valid())
         {
             FatalErrorInFunction
                 << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -880,7 +926,10 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
                 << exit(FatalError);
         }
 
-        const fvPatchField<scalar>& psrc = tsrc().boundaryField()[patchI];
+        const volScalarField& src =
+            registered ? mesh_.lookupObject<volScalarField>(name) : tsrc();
+
+        const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
         forAll(faces, faceI)
         {
@@ -2401,6 +2450,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         context
     );
 
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
+
     if (scalarTangentPtr)
     {
         checkIntegrationPointListSize
@@ -2588,7 +2653,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -2634,6 +2700,22 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         tangentReq,
         context
     );
+
+    // A volumetric split asked for here is checked here. The GeometricField
+    // overloads validate it where the request is made; these take the storage
+    // directly and validated neither that a law can fill it nor that it is the
+    // right length, so an unsupported law returned a total stress the caller
+    // would read as isochoric, and a short list was indexed through the
+    // topology's addressing
+    if (volumetricPtr)
+    {
+        checkIntegrationPointListSize
+        (
+            nIP, volumetricPtr->size(), "volumetricResponse", context
+        );
+
+        checkVolumetricSplitSupported(context);
+    }
 
     if (scalarTangentPtr)
     {
@@ -2819,7 +2901,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     ipIDs,
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
-                    tangentReq
+                    tangentReq,
+                    volumetricPtr
                 );
             }
         }
@@ -3237,7 +3320,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                       ? &scalarTangentPtr->boundaryField()[patchI]
                       : nullptr,
                         static_cast<const UList<mat66>*>(nullptr),
-                        tangentReq
+                        tangentReq,
+                        volumetricResponsePtr
+                      ? &volumetricResponsePtr->boundaryField()[patchI]
+                      : nullptr
                     );
                 }
             }

@@ -18,6 +18,27 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
+  one material is refused rather than run. `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian` all abort with an explanation when the
+  framework is enabled alongside multiple materials on that fork. The
+  displacement-to-point interpolation there has no gradient-corrected form, so
+  the run would otherwise fall back to the legacy per-material subMesh path -
+  the machinery the framework exists to replace - and quietly return the answer
+  that path gives. The combination is supported on OpenFOAM.com and
+  OpenFOAM.org; single-material framework runs are unaffected on every fork.
+- **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
+  pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
+  than `p`. An existing case carrying `0/p` fails at construction with a
+  `MUST_READ` error and must rename the field; the bundled tutorials are
+  already migrated. The rename is needed because a solid model solving the
+  mixed displacement-pressure formulation has its own `p`, which is a different
+  quantity, and the two collided in the same registry. The old name is not
+  accepted as a fallback: the two fields are not interchangeable, so silently
+  reading one where the other was meant would be worse than a clear failure.
+  This applies whether or not the `mechanicalConstitutiveLaw` framework is in
+  use.
 - `linearGeometryTotalDisplacement` with `solvePressure yes` now uses an
   implicit stiffness of `(4/3)*mu` rather than `2*mu`. The mixed
   displacement-pressure formulation solves `div(dev(sigma))`, whose scalar
@@ -30,6 +51,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- **Breaking:** the public virtual `solidModel::newDeltaT()`, which forwarded to
+  `mechanicalModel::newDeltaT()`, is removed. Its purpose was to let a
+  constitutive law ask for a smaller time step, but nothing in solids4foam
+  called it: the `solids4Foam` solver never consulted it, so no law could
+  actually influence the time step through it. The `mechanicalConstitutiveLaw`
+  framework provides no equivalent, and adding one is left until there is a
+  caller to justify its shape. An external driver calling
+  `solidModel::newDeltaT()` no longer compiles, and adaptive time stepping
+  driven by material state will need a new interface rather than this one.
 - `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
   solver does not currently run: no tutorial selected it, so nothing exercised
   it, an attempt to give it one failed inside the PETSc solve, and its

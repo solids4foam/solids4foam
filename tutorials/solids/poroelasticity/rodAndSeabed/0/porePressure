@@ -13,24 +13,19 @@ FoamFile
     format      ascii;
     class       volScalarField;
     location    "0";
-    object      p;
+    object      porePressure;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dimensions      [1 -1 -2 0 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform 79290;
 
 boundaryField
 {
-    left
+    bottom
     {
-        type            symmetry;
-    }
-
-    front
-    {
-        type            symmetry;
+        type            zeroGradient;
     }
 
     sides
@@ -38,22 +33,11 @@ boundaryField
         type            zeroGradient;
     }
 
-    soilStructureInterface
+    seabed
     {
-        type            zeroGradient;
+        type            timeVaryingMappedFixedValue;
+        setAverage      off;
     }
-
-    soilBottom
-    {
-        type            zeroGradient;
-    }
-
-    ground
-    {
-        type            fixedValue;
-        value           uniform 0;
-    }
-
 }
 
 // ************************************************************************* //

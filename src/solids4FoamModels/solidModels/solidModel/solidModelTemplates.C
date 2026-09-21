@@ -103,7 +103,7 @@ bool Foam::solidModel::converged
         )/denom;
 
     // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
+    const scalar materialResidual = this->materialResidual();
 
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged

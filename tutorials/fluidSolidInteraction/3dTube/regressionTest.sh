@@ -72,6 +72,11 @@ prepare_case() {
 prepare_backward_case() {
     copy_case "${BACKWARD_CASE_DIR}"
 
+    # This total-strain material does not need constitutive kinematic history,
+    # but a restart must say so explicitly.
+    sed -i \
+        's/^    nCorrectors/    restart                 no;\n\n    nCorrectors/' \
+        "${BACKWARD_CASE_DIR}/constant/solid/solidProperties"
     sed -i "s/^\(endTime[[:space:]]*\).*/\1${BACKWARD_END_TIME};/" \
         "${BACKWARD_CASE_DIR}/system/controlDict"
     sed -i "s/^\(writeInterval[[:space:]]*\).*/\1${BACKWARD_WRITE_INTERVAL};/" \

@@ -59,20 +59,20 @@ Table 1 - Poroelastic material properties used in the current case
 
 Table 2 - Boundary conditions for displacement and pressure
 
-| Boundary | $$D$$ | $$p$$ |
+| Boundary | $$D$$ | `porePressure` |
 | --- | --- | --- |
 | `seabed` | `solidTraction` | `timeVaryingMappedFixedValue` |
 | `sides` | `slip` | `zeroGradient` |
 | `bottom` | `slip` | `zeroGradient` |
 
 The `seabed` pressure condition reads the mapped pressure values from
-`constant/boundaryData/seabed`. Since the solved field is named `p`, the active
-time directories contain files named `p` for the initial state and the single
-simulated time step:
+`constant/boundaryData/seabed`. Since the solved field is named `porePressure`,
+the active time directories contain files with that name for the initial state
+and the single simulated time step:
 
 ```text
-constant/boundaryData/seabed/0/p
-constant/boundaryData/seabed/0.05/p
+constant/boundaryData/seabed/0/porePressure
+constant/boundaryData/seabed/0.05/porePressure
 ```
 
 The same directory also contains `points` and `faces`, which define the source
