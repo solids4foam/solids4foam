@@ -35,8 +35,8 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#include "hofvc.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "hofvc.H"
     #include "enhancedVolPointInterpolation.H"
 #endif
 
@@ -557,20 +557,19 @@ Foam::solidModel::gradDQuad0() const
 {
     if (gradDQuad0Ptr_.empty())
     {
-#ifdef OPENFOAM_NOT_EXTEND
         if (gradDQuadPtr_.empty())
         {
             makeGradDQuad();
         }
 
-        gradDQuad0Ptr_.set(new CompactListList<tensor>());
-        gradDQuad0Ptr_().offsets() = gradDQuadPtr_().offsets();
-        gradDQuad0Ptr_().m().setSize(gradDQuadPtr_().m().size());
+        // Build the previous-time store from the previous-time displacement,
+        // rather than copying the current gradient into it: on a restart the
+        // current gradient is not the previous step's
+        gradDQuad0Ptr_.set
+        (
+            new CompactListList<tensor>(gradDQuadPtr_().sizes())
+        );
         hofvc::fGrad(D_.oldTime(), gradDQuad0Ptr_());
-#else
-        gradDQuad0Ptr_.set(new CompactListList<tensor>());
-        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
-#endif
     }
 
     return autoPtrRef(gradDQuad0Ptr_);
@@ -1859,9 +1858,6 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 
 void Foam::solidModel::rollOverQuadratureHistory()
 {
-    // The high-order discretisation, and hence gradDQuad(), does not exist on
-    // foam-extend
-#ifndef FOAMEXTEND
     if (gradDQuadPtr_.valid())
     {
         if (gradDQuad0Ptr_.empty())
@@ -1871,7 +1867,6 @@ void Foam::solidModel::rollOverQuadratureHistory()
 
         copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
     }
-#endif
 }
 
 
@@ -1884,8 +1879,6 @@ void Foam::solidModel::updateTotalFields()
 }
 
 
-// The high-order face quadrature does not run on foam-extend, but these
-// helpers are portable and the models that call them are compiled there
 void Foam::solidModel::quadDeformationGradient
 (
     const CompactListList<tensor>& gradD,
@@ -1897,8 +1890,7 @@ void Foam::solidModel::quadDeformationGradient
         FPtr.set(new CompactListList<tensor>());
     }
 
-    FPtr().offsets() = gradD.offsets();
-    FPtr().m().setSize(gradD.m().size());
+    FPtr().setSize(gradD.sizes());
 
     const List<tensor>& gradDv = gradD.m();
     List<tensor>& F = FPtr().m();
@@ -1923,10 +1915,8 @@ void Foam::solidModel::quadInverseAndJacobian
         JPtr.set(new CompactListList<scalar>());
     }
 
-    FinvPtr().offsets() = F.offsets();
-    JPtr().offsets() = F.offsets();
-    FinvPtr().m().setSize(F.m().size());
-    JPtr().m().setSize(F.m().size());
+    FinvPtr().setSize(F.sizes());
+    JPtr().setSize(F.sizes());
 
     const List<tensor>& Fv = F.m();
     List<tensor>& Finv = FinvPtr().m();

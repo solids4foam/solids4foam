@@ -868,7 +868,6 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
 }
 
 
-// The high-order face quadrature does not exist on foam-extend
 void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
 {
     if (!useMechanicalConstitutiveLawManager())

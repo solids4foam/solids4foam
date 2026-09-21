@@ -127,8 +127,7 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Update the stress at the face quadrature points, from the framework
         //  when the framework is in use and from the
-        //  legacy mechanicalModel otherwise.
-        //  The high-order face quadrature does not exist on foam-extend
+        //  legacy mechanicalModel otherwise
         void correctStressQuad();
 
         //- Finite-strain kinematics at the face quadrature points, held here
