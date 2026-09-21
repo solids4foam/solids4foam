@@ -563,6 +563,9 @@ Foam::solidModel::gradDQuad0() const
             makeGradDQuad();
         }
 
+        // Build the previous-time store from the previous-time displacement,
+        // rather than copying the current gradient into it: on a restart the
+        // current gradient is not the previous step's
         gradDQuad0Ptr_.set
         (
             new CompactListList<tensor>(gradDQuadPtr_().sizes())
