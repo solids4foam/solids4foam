@@ -47,9 +47,7 @@ Description
     solid impedance), while pWaveSpeed can diverge for thin or nearly
     incompressible walls and large time steps. With writeDiagnostics, the
     measured impedances and the predicted and observed contraction factors
-    are written to postProcessing/robinCoefficient_<patch>.dat. See
-    tutorials/fluidSolidInteraction/robinCouplingStudy for the study behind
-    these choices.
+    are written to postProcessing/robinCoefficient_<patch>.dat.
 
     Coupling: the Robin-Neumann coupling is designed for unrelaxed fixed-point
     FSI iterations, i.e. fluidSolidInterface fixedRelaxation with

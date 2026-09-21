@@ -41,8 +41,7 @@ FSI_RES_MAX=1e-5
 # OpenFOAM.com versions grew to about 2.6e-3 after the change, which the old
 # tolerance could not accommodate with a single reference value.
 # Reference updated from -0.479 when the Robin interface convergence criteria
-# were added (interface pressure change and leakage, see
-# tutorials/fluidSolidInteraction/robinCouplingStudy): the displacement-only
+# were added (interface pressure change and leakage): the displacement-only
 # criterion accepted most steps after about one FSI iteration, while the
 # converged coupling needs about six to nine and gives -0.4822 (-0.4817 to
 # -0.4826 across coupling methods and Robin coefficient models on
