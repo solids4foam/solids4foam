@@ -27,7 +27,13 @@ solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
    constitutive law work; see the solver's README.md.
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 */
+/* Not compiled: weakThermalLinearGeometry is withdrawn. No tutorial selects it,
+   so nothing exercises it, and it inherits the framework path from
+   linearGeometryTotalDisplacement without anything having tested that it works
+   there. thermalLinearGeometry may also cover every case it was written for.
+   Reintroducing it needs a tutorial; see issue #459.
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+*/
 solidModels/coupledPressureDisplacementSolid/coupledPressureDisplacementSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -64,27 +70,20 @@ $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
 $(linGeomLaws)/linearElastic/linearElastic.C
-$(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
 $(linGeomLaws)/poroMechanicalLaw/poroMechanicalLaw.C
 $(linGeomLaws)/thermoMechanicalLaw/thermoMechanicalLaw.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
 $(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
-$(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
-$(nonLinGeomLaws)/isotropicFungElastic/isotropicFungElastic.C
 $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
 $(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
-$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
-$(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
-$(nonLinGeomLaws)/YeohElastic/YeohElastic.C
 $(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
 
 

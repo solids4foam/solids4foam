@@ -295,7 +295,6 @@ Prepared by Ivan Batistić with edits by Philip Cardiff
   `solids/elastoplasticity/simpleShear`
   `solids/elastoplasticity/perforatedPlate`
   `solids/elastoplasticity/cylinderCrush`
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`
   `solids/hyperelasticity/plateHoleTotalLag`
   `solids/hyperelasticity/cylinderCrush`
   `fluidSolidInteraction/3dTube`
@@ -366,7 +365,6 @@ Prepared by Ivan Batistić with edits by Philip Cardiff
   `solids/elastoplasticity/pipeCrush`
   `solids/elastoplasticity/perforatedPlate`
   `solids/elastoplasticity/cylinderCrush`
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`
   `solids/hyperelasticity/plateHoleTotalLag`
 
 ---
@@ -521,12 +519,10 @@ Prepared by Ivan Batistić with edits by Philip Cardiff
 - **Tutorial case in which it is used:**
   `solids/hyperelasticity/cylinderCrush`
   `solids/hyperelasticity/cylindricalPressureVessel`
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`
   `solids/elastoplasticity/perforatedPlate`
   `solids/elastoplasticity/cooksMembrane`
   `solids/viscoelasticity/viscoTube`
   `solids/linearElasticity/cooksMembrane`
-  `solids/abaqusUMATs/plateHoleTotalDispUMAT`
   `solids/linearElasticity/wobblyNewton`
   `solids/linearElasticity/plateHole`
   `fluidSolidInteraction/beamInCrossFlow`

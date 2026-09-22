@@ -43,24 +43,17 @@ name is what you type in `constant/mechanicalProperties`.
 | Runtime type | Purpose |
 | --- | --- |
 | `linearElastic` | Isotropic Hooke's law |
-| `orthotropicLinearElastic` | Nine-parameter orthotropic Hooke's law |
 | `linearElasticMisesPlastic` | Hooke's law with J2 (von Mises) plasticity |
 | `linearElasticMohrCoulombPlastic` | Hooke's law with Mohr-Coulomb plasticity |
 | `poroMechanicalLaw` | Wrapper adding a pore-pressure term |
 | `thermoMechanicalLaw` | Wrapper adding a thermal expansion term |
 | `viscousHookeanElastic` | Generalised Maxwell (Prony series) viscoelasticity |
 | `anisotropicBiotElastic` | Orthotropic elasticity for soil skeletons |
-| `diffusionElastic` | Hooke's law scaled by a mesh motion diffusivity |
-| `linearElasticCt` | `E` from CT data; **not currently built** |
-| `linearElasticFromFile` | Hooke's law with `E` read as a field from disk |
 
 Three of these are _wrappers_ rather than stand-alone constitutive models:
 `poroMechanicalLaw` and `thermoMechanicalLaw` each own a nested, run-time
 selectable law and add a spherical stress contribution to whatever it returns.
 They can therefore be combined with most of the other entries in the table.
-
-`diffusionElastic` is not a physical material model; it exists so that a solid
-model can be used as a mesh motion solver.
 
 ---
 

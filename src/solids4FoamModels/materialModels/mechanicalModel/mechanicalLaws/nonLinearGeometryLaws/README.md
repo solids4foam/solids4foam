@@ -48,42 +48,30 @@ name is what you type in `constant/mechanicalProperties`.
 | Runtime type | Purpose |
 | --- | --- |
 | `StVenantKirchhoffElastic` | Hookean law in Green strain and 2nd PK stress |
-| `StVenantKirchhoffOrthotropicElastic` | Nine-parameter orthotropic St Venant |
 | `neoHookeanElastic` | Compressible neo-Hookean, Simo and Hughes Eqn 9.2.6 |
 | `MooneyRivlinElastic` | Three-parameter Mooney-Rivlin |
-| `YeohElastic` | Three-parameter Yeoh |
 | `OgdenElastic` | Third-order Ogden, in principal stretches |
-| `GentElastic` | Gent-Flory law for the swelling behaviour of microgels |
-| `isotropicFungElastic` | Two-parameter exponential Fung-like model |
 | `GuccioneElastic` | Exponential Guccione law for myocardium |
 | `HolzapfelGasserOgdenElastic` | Two-fibre-family anisotropic HGO law |
 | `neoHookeanElasticMisesPlastic` | Neo-Hookean with J2 plasticity |
-| `viscoNeoHookeanElastic` | Neo-Hookean generalised Maxwell viscoelasticity |
 | `electroMechanicalLaw` | Wrapper adding an active electro-mechanical stress |
-| `diffusionHyperElastic` | Neo-Hookean scaled by a mesh motion diffusivity |
 
-`neoHookeanElastic`, `MooneyRivlinElastic`, `YeohElastic`, `OgdenElastic`,
-`GentElastic` and `isotropicFungElastic` are isotropic and purely elastic, and
+`neoHookeanElastic`, `MooneyRivlinElastic` and `OgdenElastic` are isotropic
+and purely elastic, and
 differ only in their strain energy function; `StVenantKirchhoffElastic` is the
 degenerate case that keeps a linear stress-strain relation while accounting for
-finite rotation. The remaining anisotropic laws each need directional data in
-addition to their material constants: `StVenantKirchhoffOrthotropicElastic`
-takes a local coordinate system, while `GuccioneElastic` and
-`HolzapfelGasserOgdenElastic` take a fibre direction field. The latter two were
-added for cardiovascular modelling.
+finite rotation. The anisotropic laws each need directional data in addition
+to their material constants: `GuccioneElastic` and
+`HolzapfelGasserOgdenElastic` take a fibre direction field. Both were added for
+cardiovascular modelling.
 
-`neoHookeanElasticMisesPlastic` and `viscoNeoHookeanElastic` are the two
-inelastic laws in this subsection: they carry internal state between time
-steps, so they require the solid model to be run with a sensible time step
-rather than as a steady-state solve.
+`neoHookeanElasticMisesPlastic` is the inelastic law in this subsection: it
+carries internal state between time steps, so it requires the solid model to be
+run with a sensible time step rather than as a steady-state solve.
 
 `electroMechanicalLaw` is a _wrapper_. It owns a nested, run-time selectable
 passive hyperelastic law and adds an active stress contribution to whatever
 that law returns, so it can be combined with most of the other entries.
-
-`diffusionHyperElastic` is not a physical material model; like
-`diffusionElastic` in the linear geometry subsection, it exists so that a solid
-model can be used as a mesh motion solver.
 
 ```warning
 `HolzapfelGasserOgdenElastic` is written for the mixed pressure-displacement

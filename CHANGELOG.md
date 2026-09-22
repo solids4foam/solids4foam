@@ -64,6 +64,33 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
+  `linearElasticCt`, `linearElasticFromFile`, `orthotropicLinearElastic`,
+  `GentElastic`, `StVenantKirchhoffOrthotropicElastic`, `YeohElastic`,
+  `diffusionHyperElastic`, `isotropicFungElastic` and `viscoNeoHookeanElastic`.
+  A case selecting any of these now fails to construct its mechanical model.
+  None of the ten was ported to the `mechanicalConstitutiveLaw` framework, and
+  none is selected by any tutorial, so none has ever had regression coverage on
+  either path; three carry open correctness issues that nothing would have
+  caught. Keeping unported, untested laws alive is what the framework exists to
+  get away from, and `linearElasticCt` was in neither build list already, so it
+  could not be selected at run time in any case. Each may return, but only
+  together with a tutorial and a regression case that pins its numbers; see
+  #457, and #458 for the two orthotropic laws in particular.
+- **Breaking:** the `abaqusUMATs` library, its `plateHoleTotalDispUMAT`
+  tutorial and the `S4F_USE_GFORTRAN` build hook are removed. It was a proof of
+  concept that never covered the full Abaqus UMAT interface. The
+  `abaqusMeshToFoam` and `foamMeshToAbaqus` mesh utilities are unaffected.
+- **Breaking:** `weakThermalLinearGeometry` is no longer compiled, on any fork,
+  following the precedent set for `vertexCentredNonLinTotalLagGeometry`. No
+  tutorial selects it, so nothing exercises it, and it derives from
+  `linearGeometryTotalDisplacement` and so inherits the
+  `mechanicalConstitutiveLaw` framework path without anything having tested
+  that it works there. `thermalLinearGeometry` may in any case cover every
+  problem it was written for. Both build lists carry the reason in a comment,
+  and the solver's sources are untouched, so restoring it is a matter of
+  uncommenting the entry in both files - together with a tutorial. See #459,
+  which also asks whether `thermalLinearGeometry` supersedes it entirely.
 - **Breaking:** the public virtual `solidModel::newDeltaT()`, which forwarded to
   `mechanicalModel::newDeltaT()`, is removed. Its purpose was to let a
   constitutive law ask for a smaller time step, but nothing in solids4foam
