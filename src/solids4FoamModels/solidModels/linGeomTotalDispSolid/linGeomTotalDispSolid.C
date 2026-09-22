@@ -57,7 +57,7 @@ void linGeomTotalDispSolid::predict()
     // Update gradient of displacement
     if (useMechanicalConstitutiveLawManager())
     {
-        frameworkGrad(D(), gradD());
+        gradD() = fvc::grad(D());
     }
     else
     {
@@ -422,7 +422,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Update gradient of displacement
             if (useMechanicalConstitutiveLawManager())
             {
-                frameworkGrad(D(), gradD());
+                gradD() = fvc::grad(D());
             }
             else
             {
@@ -559,7 +559,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     {
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D(), gradD());
+            gradD() = fvc::grad(D());
         }
         else
         {
@@ -665,7 +665,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
     // Update gradient of displacement
     if (useMechanicalConstitutiveLawManager())
     {
-        frameworkGrad(D, gradD);
+        gradD = fvc::grad(D);
     }
     else
     {
@@ -1009,7 +1009,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().storePrevIter();
     if (useMechanicalConstitutiveLawManager())
     {
-        frameworkGrad(D(), gradD());
+        gradD() = fvc::grad(D());
     }
     else
     {
@@ -1334,7 +1334,7 @@ label linGeomTotalDispSolid::formResidual
         // Update gradient of displacement
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D, gradD());
+            gradD() = fvc::grad(D);
         }
         else
         {

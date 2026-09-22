@@ -64,7 +64,7 @@ void nonLinGeomUpdatedLagSolid::predict()
     // Update gradient of displacement increment
     if (useMechanicalConstitutiveLawManager())
     {
-        frameworkGrad(DD(), gradDD());
+        gradDD() = fvc::grad(DD());
     }
     else
     {
@@ -398,7 +398,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         // Update gradient of displacement increment
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(DD(), gradDD());
+            gradDD() = fvc::grad(DD());
         }
         else
         {
@@ -955,7 +955,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     {
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(DD(), gradDD());
+            gradDD() = fvc::grad(DD());
         }
         else
         {
@@ -1219,7 +1219,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // Update displacement increment gradient
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(DD, gradDD());
+            gradDD() = fvc::grad(DD);
         }
         else
         {

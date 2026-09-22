@@ -2051,17 +2051,6 @@ Foam::solidModel::mechanicalManager() const
 }
 
 
-void Foam::solidModel::frameworkGrad
-(
-    const volVectorField& D,
-    volTensorField& gradD
-) const
-{
-    // See the header for why this does not call mechanical().grad()
-    gradD = fvc::grad(D);
-}
-
-
 void Foam::solidModel::frameworkInterpolate
 (
     const volVectorField& D,

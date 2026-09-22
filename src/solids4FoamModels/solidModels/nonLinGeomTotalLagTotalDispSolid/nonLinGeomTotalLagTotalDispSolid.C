@@ -137,7 +137,7 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     // Update gradient of displacement
     if (useMechanicalConstitutiveLawManager())
     {
-        frameworkGrad(D(), gradD());
+        gradD() = fvc::grad(D());
     }
     else
     {
@@ -573,7 +573,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Update gradient of displacement
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D(), gradD());
+            gradD() = fvc::grad(D());
         }
         else
         {
@@ -1154,7 +1154,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         DD() = D() - D().oldTime();
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D(), gradD());
+            gradD() = fvc::grad(D());
         }
         else
         {
@@ -1431,7 +1431,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // Update gradient of displacement
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D, gradD());
+            gradD() = fvc::grad(D);
         }
         else
         {
