@@ -303,6 +303,11 @@ checks equivalent model pairs, constant gamma and invalid configurations,
 and exits nonzero on failure. Optional `-symbolSweep` exports raw analytical
 curves/maps, `-writeFields` writes uniquely named pressure/stabilisation
 fields, and `-constructOnly` supports focused constructor rejection tests.
+When a dictionary contains `fieldOutput`, `-writeFields` performs only a
+generic field export: its named Fourier modes and runtime-selected models are
+written using configurable pressure and stabilisation prefixes, without
+running the CSV campaign. Model dictionaries control normalisation normally.
 
-The Paper-1 verification case lives in the solid-benchmarks repository under
+The particular Paper-1 ParaView demonstration, including its selected modes,
+models and synthetic filtering, lives in the solid-benchmarks repository under
 `papers/JFNK_mixed/fourierVerification/pressureStabilisationFourier/`.

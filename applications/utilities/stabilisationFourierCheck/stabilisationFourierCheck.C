@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
     argList::validOptions.insert("constructOnly", "");
 #else
     argList::addOption("dict", "name", "Dictionary in system (default stabilisationFourierDict)");
-    argList::addBoolOption("writeFields", "Write uniquely named p and S fields");
+    argList::addBoolOption("writeFields", "Write Fourier pressure and production stabilisation fields");
     argList::addBoolOption("symbolSweep", "Export analytical cuts and 2-D maps");
     argList::addOption("gammaLinearityCheck", "scalar", "Override secondary constant gamma (0 disables)");
     argList::addBoolOption("constructOnly", "Construct configured models, then exit");
@@ -235,6 +235,208 @@ int main(int argc, char *argv[])
         Info<< "End" << endl;
         return 0;
     }
+
+    if (optionFound(args, "writeFields") && dict.found("fieldOutput"))
+    {
+        const dictionary& outputDict = dict.subDict("fieldOutput");
+        if (!outputDict.found("modes"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "fieldOutput requires a modes sub-dictionary"
+                << exit(FatalIOError);
+        }
+        const dictionary& outputModes = outputDict.subDict("modes");
+        const wordList modeNames(outputModes.toc());
+        if (names.empty() || modeNames.empty())
+        {
+            FatalIOErrorInFunction(dict)
+                << "fieldOutput models and modes must not be empty"
+                << exit(FatalIOError);
+        }
+        const word pressurePrefix
+        (
+            outputDict.lookupOrDefault<word>("pressurePrefix", "fourierP")
+        );
+        const word stabilisationPrefix
+        (
+            outputDict.lookupOrDefault<word>
+            (
+                "stabilisationPrefix",
+                "fourierS"
+            )
+        );
+
+        wordList patchTypes(mesh.boundary().size());
+        forAll(patchTypes, patchi)
+        {
+            patchTypes[patchi] = mesh.boundary()[patchi].type();
+        }
+        volScalarField p
+        (
+            IOobject
+            (
+                "p",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0),
+            patchTypes
+        );
+        surfaceScalarField rAUf
+        (
+            IOobject
+            (
+                "rAUf",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("one", dimArea/dimPressure, 1)
+        );
+
+        Info<< "Fourier field output: "
+            << grid.N[0] << 'x' << grid.N[1] << 'x' << grid.N[2]
+            << ", " << modeNames.size() << " modes, "
+            << names.size() << " models" << nl;
+
+        label failures = 0;
+        forAll(modeNames, modei)
+        {
+            const word& modeName = modeNames[modei];
+            const vector thetaByPi(outputModes.lookup(modeName));
+            vector theta(vector::zero);
+            label k[3];
+            for (direction d = 0; d < 3; ++d)
+            {
+                const scalar discrete = grid.N[d]*thetaByPi[d]/2;
+                if
+                (
+                    !std::isfinite(discrete)
+                 || discrete < 0
+                 || discrete > grid.N[d]/2.0
+                )
+                {
+                    FatalErrorInFunction
+                        << "Field-output mode " << modeName
+                        << " must lie in [0,pi]" << exit(FatalError);
+                }
+                k[d] = std::lround(discrete);
+                if
+                (
+                    mag(discrete - k[d]) > 1e-12
+                 || (mesh.geometricD()[d] == -1 && thetaByPi[d] != 0)
+                )
+                {
+                    FatalErrorInFunction
+                        << "Field-output mode " << modeName
+                        << " is incompatible with mesh periodicity"
+                        << exit(FatalError);
+                }
+                theta[d] = 2*pi*k[d]/grid.N[d];
+            }
+
+            forAll(primitiveField(p), celli)
+            {
+                scalar phase = 0;
+                for (direction d = 0; d < 3; ++d)
+                {
+                    phase += theta[d]*grid.index[d][celli];
+                }
+                primitiveFieldRef(p)[celli] = std::cos(phase);
+            }
+            p.correctBoundaryConditions();
+
+            const word pName(pressurePrefix + "_" + modeName);
+            volScalarField pMode
+            (
+                IOobject
+                (
+                    pName,
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    false
+                ),
+                p
+            );
+            pMode.write();
+
+            volVectorField gradP(fvc::grad(p));
+            gradP.correctBoundaryConditions();
+            const scalarField pressure(primitiveField(p));
+            const scalar p2 = gSum(mesh.V()*sqr(pressure));
+            if (p2 <= SMALL)
+            {
+                FatalErrorInFunction
+                    << "Degenerate field-output mode " << modeName
+                    << exit(FatalError);
+            }
+
+            forAll(names, modeli)
+            {
+                const dictionary& modelDict =
+                    models.subDict(names[modeli]);
+
+                autoPtr<stabilisationModel> model
+                (
+                    stabilisationModel::New
+                    (
+                        mesh,
+                        modelDict,
+                        dimPressure/dimLength
+                    )
+                );
+                model->updateScalar(p, &gradP);
+                const volScalarField& stab =
+                    model->cellScalar(&rAUf, true);
+                const scalarField& S = primitiveField(stab);
+                const scalar num = gSum(mesh.V()*pressure*S)/p2;
+                const scalar residual = std::sqrt
+                (
+                    gSum(mesh.V()*sqr(S - num*pressure))
+                );
+                const scalar modeErr = residual
+                  / max(mag(num)*std::sqrt(p2), SMALL);
+                failures += !std::isfinite(num) || modeErr > tol;
+
+                const word sName
+                (
+                    stabilisationPrefix + "_"
+                  + names[modeli] + "_" + modeName
+                );
+                volScalarField outputS
+                (
+                    IOobject
+                    (
+                        sName,
+                        runTime.timeName(),
+                        mesh,
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE,
+                        false
+                    ),
+                    stab
+                );
+                outputS.write();
+
+                Info<< modeName << ' ' << names[modeli]
+                    << " lambda_num=" << num
+                    << " eigenmodeError=" << modeErr << nl;
+            }
+        }
+
+        Info<< "Fourier fields written to "
+            << runTime.path()/runTime.timeName() << nl
+            << "Failures: " << failures << nl << "End" << endl;
+        return failures ? 1 : 0;
+    }
+
     const List<vector> modes(dict.lookup("modes"));
     const List<Pair<word>> pairs(dict.lookup("crossChecks"));
     if (names.empty() || modes.empty())
