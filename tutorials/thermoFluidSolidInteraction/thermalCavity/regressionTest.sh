@@ -5,6 +5,7 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+FRAMEWORK_DIR="${REGRESSION_ROOT}/framework"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
@@ -33,20 +34,21 @@ echo "============================================================"
 echo
 
 prepare_case() {
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
+    local d="${1:-${CASE_DIR}}"
+    rm -rf "${d}"
+    mkdir -p "${d}"
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-        cp -a "${item}" "${CASE_DIR}/"
+        cp -a "${item}" "${d}/"
     done
 }
 
 shorten_case() {
-    local controlDict="${CASE_DIR}/system/controlDict"
+    local controlDict="${1:-${CASE_DIR}}/system/controlDict"
     sed -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
@@ -64,8 +66,8 @@ find_fsi_data() {
         fi
     done
 
-    find "${CASE_DIR}/postProcessing" -name 'fsiConvergenceData.dat' -print 2>/dev/null \
-        | tail -n 1
+    find "${1:-${CASE_DIR}}/postProcessing" -name 'fsiConvergenceData.dat' \
+        -print 2>/dev/null | tail -n 1
 }
 
 # ------------------------------------------------------------
@@ -85,9 +87,28 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
-    shorten_case
+    prepare_case "${CASE_DIR}"
+    shorten_case "${CASE_DIR}"
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+    # The framework arm differs in this one entry and nothing else. thermalSolid
+    # asks the constitutive implementation only for the density, so this checks
+    # that the framework supplies the same rho the legacy model did
+    prepare_case "${FRAMEWORK_DIR}"
+    shorten_case "${FRAMEWORK_DIR}"
+    sed -i.bak \
+        's|^\( *\)solutionTolerance|\1useMechanicalConstitutiveLawManager yes;\n\1solutionTolerance|' \
+        "${FRAMEWORK_DIR}/constant/solid/solidProperties"
+    rm -f "${FRAMEWORK_DIR}/constant/solid/solidProperties.bak"
+
+    if ! grep -q "useMechanicalConstitutiveLawManager" \
+        "${FRAMEWORK_DIR}/constant/solid/solidProperties"
+    then
+        echo "FAIL: could not set the framework switch on the framework arm"
+        exit 1
+    fi
+
+    ( cd "${FRAMEWORK_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -127,9 +148,66 @@ else
     failures=$((failures + 1))
 fi
 
+# ------------------------------------------------------------
+# The framework arm
+#
+# thermalSolid takes only the density from the constitutive implementation, so
+# the two arms should agree exactly: the same rho drives the same conjugate
+# heat transfer and the same coupling iteration count
+# ------------------------------------------------------------
+
+if [ "$CHECK_ONLY" = false ]; then
+    if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: framework arm skipped in this environment"
+    else
+        fw_log=$(find "${FRAMEWORK_DIR}" -name "${SOLVER_LOGFILE}" | tail -n 1)
+        main_log=$(find "${CASE_DIR}" -name "${SOLVER_LOGFILE}" | tail -n 1)
+
+        # Each arm must have taken the path it was set up for, or this
+        # compares the legacy path against itself and proves nothing
+        if [[ -n "${main_log}" ]] \
+            && grep -q "mechanicalConstitutiveLawManager" "${main_log}"
+        then
+            echo "FAIL: the legacy arm used the framework"
+            failures=$((failures + 1))
+        else
+            echo "PASS: legacy arm took the legacy path"
+        fi
+
+        if [[ -n "${fw_log}" ]] \
+            && grep -q "mechanicalConstitutiveLawManager" "${fw_log}"
+        then
+            echo "PASS: framework arm took the framework path"
+        else
+            echo "FAIL: framework arm did not take the framework path"
+            failures=$((failures + 1))
+        fi
+
+        fw_data=$(find_fsi_data "${FRAMEWORK_DIR}")
+        if [[ -z "${fw_data}" ]]; then
+            echo "FAIL: framework arm produced no fsiConvergenceData"
+            failures=$((failures + 1))
+        else
+            fw_n=$(grep -v '^[[:space:]]*#' "${fw_data}" | tail -n 1 \
+                | awk '{print $2}')
+
+            if [[ "${fw_n}" == "${n_fsi_correctors}" ]]; then
+                printf "PASS: framework nFsiCorrectors = %s, as legacy\n" \
+                    "${fw_n}"
+            else
+                printf "FAIL: nFsiCorrectors differ (%s legacy, %s framework)\n" \
+                    "${n_fsi_correctors}" "${fw_n}"
+                failures=$((failures + 1))
+            fi
+        fi
+    fi
+fi
+
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${FRAMEWORK_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo
