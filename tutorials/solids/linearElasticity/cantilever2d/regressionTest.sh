@@ -29,6 +29,8 @@ ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     petscSnes
+    unsCoupled
+    unsCoupledManager
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrderJacobian
@@ -449,10 +451,33 @@ extract_disp_linf() {
         || true
 }
 
+# The framework arm of an approach differs in one dictionary entry and
+# nothing else. It is applied after Allclean, which ends in restoreCaseFormat
+# and would otherwise put the stored dictionary back, and before Allrun
+apply_framework_switch() {
+    local dict="$1"
+
+    sed -i.bak \
+        's|^\(coupledUnsLinearGeometryLinearElasticCoeffs\)|\1|; s|^{}$|{\n    useMechanicalConstitutiveLawManager yes;\n}|' \
+        "${dict}"
+    rm -f "${dict}.bak"
+
+    if ! grep -q "useMechanicalConstitutiveLawManager" "${dict}"; then
+        echo "FAIL: could not set the framework switch in ${dict}"
+        return 1
+    fi
+}
+
 select_run_approach() {
     local requested="$1"
 
+    USE_FRAMEWORK=false
+
     case "${requested}" in
+        unsCoupledManager)
+            USE_FRAMEWORK=true
+            RUN_APPROACH=unsCoupled
+            ;;
         highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
             local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
@@ -530,11 +555,39 @@ if [ "$CHECK_ONLY" = false ]; then
 
         select_run_approach "${approach}"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+
+        if [[ "${USE_FRAMEWORK}" == true ]]; then
+            if ! apply_framework_switch \
+                "${CASE_DIR}/constant/solidProperties.${RUN_APPROACH}"
+            then
+                failures=$((failures + 1))
+                continue
+            fi
+        fi
+
         ( cd "${CASE_DIR}" && ./Allrun "${RUN_APPROACH}" > "${ALLRUN_LOGFILE}" 2>&1 )
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
             continue
+        fi
+
+        # Each arm must have taken the path it was set up for, or a
+        # comparison between them is between two copies of the same thing
+        if [[ -f "${CASE_DIR}/${SOLVER_LOGFILE}" ]]; then
+            if grep -q "mechanicalConstitutiveLawManager" \
+                "${CASE_DIR}/${SOLVER_LOGFILE}"
+            then
+                if [[ "${USE_FRAMEWORK}" == true ]]; then
+                    echo "PASS: ${approach} took the framework path"
+                else
+                    echo "FAIL: ${approach} used the framework unasked"
+                    failures=$((failures + 1))
+                fi
+            elif [[ "${USE_FRAMEWORK}" == true ]]; then
+                echo "FAIL: ${approach} did not take the framework path"
+                failures=$((failures + 1))
+            fi
         fi
 
         if ! check_solver_extrema "${approach}"; then
