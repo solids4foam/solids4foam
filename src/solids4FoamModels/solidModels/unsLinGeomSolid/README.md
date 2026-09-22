@@ -214,7 +214,6 @@ are the natural places to try it:
 - `solids/linearElasticity/rigidCylinderContactBrick`
 - `solids/linearElasticity/slidingFrictionBall`
 - `solids/multiMaterial/layeredPipe`
-- `solids/abaqusUMATs/plateHoleTotalDispUMAT`
 
 Swap the `solidModel` entry in `constant/solidProperties` to switch a case
 over; no other case settings need to change.
