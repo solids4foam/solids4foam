@@ -8,6 +8,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Framework regression arms for `squarePlate`, `cantilever2d`, `thermalCavity`,
+  `curvedBeams` and `3dTube`. Each runs its tutorial on both implementations
+  and asserts that each arm took the path it was set up for before comparing
+  them. `curvedBeams` and `3dTube` are the first coverage of the `impK`
+  registry lookup that the contact penalty models, the cohesive zone models
+  and `elasticWallPressure` all depend on; `thermalCavity` is the first
+  framework arm under `thermoFluidSolidInteraction`; and `cantilever2d`'s
+  `unsCoupled` arms are the first regression coverage of
+  `coupledUnsLinearGeometryLinearElastic` on either implementation.
 - Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
   the [preCICE tutorials](https://github.com/precice/tutorials) against the
   current source and checks them against stored reference values. The preCICE
@@ -18,6 +27,24 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The `mechanicalConstitutiveLaw` framework no longer requires the legacy
+  `mechanicalModel` it replaces. `solidModel` reads
+  `constant/mechanicalProperties` itself and hands it to whichever
+  implementation is in use, where previously the manager was built from the
+  legacy model, so every framework run constructed the whole legacy hierarchy
+  and every legacy law. Reaching the legacy model on a framework run is now a
+  fatal error rather than a silent fallback, unless the solid model declares
+  that it needs both, which only `vertexCentredLinearGeometry` does.
+- `kirchhoffPlate`, `coupledUnsLinearGeometryLinearElastic` and `thermalSolid`
+  accept `useMechanicalConstitutiveLawManager`. The first two read material
+  constants from a single isotropic linear elastic law rather than asking it
+  for a stress - a plate has one bending stiffness, and the block-coupled
+  solver assembles one set of Lame constants - so both keep that restriction
+  and only change where the constants come from.
+- `kirchhoffPlate` no longer reports or tests a material residual. It admits
+  only `linearElastic`, which does not override `mechanicalLaw::residual()`,
+  and that returns zero, so the value was always zero and its convergence test
+  always passed. The `matRes` column is gone from its residual output.
 - On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
   one material is refused rather than run. `linearGeometryTotalDisplacement`,
   `nonLinearGeometryTotalLagrangianTotalDisplacement` and
