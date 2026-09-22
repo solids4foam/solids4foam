@@ -154,7 +154,13 @@ class fluidSolidInterface
         //  using the legacy minimum-based combination
         const Switch requireAllResidualMeasures_;
 
-        //- Pressure-change tolerance for Robin interfaces
+        //- Pressure-change tolerance for Robin interfaces: the normalised
+        //  change in interface pressure between FSI iterations. The default
+        //  is 10*outerCorrTolerance, as for the kinematic residual below;
+        //  the pressure change is normalised by the largest interface
+        //  pressure norm in the time step, so on cases with a large mean
+        //  interface pressure the relative residual bottoms out at the
+        //  floors of the inner solvers
         const scalar robinPressureTolerance_;
 
         //- Tolerance for the Robin kinematic residual: the interface flux

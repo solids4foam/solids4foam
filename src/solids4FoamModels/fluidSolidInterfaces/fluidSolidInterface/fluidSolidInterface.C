@@ -414,7 +414,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<scalar>
         (
-            "robinPressureTolerance", outerCorrTolerance_
+            "robinPressureTolerance", 10*outerCorrTolerance_
         )
     ),
     robinFluxTolerance_

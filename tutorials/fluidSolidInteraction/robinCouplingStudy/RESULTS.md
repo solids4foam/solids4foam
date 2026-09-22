@@ -218,11 +218,11 @@ change and the absolute leakage (normalised by the throughput) to satisfy
 
 Final design (`robinConvergence residual`, default): displacement residual
 `<= outerCorrTolerance`, pressure change `<= robinPressureTolerance` (default
-`outerCorrTolerance`) and, if the Robin condition is kinematically consistent,
-leakage normalised by the throughput plus the interface motion flux `<=
-robinFluxTolerance` (default `10*outerCorrTolerance`); otherwise the leakage
-is only reported. Before `couplingStartTime` only the displacement residual
-is used. The residual file gains a convergence-state column.
+`10*outerCorrTolerance`) and, if the Robin condition is kinematically
+consistent, leakage normalised by the throughput plus the interface motion flux
+`<= robinFluxTolerance` (default `10*outerCorrTolerance`); otherwise the
+leakage is only reported. Before `couplingStartTime` only the displacement
+residual is used. The residual file gains a convergence-state column.
 
 An iteration-error criterion (`robinConvergence iterationError`) was also
 implemented and compared: it estimates the remaining error of each residual
