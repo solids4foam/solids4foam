@@ -35,8 +35,8 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
-#include "hofvc.H"
 #ifdef OPENFOAM_NOT_EXTEND
+    #include "hofvc.H"
     #include "enhancedVolPointInterpolation.H"
 #endif
 
@@ -557,6 +557,7 @@ Foam::solidModel::gradDQuad0() const
 {
     if (gradDQuad0Ptr_.empty())
     {
+#ifdef OPENFOAM_NOT_EXTEND
         if (gradDQuadPtr_.empty())
         {
             makeGradDQuad();
@@ -570,6 +571,10 @@ Foam::solidModel::gradDQuad0() const
             new CompactListList<tensor>(gradDQuadPtr_().sizes())
         );
         hofvc::fGrad(D_.oldTime(), gradDQuad0Ptr_());
+#else
+        gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+#endif
     }
 
     return autoPtrRef(gradDQuad0Ptr_);
@@ -1858,6 +1863,9 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 
 void Foam::solidModel::rollOverQuadratureHistory()
 {
+    // The high-order discretisation, and hence gradDQuad(), does not exist on
+    // foam-extend
+#ifndef FOAMEXTEND
     if (gradDQuadPtr_.valid())
     {
         if (gradDQuad0Ptr_.empty())
@@ -1867,6 +1875,7 @@ void Foam::solidModel::rollOverQuadratureHistory()
 
         copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
     }
+#endif
 }
 
 
@@ -1879,6 +1888,8 @@ void Foam::solidModel::updateTotalFields()
 }
 
 
+// The high-order face quadrature does not run on foam-extend, but these
+// helpers are portable and the models that call them are compiled there
 void Foam::solidModel::quadDeformationGradient
 (
     const CompactListList<tensor>& gradD,

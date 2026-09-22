@@ -599,6 +599,7 @@ Foam::scalar Foam::solidModels::nonLinGeomUpdatedLagSolid::materialResidual()
 }
 
 
+// The high-order face quadrature does not exist on foam-extend
 void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
 {
     if (!useMechanicalConstitutiveLawManager())

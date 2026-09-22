@@ -14,15 +14,15 @@ fi
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# (segregated/petscSnes/petscSnesPressure/high-order variants) and
-# pressure-displacement
-# solution options.
+# (segregated/segregatedManager/petscSnes/petscSnesPressure/high-order
+# variants) and pressure-displacement
 #
 # Note that petscSnesPressure and pressureDisplacement* are different things:
 # petscSnesPressure is the mixed displacement-pressure form of
 # linearGeometryTotalDisplacement (solvePressure yes), whereas
 # pressureDisplacement* selects coupledPressureDisplacementSolid, which runs
 # on foam-extend only.
+# solution options.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -32,6 +32,7 @@ fi
 DISP_TOL=1e-7
 POINT_DISP_TOL=1e-7
 STRESS_TOL=2e5
+FRAMEWORK_FIELD_ABS_TOL=2e-12
 
 PD_DISP_TOL=3.0e-4
 PD_POINT_DISP_TOL=3.0e-4
@@ -44,12 +45,15 @@ PARALLEL_N_PROCS=2
 
 APPROACHES=(
     segregated
+    segregatedManager
     petscSnes
     petscSnesPressure
+    petscSnesPressureManager
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrder-movingLeastSquares-parallel
     highOrder-kExactLeastSquares-parallel
+    highOrderFourthOrder
 )
 
 PRESSURE_DISPLACEMENT_CASES=(
@@ -216,6 +220,79 @@ check_less_than() {
     fi
 }
 
+compare_written_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = re.compile(
+    r"(?<![A-Za-z_])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+)
+
+try:
+    texts = [open(path).read() for path in sys.argv[1:]]
+    structure = [number.sub("<number>", text) for text in texts]
+    if structure[0] != structure[1]:
+        raise ValueError("field structures differ")
+
+    values = [
+        [float(match.group()) for match in number.finditer(text)]
+        for text in texts
+    ]
+    if not values[0] or len(values[0]) != len(values[1]):
+        raise ValueError("field numeric data are missing or differ in size")
+
+    print(max(abs(a - b) for a, b in zip(*values)))
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
+# The arms whose solidProperties carries useMechanicalConstitutiveLawManager.
+# Every other arm must run the legacy path
+FRAMEWORK_APPROACHES=(
+    segregatedManager
+    petscSnesPressureManager
+    highOrderFourthOrder
+)
+
+is_framework_approach() {
+    local a="$1"
+    local f
+    for f in "${FRAMEWORK_APPROACHES[@]}"; do
+        [[ "${a}" == "${f}" ]] && return 0
+    done
+    return 1
+}
+
+# An arm that silently ran the other path still satisfies every tolerance
+# below, because both paths solve the same problem correctly. Without this the
+# framework arms prove nothing: losing the switch from the dictionary, or
+# linking the wrong file, would read as a pass
+check_took_its_path() {
+    local approach="$1"
+    local log="${2}/${SOLVER_LOGFILE}"
+
+    if [[ ! -f "${log}" ]]; then
+        echo "FAIL: ${approach}: no solver log to check the path taken"
+        failures=$((failures + 1))
+        return
+    fi
+
+    if is_framework_approach "${approach}"; then
+        if ! grep -q "Selecting mechanical constitutive law" "${log}"; then
+            echo "FAIL: ${approach}: framework arm did not use the framework"
+            failures=$((failures + 1))
+        fi
+    else
+        if grep -q "Selecting mechanical constitutive law" "${log}"; then
+            echo "FAIL: ${approach}: legacy arm used the framework"
+            failures=$((failures + 1))
+        fi
+    fi
+}
+
 failures=0
 
 for approach in "${APPROACHES[@]}"; do
@@ -224,6 +301,7 @@ for approach in "${APPROACHES[@]}"; do
         echo "SKIP: ${approach}"
         continue
     fi
+    check_took_its_path "${approach}" "${case_dir}"
     check_less_than \
         "${approach}" "DDifference LInf" \
         "$(extract_disp_linf "${case_dir}" "DDifference")" \
@@ -236,6 +314,61 @@ for approach in "${APPROACHES[@]}"; do
         "${approach}" "stress component-0 LInf" \
         "$(extract_stress_linf_comp0 "${case_dir}")" \
         "${STRESS_TOL}"
+done
+
+# ------------------------------------------------------------
+# Each framework arm against the legacy arm it mirrors
+# ------------------------------------------------------------
+# Checking both arms against the analytical tolerances separately does not
+# compare them with each other: both paths solve this problem well within
+# tolerance, so both would pass even if they disagreed. For isotropic linear
+# elasticity a deviatoric projection and the declared volumetric split are the
+# same operation, so the two arms must agree to the precision written in the
+# fields, not merely satisfy the analytical tolerances independently.
+#
+# highOrderFourthOrder has no legacy twin here - the other high-order arms are
+# different discretisations rather than the same one on the legacy path - so it
+# is covered by its tolerances and its path assertion only
+FRAMEWORK_PAIRS=(
+    "segregated segregatedManager"
+    "petscSnesPressure petscSnesPressureManager"
+)
+
+for pair in "${FRAMEWORK_PAIRS[@]}"; do
+    IFS=' ' read -r legacy_arm framework_arm <<< "${pair}"
+    legacy_case="${REGRESSION_ROOT}/${legacy_arm}"
+    framework_case="${REGRESSION_ROOT}/${framework_arm}"
+
+    if solids4Foam::regressionCaseSkipped "${legacy_case}/${ALLRUN_LOGFILE}" \
+        || solids4Foam::regressionCaseSkipped \
+            "${framework_case}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${framework_arm} against ${legacy_arm}"
+        continue
+    fi
+
+    t=$(solids4Foam::latestTime "${framework_case}")
+
+    if [[ -z "${t}" || ! -f "${framework_case}/${t}/D" \
+        || ! -f "${legacy_case}/${t}/D" ]]
+    then
+        echo "FAIL: ${framework_arm}: no D field to compare with ${legacy_arm}"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    field_diff=""
+    if field_diff=$(compare_written_fields \
+        "${legacy_case}/${t}/D" "${framework_case}/${t}/D") \
+      && awk "BEGIN {exit !(${field_diff} <= ${FRAMEWORK_FIELD_ABS_TOL})}"
+    then
+        printf "PASS: %s and %s agree to write precision (max |delta| = %.3g)\n" \
+            "${framework_arm}" "${legacy_arm}" "${field_diff}"
+    else
+        printf "FAIL: %s and %s fields differ (max |delta| = %s)\n" \
+            "${framework_arm}" "${legacy_arm}" "${field_diff:-unavailable}"
+        failures=$((failures + 1))
+    fi
 done
 
 for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do

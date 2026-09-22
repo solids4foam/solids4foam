@@ -22,6 +22,7 @@ DISP_Y_MIN=-0.0034
 DISP_Y_MAX=-0.0032
 
 ALLRUN_LOGFILE="log.Allrun"
+SOLVER_LOGFILE="log.solids4Foam"
 FORCE_FILE="postProcessing/0/solidForcescylinderContact.dat"
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 
@@ -86,6 +87,206 @@ if [[ -z "${final_force_y}" || -z "${final_disp_y}" ]]; then
     exit 1
 fi
 
+# Run the case both ways and require the two to agree.
+#
+# Both arms turn the pressure equation off. The case ships with
+# solvePressureEqn yes and a smoothing scale factor, and the framework has no
+# equivalent yet - the hydrostatic stress there is 0.5*K*(J^2 - 1) taken
+# directly, where the legacy law solves and smooths an equation for it. So this
+# checks the Ogden law itself: the principal stretches, the stress built from
+# them, and the rotation back. The shipped configuration is covered by the
+# checks above, and the pressure equation is a separate piece of work.
+#
+# Two of the thirty steps. The legacy solver reaches its corrector limit from
+# the third step onwards, so past that it is an unconverged answer being
+# compared against a converged one
+COMPARISON_END_TIME=2
+
+# The latest written time directory.
+#
+# Not foamListTimes: it needs an etc/controlDict that this foam-extend
+# installation does not provide, and this case runs only on foam-extend
+latest_time_dir() {
+    ls -1 "$1" 2>/dev/null \
+        | grep -E '^[0-9]+([.][0-9]+)?$' \
+        | sort -g \
+        | tail -n 1
+}
+
+check_completed() {
+    local case_dir="$1"
+    local expected_time="$2"
+    local actual_time
+
+    if ! grep -q "^End" "${case_dir}/${SOLVER_LOGFILE}" \
+      || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
+          "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${case_dir} did not complete and converge"
+        return 1
+    fi
+
+    actual_time=$(latest_time_dir "${case_dir}")
+    if ! awk "BEGIN {exit !((${actual_time:-0} - ${expected_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: ${case_dir} stopped at ${actual_time:-none}; expected ${expected_time}"
+        return 1
+    fi
+}
+
+compare_internal_vector_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+def read_internal(path):
+    text = open(path).read()
+    uniform = re.search(
+        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
+        text,
+    )
+    if uniform:
+        return [tuple(map(float, uniform.groups()))]
+
+    nonuniform = re.search(
+        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not nonuniform:
+        raise ValueError(f"cannot parse internalField in {path}")
+
+    values = re.findall(
+        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
+    )
+    if not values:
+        raise ValueError(f"empty internalField in {path}")
+    return [tuple(map(float, value)) for value in values]
+
+try:
+    a = read_internal(sys.argv[1])
+    b = read_internal(sys.argv[2])
+    if len(a) == 1 and len(b) > 1:
+        a *= len(b)
+    if len(b) == 1 and len(a) > 1:
+        b *= len(a)
+    if len(a) != len(b):
+        raise ValueError("different internalField sizes")
+    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
+    max_value = max(abs(x) for av in a for x in av)
+    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
+run_framework_comparison() {
+    local legacy_dir="${REGRESSION_ROOT}/comparisonLegacy"
+    local framework_dir="${REGRESSION_ROOT}/comparisonFramework"
+    local dir
+
+    if [ "$CHECK_ONLY" = false ]; then
+        for dir in "${legacy_dir}" "${framework_dir}"; do
+            rm -rf "${dir}"
+            mkdir -p "${dir}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${dir}/"
+        done
+
+        sed -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+            "${dir}/system/controlDict"
+
+        sed -i 's|solvePressureEqn[[:space:]]*yes;|solvePressureEqn no;|' \
+            "${dir}/constant/mechanicalProperties"
+
+        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+                "${dir}/system/controlDict"
+        else
+            echo "writePrecision  14;" >> "${dir}/system/controlDict"
+        fi
+        done
+
+        sed -i \
+            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+            "${framework_dir}/constant/solidProperties"
+
+        for dir in "${legacy_dir}" "${framework_dir}"; do
+            ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+                echo "FAIL: the comparison could not run ${dir}"
+                return 1
+            }
+        done
+    else
+        echo "Check-only: checking existing framework comparison"
+    fi
+
+    if solids4Foam::regressionCaseSkipped "${legacy_dir}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping the framework comparison: the case skipped here"
+        return 0
+    fi
+
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${framework_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${legacy_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        return 1
+    fi
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        if ! check_completed "${dir}" "${COMPARISON_END_TIME}"; then
+            return 1
+        fi
+    done
+
+    local t
+    t=$(latest_time_dir "${legacy_dir}")
+
+    if [[ "${t}" != "$(latest_time_dir "${framework_dir}")" ]]; then
+        echo "FAIL: the arms reached different times"
+        return 1
+    fi
+
+    if [[ -z "${t}" || ! -f "${legacy_dir}/${t}/D" \
+       || ! -f "${framework_dir}/${t}/D" ]]
+    then
+        echo "FAIL: the comparison produced no D field"
+        return 1
+    fi
+
+    local rel
+    if ! rel=$(compare_internal_vector_fields \
+        "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D")
+    then
+        echo "FAIL: could not compare the two D internal fields"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${rel} < 1e-10)}"; then
+        printf "PASS: framework and legacy agree to round-off, %.3g\n" "${rel}"
+        return 0
+    fi
+
+    printf "FAIL: framework and legacy differ, relative D diff = %.4g\n" "${rel}"
+    return 1
+}
+
 failures=0
 
 if awk "BEGIN {exit !(${final_force_y} >= ${FORCE_Y_MIN} && ${final_force_y} <= ${FORCE_Y_MAX})}"; then
@@ -107,6 +308,11 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 echo
+
+if ! run_framework_comparison; then
+    failures=$((failures + 1))
+fi
+
 if (( failures == 0 )); then
     echo "============================================================"
     echo "Regression test PASSED"
