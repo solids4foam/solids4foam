@@ -492,6 +492,12 @@ select_run_approach() {
     esac
 }
 
+# The two unsCoupled arms run in the same case directory, which is cleaned
+# between approaches, so the legacy result is gone by the time the framework
+# arm runs. Capture each as it goes and compare the pair afterwards
+UNSCOUPLED_LEGACY_EPS=""
+UNSCOUPLED_FRAMEWORK_EPS=""
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -505,6 +511,11 @@ check_solver_extrema() {
         echo "FAIL: Could not extract one or more regression quantities for ${approach}"
         return 1
     fi
+
+    case "${approach}" in
+        unsCoupled)          UNSCOUPLED_LEGACY_EPS="${epsilon}" ;;
+        unsCoupledManager)   UNSCOUPLED_FRAMEWORK_EPS="${epsilon}" ;;
+    esac
 
     if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
         printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
@@ -599,6 +610,24 @@ if [ "$CHECK_ONLY" = false ]; then
         fi
 
     done
+
+    # The bands above are correctness bounds on one arm. These two arms solve
+    # the same problem with the same material constants read two ways, so they
+    # must also agree with each other, far more closely than the band allows
+    if [[ -n "${UNSCOUPLED_LEGACY_EPS}" && -n "${UNSCOUPLED_FRAMEWORK_EPS}" ]]
+    then
+        if awk "BEGIN {d = ${UNSCOUPLED_FRAMEWORK_EPS} - ${UNSCOUPLED_LEGACY_EPS};
+                       if (d < 0) d = -d;
+                       exit !(d <= 1e-8 * ${UNSCOUPLED_LEGACY_EPS})}"
+        then
+            printf "PASS: unsCoupled legacy and framework agree (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_LEGACY_EPS}" "${UNSCOUPLED_FRAMEWORK_EPS}"
+        else
+            printf "FAIL: unsCoupled legacy and framework differ (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_LEGACY_EPS}" "${UNSCOUPLED_FRAMEWORK_EPS}"
+            failures=$((failures + 1))
+        fi
+    fi
 else
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
         echo "Skipping regression checks because the tutorial skipped in this environment"

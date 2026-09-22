@@ -54,11 +54,12 @@ shorten_case() {
 }
 
 find_fsi_data() {
+    local root="${1:-${CASE_DIR}}"
     local candidate
     for candidate in \
-        "${CASE_DIR}/postProcessing/0/fsiConvergenceData.dat" \
-        "${CASE_DIR}/postProcessing/fluid/0/fsiConvergenceData.dat" \
-        "${CASE_DIR}/postProcessing/solid/0/fsiConvergenceData.dat"
+        "${root}/postProcessing/0/fsiConvergenceData.dat" \
+        "${root}/postProcessing/fluid/0/fsiConvergenceData.dat" \
+        "${root}/postProcessing/solid/0/fsiConvergenceData.dat"
     do
         if [[ -f "${candidate}" ]]; then
             echo "${candidate}"
@@ -66,7 +67,7 @@ find_fsi_data() {
         fi
     done
 
-    find "${1:-${CASE_DIR}}/postProcessing" -name 'fsiConvergenceData.dat' \
+    find "${root}/postProcessing" -name 'fsiConvergenceData.dat' \
         -print 2>/dev/null | tail -n 1
 }
 
@@ -187,6 +188,15 @@ if [ "$CHECK_ONLY" = false ]; then
         fw_data=$(find_fsi_data "${FRAMEWORK_DIR}")
         if [[ -z "${fw_data}" ]]; then
             echo "FAIL: framework arm produced no fsiConvergenceData"
+            failures=$((failures + 1))
+        elif [[ "${fw_data}" == "${fsi_data}" ]]; then
+            # find_fsi_data once had CASE_DIR hard-coded in its preferred
+            # candidates and ignored its argument, so this returned the legacy
+            # file and the comparison below was legacy against itself. It
+            # passed. Assert the two arms are read from two different files
+            echo "FAIL: both arms read the same fsiConvergenceData file,"
+            echo "      so the comparison below would be vacuous:"
+            echo "      ${fw_data}"
             failures=$((failures + 1))
         else
             fw_n=$(grep -v '^[[:space:]]*#' "${fw_data}" | tail -n 1 \

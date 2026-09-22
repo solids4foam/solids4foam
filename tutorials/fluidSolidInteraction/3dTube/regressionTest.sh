@@ -76,7 +76,10 @@ prepare_framework_case() {
     sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" \
         "${FRAMEWORK_CASE_DIR}/system/controlDict"
 
-    # The framework arm differs in this one entry and nothing else
+}
+
+# The framework arm differs in this one entry and nothing else
+apply_framework_switch() {
     sed -i \
         's/^    nCorrectors/    useMechanicalConstitutiveLawManager yes;\n\n    nCorrectors/' \
         "${FRAMEWORK_CASE_DIR}/constant/solid/solidProperties"
@@ -91,11 +94,15 @@ prepare_framework_case() {
 
 run_framework_test() {
     prepare_framework_case || return 1
-    (
-        cd "${FRAMEWORK_CASE_DIR}"
-        ./Allclean > /dev/null 2>&1 || true
-        ./Allrun > log.Allrun 2>&1
-    )
+
+    # Allclean before the switch is applied, not after: it ends in
+    # restoreCaseFormat, which puts the stored dictionaries back and would
+    # undo the edit
+    ( cd "${FRAMEWORK_CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+
+    apply_framework_switch || return 1
+
+    ( cd "${FRAMEWORK_CASE_DIR}" && ./Allrun > log.Allrun 2>&1 )
 }
 
 # The framework arm.
