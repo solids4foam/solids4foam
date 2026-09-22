@@ -454,15 +454,6 @@ protected:
             return false;
         }
 
-        //- Displacement gradient for a solid model on the framework, computed
-        //  on the primary mesh so that a material-aware scheme can keep each
-        //  cell's stencil within its material
-        void frameworkGrad
-        (
-            const volVectorField& D,
-            volTensorField& gradD
-        ) const;
-
         //- Interpolate displacement to points on the primary mesh rather than
         //  through the legacy per-material sub-meshes
         void frameworkInterpolate
@@ -493,6 +484,17 @@ protected:
 
         //- Refuse a multi-material framework run whose gradient scheme is not
         //  material-aware.
+        //
+        //  A solid model on the framework takes its displacement gradient
+        //  straight from fvc::grad() on the primary mesh. The legacy
+        //  mechanicalModel::grad() instead splits the mesh into per-material
+        //  subMeshes, interpolates the displacement onto each, takes a
+        //  gradient there and maps the result back with a stress-based
+        //  interface correction. Replacing that machinery is much of what the
+        //  framework is for: a material-aware least-squares gradient does the
+        //  same job on one mesh, by drawing a cell's stencil only from cells
+        //  of its own material. That is only true of a scheme that gives the
+        //  guarantee, which is what this checks.
         //
         //  The primary-mesh gradient is valid only if a cell's stencil stays
         //  within its own material; leastSquaresS4f provides that guarantee

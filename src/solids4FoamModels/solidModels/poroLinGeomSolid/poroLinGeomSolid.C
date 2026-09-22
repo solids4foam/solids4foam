@@ -418,7 +418,7 @@ bool poroLinGeomSolid::evolve()
         // Update gradient of displacement
         if (useMechanicalConstitutiveLawManager())
         {
-            frameworkGrad(D(), gradD());
+            gradD() = fvc::grad(D());
         }
         else
         {
