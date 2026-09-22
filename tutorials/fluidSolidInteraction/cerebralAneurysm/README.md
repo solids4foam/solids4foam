@@ -76,12 +76,22 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
 - **Coupling:** partitioned fluid-solid interaction using fixed relaxation and
   a Robin pressure boundary condition. This added-mass procedure improves the
   stability of the partitioned coupling for the strongly coupled blood-wall
-  system [2]. The case uses `constantHs 5e-4` and permits up to 30 FSI
-  correctors per time step. The `fixedRelaxation` coupling uses a relaxation
-  factor of 1.0, i.e. no additional under-relaxation is applied, as the Robin
-  condition already provides the required stability; the Robin-Neumann
-  coupling is designed for such unrelaxed iterations, and Aitken or IQN-ILS
-  acceleration is not recommended with it.
+  system [2]. The Robin coefficient `rho_s*hs` is set by the `secant`
+  `hsModel` (the default), which seeds the solid virtual thickness from the
+  local wall thickness and then rescales it using the solid and fluid
+  interface impedances measured between FSI iterations. It generally finds a
+  good coefficient on its own, so no case-specific value has to be tuned,
+  which is why it is used here. A hand-tuned constant also works well when a
+  good value is known for the geometry: this case previously used
+  `constantHs 5e-4`, which converges at a comparable rate: over the first
+  2000 time steps, i.e. through the initial transient and systole, it needs
+  2.62 FSI correctors per time step against 2.48 for `secant`. The case
+  permits up to 30 FSI correctors per time step.
+  The `fixedRelaxation` coupling uses a relaxation factor of 1.0, i.e. no
+  additional under-relaxation is applied, as the Robin condition already
+  provides the required stability; the Robin-Neumann coupling is designed for
+  such unrelaxed iterations, and Aitken or IQN-ILS acceleration is not
+  recommended with it.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 
@@ -205,8 +215,10 @@ cardiac cycle.**
 
 The partitioned coupling is inexpensive once the initial transient has passed:
 11 iterations are needed in the first time step, after which the count settles
-to one or two iterations, averaging 1.8 over the cardiac cycle. The limit of 30
-FSI correctors per time step is never reached.
+to one or two iterations, averaging 1.3 over the cardiac cycle. In the measured
+run below, 77% of the time steps converged in a single FSI corrector and a
+further 19% in two. The limit of 30 FSI correctors per time step is never
+reached.
 
 ## Running the Case
 
@@ -223,12 +235,14 @@ The case is configured for 16 subdomains by default
 `parallel` to run in serial.
 
 As a representative run time, the full cardiac cycle (20,000 time steps of
-$$5\times10^{-5}\,\mathrm{s}$$) completed in 9209 s of wall-clock time
-(approximately 2 hours 34 minutes) using **8 cores**, i.e. with
+$$5\times10^{-5}\,\mathrm{s}$$) completed in 5633 s of solver time
+(approximately 1 hour 34 minutes) using **8 cores**, i.e. with
 `numberOfSubdomains` reduced from the default 16 to 8. The hardware was an
 Apple Mac Studio with an M1 Ultra chip (20 cores: 16 performance and 4
 efficiency) and 64 GB of unified memory, running macOS 26.5 and OpenFOAM
-v2512. This timing excludes mesh generation, which takes a few seconds.
+v2412. This timing excludes mesh generation, which takes a few seconds, and
+the reconstruction of the parallel results.
+
 Performance varies with hardware and through the cardiac cycle, as the cost per
 time step follows the FSI iteration count shown in Figure 6.
 
