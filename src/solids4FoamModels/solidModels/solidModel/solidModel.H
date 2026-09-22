@@ -57,6 +57,11 @@ SourceFiles
 #include "mechanicalConstitutiveLawTangentRequest.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "enhancedVolPointInterpolation.H"
+#else
+    #include "newLeastSquaresVolPointInterpolation.H"
+#endif
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -296,6 +301,20 @@ private:
         //- The mechanicalConstitutiveLaw framework, built on first use
         mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
+        //- constant/mechanicalProperties, read by this class rather than by
+        //  the legacy mechanicalModel.
+        //
+        //  The legacy model derives from IOdictionary, so passing it to the
+        //  framework made every framework run construct the whole thing, and
+        //  every legacy law with it - the framework could not exist without
+        //  the thing it replaces. Reading the dictionary here breaks that.
+        //
+        //  Built on first use, and only on a framework run, because
+        //  mechanicalModel registers an object of this same name and two
+        //  registrations of one name is a clash. A framework run does not
+        //  construct the legacy model, so only one of the two ever exists
+        mutable autoPtr<IOdictionary> mechanicalPropertiesPtr_;
+
         //- Whether the Jacobian tangent request has been resolved
         mutable bool jacobianTangentCached_;
 
@@ -351,6 +370,9 @@ private:
 
         //- Make the mechanical model
         void makeMechanicalModel() const;
+
+        //- Make the mechanicalProperties dictionary
+        void makeMechanicalProperties() const;
 
         //- Make the rho field
         void makeRho() const;
@@ -413,6 +435,25 @@ protected:
         //- The mechanicalConstitutiveLaw framework, constructed on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
+        //- constant/mechanicalProperties, constructed on first use
+        const IOdictionary& mechanicalProperties() const;
+
+        //- Does this model still need the legacy mechanicalModel when the
+        //  framework is enabled?
+        //
+        //  False for a model that takes its whole constitutive response from
+        //  the framework, which is all of them but one: vertexCentredLinGeom
+        //  takes only its Jacobian tangent from the manager and its residual
+        //  stress still comes from dualMechanicalModel, so it needs both.
+        //
+        //  Constructing the legacy model on a framework run is the defect
+        //  this exists to catch, so makeMechanicalModel() refuses it unless
+        //  the model says here that it is expected
+        virtual bool needsLegacyMechanicalModel() const
+        {
+            return false;
+        }
+
         //- Displacement gradient for a solid model on the framework, computed
         //  on the primary mesh so that a material-aware scheme can keep each
         //  cell's stencil within its material
@@ -430,6 +471,25 @@ protected:
             const volTensorField& gradD,
             pointVectorField& pointD
         );
+
+        //- Initial density, from whichever implementation is in use.
+        //
+        //  For the models that build their own rho field in the constructor
+        //  initialiser list, where solidModel::rho() is not yet what they want
+        //  and the legacy model must not be constructed on a framework run
+        tmp<volScalarField> initialRho() const;
+
+        //- Displacement gradient at the face quadrature points.
+        //
+        //  Identical on both paths and needs neither implementation: the
+        //  legacy mechanicalModel::grad() overload is hofvc::fGrad() for one
+        //  material and notImplemented for more than one, so this is that
+        //  operation with the refusal kept and the legacy model dropped
+        void gradQuad
+        (
+            const volVectorField& D,
+            CompactListList<tensor>& gradDQuad
+        ) const;
 
         //- Refuse a multi-material framework run whose gradient scheme is not
         //  material-aware.
@@ -747,6 +807,18 @@ public:
 
             //- Return const reference to the mechanical model
             const mechanicalModel& mechanical() const;
+
+            //- Return the volume-to-point interpolation for this mesh.
+            //
+            //  Held here rather than on mechanicalModel, which owned it only
+            //  by accident of history: it is a mesh singleton with no
+            //  constitutive state, and a framework run needs it without
+            //  needing the legacy model
+#ifdef OPENFOAM_NOT_EXTEND
+            const enhancedVolPointInterpolation& volToPoint() const;
+#else
+            const newLeastSquaresVolPointInterpolation& volToPoint() const;
+#endif
 
             //- Return non-const reference to D
             virtual volVectorField& D()

@@ -541,7 +541,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 
         // Update the total deformation gradient at the face quadrature points
         // so that it is consistent with the converged solution
-        mechanical().grad(DD(), gradDQuad());
+        gradQuad(DD(), gradDQuad());
         updateQuadratureKinematics();
 
         // Calculate the cell centre stress using run-time selectable
@@ -869,7 +869,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mechanical().rho()
+        initialRho()
     ),
     A_
     (
@@ -968,8 +968,13 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         F_.storeOldTime();
         J_.storeOldTime();
 
-        // Let the mechanical law know
-        mechanical().setRestart();
+        // Let the mechanical law know. The framework restores its own
+        // constitutive state through the registered state fields, so there is
+        // nothing to tell it here
+        if (!useMechanicalConstitutiveLawManager())
+        {
+            mechanical().setRestart();
+        }
     }
 
     // Check the gradScheme
@@ -1207,7 +1212,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
         gradDD() = displacementLeastSquares().grad(DD);
 
         // Update displacement increment gradient at the face quadrature points
-        mechanical().grad(DD, gradDQuad());
+        gradQuad(DD, gradDQuad());
     }
     else
     {

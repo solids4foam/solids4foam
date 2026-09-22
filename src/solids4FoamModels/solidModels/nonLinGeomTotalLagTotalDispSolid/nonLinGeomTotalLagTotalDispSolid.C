@@ -1167,8 +1167,13 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
         gradD().storeOldTime();
 
-        // Let the mechanical law know
-        mechanical().setRestart();
+        // Let the mechanical law know. The framework restores its own
+        // constitutive state through the registered state fields, so there is
+        // nothing to tell it here
+        if (!useMechanicalConstitutiveLawManager())
+        {
+            mechanical().setRestart();
+        }
     }
 
     // Check the gradScheme
@@ -1419,7 +1424,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
-        mechanical().grad(D, gradDQuad());
+        gradQuad(D, gradDQuad());
     }
     else
     {
