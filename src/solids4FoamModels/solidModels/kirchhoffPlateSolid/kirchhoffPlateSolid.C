@@ -26,6 +26,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "faCFD.H"
 #include "linearElastic.H"
+#include "linearElasticMechanicalConstitutiveLaw.H"
+#include "mechanicalConstitutiveLawManager.H"
 
 //#include "BlockLduSystem.H"
 
@@ -89,13 +91,11 @@ bool kirchhoffPlateSolid::converged
             )()
         );
 
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
-    // If one of the residuals has converged to an order of magnitude
-    // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // This model admits only a linearElastic material, which does not
+    // override mechanicalLaw::residual(), and that returns zero. The material
+    // residual was therefore always exactly zero and its test always passed,
+    // on either implementation, so it is not asked for and not tested
+    if (iCorr > 1)
     {
         bool convergedM = false;
         bool convergedw = false;
@@ -137,7 +137,7 @@ bool kirchhoffPlateSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (M & w), relRes (M & w), matRes, iters (M & w)"
+        Info<< "    Corr, res (M & w), relRes (M & w), iters (M & w)"
             << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
@@ -147,7 +147,6 @@ bool kirchhoffPlateSolid::converged
             << ", " << solverPerfw.initialResidual()
             << ", " << residualM
             << ", " << residualw
-            << ", " << materialResidual
             << ", " << solverPerfM.nIterations()
             << ", " << solverPerfw.nIterations() << endl;
 
@@ -448,30 +447,51 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
     areaPatchID_(-1),
     areaShadowPatchID_(-1)
 {
-    const PtrList<mechanicalLaw>& mechLaws = mechanical();
-
-    // Only the linearElastic mechanicalLaw is allow and one material
-    if (mechLaws.size() != 1)
+    // A Kirchhoff plate has one thickness and one bending stiffness, so one
+    // isotropic linear elastic material is what its formulation is written
+    // for, on either implementation
+    if (useMechanicalConstitutiveLawManager())
     {
-        FatalErrorIn(type() + "::" + type())
-            << " can currently only be used with a single material"
-            << abort(FatalError);
+        const mechanicalConstitutiveLaw& law = mechanicalManager().singleLaw();
+
+        if (!isA<linearElasticMechanicalConstitutiveLaw>(law))
+        {
+            FatalErrorInFunction
+                << type() << " can only be used with the linearElastic "
+                << "mechanical constitutive law" << abort(FatalError);
+        }
+
+        const linearElasticMechanicalConstitutiveLaw& mech =
+            refCast<const linearElasticMechanicalConstitutiveLaw>(law);
+
+        rho_ = mech.rho();
+        E_ = mech.E();
+        nu_ = mech.nu();
     }
-    else if (!isA<linearElastic>(mechLaws[0]))
+    else
     {
-        FatalErrorIn(type() + "::" + type())
-            << " can only be used with the linearElastic "
-            << "mechanicalLaw" << nl
-            << abort(FatalError);
+        const PtrList<mechanicalLaw>& mechLaws = mechanical();
+
+        if (mechLaws.size() != 1)
+        {
+            FatalErrorIn(type() + "::" + type())
+                << " can currently only be used with a single material"
+                << abort(FatalError);
+        }
+        else if (!isA<linearElastic>(mechLaws[0]))
+        {
+            FatalErrorIn(type() + "::" + type())
+                << " can only be used with the linearElastic "
+                << "mechanicalLaw" << nl
+                << abort(FatalError);
+        }
+
+        const linearElastic& mech = refCast<const linearElastic>(mechLaws[0]);
+
+        rho_ = mech.rhoScalar();
+        E_ = mech.E();
+        nu_ = mech.nu();
     }
-
-    // Cast the mechanical law to a linearElastic mechanicalLaw
-    const linearElastic& mech = refCast<const linearElastic>(mechLaws[0]);
-
-    // Set plate properties
-    rho_ = mech.rhoScalar();
-    E_ = mech.E();
-    nu_ = mech.nu();
     bendingStiffness_ = E_*pow(h_, 3)/(12*(1 - pow(nu_, 2)));
 }
 
@@ -622,7 +642,15 @@ bool kirchhoffPlateSolid::evolve()
         }
 
         // Interpolate cell displacements to vertices
-        mechanical().interpolate(D(), pointD());
+        if (useMechanicalConstitutiveLawManager())
+        {
+            volToPoint().interpolate(D(), pointD());
+            correctPointDisplacement(pointD());
+        }
+        else
+        {
+            mechanical().interpolate(D(), pointD());
+        }
 
         // Increment of displacement
         DD() = D() - D().oldTime();

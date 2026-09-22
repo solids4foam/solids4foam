@@ -114,9 +114,6 @@ class thermalLinGeomSolid
         //  reports no residual of its own, so it contributes nothing here
         virtual scalar materialResidual() override;
 
-        //- End-of-step bookkeeping, including the framework's own
-        virtual void updateTotalFields() override;
-
         //- Check if the momentum equation is converged
         bool converged
         (

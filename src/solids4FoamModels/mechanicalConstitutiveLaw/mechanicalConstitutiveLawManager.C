@@ -2199,6 +2199,24 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
 }
 
 
+const Foam::mechanicalConstitutiveLaw&
+Foam::mechanicalConstitutiveLawManager::singleLaw() const
+{
+    if (laws_.size() != 1)
+    {
+        FatalErrorInFunction
+            << "singleLaw() was asked for, but this manager holds "
+            << laws_.size() << " materials." << nl
+            << "    The caller is a solid model whose formulation has one "
+            << "set of material constants, so a second material has no "
+            << "meaning for it."
+            << exit(FatalError);
+    }
+
+    return laws_[0];
+}
+
+
 const Foam::volScalarField&
 Foam::mechanicalConstitutiveLawManager::kappa() const
 {

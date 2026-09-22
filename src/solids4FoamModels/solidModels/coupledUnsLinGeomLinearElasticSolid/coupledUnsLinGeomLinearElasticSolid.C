@@ -24,6 +24,8 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "linearElastic.H"
+#include "linearElasticMechanicalConstitutiveLaw.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "processorPolyPatch.H"
 #ifdef FOAMEXTEND
     #include "blockSolidTractionFvPatchVectorField.H"
@@ -122,6 +124,31 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
     writeBanner(Info);
 
     DisRequired();
+
+    // This model assembles one set of Lame constants into its block matrix,
+    // so one isotropic linear elastic material is what it is written for, on
+    // either implementation
+    if (useMechanicalConstitutiveLawManager())
+    {
+        const mechanicalConstitutiveLaw& law = mechanicalManager().singleLaw();
+
+        if (!isA<linearElasticMechanicalConstitutiveLaw>(law))
+        {
+            FatalErrorInFunction
+                << type() << " can only be used with the linearElastic "
+                << "mechanical constitutive law" << nl
+                << "Consider using one of the other linearGeometry solidModels."
+                << abort(FatalError);
+        }
+
+        const linearElasticMechanicalConstitutiveLaw& mech =
+            refCast<const linearElasticMechanicalConstitutiveLaw>(law);
+
+        muf_ = mech.mu();
+        lambdaf_ = mech.lambda();
+
+        return;
+    }
 
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
@@ -296,7 +323,15 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     D().relax();
 
     // Update gradient of displacement
-    mechanical().interpolate(D(), pointD());
+    if (useMechanicalConstitutiveLawManager())
+    {
+        volToPoint().interpolate(D(), pointD());
+        correctPointDisplacement(pointD());
+    }
+    else
+    {
+        mechanical().interpolate(D(), pointD());
+    }
 
     // Enforce zero normal displacement on symmetry
     // Todo: we should create a blockSymmetry boundary condition
@@ -343,7 +378,17 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     gradDD() = gradD() - gradD().oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    if (useMechanicalConstitutiveLawManager())
+    {
+        mechanicalManager().updateStressSmallStrain
+        (
+            gradD(), gradD().oldTime(), mesh().time().deltaTValue(), sigma()
+        );
+    }
+    else
+    {
+        mechanical().correct(sigma());
+    }
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

@@ -154,6 +154,34 @@ public:
             return kappa_;
         }
 
+        //- Return Young's modulus.
+        //  For a solid model whose own formulation is written in terms of E
+        //  and nu, such as a Kirchhoff plate's bending stiffness. Both are
+        //  set whichever pair the case gave, (E, nu) or (mu, K)
+        dimensionedScalar E() const
+        {
+            return E_;
+        }
+
+        //- Return Poisson's ratio. See E()
+        dimensionedScalar nu() const
+        {
+            return nu_;
+        }
+
+        //- Return the shear modulus. For a solid model that assembles the
+        //  Lame constants into its own matrix rather than asking for a stress
+        dimensionedScalar mu() const
+        {
+            return mu_;
+        }
+
+        //- Return the first Lame parameter. See mu()
+        dimensionedScalar lambda() const
+        {
+            return lambda_;
+        }
+
     // Edit
 
         //- Declare the initial stress, which is added to every evaluation and
