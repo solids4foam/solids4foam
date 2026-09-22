@@ -1321,7 +1321,7 @@ label linGeomTotalDispSolid::formResidual
         gradD() = displacementLeastSquares().grad(D);
 
         // Update gradient of displacement at face quadrature points
-        mechanical().grad(D, gradDQuad());
+        gradQuad(D, gradDQuad());
 
         // Calculate sigma at quadrature points
         correctStressQuad();

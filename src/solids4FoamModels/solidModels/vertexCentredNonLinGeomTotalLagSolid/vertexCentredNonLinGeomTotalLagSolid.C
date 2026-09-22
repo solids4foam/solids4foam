@@ -1327,7 +1327,7 @@ vertexCentredNonLinGeomTotalLagSolid
     );
 
     // Set point density field
-    mechanical().volToPoint().interpolate(rho(), pointRho_);
+    volToPoint().interpolate(rho(), pointRho_);
 
     // Set the pointVol and pointGlobalVol fields
     // Map dualMesh cell volumes to the primary mesh points

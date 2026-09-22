@@ -309,9 +309,53 @@ void Foam::solidModel::makeMechanicalModel() const
             << "pointer already set!" << abort(FatalError);
     }
 
+    // The framework exists to replace this. A run that builds it anyway
+    // constructs every legacy law, registers a second dictionary under the
+    // name this class now reads for itself, and silently keeps the legacy
+    // hierarchy alive, so it is a defect rather than a fallback
+    if (useMechanicalConstitutiveLawManager() && !needsLegacyMechanicalModel())
+    {
+        FatalErrorInFunction
+            << "A mechanicalConstitutiveLaw framework run reached the legacy "
+            << "mechanicalModel." << nl << nl
+            << "    Either solid model " << type() << " does not offer "
+            << "'useMechanicalConstitutiveLawManager' at all, in which case "
+            << "unset it in solidProperties; or it does offer it and has a "
+            << "path that still reaches the legacy model, which is a bug in "
+            << "the solid model." << nl
+            << "    The two cannot be told apart here. The solid model's "
+            << "README.md says which it is."
+            << abort(FatalError);
+    }
+
     mechanicalPtr_.set
     (
         new mechanicalModel(mesh(), nonLinGeom(), incremental())
+    );
+}
+
+
+void Foam::solidModel::makeMechanicalProperties() const
+{
+    if (!mechanicalPropertiesPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    mechanicalPropertiesPtr_.set
+    (
+        new IOdictionary
+        (
+            IOobject
+            (
+                "mechanicalProperties",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        )
     );
 }
 
@@ -324,10 +368,22 @@ void Foam::solidModel::makeRho() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    rhoPtr_.set
-    (
-        new volScalarField(mechanical().rho())
-    );
+    // Both implementations read the same density entries, but only one of
+    // them may be constructed on a given run
+    if (useMechanicalConstitutiveLawManager())
+    {
+        rhoPtr_.set
+        (
+            new volScalarField(mechanicalManager().rho())
+        );
+    }
+    else
+    {
+        rhoPtr_.set
+        (
+            new volScalarField(mechanical().rho())
+        );
+    }
 }
 
 
@@ -1618,6 +1674,40 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 }
 
 
+const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
+{
+    // A model that runs both implementations at once - vertexCentredLinGeom,
+    // which takes only its tangent from the framework - already has this
+    // dictionary, because the legacy model is one. Reading a second copy would
+    // register a second object under the same name, so use the one that exists
+    if (needsLegacyMechanicalModel())
+    {
+        return mechanical();
+    }
+
+    if (mechanicalPropertiesPtr_.empty())
+    {
+        makeMechanicalProperties();
+    }
+
+    return mechanicalPropertiesPtr_();
+}
+
+
+#ifdef OPENFOAM_NOT_EXTEND
+const Foam::enhancedVolPointInterpolation& Foam::solidModel::volToPoint() const
+{
+    return enhancedVolPointInterpolation::New(mesh());
+}
+#else
+const Foam::newLeastSquaresVolPointInterpolation&
+Foam::solidModel::volToPoint() const
+{
+    return newLeastSquaresVolPointInterpolation::New(mesh());
+}
+#endif
+
+
 void Foam::solidModel::DisRequired()
 {
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1805,7 +1895,7 @@ Foam::vector Foam::solidModel::pointU(const label pointID) const
         dimensionedVector("0", dimVelocity, vector::zero)
     );
 
-    mechanical().volToPoint().interpolate(U(), pointU);
+    volToPoint().interpolate(U(), pointU);
 
     return pointU.internalField()[pointID];
 }
@@ -1946,18 +2036,14 @@ Foam::solidModel::mechanicalManager() const
 {
     if (mechanicalManagerPtr_.empty())
     {
-        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
-        // both frameworks are built from exactly the same entries
-        //
-        // TODO: this also means a framework run constructs the whole legacy
-        // model and every legacy law, so the framework cannot yet exist
-        // without the thing it replaces. Breaking that is stage 5 work:
-        // solidModel should read mechanicalProperties itself and hand the
-        // dictionary to whichever implementation is in use, leaving
-        // mechanicalModel as one consumer of it rather than the owner
+        // Built from the dictionary this class reads, not from the legacy
+        // mechanicalModel. The legacy model is the same dictionary - it
+        // derives from IOdictionary - so both implementations still see
+        // exactly the same entries, but the framework no longer needs the
+        // thing it replaces in order to exist
         mechanicalManagerPtr_.set
         (
-            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+            new mechanicalConstitutiveLawManager(mesh(), mechanicalProperties())
         );
     }
 
@@ -1997,10 +2083,58 @@ void Foam::solidModel::frameworkInterpolate
             << exit(FatalError);
     }
 
-    mechanical().interpolate(D, gradD, pointD);
+    // What the legacy single-material branch does on this fork: there is no
+    // gradient-corrected form here, so gradD is unused
+    volToPoint().interpolate(D, pointD);
 #endif
 
     correctPointDisplacement(pointD);
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
+{
+    if (useMechanicalConstitutiveLawManager())
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField(mechanicalManager().rho())
+        );
+    }
+
+    return mechanical().rho();
+}
+
+
+void Foam::solidModel::gradQuad
+(
+    const volVectorField& D,
+    CompactListList<tensor>& gradDQuad
+) const
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    // The legacy overload refused this, and the framework has no
+    // quadrature-point gradient for more than one material either
+    // mechanicalModel derives from both IOdictionary and PtrList, so name the
+    // base whose size is the number of materials
+    const label nMaterials =
+        useMechanicalConstitutiveLawManager()
+      ? mechanicalManager().nLaws()
+      : mechanical().PtrList<mechanicalLaw>::size();
+
+    if (nMaterials > 1)
+    {
+        FatalErrorInFunction
+            << "The face quadrature gradient is not implemented for more than "
+            << "one material." << exit(FatalError);
+    }
+
+    hofvc::fGrad(D, gradDQuad);
+#else
+    FatalErrorInFunction
+        << "The high-order face quadrature does not exist on foam-extend."
+        << exit(FatalError);
+#endif
 }
 
 
@@ -2542,8 +2676,13 @@ void Foam::solidModel::moveMesh
 
 
 #ifdef FOAMEXTEND
-    // Tell the mechanical model to move the subMeshes, if they exist
-    mechanical().moveSubMeshes();
+    // Tell the mechanical model to move the subMeshes, if they exist.
+    // The framework has no subMeshes, and asking would construct the legacy
+    // model for the sake of a no-op
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        mechanical().moveSubMeshes();
+    }
 #endif
 }
 
