@@ -1971,7 +1971,25 @@ void Foam::solidModel::rollOverQuadratureHistory()
 
 void Foam::solidModel::updateTotalFields()
 {
-    mechanical().updateTotalFields();
+    // One or the other, not both.
+    //
+    // The legacy call runs the legacy laws' end-of-step work, and that is not
+    // the no-op it looks like: linearElasticMohrCoulombPlastic updates its
+    // strain, plastic fields and diagnostics there, and others recompute an
+    // effective stiffness. On a framework run those laws are never evaluated,
+    // so the work would be done on stale inputs and read by nothing.
+    //
+    // Here rather than in each solid model because every model needs it and
+    // three of them had identical copies, while the models ported later had
+    // none and reached the legacy model through this function
+    if (useMechanicalConstitutiveLawManager())
+    {
+        mechanicalManager().endTimeStep();
+    }
+    else
+    {
+        mechanical().updateTotalFields();
+    }
 
     // A model overriding this must call rollOverQuadratureHistory() itself
     rollOverQuadratureHistory();

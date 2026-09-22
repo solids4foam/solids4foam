@@ -167,7 +167,7 @@ thermalSolid::thermalSolid
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        thermal_.C()*mechanical().rho()
+        thermal_.C()*initialRho()
     ),
     k_(thermal_.k()),
     T_

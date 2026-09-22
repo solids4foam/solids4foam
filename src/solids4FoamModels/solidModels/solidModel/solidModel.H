@@ -389,10 +389,6 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Correct point displacement boundary conditions, symmetry planes and
-        //  empty directions after interpolation
-        void correctPointDisplacement(pointVectorField& pointD) const;
-
         //- Return root high-order coefficients dictionary
         const dictionary& highOrderCoeffsDict() const;
 
@@ -453,6 +449,15 @@ protected:
         {
             return false;
         }
+
+        //- Correct point displacement boundary conditions, symmetry planes and
+        //  empty directions after interpolation.
+        //
+        //  Protected because a solid model that does its own point
+        //  interpolation on the framework has to finish it the same way: this
+        //  is what the legacy mechanicalModel::correctSymmPlanes() became, and
+        //  it also applies the two-dimensional correction
+        void correctPointDisplacement(pointVectorField& pointD) const;
 
         //- Interpolate displacement to points on the primary mesh rather than
         //  through the legacy per-material sub-meshes

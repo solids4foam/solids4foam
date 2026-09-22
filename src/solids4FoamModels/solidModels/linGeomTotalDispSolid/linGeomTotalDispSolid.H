@@ -232,10 +232,6 @@ public:
             //  base class declaration
             virtual scalar materialResidual() override;
 
-            //- Let the framework know the time step has ended, so a law
-            //  can report or commit anything it keeps per step
-            virtual void updateTotalFields() override;
-
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 

@@ -15,9 +15,24 @@ solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
+/* Not compiled: unsLinearGeometry is withdrawn. No tutorial selects it,
+   so nothing exercises it, and it was never ported to the
+   mechanicalConstitutiveLaw framework. Reintroducing it needs a
+   tutorial; see issue #461.
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
+*/
+/* Not compiled: unsNonLinearGeometryUpdatedLagrangian is withdrawn. No tutorial selects it,
+   so nothing exercises it, and it was never ported to the
+   mechanicalConstitutiveLaw framework. Reintroducing it needs a
+   tutorial; see issue #461.
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
+*/
+/* Not compiled: unsNonLinearGeometryTotalLagrangian is withdrawn. No tutorial selects it,
+   so nothing exercises it, and it was never ported to the
+   mechanicalConstitutiveLaw framework. Reintroducing it needs a
+   tutorial; see issue #461.
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
+*/
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 /* Not compiled: vertexCentredNonLinTotalLagGeometry does not currently run.
    No tutorial selects it, so nothing exercised it; an attempt to give it one

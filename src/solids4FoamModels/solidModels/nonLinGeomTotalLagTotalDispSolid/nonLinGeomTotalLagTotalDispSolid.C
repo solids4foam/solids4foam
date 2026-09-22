@@ -785,30 +785,6 @@ Foam::scalar Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::materialResidu
 }
 
 
-void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateTotalFields()
-{
-    // One or the other, not both.
-    //
-    // The base call runs the legacy laws' end-of-step work, and that is not
-    // the no-op it looks like: linearElasticMohrCoulombPlastic updates its
-    // strain, plastic fields and diagnostics there, and others recompute an
-    // effective stiffness. On a framework run those laws are constructed and
-    // never evaluated, so the work is done on stale inputs and read by
-    // nothing - wasted, and misleading to anyone reading their fields
-    if (useMechanicalConstitutiveLawManager())
-    {
-        mechanicalManager().endTimeStep();
-
-        // The base call is skipped on this branch, so the quadrature history
-        // it would have rolled over is rolled over here
-        rollOverQuadratureHistory();
-    }
-    else
-    {
-        solidModel::updateTotalFields();
-    }
-}
-
 
 void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
 {

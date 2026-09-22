@@ -1371,6 +1371,19 @@ public:
             return laws_.size();
         }
 
+        //- The one law, for a solid model that is single-material by
+        //  construction.
+        //
+        //  A Kirchhoff plate has one thickness and one bending stiffness, and
+        //  a block-coupled linear elastic solver assembles one set of
+        //  constants into its matrix; both are isotropic single-material
+        //  models by their own formulation rather than by limitation. Such a
+        //  model needs the law itself, to read material constants from, not a
+        //  field. Refuses rather than picks the first when there is more than
+        //  one, because a model asking this has no meaning for a second
+        //  material
+        const mechanicalConstitutiveLaw& singleLaw() const;
+
         //- True if every law can separate its isochoric stress from its
         //  volumetric response. Asked rather than assumed by anything that
         //  wants to exercise the split without demanding it - the unit test
