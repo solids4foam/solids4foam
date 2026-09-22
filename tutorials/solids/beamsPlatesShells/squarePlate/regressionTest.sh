@@ -170,6 +170,15 @@ else
         echo "PASS: legacy arm took the legacy path"
     fi
 
+    if [[ -n "${fw_solver_log}" ]] \
+        && grep -q "mechanicalConstitutiveLawManager" "${fw_solver_log}"
+    then
+        echo "PASS: framework arm took the framework path"
+    else
+        echo "FAIL: framework arm did not take the framework path"
+        failures=$((failures + 1))
+    fi
+
     max_wvf_fw=$(read_max_wvf "${FRAMEWORK_DIR}" || true)
 
     if [[ -z "${max_wvf_fw}" ]]; then

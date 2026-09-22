@@ -20,6 +20,11 @@ fi
 FORCE_Y_MIN=-17.8
 FORCE_Y_MAX=-17.6
 
+# How closely the legacy and framework arms must agree with each other. The
+# band above is a correctness bound on one arm; this is a much tighter bound
+# on the difference between them, because the two paths solve the same problem
+ARM_AGREEMENT_TOL=0.02
+
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/0/solidForcesdisplacement.dat"
 
@@ -166,6 +171,22 @@ if [ "$CHECK_ONLY" = false ]; then
                   && ${fw_force_y} <= ${FORCE_Y_MAX})}"
         then
             printf "PASS: framework final force_y = %.6g\n" "${fw_force_y}"
+
+            # The band is wide enough that both arms can sit inside it while
+            # disagreeing materially, so compare them with each other too.
+            # The two paths solve the same problem, so they should agree far
+            # more closely than the band allows
+            if awk "BEGIN {d = ${fw_force_y} - ${final_force_y};
+                           if (d < 0) d = -d;
+                           exit !(d <= ${ARM_AGREEMENT_TOL})}"
+            then
+                printf "PASS: legacy and framework force_y agree (%.8g vs %.8g)\n" \
+                    "${final_force_y}" "${fw_force_y}"
+            else
+                printf "FAIL: legacy and framework force_y differ (%.8g vs %.8g)\n" \
+                    "${final_force_y}" "${fw_force_y}"
+                failures=$((failures + 1))
+            fi
         else
             printf "FAIL: framework final force_y = %.6g\n" "${fw_force_y}"
             failures=$((failures + 1))
