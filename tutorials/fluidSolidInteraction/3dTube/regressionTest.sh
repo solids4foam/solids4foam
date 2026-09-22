@@ -6,6 +6,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 BACKWARD_CASE_DIR="${REGRESSION_ROOT}/backwardRestart"
+FRAMEWORK_CASE_DIR="${REGRESSION_ROOT}/framework"
 
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
@@ -67,6 +68,122 @@ prepare_case() {
     copy_case "${CASE_DIR}"
 
     sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+}
+
+prepare_framework_case() {
+    copy_case "${FRAMEWORK_CASE_DIR}"
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" \
+        "${FRAMEWORK_CASE_DIR}/system/controlDict"
+
+    # The framework arm differs in this one entry and nothing else
+    sed -i \
+        's/^    nCorrectors/    useMechanicalConstitutiveLawManager yes;\n\n    nCorrectors/' \
+        "${FRAMEWORK_CASE_DIR}/constant/solid/solidProperties"
+
+    if ! grep -q "useMechanicalConstitutiveLawManager" \
+        "${FRAMEWORK_CASE_DIR}/constant/solid/solidProperties"
+    then
+        echo "FAIL: could not set the framework switch on the framework arm"
+        return 1
+    fi
+}
+
+run_framework_test() {
+    prepare_framework_case || return 1
+    (
+        cd "${FRAMEWORK_CASE_DIR}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun > log.Allrun 2>&1
+    )
+}
+
+# The framework arm.
+#
+# The first framework coverage of a fluid-solid interaction case. It matters
+# beyond this tutorial: elasticWallPressure looks impK up from the solid mesh
+# by name, to build the p-wave speed it uses for its added-mass term, so
+# frameworkImpK() has to register a field the fluid side can find. The same
+# lookup is used by the contact penalty models and the cohesive zone models
+check_framework_arm() {
+    local failures=0
+
+    local fw_log
+    fw_log=$(find "${FRAMEWORK_CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
+    local main_log
+    main_log=$(find "${CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
+
+    # Each arm must have taken the path it was set up for, or this compares
+    # the legacy path against itself and proves nothing
+    if [[ -n "${main_log}" ]] \
+        && grep -q "mechanicalConstitutiveLawManager" "${main_log}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        failures=$((failures + 1))
+    else
+        echo "PASS: legacy arm took the legacy path"
+    fi
+
+    if [[ -n "${fw_log}" ]] \
+        && grep -q "mechanicalConstitutiveLawManager" "${fw_log}"
+    then
+        echo "PASS: framework arm took the framework path"
+    else
+        echo "FAIL: framework arm did not take the framework path"
+        return $((failures + 1))
+    fi
+
+    local fw_disp_time
+    fw_disp_time=$(latest_numeric_time "${FRAMEWORK_CASE_DIR}/${DISP_FILE}" || true)
+
+    if [[ -z "${fw_disp_time}" ]]; then
+        echo "FAIL: framework arm produced no displacement history"
+        return $((failures + 1))
+    fi
+
+    if ! awk "BEGIN {exit !(${fw_disp_time} + 0 >= ${REG_END_TIME})}"; then
+        echo "FAIL: framework arm did not reach the requested end time"
+        return $((failures + 1))
+    fi
+
+    echo "PASS: framework arm reached the requested end time"
+
+    # The material is linear elastic, so the two paths solve the same problem
+    # and the coupled answer should agree to the same tolerance the tutorial
+    # already applies to its own displacement check.
+    #
+    # Column 5 is magD. Column 2 is Dx, which is identically zero on this
+    # geometry, so comparing it would compare zero with zero and pass whatever
+    # the framework did
+    local legacy_disp fw_disp
+    legacy_disp=$(awk 'END {print $5}' "${CASE_DIR}/${DISP_FILE}")
+    fw_disp=$(awk 'END {print $5}' "${FRAMEWORK_CASE_DIR}/${DISP_FILE}")
+
+    if [[ -z "${legacy_disp}" || -z "${fw_disp}" ]]; then
+        echo "SKIP: could not compare the two arms' displacement"
+        return "${failures}"
+    fi
+
+    # A comparison against zero is vacuous: it would pass for a framework arm
+    # that produced nothing at all
+    if awk "BEGIN {exit !(${legacy_disp} <= 0)}"; then
+        echo "FAIL: the legacy displacement is zero, so this comparison would"
+        echo "      pass whatever the framework arm did"
+        return $((failures + 1))
+    fi
+
+    if awk "BEGIN {d = ${fw_disp} - ${legacy_disp}; if (d < 0) d = -d;
+                   exit !(d <= ${DISP_MAX_TOL})}"
+    then
+        printf "PASS: legacy and framework displacement agree (%.8g vs %.8g)\n" \
+            "${legacy_disp}" "${fw_disp}"
+    else
+        printf "FAIL: legacy and framework displacement differ (%.8g vs %.8g)\n" \
+            "${legacy_disp}" "${fw_disp}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
 }
 
 prepare_backward_case() {
@@ -184,6 +301,10 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 check_backward_restart
 
+if [ "$CHECK_ONLY" = false ]; then
+    run_framework_test || true
+fi
+
 # OpenFOAM variant compatibility
 mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
 (
@@ -249,6 +370,10 @@ force_diff_abs=$(abs "${force_diff}")
 # ------------------------------------------------------------
 
 failures=0
+
+if [ "$CHECK_ONLY" = false ]; then
+    check_framework_arm || failures=$((failures + $?))
+fi
 
 if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
     printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
