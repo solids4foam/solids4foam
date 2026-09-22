@@ -194,11 +194,11 @@ discretisation difference. The high-order variant is skipped on foam-extend.
 
 For an `elasticWallPressure` interface, FSI convergence also considers the
 normalized interface-pressure change (`robinPressureTolerance`, default
-`outerCorrTolerance`) and the kinematic residual (`robinFluxTolerance`, default
-`10*outerCorrTolerance`): the interface flux relative to the mesh motion, i.e.
-the leakage through the moving wall, normalized by the largest boundary
-throughput plus interface motion flux in the time step. The pressure change is
-normalized by the largest interface-pressure norm in the time step.
+`10*outerCorrTolerance`) and the kinematic residual (`robinFluxTolerance`,
+default `10*outerCorrTolerance`): the interface flux relative to the mesh
+motion, i.e. the leakage through the moving wall, normalized by the largest
+boundary throughput plus interface motion flux in the time step. The pressure
+change is normalized by the largest interface-pressure norm in the time step.
 
 If the flow is at or near rest, e.g. a closed or pressurised cavity without
 throughput or interface motion, these scales vanish and the leakage floor of
