@@ -2059,6 +2059,14 @@ Foam::solidModel::mechanicalManager() const
         // derives from IOdictionary - so both implementations still see
         // exactly the same entries, but the framework no longer needs the
         // thing it replaces in order to exist
+        // Said once, on the one path that every framework run goes through,
+        // so that "did this run use the framework?" is answerable from the
+        // log for every solid model rather than only the two that happen to
+        // announce it from makeImpK(). The regression arms rely on this to
+        // tell their two paths apart; without it an arm whose switch silently
+        // failed to apply compares the legacy path against itself and passes
+        Info<< "Creating the mechanicalConstitutiveLawManager" << endl;
+
         mechanicalManagerPtr_.set
         (
             new mechanicalConstitutiveLawManager(mesh(), mechanicalProperties())
