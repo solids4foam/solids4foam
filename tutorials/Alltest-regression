@@ -136,6 +136,7 @@ REGRESSION_TESTS=(
     "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
     "solids/thermoelasticity/hotCylinder/hotCylinder"
+    "solids/thermoelasticity/hotCylinder/hotCylinderPredefinedTFieldMultipleMaterials"
     "solids/viscoelasticity/viscoTube"
     "fluids/decayingTaylorGreenVortex"
     "fluids/cylinderInChannel"
