@@ -194,6 +194,21 @@ public:
             DimensionedField<Type, pointMesh>& pf
         ) const;
 
+        //- Interpolate from volField to pointField, storing the old-time
+        //  pointField before it is overwritten
+        template<class Type>
+        void interpolate
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const GeometricField
+            <
+                typename outerProduct<vector, Type>::type,
+                fvPatchField,
+                volMesh
+            >& gradVf,
+            GeometricField<Type, pointPatchField, pointMesh>& pf
+        ) const;
+
         //- Interpolate volField using inverse distance weighting
         //  \return pointField
         template<class Type>
