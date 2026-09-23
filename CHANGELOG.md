@@ -17,6 +17,10 @@ release. For complete commit-level details and contributor information, see the
   framework arm under `thermoFluidSolidInteraction`; and `cantilever2d`'s
   `unsCoupled` arms are the first regression coverage of
   `coupledUnsLinearGeometryLinearElastic` on either implementation.
+- `cantilever2d` regression arms for `vertexCentredLinearGeometry`, on both
+  implementations, which no regression case ran before. The legacy and
+  framework results are compared field by field, for the PETSc SNES path and
+  for a short run of the explicit path, which no tutorial exercises.
 - Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
   the [preCICE tutorials](https://github.com/precice/tutorials) against the
   current source and checks them against stored reference values. The preCICE
@@ -46,8 +50,18 @@ release. For complete commit-level details and contributor information, see the
   implementation is in use, where previously the manager was built from the
   legacy model, so every framework run constructed the whole legacy hierarchy
   and every legacy law. Reaching the legacy model on a framework run is now a
-  fatal error rather than a silent fallback, unless the solid model declares
-  that it needs both, which only `vertexCentredLinearGeometry` does.
+  fatal error rather than a silent fallback, for every solid model.
+- `vertexCentredLinearGeometry` takes its whole constitutive response from the
+  `mechanicalConstitutiveLaw` framework when
+  `useMechanicalConstitutiveLawManager` is set: the residual stress at the dual
+  mesh faces, on the PETSc SNES and explicit paths alike, as well as the
+  Jacobian tangent, the cell stress and the stiffness behind the default
+  `fixedDofScale` and the explicit time step. It previously refused the
+  switch, and it no longer constructs the legacy `mechanicalModel` or
+  `dualMechanicalModel` on a framework run. More than one material is
+  supported on the framework path. The legacy path of this model does not
+  manage it: with more than one material, constructing its dual-mesh laws
+  stops with "SubMesh not found when looking for a field in the base mesh".
 - `kirchhoffPlate`, `coupledUnsLinearGeometryLinearElastic` and `thermalSolid`
   accept `useMechanicalConstitutiveLawManager`. The first two read material
   constants from a single isotropic linear elastic law rather than asking it
