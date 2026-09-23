@@ -238,6 +238,13 @@ class mechanicalConstitutiveLawManager
         //  first one's history
         mutable HashTable<word> compactFingerprints_;
 
+        //- Mesh sizes the per-patch addressing above was built for: the
+        //  number of cells, then the number of faces on each patch.
+        //  A topology-changing mesh (e.g. crackerFvMesh, which moves internal
+        //  faces onto a crack patch) changes the patch sizes under the
+        //  manager; comparing against these is how that is detected
+        labelList addressingMeshSizes_;
+
 
     // Private Member Functions
 
@@ -865,6 +872,21 @@ class mechanicalConstitutiveLawManager
         //  rather than by the solid model, so that a law's history advances
         //  exactly once per step however many times its stress is evaluated
         void updateOldTimeIfNeeded();
+
+        //- The current mesh sizes, in the layout of addressingMeshSizes_
+        labelList currentMeshSizes() const;
+
+        //- Build lawBoundaryFaces_ from cellToLaw_ for the current mesh
+        void calcLawBoundaryFaces();
+
+        //- Rebuild the per-patch addressing and boundary states if the mesh
+        //  topology has changed since they were built. Checked on every
+        //  evaluation, not once per time step, because a cracking mesh
+        //  changes topology within a time step. Cell addressing and cell
+        //  states are kept, so a change in the number of cells is refused,
+        //  as is any change when a law carries persistent state, which would
+        //  need mapping onto the new boundary faces
+        void updateAddressingIfTopologyChanged();
 
 
         //- No copy construct

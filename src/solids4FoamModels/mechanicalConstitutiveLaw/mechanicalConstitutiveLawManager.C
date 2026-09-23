@@ -1806,8 +1806,161 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
 }
 
 
+Foam::labelList
+Foam::mechanicalConstitutiveLawManager::currentMeshSizes() const
+{
+    labelList sizes(mesh_.boundary().size() + 1);
+
+    sizes[0] = mesh_.nCells();
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        sizes[patchI + 1] = mesh_.boundary()[patchI].size();
+    }
+
+    return sizes;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::calcLawBoundaryFaces()
+{
+    forAll(lawBoundaryFaces_, lawI)
+    {
+        lawBoundaryFaces_[lawI].clear();
+        lawBoundaryFaces_[lawI].setSize(mesh_.boundary().size());
+
+        forAll(lawBoundaryFaces_[lawI], patchI)
+        {
+            const labelUList& faceCells =
+                mesh_.boundary()[patchI].faceCells();
+
+            // Collected in ascending face order: the boundary constitutive
+            // state is indexed by position in this list, so the order must be
+            // reproducible
+            DynamicList<label> curFaces(faceCells.size());
+
+            forAll(faceCells, faceI)
+            {
+                if (cellToLaw_[faceCells[faceI]] == lawI)
+                {
+                    curFaces.append(faceI);
+                }
+            }
+
+            lawBoundaryFaces_[lawI][patchI].transfer(curFaces);
+        }
+    }
+
+    addressingMeshSizes_ = currentMeshSizes();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
+{
+    const labelList sizes(currentMeshSizes());
+
+    if (sizes == addressingMeshSizes_)
+    {
+        return;
+    }
+
+    if (sizes[0] != addressingMeshSizes_[0])
+    {
+        FatalErrorInFunction
+            << "The number of cells changed from " << addressingMeshSizes_[0]
+            << " to " << sizes[0] << "." << nl
+            << "    The mechanicalConstitutiveLaw framework keeps its cell "
+            << "addressing and cell states through a topology change, so it "
+            << "supports changes that only move faces between patches, as "
+            << "crackerFvMesh does, and not ones that add or remove cells."
+            << exit(FatalError);
+    }
+
+    forAll(laws_, lawI)
+    {
+        if (declaresPersistentState(laws_[lawI]))
+        {
+            FatalErrorInFunction
+                << "The mesh topology changed, and the mechanical "
+                << "constitutive law " << lawNames_[lawI] << " carries "
+                << "persistent state." << nl
+                << "    The framework does not map a law's history onto new "
+                << "boundary faces, so it cannot continue without silently "
+                << "restarting that history on them."
+                << exit(FatalError);
+        }
+    }
+
+    DebugInfo
+        << "Mesh topology changed: rebuilding the boundary addressing and "
+        << "boundary states" << endl;
+
+    calcLawBoundaryFaces();
+
+    forAllIters(topologyEntries_, topoIter)
+    {
+        topologyEntry& entry = autoPtrRef(topoIter());
+
+        // A cell-centred topology indexes cells only, and keeps a state per
+        // patch face, sized from lawBoundaryFaces_. The others index faces or
+        // points, which the topology itself would have to be rebuilt for
+        if (!isA<cellCentredIntegrationPointTopology>(entry.topology_))
+        {
+            FatalErrorInFunction
+                << "The mesh topology changed, and the integration-point "
+                << "topology " << entry.topology_.type() << " is in use." << nl
+                << "    Only " << cellCentredIntegrationPointTopology::typeName
+                << " is rebuilt on a topology change."
+                << exit(FatalError);
+        }
+
+        if (!entry.boundaryAware_)
+        {
+            continue;
+        }
+
+        // No law carries persistent state, so a cold boundary state is the
+        // state these faces would have had anyway
+        forAll(laws_, lawI)
+        {
+            PtrList<mechanicalConstitutiveLawState>& bStates =
+                entry.boundaryStates_[lawI];
+
+            bStates.clear();
+            bStates.setSize(mesh_.boundary().size());
+
+            forAll(mesh_.boundary(), patchI)
+            {
+                bStates.set
+                (
+                    patchI,
+                    new mechanicalConstitutiveLawState
+                    (
+                        lawBoundaryFaces_[lawI][patchI].size()
+                    )
+                );
+
+                applyStateSpecPatch(lawI, patchI, bStates[patchI]);
+            }
+        }
+    }
+
+    // Scratch and cached fields sized to the old mesh
+    surfaceStressSumPtr_.clear();
+    surfaceStressWeightPtr_.clear();
+    surfaceTangentWeightPtr_.clear();
+    pointStressSumPtr_.clear();
+    pointStressWeightPtr_.clear();
+    pointTangentWeightPtr_.clear();
+    resetMaterialPropertyFields();
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
 {
+    // First, so that the states rolled over below are the current ones
+    updateAddressingIfTopologyChanged();
+
     const label timeIndex = mesh_.time().timeIndex();
 
     if (timeIndex != curTimeIndex_)
@@ -2052,7 +2205,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     kappaPtr_(),
     topologyCache_(),
     topologyEntries_(),
-    compactFingerprints_()
+    compactFingerprints_(),
+    addressingMeshSizes_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -2180,32 +2334,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     }
 
     // Set lawBoundaryFaces
-    forAll(lawNames, lawI)
-    {
-        lawBoundaryFaces_[lawI].resize(mesh.boundary().size());
-
-        forAll(lawBoundaryFaces_[lawI], patchI)
-        {
-            const labelList& faceCells = mesh.boundary()[patchI].faceCells();
-
-            // Collected in ascending face order: the boundary constitutive
-            // state is indexed by position in this list, so the order must be
-            // reproducible
-            DynamicList<label> curFaces(faceCells.size());
-
-            forAll(faceCells, faceI)
-            {
-                const label cellID = faceCells[faceI];
-
-                if (cellToLaw[cellID] == lawI)
-                {
-                    curFaces.append(faceI);
-                }
-            }
-
-            lawBoundaryFaces_[lawI][patchI].transfer(curFaces);
-        }
-    }
+    calcLawBoundaryFaces();
 }
 
 
@@ -2222,6 +2351,12 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
 {
     if (!rhoPtr_.valid())
     {
+        // Not registered. This is the manager's private cache; the solid
+        // model's own copy (solidModel::makeRho) is the field registered as
+        // "rho", as it is on a legacy run. Were this one to hold the name, the
+        // solid model's copy could not register, and a topology-changing mesh
+        // (crackerFvMesh) maps only registered fields, so the solid model's
+        // rho would keep its old boundary sizes after the mesh changed
         rhoPtr_.reset
         (
             new volScalarField
@@ -2232,7 +2367,8 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
                     mesh_.time().timeName(),
                     mesh_,
                     IOobject::NO_READ,
-                    IOobject::NO_WRITE
+                    IOobject::NO_WRITE,
+                    false  // Do not register
                 ),
                 mesh_,
                 dimensionedScalar("rho", dimDensity, 0.0),
