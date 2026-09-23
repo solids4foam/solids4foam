@@ -42,7 +42,9 @@ Description
          caller's stress storage untouched.
       5. dualFaceIntegrationPointTopology inverts the dual-face-to-cell map
          correctly, registerTopology is idempotent, and a stress evaluated on
-         the dual faces uses the material of the owning primary cell.
+         the dual faces uses the material of the owning primary cell - also
+         on a second topology built from the boundary part of the map, the
+         way vertexCentredLinGeomSolid evaluates its boundary dual faces.
       6. A fourth-order tangent on the dual faces matches the closed-form
          isotropic stiffness, including with more than one material.
       7. The finite-difference fourth-order tangent reproduces the analytical
@@ -1462,7 +1464,8 @@ int main(int argc, char *argv[])
     // A synthetic dual-face-to-cell map. The dual faces are interleaved across
     // the cells so that the inversion is not trivially ordered, and a handful
     // of trailing entries stand in for boundary dual faces, which are not
-    // integration points
+    // integration points of the internal topology. They are spread over the
+    // whole cell range, so that they do not all share one material
     const label nPerCell = 3;
     const label nInternalDualFaces = nPerCell*mesh.nCells();
     const label nBoundaryDualFaces = 5;
@@ -1471,6 +1474,11 @@ int main(int argc, char *argv[])
     for (label i = 0; i < nInternalDualFaces; ++i)
     {
         dualFaceToCell[i] = i % mesh.nCells();
+    }
+    for (label i = 0; i < nBoundaryDualFaces; ++i)
+    {
+        dualFaceToCell[nInternalDualFaces + i] =
+            mesh.nCells() - 1 - (i*mesh.nCells())/nBoundaryDualFaces;
     }
 
     const integrationPointTopology& dualTopo =
@@ -1566,6 +1574,34 @@ int main(int argc, char *argv[])
         ) == &dualTopo
     );
 
+    // vertexCentredLinGeomSolid evaluates its boundary dual faces as a second
+    // dual-face topology, built from the boundary part of the same map, so
+    // that they keep their own constitutive state
+    const labelList boundaryDualFaceToCell
+    (
+        SubList<label>(dualFaceToCell, nBoundaryDualFaces, nInternalDualFaces)
+    );
+
+    const integrationPointTopology& dualBoundaryTopo =
+        manager.registerTopology
+        (
+            "testDualBoundaryFaces",
+            autoPtr<integrationPointTopology>
+            (
+                new dualFaceIntegrationPointTopology
+                (
+                    mesh, boundaryDualFaceToCell, nBoundaryDualFaces
+                )
+            )
+        );
+
+    report
+    (
+        "the boundary dual faces form a separate topology",
+        &dualBoundaryTopo != &dualTopo
+     && dualBoundaryTopo.nIntegrationPoints() == nBoundaryDualFaces
+    );
+
     // Kinematics on the dual faces, then a stress check per dual face against
     // the material of the primary cell that owns it
     tensorField dualGradD(nInternalDualFaces, tensor::zero);
@@ -1620,6 +1656,52 @@ int main(int argc, char *argv[])
         else
         {
             Info<< "    SKIP: dual-face closed-form stress "
+                << "(not all materials are linearElastic)" << endl;
+        }
+
+        // The same on the boundary topology, whose integration point i is
+        // boundary dual face i
+        tensorField bGradD(nBoundaryDualFaces, tensor::zero);
+        const tensorField bGradD0(nBoundaryDualFaces, tensor::zero);
+        forAll(bGradD, i)
+        {
+            bGradD[i] =
+                testGradD
+                (
+                    mesh.C()[boundaryDualFaceToCell[i]]
+                  + vector(0, 0.001*i, 0)
+                );
+        }
+
+        symmTensorField bSigma(nBoundaryDualFaces, symmTensor::zero);
+
+        manager.updateStressSmallStrain
+        (
+            dualBoundaryTopo, bGradD, bGradD0, dt, bSigma
+        );
+
+        symmTensorField refBSigma(nBoundaryDualFaces, symmTensor::zero);
+        forAll(refBSigma, i)
+        {
+            const label cellI = boundaryDualFaceToCell[i];
+
+            refBSigma[i] =
+                refMu[cellI]*twoSymm(bGradD[i])
+              + refLambda[cellI]*tr(bGradD[i])*I;
+        }
+
+        if (allLinearElastic)
+        {
+            reportError
+            (
+                "boundary dual-face stress uses the owning cell's material",
+                relativeDifference(bSigma, refBSigma),
+                1e-12
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: boundary dual-face closed-form stress "
                 << "(not all materials are linearElastic)" << endl;
         }
     }
