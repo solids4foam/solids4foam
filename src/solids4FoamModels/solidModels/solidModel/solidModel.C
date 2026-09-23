@@ -35,8 +35,8 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#include "hofvc.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "hofvc.H"
     #include "enhancedVolPointInterpolation.H"
 #endif
 
@@ -2127,7 +2127,6 @@ void Foam::solidModel::gradQuad
     CompactListList<tensor>& gradDQuad
 ) const
 {
-#ifdef OPENFOAM_NOT_EXTEND
     // The legacy overload refused this, and the framework has no
     // quadrature-point gradient for more than one material either
     // mechanicalModel derives from both IOdictionary and PtrList, so name the
@@ -2145,11 +2144,6 @@ void Foam::solidModel::gradQuad
     }
 
     hofvc::fGrad(D, gradDQuad);
-#else
-    FatalErrorInFunction
-        << "The high-order face quadrature does not exist on foam-extend."
-        << exit(FatalError);
-#endif
 }
 
 
