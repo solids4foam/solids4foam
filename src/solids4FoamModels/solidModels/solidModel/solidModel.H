@@ -434,22 +434,6 @@ protected:
         //- constant/mechanicalProperties, constructed on first use
         const IOdictionary& mechanicalProperties() const;
 
-        //- Does this model still need the legacy mechanicalModel when the
-        //  framework is enabled?
-        //
-        //  False for a model that takes its whole constitutive response from
-        //  the framework, which is all of them but one: vertexCentredLinGeom
-        //  takes only its Jacobian tangent from the manager and its residual
-        //  stress still comes from dualMechanicalModel, so it needs both.
-        //
-        //  Constructing the legacy model on a framework run is the defect
-        //  this exists to catch, so makeMechanicalModel() refuses it unless
-        //  the model says here that it is expected
-        virtual bool needsLegacyMechanicalModel() const
-        {
-            return false;
-        }
-
         //- Correct point displacement boundary conditions, symmetry planes and
         //  empty directions after interpolation.
         //

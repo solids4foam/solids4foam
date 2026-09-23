@@ -313,7 +313,7 @@ void Foam::solidModel::makeMechanicalModel() const
     // constructs every legacy law, registers a second dictionary under the
     // name this class now reads for itself, and silently keeps the legacy
     // hierarchy alive, so it is a defect rather than a fallback
-    if (useMechanicalConstitutiveLawManager() && !needsLegacyMechanicalModel())
+    if (useMechanicalConstitutiveLawManager())
     {
         FatalErrorInFunction
             << "A mechanicalConstitutiveLaw framework run reached the legacy "
@@ -1685,15 +1685,6 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 
 const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
 {
-    // A model that runs both implementations at once - vertexCentredLinGeom,
-    // which takes only its tangent from the framework - already has this
-    // dictionary, because the legacy model is one. Reading a second copy would
-    // register a second object under the same name, so use the one that exists
-    if (needsLegacyMechanicalModel())
-    {
-        return mechanical();
-    }
-
     if (mechanicalPropertiesPtr_.empty())
     {
         makeMechanicalProperties();
