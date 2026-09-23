@@ -1,0 +1,33 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Four processors whose boundaries cut across the material interface, so the
+// material-filtered gradient stencil meets both materials at a processor
+// boundary
+numberOfSubdomains 4;
+
+method          simple;
+
+simpleCoeffs
+{
+    n           (2 2 1);
+    delta       0.001;
+}
+
+
+// ************************************************************************* //

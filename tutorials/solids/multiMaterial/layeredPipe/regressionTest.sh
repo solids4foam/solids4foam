@@ -31,6 +31,16 @@ THETA_POINT_ERR_MAX=0.01
 # puts the difference at 4.9e-3, so the threshold separates the two
 POINT_D_ARM_REL_MAX=3e-3
 
+# The parallel framework arms against the serial framework arm. The solver is
+# not decomposition invariant to round-off with any gradient scheme: a single
+# material on this mesh, decomposed as the interface arm is, differs from
+# serial by 3.5e-5 in D on the legacy path with leastSquares and on the
+# framework with leastSquaresS4f alike, identically on foam-extend 4.1 and
+# OpenFOAM.com v2512. The two materials measure 1.4e-5 (interface) and 9e-5
+# (simple), the same order, so this bounds the decomposition dependence of
+# the multi-material machinery rather than asserting there is none
+PARALLEL_REL_MAX=2e-4
+
 R1=0.05
 R2=0.07
 R3=0.1
@@ -369,6 +379,194 @@ if [ "$CHECK_ONLY" = false ]; then
             fi
         fi
     fi
+fi
+
+# ------------------------------------------------------------
+# The framework's multi-material path in parallel
+# ------------------------------------------------------------
+# Two decompositions: one whose processor boundary is the material interface,
+# so an interface face is a processor face on both sides, and a simple one
+# whose processor boundaries cut across the interface, so the material
+# filter meets processor faces of both materials. Each is held to the
+# analytical bound and to the serial framework arm
+run_parallel_arm() {
+    local decomposition="$1"
+    local arm="parallel-${decomposition}"
+    local dir="${REGRESSION_ROOT}/${arm}"
+    local item
+
+    rm -rf "${dir}"; mkdir -p "${dir}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${dir}/"
+    done
+
+    ( cd "${dir}" && ./Allrun framework parallel "${decomposition}" \
+        > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${arm} does not run in this environment"
+        return
+    fi
+
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        echo "FAIL: ${arm}: did not use the framework"
+        failures=$((failures + 1))
+        return
+    fi
+
+    if [[ ! -d "${dir}/processor1" ]]
+    then
+        echo "FAIL: ${arm}: did not run in parallel"
+        failures=$((failures + 1))
+        return
+    fi
+
+    # The interface decomposition is only the test it claims to be if
+    # processor 0 holds exactly the inner material
+    if [[ "${decomposition}" == "interface" ]]
+    then
+        local nInner nProc0
+        nInner=$(sed -n '/^[0-9][0-9]*$/{p;q}' \
+            "${dir}/constant/polyMesh/sets/inner")
+        nProc0=$(grep -o 'nCells:[ ]*[0-9]*' \
+            "${dir}/processor0/constant/polyMesh/owner" | grep -o '[0-9]*$')
+        if [[ -z "${nInner}" || "${nInner}" != "${nProc0}" ]]
+        then
+            echo "FAIL: ${arm}: processor 0 holds ${nProc0} cells," \
+                "the inner material ${nInner}"
+            failures=$((failures + 1))
+            return
+        fi
+    fi
+
+    local par_file par_radial
+    par_file="$(find "${dir}" -name 'line_sigma:Transformed.xy' \
+        -not -path '*/processor*' | sort | tail -n 1)"
+
+    if [[ -z "${par_file}" ]]
+    then
+        echo "FAIL: ${arm}: produced no sampled stress"
+        failures=$((failures + 1))
+    else
+        par_radial="$(compute_radial_err "${par_file}")"
+        if awk "BEGIN {exit !(${par_radial} < ${RADIUS_STRESS_ERR_MAX})}"
+        then
+            printf "PASS: %s: Max radial stress error = %.6g\n" \
+                "${arm}" "${par_radial}"
+        else
+            printf "FAIL: %s: Max radial stress error = %.6g\n" \
+                "${arm}" "${par_radial}"
+            failures=$((failures + 1))
+        fi
+    fi
+
+    local sr_time par_time fld cmp rel sr_max par_max
+    sr_time="$(solids4Foam::latestTime "${FRAMEWORK_DIR}")"
+    par_time="$(solids4Foam::latestTime "${dir}")"
+
+    if [[ -z "${sr_time}" || "${sr_time}" != "${par_time}" ]]
+    then
+        echo "FAIL: ${arm}: reached '${par_time}', the serial arm '${sr_time}'"
+        failures=$((failures + 1))
+        return
+    fi
+
+    for fld in D pointD; do
+        if ! cmp=$(compare_internal_vector_fields \
+            "${FRAMEWORK_DIR}/${sr_time}/${fld}" "${dir}/${par_time}/${fld}")
+        then
+            echo "FAIL: ${arm}: could not compare ${fld} with the serial arm"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        read -r rel sr_max par_max <<< "${cmp}"
+
+        if ! awk "BEGIN {exit !(${sr_max} > 1e-9 && ${par_max} > 1e-9)}"
+        then
+            printf "FAIL: %s: %s is trivially small (%.4g, %.4g)\n" \
+                "${arm}" "${fld}" "${sr_max}" "${par_max}"
+            failures=$((failures + 1))
+        elif awk "BEGIN {exit !(${rel} < ${PARALLEL_REL_MAX})}"
+        then
+            printf "PASS: %s: %s relative diff to serial = %.4g\n" \
+                "${arm}" "${fld}" "${rel}"
+        else
+            printf "FAIL: %s: %s relative diff to serial = %.4g\n" \
+                "${arm}" "${fld}" "${rel}"
+            failures=$((failures + 1))
+        fi
+    done
+}
+
+# ------------------------------------------------------------
+# A material one cell thick is refused, and for that reason
+# ------------------------------------------------------------
+# The inner material is reduced to the single layer of cells between r = 70
+# and 71 mm, inside the outer one. Its cells then have no neighbour of their
+# own material in the radial direction, even after the stencil is widened to
+# point neighbours, so there is no gradient to reconstruct and the
+# material-aware scheme must stop, naming the rank-deficient cells, rather
+# than build one from both materials. The error's other cause, a stencil
+# truncated at a processor boundary, is not reachable on this mesh: the
+# compact stencil reaches across processor faces, and a processor slab one
+# layer thick runs to completion
+run_one_cell_thick_arm() {
+    local arm="oneCellThick"
+    local dir="${REGRESSION_ROOT}/${arm}"
+    local item
+
+    rm -rf "${dir}"; mkdir -p "${dir}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${dir}/"
+    done
+
+    cat > "${dir}/batch.setSet" << 'SETEOF'
+cellSet outer new cylinderToCell (0.0 0.0 -100) (0.0 0.0 100) 100e-3
+cellSet inner new cylinderToCell (0.0 0.0 -100) (0.0 0.0 100) 71e-3
+cellSet core new cylinderToCell (0.0 0.0 -100) (0.0 0.0 100) 70e-3
+cellSet inner delete cellToCell core
+cellSet outer delete cellToCell inner
+SETEOF
+
+    ( cd "${dir}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${arm} does not run in this environment"
+        return
+    fi
+
+    local nLayer
+    nLayer=$(sed -n '/^[0-9][0-9]*$/{p;q}' \
+        "${dir}/constant/polyMesh/sets/inner" 2>/dev/null)
+
+    if grep -q "^End" "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        echo "FAIL: ${arm}: ran to completion on a material one cell thick"
+        failures=$((failures + 1))
+    elif grep -q "${nLayer} cells remain rank-deficient after widening the gradient stencil to point neighbours of the same material" \
+        "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        echo "PASS: ${arm}: refused, naming the ${nLayer} cells of the layer"
+    else
+        echo "FAIL: ${arm}: did not stop for the rank-deficient stencil" \
+            "of the ${nLayer} layer cells"
+        failures=$((failures + 1))
+    fi
+}
+
+if [ "$CHECK_ONLY" = false ] && [[ -n "${FRAMEWORK_DIR:-}" ]] \
+    && ! solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
+then
+    run_parallel_arm interface
+    run_parallel_arm simple
+    run_one_cell_thick_arm
 fi
 
 if [ "$CHECK_ONLY" = false ]; then

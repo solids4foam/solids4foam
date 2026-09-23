@@ -144,6 +144,14 @@ extract data. Optionally, if `gnuplot` is installed, the radial and
 circumferential stress distributions are plotted in the `sigmaR.png` and
 `sigmaTheta.png` files.
 
+`./Allrun framework` runs the same case on the mechanicalConstitutiveLaw
+framework, with the material-aware `leastSquaresS4f` gradient. Adding
+`parallel` runs that in parallel: by default on two processors whose boundary
+is the material interface (`system/decomposeParDict.interface`, with
+`constant/cellDecomposition` written from the `inner` cellSet), or with
+`./Allrun framework parallel simple` on four processors whose boundaries cut
+across it (`system/decomposeParDict.simple`).
+
 ```note
 For multi-material cases, solids4foam expects to find a cellZone for each
 material defined in constant/mechanicalProperties, where the cellZone name is
