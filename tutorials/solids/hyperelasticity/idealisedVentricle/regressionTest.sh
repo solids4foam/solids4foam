@@ -290,8 +290,14 @@ fi
 # not apply, because the active tension is not derived from a potential - so
 # this is where it does apply
 run_split_check() {
+    # Only the framework arm's mechanicalProperties describes a framework law:
+    # the pressureDisplacement arm's is a legacy dictionary, with no
+    # bulkModulus, which Test-mechanicalConstitutiveLaw cannot read. So the
+    # check runs on petscManager or not at all, rather than on whichever arm
+    # happens to have a mesh - on foam-extend the petsc arms skip before
+    # meshing, and that used to be the legacy one (#466)
     local d
-    for d in "${REGRESSION_ROOT}"/*; do
+    for d in "${REGRESSION_ROOT}/petscManager"; do
         [[ -d "${d}/constant/polyMesh" ]] || continue
 
         if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
@@ -317,7 +323,7 @@ run_split_check() {
         return 0
     done
 
-    echo "SKIP: mechanicalConstitutiveLaw checks (no meshed case)"
+    echo "SKIP: mechanicalConstitutiveLaw checks (the framework arm did not run)"
     return 0
 }
 
