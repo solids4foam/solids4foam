@@ -369,21 +369,9 @@ void Foam::solidModel::makeRho() const
     }
 
     // Both implementations read the same density entries, but only one of
-    // them may be constructed on a given run
-    if (useMechanicalConstitutiveLawManager())
-    {
-        rhoPtr_.set
-        (
-            new volScalarField(mechanicalManager().rho())
-        );
-    }
-    else
-    {
-        rhoPtr_.set
-        (
-            new volScalarField(mechanical().rho())
-        );
-    }
+    // them may be constructed on a given run; initialRho() picks it. Built
+    // from a tmp, so the field takes over the tmp's registration as "rho"
+    rhoPtr_.set(new volScalarField(initialRho()));
 }
 
 
@@ -2104,9 +2092,25 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
 {
     if (useMechanicalConstitutiveLawManager())
     {
+        // A registered copy, as the legacy mechanicalLaw::rho() returns, so
+        // that a field built from it takes over the registration. The
+        // manager's own cache is not registered, and a plain copy of it would
+        // not be either; an unregistered field is not mapped when the mesh
+        // topology changes
         return tmp<volScalarField>
         (
-            new volScalarField(mechanicalManager().rho())
+            new volScalarField
+            (
+                IOobject
+                (
+                    "rho",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mechanicalManager().rho()
+            )
         );
     }
 
