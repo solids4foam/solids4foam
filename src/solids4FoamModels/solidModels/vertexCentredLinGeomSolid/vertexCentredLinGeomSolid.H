@@ -30,6 +30,11 @@ Description
 
     An implicit Newton-Raphson algorithm is employed.
 
+    The stress at the dual mesh faces comes from the legacy
+    dualMechanicalModel or, with useMechanicalConstitutiveLawManager, from the
+    mechanicalConstitutiveLaw framework, in which case the legacy
+    mechanicalModel is not constructed at all.
+
 Author
     Philip Cardiff, UCD.
     Federico Mazzanti, UCD.
@@ -86,6 +91,8 @@ private:
     // Private Data
 
         //- Mechanical model for dual mesh
+        //  Only constructed when the legacy mechanicalModel is in use: on a
+        //  mechanicalConstitutiveLaw framework run it is left empty
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
 
         //- Implicit stiffness used by segregated algorithm
@@ -97,6 +104,14 @@ private:
         //- Integration-point topology for the internal dual mesh faces,
         //  owned by the manager
         mutable const integrationPointTopology* dualFaceTopologyPtr_;
+
+        //- Integration-point topology for the boundary dual mesh faces whose
+        //  stress is evaluated, owned by the manager
+        mutable const integrationPointTopology* dualBoundaryFaceTopologyPtr_;
+
+        //- Dual mesh face index of each integration point of the boundary
+        //  dual-face topology
+        mutable labelList dualBoundaryFaces_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -213,6 +228,27 @@ private:
         //- Return the integration-point topology for the internal dual faces
         const integrationPointTopology& dualFaceTopology() const;
 
+        //- Return the integration-point topology for the boundary dual faces
+        //  whose stress is evaluated. The dual mesh face index of each of its
+        //  integration points is dualBoundaryFaces_
+        const integrationPointTopology& dualBoundaryFaceTopology() const;
+
+        //- Update the stress at the dual mesh faces from the displacement
+        //  gradient there, using whichever implementation is in use
+        void correctDualStress
+        (
+            const surfaceTensorField& dualGradDf,
+            surfaceSymmTensorField& dualSigmaf
+        );
+
+        //- Update the primary mesh cell stress field from gradD, using
+        //  whichever implementation is in use
+        void correctCellStress();
+
+        //- Implicit stiffness at the primary mesh cells, using whichever
+        //  implementation is in use
+        tmp<volScalarField> impK() const;
+
         //- Make dualImpKf field
         void makeDualImpKf() const;
 
@@ -243,14 +279,6 @@ protected:
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
             return nonLinearGeometry::LINEAR_GEOMETRY;
-        }
-
-        //- This model always needs the legacy mechanicalModel. Its constructor
-        //  rejects framework runs because the residual stress still comes
-        //  from dualMechanicalModel, which is built on the legacy laws
-        virtual bool needsLegacyMechanicalModel() const
-        {
-            return true;
         }
 
 
