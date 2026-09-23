@@ -63,7 +63,7 @@ There is a single block-coupled path. This model does not read
 | `K` | `0` | Mass-proportional damping coefficient |
 | `consistentRhieChow` | `false` | Consistent Rhie-Chow correction |
 | `composite` | `false` | Composite-material mode |
-| `stdDispGrad` | `true` | Standard displacement-gradient evaluation |
+| `stdDispGrad` | `true` | Deprecated; `false` (point-based gradient) is rejected |
 | `debug` | `false` | Extra per-iteration solver output |
 | `writeConvergenceData` | `false` | Write `convergData.dat` in the case |
 | `solutionTolerance` | inherited | Used here as a _relative_ tolerance |
@@ -149,7 +149,6 @@ coupledPressureDisplacementSolidCoeffs
 
     consistentRhieChow    false;
     composite             false;
-    stdDispGrad           true;
 
     restart               true;
 
