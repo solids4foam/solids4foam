@@ -922,6 +922,45 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
 }
 
 
+const Foam::volScalarField*
+Foam::mechanicalConstitutiveLawManager::scalarInputSource
+(
+    const label lawI,
+    const word& name
+) const
+{
+    const bool sourced =
+        caseInputsPtr_.valid() && caseInputsPtr_->found(lawI, name);
+
+    if (mesh_.foundObject<volScalarField>(name))
+    {
+        const volScalarField& registered =
+            mesh_.lookupObject<volScalarField>(name);
+
+        if (!sourced)
+        {
+            return &registered;
+        }
+
+        if (!caseInputsPtr_->owns(registered))
+        {
+            // Solved for, or at least supplied, by another model, which is
+            // the precedence the legacy thermoMechanicalLaw gives its T
+            caseInputsPtr_->reportShadowed(lawI, name);
+
+            return &registered;
+        }
+    }
+
+    if (sourced)
+    {
+        return &caseInputsPtr_->field(lawI, name);
+    }
+
+    return nullptr;
+}
+
+
 Foam::mechanicalConstitutiveLawInputs
 Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 (
@@ -965,19 +1004,20 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
         scalarField& fld = store[key]();
         fld.setSize(faces.size(), 0.0);
 
-        // A registered field is used where it is; only a missing one is built.
-        // The two are kept apart rather than put through one tmp, because
-        // foam-extend's tmp refuses to be assigned one that holds a reference
-        const bool registered = mesh_.foundObject<volScalarField>(name);
+        // A registered or case-directory field is used where it is; only a
+        // missing one is built. The two are kept apart rather than put
+        // through one tmp, because foam-extend's tmp refuses to be assigned
+        // one that holds a reference
+        const volScalarField* srcPtr = scalarInputSource(lawI, name);
 
         const tmp<volScalarField> tsrc
         (
-            registered
+            srcPtr
           ? tmp<volScalarField>()
           : prescribedField<scalar>(name)
         );
 
-        if (!registered && !tsrc.valid())
+        if (!srcPtr && !tsrc.valid())
         {
             FatalErrorInFunction
                 << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -987,8 +1027,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
                 << exit(FatalError);
         }
 
-        const volScalarField& src =
-            registered ? mesh_.lookupObject<volScalarField>(name) : tsrc();
+        const volScalarField& src = srcPtr ? *srcPtr : tsrc();
 
         const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
@@ -1083,16 +1122,15 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
         // field has not reached its own members yet - the base class runs
         // first. At that moment the field exists only as the initial condition
         // on disk, which is the right value to evaluate against anyway
-        if (mesh_.foundObject<volScalarField>(name))
+        //
+        // A case that reads the field from another case directory, because
+        // nothing in this run solves for it, is served in between: after any
+        // registered field and before the file
+        const volScalarField* srcPtr = scalarInputSource(lawI, name);
+
+        if (srcPtr)
         {
-            gatherToIntegrationPoints
-            (
-                mesh_.lookupObject<volScalarField>(name),
-                lawI,
-                topo,
-                ipIDs,
-                fld
-            );
+            gatherToIntegrationPoints(*srcPtr, lawI, topo, ipIDs, fld);
         }
         else
         {
@@ -2206,7 +2244,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     topologyCache_(),
     topologyEntries_(),
     compactFingerprints_(),
-    addressingMeshSizes_()
+    addressingMeshSizes_(),
+    caseInputsPtr_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -2277,6 +2316,41 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
             lawI,
             mechanicalConstitutiveLaw::New(lawDict)
         );
+
+        // Any of the law's scalar inputs that the case reads from another
+        // case directory rather than from this run. Read from the dictionary
+        // as the user gave it, and for the inputs the whole law tree reads,
+        // so that a sub-law's input can be sourced like its parent's
+        {
+            const HashTable<fileName> sources
+            (
+                mechanicalConstitutiveLawCaseInputs::readSources
+                (
+                    lawEntries[lawI].dict(),
+                    lawName,
+                    requiredScalarInputsRecursive(laws_[lawI])
+                )
+            );
+
+            if (sources.size() && !caseInputsPtr_.valid())
+            {
+                caseInputsPtr_.reset
+                (
+                    new mechanicalConstitutiveLawCaseInputs
+                    (
+                        mesh_,
+                        lawEntries.size()
+                    )
+                );
+            }
+
+            const wordList names(sources.sortedToc());
+
+            forAll(names, i)
+            {
+                caseInputsPtr_->addSource(lawI, names[i], sources[names[i]]);
+            }
+        }
 
         if (lawNames.size() == 1)
         {

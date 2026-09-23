@@ -62,6 +62,7 @@ Author
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
 #include "integrationPointTopology.H"
+#include "mechanicalConstitutiveLawCaseInputs.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -244,6 +245,10 @@ class mechanicalConstitutiveLawManager
         //  faces onto a crack patch) changes the patch sizes under the
         //  manager; comparing against these is how that is detected
         labelList addressingMeshSizes_;
+
+        //- Scalar inputs read from another case directory, for the laws
+        //  whose dictionaries ask for that; empty if none does
+        autoPtr<mechanicalConstitutiveLawCaseInputs> caseInputsPtr_;
 
 
     // Private Member Functions
@@ -471,6 +476,21 @@ class mechanicalConstitutiveLawManager
             autoPtr<mechanicalConstitutiveLawState>& bScratchPtr,
             autoPtr<mechanicalConstitutiveLawState>& bShadowPtr,
             mechanicalConstitutiveLawState*& bState
+        ) const;
+
+        //- The field a law's scalar input is gathered from, or nullptr if
+        //  neither the registry nor a case directory supplies it, in which
+        //  case the caller falls back to a field on disk.
+        //
+        //  A field registered by another model comes first, so that one
+        //  solved for in this run is always what the law sees. A case
+        //  directory source comes next; the copy it registers is recognised
+        //  as its own and refreshed, once per time step, rather than taken as
+        //  another model's
+        const volScalarField* scalarInputSource
+        (
+            const label lawI,
+            const word& name
         ) const;
 
         //- Gather the live coupling inputs a law asked for, as views over its
