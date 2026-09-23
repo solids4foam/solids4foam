@@ -2089,18 +2089,20 @@ void Foam::solidModel::frameworkInterpolate
 #else
     if (mechanicalManager().nLaws() > 1)
     {
-        FatalErrorInFunction
-            << "The constitutive-law framework does not support more than one "
-            << "material on foam-extend in this solid model." << nl << nl
-            << "    The point interpolation would fall back to the legacy "
-            << "per-material sub-mesh path, which the framework replaces, and "
-            << "this fork's interpolator has no gradient-corrected form."
-            << exit(FatalError);
+        // The least squares fit below would straddle a material interface,
+        // where the displacement is continuous but its gradient jumps, and
+        // smear it. The legacy model avoided that with per-material
+        // sub-meshes; the framework instead extrapolates each cell's value
+        // with its own gradient, which the material-aware leastSquaresS4f
+        // scheme keeps to one material, as the other forks do for any
+        // number of materials
+        volToPoint().interpolate(D, gradD, pointD);
     }
-
-    // What the legacy single-material branch does on this fork: there is no
-    // gradient-corrected form here, so gradD is unused
-    volToPoint().interpolate(D, pointD);
+    else
+    {
+        // What the legacy single-material branch does on this fork
+        volToPoint().interpolate(D, pointD);
+    }
 #endif
 
     correctPointDisplacement(pointD);

@@ -20,6 +20,17 @@ fi
 RADIUS_STRESS_ERR_MAX=0.03
 THETA_POINT_ERR_MAX=0.01
 
+# Largest relative difference allowed between the point displacements of the
+# legacy and framework arms. The two are different discretisations - the legacy
+# arm takes its gradient per material on sub-meshes, the framework arm from the
+# material-aware leastSquaresS4f scheme on the whole mesh - so their cell
+# displacements differ by about 1.5e-3 of the largest displacement, and the
+# point displacements by 1.5e-3 on both foam-extend 4.1 and OpenFOAM.com
+# v2512. Interpolating the framework displacement to the points with
+# foam-extend's least squares fit, which straddles the interface, instead
+# puts the difference at 4.9e-3, so the threshold separates the two
+POINT_D_ARM_REL_MAX=3e-3
+
 R1=0.05
 R2=0.07
 R3=0.1
@@ -101,6 +112,48 @@ run_constitutive_test() {
     echo "FAIL: mechanicalConstitutiveLaw checks"
     grep 'FAIL:' "${CASE_DIR}/${CONSTITUTIVE_LOGFILE}" || true
     return 1
+}
+
+# Relative difference between the internal fields of two vector fields on the
+# same mesh, followed by the largest magnitude component of each, separated by
+# tabs as IFS does not split on spaces here
+compare_internal_vector_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+def read_internal(path):
+    text = open(path).read()
+    nonuniform = re.search(
+        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not nonuniform:
+        raise ValueError(f"cannot parse internalField in {path}")
+
+    values = re.findall(
+        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
+    )
+    if not values:
+        raise ValueError(f"empty internalField in {path}")
+    return [tuple(map(float, value)) for value in values]
+
+try:
+    a = read_internal(sys.argv[1])
+    b = read_internal(sys.argv[2])
+    if len(a) != len(b):
+        raise ValueError("different internalField sizes")
+    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
+    max_a = max(abs(x) for av in a for x in av)
+    max_b = max(abs(x) for av in b for x in av)
+    print(f"{max_diff/max_a if max_a else max_diff:.10g}\t{max_a:.10g}\t{max_b:.10g}")
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
 }
 
 CHECK_ONLY=false
@@ -264,6 +317,54 @@ if [ "$CHECK_ONLY" = false ]; then
             else
                 printf "FAIL: framework: Max radial stress error = %.6g\n" \
                     "${fw_radial}"
+                failures=$((failures + 1))
+            fi
+        fi
+
+        # The point displacement is where the two arms part company: the
+        # legacy arm interpolates per material on its sub-meshes, and the
+        # framework arm on the whole mesh, extrapolating each cell with its
+        # own material's gradient. The stress above does not see it, as this
+        # solid model does not feed the point displacement back into the
+        # solution, so compare it directly against the legacy arm
+        lg_time="$(solids4Foam::latestTime "${CASE_DIR}")"
+        fw_time="$(solids4Foam::latestTime "${FRAMEWORK_DIR}")"
+        lg_pointD="${CASE_DIR}/${lg_time}/pointD"
+        fw_pointD="${FRAMEWORK_DIR}/${fw_time}/pointD"
+
+        if grep -q "Selecting mechanical constitutive law" \
+            "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
+        then
+            # Only when ARM selects the framework for the main case too
+            echo "SKIP: point displacement comparison (main arm is not legacy)"
+        elif [[ -z "${lg_time}" || "${lg_time}" != "${fw_time}" ]]; then
+            echo "FAIL: the arms reached different times" \
+                "('${lg_time}' vs '${fw_time}')"
+            failures=$((failures + 1))
+        elif [[ ! -f "${lg_pointD}" || ! -f "${fw_pointD}" ]]; then
+            echo "FAIL: an arm wrote no pointD"
+            failures=$((failures + 1))
+        elif ! pointD_cmp=$(compare_internal_vector_fields \
+            "${lg_pointD}" "${fw_pointD}")
+        then
+            echo "FAIL: could not compare the pointD fields"
+            failures=$((failures + 1))
+        else
+            read -r pointD_rel lg_max fw_max <<< "${pointD_cmp}"
+
+            # A zero legacy field would make any comparison pass
+            if ! awk "BEGIN {exit !(${lg_max} > 1e-9 && ${fw_max} > 1e-9)}"
+            then
+                printf "FAIL: pointD is trivially small (%.4g, %.4g)\n" \
+                    "${lg_max}" "${fw_max}"
+                failures=$((failures + 1))
+            elif awk "BEGIN {exit !(${pointD_rel} < ${POINT_D_ARM_REL_MAX})}"
+            then
+                printf "PASS: framework: pointD relative diff to legacy = %.4g\n" \
+                    "${pointD_rel}"
+            else
+                printf "FAIL: framework: pointD relative diff to legacy = %.4g\n" \
+                    "${pointD_rel}"
                 failures=$((failures + 1))
             fi
         fi

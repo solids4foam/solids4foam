@@ -73,15 +73,20 @@ release. For complete commit-level details and contributor information, see the
   and that returns zero, so the value was always zero and its convergence test
   always passed. The `matRes` column is gone from its residual output.
 - On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
-  one material is refused rather than run. `linearGeometryTotalDisplacement`,
-  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
-  `nonLinearGeometryUpdatedLagrangian` all abort with an explanation when the
-  framework is enabled alongside multiple materials on that fork. The
-  displacement-to-point interpolation there has no gradient-corrected form, so
-  the run would otherwise fall back to the legacy per-material subMesh path -
-  the machinery the framework exists to replace - and quietly return the answer
-  that path gives. The combination is supported on OpenFOAM.com and
-  OpenFOAM.org; single-material framework runs are unaffected on every fork.
+  one material now runs, in `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+  `nonLinearGeometryUpdatedLagrangian`, `poroLinearGeometry` and
+  `thermalLinearGeometry`. The displacement is interpolated to the points the
+  way the framework does it on OpenFOAM.com and OpenFOAM.org: each cell around
+  a point extrapolates its value with its own gradient, which the
+  material-aware `leastSquaresS4f` scheme keeps to one material, and the
+  extrapolated values are averaged with inverse-distance weights. foam-extend's
+  least squares interpolation, which a stencil straddling a material interface
+  smears, is not used for these runs, and nor are the legacy per-material
+  sub-meshes. On `layeredPipe` the framework's point displacement is within
+  1.5e-3 of the legacy arm's, where the least squares interpolation is 4.9e-3
+  away. Single-material framework runs on foam-extend keep the least squares
+  interpolation, as before.
 - **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
   pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
   than `p`. An existing case carrying `0/p` fails at construction with a
