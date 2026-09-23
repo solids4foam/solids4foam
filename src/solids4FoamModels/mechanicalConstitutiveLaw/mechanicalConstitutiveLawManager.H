@@ -1359,6 +1359,42 @@ public:
             volScalarField& volumetricResponse
         );
 
+        //- Update the true (Cauchy) stress field stored on mesh faces using
+        //  the configured mechanical constitutive laws for a finite-strain
+        //  formulation: the face twin of the cell-centred overload, with the
+        //  same collapse rule as the small-strain face overload for a face
+        //  reached by more than one law. When volumetricResponsePtr is given,
+        //  stress receives the isochoric stress and the volumetric response
+        //  is written separately, as updateStressFiniteStrainSplit does
+        void updateStressFiniteStrain
+        (
+            const surfaceTensorField& F,
+            const surfaceTensorField& F0,
+            const surfaceScalarField& J,
+            const surfaceScalarField& J0,
+            const surfaceTensorField& Finv,
+            const surfaceTensorField& Finv0,
+            const scalar dt,
+            surfaceSymmTensorField& stress,
+            const stressCollapseRule collapseRule = stressCollapseRule::none,
+            surfaceScalarField* volumetricResponsePtr = nullptr
+        );
+
+        //- The face twin of updateStressFiniteStrainSplit
+        void updateStressFiniteStrainSplit
+        (
+            const surfaceTensorField& F,
+            const surfaceTensorField& F0,
+            const surfaceTensorField& Finv,
+            const surfaceTensorField& Finv0,
+            const surfaceScalarField& J,
+            const surfaceScalarField& J0,
+            const scalar dt,
+            surfaceSymmTensorField& isochoricStress,
+            surfaceScalarField& volumetricResponse,
+            const stressCollapseRule collapseRule = stressCollapseRule::none
+        );
+
         //- Refuse if any law cannot separate the two, naming it
         void checkVolumetricSplitSupported(const word& context) const;
 
