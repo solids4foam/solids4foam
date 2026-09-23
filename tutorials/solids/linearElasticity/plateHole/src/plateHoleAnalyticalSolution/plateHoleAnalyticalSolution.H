@@ -108,8 +108,20 @@ class plateHoleAnalyticalSolution
         //- Lookup the active mesh
         const fvMesh& mesh() const;
 
+        //- constant/mechanicalProperties, wherever this case keeps it
+        const IOdictionary& mechanicalProperties(const fvMesh& mesh) const;
+
         //- Check if this is plane stress simulation
         bool planeStress(const fvMesh& mesh) const;
+
+        //- Shear modulus and Poisson's ratio of the single material, read
+        //  from its entry in mechanicalProperties
+        void derivedMaterial
+        (
+            const fvMesh& mesh,
+            scalar& mu,
+            scalar& nu
+        ) const;
 
         //- Analytical stress solution
         symmTensor plateHoleStress(const vector& C) const;
