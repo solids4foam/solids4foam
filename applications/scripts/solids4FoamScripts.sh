@@ -774,7 +774,8 @@ function solids4Foam::requirePetscOrExitSilently()
 # regressionCaseSkipped
 #     Return success when an Allrun log contains a known case-skip message.
 #     Regression scripts use this to exit cleanly when a tutorial is not
-#     intended to run in the current OpenFOAM flavour.
+#     intended to run in the current OpenFOAM flavour, or when a required
+#     dependency (PETSc, or a command such as cartesianMesh) is unavailable.
 # Arguments:
 #     1: LOG_FILE
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -787,7 +788,7 @@ function solids4Foam::regressionCaseSkipped()
         return 1
     fi
 
-    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case" "${LOG_FILE}"
     then
         return 0
     fi
