@@ -5,14 +5,15 @@ sort: 6
 # unsNonLinGeomUpdatedLagSolid
 
 ```warning
-`unsNonLinearGeometryUpdatedLagrangian` is **withdrawn**: it is not compiled on any fork, so selecting it
-fails to construct the solid model. No tutorial selected it, so nothing
-exercised it, and it was never ported to the mechanicalConstitutiveLaw
-framework. The sources are kept and the entry is commented out in both
-build lists. Reintroducing it needs a tutorial; see issue #461.
+`unsNonLinearGeometryUpdatedLagrangian` is **withdrawn**: it is not compiled on
+any fork, so selecting it fails to construct the solid model. No tutorial
+selected it, so nothing exercised it, and it was never ported to the
+mechanicalConstitutiveLaw framework. The sources are kept and the entry is
+commented out in both build lists. Reintroducing it needs a tutorial; see issue
+#461.
 
-Any tutorial named below either no longer exists or no longer selects
-this model.
+Any tutorial named below either no longer exists or no longer selects this
+model.
 ```
 
 This page documents the unstructured nonlinear updated-Lagrangian
