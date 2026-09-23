@@ -106,6 +106,8 @@ REGRESSION_TESTS=(
     "solids/elastoplasticity/curvedBeams"
     "solids/elastoplasticity/cylinderExpansion"
     "solids/elastoplasticity/neckingBar"
+    "solids/fracture/crackingBeams"
+    "solids/fracture/crackingPlateHole"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
     "solids/hyperelasticity/rigidRotation/rotatingBlock"
     "solids/hyperelasticity/rigidRotation/rotatingCylinder"
