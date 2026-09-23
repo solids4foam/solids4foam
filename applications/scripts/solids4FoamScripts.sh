@@ -18,9 +18,18 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # On macOS, ensure OpenFOAM libraries remain discoverable for child processes.
+# The ":-" defaults keep sourcing safe under "set -u" when no OpenFOAM
+# environment is loaded, and empty entries are not added to the path.
 case "$(uname -s)" in
 Darwin)
-    export DYLD_LIBRARY_PATH="${FOAM_LIBBIN}:${FOAM_USER_LIBBIN}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    for LIB_DIR in "${FOAM_USER_LIBBIN:-}" "${FOAM_LIBBIN:-}"
+    do
+        if [[ -n ${LIB_DIR} ]]
+        then
+            export DYLD_LIBRARY_PATH="${LIB_DIR}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+        fi
+    done
+    unset LIB_DIR
     ;;
 esac
 
