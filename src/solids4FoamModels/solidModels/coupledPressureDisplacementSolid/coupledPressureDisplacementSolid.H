@@ -171,9 +171,6 @@ class coupledPressureDisplacementSolid
         //- Composite temporal scheme;
         // Switch skewCorr_;
 
-        //- Use standard procedure for displ grad calculation
-        Switch stdDispGrad_;
-
         //- Temporal discretisation coefficient;
         dimensionedScalar coeff_;
 

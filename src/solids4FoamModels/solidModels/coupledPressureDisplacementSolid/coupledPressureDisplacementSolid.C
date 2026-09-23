@@ -542,14 +542,6 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             false
         )
     ),
-    stdDispGrad_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "stdDispGrad",
-            true
-        )
-    ),
     coeff_("coeff", dimless, 1.0),
     delta_
     (
@@ -594,6 +586,21 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
 {
     DDisRequired();
     // DisRequired();
+
+    // The point-based displacement gradient option (stdDispGrad false) has
+    // been removed: no case used it, and it tied this model to the legacy
+    // mechanicalModel. Refuse it rather than silently change the scheme.
+    if (!solidModelDict().lookupOrDefault<Switch>("stdDispGrad", true))
+    {
+        FatalErrorIn
+        (
+            "coupledPressureDisplacementSolid::"
+            "coupledPressureDisplacementSolid(...)"
+        )   << "stdDispGrad false is no longer supported: the point-based "
+            << "displacement gradient has been removed. Remove the "
+            << "stdDispGrad entry from " << solidModelDict().name()
+            << abort(FatalError);
+    }
 
     if (runTime.timeIndex() == 0)
     {
@@ -927,15 +934,7 @@ bool coupledPressureDisplacementSolid::evolve()
         // Momentum equation
         {
             // Update gradient of displacement
-            if (stdDispGrad_)
-            {
-                #include "stdDispGrad.H"
-            }
-            else
-            {
-                mechanical().grad(DD(), pointDD(), gradDD());
-                mechanical().grad(DD(), pointDD(), gradDDf_);
-            }
+            #include "stdDispGrad.H"
 
             gradD() = gradD().oldTime() + gradDD();
             gradDf_ = gradDf_.oldTime() + gradDDf_;
