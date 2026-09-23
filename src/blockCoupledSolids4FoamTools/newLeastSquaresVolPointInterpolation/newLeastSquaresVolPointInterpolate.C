@@ -28,6 +28,12 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "symmetryPointPatchFields.H"
 
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "enhancedVolPointInterpolation.H"
+#else
+    #include "syncTools.H"
+#endif
+
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
@@ -801,6 +807,127 @@ void newLeastSquaresVolPointInterpolation::interpolate
             }
         }
     }
+}
+
+
+#ifndef OPENFOAM_NOT_EXTEND
+template<class Type>
+void newLeastSquaresVolPointInterpolation::sumCoupledPointValues
+(
+    const polyMesh& mesh,
+    List<Type>& pointValues
+)
+{
+    // syncTools sums across each processor patch and then again over the
+    // points shared by more than two processors, starting from the values
+    // the patches have already summed, so a shared point can count a
+    // neighbour's contribution more than once. Keep the local values of the
+    // shared points and sum those alone once the patches are done
+    const globalMeshData& gmd = mesh.globalData();
+    const labelList& sharedPointLabels = gmd.sharedPointLabels();
+    const labelList& sharedPointAddr = gmd.sharedPointAddr();
+
+    List<Type> sharedValues(gmd.nGlobalPoints(), pTraits<Type>::zero);
+
+    forAll(sharedPointLabels, i)
+    {
+        sharedValues[sharedPointAddr[i]] = pointValues[sharedPointLabels[i]];
+    }
+
+    syncTools::syncPointList
+    (
+        mesh, pointValues, plusEqOp<Type>(), pTraits<Type>::zero, false
+    );
+
+    if (gmd.nGlobalPoints() > 0)
+    {
+        Pstream::listCombineGather(sharedValues, plusEqOp<Type>());
+        Pstream::listCombineScatter(sharedValues);
+
+        forAll(sharedPointLabels, i)
+        {
+            pointValues[sharedPointLabels[i]] =
+                sharedValues[sharedPointAddr[i]];
+        }
+    }
+}
+#endif
+
+
+template<class Type>
+void newLeastSquaresVolPointInterpolation::interpolate
+(
+    const DimensionedField<Type, volMesh>& vf,
+    const DimensionedField
+    <
+        typename outerProduct<vector, Type>::type, volMesh
+    >& gradVf,
+    DimensionedField<Type, pointMesh>& pf
+) const
+{
+    if (debug)
+    {
+        Info<< "newLeastSquaresVolPointInterpolation::interpolate("
+            << "const DimensionedField<Type, volMesh>&, "
+            << "const DimensionedField<GradType, volMesh>&, "
+            << "DimensionedField<Type, pointMesh>&) : "
+            << "interpolating field " << vf.name() << " from cells to points "
+            << pf.name() << endl;
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    // The implementation these forks already have, so that there is one
+    enhancedVolPointInterpolation::New(mesh()).interpolate(vf, gradVf, pf);
+#else
+    const fvMesh& mesh = vf.mesh();
+
+    const labelListList& pointCells = mesh.pointCells();
+    const pointField& points = mesh.points();
+    const vectorField& cellCentres = mesh.cellCentres();
+
+    // Weighted sums of the extrapolated values, and the weights
+    Field<Type> sumWVf(points.size(), pTraits<Type>::zero);
+    scalarField sumW(points.size(), 0.0);
+
+    forAll(pointCells, pointI)
+    {
+        const labelList& ppc = pointCells[pointI];
+
+        forAll(ppc, pointCellI)
+        {
+            const label cellI = ppc[pointCellI];
+
+            // Distance vector
+            const vector delta = points[pointI] - cellCentres[cellI];
+
+            // Inverse distance weight
+            const scalar pw = 1.0/mag(delta);
+
+            // Weighted extrapolated value
+            sumWVf[pointI] += pw*(vf[cellI] + (delta & gradVf[cellI]));
+            sumW[pointI] += pw;
+        }
+    }
+
+    // Sum collocated contributions
+    sumCoupledPointValues(mesh, sumW);
+    sumCoupledPointValues(mesh, sumWVf);
+
+    // Normalise
+    forAll(pf, pointI)
+    {
+        const scalar s = sumW[pointI];
+
+        if (s > ROOTVSMALL)
+        {
+            pf[pointI] = sumWVf[pointI]/s;
+        }
+        else
+        {
+            pf[pointI] = sumWVf[pointI];
+        }
+    }
+#endif
 }
 
 
