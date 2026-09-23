@@ -48,6 +48,7 @@ License
 #include "fvcInterpolate.H"
 
 #include "stabLeastSquaresGrad.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "leastSquaresGrad.H"
 #include "gaussGrad.H"
 
@@ -82,6 +83,179 @@ addToRunTimeSelectionTable
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return mechanical().impK();
+    }
+
+    if (frameworkImpKPtr_.empty())
+    {
+        // Announce it, so that a case which sets the switch can be shown to
+        // have taken this path
+        Info<< type() << ": taking the stiffness from the "
+            << "mechanicalConstitutiveLaw framework" << endl;
+
+        frameworkImpKPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimForce/dimArea, 0),
+                calculatedFvPatchScalarField::typeName
+            )
+        );
+
+        // A finite-strain tangent query, as the finite-strain laws this model
+        // runs with have no small-strain evaluation. It neither writes a
+        // stress nor disturbs history, and is taken at the current
+        // deformation gradient: the identity on a cold start and the restart
+        // value otherwise, the same state dependence the legacy impK() has
+        const volTensorField F(I + gradD().T());
+        const volTensorField F0(I + gradD().oldTime().T());
+        const volScalarField J(det(F));
+        const volScalarField J0(det(F0));
+        const volTensorField Finv(inv(F));
+        const volTensorField Finv0(inv(F0));
+
+        mechanicalManager().updateScalarTangentFiniteStrain
+        (
+            F, F0, Finv, Finv0, J, J0,
+            mesh().time().deltaTValue(),
+            frameworkImpKPtr_(),
+            tangentRequest::scalarDeviatoric
+        );
+
+        frameworkImpKPtr_() *= 0.75;
+    }
+
+    return tmp<volScalarField>(new volScalarField(frameworkImpKPtr_()));
+}
+
+
+tmp<surfaceScalarField> coupledPressureDisplacementSolid::momentumImpKf() const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return mechanical().impKf();
+    }
+
+    // The framework has no separate face tangent: the face value is the
+    // interpolate of the cell one, which is what the legacy impKf() amounts
+    // to for a law whose stiffness does not vary within a material
+    return fvc::interpolate(momentumImpK());
+}
+
+
+tmp<volScalarField> coupledPressureDisplacementSolid::makeRKappa() const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return 1.0/mechanical().bulkModulus()();
+    }
+
+    return 1.0/mechanicalManager().kappa();
+}
+
+
+void coupledPressureDisplacementSolid::updateStress(volSymmTensorField& sigma)
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        mechanical().correct(sigma);
+        return;
+    }
+
+    // Total Lagrangian: the gradient is with respect to the reference
+    // configuration, as calcTraction.H takes it
+    const volTensorField F(I + gradD().T());
+    const volTensorField F0(I + gradD().oldTime().T());
+    const volScalarField J(det(F));
+    const volScalarField J0(det(F0));
+    const volTensorField Finv(inv(F));
+    const volTensorField Finv0(inv(F0));
+
+    // The law's volumetric response is asked for only so that it is kept out
+    // of the stress; the solved pressure takes its place
+    volScalarField volumetricResponse
+    (
+        IOobject
+        (
+            "volumetricResponse",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("0", dimPressure, 0)
+    );
+
+    mechanicalManager().updateStressFiniteStrainSplit
+    (
+        F, F0, Finv, Finv0, J, J0,
+        runTime().deltaTValue(),
+        sigma,
+        volumetricResponse
+    );
+
+    sigma = sigma - p_*I;
+}
+
+
+void coupledPressureDisplacementSolid::updateStress
+(
+    surfaceSymmTensorField& sigmaf
+)
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        mechanical().correct(sigmaf);
+        return;
+    }
+
+    const surfaceTensorField F(I + gradDf_.T());
+    const surfaceTensorField F0(I + gradDf_.oldTime().T());
+    const surfaceScalarField J(det(F));
+    const surfaceScalarField J0(det(F0));
+    const surfaceTensorField Finv(inv(F));
+    const surfaceTensorField Finv0(inv(F0));
+
+    surfaceScalarField volumetricResponse
+    (
+        IOobject
+        (
+            "volumetricResponsef",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("0", dimPressure, 0)
+    );
+
+    mechanicalManager().updateStressFiniteStrainSplit
+    (
+        F, F0, Finv, Finv0, J, J0,
+        runTime().deltaTValue(),
+        sigmaf,
+        volumetricResponse
+    );
+
+    sigmaf = sigmaf - pf_*I;
+}
 
 
 scalar coupledPressureDisplacementSolid::residual(const volVectorField& DD) const
@@ -463,6 +637,7 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
         mesh(),
         dimensionedVector("0", dimless, vector::zero)
     ),
+    frameworkImpKPtr_(),
     impKf_
     (
         IOobject
@@ -473,9 +648,9 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mechanical().impKf()
+        momentumImpKf()
     ),
-    rKappa_(1.0/mechanical().bulkModulus()()),
+    rKappa_(makeRKappa()),
     nuCoeff_
     (
         IOobject
@@ -602,6 +777,25 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             << abort(FatalError);
     }
 
+    // One material on the framework path. The legacy path handles more
+    // through per-material sub-meshes, which the framework replaces, and on
+    // foam-extend - the only fork this model is built on - the framework has
+    // no per-material point interpolation to replace them with
+    if
+    (
+        useMechanicalConstitutiveLawManager()
+     && mechanicalManager().nLaws() > 1
+    )
+    {
+        FatalErrorIn
+        (
+            "coupledPressureDisplacementSolid::"
+            "coupledPressureDisplacementSolid(...)"
+        )   << "More than one material is not supported on the "
+            << "mechanicalConstitutiveLaw framework in this solid model"
+            << abort(FatalError);
+    }
+
     if (runTime.timeIndex() == 0)
     {
         Info << "Initialize curSf, deltas and weights" << endl;
@@ -629,7 +823,7 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
 
     // Calc. nuCoeff
     {
-        const volScalarField G = mechanical().impK();
+        const volScalarField G(momentumImpK());
 
         if (gMax(rKappa_.internalField())/10 < SMALL)
         {
@@ -943,7 +1137,7 @@ bool coupledPressureDisplacementSolid::evolve()
             // selectable mechanical law
             if (nonLinear_)
             {
-                mechanical().correct(sigma());
+                updateStress(sigma());
             }
 
             Dp_.boundaryField().updateCoeffs();
@@ -953,7 +1147,7 @@ bool coupledPressureDisplacementSolid::evolve()
             // selectable mechanical law
             if (nonLinear_)
             {
-                mechanical().correct(sigmaf_);
+                updateStress(sigmaf_);
             }
 
             surfaceVectorField nf = mesh().Sf()/mesh().magSf();
@@ -969,7 +1163,7 @@ bool coupledPressureDisplacementSolid::evolve()
             // form where gradients are calculated directly at the faces
             fvVectorMatrix DDEqn
             (
-              - fvm::laplacian(mechanical().impK(), DD(), "laplacian(DDD,DD)")
+              - fvm::laplacian(momentumImpK(), DD(), "laplacian(DDD,DD)")
               - fvc::div(impKf_*tGradDDn_*mesh().magSf())
               - fvc::div(nonLinForceCorrection_)
               - fvc::div(force_.oldTime())
@@ -1159,8 +1353,16 @@ bool coupledPressureDisplacementSolid::evolve()
             maxIterReached()++;
         }
 
-        // Interpolate D to pointD
-        mechanical().interpolate(DD(), pointDD(), false);
+        // Interpolate D to pointD. For one material the legacy call is this
+        // same interpolation, and the framework path allows only one
+        if (useMechanicalConstitutiveLawManager())
+        {
+            volToPoint().interpolate(DD(), pointDD());
+        }
+        else
+        {
+            mechanical().interpolate(DD(), pointDD(), false);
+        }
 
         // Total point displacement
         pointD() = pointD().oldTime() + pointDD();
@@ -1266,12 +1468,12 @@ bool coupledPressureDisplacementSolid::evolve()
     // Calculate the stress using run-time selectable mechanical law
     if (nonLinear_)
     {
-        mechanical().correct(sigma());
+        updateStress(sigma());
     }
     else
     {
         volSymmTensorField epsilon = symm(gradD());
-        volScalarField mu = mechanical().impK();
+        volScalarField mu(momentumImpK());
         sigma() = 2*mu*epsilon - nuCoeff_*p_*I;
     }
 
@@ -1684,7 +1886,7 @@ faceZoneAcceleration
 void coupledPressureDisplacementSolid::updateTotalFields()
 {
     solidModel::updateTotalFields();
-    impKf_ = mechanical().impKf();
+    impKf_ = momentumImpKf();
 
     // Update settings
     {
