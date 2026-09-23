@@ -288,25 +288,41 @@ else
     force_time=""
 fi
 
-if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
+# The one supported reason not to run is the environment the case declares it
+# needs (PETSc); Allrun then says so, and that is a skip. A run that starts
+# and stops short is a failure, not a skip: it used to exit 0 here, which kept
+# a crash on OpenFOAM.org and foam-extend green for as long as it lasted (#455)
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the case does not run in this environment"
     exit 0
+fi
+
+if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+    echo "FAIL: the case produced no displacement or force history"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the case did not reach the requested end time"
-    exit 0
+    echo "FAIL: the case stopped at ${disp_time}, before the requested end time ${REG_END_TIME}"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the force history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the force history stopped at ${force_time}, before the requested end time ${REG_END_TIME}"
+    exit 1
 fi
 
 if [ "$CHECK_ONLY" = false ]; then
     run_backward_restart_test
 fi
 check_backward_restart
+
+# Said, so that a run which reached this check can be told from one which
+# skipped it: the check used to be skipped silently on two forks (#455).
+# A failure has already stopped the script under set -e
+echo "PASS: fluxCorrectedVelocity backward restart" \
+    "($(grep -o 'Checked [0-9]* fluxCorrectedVelocity patches' \
+        "${BACKWARD_CASE_DIR}/log.Test-fluxCorrectedVelocityRestart"))"
 
 if [ "$CHECK_ONLY" = false ]; then
     run_framework_test || true

@@ -157,8 +157,11 @@ const scalarField& elasticWallPressureFvPatchScalarField::rhoSolidHs() const
             rhoHsZoneAtFluid    // to field
         );
 
-        // Initialise the rhoHs field for the fluid patch and map zone to patch
-        rhoSolidHsPtr_.set
+        // Initialise the rhoHs field for the fluid patch and map zone to patch.
+        // reset rather than set: the field is recomputed each time step when
+        // constantHs is zero, and set() refuses an allocated pointer on
+        // OpenFOAM.org and foam-extend (#455)
+        rhoSolidHsPtr_.reset
         (
             new scalarField
             (
