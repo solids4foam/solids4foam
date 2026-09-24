@@ -742,13 +742,19 @@ void elasticWallPressureFvPatchScalarField::smoothPatchField
     const label nSweeps
 ) const
 {
-    const labelListList& faceFaces = patch().patch().faceFaces();
+    // Smooth on the global interface patch, which is the same on every
+    // processor, so that the result does not depend on the decomposition
+    const globalPolyPatch& globalPatch =
+        fsi().fluid().globalPatches()[interfaceIndex()];
+    const labelListList& faceFaces = globalPatch.globalPatch().faceFaces();
+
+    scalarField globalFld(globalPatch.patchFaceToGlobal(fld));
 
     for (label sweepI = 0; sweepI < nSweeps; sweepI++)
     {
-        const scalarField fld0(fld);
+        const scalarField fld0(globalFld);
 
-        forAll(fld, faceI)
+        forAll(globalFld, faceI)
         {
             const labelList& nbrs = faceFaces[faceI];
 
@@ -760,10 +766,12 @@ void elasticWallPressureFvPatchScalarField::smoothPatchField
                     sumNbr += fld0[nbrs[nI]];
                 }
 
-                fld[faceI] = 0.5*fld0[faceI] + 0.5*sumNbr/nbrs.size();
+                globalFld[faceI] = 0.5*fld0[faceI] + 0.5*sumNbr/nbrs.size();
             }
         }
     }
+
+    fld = globalPatch.globalFaceToPatch(globalFld);
 }
 
 

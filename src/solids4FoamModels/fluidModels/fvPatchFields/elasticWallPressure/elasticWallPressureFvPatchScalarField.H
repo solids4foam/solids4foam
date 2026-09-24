@@ -308,7 +308,8 @@ class elasticWallPressureFvPatchScalarField
         //- Return the fluid normal acceleration implied by the pressure
         tmp<scalarField> fluidNormalAcceleration() const;
 
-        //- Smooth a face field over the patch face neighbours
+        //- Smooth a face field over the face neighbours on the global
+        //  interface patch
         void smoothPatchField(scalarField& fld, const label nSweeps) const;
 
         //- Bound and apply a new secant scale factor field
