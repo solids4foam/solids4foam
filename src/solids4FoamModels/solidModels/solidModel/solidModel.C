@@ -305,40 +305,6 @@ void Foam::solidModel::makeThermalModel() const
 }
 
 
-void Foam::solidModel::makeMechanicalModel() const
-{
-    if (!mechanicalPtr_.empty())
-    {
-        FatalErrorIn("void Foam::solidModel::makeMechanicalModel() const")
-            << "pointer already set!" << abort(FatalError);
-    }
-
-    // The framework exists to replace this. A run that builds it anyway
-    // constructs every legacy law, registers a second dictionary under the
-    // name this class now reads for itself, and silently keeps the legacy
-    // hierarchy alive, so it is a defect rather than a fallback
-    if (useMechanicalConstitutiveLawManager())
-    {
-        FatalErrorInFunction
-            << "A mechanicalConstitutiveLaw framework run reached the legacy "
-            << "mechanicalModel." << nl << nl
-            << "    Either solid model " << type() << " does not offer "
-            << "'useMechanicalConstitutiveLawManager' at all, in which case "
-            << "unset it in solidProperties; or it does offer it and has a "
-            << "path that still reaches the legacy model, which is a bug in "
-            << "the solid model." << nl
-            << "    The two cannot be told apart here. The solid model's "
-            << "README.md says which it is."
-            << abort(FatalError);
-    }
-
-    mechanicalPtr_.set
-    (
-        new mechanicalModel(mesh(), nonLinGeom(), incremental())
-    );
-}
-
-
 void Foam::solidModel::makeMechanicalProperties() const
 {
     if (!mechanicalPropertiesPtr_.empty())
@@ -364,6 +330,44 @@ void Foam::solidModel::makeMechanicalProperties() const
 }
 
 
+void Foam::solidModel::checkRemovedMechanicalModelSwitch() const
+{
+    // The switch chose between the mechanicalConstitutiveLaw framework and the
+    // legacy mechanicalModel. The legacy model has been removed, so a case
+    // that asks for it must stop rather than silently run on the framework
+    // and give different results; one that asks for the framework gets what
+    // it asked for, and is only told that the entry is no longer needed
+    const word key("useMechanicalConstitutiveLawManager");
+
+    if (!solidModelDict().found(key))
+    {
+        return;
+    }
+
+    if (Switch(solidModelDict().lookup(key)))
+    {
+        Info<< "    '" << key << " yes' is obsolete and can be removed: the "
+            << "mechanicalConstitutiveLaw framework is the only mechanical "
+            << "model" << endl;
+
+        return;
+    }
+
+    FatalIOErrorInFunction(solidModelDict())
+        << "'" << key << " no' selects the legacy mechanicalModel, which has "
+        << "been removed from solids4foam." << nl << nl
+        << "    The mechanicalConstitutiveLaw framework is now the only "
+        << "mechanical model. It reads the same constant/mechanicalProperties "
+        << "and provides every law the legacy model did. Remove '" << key
+        << "' from " << type_ << "Coeffs in constant/solidProperties to run "
+        << "on it, and check the results: they are not guaranteed to match "
+        << "the legacy model's." << nl
+        << "    To reproduce a result from the legacy model, use a solids4foam "
+        << "release that still contains it."
+        << exit(FatalIOError);
+}
+
+
 void Foam::solidModel::makeRho() const
 {
     if (!rhoPtr_.empty())
@@ -372,9 +376,8 @@ void Foam::solidModel::makeRho() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    // Both implementations read the same density entries, but only one of
-    // them may be constructed on a given run; initialRho() picks it. Built
-    // from a tmp, so the field takes over the tmp's registration as "rho"
+    // Built from a tmp, so the field takes over the tmp's registration as
+    // "rho"
     rhoPtr_.set(new volScalarField(initialRho()));
 }
 
@@ -1052,7 +1055,6 @@ Foam::solidModel::solidModel
       : solutionAlgorithm::IMPLICIT_SEGREGATED
     ),
     thermalPtr_(),
-    mechanicalPtr_(),
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -1270,13 +1272,6 @@ Foam::solidModel::solidModel
     ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
-    useMechanicalConstitutiveLawManager_
-    (
-        solidModelDict().lookupOrDefault<Switch>
-        (
-            "useMechanicalConstitutiveLawManager", false
-        )
-    ),
     mechanicalManagerPtr_(),
     jacobianTangentCached_(false),
     jacobianTangent_(tangentRequest::none),
@@ -1318,6 +1313,8 @@ Foam::solidModel::solidModel
     // for example, backwardD2dt2Scheme stops with a "not implemented for a
     // moving mesh" error (issue #184). So the flag is cleared here
     mesh().moving(false);
+
+    checkRemovedMechanicalModelSwitch();
 
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
@@ -1624,8 +1621,6 @@ Foam::solidModel::solidModel
 Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
-    mechanicalPtr_.clear();
-
 }
 
 
@@ -1652,28 +1647,6 @@ const Foam::thermalModel& Foam::solidModel::thermal() const
 }
 
 
-Foam::mechanicalModel& Foam::solidModel::mechanical()
-{
-    if (mechanicalPtr_.empty())
-    {
-        makeMechanicalModel();
-    }
-
-    return mechanicalPtr_();
-}
-
-
-const Foam::mechanicalModel& Foam::solidModel::mechanical() const
-{
-    if (mechanicalPtr_.empty())
-    {
-        makeMechanicalModel();
-    }
-
-    return mechanicalPtr_();
-}
-
-
 const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
 {
     if (mechanicalPropertiesPtr_.empty())
@@ -1689,10 +1662,10 @@ void Foam::solidModel::readHydrostaticSmoothing() const
 {
     hydrostaticSmoothingRead_ = true;
 
-    // Read from the law entries, where the legacy laws read it, so that every
-    // existing case keeps working unchanged. It is a solid-model setting in
-    // all but location: one equation is solved, with the solid model's own
-    // momentum diagonal, so one answer is needed for the whole mesh
+    // Read from the law entries, where cases have always set it. It is a
+    // solid-model setting in all but location: one equation is solved, with
+    // the solid model's own momentum diagonal, so one answer is needed for
+    // the whole mesh
     const PtrList<entry> lawEntries(mechanicalProperties().lookup("mechanical"));
 
     label nRequested = 0;
@@ -1722,21 +1695,19 @@ void Foam::solidModel::readHydrostaticSmoothing() const
 
     // Not supported for more than one material. One equation over the whole
     // mesh would diffuse the hydrostatic stress across a material interface,
-    // where it genuinely jumps; the legacy laws instead solved one per
-    // material sub-mesh on foam-extend, and refused on OpenFOAM
+    // where it genuinely jumps
     if (lawEntries.size() > 1)
     {
         FatalIOErrorInFunction(mechanicalProperties())
             << "solvePressureEqn is set for material '" << requestingLaw
             << "', and there are " << lawEntries.size() << " materials."
             << nl << nl
-            << "    On the mechanicalConstitutiveLaw framework the hydrostatic "
-            << "stress smoothing is done by the solid model, as one equation "
-            << "over the whole mesh, and that would smear the hydrostatic "
-            << "stress across the material interfaces, where it jumps. It is "
-            << "therefore supported for a single material only." << nl
-            << "    Remove solvePressureEqn, or, on foam-extend, run on the "
-            << "legacy path with useMechanicalConstitutiveLawManager no."
+            << "    The hydrostatic stress smoothing is done by the solid "
+            << "model, as one equation over the whole mesh, and that would "
+            << "smear the hydrostatic stress across the material interfaces, "
+            << "where it jumps. It is therefore supported for a single "
+            << "material only." << nl
+            << "    Remove solvePressureEqn."
             << exit(FatalIOError);
     }
 
@@ -1746,14 +1717,6 @@ void Foam::solidModel::readHydrostaticSmoothing() const
 
 bool Foam::solidModel::hydrostaticSmoothingRequested() const
 {
-    // On the legacy path the law does this itself, and reading
-    // mechanicalProperties here would clash with the legacy model's own
-    // registration of it
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return false;
-    }
-
     if (!hydrostaticSmoothingRead_)
     {
         readHydrostaticSmoothing();
@@ -1867,7 +1830,7 @@ void Foam::solidModel::addSmoothedHydrostaticStress
 {
     if (sigmaHydPtr_.empty())
     {
-        // As the legacy law makes it: not read, zero-gradient, and written
+        // Not read, zero-gradient, and written
         sigmaHydPtr_.set
         (
             new volScalarField
@@ -1925,7 +1888,7 @@ void Foam::solidModel::addSmoothedHydrostaticStress
     volVectorField& gradSigmaHyd = gradSigmaHydPtr_();
 
     // The solid model registers its momentum diagonal under this name for the
-    // duration of each outer iteration, as it did for the legacy laws
+    // duration of each outer iteration
     if (!mesh().foundObject<volScalarField>("DEqnA"))
     {
         FatalErrorInFunction
@@ -1934,15 +1897,13 @@ void Foam::solidModel::addSmoothedHydrostaticStress
             << " has not registered one at this stress update." << nl
             << "    It exists only inside the segregated momentum loop, so "
             << "the smoothing is not available from a stress update outside "
-            << "it, such as the linear predictor; the legacy laws refused the "
-            << "same thing."
+            << "it, such as the linear predictor."
             << exit(FatalError);
     }
 
     const volScalarField& AD = mesh().lookupObject<volScalarField>("DEqnA");
 
-    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ, which is what the
-    // legacy laws pass to updateSigmaHyd
+    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ
     const volScalarField& volumetricResponse = smoothingVolumetricResponse();
     const volScalarField sigmaHydExplicit
     (
@@ -1991,8 +1952,8 @@ void Foam::solidModel::addSmoothedHydrostaticStress
 
     gradSigmaHyd = fvc::grad(sigmaHyd);
 
-    // Recombine, including on the boundary, where the legacy law also takes
-    // the zero-gradient value of sigmaHyd
+    // Recombine, including on the boundary, where this takes the
+    // zero-gradient value of sigmaHyd
     if (JPtr)
     {
         sigma = sigma + (sigmaHyd/(*JPtr))*I;
@@ -2281,25 +2242,8 @@ void Foam::solidModel::rollOverQuadratureHistory()
 
 void Foam::solidModel::updateTotalFields()
 {
-    // One or the other, not both.
-    //
-    // The legacy call runs the legacy laws' end-of-step work, and that is not
-    // the no-op it looks like: linearElasticMohrCoulombPlastic updates its
-    // strain, plastic fields and diagnostics there, and others recompute an
-    // effective stiffness. On a framework run those laws are never evaluated,
-    // so the work would be done on stale inputs and read by nothing.
-    //
-    // Here rather than in each solid model because every model needs it and
-    // three of them had identical copies, while the models ported later had
-    // none and reached the legacy model through this function
-    if (useMechanicalConstitutiveLawManager())
-    {
-        mechanicalManager().endTimeStep();
-    }
-    else
-    {
-        mechanical().updateTotalFields();
-    }
+    // Here rather than in each solid model because every model needs it
+    mechanicalManager().endTimeStep();
 
     // A model overriding this must call rollOverQuadratureHistory() itself
     rollOverQuadratureHistory();
@@ -2364,17 +2308,6 @@ Foam::solidModel::mechanicalManager() const
 {
     if (mechanicalManagerPtr_.empty())
     {
-        // Built from the dictionary this class reads, not from the legacy
-        // mechanicalModel. The legacy model is the same dictionary - it
-        // derives from IOdictionary - so both implementations still see
-        // exactly the same entries, but the framework no longer needs the
-        // thing it replaces in order to exist
-        // Said once, on the one path that every framework run goes through,
-        // so that "did this run use the framework?" is answerable from the
-        // log for every solid model rather than only the two that happen to
-        // announce it from makeImpK(). The regression arms rely on this to
-        // tell their two paths apart; without it an arm whose switch silently
-        // failed to apply compares the legacy path against itself and passes
         Info<< "Creating the mechanicalConstitutiveLawManager" << endl;
 
         mechanicalManagerPtr_.set
@@ -2401,16 +2334,13 @@ void Foam::solidModel::frameworkInterpolate
     {
         // The least squares fit below would straddle a material interface,
         // where the displacement is continuous but its gradient jumps, and
-        // smear it. The legacy model avoided that with per-material
-        // sub-meshes; the framework instead extrapolates each cell's value
-        // with its own gradient, which the material-aware leastSquaresS4f
-        // scheme keeps to one material, as the other forks do for any
-        // number of materials
+        // smear it. Instead each cell's value is extrapolated with its own
+        // gradient, which the material-aware leastSquaresS4f scheme keeps to
+        // one material, as the other forks do for any number of materials
         volToPoint().interpolate(D, gradD, pointD);
     }
     else
     {
-        // What the legacy single-material branch does on this fork
         volToPoint().interpolate(D, pointD);
     }
 #endif
@@ -2421,31 +2351,25 @@ void Foam::solidModel::frameworkInterpolate
 
 Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
 {
-    if (useMechanicalConstitutiveLawManager())
-    {
-        // A registered copy, as the legacy mechanicalLaw::rho() returns, so
-        // that a field built from it takes over the registration. The
-        // manager's own cache is not registered, and a plain copy of it would
-        // not be either; an unregistered field is not mapped when the mesh
-        // topology changes
-        return tmp<volScalarField>
+    // A registered copy, so that a field built from it takes over the
+    // registration. The manager's own cache is not registered, and a plain
+    // copy of it would not be either; an unregistered field is not mapped
+    // when the mesh topology changes
+    return tmp<volScalarField>
+    (
+        new volScalarField
         (
-            new volScalarField
+            IOobject
             (
-                IOobject
-                (
-                    "rho",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                mechanicalManager().rho()
-            )
-        );
-    }
-
-    return mechanical().rho();
+                "rho",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mechanicalManager().rho()
+        )
+    );
 }
 
 
@@ -2455,16 +2379,9 @@ void Foam::solidModel::gradQuad
     CompactListList<tensor>& gradDQuad
 ) const
 {
-    // The legacy overload refused this, and the framework has no
-    // quadrature-point gradient for more than one material either
-    // mechanicalModel derives from both IOdictionary and PtrList, so name the
-    // base whose size is the number of materials
-    const label nMaterials =
-        useMechanicalConstitutiveLawManager()
-      ? mechanicalManager().nLaws()
-      : mechanical().PtrList<mechanicalLaw>::size();
-
-    if (nMaterials > 1)
+    // The framework has no quadrature-point gradient for more than one
+    // material
+    if (mechanicalManager().nLaws() > 1)
     {
         FatalErrorInFunction
             << "The face quadrature gradient is not implemented for more than "
@@ -2477,11 +2394,6 @@ void Foam::solidModel::gradQuad
 
 void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return;
-    }
-
     if (mechanicalManager().nLaws() < 2)
     {
         return;
@@ -2499,13 +2411,12 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
     if (gradScheme != "leastSquaresS4f")
     {
         FatalErrorInFunction
-            << "More than one material on the mechanicalConstitutiveLaw "
-            << "framework needs a material-aware gradient for grad("
-            << fieldName << "), and `" << gradScheme << "` is not one."
-            << nl << nl
-            << "    The framework computes one gradient on one mesh in place "
-            << "of the legacy per-material subMeshes, which only works if the "
-            << "scheme keeps a cell's stencil within its own material. Set "
+            << "More than one material needs a material-aware gradient for "
+            << "grad(" << fieldName << "), and `" << gradScheme << "` is not "
+            << "one." << nl << nl
+            << "    One gradient is computed on the whole mesh, which only "
+            << "works if the scheme keeps a cell's stencil within its own "
+            << "material. Set "
             << "`grad(" << fieldName << ") leastSquaresS4f;` in fvSchemes."
             << abort(FatalError);
     }
@@ -2581,11 +2492,6 @@ void Foam::solidModel::end()
         solidProperties().IOobject::name() + ".withDefaultValues"
     );
     solidProperties_.regIOobject::write();
-
-    if (!mechanicalPtr_.empty())
-    {
-        mechanical().writeDict();
-    }
 
     if (!thermalPtr_.empty())
     {
@@ -2711,22 +2617,18 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     // refuses a case that asks for it rather than silently ignoring it.
     //
     // Only of a model that has built the framework manager, and so has read
-    // mechanicalProperties already. A model that uses the legacy
-    // mechanicalModel whatever the switch says registers mechanicalProperties
-    // itself, and reading it a second time here would clash with that; its
-    // legacy law smooths, or refuses, on its own
+    // mechanicalProperties already
     if
     (
         modelPtr->mechanicalManagerPtr_.valid()
-     && modelPtr->mechanicalPtr_.empty()
      && !modelPtr->supportsHydrostaticSmoothing()
      && modelPtr->hydrostaticSmoothingRequested()
     )
     {
         FatalErrorIn("solidModel::New(Time&, const word&)")
             << "solvePressureEqn is set in mechanicalProperties, and solid "
-            << "model " << modelType << " cannot smooth the hydrostatic stress "
-            << "on the mechanicalConstitutiveLaw framework." << nl
+            << "model " << modelType << " cannot smooth the hydrostatic "
+            << "stress." << nl
             << "    It is supported by the updated Lagrangian, total "
             << "Lagrangian and linear geometry total displacement models. "
             << "Remove solvePressureEqn, or use one of those."
@@ -3038,17 +2940,6 @@ void Foam::solidModel::moveMesh
     }
 #else
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
-#endif
-
-
-#ifdef FOAMEXTEND
-    // Tell the mechanical model to move the subMeshes, if they exist.
-    // The framework has no subMeshes, and asking would construct the legacy
-    // model for the sake of a no-op
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().moveSubMeshes();
-    }
 #endif
 }
 

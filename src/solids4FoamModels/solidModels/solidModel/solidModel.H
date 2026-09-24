@@ -41,7 +41,6 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "thermalModel.H"
-#include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
 #include "globalPolyPatch.H"
@@ -132,9 +131,6 @@ private:
 
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
-
-        //- Mechanical model
-        mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
@@ -289,30 +285,10 @@ private:
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
-        //- Take the stress, and the implicit stiffness built from it, from
-        //  the mechanicalConstitutiveLaw framework rather than from the
-        //  legacy mechanicalModel.
-        //  Held here rather than in each solid model both because they all
-        //  need it and because a base member is constructed before any
-        //  derived one, so it is set by the time a derived impK_ is built
-        //  from it
-        const Switch useMechanicalConstitutiveLawManager_;
-
         //- The mechanicalConstitutiveLaw framework, built on first use
         mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
 
-        //- constant/mechanicalProperties, read by this class rather than by
-        //  the legacy mechanicalModel.
-        //
-        //  The legacy model derives from IOdictionary, so passing it to the
-        //  framework made every framework run construct the whole thing, and
-        //  every legacy law with it - the framework could not exist without
-        //  the thing it replaces. Reading the dictionary here breaks that.
-        //
-        //  Built on first use, and only on a framework run, because
-        //  mechanicalModel registers an object of this same name and two
-        //  registrations of one name is a clash. A framework run does not
-        //  construct the legacy model, so only one of the two ever exists
+        //- constant/mechanicalProperties, built on first use
         mutable autoPtr<IOdictionary> mechanicalPropertiesPtr_;
 
         //- Whether the Jacobian tangent request has been resolved
@@ -354,8 +330,8 @@ private:
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
         mutable autoPtr<volScalarField> pPtr_;
 
-        // Hydrostatic stress smoothing on the framework path: the legacy
-        // laws' solvePressureEqn, done here. See smoothHydrostaticStress()
+        // Hydrostatic stress smoothing (solvePressureEqn). See
+        // smoothHydrostaticStress()
 
             //- Whether the law entries have been read for the setting
             mutable bool hydrostaticSmoothingRead_;
@@ -370,12 +346,10 @@ private:
             mutable scalar pressureSmoothingScaleFactor_;
 
             //- Smoothed hydrostatic stress, J times the mean Cauchy stress.
-            //  Named as the legacy law names it, so that a case's solver and
-            //  relaxation entries for it apply unchanged
+            //  A case's solver and relaxation entries for it use this name
             autoPtr<volScalarField> sigmaHydPtr_;
 
-            //- Which sigmaHyd patches the leastSquaresS4f gradient uses: none,
-            //  as for the legacy law
+            //- Which sigmaHyd patches the leastSquaresS4f gradient uses: none
             autoPtr<boolIOList> useBoundaryFaceValuesSigmaHydPtr_;
 
             //- Gradient of sigmaHyd, lagged by one outer iteration
@@ -398,11 +372,12 @@ private:
         //- Make the thermal model
         void makeThermalModel() const;
 
-        //- Make the mechanical model
-        void makeMechanicalModel() const;
-
         //- Make the mechanicalProperties dictionary
         void makeMechanicalProperties() const;
+
+        //- Refuse 'useMechanicalConstitutiveLawManager no': the legacy
+        //  mechanical model it selected has been removed
+        void checkRemovedMechanicalModelSwitch() const;
 
         //- Make the rho field
         void makeRho() const;
@@ -454,13 +429,6 @@ private:
 
 protected:
 
-        //- Is the stress taken from the mechanicalConstitutiveLaw framework
-        //  rather than from the legacy mechanicalModel?
-        bool useMechanicalConstitutiveLawManager() const
-        {
-            return useMechanicalConstitutiveLawManager_;
-        }
-
         //- The mechanicalConstitutiveLaw framework, constructed on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
@@ -471,13 +439,11 @@ protected:
         //  empty directions after interpolation.
         //
         //  Protected because a solid model that does its own point
-        //  interpolation on the framework has to finish it the same way: this
-        //  is what the legacy mechanicalModel::correctSymmPlanes() became, and
-        //  it also applies the two-dimensional correction
+        //  interpolation has to finish it the same way. It also applies the
+        //  two-dimensional correction
         void correctPointDisplacement(pointVectorField& pointD) const;
 
-        //- Interpolate displacement to points on the primary mesh rather than
-        //  through the legacy per-material sub-meshes
+        //- Interpolate displacement to points on the primary mesh
         void frameworkInterpolate
         (
             const volVectorField& D,
@@ -485,41 +451,31 @@ protected:
             pointVectorField& pointD
         );
 
-        //- Initial density, from whichever implementation is in use.
+        //- Initial density, from the mechanicalConstitutiveLaw framework.
         //
         //  For the models that build their own rho field in the constructor
         //  initialiser list, where solidModel::rho() is not yet what they want
-        //  and the legacy model must not be constructed on a framework run
         tmp<volScalarField> initialRho() const;
 
         //- Displacement gradient at the face quadrature points.
         //
-        //  Identical on both paths and needs neither implementation: the
-        //  legacy mechanicalModel::grad() overload is hofvc::fGrad() for one
-        //  material and notImplemented for more than one, so this is that
-        //  operation with the refusal kept and the legacy model dropped
+        //  hofvc::fGrad() for one material; not implemented for more than one
         void gradQuad
         (
             const volVectorField& D,
             CompactListList<tensor>& gradDQuad
         ) const;
 
-        //- Refuse a multi-material framework run whose gradient scheme is not
+        //- Refuse a multi-material run whose gradient scheme is not
         //  material-aware.
         //
-        //  A solid model on the framework takes its displacement gradient
-        //  straight from fvc::grad() on the primary mesh. The legacy
-        //  mechanicalModel::grad() instead splits the mesh into per-material
-        //  subMeshes, interpolates the displacement onto each, takes a
-        //  gradient there and maps the result back with a stress-based
-        //  interface correction. Replacing that machinery is much of what the
-        //  framework is for: a material-aware least-squares gradient does the
-        //  same job on one mesh, by drawing a cell's stencil only from cells
-        //  of its own material. That is only true of a scheme that gives the
-        //  guarantee, which is what this checks.
-        //
-        //  The primary-mesh gradient is valid only if a cell's stencil stays
-        //  within its own material; leastSquaresS4f provides that guarantee
+        //  A solid model takes its displacement gradient straight from
+        //  fvc::grad() on the primary mesh. Across a material interface, where
+        //  the displacement is continuous but its gradient jumps, that is
+        //  valid only if a cell's stencil stays within its own material: a
+        //  material-aware least-squares gradient does that, by drawing a
+        //  cell's stencil only from cells of its own material, and
+        //  leastSquaresS4f provides that guarantee
         void checkFrameworkGradScheme(const word& fieldName) const;
 
         //- Copy the quadrature gradient into its old-time store, at the end
@@ -532,10 +488,9 @@ protected:
         //  model wanting one does not necessarily want the other
         void rollOverQuadratureHistory();
 
-        //- Does a framework run ask for the hydrostatic stress to be
-        //  smoothed? That is the legacy solvePressureEqn, still read from the
-        //  law entry in mechanicalProperties so that existing cases run
-        //  unchanged. Always false on the legacy path, where the law does it
+        //- Does the case ask for the hydrostatic stress to be smoothed?
+        //  That is solvePressureEqn, read from the law entry in
+        //  mechanicalProperties
         bool hydrostaticSmoothingRequested() const;
 
         //- Can this solid model smooth the hydrostatic stress? Only one that
@@ -550,8 +505,8 @@ protected:
 
         //- Is the hydrostatic stress to be smoothed on this run?
         //
-        //  The legacy laws' solvePressureEqn replaces the explicit
-        //  hydrostatic stress with the solution of
+        //  solvePressureEqn replaces the explicit hydrostatic stress with the
+        //  solution of
         //
         //      sigmaHyd - lap(rDAf, sigmaHyd)
         //    = sigmaHydExplicit - div(rDAf*interpolate(grad(sigmaHyd)) & Sf)
@@ -562,7 +517,7 @@ protected:
         //  checkerboard a segregated solve of a nearly incompressible
         //  material leaves in its hydrostatic stress. It depends on the
         //  momentum matrix and so is a solid-model stabilisation, not part of
-        //  the material, and a framework law does not do it.
+        //  the material, and a law does not do it.
         //
         //  When this answers yes, the solid model asks for the split stress
         //  into smoothingVolumetricResponse() and then calls
@@ -579,13 +534,11 @@ protected:
         //  holds the isochoric stress, with smoothingVolumetricResponse()
         //  holding the volumetric response.
         //
-        //  As in the legacy laws, the quantity smoothed is J times the
-        //  volumetric response, the hydrostatic Kirchhoff stress, and the
-        //  result is divided by J again; JPtr is null for small strain. impK
-        //  is the solid model's implicit stiffness, which on a cold start is
-        //  the (4/3)*mu + K the legacy laws pass. Only the cell-centred
-        //  stress is smoothed: the legacy laws' face stress takes its
-        //  hydrostatic part explicitly, and so does the framework's
+        //  The quantity smoothed is J times the volumetric response, the
+        //  hydrostatic Kirchhoff stress, and the result is divided by J
+        //  again; JPtr is null for small strain. impK is the solid model's
+        //  implicit stiffness. Only the cell-centred stress is smoothed: the
+        //  face stress takes its hydrostatic part explicitly
         void addSmoothedHydrostaticStress
         (
             volSymmTensorField& sigma,
@@ -596,8 +549,7 @@ protected:
         //- The implicit stiffness taken from the mechanicalConstitutiveLaw
         //  framework.
         //
-        //  Shared by the solid models that offer the framework, because the
-        //  field has to match the legacy one exactly: it is registered under
+        //  Shared by the solid models, because the field is registered under
         //  "impK" and looked up by that name by the contact and cohesive zone
         //  models, so its name, dimensions and boundary types are not free
         tmp<volScalarField> frameworkImpK
@@ -887,18 +839,7 @@ public:
             //- Return const reference to the thermal model
             const thermalModel& thermal() const;
 
-            //- Return non-const reference to the mechanical model
-            mechanicalModel& mechanical();
-
-            //- Return const reference to the mechanical model
-            const mechanicalModel& mechanical() const;
-
-            //- Return the volume-to-point interpolation for this mesh.
-            //
-            //  Held here rather than on mechanicalModel, which owned it only
-            //  by accident of history: it is a mesh singleton with no
-            //  constitutive state, and a framework run needs it without
-            //  needing the legacy model
+            //- Return the volume-to-point interpolation for this mesh
 #ifdef OPENFOAM_NOT_EXTEND
             const enhancedVolPointInterpolation& volToPoint() const;
 #else
@@ -1323,15 +1264,16 @@ public:
             ) const = 0;
 
             //- Residual of the material update between outer iterations.
-            //  The legacy mechanicalModel under-relaxes its plastic strain
-            //  increment, so its constitutive update lags the displacement
-            //  solution and has to be checked for convergence. A solid model
-            //  taking its stress from the mechanicalConstitutiveLaw framework
-            //  overrides this, because a framework law is a pure function of
-            //  the kinematics and the old-time state and so does not lag
+            //  Zero: a mechanicalConstitutiveLaw is a pure function of the
+            //  kinematics and the old-time state, and the framework does not
+            //  under-relax the plastic strain increment, so the constitutive
+            //  update does not lag the displacement solution between outer
+            //  iterations. There is therefore nothing for a material residual
+            //  to measure, and convergence is governed by the displacement
+            //  residuals alone
             virtual scalar materialResidual()
             {
-                return mechanical().residual();
+                return 0.0;
             }
 
             //- Update total accumulated fields

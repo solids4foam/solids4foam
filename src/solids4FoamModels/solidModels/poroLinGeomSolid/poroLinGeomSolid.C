@@ -239,7 +239,7 @@ poroLinGeomSolid::poroLinGeomSolid
     // Store old time of p
     p_.oldTime();
 
-    // A multi-material framework run needs a material-aware gradient
+    // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
 }
 
@@ -249,12 +249,6 @@ poroLinGeomSolid::poroLinGeomSolid
 
 void poroLinGeomSolid::correctStress()
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(sigma());
-        return;
-    }
-
     // The framework is a pure function of the displacement gradient and the
     // old-time state, so the gradient is passed explicitly rather than looked
     // up from the registry, and the old-time state is rolled over by the
@@ -271,38 +265,15 @@ void poroLinGeomSolid::correctStress()
 
 Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impK();
-    }
-
     return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 
 Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impKf();
-    }
-
     // The framework has no separate face tangent: the face value is the
     // interpolate of the cell one
     return fvc::interpolate(makeImpK()());
-}
-
-
-Foam::scalar poroLinGeomSolid::materialResidual()
-{
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().residual();
-    }
-
-    // The framework keeps its own state and rolls it over itself, so it has no
-    // residual of its own to report and contributes nothing to convergence
-    return 0.0;
 }
 
 
@@ -394,14 +365,7 @@ bool poroLinGeomSolid::evolve()
         DD() = D() - D().oldTime();
 
         // Update gradient of displacement
-        if (useMechanicalConstitutiveLawManager())
-        {
-            gradD() = fvc::grad(D());
-        }
-        else
-        {
-            mechanical().grad(D(), gradD());
-        }
+        gradD() = fvc::grad(D());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
@@ -427,14 +391,7 @@ bool poroLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    if (useMechanicalConstitutiveLawManager())
-    {
-        frameworkInterpolate(D(), gradD(), pointD());
-    }
-    else
-    {
-        mechanical().interpolate(D(), pointD());
-    }
+    frameworkInterpolate(D(), gradD(), pointD());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

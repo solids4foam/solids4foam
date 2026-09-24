@@ -148,9 +148,7 @@ class nonLinGeomUpdatedLagSolid
         //  framework and not otherwise kept by this solver. Built on first use
         mutable autoPtr<volTensorField> FinvPtr_;
 
-        //- Update the cell-centred stress, from the framework when
-        //  the framework is in use and from the legacy
-        //  mechanicalModel otherwise
+        //- Update the cell-centred stress
         void correctStress();
 
         //- This model smooths the hydrostatic stress on request, in
@@ -160,9 +158,7 @@ class nonLinGeomUpdatedLagSolid
             return true;
         }
 
-        //- Update the stress at the face quadrature points, from the framework
-        //  when the framework is in use and from the
-        //  legacy mechanicalModel otherwise.
+        //- Update the stress at the face quadrature points.
         //  The high-order face quadrature does not exist on foam-extend
         void correctStressQuad();
 
@@ -175,12 +171,10 @@ class nonLinGeomUpdatedLagSolid
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
 
-        //- Construct impK from the framework when
-        //  the framework is in use, and from the legacy
-        //  mechanicalModel otherwise
+        //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
-        //- Construct impKf to match whichever impK was built
+        //- Construct impKf to match impK
         tmp<surfaceScalarField> makeImpKf() const;
 
         //- Return const access to the reciprocal of the bulk modulus
@@ -304,10 +298,6 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
-
-            //- Material residual, zero on the framework path: see the
-            //  base class declaration
-            virtual scalar materialResidual() override;
 
             //- Update total accumulated fields
             virtual void updateTotalFields();

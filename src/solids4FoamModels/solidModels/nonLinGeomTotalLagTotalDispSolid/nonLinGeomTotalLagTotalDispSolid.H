@@ -120,9 +120,7 @@ class nonLinGeomTotalLagTotalDispSolid
 
     // Private Member Functions
 
-        //- Update the cell-centred stress, from the framework when
-        //  the framework is in use and from the legacy
-        //  mechanicalModel otherwise
+        //- Update the cell-centred stress
         void correctStress();
 
         //- This model smooths the hydrostatic stress on request, in
@@ -132,9 +130,7 @@ class nonLinGeomTotalLagTotalDispSolid
             return true;
         }
 
-        //- Update the stress at the face quadrature points, from the framework
-        //  when the framework is in use and from the
-        //  legacy mechanicalModel otherwise.
+        //- Update the stress at the face quadrature points.
         //  The high-order face quadrature does not exist on foam-extend
         void correctStressQuad();
 
@@ -148,9 +144,7 @@ class nonLinGeomTotalLagTotalDispSolid
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
 
-        //- Construct impK from the framework when
-        //  the framework is in use, and from the legacy
-        //  mechanicalModel otherwise
+        //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
         //- Calculate the current face-area vectors
@@ -250,10 +244,6 @@ public:
             }
 
         // Edit
-
-            //- Material residual, zero on the framework path: see the
-            //  base class declaration
-            virtual scalar materialResidual() override;
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
