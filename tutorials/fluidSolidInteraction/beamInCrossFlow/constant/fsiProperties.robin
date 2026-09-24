@@ -43,9 +43,12 @@ fluidSolidInterface    fixedRelaxation;
     outerCorrTolerance 1e-6;
 
     // Additional convergence tolerances used automatically by Robin pressure
-    // interfaces: interface-pressure change and kinematic (interface
-    // leakage-flux change) residuals; see README.md for the iteration-error
-    // estimate (robinConvergence iterationError) used to test them
+    // interfaces: the interface-pressure change and, when the fluid mesh
+    // follows the solid, the leakage (interface flux relative to the mesh
+    // motion, normalised by the throughput plus the interface motion flux).
+    // The default robinConvergence residual tests the latest residuals
+    // against these tolerances; see README.md for the optional iteration-error
+    // estimate (robinConvergence iterationError)
     robinPressureTolerance 1e-5;
     robinFluxTolerance     5e-3;
 

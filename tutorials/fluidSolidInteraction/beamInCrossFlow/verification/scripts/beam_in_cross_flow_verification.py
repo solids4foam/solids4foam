@@ -163,6 +163,8 @@ def run_case(case: Path, label: str, cores: int,
         re.MULTILINE,
     ):
         fail(f"{label} failed inside Allrun; see {solver_log}")
+    if not re.search(r"^End\s*$", solver_text, re.MULTILINE):
+        fail(f"{label} did not run to completion; see {solver_log}")
 
 
 def numeric_rows(path: Path):
@@ -261,9 +263,22 @@ def relative_error(value: float, reference: float) -> float:
     return abs(value - reference) / abs(reference) if reference else abs(value - reference)
 
 
-def extract(case: Path, evaluation_time: float | None) -> dict[str, float]:
-    time, displacement = vector_at_or_before(find_displacement(case), evaluation_time)
-    force_time, force = force_at_or_before(find_force(case), evaluation_time)
+def require_end_time(path: Path, time: float, end_time: float | None) -> None:
+    """Fail unless the history in path reaches the requested end time."""
+    if end_time is not None and not math.isclose(
+        time, end_time, rel_tol=1e-6, abs_tol=1e-12
+    ):
+        fail(f"{path} ends at t={time:g}, not at the end time t={end_time:g}")
+
+
+def extract(case: Path, evaluation_time: float | None,
+            end_time: float | None = None) -> dict[str, float]:
+    displacement_path = find_displacement(case)
+    force_path = find_force(case)
+    time, displacement = vector_at_or_before(displacement_path, evaluation_time)
+    force_time, force = force_at_or_before(force_path, evaluation_time)
+    require_end_time(displacement_path, time, end_time)
+    require_end_time(force_path, force_time, end_time)
     return {"evaluation_time": time, "force_time": force_time, "ux": displacement[0],
             "uy": displacement[1], "uz": displacement[2], "fx": force[0],
             "fy": force[1], "fz": force[2],
@@ -271,7 +286,8 @@ def extract(case: Path, evaluation_time: float | None) -> dict[str, float]:
             "cell_count": cell_count(case)}
 
 
-def robin_residual_summary(case: Path) -> dict[str, float]:
+def robin_residual_summary(case: Path,
+                           end_time: float | None = None) -> dict[str, float]:
     path = case / "postProcessing/fsiResiduals.dat"
     if not path.is_file():
         fail(f"Robin residual data not found in {case}")
@@ -296,6 +312,7 @@ def robin_residual_summary(case: Path) -> dict[str, float]:
         final_by_time[values[0]] = values
         if state_index is not None and len(fields) > state_index:
             states[values[0]] = float(fields[state_index])
+    require_end_time(path, max(final_by_time), end_time)
 
     pressure_tolerance = dictionary_scalar(
         case / "constant/fsiProperties.robin", "robinPressureTolerance"
@@ -476,9 +493,9 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
         configure_time_scheme(case, args.time_scheme)
         configure_output(case, delta_t, end_time, args.write_interval)
         run_case(case, f"{coupling} coupling", cores, coupling)
-        results[coupling] = extract(case, None)
+        results[coupling] = extract(case, None, end_time)
         if coupling == "robin":
-            results[coupling].update(robin_residual_summary(case))
+            results[coupling].update(robin_residual_summary(case, end_time))
 
     primary_quantities = [
         quantity
@@ -601,7 +618,7 @@ def main() -> int:
             refine_mesh(case / "system/solid/blockMeshDict", factor)
             cores = study_cores(args.cores, args.case, factor)
             run_case(case, f"mesh level {factor}x", cores)
-            row = extract(case, None)
+            row = extract(case, None, mesh_end_time)
             row.update({"case": args.case, "study": "mesh", "time_scheme": args.time_scheme, "mesh_level": level, "delta_t": mesh_delta_t, "cores": cores})
             rows.append(row)
         name = f"{args.case}_mesh_sweep{scheme_suffix}"
