@@ -358,6 +358,28 @@ void Foam::enhancedVolPointInterpolation::interpolateBoundaryField
 template<class Type>
 void Foam::enhancedVolPointInterpolation::interpolate
 (
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const GeometricField
+    <
+        typename outerProduct<vector, Type>::type,
+        fvPatchField,
+        volMesh
+    >& gradVf,
+    GeometricField<Type, pointPatchField, pointMesh>& pf
+) const
+{
+    // Access through GeometricField before delegating so that old-time values
+    // are stored before the internal field is overwritten
+    pf.primitiveFieldRef();
+    DimensionedField<Type, pointMesh>& pfI = pf;
+
+    interpolate(vf, gradVf, pfI);
+}
+
+
+template<class Type>
+void Foam::enhancedVolPointInterpolation::interpolate
+(
     const DimensionedField<Type, volMesh>& vf,
     const DimensionedField
     <

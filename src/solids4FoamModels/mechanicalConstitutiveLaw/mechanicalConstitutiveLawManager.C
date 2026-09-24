@@ -2476,7 +2476,7 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
             (
                 IOobject
                 (
-                    "rho",
+                    "rhoFromLaws",
                     mesh_.time().timeName(),
                     mesh_,
                     IOobject::NO_READ,

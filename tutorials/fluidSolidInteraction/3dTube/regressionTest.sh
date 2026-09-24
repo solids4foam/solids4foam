@@ -115,6 +115,13 @@ run_framework_test() {
 check_framework_arm() {
     local failures=0
 
+    if solids4Foam::regressionCaseSkipped \
+        "${FRAMEWORK_CASE_DIR}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: framework arm skipped in this environment"
+        return 0
+    fi
+
     local fw_log
     fw_log=$(find "${FRAMEWORK_CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
     local main_log
@@ -394,9 +401,7 @@ force_diff_abs=$(abs "${force_diff}")
 
 failures=0
 
-if [ "$CHECK_ONLY" = false ]; then
-    check_framework_arm || failures=$((failures + $?))
-fi
+check_framework_arm || failures=$((failures + $?))
 
 if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
     printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
