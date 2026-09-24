@@ -136,7 +136,7 @@ fi
 # carrying plastic state through a contact solve
 # ------------------------------------------------------------
 
-if [ "$CHECK_ONLY" = false ]; then
+check_framework_arm() {
     if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
     then
         echo "SKIP: framework arm skipped in this environment"
@@ -192,7 +192,9 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
     fi
-fi
+}
+
+check_framework_arm
 
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true

@@ -245,10 +245,9 @@ protected:
             return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
-        //- This model needs the legacy mechanicalModel even on a framework
-        //  run. The framework switch moves only the Jacobian tangent here;
-        //  the residual stress still comes from dualMechanicalModel, which is
-        //  built on the legacy laws, so the converged answer is the legacy one
+        //- This model always needs the legacy mechanicalModel. Its constructor
+        //  rejects framework runs because the residual stress still comes
+        //  from dualMechanicalModel, which is built on the legacy laws
         virtual bool needsLegacyMechanicalModel() const
         {
             return true;

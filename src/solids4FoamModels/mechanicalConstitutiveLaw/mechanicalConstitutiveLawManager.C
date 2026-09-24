@@ -2167,11 +2167,12 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
             (
                 IOobject
                 (
-                    "rho",
+                    "rhoFromLaws",
                     mesh_.time().timeName(),
                     mesh_,
                     IOobject::NO_READ,
-                    IOobject::NO_WRITE
+                    IOobject::NO_WRITE,
+                    false
                 ),
                 mesh_,
                 dimensionedScalar("rho", dimDensity, 0.0),

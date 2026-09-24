@@ -124,8 +124,7 @@ class linGeomTotalDispSolid
         tmp<volScalarField> makeRKappa() const;
 
         //- Update the stress at the face quadrature points of the high-order
-        //  discretisation, from the same source as correctStress().
-        //  The high-order discretisation does not exist on foam-extend
+        //  discretisation, from the same source as correctStress()
         void correctStressQuad();
 
         //- Somewhere for the laws to put their volumetric response
