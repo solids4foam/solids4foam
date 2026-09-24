@@ -31,7 +31,7 @@ solvers
         mergeLevels     1;
     }
 
-    p
+    porePressure
     {
         solver          GAMG;
         tolerance       1e-06;

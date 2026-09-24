@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     linearGeometryTotalDisplacement;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    // Assemble the high-order Jacobian from the full material tangent rather
+    // than from a mu and lambda back-derived out of impK and the bulk
+    // modulus. For a linear elastic material the two are identical; they
+    // differ for any law where impK is not exactly 2*mu + lambda
+    useMechanicalConstitutiveLawManager yes;
+    jacobianTangent fourthOrder;
+
+    // Solution algorithm
+    solutionAlgorithm    PETScSNES;
+
+    highOrderCoeffs
+    {
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        displacement
+        {
+            // Polynomial order of displacement field
+            polynomialOrder 2;
+
+            // Extra cells in minimum size stencil
+            faceStencilExtraCells 15;
+
+            // Weight function for least square systems
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+}
+
+// ************************************************************************* //

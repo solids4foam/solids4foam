@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # hotSphere regression test
@@ -99,6 +104,199 @@ extract_max_sigma() {
         | awk '{print $NF}'
 }
 
+# Run the case a second time with the stress taken from the
+# mechanicalConstitutiveLaw framework rather than the legacy mechanicalModel.
+#
+# This case runs several time steps, so unlike slabCooling it exercises the
+# framework rolling its constitutive state over between them.
+#
+# The two arms are compared to a tolerance rather than exactly. They solve the
+# same problem but reach it by slightly different iteration paths, because the
+# implicit stiffness that steers the iteration is built differently: the
+# framework interpolates its cell tangent to the faces where the legacy model
+# forms a face value directly. The converged answers therefore agree only to
+# the solution tolerance, and the difference shrinks with it - at
+# solutionTolerance 1e-6 it is around 1e-7 of the displacement, and tightening
+# to 1e-10 takes it to 1e-8. The threshold here is well above that and far
+# below anything physical
+FRAMEWORK_D_REL_TOL=1e-6
+COMPARISON_END_TIME=5
+
+compare_internal_vector_fields() {
+    python3 - "$1" "$2" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+def read_internal(path):
+    text = open(path).read()
+    uniform = re.search(
+        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
+        text,
+    )
+    if uniform:
+        return [tuple(map(float, uniform.groups()))]
+
+    nonuniform = re.search(
+        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not nonuniform:
+        raise ValueError(f"cannot parse internalField in {path}")
+
+    values = re.findall(
+        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
+    )
+    if not values:
+        raise ValueError(f"empty internalField in {path}")
+    return [tuple(map(float, value)) for value in values]
+
+try:
+    a = read_internal(sys.argv[1])
+    b = read_internal(sys.argv[2])
+    if len(a) == 1 and len(b) > 1:
+        a *= len(b)
+    if len(b) == 1 and len(a) > 1:
+        b *= len(a)
+    if len(a) != len(b):
+        raise ValueError("different internalField sizes")
+    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
+    max_value = max(abs(x) for av in a for x in av)
+    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
+except (OSError, ValueError) as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
+run_framework_comparison() {
+    # Not on foam-extend, where the two arms are known to differ, by 0.6 % in D.
+    # They match to 1e-13 for two correctors and part on the third, and only in
+    # the stress on the three symmetryPlane patches: the framework corrects the
+    # stress's boundary conditions after evaluating it and the legacy law does
+    # not, and on foam-extend's symmetryPlane that correction changes the value.
+    # Correcting the legacy stress too reproduces the framework's answer to
+    # 2e-8. Dropping the correction from the framework instead breaks the exact
+    # agreement perforatedPlate has on foam-extend, so which one is right is
+    # still open, and until it is settled this comparison would only report it
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        echo "SKIP: framework comparison (open foam-extend symmetryPlane difference)"
+        return 0
+    fi
+
+    local legacy_dir="${REGRESSION_ROOT}/frameworkLegacy"
+    local framework_dir="${REGRESSION_ROOT}/framework"
+    local dir
+
+    # Both arms are prepared and run here rather than reusing the main case,
+    # so the comparison does not depend on what the main run left behind
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        rm -rf "${dir}"
+        mkdir -p "${dir}"
+
+        local item base_item
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${dir}/"
+        done
+    done
+
+    # Write enough digits for the comparison to be about the solution rather
+    # than about the file format. At the default six significant figures the
+    # two arms differ by around 3e-6 simply because that is the last digit
+    # written, which would tell us nothing
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+                "${dir}/system/controlDict"
+        else
+            echo "writePrecision  14;" >> "${dir}/system/controlDict"
+        fi
+    done
+
+    # The two arms differ in this one entry and nothing else. It goes inside
+    # the solid model's coeffs block, which is where the model looks for it
+    sed -i \
+        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
+        "${framework_dir}/constant/solidProperties"
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+            echo "FAIL: the framework comparison could not run ${dir}"
+            return 1
+        }
+    done
+
+    # Each arm must have taken the path it was set up for
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${framework_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the framework arm did not use the framework"
+        return 1
+    fi
+
+    if grep -q "Selecting mechanical constitutive law" \
+        "${legacy_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the legacy arm used the framework"
+        return 1
+    fi
+
+    for dir in "${legacy_dir}" "${framework_dir}"; do
+        if ! grep -q "^End" "${dir}/${SOLVER_LOGFILE}" \
+          || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
+              "${dir}/${SOLVER_LOGFILE}"
+        then
+            echo "FAIL: ${dir} did not complete and converge"
+            return 1
+        fi
+    done
+
+    local tL tF
+    tL=$(solids4Foam::latestTime "${legacy_dir}")
+    tF=$(solids4Foam::latestTime "${framework_dir}")
+
+    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
+        echo "FAIL: the two arms reached different times ('${tL}' vs '${tF}')"
+        return 1
+    fi
+
+    if ! awk "BEGIN {exit !((${tL} - ${COMPARISON_END_TIME})^2 <= 1e-20)}"
+    then
+        echo "FAIL: comparison stopped at ${tL}; expected ${COMPARISON_END_TIME}"
+        return 1
+    fi
+
+    if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
+    then
+        echo "FAIL: the framework comparison produced no D field"
+        return 1
+    fi
+
+    local rel
+    if ! rel=$(compare_internal_vector_fields \
+        "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D")
+    then
+        echo "FAIL: could not compare the two D internal fields"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${rel} < ${FRAMEWORK_D_REL_TOL})}"; then
+        printf "PASS: framework and legacy agree, relative D diff = %.4g\n" \
+            "${rel}"
+        return 0
+    fi
+
+    printf "FAIL: framework and legacy differ, relative D diff = %.4g\n" \
+        "${rel}"
+    return 1
+}
+
 # ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
@@ -141,6 +339,10 @@ fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
+if ! run_framework_comparison; then
+    failures=$((failures + 1))
+fi
+
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 

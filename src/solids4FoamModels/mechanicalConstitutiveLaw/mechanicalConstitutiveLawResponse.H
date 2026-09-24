@@ -1,0 +1,361 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::mechanicalConstitutiveLawResponse
+
+Description
+    Container class providing non-owning views onto the output fields
+    produced by a mechanicalConstitutiveLaw evaluation.
+
+    The mechanicalConstitutiveLawResponse bundles together references to
+    stress and (optionally) tangent-related fields that are populated by
+    a mechanicalConstitutiveLaw during constitutive evaluation.
+
+    This class does not allocate, own, or manage memory. Instead, it
+    provides lightweight views (via UIndirectList) onto existing storage
+    supplied by the mechanicalConstitutiveLawManager. As a result, it
+    can be safely constructed at high frequency and passed to
+    constitutive laws without performance overhead.
+
+    Tangent-related fields are optional and may or may not be present
+    depending on the requirements of the calling solver. Constitutive
+    laws are expected to check for the availability of such fields
+    before accessing them.
+
+    The response object is deliberately minimal and purely a data
+    container. It contains no constitutive logic and performs no
+    post-processing or transformations of the computed quantities.
+
+    Usage:
+    A mechanicalConstitutiveLawResponse is constructed by the
+    mechanicalConstitutiveLawManager and passed to a
+    mechanicalConstitutiveLaw, which fills the referenced fields during
+    evaluation.
+
+    Notes:
+    - This class is non-owning and relies on the lifetime of the
+      referenced fields exceeding that of the response object.
+    - Additional response quantities (e.g. higher-order tangents or
+      diagnostics) may be added in the future without changing the
+      fundamental role of the class.
+
+Author
+    Philip Cardiff, UCD.
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef mechanicalConstitutiveLawResponse_H
+#define mechanicalConstitutiveLawResponse_H
+
+#include "UIndirectList.H"
+#include "symmTensor.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// Forward Declarations
+struct mat66;
+
+/*---------------------------------------------------------------------------*\
+               Class mechanicalConstitutiveLawResponse Declaration
+\*---------------------------------------------------------------------------*/
+
+class mechanicalConstitutiveLawResponse
+{
+    // Private Data
+
+        //- View onto output fields (no ownership, no allocation)
+        UIndirectList<symmTensor>& stress_;
+
+        //- Optional scalar tangent view.
+        //  Null unless the caller supplied storage for a scalar tangent
+        UIndirectList<scalar>* scalarTangentPtr_;
+
+        //- Optional mat66 (6x6 matrix) tangent view.
+        //  Null unless the caller supplied storage for a fourth-order tangent
+        UIndirectList<mat66>* fourthOrderTangentPtr_;
+
+        //- What type, if any, material tangent is requested
+        tangentRequest tangentRequest_;
+
+        //- Optional volumetric response view, one value per integration point.
+        //
+        //  When this is present the law is being asked to split its answer.
+        //  The split is not deviatoric against spherical, and mistaking it for
+        //  that is the whole difficulty:
+        //
+        //    volumetric_  is dU/dJ, the volumetric response of the law's own
+        //                 energy, and only that. A mixed formulation replaces
+        //                 it with a solved pressure, so what goes here has to
+        //                 be a function of J that a pressure equation can be
+        //                 built from.
+        //
+        //    stress_      is everything the pressure must not overwrite. For a
+        //                 law split on Cbar that is exactly the isochoric
+        //                 stress, and trace-free. For a law that adds a
+        //                 spherical stress of its own it is not trace-free,
+        //                 and that is correct rather than a violation.
+        //
+        //  Two contributions make the second line concrete, and neither is
+        //  dU/dJ. An active tension along a fibre, Ta*f0(x)f0 pushed forward,
+        //  has mean stress Ta*|F.f0|^2/(3*J): a fibre carrying tension along
+        //  itself and nothing across it genuinely has a non-zero mean, which
+        //  is a property of that stress state rather than an artefact to
+        //  project away, and it is not a function of J. poroMechanicalLaw's
+        //  Biot term lives entirely in the trace and survives for the same
+        //  reason. Both belong with the stress, and a pressure that replaced
+        //  the whole trace would destroy them.
+        //  Defaulted here as well as in every constructor: left uninitialised
+        //  by one of them it reads as a non-null pointer, wantsVolumetricSplit
+        //  answers yes, and the first law that believes it writes through it
+        UIndirectList<scalar>* volumetricPtr_ = nullptr;
+
+
+    // Private Member Functions
+
+        //- No copy construct
+        mechanicalConstitutiveLawResponse
+        (
+            const mechanicalConstitutiveLawResponse&
+        ) = delete;
+
+        //- No copy assignment
+        void operator=(const mechanicalConstitutiveLawResponse&) = delete;
+
+
+public:
+
+    // Constructors
+
+        //- Construct with stress view only
+        explicit mechanicalConstitutiveLawResponse
+        (
+            UIndirectList<symmTensor>& stress,
+            tangentRequest tangentReq = tangentRequest::none
+        )
+        :
+            stress_(stress),
+            scalarTangentPtr_(nullptr),
+            fourthOrderTangentPtr_(nullptr),
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
+        {}
+
+        //- Construct with stress view and scalar tangent view
+        mechanicalConstitutiveLawResponse
+        (
+            UIndirectList<symmTensor>& stress,
+            UIndirectList<scalar>& scalarTangent,
+            tangentRequest tangentReq
+        )
+        :
+            stress_(stress),
+            scalarTangentPtr_(&scalarTangent),
+            fourthOrderTangentPtr_(nullptr),
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
+        {
+            if
+            (
+                tangentReq != tangentRequest::scalar
+             && tangentReq != tangentRequest::scalarDeviatoric
+            )
+            {
+                FatalErrorInFunction
+                    << "Scalar tangent supplied but tangentReq = "
+                    << tangentRequestName(tangentReq)
+                    << exit(FatalError);
+            }
+        }
+
+        //- Construct with stress view and fourth order tangent view
+        mechanicalConstitutiveLawResponse
+        (
+            UIndirectList<symmTensor>& stress,
+            UIndirectList<mat66>& fourthOrderTangent,
+            tangentRequest tangentReq
+        )
+        :
+            stress_(stress),
+            scalarTangentPtr_(nullptr),
+            fourthOrderTangentPtr_(&fourthOrderTangent),
+            tangentRequest_(tangentReq),
+            volumetricPtr_(nullptr)
+        {
+            if
+            (
+                tangentReq != tangentRequest::fourthOrder
+             && tangentReq != tangentRequest::fourthOrderFiniteDifference
+            )
+            {
+                FatalErrorInFunction
+                    << "Fourth-order tangent supplied but tangentReq = "
+                    << tangentRequestName(tangentReq)
+                    << exit(FatalError);
+            }
+        }
+
+
+    //- Destructor
+    ~mechanicalConstitutiveLawResponse()
+    {}
+
+
+    // Member Functions
+
+    // Access
+
+        //- Non-const access to stress view
+        UIndirectList<symmTensor>& stress()
+        {
+            return stress_;
+        }
+
+        //- Const-access to stress view
+        const UIndirectList<symmTensor>& stress() const
+        {
+            return stress_;
+        }
+
+        //- Return the tangentRequest enum, e.g. none, scalar, etc.
+        tangentRequest tangentReq() const
+        {
+            return tangentRequest_;
+        }
+
+    // Check
+
+        //- Is a scalar tangent view available?
+        bool hasScalarTangent() const
+        {
+            return scalarTangentPtr_ != nullptr;
+        }
+
+        //- Is a fourth order tangent view available?
+        bool hasFourthOrderTangent() const
+        {
+            return fourthOrderTangentPtr_ != nullptr;
+        }
+
+        //- Is the law being asked to split its answer?
+        bool wantsVolumetricSplit() const
+        {
+            return volumetricPtr_ != nullptr;
+        }
+
+        //- The volumetric response view, dU/dJ per integration point
+        UIndirectList<scalar>& volumetric()
+        {
+            if (!wantsVolumetricSplit())
+            {
+                FatalErrorInFunction
+                    << "The volumetric response was not requested, so there "
+                    << "is nowhere to put it." << exit(FatalError);
+            }
+
+            return *volumetricPtr_;
+        }
+
+        //- Ask this response for a split answer
+        void requestVolumetricSplit(UIndirectList<scalar>& volumetric)
+        {
+            volumetricPtr_ = &volumetric;
+        }
+
+        //- Does this response want a scalar tangent calculated
+        bool wantsScalarTangent() const
+        {
+            return
+                tangentRequest_ == tangentRequest::scalar
+             || tangentRequest_ == tangentRequest::scalarDeviatoric;
+        }
+
+        //- Does this response want a fourth order tangent calculated
+        bool wantsFourthOrderTangent() const
+        {
+            return
+                tangentRequest_ == tangentRequest::fourthOrder
+             || tangentRequest_ == tangentRequest::fourthOrderFiniteDifference;
+        }
+
+    // Edit
+
+        //- Non-const access to the scalar tangent view
+        UIndirectList<scalar>& scalarTangent()
+        {
+            if (!hasScalarTangent())
+            {
+                FatalErrorInFunction
+                    << "The scalarTangent is unavailable!" << exit(FatalError);
+            }
+
+            return *scalarTangentPtr_;
+        }
+
+        //- Const access to the scalar tangent view
+        const UIndirectList<scalar>& scalarTangent() const
+        {
+            if (!hasScalarTangent())
+            {
+                FatalErrorInFunction
+                    << "The scalarTangent is unavailable!" << exit(FatalError);
+            }
+
+            return *scalarTangentPtr_;
+        }
+
+        //- Non-const access to the fourthOrder tangent view
+        UIndirectList<mat66>& fourthOrderTangent()
+        {
+            if (!hasFourthOrderTangent())
+            {
+                FatalErrorInFunction
+                    << "The fourthOrderTangent is unavailable!"
+                    << exit(FatalError);
+            }
+
+            return *fourthOrderTangentPtr_;
+        }
+
+        //- Const access to the fourthOrder tangent view
+        const UIndirectList<mat66>& fourthOrderTangent() const
+        {
+            if (!hasFourthOrderTangent())
+            {
+                FatalErrorInFunction
+                    << "The fourthOrderTangent is unavailable!"
+                    << exit(FatalError);
+            }
+
+            return *fourthOrderTangentPtr_;
+        }
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

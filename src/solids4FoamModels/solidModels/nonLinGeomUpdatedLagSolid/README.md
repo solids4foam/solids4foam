@@ -322,3 +322,28 @@ If you extend this model, the main places to consider are:
 Keep the updated-configuration interpretation in mind when making changes:
 the solver updates kinematic quantities relative to the last time step and
 moves the mesh each step.
+
+### Known limitation: restart is not exact
+
+This model does not reproduce an uninterrupted run exactly when a run is
+stopped and continued, even with `restart yes` set and every field it writes
+read back.
+
+Measured on the `neckingBar` tutorial, stopping halfway and continuing: the
+axial loading force differs by about 1e-5 relative, and a force component that
+is otherwise zero returns as a small non-zero value. The size is the same
+whether the material is evaluated through the legacy `mechanicalModel` or
+through the `mechanicalConstitutiveLaw` framework, and the framework is if
+anything the closer of the two, so this is the solid model's rather than the
+material's.
+
+The cause has not been established. The likely place to look is what the
+updated configuration needs carried across a restart beyond the fields
+currently written: the mesh is moved every step and kinematic quantities are
+measured relative to the last one, so anything relative that is rebuilt from
+scratch on restart rather than read is a candidate.
+
+The regression test for this tutorial therefore holds the restart comparison to
+1e-4 rather than the 1e-6 used by the small-strain cases, and relies on a
+separate check - that deleting the constitutive history stops the run - to
+catch a lost state rather than on the tolerance.

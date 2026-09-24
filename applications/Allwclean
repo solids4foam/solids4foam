@@ -7,5 +7,6 @@ echo
 
 wclean all solvers
 wclean all utilities
+wclean all test
 
 #------------------------------------------------------------------------------

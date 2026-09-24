@@ -115,7 +115,7 @@ bool thermalLinGeomSolid::converged
         );
 
     // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
+    const scalar materialResidual = this->materialResidual();
 
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
@@ -249,11 +249,14 @@ thermalLinGeomSolid::thermalLinGeomSolid
             1e-06
         )
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_)
 {
     DisRequired();
+
+    // A multi-material framework run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 
     // Store T old time
     T_.oldTime();
@@ -261,6 +264,91 @@ thermalLinGeomSolid::thermalLinGeomSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void thermalLinGeomSolid::correctStress()
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        mechanical().correct(sigma());
+        return;
+    }
+
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField> thermalLinGeomSolid::makeImpK() const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return mechanical().impK();
+    }
+
+    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+}
+
+
+Foam::tmp<Foam::surfaceScalarField> thermalLinGeomSolid::makeImpKf() const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return mechanical().impKf();
+    }
+
+    // The framework has no separate face tangent: the face value is the
+    // interpolate of the cell one, which is what the legacy impKf() amounts to
+    // for a law whose stiffness does not vary within a material
+    return fvc::interpolate(makeImpK()());
+}
+
+
+Foam::scalar thermalLinGeomSolid::materialResidual()
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return mechanical().residual();
+    }
+
+    // The framework keeps its own state and rolls it over itself, so it has no
+    // residual of its own to report and contributes nothing to convergence.
+    // The legacy residual is a plasticity-style measure that only some laws
+    // define; the framework's equivalent is not yet defined
+    return 0.0;
+}
+
+
+void thermalLinGeomSolid::updateTotalFields()
+{
+    // One or the other, not both. The base call runs the legacy laws'
+    // end-of-step work, which is not the no-op it looks like -
+    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
+    // diagnostics there, and others recompute an effective stiffness. On a
+    // framework run those laws are never evaluated, so that work is done on
+    // stale inputs and read by nothing
+    if (useMechanicalConstitutiveLawManager())
+    {
+        mechanicalManager().endTimeStep();
+
+        // The base call is skipped on this branch, so the quadrature history
+        // it would have rolled over is rolled over here
+        rollOverQuadratureHistory();
+    }
+    else
+    {
+        solidModel::updateTotalFields();
+    }
+}
 
 
 bool thermalLinGeomSolid::evolve()
@@ -348,20 +436,27 @@ bool thermalLinGeomSolid::evolve()
         U() = fvc::ddt(D());
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        if (useMechanicalConstitutiveLawManager())
+        {
+            frameworkGrad(D(), gradD());
+        }
+        else
+        {
+            mechanical().grad(D(), gradD());
+        }
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
         if (iCorr % 10 == 0)
         {
-            impKf_ = mechanical().impKf();
+            impKf_ = makeImpKf();
         }
     }
     while
@@ -371,7 +466,14 @@ bool thermalLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    if (useMechanicalConstitutiveLawManager())
+    {
+        frameworkInterpolate(D(), gradD(), pointD());
+    }
+    else
+    {
+        mechanical().interpolate(D(), pointD());
+    }
 
     // Increment of displacement
     DD() = D() - D().oldTime();

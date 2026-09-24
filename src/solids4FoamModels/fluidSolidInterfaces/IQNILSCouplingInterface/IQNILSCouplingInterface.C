@@ -1060,6 +1060,32 @@ bool IQNILSCouplingInterface::evolve()
     }
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
+    if (!(residualNorm <= outerCorrTolerance()))
+    {
+        if (allowUnconvergedCoupling())
+        {
+            WarningInFunction
+                << "FSI coupling did not converge after " << outerCorr()
+                << " outer corrections. Final residual: " << residualNorm
+                << ", tolerance: " << outerCorrTolerance() << ". "
+                << "Accepting the unconverged step because "
+                << "allowUnconvergedCoupling is enabled. The resulting "
+                << "solution may be invalid." << endl;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "FSI coupling did not converge after " << outerCorr()
+                << " outer corrections. Final residual: " << residualNorm
+                << ", tolerance: " << outerCorrTolerance() << nl
+                << "To accept unconverged coupling steps for debugging, set"
+                << nl << "    allowUnconvergedCoupling yes;" << nl
+                << "in the coupling coefficients. The resulting solution "
+                << "may be invalid."
+                << abort(FatalError);
+        }
+    }
+
     cacheCurrentStepModes();
 
     solid().updateTotalFields();

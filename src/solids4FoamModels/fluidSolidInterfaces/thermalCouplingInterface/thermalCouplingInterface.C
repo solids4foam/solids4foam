@@ -210,6 +210,39 @@ bool thermalCouplingInterface::evolve()
      && outerCorr() < nOuterCorr()
     );
 
+    if
+    (
+        !(residualNormTherm <= outerCorrTolerance())
+     || !(residualNormMech <= outerCorrTolerance())
+    )
+    {
+        if (allowUnconvergedCoupling())
+        {
+            WarningInFunction
+                << "Thermal coupling did not converge after " << outerCorr()
+                << " outer corrections. Final thermal residual: "
+                << residualNormTherm << ", final mechanical residual: "
+                << residualNormMech << ", tolerance: "
+                << outerCorrTolerance() << ". Accepting the unconverged step "
+                << "because allowUnconvergedCoupling is enabled. The "
+                << "resulting solution may be invalid." << endl;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "Thermal coupling did not converge after " << outerCorr()
+                << " outer corrections. Final thermal residual: "
+                << residualNormTherm << ", final mechanical residual: "
+                << residualNormMech << ", tolerance: "
+                << outerCorrTolerance() << nl
+                << "To accept unconverged coupling steps for debugging, set"
+                << nl << "    allowUnconvergedCoupling yes;" << nl
+                << "in the coupling coefficients. The resulting solution "
+                << "may be invalid."
+                << abort(FatalError);
+        }
+    }
+
     return 0;
 }
 
