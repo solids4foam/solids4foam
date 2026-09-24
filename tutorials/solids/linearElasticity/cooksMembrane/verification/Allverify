@@ -9,5 +9,5 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 \
-    "${SCRIPT_DIR}/../../../../verification/cooks_membrane_verification.py" \
+    "${SCRIPT_DIR}/scripts/cooks_membrane_verification.py" \
     --verification-dir "${SCRIPT_DIR}" "$@"
