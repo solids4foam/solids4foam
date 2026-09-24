@@ -115,19 +115,19 @@ extract_yielding_cells() {
     # Prefer the framework's message: in the framework arm the legacy law is
     # still constructed but never called, so it truthfully reports zero and
     # would mask the framework's own count
+    # sed and awk read all their input: "head -n 1" would close the pipe
+    # early, and the resulting SIGPIPE in tail fails the script under pipefail
     if grep -q "yielding integration points" "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
         grep "Number of yielding integration points" \
             "${CASE_DIR}/${SOLVER_LOGFILE}" \
             | tail -n 101 \
-            | head -n 1 \
-            | sed 's|.*= *||; s|/.*||'
+            | sed -n '1{s|.*= *||; s|/.*||; p;}'
     elif grep -q "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
         grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
             | tail -n 101 \
-            | head -n 1 \
-            | awk '{print $1}'
+            | awk 'NR == 1 {print $1}'
     fi
 }
 

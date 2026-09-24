@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+mechanical
+(
+    rubber
+    {
+        type            neoHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+
+        // E and nu give a shear modulus of 422.5 kPa and a bulk modulus of
+        // 915.4 kPa, as used by Pelteret and McBride (2016)
+        E               E [1 -1 -2 0 0 0 0]  1.0985e6;
+        nu              nu [0 0 0 0 0 0 0]   0.3;
+
+        // The default volumetric response, Kirchhoff pressure
+        // -0.5*K*(J^2 - 1), is used, which corresponds to the volumetric
+        // free energy K/4*(J^2 - 1 - 2*ln(J)) of Pelteret and McBride (2016)
+        //alternatePressureDefinition false;
+    }
+);
+
+// ************************************************************************* //

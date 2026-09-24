@@ -1,0 +1,98 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      DD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    block-contact
+    {
+        type            solidContact;
+        master          yes;
+        rigidMaster     no;
+        shadowPatch     sphere-contact;
+        useNewPointDistanceMethod no;
+        usePrevCandidateMasterNeighbors no;
+        writePointDistanceFields false;
+        normalContactModel standardPenalty;
+        standardPenaltyNormalModelDict
+        {
+            penaltyScale    1.7;
+            relaxationFactor 0.01;
+        }
+        frictionContactModel standardPenalty;
+        standardPenaltyFrictionModelDict
+        {
+            relaxationFactor 0.005;
+            penaltyScale     0.5;
+            frictionLaw     coulomb;
+            frictionLawDict
+            {
+                frictionCoeff   0.5;
+            }
+        }
+        value           uniform (0 0 0);
+    }
+
+    sphere-contact
+    {
+        type            solidContact;
+        shadowPatch     block-contact;
+        master          no;
+        value           uniform (0 0 0);
+    }
+
+    traction-free
+    {
+        type            solidTraction;
+        gradient        uniform ( 0 0 0 );
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    block-fixed
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+
+    sphere-displacement
+    {
+        type            fixedRotation;
+        displacementSeries
+        {
+            "file|fileName"        "$FOAM_CASE/constant/timeVsDisp";
+            outOfBounds     clamp;
+        }
+        rotationAxis    ( 0 1 0 );
+        rotationOrigin  ( 0 0 0 );
+        rotationAngleSeries
+        {
+            "file|fileName"        "$FOAM_CASE/constant/rotVsDisp";
+            outOfBounds     clamp;
+        }
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

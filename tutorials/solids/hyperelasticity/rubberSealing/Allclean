@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Check the OpenFOAM environment is loaded
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+cleanCase
+
+# Restore the stored case format, which moves the blockMeshDict back to system
+# if foam-extend was used
+solids4Foam::restoreCaseFormat .
+
+# Remove the generated mesh, unless it still holds the blockMeshDict
+if [[ ! -e constant/polyMesh/blockMeshDict ]]
+then
+    \rm -rf constant/polyMesh
+fi
+
+\rm -rf case.foam postProcessing VTK regressionTests
+\rm -f constant/*.withDefaultValues
