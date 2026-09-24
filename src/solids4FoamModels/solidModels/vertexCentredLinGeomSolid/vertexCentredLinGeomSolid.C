@@ -1162,6 +1162,24 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     // pointD field must be defined
     pointDisRequired();
 
+    // Start the dual-face gradient's history from the displacement the run
+    // starts from: zero on a cold start, the restart value otherwise. Taken
+    // lazily at the first stress update instead, the old time would be a copy
+    // of the first new gradient, so a law that works from the increment would
+    // see none in the first step, and after a restart would pair its restored
+    // state with the wrong previous gradient
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        solidModelDict().lookupOrDefault<scalar>("zeta", 1.0),
+        debug
+    );
+    dualGradDf_.oldTime();
+
     // Set fixed degree of freedom list
     setFixedDofs
     (
