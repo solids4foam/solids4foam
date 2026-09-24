@@ -25,6 +25,7 @@ License
 
 #include "wedgeFvPatchFields.H"
 #include "symmetryFvPatchFields.H"
+#include "emptyFvPatchFields.H"
 #include "blockSymmPlaneFvPatchVectorField.H"
 // #include "blockRadialSlipFvPatchVectorField.H"
 #include "tractionPressureDisplacementFvPatchVectorField.H"

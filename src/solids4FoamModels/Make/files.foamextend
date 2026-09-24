@@ -42,33 +42,6 @@ $(interfaceToInterface)/ggiInterfaceToInterfaceMapping/ggiInterfaceToInterfaceMa
 $(interfaceToInterface)/directMapInterfaceToInterfaceMapping/directMapInterfaceToInterfaceMapping.C
 $(interfaceToInterface)/rbfInterfaceToInterfaceMapping/rbfInterfaceToInterfaceMapping.C
 
-materialModels/mechanicalModel/mechanicalModel.C
-materialModels/mechanicalModel/dualMechanicalModel.C
-materialModels/mechanicalModel/solidSubMeshes/solidSubMeshes.C
-mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
-$(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
-$(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
-
-linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
-$(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
-$(linGeomLaws)/linearElastic/linearElastic.C
-$(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
-$(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/poroMechanicalLaw/poroMechanicalLaw.C
-$(linGeomLaws)/thermoMechanicalLaw/thermoMechanicalLaw.C
-$(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
-
-nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
-$(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
-$(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
-$(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
-$(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
-$(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
-$(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
-$(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
-
-
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws
 $(thermalLaws)/thermalLaw/thermalLaw.C
