@@ -74,7 +74,8 @@ increment, and the driver reports that failure rather than silently accepting
 it. The divergence follows the circumferential count alone — `20 x 100` runs,
 `10 x 200` does not — and it is insensitive to `penaltyScale` and to the
 contact `relaxationFactor`, so it reflects the contact discretisation rather
-than the choice of under-relaxation.
+than the choice of under-relaxation. This is tracked in
+[#469](https://github.com/solids4foam/solids4foam/issues/469).
 
 ## Acceptance criteria
 
