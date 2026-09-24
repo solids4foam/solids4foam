@@ -227,7 +227,7 @@ are:
 - geometry is evaluated in the reference configuration;
 - `D` is the primary variable;
 - `F`, `Finv`, and `J` are updated from `grad(D)`;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.

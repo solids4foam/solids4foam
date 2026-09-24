@@ -234,7 +234,7 @@ choices are:
 - `D` is reconstructed from `DD`;
 - `F`, `relF`, `relFinv`, `relJ`, and `J` are updated from `grad(DD)`;
 - the model is marked as incremental and moving-mesh;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.
@@ -331,11 +331,10 @@ read back.
 
 Measured on the `neckingBar` tutorial, stopping halfway and continuing: the
 axial loading force differs by about 1e-5 relative, and a force component that
-is otherwise zero returns as a small non-zero value. The size is the same
-whether the material is evaluated through the legacy `mechanicalModel` or
-through the `mechanicalConstitutiveLaw` framework, and the framework is if
-anything the closer of the two, so this is the solid model's rather than the
-material's.
+is otherwise zero returns as a small non-zero value. The size was the same with
+the former `mechanicalModel` material implementation as with the
+`mechanicalConstitutiveLaw` framework, so this is the solid model's rather
+than the material's.
 
 The cause has not been established. The likely place to look is what the
 updated configuration needs carried across a restart beyond the fields

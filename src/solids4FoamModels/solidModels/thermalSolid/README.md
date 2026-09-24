@@ -153,7 +153,7 @@ heat equation only.
 
 The constructor calls the base `solidModel` constructor, constructs the
 `thermalModel` from the mesh, builds `rhoC_` as
-`thermal.C()*mechanical().rho()` and `k_` from `thermal.k()`, reads `T`
+`thermal.C()` times the initial density and `k_` from `thermal.k()`, reads `T`
 (`MUST_READ`), creates `grad(T)`, reads `absoluteTemperatureTolerance`, and
 forces creation of `T.oldTime()`.
 

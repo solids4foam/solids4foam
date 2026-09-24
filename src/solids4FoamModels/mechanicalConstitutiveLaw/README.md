@@ -1,7 +1,8 @@
 # Mechanical Constitutive Laws in solids4foam
 
-This directory contains the **next-generation mechanical constitutive
-modelling framework** for solids4foam.
+This directory contains the **mechanical constitutive modelling framework**
+of solids4foam: every solid model takes its stress, implicit stiffness and
+density from it.
 
 The design separates:
 
@@ -52,13 +53,10 @@ At runtime, a client of the framework:
 
 ## Solid-model integration boundary
 
-The framework is currently **not connected to any `solidModel`**. This is
-intentional: the manager and constitutive laws must remain independently
-buildable while the solid-model integration is redesigned against the current
-solver interfaces.
-
-A future solid model should use the manager only as a constitutive-update
-service. It is responsible for:
+The manager and constitutive laws are independent of `solidModel`: a solid
+model uses the manager only as a constitutive-update service. `solidModel`
+constructs one manager, on first use, from `constant/mechanicalProperties`,
+and the solid model is responsible for:
 
 - constructing and owning the manager for its mesh and `mechanicalProperties`;
 - selecting the integration-point topology that matches its field storage;
@@ -281,14 +279,14 @@ steel
 }
 ```
 
-`<input>caseDirectory` means the same, so the legacy `TcaseDirectory` entry
-works unchanged on the framework. The manager (via
+`<input>caseDirectory` means the same, so a `TcaseDirectory` entry works
+unchanged. The manager (via
 `mechanicalConstitutiveLawCaseInputs`) builds a `Time` and mesh for the
 directory, relative to the case, checks that the mesh matches, and reads the
 field once per time step at the current time. A step with no such field keeps
 the last one read; none at all is fatal. The copy is registered under the
-input's name and written, as the legacy law's is. In parallel the directory is
-looked for inside each `processorN`, again as on the legacy path.
+input's name and written. In parallel the directory is looked for inside each
+`processorN`.
 
 ---
 
@@ -385,10 +383,4 @@ This framework is designed to:
 Planned extensions include:
 
 - additional tangent types,
-- a dual-face integration point topology for the vertex-centred solid models,
 - a law-defined hydrostatic response for mixed displacement-pressure solvers.
-
-Solid models adopt this framework incrementally: a model first takes only its
-Jacobian tangent from the manager, via `updateTangentSmallStrain`, while its
-residual stress still comes from the legacy `mechanicalModel`; the residual
-follows once the model's own integration-point topology is in place.

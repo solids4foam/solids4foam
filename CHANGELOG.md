@@ -97,6 +97,21 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- **Breaking:** the legacy `mechanicalModel` is removed - `mechanicalModel`,
+  `dualMechanicalModel`, `solidSubMeshes`, `mechanicalLaw` and every legacy
+  law - together with the `useMechanicalConstitutiveLawManager` switch that
+  chose it. The `mechanicalConstitutiveLaw` framework is the only mechanical
+  model, reading the same `constant/mechanicalProperties`, and results are
+  those the switch's `yes` gave. A case that still sets
+  `useMechanicalConstitutiveLawManager no;` stops with an error saying so,
+  rather than silently changing its results; `yes` is accepted with a note
+  that the entry can be removed. Entries only the legacy model read, such as
+  a law's `pressureDisplacement` and `writeSubMeshes`, are ignored. The
+  sources of the withdrawn `unsLinearGeometry`,
+  `unsNonLinearGeometryTotalLagrangian`,
+  `unsNonLinearGeometryUpdatedLagrangian`, `weakThermalLinearGeometry` and
+  `vertexCentredNonLinTotalLagGeometry` solid models, which depended on the
+  legacy model, are deleted.
 - **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
   `linearElasticCt`, `linearElasticFromFile`, `orthotropicLinearElastic`,
   `GentElastic`, `StVenantKirchhoffOrthotropicElastic`, `YeohElastic`,

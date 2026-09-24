@@ -163,7 +163,7 @@ magnitude of the heat flux.
 
 The constructor calls the base `solidModel` constructor and `DisRequired()`,
 constructs the `thermalModel` from the mesh, builds `rhoC_` as
-`thermal.C()*mechanical().rho()` and `k_` from `thermal.k()`, reads `T`
+`thermal.C()` times the initial density and `k_` from `thermal.k()`, reads `T`
 (`MUST_READ`) and creates `grad(T)`, reads `absoluteTemperatureTolerance`, and
 takes `impK_`, `impKf_` and `rImpK_` from the mechanical law. It then forces
 creation of `T.oldTime()`.

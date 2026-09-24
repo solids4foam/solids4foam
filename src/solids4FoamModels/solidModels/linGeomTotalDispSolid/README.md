@@ -232,7 +232,7 @@ family. The key design choices are:
 
 - `D` is the primary solution variable;
 - the geometry is fixed in the governing equations;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver can run in three distinct modes: segregated implicit, PETSc SNES,
   and explicit.
 
