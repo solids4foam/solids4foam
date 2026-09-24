@@ -30,14 +30,15 @@ UY_MAX=0.407
 SYY_MIN=9.99e7
 SYY_MAX=1.001e8
 
-# The two runs are NOT expected to be bit-identical here, unlike
-# rotatingCylinder. This case sets solvePressureEqn, so the legacy
-# MooneyRivlinElastic solves a Laplacian equation for its hydrostatic stress,
-# which the framework law deliberately omits: that smoothing stabilises the
-# discretisation rather than describing the material, and belongs to the solid
-# model. The converged answers agree to about 2e-6 relative, which is the
-# evidence that it is indeed a stabilisation, so the tolerance is set to
-# accommodate that rather than to hide it
+# This case used to set solvePressureEqn, which made the legacy
+# MooneyRivlinElastic solve a Laplacian equation for its hydrostatic stress.
+# The framework law deliberately has no such thing: that smoothing stabilises
+# the discretisation rather than describing the material, and belongs to the
+# solid model. With it the converged answers agreed to about 2e-6 relative,
+# which is the evidence that it was only a stabilisation, and the case does not
+# need it, so it no longer sets it. Without it the legacy run matches the
+# framework one in every written digit of D; the tolerance is left at what
+# accommodated the smoothing
 CROSS_TOL=1e-4
 
 SOLVER_LOGFILE="log.solids4Foam"

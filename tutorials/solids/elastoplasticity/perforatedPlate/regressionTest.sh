@@ -258,9 +258,9 @@ for approach in "${APPROACHES[@]}"; do
 done
 
 # The framework must reproduce the legacy result. This case has no pressure
-# smoothing, so unlike longWall there is nothing the framework omits: the two
-# should agree to solver tolerance, and a plastic history error would show
-# here as a difference that the unit checks cannot see
+# smoothing, so there is nothing the framework omits: the two should agree to
+# solver tolerance, and a plastic history error would show here as a
+# difference that the unit checks cannot see
 if [[ -n "${RESULT_EPS[legacy]:-}" && -n "${RESULT_EPS[framework]:-}" ]]; then
     for q in eps sig; do
         if [[ "${q}" == "eps" ]]; then
