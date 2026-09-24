@@ -100,6 +100,15 @@ rm -rf "${REG_ROOT}"
 mkdir -p "${REG_ROOT}"
 
 # List of regression test directories (relative to tutorials/)
+#
+# Every tutorial with a regressionTest.sh is listed, except two whose scripts
+# are run by hand:
+#   fluidSolidInteraction/cerebralAneurysm, which meshes with cfMesh's
+#     cartesianMesh and fails, rather than skipping, where that cannot run
+#   solids/poroelasticity/suctionCaission, which takes about eleven minutes,
+#     and whose stress band holds on OpenFOAM.com and OpenFOAM.org but not on
+#     foam-extend, where the case reads 7.2e5 against [1.5e6, 2.2e6], as the
+#     removed legacy model also did
 REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
     "solids/elastoplasticity/cooksMembrane"
@@ -116,6 +125,8 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/cylinderCrush"
     "solids/hyperelasticity/blockPunch"
     "solids/hyperelasticity/longWall"
+    "solids/hyperelasticity/LandEtAl2015/problem3"
+    "solids/hyperelasticity/ratCarotid"
     "solids/beamsPlatesShells/squarePlate"
     "solids/linearElasticity/cantilever2d"
     "solids/linearElasticity/curvedCantilever"
@@ -133,6 +144,7 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/wobblyNewton"
     "solids/multiMaterial/layeredPipe"
     "solids/poroelasticity/rodAndSeabed"
+    "solids/poroelasticity/stripFooting"
     "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
     "solids/thermoelasticity/hotCylinder/hotCylinder"
