@@ -157,7 +157,7 @@ fi
 # heat transfer and the same coupling iteration count
 # ------------------------------------------------------------
 
-if [ "$CHECK_ONLY" = false ]; then
+check_framework_arm() {
     if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
     then
         echo "SKIP: framework arm skipped in this environment"
@@ -212,7 +212,9 @@ if [ "$CHECK_ONLY" = false ]; then
             fi
         fi
     fi
-fi
+}
+
+check_framework_arm
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
