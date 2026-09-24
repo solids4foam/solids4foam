@@ -165,6 +165,31 @@ public:
 //  primitiveFieldRef, and those are not the same thing: they call
 //  setUpToDate() and storeOldTimes(), so merely reaching for the pointer would
 //  snapshot an old time that nothing asked for.
+// True if the law, or any law it wraps, is fully incompressible. Asked of
+// the whole tree because a wrapper such as electroMechanicalLaw evaluates
+// its passive law directly: an incompressible law inside one would otherwise
+// reach a total-stress evaluation unseen
+bool incompressibleLawTree(const mechanicalConstitutiveLaw& law)
+{
+    if (law.incompressible())
+    {
+        return true;
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        if (incompressibleLawTree(law.childLaw(childNames[i])))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 template<class KinematicsType>
 void evaluateResponse
 (
@@ -177,17 +202,21 @@ void evaluateResponse
     const UList<scalar>* scalarTangentStore,
     const UList<mat66>* fourthOrderTangentStore,
     const tangentRequest tangentReq,
-    const UList<scalar>* volumetricStore = nullptr
+    const UList<scalar>* volumetricStore = nullptr,
+    const bool stressReturned = true
 )
 {
     // A fully incompressible law has no volumetric response of its own, so
     // only a caller that replaces it - one asking for the split - can use it,
     // and only a tangent that leaves the bulk stiffness out means anything.
     // Checked here because every evaluation, stress or tangent, comes this way
-    if (law.incompressible())
+    if (incompressibleLawTree(law))
     {
-        const bool totalStress =
-            !volumetricStore && tangentReq == tangentRequest::none;
+        // Whatever tangent comes with it: a total stress handed back to the
+        // caller is undefined for this law. Only a tangent query, which
+        // evaluates into a shadow state and discards the stress, may leave
+        // the split out
+        const bool totalStress = stressReturned && !volumetricStore;
 
         const bool bulkTangent =
             tangentReq == tangentRequest::scalar
@@ -2631,7 +2660,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             scalarTangentPtr,
             fourthOrderTangentPtr,
             tangentReq,
-            volumetricPtr
+            volumetricPtr,
+            !preserveState
         );
     }
 
@@ -2705,7 +2735,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
                     tangentReq,
-                    volumetricPtr
+                    volumetricPtr,
+                    !preserveState
                 );
             }
         }
@@ -2883,7 +2914,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
             scalarTangentPtr,
             fourthOrderTangentPtr,
             tangentReq,
-            volumetricPtr
+            volumetricPtr,
+            !preserveState
         );
     }
 
@@ -2953,7 +2985,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
                     tangentReq,
-                    volumetricPtr
+                    volumetricPtr,
+                    !preserveState
                 );
             }
         }
@@ -4253,6 +4286,20 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // the small-strain face overload is: a face can be reached by two laws at
     // a material interface, so contributions are accumulated and collapsed
     // rather than written once
+    //
+    // In parallel a material interface can lie on a processor boundary, where
+    // each side holds only its own material's contribution and nothing
+    // exchanges them before the collapse, so the two sides would disagree
+    // with each other and with serial. Refused rather than answered wrongly:
+    // the only caller is single-material
+    if (Pstream::parRun() && laws_.size() > 1)
+    {
+        FatalErrorInFunction
+            << "The face finite-strain stress update does not support more "
+            << "than one material in parallel: contributions at a material "
+            << "interface on a processor boundary are not reconciled"
+            << exit(FatalError);
+    }
     checkMeshConsistency(mesh_, F.mesh(), F.name());
     checkMeshConsistency(mesh_, F0.mesh(), F0.name());
     checkMeshConsistency(mesh_, J.mesh(), J.name());

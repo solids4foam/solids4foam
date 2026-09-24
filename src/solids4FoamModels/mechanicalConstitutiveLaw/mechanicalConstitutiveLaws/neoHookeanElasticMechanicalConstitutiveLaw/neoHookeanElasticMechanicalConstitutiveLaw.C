@@ -106,7 +106,28 @@ neoHookeanElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    if (mag(nu_.value() - 0.5) < SMALL)
+    // Note: the planeStress entry is injected into this dictionary by the
+    // mechanicalConstitutiveLawManager from the top-level entry in
+    // mechanicalProperties; it is not given by the user in this sub-dictionary
+    const Switch planeStress
+    (
+        dict.lookupOrDefault<Switch>("planeStress", false)
+    );
+
+    if (nu_.value() > 0.5 || nu_.value() <= -1.0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Invalid Poisson's ratio nu = " << nu_.value()
+            << ". Expected -1 < nu <= 0.5."
+            << exit(FatalIOError);
+    }
+    else if (planeStress)
+    {
+        // The plane-stress reduction keeps the bulk stiffness finite up to
+        // and including nu = 0.5, as the legacy law's does, so nothing here
+        // is incompressible or ill-conditioned
+    }
+    else if (mag(nu_.value() - 0.5) < SMALL)
     {
         // Fully incompressible. Allowed, because a mixed displacement-pressure
         // formulation replaces the volumetric response with a solved pressure
@@ -114,13 +135,6 @@ neoHookeanElasticMechanicalConstitutiveLaw
         // would need the bulk stiffness is refused by the manager, which asks
         // incompressible() rather than meeting an infinite kappa
         incompressible_ = true;
-    }
-    else if (nu_.value() > 0.5)
-    {
-        FatalIOErrorInFunction(dict)
-            << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected nu <= 0.5."
-            << exit(FatalIOError);
     }
     else if (nu_.value() >= 0.5 - SMALL)
     {
@@ -130,23 +144,8 @@ neoHookeanElasticMechanicalConstitutiveLaw
             << "This leads to an ill-conditioned bulk modulus."
             << exit(FatalIOError);
     }
-    else if (nu_.value() <= -1.0)
-    {
-        FatalIOErrorInFunction(dict)
-            << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
-            << exit(FatalIOError);
-    }
 
     // Set lambda, mu and kappa
-    // Note: the planeStress entry is injected into this dictionary by the
-    // mechanicalConstitutiveLawManager from the top-level entry in
-    // mechanicalProperties; it is not given by the user in this sub-dictionary
-    const Switch planeStress
-    (
-        dict.lookupOrDefault<Switch>("planeStress", false)
-    );
-
     mu_ = E_/(2.0*(1.0 + nu_));
 
     if (incompressible_)

@@ -781,6 +781,13 @@ if [ "$CHECK_ONLY" = false ]; then
             continue
         fi
 
+        # Recorded so that a vertex-centred arm which ran but wrote no
+        # displacement fails below, rather than quietly switching the
+        # comparison off
+        if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
+            VERTEX_CENTRED_RAN="${VERTEX_CENTRED_RAN:-} ${approach}"
+        fi
+
         # Each arm must have taken the path it was set up for, or a
         # comparison between them is between two copies of the same thing
         if [[ -f "${CASE_DIR}/${SOLVER_LOGFILE}" ]]; then
@@ -826,9 +833,10 @@ if [ "$CHECK_ONLY" = false ]; then
     done
 
     # As for unsCoupled, but compared field by field rather than on one
-    # extremum, since the two arms should agree to round-off everywhere
-    if [[ -f "${REGRESSION_ROOT}/pointD.vertexCentred" \
-       || -f "${REGRESSION_ROOT}/pointD.vertexCentredManager" ]]
+    # extremum, since the two arms should agree to round-off everywhere.
+    # Scheduled on whether the arms ran, not on whether they wrote output: an
+    # arm that ran and wrote no pointD is a failure, not a reason to skip
+    if [[ -n "${VERTEX_CENTRED_RAN:-}" ]]
     then
         if ! check_vertex_centred_agreement "vertexCentred" \
             "${REGRESSION_ROOT}/pointD.vertexCentred" \
