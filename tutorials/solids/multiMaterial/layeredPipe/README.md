@@ -149,7 +149,7 @@ framework, with the material-aware `leastSquaresS4f` gradient. Adding
 `parallel` runs that in parallel: by default on two processors whose boundary
 is the material interface (`system/decomposeParDict.interface`, with
 `constant/cellDecomposition` written from the `inner` cellSet), or with
-`./Allrun framework parallel simple` on four processors whose boundaries cut
+`./Allrun framework parallel simple` on two processors whose boundary cuts
 across it (`system/decomposeParDict.simple`).
 
 ```note

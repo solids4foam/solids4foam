@@ -20,7 +20,7 @@ solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 # "./Allrun framework parallel" runs in parallel instead, decomposed with
 # system/decomposeParDict.interface, which puts the processor boundary on the
 # material interface; "./Allrun framework parallel simple" uses
-# system/decomposeParDict.simple, whose processor boundaries cut across it
+# system/decomposeParDict.simple, whose processor boundary cuts across it
 APPROACH="legacy"
 PARALLEL=false
 DECOMPOSITION="interface"

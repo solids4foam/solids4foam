@@ -16,16 +16,17 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Four processors whose boundaries cut across the material interface, so the
-// material-filtered gradient stencil meets both materials at a processor
-// boundary
-numberOfSubdomains 4;
+// Two processors, split at the middle of the domain in x, whose boundary cuts
+// across the material interface, so the material-filtered gradient stencil
+// meets both materials at a processor boundary. Two rather than four: CI
+// runs several regression tests at once, and four ranks do not always start
+numberOfSubdomains 2;
 
 method          simple;
 
 simpleCoeffs
 {
-    n           (2 2 1);
+    n           (2 1 1);
     delta       0.001;
 }
 
