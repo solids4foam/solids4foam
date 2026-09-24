@@ -1658,6 +1658,46 @@ const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
 }
 
 
+namespace Foam
+{
+    // Search a law's dictionary and every sub-dictionary for a smoothing
+    // request. A wrapper law - thermoMechanicalLaw, poroMechanicalLaw,
+    // electroMechanicalLaw - keeps its inner law in a sub-dictionary, and a
+    // case could set solvePressureEqn there, where the inner law read it
+    static bool findSmoothingRequest
+    (
+        const dictionary& dict,
+        scalar& scaleFactor
+    )
+    {
+        if (dict.lookupOrDefault<Switch>("solvePressureEqn", false))
+        {
+            scaleFactor =
+                dict.lookupOrDefault<scalar>
+                (
+                    "pressureSmoothingScaleFactor", 100.0
+                );
+
+            return true;
+        }
+
+        forAllConstIter(dictionary, dict, iter)
+        {
+            if
+            (
+                iter().isDict()
+             && findSmoothingRequest(iter().dict(), scaleFactor)
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+
 void Foam::solidModel::readHydrostaticSmoothing() const
 {
     hydrostaticSmoothingRead_ = true;
@@ -1673,18 +1713,13 @@ void Foam::solidModel::readHydrostaticSmoothing() const
 
     forAll(lawEntries, lawI)
     {
-        const dictionary& lawDict = lawEntries[lawI].dict();
+        scalar scaleFactor = 100.0;
 
-        if (lawDict.lookupOrDefault<Switch>("solvePressureEqn", false))
+        if (findSmoothingRequest(lawEntries[lawI].dict(), scaleFactor))
         {
             nRequested++;
             requestingLaw = lawEntries[lawI].keyword();
-
-            pressureSmoothingScaleFactor_ =
-                lawDict.lookupOrDefault<scalar>
-                (
-                    "pressureSmoothingScaleFactor", 100.0
-                );
+            pressureSmoothingScaleFactor_ = scaleFactor;
         }
     }
 
@@ -1903,7 +1938,14 @@ void Foam::solidModel::addSmoothedHydrostaticStress
 
     const volScalarField& AD = mesh().lookupObject<volScalarField>("DEqnA");
 
-    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ
+    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ.
+    //
+    // Kirchhoff for every law, deliberately. Most of the legacy laws passed
+    // their hydrostatic Kirchhoff stress to the smoothing, but GuccioneElastic
+    // passed its Cauchy one, and since multiplying by a varying J does not
+    // commute with the smoothing, a Guccione case smoothed this way is
+    // stabilised a little differently from before. No case combines the two;
+    // one measure for all laws is the simpler contract
     const volScalarField& volumetricResponse = smoothingVolumetricResponse();
     const volScalarField sigmaHydExplicit
     (

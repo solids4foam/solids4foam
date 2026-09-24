@@ -76,26 +76,21 @@ The following `solidModel` options are particularly relevant here:
 | `residualFile` | `false` | Writes `residual.dat` in the case directory |
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
-| `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `solvePressure` | `false` | Not supported; refused at construction |
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
 `scaleFactor 0.1` for both momentum and pressure.
 
-### Pressure coupling special case
+### Pressure coupling
 
-This model can also solve for pressure by enabling:
-
-```text
-solvePressure true;
-```
-
-This is a special case and is only supported when `solutionAlgorithm` is
-`PETScSNES`. When pressure solving is enabled:
-
-- the PETSc solution vector includes `p` as an extra unknown;
-- the pressure stabilisation sub-model is used;
-- the code enforces the `PETScSNES` path at construction time.
+The mixed displacement-pressure formulation (`solvePressure`) is not
+supported by this model, and a case that sets it stops at construction. This
+model obtains the volumetric part by taking `dev()` of the total stress, which
+is exact only where everything the solved pressure must not replace is trace
+free. Use `nonLinearGeometryTotalLagrangianTotalDisplacement` for a mixed
+formulation. For a segregated solve of a nearly incompressible material, the
+hydrostatic stress smoothing (`solvePressureEqn`) is available instead.
 
 ### Recommended dictionary setup
 
@@ -141,12 +136,6 @@ nonLinearGeometryUpdatedLagrangianCoeffs
 }
 ```
 
-If `solvePressure` is enabled, add:
-
-```text
-    solvePressure         true;
-```
-
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
 you override that name in the coefficients sub-dictionary.
@@ -184,7 +173,6 @@ The main fields you will typically see in the output are:
 - `A`: acceleration field.
 - `sigma`: symmetric stress tensor field.
 - `rho`: updated-configuration density field.
-- `p`: pressure field, only when `solvePressure` is enabled.
 
 Here `oldTime()` means the value stored at the previous time step.
 
@@ -252,8 +240,7 @@ The constructor performs the following setup:
 4. Reads optional settings such as `predictor`, `solvePressure`,
    `dampingCoeff`, and the PETSc options file name.
 5. Forces creation of old-time fields for consistent restart behaviour.
-6. Creates `p` and validates that `solvePressure` is only used with
-   `PETScSNES`.
+6. Refuses `solvePressure`, which this model does not support.
 7. Rebuilds `relF`, `relFinv`, `relJ`, `F`, and `J` when `restart` is enabled.
 8. Enforces `leastSquaresS4f` for `grad(DD)` when PETSc SNES is used.
 9. Enables `extrapolateValue` on `solidTraction` patch fields for the PETSc
@@ -291,7 +278,6 @@ Any other algorithm value is treated as unsupported for this class.
   solution vector;
 - solves the nonlinear system through `foamPetscSnesHelper`;
 - extracts the solution back into `DD`;
-- optionally extracts `p` when `solvePressure` is enabled;
 - recomputes `D`, `gradDD`, `pointDD`, `pointD`, `U`, `A`, `F`, `relF`,
   `relFinv`, `relJ`, and `J`.
 

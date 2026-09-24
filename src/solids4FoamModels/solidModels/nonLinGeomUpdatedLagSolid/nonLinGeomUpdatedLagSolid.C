@@ -851,6 +851,32 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 {
     DDisRequired();
 
+    // Refused here, at construction, rather than at the first residual
+    // evaluation, so that a case asking for it stops before it runs.
+    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // stress and its volumetric response apart, and replaces the second with
+    // the solved pressure; this one asks for a total stress and takes dev()
+    // of it, which is the same thing only where what remains is trace free.
+    // Refused rather than solved approximately: the difference is a different
+    // material rather than a visible error
+    if (solvePressure())
+    {
+        FatalErrorInFunction
+            << "solvePressure is not supported by this solid model." << nl
+            << nl
+            << "    The mixed formulation replaces the law's volumetric "
+            << "response with a solved pressure. This model still recovers "
+            << "that part by taking dev() of the total stress, which is "
+            << "correct only where everything the pressure must not replace "
+            << "is trace free - true of an isotropic hyperelastic law and "
+            << "false of, for instance, an active tension along a fibre "
+            << "direction." << nl << nl
+            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
+            << "which asks the law for the two apart, or disable "
+            << "solvePressure."
+            << abort(FatalError);
+    }
+
     // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(DD().name());
 
@@ -1108,30 +1134,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
         FatalErrorInFunction
             << "solvePressure must be disabled when using high order "
             << "residual calculation. Mixed approach not yet supported!"
-            << abort(FatalError);
-    }
-
-    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
-    // stress and its volumetric response apart, and replaces the second with
-    // the solved pressure; this one asks for a total stress and takes dev()
-    // of it, which is the same thing only where what remains is trace free.
-    // Refused rather than solved approximately: the difference is a different
-    // material rather than a visible error
-    if (solvePressure())
-    {
-        FatalErrorInFunction
-            << "solvePressure is not supported by this solid model." << nl
-            << nl
-            << "    The mixed formulation replaces the law's volumetric "
-            << "response with a solved pressure. This model still recovers "
-            << "that part by taking dev() of the total stress, which is "
-            << "correct only where everything the pressure must not replace "
-            << "is trace free - true of an isotropic hyperelastic law and "
-            << "false of, for instance, an active tension along a fibre "
-            << "direction." << nl << nl
-            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
-            << "which asks the law for the two apart, or disable "
-            << "solvePressure."
             << abort(FatalError);
     }
 
