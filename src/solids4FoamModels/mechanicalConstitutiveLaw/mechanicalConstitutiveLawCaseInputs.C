@@ -261,6 +261,32 @@ void Foam::mechanicalConstitutiveLawCaseInputs::checkMesh
 }
 
 
+void Foam::mechanicalConstitutiveLawCaseInputs::prepareCase
+(
+    sourceCase& sc
+) const
+{
+    const label timeIndex = mesh_.time().timeIndex();
+
+    if (sc.timeIndex_ == timeIndex && sc.meshPtr_.valid())
+    {
+        return;
+    }
+
+    if (!sc.meshPtr_.valid())
+    {
+        makeCase(sc);
+    }
+    else
+    {
+        checkMesh(sc, false);
+    }
+
+    autoPtrRef(sc.runTimePtr_).setTime(mesh_.time());
+    sc.timeIndex_ = timeIndex;
+}
+
+
 void Foam::mechanicalConstitutiveLawCaseInputs::refresh
 (
     sourcedField& sf
@@ -278,18 +304,9 @@ void Foam::mechanicalConstitutiveLawCaseInputs::refresh
     sf.timeIndex_ = timeIndex;
 
     sourceCase& sc = cases_[sf.caseI_];
-
-    if (!sc.meshPtr_.valid())
-    {
-        makeCase(sc);
-    }
-    else
-    {
-        checkMesh(sc, false);
-    }
+    prepareCase(sc);
 
     Time& runTime = autoPtrRef(sc.runTimePtr_);
-    runTime.setTime(mesh_.time());
 
     IOobject io
     (
@@ -301,11 +318,20 @@ void Foam::mechanicalConstitutiveLawCaseInputs::refresh
     );
 
 #ifdef OPENFOAM_NOT_EXTEND
-    const bool present = io.typeHeaderOk<volScalarField>(true);
+    bool present = io.typeHeaderOk<volScalarField>(true);
 #else
-    const bool present =
+    bool present =
         io.headerOk() && io.headerClassName() == volScalarField::typeName;
 #endif
+
+    // Reading can be collective under a collated file handler, so every rank
+    // must either read or retain the preceding value together
+    if (Pstream::parRun())
+    {
+        bool allPresent = present;
+        reduce(allPresent, andOp<bool>());
+        present = allPresent;
+    }
 
     if (!present)
     {
@@ -424,6 +450,7 @@ void Foam::mechanicalConstitutiveLawCaseInputs::addSource
         cases_.setSize(caseI + 1);
         cases_.set(caseI, new sourceCase());
         cases_[caseI].caseDir_ = caseDir;
+        cases_[caseI].timeIndex_ = -1;
     }
 
     // One copy per (directory, name), shared by the laws that read it

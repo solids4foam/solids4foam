@@ -112,6 +112,9 @@ class mechanicalConstitutiveLawCaseInputs
             fileName caseDir_;
             autoPtr<Time> runTimePtr_;
             autoPtr<fvMesh> meshPtr_;
+
+            //- Time index at which the source case was last prepared
+            label timeIndex_;
         };
 
         //- One input read from one case directory, copied onto the mesh
@@ -151,10 +154,14 @@ class mechanicalConstitutiveLawCaseInputs
         //- Construct the second case's Time and mesh and check the mesh
         void makeCase(sourceCase& sc) const;
 
+        //- Set the second case to the current time and check its mesh once
+        //  per time step
+        void prepareCase(sourceCase& sc) const;
+
         //- Check the second case's mesh against the main one. The full check,
         //  including the points, is done once; the sizes are checked on every
-        //  read so that a topology change of the main mesh is refused rather
-        //  than read out of bounds
+        //  time step so that a topology change of the main mesh is refused
+        //  rather than read out of bounds
         void checkMesh(const sourceCase& sc, const bool checkPoints) const;
 
         //- Read the field at the current time if not yet done this step

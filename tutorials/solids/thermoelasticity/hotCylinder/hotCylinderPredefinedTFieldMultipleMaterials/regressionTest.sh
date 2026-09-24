@@ -204,7 +204,7 @@ check_arm() {
         # last time too, not merely once at the start
         if ! grep "${FRAMEWORK_T_READ}" "${dir}/${SOLVER_LOGFILE}" \
             | tail -n 1 \
-            | grep -q "hotCylinderTemperatureField/${COMPARISON_END_TIME}\""
+            | grep -q "hotCylinderTemperatureField/${COMPARISON_END_TIME}"
         then
             echo "FAIL: ${dir##*/} did not read T from" \
                 "hotCylinderTemperatureField/${COMPARISON_END_TIME}"
