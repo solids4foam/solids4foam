@@ -11,32 +11,38 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Hron-Turek FSI3 regression test
 # ============================================================
 
-# Shortened regression horizon: keep the case quick while still
-# exercising the coupled fluid-solid response after coupling starts.
-REG_END_TIME=2.5
+# Shortened regression horizon: 100 coupled time-steps after coupling starts
+# at t = 2. The flap oscillation grows from here, and it amplifies differences
+# at the level of the FSI tolerance (1e-6): by t = 2.5, runs that converge
+# every step but differ only in coupling settings disagree by several times the
+# tolerances below. Up to t = 2.1 that spread stays within 0.15 of them.
+REG_END_TIME=2.1
 
 # Regression tolerances
 DISP_TOL=2e-5
-FX_TOL=1e-4
+FX_TOL=5e-4
 FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
-# Note: the force references are the total force. They were previously the
-# total force plus the pressure force, as the extraction summed the OpenFOAM.com
-# total and pressure columns.
-# Reference values updated for the interface-normal correction (PR #375): the
-# fluid pressure is now applied using the deformed interface normals rather than
-# the initial-configuration ones, which shifts every FSI result. See
-# https://github.com/solids4foam/solids4foam/pull/375
+# The force references are the total force.
 # The values are the midpoint of OpenFOAM-v2412, OpenFOAM-v2512 and
-# OpenFOAM-9; the spread across those is well inside the tolerances above.
-REF_TIP_UY=-0.00031014
-REF_FX=-0.0393827
-REF_FY=-0.0461165
+# OpenFOAM-9. Fx differs across them by up to 3.4e-4 once the coupling starts
+# (the forces agree at t = 2), which FX_TOL covers; Uy and Fy agree to within
+# 0.1 of their tolerances.
+REF_TIP_UY=-0.000282442
+REF_FX=-0.0318083
+REF_FY=-0.0388867
+
+# foam-extend uses GGI rather than AMI for the interface interpolation and has
+# a distinct, repeatable tip displacement and force at the regression end time.
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    REF_TIP_UY=-0.000244033
+    REF_FX=-0.0308966
+    REF_FY=-0.0371161
+fi
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
-FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 echo "============================================================"
 echo "Hron-Turek FSI3 regression test"
@@ -67,14 +73,6 @@ run_case() {
         cd "${CASE_DIR}"
         ./Allclean > /dev/null 2>&1 || true
         ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
-    )
-
-    mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
-    (
-        cd "${CASE_DIR}/postProcessing/fluid/forces/0"
-        if [[ ! -e force.dat && -f forces.dat ]]; then
-            ln -s forces.dat force.dat
-        fi
     )
 }
 
@@ -130,12 +128,15 @@ extract_final_force_components() {
 }
 
 find_force_file() {
+    # OpenFOAM.com and OpenFOAM.org write the forces under postProcessing,
+    # whereas foam-extend writes them to <case>/forces/<startTime>
     local candidate
     for candidate in \
         "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
         "${CASE_DIR}/postProcessing/fluid/forces/0/forces.dat" \
         "${CASE_DIR}/postProcessing/forces/0/force.dat" \
-        "${CASE_DIR}/postProcessing/forces/0/forces.dat"
+        "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
+        "${CASE_DIR}/forces/0/forces.dat"
     do
         if [[ -f "${candidate}" ]]; then
             echo "${candidate}"
@@ -148,54 +149,69 @@ find_force_file() {
 prepare_case
 run_case
 
-tip_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
-force_file=""
-if force_file=$(find_force_file); then
-    force_time=$(latest_numeric_time "${force_file}" || true)
-else
-    force_time=""
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
 fi
 
-if [[ -z "${tip_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+tip_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
+
+if [[ -z "${tip_time}" ]]; then
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      displacement output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${tip_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the tip displacement history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the tip displacement history stops at t = ${tip_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
+fi
+
+if ! force_file=$(find_force_file); then
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      force output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
+fi
+
+force_time=$(latest_numeric_time "${force_file}" || true)
+
+if [[ -z "${force_time}" ]]; then
+    echo "FAIL: the case did not complete in this environment:"
+    echo "      the force output contains no time data and the tutorial did not"
+    echo "      declare a skip (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the force history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 tip_uy=$(extract_final_tip_uy)
-if force_file=$(find_force_file); then
-    force_components=$(extract_final_force_components "${force_file}")
-else
-    force_components=""
-    echo "Skipping force checks because force data is unavailable"
+force_components=$(extract_final_force_components "${force_file}")
+
+if [[ -z "${tip_uy}" ]]; then
+    echo "FAIL: Could not extract tip displacement"
+    exit 1
 fi
 
-if [[ -z "${tip_uy}" || -z "${force_components}" ]]; then
-    if [[ -z "${tip_uy}" ]]; then
-        echo "FAIL: Could not extract tip displacement"
-        exit 1
-    fi
+if [[ -z "${force_components}" ]]; then
+    echo "FAIL: Could not extract the force components from ${force_file}"
+    exit 1
 fi
 
-if [[ -n "${force_components}" ]]; then
-    final_fx=$(awk '{print $1}' <<< "${force_components}")
-    final_fy=$(awk '{print $2}' <<< "${force_components}")
-fi
+final_fx=$(awk '{print $1}' <<< "${force_components}")
+final_fy=$(awk '{print $2}' <<< "${force_components}")
 
 tip_uy_diff_abs=$(abs "$(awk "BEGIN {print ${tip_uy} - ${REF_TIP_UY}}")")
-if [[ -n "${force_components}" ]]; then
-    final_fx_diff_abs=$(abs "$(awk "BEGIN {print ${final_fx} - ${REF_FX}}")")
-    final_fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
-fi
+final_fx_diff_abs=$(abs "$(awk "BEGIN {print ${final_fx} - ${REF_FX}}")")
+final_fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
 
 failures=0
 
@@ -206,20 +222,18 @@ else
     failures=$((failures + 1))
 fi
 
-if [[ -n "${force_components}" ]]; then
-    if awk "BEGIN {exit !(${final_fx_diff_abs} < ${FX_TOL})}"; then
-        printf "PASS: final Fx = %.6g\n" "${final_fx}"
-    else
-        printf "FAIL: final Fx = %.6g\n" "${final_fx}"
-        failures=$((failures + 1))
-    fi
+if awk "BEGIN {exit !(${final_fx_diff_abs} < ${FX_TOL})}"; then
+    printf "PASS: final Fx = %.6g\n" "${final_fx}"
+else
+    printf "FAIL: final Fx = %.6g\n" "${final_fx}"
+    failures=$((failures + 1))
+fi
 
-    if awk "BEGIN {exit !(${final_fy_diff_abs} < ${FY_TOL})}"; then
-        printf "PASS: final Fy = %.6g\n" "${final_fy}"
-    else
-        printf "FAIL: final Fy = %.6g\n" "${final_fy}"
-        failures=$((failures + 1))
-    fi
+if awk "BEGIN {exit !(${final_fy_diff_abs} < ${FY_TOL})}"; then
+    printf "PASS: final Fy = %.6g\n" "${final_fy}"
+else
+    printf "FAIL: final Fy = %.6g\n" "${final_fy}"
+    failures=$((failures + 1))
 fi
 
 echo
