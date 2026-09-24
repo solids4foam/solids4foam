@@ -2407,6 +2407,45 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         }
     }
 
+    // An input read from a case directory by one material must be read that
+    // way by every material that reads it. The sourced copy is registered and
+    // written under the input's own name, so a material left to find the
+    // input in this run would find the other material's copy instead, or
+    // read it back from disk at the next write
+    if (caseInputsPtr_.valid())
+    {
+        forAll(laws_, lawI)
+        {
+            const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+
+            forAll(names, i)
+            {
+                if (caseInputsPtr_->found(lawI, names[i]))
+                {
+                    continue;
+                }
+
+                forAll(laws_, otherI)
+                {
+                    if (caseInputsPtr_->found(otherI, names[i]))
+                    {
+                        FatalErrorInFunction
+                            << "Material " << lawEntries[otherI].keyword()
+                            << " reads '" << names[i] << "' from a case "
+                            << "directory, but material "
+                            << lawEntries[lawI].keyword() << " reads it from "
+                            << "this run." << nl
+                            << "    Every material that reads an input must "
+                            << "read it the same way: give "
+                            << lawEntries[lawI].keyword() << " a case "
+                            << "directory for '" << names[i] << "' too."
+                            << exit(FatalError);
+                    }
+                }
+            }
+        }
+    }
+
     // Set lawBoundaryFaces
     calcLawBoundaryFaces();
 }
@@ -2722,6 +2761,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     UList<scalar>* volumetricPtr
 )
 {
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
+
     const word context = "updateStressSmallStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
 
@@ -2971,6 +3018,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     UList<scalar>* volumetricPtr
 )
 {
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
+
     const word context = "updateStressFiniteStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
 

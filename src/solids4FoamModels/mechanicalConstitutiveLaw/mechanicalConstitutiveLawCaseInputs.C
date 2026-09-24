@@ -217,15 +217,46 @@ void Foam::mechanicalConstitutiveLawCaseInputs::checkMesh
             << exit(FatalError);
     }
 
-    if
-    (
-        checkPoints
-     && gMax(mag(mesh_.points() - srcMesh.points())()) > SMALL
-    )
+    if (checkPoints)
     {
-        FatalErrorInFunction
-            << "The points of the mesh of the input case " << sc.caseDir_
-            << " differ from those of this case." << exit(FatalError);
+        if (gMax(mag(mesh_.points() - srcMesh.points())()) > SMALL)
+        {
+            FatalErrorInFunction
+                << "The points of the mesh of the input case " << sc.caseDir_
+                << " differ from those of this case." << exit(FatalError);
+        }
+
+        // Equal counts and points do not make equal numbering, and the input
+        // is copied by index: the face addressing must match too, or a
+        // renumbered source mesh would put each value in the wrong cell
+        bool addressingDiffers =
+            mesh_.faceOwner() != srcMesh.faceOwner()
+         || mesh_.faceNeighbour() != srcMesh.faceNeighbour();
+
+        forAll(mesh_.boundaryMesh(), patchI)
+        {
+            if
+            (
+                mesh_.boundaryMesh()[patchI].start()
+             != srcMesh.boundaryMesh()[patchI].start()
+            )
+            {
+                addressingDiffers = true;
+            }
+        }
+
+        reduce(addressingDiffers, orOp<bool>());
+
+        if (addressingDiffers)
+        {
+            FatalErrorInFunction
+                << "The mesh of the input case " << sc.caseDir_ << " is "
+                << "numbered differently from that of this case: the face "
+                << "owner, neighbour or patch addressing differs." << nl
+                << "    The input is copied cell by cell and face by face, so "
+                << "the two meshes must be the same mesh."
+                << exit(FatalError);
+        }
     }
 }
 
@@ -452,6 +483,15 @@ bool Foam::mechanicalConstitutiveLawCaseInputs::owns
     }
 
     return false;
+}
+
+
+void Foam::mechanicalConstitutiveLawCaseInputs::refreshAll() const
+{
+    forAll(fields_, fieldI)
+    {
+        refresh(fields_[fieldI]);
+    }
 }
 
 

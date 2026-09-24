@@ -219,6 +219,13 @@ public:
         //  Reads it from the case directory on the first call of a step.
         //  The manager is const where it gathers, so this is too, and the
         //  refresh is a cache update
+        //- Bring every sourced field up to the current time step, on every
+        //  processor in the same order. Reading a source case involves
+        //  collective operations, so it must not wait for the first law that
+        //  happens to have points on a processor: a processor holding none of
+        //  a material would skip them and the others would hang
+        void refreshAll() const;
+
         const volScalarField& field(const label lawI, const word& name) const;
 
         //- Say, once per input, that a registered field is used in place of

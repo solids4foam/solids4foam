@@ -302,6 +302,10 @@ if [ "$CHECK_ONLY" = false ]; then
         cp -a "${item}" "${FRAMEWORK_DIR}/"
     done
 
+    # Cleaned first: the copy takes whatever the tutorial directory holds,
+    # and a log or result left there by a manual run would stand in for this
+    # arm's (runParallel, for one, skips a solver whose log already exists)
+    ( cd "${FRAMEWORK_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${FRAMEWORK_DIR}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) \
         || true
 
@@ -404,6 +408,7 @@ run_parallel_arm() {
         cp -a "${item}" "${dir}/"
     done
 
+    ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${dir}" && ./Allrun framework parallel "${decomposition}" \
         > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
@@ -537,6 +542,7 @@ cellSet inner delete cellToCell core
 cellSet outer delete cellToCell inner
 SETEOF
 
+    ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${dir}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
     if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
