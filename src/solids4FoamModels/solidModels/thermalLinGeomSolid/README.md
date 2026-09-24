@@ -156,9 +156,8 @@ magnitude of the heat flux.
 - the momentum equation is the same deferred-correction Laplacian form used by
   `linGeomTotalDispSolid`, with the momentum stabilisation term applied
   explicitly;
-- the heat equation and the momentum equation share one outer loop, which is
-  what distinguishes this model from
-  [weakThermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/weakThermalLinGeomSolid.html).
+- the heat equation and the momentum equation share one outer loop, so the
+  temperature-displacement coupling is converged within each time step.
 
 ### Construction
 

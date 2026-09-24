@@ -72,8 +72,8 @@ There is a single block-coupled path. This model does not read
 interpolated face fields when enabled.
 
 ```warning
-As in `unsNonLinGeomTotalLagSolid`, `solutionTolerance` is used as a relative
-tolerance in this model, not an absolute one.
+`solutionTolerance` is used as a relative tolerance in this model, not an
+absolute one.
 ```
 
 `K` is unusual in that it is re-read from the dictionary inside

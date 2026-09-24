@@ -37,10 +37,7 @@ rigid solid.
 ```warning
 No mechanical equation is solved. If you need the deformation as well as the
 temperature, use
-[thermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/thermalLinGeomSolid.html)
-for a strongly coupled solve, or
-[weakThermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/weakThermalLinGeomSolid.html)
-for a one-way coupled one.
+[thermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/thermalLinGeomSolid.html).
 ```
 
 ### Supported solution algorithms

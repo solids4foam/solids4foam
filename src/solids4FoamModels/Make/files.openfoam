@@ -15,40 +15,7 @@ solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
-/* Not compiled: unsLinearGeometry is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsLinGeomSolid/unsLinGeomSolid.C
-*/
-/* Not compiled: unsNonLinearGeometryUpdatedLagrangian is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
-*/
-/* Not compiled: unsNonLinearGeometryTotalLagrangian is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-*/
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
-/* Not compiled: vertexCentredNonLinTotalLagGeometry does not currently run.
-   No tutorial selects it, so nothing exercised it; an attempt to give it one
-   failed inside the PETSc solve. Its dictionary entries useGeometricStiffness,
-   compactImplicitStencil and the material's tangentEps also have no defaults
-   and are set by no case. Fixing it is separate from the mechanical
-   constitutive law work; see the solver's README.md.
-solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
-*/
-/* Not compiled: weakThermalLinearGeometry is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it inherits the framework path from
-   linearGeometryTotalDisplacement without anything having tested that it works
-   there. thermalLinearGeometry may also cover every case it was written for.
-   Reintroducing it needs a tutorial; see issue #459.
-solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
-*/
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
