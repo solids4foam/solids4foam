@@ -113,8 +113,8 @@ and checks:
   values;
 - the vertical force and twisting torque at $$40^{\circ}$$ against the solution
   of [3], interpolated from `reference/deLorenzisForce.dat` and
-  `reference/deLorenzisMoment.dat` (to within 3% and 25%, respectively; the calibration run gives deviations of
-  0.8% and 18%).
+  `reference/deLorenzisMoment.dat` (to within 3% and 25%, respectively; the
+  calibration run gives deviations of 0.8% and 18%).
 
 The twisting phase beyond $$40^{\circ}$$ is not part of the regression test.
 
