@@ -57,7 +57,8 @@ class generalisedEvenOrderLaplacianStab
         const scalar scaleFactor_;
 
         //- Laplacian power: 0 == laplacianStab, 1 == JSTStab, ...
-        const label laplacianPower_;   // m >= 0
+        //  The paper order is laplacianPower + 1
+        const label laplacianPower_;
 
 
     // Private Member Functions
@@ -69,7 +70,7 @@ class generalisedEvenOrderLaplacianStab
             const GeoField& field,
             SurfaceField& faceFlux,
             scalar scaleFactor,
-            const label laplacianPower   // m ≥ 1
+            const label laplacianPower
         ) const;
 
         //- Disallow default bitwise copy construct
@@ -105,6 +106,12 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return true: spectral normalisation is supported
+            virtual bool supportsSpectralNormalisation() const
+            {
+                return true;
+            }
 
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient

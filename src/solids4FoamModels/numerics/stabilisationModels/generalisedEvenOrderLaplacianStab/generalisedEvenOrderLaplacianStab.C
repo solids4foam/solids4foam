@@ -47,7 +47,20 @@ Foam::generalisedEvenOrderLaplacianStab::generalisedEvenOrderLaplacianStab
     stabilisationModel(mesh, dict, dims),
     scaleFactor_(readScalar(dict.lookup("scaleFactor"))),
     laplacianPower_(readInt(dict.lookup("laplacianPower")))
-{}
+{
+    if (laplacianPower_ < 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "laplacianPower must be non-negative, found "
+            << laplacianPower_ << exit(FatalIOError);
+    }
+
+    writeSpectralNormalisationInfo
+    (
+        laplacianPower_ + 1,
+        laplacianPower_ == 0
+    );
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -88,11 +101,14 @@ void Foam::generalisedEvenOrderLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
+    const scalar effectiveScaleFactor =
+        scaleFactor_*nyquistNormalisation(laplacianPower_ + 1);
+
     computeDiffStencil
     (
         p,
         autoPtrRef(faceScalarPtr()),
-        scaleFactor_,
+        effectiveScaleFactor,
         laplacianPower_
     );
 }
@@ -128,11 +144,14 @@ void Foam::generalisedEvenOrderLaplacianStab::updateVector
     }
 
     // Update the stabilisation
+    const scalar effectiveScaleFactor =
+        scaleFactor_*nyquistNormalisation(laplacianPower_ + 1);
+
     computeDiffStencil
     (
         p,
         autoPtrRef(faceVectorPtr()),
-        scaleFactor_,
+        effectiveScaleFactor,
         laplacianPower_
     );
 }

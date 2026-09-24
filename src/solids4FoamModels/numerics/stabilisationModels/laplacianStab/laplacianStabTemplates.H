@@ -39,13 +39,19 @@ void Foam::laplacianStab::computeDiffStencil
     using Type = typename GeoField::value_type;
     fv::orthogonalSnGrad<Type> op(mesh);
 
-    // Face-based h^2 scale via deltaCoeffs
+    if (normalise())
+    {
+        faceFlux = scaleFactor*op.snGrad(field);
+        return;
+    }
+
+    // Legacy face-based |d|^2 numerical scaling, retained for compatibility
     const surfaceScalarField h2f(1.0/sqr(mesh.deltaCoeffs()));
 
     // Dimensional consistency factor
     const dimensionedScalar one("one", dimless/sqr(dimLength), 1.0);
 
-    // Outer pass: orthogonal diffusion of L1, scaled by h^2
+    // Orthogonal normal gradient scaled by |d|^2
     faceFlux = scaleFactor*one*h2f*op.snGrad(field);
 }
 

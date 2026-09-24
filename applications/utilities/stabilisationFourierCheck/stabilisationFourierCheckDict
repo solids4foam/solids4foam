@@ -1,0 +1,42 @@
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    object stabilisationFourierCheckDict;
+}
+
+// rAUf is exactly 1 with dimensions area/pressure.
+tolerance 1e-9;
+pairTolerance 1e-12;
+gammaTolerance 1e-14;
+gammaLinearityCheck 0.37;  // 0 disables this secondary check
+normalisedVerification true;
+referenceNyquistDirections 2;
+
+models
+{
+    laplacian { type laplacian; scaleFactor 0.37; }
+    JST { type JamesonSchmidtTurkel; scaleFactor 0.37; }
+    gen0 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 0; }
+    gen1 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 1; }
+    gen2 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 2; }
+    diffStencil { type diffStencilLaplacian; scaleFactor 0.37; }
+    RhieChow { type RhieChow; scaleFactor 0.37; }
+}
+
+// theta/pi: k_d = N_d * (theta_d/pi) / 2 must be an integer.
+// Index-based cosine has nonzero amplitude even at the Nyquist mode.
+modes
+(
+    (0 0 0)
+    (0.5 0 0)
+    (1 0 0)
+    (0.5 0.5 0)
+    (1 0.5 0)
+    (0.5 1 0)
+    (1 1 0)
+    (0.125 0 0)
+);
+
+crossChecks ((laplacian gen0) (JST gen1) (diffStencil RhieChow));
