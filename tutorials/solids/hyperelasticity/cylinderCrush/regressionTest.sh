@@ -90,12 +90,11 @@ fi
 # Run the case both ways and require the two to agree.
 #
 # Both arms turn the pressure equation off. The case ships with
-# solvePressureEqn yes and a smoothing scale factor, and the framework has no
-# equivalent yet - the hydrostatic stress there is 0.5*K*(J^2 - 1) taken
-# directly, where the legacy law solves and smooths an equation for it. So this
-# checks the Ogden law itself: the principal stretches, the stress built from
-# them, and the rotation back. The shipped configuration is covered by the
-# checks above, and the pressure equation is a separate piece of work.
+# solvePressureEqn yes and a smoothing scale factor; the legacy law smooths the
+# hydrostatic stress itself, and on the framework the solid model does it
+# instead. Turning it off here checks the MooneyRivlin law on its own. The
+# shipped configuration, smoothing included, is covered by the force band
+# above: without the smoothing the final force is about -497 N, outside it.
 #
 # Two of the thirty steps. The legacy solver reaches its corrector limit from
 # the third step onwards, so past that it is an unconverged answer being

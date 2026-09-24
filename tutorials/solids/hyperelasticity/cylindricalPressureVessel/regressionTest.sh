@@ -16,13 +16,16 @@ fi
 # radius probe used by the tutorial.
 # ============================================================
 
-DISP_MIN=3.10
+# The lower bound also guards the hydrostatic stress smoothing that the case
+# asks for with solvePressureEqn: with it the probe reads 3.18206 on both the
+# legacy and framework paths, and without it 3.16927
+DISP_MIN=3.175
 DISP_MAX=3.25
 
 ALLRUN_LOGFILE="log.Allrun"
 
 CASES=(
-    "displacement::3.10:3.25"
+    "displacement::${DISP_MIN}:${DISP_MAX}"
     "pressureDisplacement:pressureDisplacement:2.20:2.32"
     "pressureDisplacementLinear:pressureDisplacementLinear:0.15:0.17"
     "pressureDisplacementUnsteady:pressureDisplacementUnsteady:1.50:1.60"
