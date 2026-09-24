@@ -17,7 +17,7 @@
 interfaceMotionRatio
 {
     type            coded;
-    libs            (utilityFunctionObjects);
+    libs            ("libutilityFunctionObjects.so");
     name            interfaceMotionRatio;
     region          fluid;
 
@@ -34,7 +34,8 @@ interfaceMotionRatio
 
     codeExecute
     #{
-        const fvMesh& solidMesh = time().lookupObject<fvMesh>("solid");
+        const fvMesh& solidMesh =
+            mesh().time().lookupObject<fvMesh>("solid");
         const pointVectorField& pointD =
             solidMesh.lookupObject<pointVectorField>("pointD");
 
@@ -57,7 +58,7 @@ interfaceMotionRatio
             const scalar solidIncr = gSum(mag(solidPointD - prevSolidPointD_));
             const scalar fluidIncr = gSum(mag(fluidPoints - prevFluidPoints_));
 
-            Info<< "interfaceMotionRatio " << time().timeName() << " "
+            Info<< "interfaceMotionRatio " << mesh().time().timeName() << " "
                 << fluidIncr/max(solidIncr, VSMALL) << endl;
         }
 

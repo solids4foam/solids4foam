@@ -303,10 +303,13 @@ else
             || true
     fi
 
+    # OpenFOAM-9 also executes the function object at the start time, so it
+    # reports step 1 too; step 1 is dropped here on every version
     ratio_file="${UNMASKED_CASE_DIR}/interfaceMotionRatio.dat"
     grep -h "^interfaceMotionRatio " \
         "${UNMASKED_CASE_DIR}/log.solids4Foam" 2>/dev/null \
-        | awk '{print $2, $3}' > "${ratio_file}" || true
+        | awk -v dt=2.5e-5 '$2 > 1.5*dt {print $2, $3}' > "${ratio_file}" \
+        || true
 
     n_expected=$(awk -v t="${UNMASKED_END_TIME}" -v dt=2.5e-5 \
         'BEGIN {printf "%d", t/dt - 1 + 0.5}')
