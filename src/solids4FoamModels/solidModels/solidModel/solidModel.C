@@ -368,13 +368,22 @@ void Foam::solidModel::makeRho() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    // Both implementations read the same density entries, but only one of
-    // them may be constructed on a given run
     if (useMechanicalConstitutiveLawManager())
     {
         rhoPtr_.set
         (
-            new volScalarField(mechanicalManager().rho())
+            new volScalarField
+            (
+                IOobject
+                (
+                    "rho",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                mechanicalManager().rho()
+            )
         );
     }
     else
