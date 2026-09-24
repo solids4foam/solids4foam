@@ -39,6 +39,7 @@ SourceFiles
 #include "solidModel.H"
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
+#include "mat66.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
