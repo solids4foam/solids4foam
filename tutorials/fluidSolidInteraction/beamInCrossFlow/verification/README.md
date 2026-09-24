@@ -14,6 +14,9 @@ from either this directory or the repository root:
 cd tutorials/fluidSolidInteraction/beamInCrossFlow/verification
 ./Allverify --case original --study mesh
 ./Allverify --case modified --study mesh
+# Compare base-mesh Robin and IQNILS solutions
+./Allverify --case original --study coupling
+./Allverify --case modified --study coupling
 # Optional steady-solution acceleration diagnostic
 ./Allverify --case original --study mesh --time-scheme Euler
 ```
@@ -37,6 +40,14 @@ The reference data and initial tolerances are in
 intentionally moderate:
 the verification signal is convergence toward the reference, not bitwise
 reproduction across OpenFOAM versions, PETSc configurations, or hardware.
+
+The `coupling` study runs base-mesh IQNILS and Robin cases with otherwise
+identical settings. It checks every primary quantity for the selected benchmark
+form and requires the Robin result to agree with IQNILS within 1%. It also
+checks the recorded residual history to ensure every Robin time step terminates
+with the displacement, pressure-change, and leakage-flux residuals below their
+configured tolerances. Unlike the mesh study, this comparison does not require
+`gnuplot`.
 
 - `original --study mesh` uses the Richter/Tukovic small-deformation form with
   St Venant-Kirchhoff elasticity and clean runs to `t = 8 s`. The inlet reaches

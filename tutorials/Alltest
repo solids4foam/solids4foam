@@ -231,6 +231,8 @@ do
     # Edit the target in-place, preserving symlink
     sed -i.bak \
       -e 's|outerCorrTolerance.*;|outerCorrTolerance 1e100;|g' \
+      -e 's|robinPressureTolerance.*;|robinPressureTolerance 1e100;|g' \
+      -e 's|robinFluxTolerance.*;|robinFluxTolerance 1e100;|g' \
       -e 's|//nOuterCorr.*;|nOuterCorr 1;|g' \
       -e 's|nOuterCorr.*;|nOuterCorr 1;|g' \
       "$FP"

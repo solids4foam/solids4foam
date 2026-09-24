@@ -12,11 +12,11 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volScalarField;
-    object      p_rgh;
+    object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [1 -1 -2 0 0 0 0];
+dimensions      [0 2 -2 0 0 0 0];
 
 internalField   uniform 0;
 
@@ -24,25 +24,32 @@ boundaryField
 {
     interface
     {
-        type            elasticWallPressure;
-        value           uniform 0;
+        type            zeroGradient;
     }
-
-    walls
+    outlet
     {
-        type            fixedFluxPressure;
-        value           uniform 0;
+         type           fixedValue;
+         value          uniform 0;
     }
-
-    atmosphere
+    inlet
     {
-        type            totalPressure;
-        p0              uniform 0;
+        type            zeroGradient;
     }
-
-    defaultFaces
+    bottom
     {
-        type            empty;
+        type            zeroGradient;
+    }
+    top
+    {
+        type            zeroGradient;
+    }
+    left
+    {
+        type            zeroGradient;
+    }
+    symmetry
+    {
+        type            symmetry;
     }
 }
 
