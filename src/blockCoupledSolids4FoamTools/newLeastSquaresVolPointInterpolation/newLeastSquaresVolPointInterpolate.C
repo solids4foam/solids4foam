@@ -873,7 +873,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
     pf.primitiveFieldRef();
     DimensionedField<Type, pointMesh>& pfI = pf;
 #else
-    DimensionedField<Type, pointMesh>& pfI = pf.internalField();
+    DimensionedField<Type, pointMesh>& pfI = pf.dimensionedInternalField();
 #endif
 
     interpolate(vf, gradVf, pfI);
