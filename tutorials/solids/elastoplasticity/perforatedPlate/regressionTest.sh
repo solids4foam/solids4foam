@@ -4,14 +4,17 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-# Run twice: the legacy mechanicalModel, and the mechanicalConstitutiveLaw
-# framework. This is the only regression case whose material is history
-# dependent AND which runs the framework end to end in a solver, so it is the
-# only place a plastic history error in the framework would show up in a real
-# solve rather than in a unit check
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+# For solids4Foam::foamFlavour, which picks the legacy reference for this fork
+source "${SOLIDS4FOAM_SCRIPTS}"
+
+# This is the regression case whose material is history dependent AND which
+# runs the mechanicalConstitutiveLaw framework end to end in a solver, so it is
+# where a plastic history error would show up in a real solve rather than in a
+# unit check
 APPROACHES=(
-    legacy
-    framework
+    main
 )
 
 # ============================================================
@@ -26,16 +29,36 @@ EPSILON_MAX=6.0e-3
 SIGMA_MIN=1.5e8
 SIGMA_MAX=2.2e8
 
-YIELD_MIN=28
-YIELD_MAX=32
+# Yielding integration points. The removed legacy law counted 28-32 here, and
+# the framework counts more, as it should: the legacy law reduced over its
+# cell field only, where the framework law reports per state and the manager
+# gathers the boundary states too. So the same material yielding in the same
+# places is 30 cell-centred points and 41 integration points once the boundary
+# faces are included, and the legacy band does not apply
+YIELD_MIN=38
+YIELD_MAX=44
 
-# The framework counts more, and should. The legacy law reduces over its cell
-# field only; the framework law reports per state and the manager gathers the
-# boundary states too, which were skipped entirely while the laws did their own
-# reducing. So the same material yielding in the same places is 30 cell-centred
-# points and 41 integration points once the boundary faces are included
-FRAMEWORK_YIELD_MIN=38
-FRAMEWORK_YIELD_MAX=44
+# The final extrema of the removed legacy mechanicalModel, from the last commit
+# that had it (mcl-stage8-coverage, c3a92b3d), per fork. This case has no
+# pressure smoothing, so there is nothing the framework omits: it reproduced
+# these in every digit logged, and is held to the 1e-8 relative that comparison
+# used. A plastic history error would show here as a difference the unit checks
+# cannot see
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_EPS=0.00507147
+        LEGACY_SIG=1.79161e+08
+        ;;
+    org)
+        LEGACY_EPS=0.00507147
+        LEGACY_SIG=1.79161e+08
+        ;;
+    foamextend)
+        LEGACY_EPS=0.00547244
+        LEGACY_SIG=1.87143e+08
+        ;;
+esac
+LEGACY_REL_TOL=1e-8
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -50,8 +73,8 @@ echo "============================================================"
 echo "Elastoplastic perforated plate regression test"
 echo "Max epsilonEq           in [${EPSILON_MIN}, ${EPSILON_MAX}]"
 echo "Max sigmaEq (von Mises) in [${SIGMA_MIN}, ${SIGMA_MAX}]"
-echo "Yielding cells          in [${YIELD_MIN}, ${YIELD_MAX}] (legacy)"
-echo "Yielding points         in [${FRAMEWORK_YIELD_MIN}, ${FRAMEWORK_YIELD_MAX}] (framework)"
+echo "Yielding points         in [${YIELD_MIN}, ${YIELD_MAX}]"
+echo "epsilonEq and sigmaEq match the legacy model to ${LEGACY_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -70,25 +93,20 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    if [[ "${approach}" == framework* ]]; then
-        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
-        # it is silently ignored and this arm would quietly repeat the legacy run
-        # restart yes makes the solid model write the kinematic history - the
-        # displacement gradient at old time, among others - which a
-        # constitutive history is measured against. This law happens not to
-        # need it, being written in total strain, but an incremental one does,
-        # and a restart arm that does not ask for it is testing a half restart
-        sed -i.bak \
-            's/^    predictor yes;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    predictor yes;/' \
-            "${CASE_DIR}/constant/solidProperties"
-        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+    # restart yes makes the solid model write the kinematic history - the
+    # displacement gradient at old time, among others - which a constitutive
+    # history is measured against. This law happens not to need it, being
+    # written in total strain, but an incremental one does, and a restart arm
+    # that does not ask for it is testing a half restart. The main arm asks
+    # too, so that the restarts below are compared with a run set up the same
+    sed -i.bak \
+        's/^    predictor yes;/    restart yes;\n    predictor yes;/' \
+        "${CASE_DIR}/constant/solidProperties"
+    rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${CASE_DIR}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
+    if ! grep -q 'restart yes' "${CASE_DIR}/constant/solidProperties"; then
+        echo "FAIL: could not set restart in solidProperties"
+        exit 1
     fi
 }
 
@@ -108,27 +126,14 @@ extract_max_sigma() {
         | tail -n 1
 }
 
-extract_yielding_cells() {
-    # The legacy law counts cells; the framework law counts integration points,
-    # which is the honest description for a law that may be evaluated on faces
-    # or points. Accept either wording rather than making one law lie
-    # Prefer the framework's message: in the framework arm the legacy law is
-    # still constructed but never called, so it truthfully reports zero and
-    # would mask the framework's own count
-    if grep -q "yielding integration points" "${CASE_DIR}/${SOLVER_LOGFILE}"
-    then
-        grep "Number of yielding integration points" \
-            "${CASE_DIR}/${SOLVER_LOGFILE}" \
-            | tail -n 101 \
-            | head -n 1 \
-            | sed 's|.*= *||; s|/.*||'
-    elif grep -q "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}"
-    then
-        grep "cells .* are actively yielding" "${CASE_DIR}/${SOLVER_LOGFILE}" \
-            | tail -n 101 \
-            | head -n 1 \
-            | awk '{print $1}'
-    fi
+extract_yielding_points() {
+    # Integration points rather than cells, which is the honest description for
+    # a law that may be evaluated on faces or points
+    grep "Number of yielding integration points" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        | tail -n 101 \
+        | head -n 1 \
+        | sed 's|.*= *||; s|/.*||'
 }
 
 # Exercise the mechanicalConstitutiveLawManager on this case. It is the only
@@ -185,30 +190,20 @@ for approach in "${APPROACHES[@]}"; do
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
-    # Assert the run took the path this approach names
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        used_framework=true
+        echo "PASS: ${approach} took its material from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not construct the framework"
+        echo "FAIL: ${approach} constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly constructed the framework"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected path"
     fi
 
     epsilon=$(extract_max_epsilon)
     sigma=$(extract_max_sigma)
-    yielding_cells=$(extract_yielding_cells)
+    yielding_points=$(extract_yielding_points)
 
-    if [[ -z "${epsilon}" || -z "${sigma}" || -z "${yielding_cells}" ]]; then
+    if [[ -z "${epsilon}" || -z "${sigma}" || -z "${yielding_points}" ]]; then
         echo "FAIL: ${approach} could not extract one or more quantities"
         failures=$((failures + 1))
         continue
@@ -233,53 +228,41 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    yield_min="${YIELD_MIN}"
-    yield_max="${YIELD_MAX}"
-
-    if [[ "${approach}" != "legacy" ]]; then
-        yield_min="${FRAMEWORK_YIELD_MIN}"
-        yield_max="${FRAMEWORK_YIELD_MAX}"
-    fi
-
-    if (( yielding_cells >= yield_min && yielding_cells <= yield_max )); then
-        printf "PASS: %s yielding = %d\n" "${approach}" "${yielding_cells}"
+    if (( yielding_points >= YIELD_MIN && yielding_points <= YIELD_MAX )); then
+        printf "PASS: %s yielding = %d\n" "${approach}" "${yielding_points}"
     else
-        printf "FAIL: %s yielding = %d\n" "${approach}" "${yielding_cells}"
+        printf "FAIL: %s yielding = %d\n" "${approach}" "${yielding_points}"
         failures=$((failures + 1))
     fi
 
-    if [[ "${approach}" == "legacy" ]]; then
-        if ! run_constitutive_test; then
-            failures=$((failures + 1))
-        fi
+    if ! run_constitutive_test; then
+        failures=$((failures + 1))
     fi
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 done
 
-# The framework must reproduce the legacy result. This case has no pressure
-# smoothing, so there is nothing the framework omits: the two should agree to
-# solver tolerance, and a plastic history error would show here as a
-# difference that the unit checks cannot see
-if [[ -n "${RESULT_EPS[legacy]:-}" && -n "${RESULT_EPS[framework]:-}" ]]; then
+# The framework must reproduce the legacy result
+if [[ -n "${RESULT_EPS[main]:-}" ]]; then
     for q in eps sig; do
         if [[ "${q}" == "eps" ]]; then
-            a="${RESULT_EPS[legacy]}"; b="${RESULT_EPS[framework]}"; n="epsilonEq"
+            a="${LEGACY_EPS}"; b="${RESULT_EPS[main]}"; n="epsilonEq"
         else
-            a="${RESULT_SIG[legacy]}"; b="${RESULT_SIG[framework]}"; n="sigmaEq"
+            a="${LEGACY_SIG}"; b="${RESULT_SIG[main]}"; n="sigmaEq"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= (1e-8*$a)^2)}"; then
-            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" \
-                "$n" "$a" "$b"
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the legacy model (%.8g vs %.8g)\n" \
+                "$n" "$b" "$a"
         else
-            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" \
-                "$n" "$a" "$b"
+            printf "FAIL: %s differs from the legacy model (%.8g vs %.8g)\n" \
+                "$n" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
 else
-    echo "SKIP: cross-check needs both approaches to have run"
+    echo "FAIL: the main arm produced no result to compare with the legacy model"
+    failures=$((failures + 1))
 fi
 
 # ------------------------------------------------------------
@@ -397,19 +380,19 @@ run_restart_test() {
     eps=$(extract_max_epsilon)
     sig=$(extract_max_sigma)
 
-    if [[ -z "${eps}" || -z "${sig}" || -z "${RESULT_EPS[framework]:-}" ]]; then
-        echo "SKIP: restart: needs the framework arm to have run"
+    if [[ -z "${eps}" || -z "${sig}" || -z "${RESULT_EPS[main]:-}" ]]; then
+        echo "SKIP: restart: needs the main arm to have run"
         return 0
     fi
 
     # The tolerance sits between the two things it has to tell apart: a
     # correct restart, which lands within 1e-8 here, and one that lost its
     # history, which is wrong by 2e-2. The remaining 1e-8 is not this
-    # framework's: the legacy model restarts to the same 1e-8 on this case,
+    # framework's: the removed legacy model restarted to the same 1e-8 here,
     # because the solver stops on a residual measured relative to its first
     # one and a restarted step does not start from the same guess
     local a b
-    a="${RESULT_EPS[framework]}"; b="${eps}"
+    a="${RESULT_EPS[main]}"; b="${eps}"
 
     if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \
@@ -510,12 +493,12 @@ EOD
     local eps
     eps=$(grep "Max epsilonEq" "${d}/log.par" | awk '{print $NF}' | tail -n 1)
 
-    if [[ -z "${eps}" || -z "${RESULT_EPS[framework]:-}" ]]; then
-        echo "SKIP: parallel restart needs the framework arm to have run"
+    if [[ -z "${eps}" || -z "${RESULT_EPS[main]:-}" ]]; then
+        echo "SKIP: parallel restart needs the main arm to have run"
         return 0
     fi
 
-    local a="${RESULT_EPS[framework]}"
+    local a="${RESULT_EPS[main]}"
 
     if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart on %s processors matches the serial run (%.8g vs %.8g)\n" \
@@ -627,12 +610,12 @@ EOD
     local eps
     eps=$(extract_max_epsilon)
 
-    if [[ -z "${eps}" || -z "${RESULT_EPS[framework]:-}" ]]; then
-        echo "SKIP: reconstructed restart needs the framework arm"
+    if [[ -z "${eps}" || -z "${RESULT_EPS[main]:-}" ]]; then
+        echo "SKIP: reconstructed restart needs the main arm"
         return 0
     fi
 
-    local a="${RESULT_EPS[framework]}"
+    local a="${RESULT_EPS[main]}"
 
     if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart after reconstructPar matches the serial run (%.8g vs %.8g)\n" \

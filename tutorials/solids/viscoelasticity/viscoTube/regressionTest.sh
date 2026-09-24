@@ -4,13 +4,17 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-# Run twice: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-# framework. viscousHookeanElastic is history dependent through its Maxwell
-# arms, and this is the only end-to-end comparison of that law against the
-# legacy one. There is no pressure smoothing here, so the two must agree
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+# For solids4Foam::foamFlavour, which picks the legacy reference for this fork
+source "${SOLIDS4FOAM_SCRIPTS}"
+
+# viscousHookeanElastic is history dependent through its Maxwell arms, and
+# this is the only end-to-end comparison of the mechanicalConstitutiveLaw
+# framework's law against the removed legacy one. There is no pressure
+# smoothing here, so the framework must reproduce the legacy answer
 APPROACHES=(
-    legacy
-    framework
+    main
 )
 
 # ============================================================
@@ -24,6 +28,28 @@ EPS_MAX=1e-3
 
 SIGMA_MIN=1e6
 SIGMA_MAX=1e8
+
+# The final extrema of the removed legacy mechanicalModel, logged to fourteen
+# figures, from the last commit that had it (mcl-stage8-coverage, c3a92b3d),
+# per fork. The framework matched them to the eight digits compared, and is
+# held to the 1e-6 relative that comparison used. The Maxwell arms are history,
+# so a relaxation error accumulates over the run and shows here in a way the
+# unit checks, which compare two trial states from one rest state, cannot see
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_EPS=0.00019987366
+        LEGACY_SIG=11480085
+        ;;
+    org)
+        LEGACY_EPS=0.00019987366
+        LEGACY_SIG=11480085
+        ;;
+    foamextend)
+        LEGACY_EPS=0.00020025214
+        LEGACY_SIG=11501844
+        ;;
+esac
+LEGACY_REL_TOL=1e-6
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -93,20 +119,17 @@ prepare_case() {
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 
-    if [[ "${approach}" == framework* ]]; then
-        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
-        # it is silently ignored and this arm would repeat the legacy run
-        sed -i.bak \
-            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    nCorrectors     1000;/' \
-            "${CASE_DIR}/constant/solidProperties"
-        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+    # restart yes makes the solid model write the kinematic history the
+    # restart test below needs; the main arm asks too, so that the two are set
+    # up the same
+    sed -i.bak \
+        's/^    nCorrectors     1000;/    restart yes;\n    nCorrectors     1000;/' \
+        "${CASE_DIR}/constant/solidProperties"
+    rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${CASE_DIR}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
+    if ! grep -q 'restart yes' "${CASE_DIR}/constant/solidProperties"; then
+        echo "FAIL: could not set restart in solidProperties"
+        exit 1
     fi
 }
 
@@ -149,19 +172,10 @@ for approach in "${APPROACHES[@]}"; do
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
     then
-        used_framework=true
+        echo "PASS: ${approach} took its material from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not construct the framework"
+        echo "FAIL: ${approach} constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly constructed the framework"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected path"
     fi
 
     epsilon=$(extract_max_epsilon)
@@ -190,35 +204,31 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    if [[ "${approach}" == "legacy" ]]; then
-        if ! run_constitutive_test; then
-            failures=$((failures + 1))
-        fi
+    if ! run_constitutive_test; then
+        failures=$((failures + 1))
     fi
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 done
 
-# The Maxwell arms are history, so a relaxation error accumulates over the run
-# and shows here in a way the unit checks, which compare two trial states from
-# one rest state, cannot see
-if [[ -n "${RESULT_E[legacy]:-}" && -n "${RESULT_E[framework]:-}" ]]; then
+if [[ -n "${RESULT_E[main]:-}" ]]; then
     for q in eps sig; do
         if [[ "${q}" == "eps" ]]; then
-            a="${RESULT_E[legacy]}"; b="${RESULT_E[framework]}"; n="epsilonEq"
+            a="${LEGACY_EPS}"; b="${RESULT_E[main]}"; n="epsilonEq"
         else
-            a="${RESULT_S[legacy]}"; b="${RESULT_S[framework]}"; n="sigmaEq"
+            a="${LEGACY_SIG}"; b="${RESULT_S[main]}"; n="sigmaEq"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
-            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" "$n" "$a" "$b"
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the legacy model (%.8g vs %.8g)\n" "$n" "$b" "$a"
         else
-            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" "$n" "$a" "$b"
+            printf "FAIL: %s differs from the legacy model (%.8g vs %.8g)\n" "$n" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
 else
-    echo "SKIP: cross-check needs both approaches to have run"
+    echo "FAIL: the main arm produced nothing to compare with the legacy model"
+    failures=$((failures + 1))
 fi
 
 
@@ -273,14 +283,14 @@ run_restart_test() {
     eps=$(extract_max_epsilon)
     sig=$(extract_max_sigma)
 
-    if [[ -z "${eps}" || -z "${RESULT_S[framework]:-}" ]]; then
-        echo "SKIP: restart needs the framework arm to have run"
+    if [[ -z "${eps}" || -z "${RESULT_S[main]:-}" ]]; then
+        echo "SKIP: restart needs the main arm to have run"
         return 0
     fi
 
     # Stress, not strain: strain is driven by the load and comes back whatever
     # the history did, while the stress is what the relaxation determines
-    local a="${RESULT_S[framework]}"
+    local a="${RESULT_S[main]}"
 
     if awk "BEGIN {exit !(($a - $sig)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \

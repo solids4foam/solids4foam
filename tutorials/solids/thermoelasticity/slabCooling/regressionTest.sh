@@ -45,6 +45,24 @@ if [[ "${variant}" != "openfoamcom" ]]; then
     SIGMA_MAX=1.05e3
 fi
 
+# The final D of the removed legacy mechanicalModel, as a digest of its
+# internal values as written, from the last commit that had it
+# (mcl-stage8-coverage, c3a92b3d), per fork. thermoMechanicalLaw is a
+# composite: it owns a sub-law, delegates to it, and subtracts the thermal
+# term, and the framework reproduced the legacy D field exactly, in every
+# figure written
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_D_DIGEST=b7609301dbc9037471029473cdc64be52c014832
+        ;;
+    org)
+        LEGACY_D_DIGEST=b7609301dbc9037471029473cdc64be52c014832
+        ;;
+    foamextend)
+        LEGACY_D_DIGEST=4760637f46f33deb124c59b8219f9e0a0d4e014e
+        ;;
+esac
+
 echo "============================================================"
 echo "slabCooling regression test"
 echo "Max sigmaEq < ${SIGMA_MAX} Pa"
@@ -73,69 +91,52 @@ prepare_case
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
-# Run the case a second time with the stress taken from the
-# mechanicalConstitutiveLaw framework rather than the legacy mechanicalModel,
-# and require the two to agree.
-#
-# thermoMechanicalLaw is the first composite law on the framework: it owns a
-# sub-law, delegates to it, and subtracts the thermal term. The two arms differ
-# in one dictionary entry and nothing else
-run_framework_comparison() {
-    local dir="${REGRESSION_ROOT}/framework"
+# A digest of a field's internal values as written, independent of the file
+# header, which names the OpenFOAM version that wrote it
+internal_field_digest() {
+    python3 - "$1" << 'PYEOF'
+import hashlib
+import re
+import sys
 
-    rm -rf "${dir}"
-    mkdir -p "${dir}"
+text = open(sys.argv[1]).read()
+field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
+if not field:
+    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
+print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
+PYEOF
+}
 
-    local item base_item
-    for item in "${SCRIPT_DIR}"/*; do
-        base_item=$(basename "${item}")
-        if [[ "${base_item}" == "regressionTests" ]]; then
-            continue
-        fi
-        cp -a "${item}" "${dir}/"
-    done
-
-    # The switch goes inside the solid model's coeffs block, which is where the
-    # model looks for it; at the top level it is read by nothing
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${dir}/constant/solidProperties"
-
-    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-        echo "FAIL: the framework arm did not run"
-        return 1
-    }
-
-    # Each arm must have taken the path it was set up for, or this compares two
-    # copies of the same thing
+check_against_legacy() {
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${dir}/${SOLVER_LOGFILE}"
-    then
-        echo "FAIL: the framework arm did not use the framework"
-        return 1
-    fi
-
-    if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         return 1
     fi
 
-    local t
-    t=$(solids4Foam::latestTime "${dir}")
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
 
-    if [[ -z "${t}" || ! -f "${dir}/${t}/D" || ! -f "${CASE_DIR}/${t}/D" ]]; then
-        echo "FAIL: the framework comparison produced no D field"
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
         return 1
     fi
 
-    if diff -q "${CASE_DIR}/${t}/D" "${dir}/${t}/D" > /dev/null; then
-        echo "PASS: framework and legacy agree exactly"
+    local digest
+    digest=$(internal_field_digest "${CASE_DIR}/${t}/D" || true)
+
+    if [[ -n "${digest}" && "${digest}" == "${LEGACY_D_DIGEST}" ]]; then
+        echo "PASS: D matches the legacy model's exactly"
         return 0
     fi
 
-    echo "FAIL: framework and legacy differ"
+    echo "FAIL: D differs from the legacy model's" \
+        "(digest ${digest:-none}, legacy ${LEGACY_D_DIGEST})"
     return 1
 }
 
@@ -196,8 +197,7 @@ else
     failures=$((failures + 1))
 fi
 
-# Clean case again
-if ! run_framework_comparison; then
+if ! check_against_legacy; then
     failures=$((failures + 1))
 fi
 

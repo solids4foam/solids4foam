@@ -14,12 +14,12 @@ fi
 # longWall regression test
 # Uses top-surface stress and displacement histories.
 #
-# Run twice: once with the implicit stiffness from the legacy mechanicalModel
-# and once with it from the mechanicalConstitutiveLaw framework. impK is the
-# coefficient of a Laplacian that is added implicitly and subtracted
-# explicitly, so it sets how the solution is reached and not what it is. The
-# two runs must therefore agree, and that agreement is the check on the
-# framework's finite-strain scalar tangent for MooneyRivlinElastic.
+# The implicit stiffness comes from the mechanicalConstitutiveLaw framework.
+# impK is the coefficient of a Laplacian that is added implicitly and
+# subtracted explicitly, so it sets how the solution is reached and not what it
+# is. The answer must therefore be the one the removed legacy mechanicalModel
+# reached, and that agreement is the check on the framework's finite-strain
+# scalar tangent for MooneyRivlinElastic.
 #
 # The case also carries the framework's own checks, since its law is
 # finite-strain only.
@@ -30,31 +30,35 @@ UY_MAX=0.407
 SYY_MIN=9.99e7
 SYY_MAX=1.001e8
 
+# The final top-surface uy and sigma_yy of the removed legacy mechanicalModel,
+# from the last commit that had it (mcl-stage8-coverage, c3a92b3d), the same on
+# every fork.
+#
 # This case used to set solvePressureEqn, which made the legacy
 # MooneyRivlinElastic solve a Laplacian equation for its hydrostatic stress.
-# The framework law deliberately has no such thing: that smoothing stabilises
-# the discretisation rather than describing the material, and belongs to the
-# solid model. With it the converged answers agreed to about 2e-6 relative,
-# which is the evidence that it was only a stabilisation, and the case does not
-# need it, so it no longer sets it. Without it the legacy run matches the
-# framework one in every written digit of D; the tolerance is left at what
-# accommodated the smoothing
-CROSS_TOL=1e-4
+# That smoothing stabilises the discretisation rather than describing the
+# material, and with it the converged answers of the two models agreed to
+# about 2e-6 relative, which is the evidence that it was only a stabilisation.
+# The case does not need it, so it no longer sets it, and without it the legacy
+# run matched the framework one in every written digit of D. The tolerance is
+# left at the 1e-4 that accommodated the smoothing
+LEGACY_UY=0.405906
+LEGACY_SYY=1e+08
+LEGACY_REL_TOL=1e-4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 
 APPROACHES=(
-    legacy
-    framework
+    main
 )
 
 echo "============================================================"
 echo "longWall regression test"
 echo "Top-surface uy in [${UY_MIN}, ${UY_MAX}] m"
 echo "Top-surface sigma_yy in [${SYY_MIN}, ${SYY_MAX}] Pa"
-echo "Legacy and framework impK agree to ${CROSS_TOL} relative"
+echo "uy and sigma_yy match the legacy model to ${LEGACY_REL_TOL} relative"
 echo "============================================================"
 echo
 
@@ -72,24 +76,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${case_dir}/"
     done
-
-    if [[ "${approach}" == "framework" ]]; then
-        # The switch is read from solidModelDict(), which is the <type>Coeffs
-        # sub-dictionary, so it must go inside those braces. Appended at the
-        # top level it is silently ignored and this approach would quietly be
-        # a second legacy run
-        sed -i.bak \
-            's/^    nCorrectors\(.*\)$/    useMechanicalConstitutiveLawManager yes;\n    nCorrectors\1/' \
-            "${case_dir}/constant/solidProperties"
-        rm -f "${case_dir}/constant/solidProperties.bak"
-
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${case_dir}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
-    fi
 }
 
 find_history_file() {
@@ -172,22 +158,13 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
-    # Assert the run really took the path this approach names
+    # impK must have come from the framework
     marker='Implicit stiffness from the mechanicalConstitutiveLaw framework'
     if grep -q "${marker}" "${CASE_DIR}/${SOLVER_LOGFILE}"; then
-        used_framework=true
+        echo "PASS: ${approach} took impK from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not use the framework impK"
+        echo "FAIL: ${approach} did not take impK from the framework"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly used the framework impK"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected impK path"
     fi
 
     disp_file=$(find_history_file "${CASE_DIR}" 'solidDisplacementstop.dat')
@@ -238,28 +215,31 @@ for approach in "${APPROACHES[@]}"; do
     fi
 done
 
-# The point of running both: impK changes the path, not the answer
-if [[ -n "${RESULT_UY[legacy]:-}" && -n "${RESULT_UY[framework]:-}" ]]; then
+# impK changes the path, not the answer
+if [[ -n "${RESULT_UY[main]:-}" ]]; then
     for quantity in uy syy; do
         if [[ "${quantity}" == "uy" ]]; then
-            a="${RESULT_UY[legacy]}"
-            b="${RESULT_UY[framework]}"
+            a="${LEGACY_UY}"
+            b="${RESULT_UY[main]}"
         else
-            a="${RESULT_SYY[legacy]}"
-            b="${RESULT_SYY[framework]}"
+            a="${LEGACY_SYY}"
+            b="${RESULT_SYY[main]}"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= ($CROSS_TOL*$a)^2)}"; then
-            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" \
-                "${quantity}" "$a" "$b"
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the legacy model (%.8g vs %.8g)\n" \
+                "${quantity}" "$b" "$a"
         else
-            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" \
-                "${quantity}" "$a" "$b"
+            printf "FAIL: %s differs from the legacy model (%.8g vs %.8g)\n" \
+                "${quantity}" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
-else
-    echo "SKIP: cross-check needs both approaches to have run"
+elif [ "$CHECK_ONLY" = false ] \
+    && ! solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"
+then
+    echo "FAIL: the main arm produced nothing to compare with the legacy model"
+    failures=$((failures + 1))
 fi
 
 echo

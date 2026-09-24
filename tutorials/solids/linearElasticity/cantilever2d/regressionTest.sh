@@ -23,10 +23,55 @@ EPS_MAX=5.0e-4
 SIGMA_MIN=8.5e7
 SIGMA_MAX=1.05e8
 HIGH_ORDER_DISP_TOL=1e-10
-# Largest difference in pointD between the legacy and framework arms of the
-# vertex-centred model, relative to the largest legacy pointD component. Both
-# solve the same linear elastic problem, so this is round-off
+
+# ------------------------------------------------------------
+# The answers of the removed legacy mechanicalModel
+# ------------------------------------------------------------
+# From the last commit that had it (mcl-stage8-coverage, c3a92b3d), per fork.
+# Each is the legacy side of a comparison the framework passed there, and is
+# held to the tolerance that comparison used. Fields are recorded as the max
+# and mean component magnitude of their internal values as written
+case "$(solids4Foam::foamFlavour)" in
+    com|org)
+        LEGACY_POINT_D_MAX=0.015999512315885
+        LEGACY_POINT_D_MEAN=0.00207382900687327
+        LEGACY_EXPLICIT_POINT_D_MAX=4.50000000005551e-06
+        LEGACY_EXPLICIT_POINT_D_MEAN=2.69525341068081e-09
+        LEGACY_EXPLICIT_DELTAT_LINE="Setting deltaT = 8.830682704707434e-08, maxCo = 0.1"
+        # unsCoupled runs on foam-extend only
+        LEGACY_UNSCOUPLED_EPS=""
+        ;;
+    foamextend)
+        LEGACY_POINT_D_MAX=0.0159995123112567
+        LEGACY_POINT_D_MEAN=0.00207382900625648
+        LEGACY_EXPLICIT_POINT_D_MAX=4.5e-06
+        LEGACY_EXPLICIT_POINT_D_MEAN=2.6952526893628e-09
+        LEGACY_EXPLICIT_DELTAT_LINE="Setting deltaT = 8.830682704706176e-08, maxCo = 0.1"
+        LEGACY_UNSCOUPLED_EPS=0.00044921
+        ;;
+esac
+
+# The same on every fork
+declare -A LEGACY_SIGMA0_D_DIGEST=(
+    [dict]=1c2bf5df020259760a2afc4badb6cf86e101c1e5
+    [field]=2c8072a41810075abbdbd5912646a309423536bf
+    [both]=1c2bf5df020259760a2afc4badb6cf86e101c1e5
+)
+
+# unsCoupled: the final max epsilonEq. The same problem with the same material
+# constants read two ways, so the two agreed far more closely than the band
+# allows: 1e-8 relative
+UNSCOUPLED_REL_TOL=1e-8
+
+# The vertex-centred model's final pointD, implicit and explicit: the same
+# linear elastic problem, so the framework reproduced the legacy field to
+# round-off, and exactly as written. The tolerance is 1e-10 of the largest
+# component, written to sixteen figures
 VERTEX_CENTRED_DISP_REL_TOL=1e-10
+
+# sigma0, given in the law's dictionary, as a field, and as both: the final D
+# agreed with the legacy model's exactly, in all six figures written, and is
+# recorded as a digest of its internal values
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -34,12 +79,10 @@ ALLRUN_LOGFILE="log.Allrun"
 APPROACHES=(
     petscSnes
     unsCoupled
-    unsCoupledManager
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrderJacobian
     vertexCentred
-    vertexCentredManager
 )
 
 echo "============================================================"
@@ -47,7 +90,8 @@ echo "cantilever2d regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "High-order DDifference LInf < ${HIGH_ORDER_DISP_TOL}"
-echo "Vertex-centred pointD rel. diff <= ${VERTEX_CENTRED_DISP_REL_TOL}"
+echo "Against the legacy model: unsCoupled max epsilonEq to ${UNSCOUPLED_REL_TOL},"
+echo "  vertex-centred pointD to ${VERTEX_CENTRED_DISP_REL_TOL}, sigma0 D exactly"
 echo "============================================================"
 echo
 
@@ -55,8 +99,8 @@ prepare_case() {
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
 
-    # Results kept from the vertex-centred arms of an earlier run would let
-    # this run's comparison pass without either arm having produced anything
+    # A result kept from the vertex-centred arm of an earlier run would let
+    # this run's comparison pass without the arm having produced anything
     rm -f "${REGRESSION_ROOT}"/pointD.vertexCentred*
 
     for item in "${SCRIPT_DIR}"/*; do
@@ -149,9 +193,8 @@ write_sigma0_field() {
     } > "${case_dir}/0/sigma0"
 }
 
-# Run this case twice with an initial stress, once through the legacy
-# mechanical law and once through the constitutive framework, and require the
-# two to agree exactly.
+# Run this case with an initial stress, and require the answer of the removed
+# legacy mechanical law exactly.
 #
 # sigma0 is the first prescribed state the framework declares. It reaches the
 # law by two routes - a uniform value in the law's dictionary, and a field the
@@ -160,125 +203,107 @@ write_sigma0_field() {
 # cell-to-integration-point map changes the answer, which a uniform field
 # would hide.
 #
-# This case is the host because it converges tightly enough for the two arms
-# to agree to the last bit, which makes the check a statement about the model
-# rather than about a solver tolerance
-run_sigma0_comparison() {
+# This case is the host because it converges tightly enough for the framework
+# and the legacy model to have agreed to the last digit, which makes the check
+# a statement about the model rather than about a solver tolerance
+run_sigma0_check() {
     local mode="$1"
-    local legacy_dir="${REGRESSION_ROOT}/sigma0Legacy-${mode}"
-    local framework_dir="${REGRESSION_ROOT}/sigma0Framework-${mode}"
-    local d
+    local d="${REGRESSION_ROOT}/sigma0-${mode}"
 
-    for d in "${legacy_dir}" "${framework_dir}"; do
-        rm -rf "${d}"
-        mkdir -p "${d}"
+    rm -rf "${d}"
+    mkdir -p "${d}"
 
-        local item base_item
-        for item in "${SCRIPT_DIR}"/*; do
-            base_item=$(basename "${item}")
-            if [[ "${base_item}" == "regressionTests" ]]; then
-                continue
-            fi
-            cp -a "${item}" "${d}/"
-        done
-
-        if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
-            # A uniform initial stress given where the material is given
-            sed -i \
-                's|^\( *\)nu  *nu .*|&\n\1sigma0 sigma0 [1 -1 -2 0 0 0 0] (10e6 2e6 -3e6 15e6 0 -5e6);|' \
-                "${d}/constant/mechanicalProperties"
+    local item base_item
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
         fi
+        cp -a "${item}" "${d}/"
     done
-
-    # The two arms differ in this one entry and nothing else. It goes inside
-    # the model's coeffs block, which is where the solid model looks for it;
-    # at the top level it is read by nothing and silently ignored
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${framework_dir}/constant/solidProperties"
-
-    for d in "${legacy_dir}" "${framework_dir}"; do
-        (
-            cd "${d}" || exit 1
-
-            solids4Foam::convertCaseFormat . > log.convert 2>&1
-
-            blockMesh > log.blockMesh 2>&1 || exit 1
-
-            if [[ "${mode}" == "field" || "${mode}" == "both" ]]; then
-                write_sigma0_field . || exit 1
-            fi
-
-            solids4Foam > log.solids4Foam 2>&1 || exit 1
-        ) || { echo "FAIL: sigma0 ${mode} arm could not run"; return 1; }
-    done
-
-    # Each arm must have taken the path it was set up for, or the comparison
-    # is between two copies of the same thing and proves nothing
-    if grep -q "mechanicalConstitutiveLawManager" \
-        "${legacy_dir}/log.solids4Foam"
-    then
-        echo "FAIL: the legacy sigma0 ${mode} arm used the framework"
-        return 1
-    fi
 
     if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
-        if ! grep -q "Uniform initial stress sigma0" \
-            "${framework_dir}/log.solids4Foam"
+        # A uniform initial stress given where the material is given
+        sed -i \
+            's|^\( *\)nu  *nu .*|&\n\1sigma0 sigma0 [1 -1 -2 0 0 0 0] (10e6 2e6 -3e6 15e6 0 -5e6);|' \
+            "${d}/constant/mechanicalProperties"
+
+        if ! grep -q "sigma0 sigma0" "${d}/constant/mechanicalProperties"
         then
-            echo "FAIL: the framework arm did not read sigma0 from the dict"
+            echo "FAIL: could not give sigma0 in the law's dictionary"
+            return 1
+        fi
+    fi
+
+    (
+        cd "${d}" || exit 1
+
+        solids4Foam::convertCaseFormat . > log.convert 2>&1
+
+        blockMesh > log.blockMesh 2>&1 || exit 1
+
+        if [[ "${mode}" == "field" || "${mode}" == "both" ]]; then
+            write_sigma0_field . || exit 1
+        fi
+
+        solids4Foam > log.solids4Foam 2>&1 || exit 1
+    ) || { echo "FAIL: sigma0 ${mode} could not run"; return 1; }
+
+    if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
+        if ! grep -q "Uniform initial stress sigma0" "${d}/log.solids4Foam"
+        then
+            echo "FAIL: sigma0 ${mode}: the law did not read sigma0 from the dict"
             return 1
         fi
     else
-        if ! grep -q "Prescribed state 'sigma0'" \
-            "${framework_dir}/log.solids4Foam"
+        if ! grep -q "Prescribed state 'sigma0'" "${d}/log.solids4Foam"
         then
-            echo "FAIL: the framework arm did not read the sigma0 field"
+            echo "FAIL: sigma0 ${mode}: the law did not read the sigma0 field"
             return 1
         fi
     fi
 
     local t
-    t=$(solids4Foam::latestTime "${legacy_dir}")
+    t=$(solids4Foam::latestTime "${d}")
 
-    if [[ -z "${t}" ]]; then
-        echo "FAIL: sigma0 ${mode} arms produced no result"
-        return 1
-    fi
-
-    if [[ ! -f "${legacy_dir}/${t}/D" || ! -f "${framework_dir}/${t}/D" ]]; then
-        echo "FAIL: sigma0 ${mode} arms produced no D field"
+    if [[ -z "${t}" || ! -f "${d}/${t}/D" ]]; then
+        echo "FAIL: sigma0 ${mode} produced no D field"
         return 1
     fi
 
     # sigma0 must actually have changed the answer, or agreement is vacuous
-    if diff -q "${legacy_dir}/${t}/D" "${SIGMA0_BASELINE_D}" > /dev/null 2>&1
+    if diff -q "${d}/${t}/D" "${SIGMA0_BASELINE_D}" > /dev/null 2>&1
     then
         echo "FAIL: sigma0 ${mode} left the solution unchanged"
         return 1
     fi
 
-    if ! diff -q "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D" > /dev/null
-    then
-        echo "FAIL: sigma0 ${mode} legacy and framework differ"
-        return 1
-    fi
-
-    # Legacy reads a sigma0 field and then assigns any dictionary sigma0 over
-    # the whole of it, so when a case carries both, the dictionary is what
-    # takes effect. Checking that here is the only way to see that the
-    # framework resolves the two the same way round
+    # The legacy model read a sigma0 field and then assigned any dictionary
+    # sigma0 over the whole of it, so when a case carried both, the dictionary
+    # was what took effect. The framework must resolve the two the same way
+    # round
     if [[ "${mode}" == "dict" ]]; then
-        SIGMA0_DICT_D="${legacy_dir}/${t}/D"
+        SIGMA0_DICT_D="${d}/${t}/D"
     elif [[ "${mode}" == "both" ]]; then
-        if ! diff -q "${legacy_dir}/${t}/D" "${SIGMA0_DICT_D}" > /dev/null
+        if ! diff -q "${d}/${t}/D" "${SIGMA0_DICT_D}" > /dev/null
         then
             echo "FAIL: sigma0 both: the field was not overridden by the dict"
             return 1
         fi
     fi
 
-    echo "PASS: sigma0 ${mode} legacy and framework agree exactly"
+    local digest
+    digest=$(internal_field_digest "${d}/${t}/D" || true)
+
+    if [[ -z "${digest}" \
+        || "${digest}" != "${LEGACY_SIGMA0_D_DIGEST[${mode}]}" ]]
+    then
+        echo "FAIL: sigma0 ${mode}: D differs from the legacy model's" \
+            "(digest ${digest:-none}, legacy ${LEGACY_SIGMA0_D_DIGEST[${mode}]})"
+        return 1
+    fi
+
+    echo "PASS: sigma0 ${mode}: D matches the legacy model's exactly"
     return 0
 }
 
@@ -287,9 +312,9 @@ run_sigma0_comparison() {
 # this is the check that the field is looked for where it actually lives.
 #
 # It compares the framework against itself, restarted against continuous,
-# rather than against legacy. Legacy looks for sigma0 only beside the fields
-# it restarts from and so loses it, keeping it only when an earlier run had
-# already written it forward. That is a hole rather than a behaviour worth
+# rather than against the legacy model. That looked for sigma0 only beside the
+# fields it restarted from and so lost it, keeping it only when an earlier run
+# had already written it forward. That was a hole rather than a behaviour worth
 # reproducing, so the framework diverges here deliberately
 run_sigma0_restart_check() {
     local root="${REGRESSION_ROOT}"
@@ -316,8 +341,14 @@ run_sigma0_restart_check() {
         # into the time this resumes from, which is the very thing the check
         # below requires to be absent
         sed -i \
-            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1restart no;\n\1nCorrectors|' \
+            's|^\( *\)nCorrectors|\1restart no;\n\1nCorrectors|' \
             "${root}/${d}/constant/solidProperties"
+
+        if ! grep -q "restart no;" "${root}/${d}/constant/solidProperties"
+        then
+            echo "FAIL: sigma0 restart check could not set restart in ${d}"
+            return 1
+        fi
     done
 
     for d in restartContinuous restartRestarted restartNone; do
@@ -354,14 +385,12 @@ run_sigma0_restart_check() {
         solids4Foam > log.solids4Foam 2>&1
     ) || { echo "FAIL: sigma0 restart check could not restart"; return 1; }
 
-    # All three arms are framework arms, by a sed that has to match. If that
-    # anchor ever stops matching they all run legacy, and the comparison below
-    # still passes - it would be comparing legacy against legacy
     for d in restartContinuous restartRestarted restartNone; do
         if ! grep -q "Selecting mechanical constitutive law" \
             "${root}/${d}/log.solids4Foam"
         then
-            echo "FAIL: sigma0 restart arm ${d} did not use the framework"
+            echo "FAIL: sigma0 restart arm ${d} constructed no mechanical" \
+                "constitutive law"
             return 1
         fi
     done
@@ -462,40 +491,10 @@ extract_disp_linf() {
         || true
 }
 
-# The framework arm of an approach differs in one dictionary entry and
-# nothing else. It is applied after Allclean, which ends in restoreCaseFormat
-# and would otherwise put the stored dictionary back, and before Allrun.
-# The unsCoupled coeffs block is empty; the vertexCentred one is not, so the
-# entry goes at the top of it
-apply_framework_switch() {
-    local dict="$1"
-
-    sed -i.bak \
-        -e 's|^{}$|{\n    useMechanicalConstitutiveLawManager yes;\n}|' \
-        -e '/^vertexCentredLinearGeometryCoeffs/,/^{/ s|^{$|{\n    useMechanicalConstitutiveLawManager yes;|' \
-        "${dict}"
-    rm -f "${dict}.bak"
-
-    if ! grep -q "useMechanicalConstitutiveLawManager" "${dict}"; then
-        echo "FAIL: could not set the framework switch in ${dict}"
-        return 1
-    fi
-}
-
 select_run_approach() {
     local requested="$1"
 
-    USE_FRAMEWORK=false
-
     case "${requested}" in
-        unsCoupledManager)
-            USE_FRAMEWORK=true
-            RUN_APPROACH=unsCoupled
-            ;;
-        vertexCentredManager)
-            USE_FRAMEWORK=true
-            RUN_APPROACH=vertexCentred
-            ;;
         highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
             local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
@@ -510,11 +509,9 @@ select_run_approach() {
     esac
 }
 
-# The two unsCoupled arms run in the same case directory, which is cleaned
-# between approaches, so the legacy result is gone by the time the framework
-# arm runs. Capture each as it goes and compare the pair afterwards
-UNSCOUPLED_LEGACY_EPS=""
-UNSCOUPLED_FRAMEWORK_EPS=""
+# The case directory is cleaned between approaches, so the unsCoupled result
+# is captured as it goes and compared with the legacy answer afterwards
+UNSCOUPLED_EPS=""
 
 check_solver_extrema() {
     local approach="$1"
@@ -530,10 +527,9 @@ check_solver_extrema() {
         return 1
     fi
 
-    case "${approach}" in
-        unsCoupled)          UNSCOUPLED_LEGACY_EPS="${epsilon}" ;;
-        unsCoupledManager)   UNSCOUPLED_FRAMEWORK_EPS="${epsilon}" ;;
-    esac
+    if [[ "${approach}" == unsCoupled ]]; then
+        UNSCOUPLED_EPS="${epsilon}"
+    fi
 
     if awk "BEGIN {exit !(${epsilon} >= ${EPS_MIN} && ${epsilon} <= ${EPS_MAX})}"; then
         printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
@@ -552,177 +548,167 @@ check_solver_extrema() {
     return "${failures}"
 }
 
-# Largest absolute difference between the internal fields of two ascii
-# pointVectorField files, and the largest absolute component of the first,
-# printed as "maxDiff maxFirst". Prints "nan nan" if either list is missing or
-# the two differ in length, so that a comparison cannot pass by reading nothing
-compare_point_vector_fields() {
-    awk '
-        FNR == 1 { f++; hdr = 0; inList = 0; n = 0 }
-        /^internalField/ { hdr = 1; next }
-        hdr && /^\($/ { hdr = 0; inList = 1; next }
-        inList && /^\)/ { inList = 0; next }
-        inList {
-            gsub(/[()]/, "")
-            n++
-            for (c = 1; c <= 3; c++) v[f, n, c] = $c
-            cnt[f] = n
-        }
-        END {
-            if (cnt[1] == 0 || cnt[1] != cnt[2]) { print "nan nan"; exit }
-            maxd = 0; maxa = 0
-            for (i = 1; i <= cnt[1]; i++) for (c = 1; c <= 3; c++) {
-                a = v[1, i, c]; d = a - v[2, i, c]
-                if (d < 0) d = -d
-                if (a < 0) a = -a
-                if (d > maxd) maxd = d
-                if (a > maxa) maxa = a
-            }
-            printf "%.6e %.6e\n", maxd, maxa
-        }' "$1" "$2"
+# A digest of a field's internal values as written, independent of the file
+# header, which names the OpenFOAM version that wrote it
+internal_field_digest() {
+    python3 - "$1" << 'PYEOF'
+import hashlib
+import re
+import sys
+
+text = open(sys.argv[1]).read()
+field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
+if not field:
+    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
+print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
+PYEOF
 }
 
-# Compare the legacy and framework results of the vertex-centred model. The
-# legacy result must not be trivially zero, or agreement proves nothing
-check_vertex_centred_agreement() {
+# The largest magnitude of any component of a field's internal values, and the
+# mean magnitude, as "max<TAB>mean"
+internal_field_norms() {
+    python3 - "$1" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+text = open(sys.argv[1]).read()
+
+uniform = re.search(
+    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
+)
+if uniform:
+    body = uniform.group(1)
+else:
+    field = re.search(
+        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not field:
+        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
+    body = field.group(1)
+
+values = [abs(float(x)) for x in re.findall(number, body)]
+if not values:
+    sys.exit(f"empty internalField in {sys.argv[1]}")
+print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
+PYEOF
+}
+
+# A field against the removed legacy model's, through the norms above. Both
+# differences are bounded by the largest pointwise difference, so a field that
+# agrees with the legacy one to tol times its largest value passes, and one
+# that does not is caught by at least one of the two in all but contrived cases
+check_field_against_legacy() {
     local label="$1"
-    local legacy="$2"
-    local framework="$3"
-    local result maxd maxa
+    local file="$2"
+    local legacy_max="$3"
+    local legacy_mean="$4"
+    local tol="$5"
+    local norms field_max field_mean
 
-    if [[ ! -f "${legacy}" || ! -f "${framework}" ]]; then
-        echo "FAIL: ${label}: missing pointD (${legacy}, ${framework})"
+    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
+        echo "FAIL: ${label}: no field to compare with the legacy model"
         return 1
     fi
 
-    result=$(compare_point_vector_fields "${legacy}" "${framework}")
-    maxd="${result% *}"
-    maxa="${result#* }"
+    read -r field_max field_mean <<< "${norms}"
 
-    if [[ "${maxd}" == nan ]] \
-        || ! awk "BEGIN {exit !(${maxa} > 1e-12)}"
+    if awk "BEGIN {
+            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
+            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
+            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
+                && b <= ${tol}*${legacy_max})
+        }"
     then
-        echo "FAIL: ${label}: legacy pointD is empty or zero (${result})"
-        return 1
-    fi
-
-    if awk "BEGIN {exit !(${maxd} <= ${VERTEX_CENTRED_DISP_REL_TOL}*${maxa})}"
-    then
-        printf "PASS: %s legacy and framework agree: %s %s, %s %s\n" \
-            "${label}" "max|dPointD| =" "${maxd}" "max|pointD| =" "${maxa}"
+        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
+            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
         return 0
     fi
 
-    printf "FAIL: %s legacy and framework differ: %s %s, %s %s\n" \
-        "${label}" "max|dPointD| =" "${maxd}" "max|pointD| =" "${maxa}"
+    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
+        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
     return 1
 }
 
-# The legacy dualMechanicalModel is built only on the legacy path. A framework
-# arm that still builds it is taking its stress, or part of it, from the
-# legacy laws, whatever the manager lines in its log say
-check_dual_mechanical_model() {
-    local approach="$1"
-    local logfile="$2"
+# The explicit path of the vertex-centred model, which no tutorial runs:
+# twenty steps of the cantilever from rest, in a case directory of its own.
+# The time step comes from the wave speed, so it is also a check that the
+# framework gives the density and stiffness the legacy model did
+run_vertex_centred_explicit_check() {
+    local d="${REGRESSION_ROOT}/vertexCentredExplicit"
+    local item base_item
 
-    if grep -q "Creating the dualMechanicalModel" "${logfile}"; then
-        if [[ "${USE_FRAMEWORK}" == true ]]; then
-            echo "FAIL: ${approach} constructed the legacy dualMechanicalModel"
-            return 1
+    rm -rf "${d}"
+    mkdir -p "${d}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
         fi
-    elif [[ "${USE_FRAMEWORK}" != true ]]; then
-        echo "FAIL: ${approach} did not construct the dualMechanicalModel"
-        return 1
-    fi
-
-    if [[ "${USE_FRAMEWORK}" == true ]] \
-        && ! grep -q "Selecting mechanical constitutive law" "${logfile}"
-    then
-        echo "FAIL: ${approach} selected no mechanical constitutive law"
-        return 1
-    fi
-
-    return 0
-}
-
-# The explicit path of the vertex-centred model, which no tutorial runs, on
-# both implementations: twenty steps of the cantilever from rest, in two case
-# directories of their own. The time step comes from the wave speed, so
-# it is also a check that the framework gives the same density and stiffness
-run_vertex_centred_explicit_comparison() {
-    local legacy_dir="${REGRESSION_ROOT}/vertexCentredExplicitLegacy"
-    local framework_dir="${REGRESSION_ROOT}/vertexCentredExplicitFramework"
-    local d item base_item
-
-    for d in "${legacy_dir}" "${framework_dir}"; do
-        rm -rf "${d}"
-        mkdir -p "${d}"
-
-        for item in "${SCRIPT_DIR}"/*; do
-            base_item=$(basename "${item}")
-            if [[ "${base_item}" == "regressionTests" ]]; then
-                continue
-            fi
-            cp -a "${item}" "${d}/"
-        done
-
-        sed -i \
-            "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
-            "${d}/src/Make/options"
-
-        sed -i \
-            's|solutionAlgorithm PETScSNES;|solutionAlgorithm explicit;|' \
-            "${d}/constant/solidProperties.vertexCentred"
-
-        # Twenty steps, and only the last one written. The time step is set
-        # by the model, so the run is stopped by step count rather than time
-        sed -i \
-            -e 's|^stopAt .*|stopAt          nextWrite;|' \
-            -e 's|^deltaT .*|deltaT          1e-8;|' \
-            -e 's|^writeControl .*|writeControl    timeStep;|' \
-            -e 's|^writeInterval .*|writeInterval   20;|' \
-            -e 's|^writePrecision .*|writePrecision  16;|' \
-            "${d}/system/controlDict"
+        cp -a "${item}" "${d}/"
     done
 
-    apply_framework_switch \
-        "${framework_dir}/constant/solidProperties.vertexCentred" || return 1
+    sed -i \
+        "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
+        "${d}/src/Make/options"
 
-    for d in "${legacy_dir}" "${framework_dir}"; do
-        ( cd "${d}" && ./Allrun vertexCentred > "${ALLRUN_LOGFILE}" 2>&1 ) \
-            || { echo "FAIL: a vertexCentred explicit arm failed"; return 1; }
-    done
+    sed -i \
+        's|solutionAlgorithm PETScSNES;|solutionAlgorithm explicit;|' \
+        "${d}/constant/solidProperties.vertexCentred"
 
-    if solids4Foam::regressionCaseSkipped "${legacy_dir}/${ALLRUN_LOGFILE}"
+    # Twenty steps, and only the last one written. The time step is set
+    # by the model, so the run is stopped by step count rather than time
+    sed -i \
+        -e 's|^stopAt .*|stopAt          nextWrite;|' \
+        -e 's|^deltaT .*|deltaT          1e-8;|' \
+        -e 's|^writeControl .*|writeControl    timeStep;|' \
+        -e 's|^writeInterval .*|writeInterval   20;|' \
+        -e 's|^writePrecision .*|writePrecision  16;|' \
+        "${d}/system/controlDict"
+
+    ( cd "${d}" && ./Allrun vertexCentred > "${ALLRUN_LOGFILE}" 2>&1 ) \
+        || { echo "FAIL: the vertexCentred explicit run failed"; return 1; }
+
+    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"
     then
         echo "Skipping vertexCentred explicit because it is unavailable here"
         return 0
     fi
 
-    USE_FRAMEWORK=false
-    check_dual_mechanical_model "vertexCentred explicit legacy" \
-        "${legacy_dir}/${SOLVER_LOGFILE}" || return 1
-    USE_FRAMEWORK=true
-    check_dual_mechanical_model "vertexCentred explicit framework" \
-        "${framework_dir}/${SOLVER_LOGFILE}" || return 1
-
-    if ! grep -q "Setting deltaT" "${legacy_dir}/${SOLVER_LOGFILE}"; then
-        echo "FAIL: vertexCentred explicit legacy arm did not run explicitly"
-        return 1
-    fi
-
-    if [[ "$(grep "Setting deltaT" "${legacy_dir}/${SOLVER_LOGFILE}")" \
-       != "$(grep "Setting deltaT" "${framework_dir}/${SOLVER_LOGFILE}")" ]]
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${d}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: vertexCentred explicit arms chose different time steps"
+        echo "FAIL: vertexCentred explicit constructed no mechanical" \
+            "constitutive law"
         return 1
     fi
+
+    local deltaT_line
+    deltaT_line=$(grep "Setting deltaT" "${d}/${SOLVER_LOGFILE}" || true)
+
+    if [[ -z "${deltaT_line}" ]]; then
+        echo "FAIL: vertexCentred explicit did not run explicitly"
+        return 1
+    fi
+
+    if [[ "${deltaT_line}" != "${LEGACY_EXPLICIT_DELTAT_LINE}" ]]; then
+        echo "FAIL: vertexCentred explicit chose a different time step from" \
+            "the legacy model ('${deltaT_line}', legacy" \
+            "'${LEGACY_EXPLICIT_DELTAT_LINE}')"
+        return 1
+    fi
+    echo "PASS: vertexCentred explicit chose the legacy model's time step"
 
     local t
-    t=$(solids4Foam::latestTime "${legacy_dir}")
+    t=$(solids4Foam::latestTime "${d}")
 
-    check_vertex_centred_agreement "vertexCentred explicit" \
-        "${legacy_dir}/${t}/pointD" "${framework_dir}/${t}/pointD"
+    check_field_against_legacy "vertexCentred explicit pointD" \
+        "${d}/${t}/pointD" \
+        "${LEGACY_EXPLICIT_POINT_D_MAX}" "${LEGACY_EXPLICIT_POINT_D_MEAN}" \
+        "${VERTEX_CENTRED_DISP_REL_TOL}"
 }
 
 check_high_order_errors() {
@@ -758,16 +744,7 @@ if [ "$CHECK_ONLY" = false ]; then
         select_run_approach "${approach}"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
-        if [[ "${USE_FRAMEWORK}" == true ]]; then
-            if ! apply_framework_switch \
-                "${CASE_DIR}/constant/solidProperties.${RUN_APPROACH}"
-            then
-                failures=$((failures + 1))
-                continue
-            fi
-        fi
-
-        # The vertex-centred arms are compared with each other, which the
+        # The vertex-centred arm is compared with the legacy answer, which the
         # default six significant figures would only do to six figures
         if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
             sed -i 's|^writePrecision .*|writePrecision  16;|' \
@@ -785,25 +762,15 @@ if [ "$CHECK_ONLY" = false ]; then
         # displacement fails below, rather than quietly switching the
         # comparison off
         if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
-            VERTEX_CENTRED_RAN="${VERTEX_CENTRED_RAN:-} ${approach}"
+            VERTEX_CENTRED_RAN=true
         fi
 
-        # Each arm must have taken the path it was set up for, or a
-        # comparison between them is between two copies of the same thing
-        if [[ -f "${CASE_DIR}/${SOLVER_LOGFILE}" ]]; then
-            if grep -q "mechanicalConstitutiveLawManager" \
+        if [[ -f "${CASE_DIR}/${SOLVER_LOGFILE}" ]] \
+            && ! grep -q "Selecting mechanical constitutive law" \
                 "${CASE_DIR}/${SOLVER_LOGFILE}"
-            then
-                if [[ "${USE_FRAMEWORK}" == true ]]; then
-                    echo "PASS: ${approach} took the framework path"
-                else
-                    echo "FAIL: ${approach} used the framework unasked"
-                    failures=$((failures + 1))
-                fi
-            elif [[ "${USE_FRAMEWORK}" == true ]]; then
-                echo "FAIL: ${approach} did not take the framework path"
-                failures=$((failures + 1))
-            fi
+        then
+            echo "FAIL: ${approach} constructed no mechanical constitutive law"
+            failures=$((failures + 1))
         fi
 
         if ! check_solver_extrema "${approach}"; then
@@ -814,15 +781,9 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
 
-        # Keep each vertex-centred result, since the case directory is
+        # Keep the vertex-centred result, since the case directory is
         # cleaned before the next arm runs
         if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
-            if ! check_dual_mechanical_model "${approach}" \
-                "${CASE_DIR}/${SOLVER_LOGFILE}"
-            then
-                failures=$((failures + 1))
-            fi
-
             t=$(solids4Foam::latestTime "${CASE_DIR}")
             if [[ -n "${t}" && -f "${CASE_DIR}/${t}/pointD" ]]; then
                 cp "${CASE_DIR}/${t}/pointD" \
@@ -832,38 +793,39 @@ if [ "$CHECK_ONLY" = false ]; then
 
     done
 
-    # As for unsCoupled, but compared field by field rather than on one
-    # extremum, since the two arms should agree to round-off everywhere.
-    # Scheduled on whether the arms ran, not on whether they wrote output: an
-    # arm that ran and wrote no pointD is a failure, not a reason to skip
+    # As for unsCoupled, but on the field rather than on one extremum, since
+    # the framework reproduced the legacy field to round-off everywhere.
+    # Scheduled on whether the arm ran, not on whether it wrote output: an arm
+    # that ran and wrote no pointD is a failure, not a reason to skip
     if [[ -n "${VERTEX_CENTRED_RAN:-}" ]]
     then
-        if ! check_vertex_centred_agreement "vertexCentred" \
+        if ! check_field_against_legacy "vertexCentred pointD" \
             "${REGRESSION_ROOT}/pointD.vertexCentred" \
-            "${REGRESSION_ROOT}/pointD.vertexCentredManager"
+            "${LEGACY_POINT_D_MAX}" "${LEGACY_POINT_D_MEAN}" \
+            "${VERTEX_CENTRED_DISP_REL_TOL}"
         then
             failures=$((failures + 1))
         fi
 
-        if ! run_vertex_centred_explicit_comparison; then
+        if ! run_vertex_centred_explicit_check; then
             failures=$((failures + 1))
         fi
     fi
 
-    # The bands above are correctness bounds on one arm. These two arms solve
-    # the same problem with the same material constants read two ways, so they
-    # must also agree with each other, far more closely than the band allows
-    if [[ -n "${UNSCOUPLED_LEGACY_EPS}" && -n "${UNSCOUPLED_FRAMEWORK_EPS}" ]]
+    # The band above is a correctness bound. The same problem with the same
+    # material constants must also give the legacy answer, far more closely
+    # than the band allows
+    if [[ -n "${UNSCOUPLED_EPS}" ]]
     then
-        if awk "BEGIN {d = ${UNSCOUPLED_FRAMEWORK_EPS} - ${UNSCOUPLED_LEGACY_EPS};
+        if awk "BEGIN {d = ${UNSCOUPLED_EPS} - ${LEGACY_UNSCOUPLED_EPS};
                        if (d < 0) d = -d;
-                       exit !(d <= 1e-8 * ${UNSCOUPLED_LEGACY_EPS})}"
+                       exit !(d <= ${UNSCOUPLED_REL_TOL} * ${LEGACY_UNSCOUPLED_EPS})}"
         then
-            printf "PASS: unsCoupled legacy and framework agree (%.8g vs %.8g)\n" \
-                "${UNSCOUPLED_LEGACY_EPS}" "${UNSCOUPLED_FRAMEWORK_EPS}"
+            printf "PASS: unsCoupled matches the legacy model (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_EPS}" "${LEGACY_UNSCOUPLED_EPS}"
         else
-            printf "FAIL: unsCoupled legacy and framework differ (%.8g vs %.8g)\n" \
-                "${UNSCOUPLED_LEGACY_EPS}" "${UNSCOUPLED_FRAMEWORK_EPS}"
+            printf "FAIL: unsCoupled differs from the legacy model (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_EPS}" "${LEGACY_UNSCOUPLED_EPS}"
             failures=$((failures + 1))
         fi
     fi
@@ -890,7 +852,7 @@ if [ "$CHECK_ONLY" = false ]; then
         echo "SKIP: sigma0 comparisons (PETSc is not installed)"
     elif make_sigma0_baseline; then
         for sigma0_mode in dict field both; do
-            if ! run_sigma0_comparison "${sigma0_mode}"; then
+            if ! run_sigma0_check "${sigma0_mode}"; then
                 failures=$((failures + 1))
             fi
         done

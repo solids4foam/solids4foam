@@ -4,15 +4,19 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-# Run twice: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-# framework. This is the end-to-end check of two things nothing else covers:
-# the stress migration of nonLinGeomUpdatedLagSolid, and the finite-strain
-# plastic law. It is the only tutorial pairing them that does not enable
-# pressure smoothing, so it is the only one where the framework is expected to
-# reproduce the legacy result exactly rather than approximately
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+# For solids4Foam::foamFlavour, which picks the legacy reference for this fork
+source "${SOLIDS4FOAM_SCRIPTS}"
+
+# The end-to-end check of two things nothing else covers: the stress
+# migration of nonLinGeomUpdatedLagSolid onto the mechanicalConstitutiveLaw
+# framework, and the finite-strain plastic law. It is the only tutorial pairing
+# them that does not enable pressure smoothing, so it is the only one where the
+# framework reproduced the removed legacy model exactly rather than
+# approximately, and it is held to that below
 APPROACHES=(
-    legacy
-    framework
+    main
 )
 
 # ============================================================
@@ -22,6 +26,25 @@ APPROACHES=(
 
 FORCE_MIN=74.3
 FORCE_MAX=74.6
+
+# The final loading force of the removed legacy mechanicalModel, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. With no
+# pressure smoothing the framework omits nothing, and it matched this in all
+# eight digits printed; the tolerance is the 1e-6 relative that comparison
+# used. A history error in the finite-strain plastic path, or in the relative
+# deformation gradient the framework is given, shows up here and nowhere else
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_FORCE=74.4649
+        ;;
+    org)
+        LEGACY_FORCE=74.4649
+        ;;
+    foamextend)
+        LEGACY_FORCE=74.4797
+        ;;
+esac
+LEGACY_REL_TOL=1e-6
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -46,20 +69,17 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    if [[ "${approach}" == framework* ]]; then
-        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
-        # it is silently ignored and this arm would repeat the legacy run
-        sed -i.bak \
-            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    nCorrectors     1000;/' \
-            "${CASE_DIR}/constant/solidProperties"
-        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+    # restart yes makes the solid model write the kinematic history the
+    # restart test below needs; the main arm asks too, so that the two are set
+    # up the same
+    sed -i.bak \
+        's/^    nCorrectors     1000;/    restart yes;\n    nCorrectors     1000;/' \
+        "${CASE_DIR}/constant/solidProperties"
+    rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${CASE_DIR}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
+    if ! grep -q 'restart yes' "${CASE_DIR}/constant/solidProperties"; then
+        echo "FAIL: could not set restart in solidProperties"
+        exit 1
     fi
 }
 
@@ -99,19 +119,10 @@ for approach in "${APPROACHES[@]}"; do
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/log.solids4Foam" 2>/dev/null
     then
-        used_framework=true
+        echo "PASS: ${approach} took its material from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not construct the framework"
+        echo "FAIL: ${approach} constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly constructed the framework"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected path"
     fi
 
     force_file=$(find "${CASE_DIR}/postProcessing" \
@@ -137,20 +148,18 @@ for approach in "${APPROACHES[@]}"; do
     fi
 done
 
-# No pressure smoothing here, so the framework omits nothing and the two must
-# agree. A history error in the finite-strain plastic path, or in the relative
-# deformation gradient the framework is given, shows up here and nowhere else
-if [[ -n "${RESULT_F[legacy]:-}" && -n "${RESULT_F[framework]:-}" ]]; then
-    a="${RESULT_F[legacy]}"; b="${RESULT_F[framework]}"
+if [[ -n "${RESULT_F[main]:-}" ]]; then
+    a="${LEGACY_FORCE}"; b="${RESULT_F[main]}"
 
-    if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
-        printf "PASS: legacy and framework force agree (%.8g vs %.8g)\n" "$a" "$b"
+    if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
+        printf "PASS: force matches the legacy model (%.8g vs %.8g)\n" "$b" "$a"
     else
-        printf "FAIL: legacy and framework force differ (%.8g vs %.8g)\n" "$a" "$b"
+        printf "FAIL: force differs from the legacy model (%.8g vs %.8g)\n" "$b" "$a"
         failures=$((failures + 1))
     fi
 else
-    echo "SKIP: cross-check needs both approaches to have run"
+    echo "FAIL: the main arm produced no force to compare with the legacy model"
+    failures=$((failures + 1))
 fi
 
 echo
@@ -297,9 +306,9 @@ PYEOF
 
     # 1e-4, not the 1e-6 the small-strain cases hold to. This solid model does
     # not reproduce an uninterrupted run exactly across a restart, with or
-    # without the framework: the legacy model differs by 1.3e-5 on this
-    # quantity here and the framework by 4.3e-6, so the residual is the solid
-    # model's and the framework is if anything the closer of the two. The
+    # without the framework: the removed legacy model differed by 1.3e-5 on
+    # this quantity here and the framework by 4.3e-6, so the residual is the
+    # solid model's and the framework is if anything the closer of the two. The
     # tolerance is set to accept that and nothing larger; a lost bEbar is
     # caught by the check above rather than by this number
     if awk "BEGIN {exit !(($ref - $got)^2 <= (1e-4*$ref)^2)}"; then

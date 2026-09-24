@@ -20,14 +20,21 @@ fi
 # direction: the fibre field is built by setFibreField before the solver runs,
 # and the constitutive law reads it.
 #
-# Both arms run: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-# framework, which must agree. This is the only case that exercises a fibre
-# direction as prescribed state, and the only one where a composite law adds an
-# active stress to a passive one.
+# This is the only case that exercises a fibre direction as prescribed state
+# of the mechanicalConstitutiveLaw framework, and the only one where a
+# composite law adds an active stress to a passive one. It is checked against
+# its own reference and against the answer of the removed legacy
+# mechanicalModel, which it deliberately does not reproduce exactly.
 # ============================================================
 
 MAG_D_MIN=8.0e-4
 MAG_D_MAX=9.0e-4
+
+# The final probe |D| of the removed legacy mechanicalModel, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), on OpenFOAM.com v2512,
+# the one fork this case runs on. See below for why the framework is near it
+# rather than on it
+LEGACY_MAG_D=8.515121585e-4
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
@@ -109,66 +116,23 @@ fi
 
 
 # ------------------------------------------------------------
-# The framework arm
+# The displacement formulation against its reference and the legacy model
 # ------------------------------------------------------------
-# The same case with the stress taken from the mechanicalConstitutiveLaw
-# framework rather than the legacy mechanicalModel, in the displacement
-# formulation. The mixed formulation is the arm after this one
-run_framework_comparison() {
-    local d="${REGRESSION_ROOT}/framework"
-
-    rm -rf "${d}"; mkdir -p "${d}"
-    for item in "${SCRIPT_DIR}"/*; do
-        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
-        cp -a "${item}" "${d}/"
-    done
-    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
-
-    # The switch lives in the solid model's Coeffs sub-dictionary, and Allrun
-    # symlinks solidProperties.displacement into place, so the variant is what
-    # has to be edited. At the top level it would be silently ignored and this
-    # arm would quietly repeat the legacy run
-    sed -i.bak \
-        's|^    // Solution algorithm|    useMechanicalConstitutiveLawManager yes;\n    // Solution algorithm|' \
-        "${d}/constant/solidProperties.displacement"
-    rm -f "${d}/constant/solidProperties.displacement.bak"
-
-    if ! grep -q 'useMechanicalConstitutiveLawManager' \
-        "${d}/constant/solidProperties.displacement"
-    then
-        echo "FAIL: could not enable the framework"
-        return 1
-    fi
-
-    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
-
-    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
-        echo "SKIP: framework arm (the tutorial skipped here)"
-        return 0
-    fi
-
-    # Each arm must have taken the path it was set up for
+check_displacement_formulation() {
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${d}/${SOLVER_LOGFILE}"
-    then
-        echo "FAIL: the framework arm did not use the framework"
-        return 1
-    fi
-
-    if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         return 1
     fi
-    echo "PASS: each arm took the path it was set up for"
 
     # The framework laws' own checks, which include the one that matters for
     # this case: a law declaring it can separate its isochoric stress from its
     # volumetric response is taken at its word by any mixed formulation, and
     # this is what tests the word. GuccioneElastic declares it
     if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        if ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 ); then
+        if ( cd "${CASE_DIR}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
+        then
             # This law's split is honest but not dilation invariant: the
             # active tension is a Cauchy stress that is not derived from any
             # potential, and it scales with a superposed dilation. So the
@@ -176,7 +140,7 @@ run_framework_comparison() {
             # and what is asserted is that it said so for that reason rather
             # than quietly not running. GuccioneElastic's own split is
             # checked where it is used on its own
-            if grep -q "not derived from a potential" "${d}/log.unit"
+            if grep -q "not derived from a potential" "${CASE_DIR}/log.unit"
             then
                 echo "PASS: the split check correctly stood aside"
             else
@@ -185,24 +149,18 @@ run_framework_comparison() {
             fi
         else
             echo "FAIL: the law checks did not pass"
-            grep -m2 "FAIL:" "${d}/log.unit" || true
+            grep -m2 "FAIL:" "${CASE_DIR}/log.unit" || true
             return 1
         fi
     fi
 
-    local b
-    b=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
-
-    if [[ -z "${b}" ]]; then
-        echo "FAIL: the framework arm produced no displacement history"
-        return 1
-    fi
+    local b="${magD}"
 
     # The framework does NOT reproduce legacy here, deliberately, and this is
     # the one place in the suite where that is true.
     #
-    # The legacy GuccioneElastic builds Q from the full Green-Lagrange strain,
-    # so its energy is coupled: the deviatoric stress varies with volume
+    # The legacy GuccioneElastic built Q from the full Green-Lagrange strain,
+    # so its energy was coupled: the deviatoric stress varied with volume
     # change. The ported law builds Q from the isochoric strain, so shape and
     # volume are separate, which is what lets a mixed displacement-pressure
     # formulation replace the volumetric part and still describe the same
@@ -217,24 +175,25 @@ run_framework_comparison() {
     local ref=8.5119442158e-4
 
     if ! awk "BEGIN {exit !((${b} - ${ref})^2 <= (1e-6*${ref})^2)}"; then
-        printf "FAIL: framework moved from its reference (%.10g vs %.10g)\n" \
-            "${ref}" "${b}"
+        printf "FAIL: moved from the reference (%.10g vs %.10g)\n" \
+            "${b}" "${ref}"
         return 1
     fi
-    printf "PASS: framework matches its reference (%.10g)\n" "${b}"
+    printf "PASS: matches the reference (%.10g)\n" "${b}"
 
-    if awk "BEGIN {exit !((${magD} - ${b})^2 <= (1e-3*${magD})^2)}"; then
-        printf "PASS: framework near legacy, differing by the reformulation (%.10g vs %.10g)\n" \
-            "${magD}" "${b}"
+    if awk "BEGIN {exit !((${LEGACY_MAG_D} - ${b})^2 <= (1e-3*${LEGACY_MAG_D})^2)}"
+    then
+        printf "PASS: near the legacy model, differing by the reformulation (%.10g vs %.10g)\n" \
+            "${b}" "${LEGACY_MAG_D}"
         return 0
     fi
 
-    printf "FAIL: framework and legacy differ by more than the reformulation explains (%.10g vs %.10g)\n" \
-        "${magD}" "${b}"
+    printf "FAIL: differs from the legacy model by more than the reformulation explains (%.10g vs %.10g)\n" \
+        "${b}" "${LEGACY_MAG_D}"
     return 1
 }
 
-if ! run_framework_comparison; then
+if [[ -n "${magD}" ]] && ! check_displacement_formulation; then
     failures=$((failures + 1))
 fi
 
@@ -256,20 +215,6 @@ run_mixed_framework() {
     done
     sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
 
-    # Allrun symlinks the ".pressure" variants into place, so that is the file
-    # the switch has to go in
-    sed -i.bak \
-        's|^    solvePressure true;|    solvePressure true;\n    useMechanicalConstitutiveLawManager yes;|' \
-        "${d}/constant/solidProperties.pressure"
-    rm -f "${d}/constant/solidProperties.pressure.bak"
-
-    if ! grep -q 'useMechanicalConstitutiveLawManager' \
-        "${d}/constant/solidProperties.pressure"
-    then
-        echo "FAIL: could not enable the framework on the mixed arm"
-        return 1
-    fi
-
     ( cd "${d}" && ./Allrun pressure > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
     if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
@@ -280,7 +225,7 @@ run_mixed_framework() {
     if ! grep -q "Selecting mechanical constitutive law" \
         "${d}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the mixed arm did not use the framework"
+        echo "FAIL: the mixed arm constructed no mechanical constitutive law"
         return 1
     fi
 

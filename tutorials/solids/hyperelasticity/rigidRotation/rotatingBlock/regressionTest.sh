@@ -34,17 +34,27 @@ APPROACHES=(
     updatedLagrangianPetscSnes
     highOrder
     highOrderUpdatedLagrangian
-    highOrderManager
-    highOrderUpdatedLagrangianManager
 )
 
-# Each of these takes its stress at the face quadrature points from the
-# mechanicalConstitutiveLaw framework; the arm it is paired with takes it from
-# the legacy mechanicalModel. The two must agree exactly
-declare -A MANAGER_ARM_OF=(
-    [highOrderManager]=highOrder
-    [highOrderUpdatedLagrangianManager]=highOrderUpdatedLagrangian
-)
+# The high-order arms take their stress at the face quadrature points from the
+# mechanicalConstitutiveLaw framework. Their final D, as written, matched the
+# removed legacy mechanicalModel's exactly, and still must. The legacy fields
+# are recorded as digests of their written internal values, from the last
+# commit that had the legacy model (mcl-stage8-coverage, c3a92b3d), on
+# OpenFOAM.com v2512 and OpenFOAM.org 9, where the high-order arms run, and the
+# same on both.
+#
+# At the six figures written, D is the rigid rotation itself: every arm here
+# writes the same field. So this says the high-order arms still rotate the
+# block rigidly to that precision, as they did on the legacy model; the
+# stress bound above is the check on how rigidly
+declare -A LEGACY_D_DIGEST=()
+case "$(solids4Foam::foamFlavour)" in
+    com|org)
+        LEGACY_D_DIGEST[highOrder]=59bbcbdcd22ae9b18f041bbbc1d5916cefeb9adb
+        LEGACY_D_DIGEST[highOrderUpdatedLagrangian]=59bbcbdcd22ae9b18f041bbbc1d5916cefeb9adb
+        ;;
+esac
 
 failures=0
 
@@ -64,6 +74,22 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+}
+
+# A digest of a field's internal values as written, independent of the file
+# header, which names the OpenFOAM version that wrote it
+internal_field_digest() {
+    python3 - "$1" << 'PYEOF'
+import hashlib
+import re
+import sys
+
+text = open(sys.argv[1]).read()
+field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
+if not field:
+    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
+print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
+PYEOF
 }
 
 prepare_case
@@ -108,49 +134,24 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    # Keep the displacement so the framework arms can be compared against the
-    # legacy ones after the loop; the case directory is reused and cleaned
-    latest_time=$(solids4Foam::latestTime "${CASE_DIR}")
-
-    if [[ -n "${latest_time}" && -f "${CASE_DIR}/${latest_time}/D" ]]; then
-        cp "${CASE_DIR}/${latest_time}/D" "${REGRESSION_ROOT}/D.${approach}"
-    fi
-
-    # Each arm must have taken the constitutive path it was set up for, or the
-    # comparison below is between two copies of the same thing
-    if grep -q "Selecting mechanical constitutive law" \
+    if ! grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        took_framework=yes
-    else
-        took_framework=no
-    fi
-
-    if [[ "${approach}" == *Manager && "${took_framework}" == no ]]; then
-        echo "FAIL: ${approach} did not use the constitutive framework"
-        failures=$((failures + 1))
-    elif [[ "${approach}" != *Manager && "${took_framework}" == yes ]]; then
-        echo "FAIL: ${approach} unexpectedly used the constitutive framework"
+        echo "FAIL: ${approach} constructed no mechanical constitutive law"
         failures=$((failures + 1))
     fi
-done
 
-for manager_arm in "${!MANAGER_ARM_OF[@]}"; do
-    legacy_arm="${MANAGER_ARM_OF[${manager_arm}]}"
+    if [[ -n "${LEGACY_D_DIGEST[${approach}]:-}" ]]; then
+        latest_time=$(solids4Foam::latestTime "${CASE_DIR}")
+        digest=$(internal_field_digest "${CASE_DIR}/${latest_time}/D" || true)
 
-    manager_D="${REGRESSION_ROOT}/D.${manager_arm}"
-    legacy_D="${REGRESSION_ROOT}/D.${legacy_arm}"
-
-    if [[ ! -f "${manager_D}" || ! -f "${legacy_D}" ]]; then
-        echo "Skipping ${manager_arm} comparison: one of the arms did not run"
-        continue
-    fi
-
-    if diff -q "${legacy_D}" "${manager_D}" > /dev/null; then
-        echo "PASS: ${manager_arm} matches ${legacy_arm} exactly"
-    else
-        echo "FAIL: ${manager_arm} differs from ${legacy_arm}"
-        failures=$((failures + 1))
+        if [[ "${digest}" == "${LEGACY_D_DIGEST[${approach}]}" ]]; then
+            echo "PASS: ${approach} D matches the legacy model's exactly"
+        else
+            echo "FAIL: ${approach} D differs from the legacy model's" \
+                "(digest ${digest:-none}, legacy ${LEGACY_D_DIGEST[${approach}]})"
+            failures=$((failures + 1))
+        fi
     fi
 done
 

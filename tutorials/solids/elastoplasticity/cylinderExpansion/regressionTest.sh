@@ -112,6 +112,18 @@ else
     failures=$((failures + 1))
 fi
 
+# The case asks for the hydrostatic stress smoothing with solvePressureEqn,
+# and the solid model has to say it is doing it, or the case is quietly
+# running without it
+if grep -q "smoothing the hydrostatic stress (solvePressureEqn)" \
+    "${CASE_DIR}/log.solids4Foam" 2>/dev/null
+then
+    echo "PASS: the hydrostatic stress is smoothed"
+else
+    echo "FAIL: no hydrostatic stress smoothing in the log"
+    failures=$((failures + 1))
+fi
+
 if ! run_constitutive_test; then
     failures=$((failures + 1))
 fi

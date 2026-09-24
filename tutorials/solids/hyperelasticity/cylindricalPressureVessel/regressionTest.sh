@@ -17,8 +17,9 @@ fi
 # ============================================================
 
 # The lower bound also guards the hydrostatic stress smoothing that the case
-# asks for with solvePressureEqn: with it the probe reads 3.18206 on both the
-# legacy and framework paths, and without it 3.16927
+# asks for with solvePressureEqn: with it the probe reads 3.18206, as it did on
+# the removed legacy mechanicalModel, and without it 3.16927. The log line
+# that says the smoothing is on is checked too, below
 DISP_MIN=3.175
 DISP_MAX=3.25
 
@@ -29,25 +30,23 @@ CASES=(
     "pressureDisplacement:pressureDisplacement:2.20:2.32"
     "pressureDisplacementLinear:pressureDisplacementLinear:0.15:0.17"
     "pressureDisplacementUnsteady:pressureDisplacementUnsteady:1.50:1.60"
-    "pressureDisplacementManager:pressureDisplacement:2.20:2.32"
-    "pressureDisplacementLinearManager:pressureDisplacementLinear:0.15:0.17"
 )
 
-# The *Manager arms run the same case with coupledPressureDisplacementSolid
-# taking its constitutive response from the mechanicalConstitutiveLaw
-# framework, and are compared with their legacy twin below. The switch goes in
-# the solid model's coeffs sub-dictionary, which is where the model reads it
-FRAMEWORK_PAIRS=(
-    # legacy arm : framework arm : relative tolerance
-    #
+# The final probe displacement of the removed legacy mechanicalModel, from the
+# last commit that had it (mcl-stage8-coverage, c3a92b3d), on foam-extend 4.1,
+# where coupledPressureDisplacementSolid runs. Each is a case above, as
+# name : legacy value : relative tolerance, the tolerance being the one the
+# framework was held to against it
+LEGACY_REFERENCES=(
     # Nonlinear: the framework takes the law's isochoric stress minus the
-    # solved pressure, where the legacy law's pressureDisplacement mode uses
+    # solved pressure, where the legacy law's pressureDisplacement mode used
     # mu*(b - I)/J, which is not deviatoric. At nu = 0.5 the two differ by
-    # about 1e-4 in this probe
-    "pressureDisplacement:pressureDisplacementManager:1e-3"
+    # about 1e-4 in this probe, so the two are not the same answer and the
+    # bound is the 1e-3 that allowed for it
+    "pressureDisplacement:2.26015672427:1e-3"
     # Linear: the law is not evaluated and the stiffness is the same shear
-    # modulus, so the two agree to round-off
-    "pressureDisplacementLinear:pressureDisplacementLinearManager:1e-9"
+    # modulus, so the framework reproduced the legacy value to round-off
+    "pressureDisplacementLinear:0.159759049445:1e-9"
 )
 
 echo "============================================================"
@@ -77,18 +76,6 @@ run_case() {
     local case_dir="${REGRESSION_ROOT}/${case_name}"
 
     prepare_case "${case_dir}"
-
-    if [[ "${case_name}" == *Manager ]]; then
-        local dict
-        local switch="    useMechanicalConstitutiveLawManager yes;"
-        for dict in \
-            "${case_dir}"/caseOptions/pressureDisplacement*/*/constant/solidProperties
-        do
-            sed -i \
-                "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
-                "${dict}"
-        done
-    fi
 
     ( cd "${case_dir}" && ./Allclean > /dev/null 2>&1 ) || true
 
@@ -177,51 +164,54 @@ for case_spec in "${CASES[@]}"; do
         "${min_value}" "${max_value}"
 done
 
-# Each framework arm against its legacy twin. Asserted positively that each
-# took the path it was set up for, or the comparison is a run against itself
-for pair in "${FRAMEWORK_PAIRS[@]}"; do
-    IFS=':' read -r legacy_name framework_name rel_tol <<< "${pair}"
-    legacy_dir="${REGRESSION_ROOT}/${legacy_name}"
-    framework_dir="${REGRESSION_ROOT}/${framework_name}"
-
-    if solids4Foam::regressionCaseSkipped "${framework_dir}/${ALLRUN_LOGFILE}"
+# The displacement arm asks for the hydrostatic stress smoothing, and the
+# solid model has to say it is doing it: the band above is set to catch its
+# loss, and this is the direct evidence
+displacement_dir="${REGRESSION_ROOT}/displacement"
+if ! solids4Foam::regressionCaseSkipped "${displacement_dir}/${ALLRUN_LOGFILE}"
+then
+    if grep -q "smoothing the hydrostatic stress (solvePressureEqn)" \
+        "${displacement_dir}/log.solids4Foam" 2>/dev/null
     then
-        echo "SKIP: ${framework_name} against ${legacy_name}"
+        echo "PASS: displacement: the hydrostatic stress is smoothed"
+    else
+        echo "FAIL: displacement: no hydrostatic stress smoothing in the log"
+        failures=$((failures + 1))
+    fi
+fi
+
+# The pressure-displacement arms against the legacy answers
+for reference in "${LEGACY_REFERENCES[@]}"; do
+    IFS=':' read -r case_name legacy_value rel_tol <<< "${reference}"
+    case_dir="${REGRESSION_ROOT}/${case_name}"
+
+    if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${case_name} against the legacy model"
         continue
     fi
 
     if ! grep -q "taking the stiffness from the mechanicalConstitutiveLaw" \
-        "${framework_dir}/log.solids4Foam" 2>/dev/null
+        "${case_dir}/log.solids4Foam" 2>/dev/null
     then
-        echo "FAIL: ${framework_name}: did not use the framework"
+        echo "FAIL: ${case_name}: did not take its stiffness from the framework"
         failures=$((failures + 1))
         continue
     fi
 
-    if grep -q "Creating the mechanicalConstitutiveLawManager" \
-        "${legacy_dir}/log.solids4Foam" 2>/dev/null
-    then
-        echo "FAIL: ${legacy_name}: used the framework"
-        failures=$((failures + 1))
-        continue
-    fi
+    value="$(extract_final_probe_displacement "${case_dir}")"
 
-    legacy_value="$(extract_final_probe_displacement "${legacy_dir}")"
-    framework_value="$(extract_final_probe_displacement "${framework_dir}")"
-
-    if [[ -z "${legacy_value}" || -z "${framework_value}" ]]; then
-        echo "FAIL: ${framework_name}: could not extract both probe values"
+    if [[ -z "${value}" ]]; then
+        echo "FAIL: ${case_name}: could not extract the probe value"
         failures=$((failures + 1))
-    elif awk "BEGIN {d = ${framework_value} - ${legacy_value}; \
-        exit !(${legacy_value} > 0 && d*d <= (${rel_tol}*${legacy_value})^2)}"
+    elif awk "BEGIN {d = ${value} - ${legacy_value}; \
+        exit !(${value} > 0 && d*d <= (${rel_tol}*${legacy_value})^2)}"
     then
-        printf "PASS: %s against %s: %.12g vs %.12g\n" \
-            "${framework_name}" "${legacy_name}" \
-            "${framework_value}" "${legacy_value}"
+        printf "PASS: %s against the legacy model: %.12g vs %.12g\n" \
+            "${case_name}" "${value}" "${legacy_value}"
     else
-        printf "FAIL: %s against %s: %.12g vs %.12g (tolerance %s)\n" \
-            "${framework_name}" "${legacy_name}" \
-            "${framework_value}" "${legacy_value}" "${rel_tol}"
+        printf "FAIL: %s against the legacy model: %.12g vs %.12g (tolerance %s)\n" \
+            "${case_name}" "${value}" "${legacy_value}" "${rel_tol}"
         failures=$((failures + 1))
     fi
 done

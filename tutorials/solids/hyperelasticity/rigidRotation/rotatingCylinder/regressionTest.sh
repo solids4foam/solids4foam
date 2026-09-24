@@ -18,10 +18,10 @@ fi
 #
 # We check that the final reported Max sigmaEq remains below a loose threshold.
 #
-# The case is run twice: once with the implicit stiffness from the legacy
-# mechanicalModel and once with it from the mechanicalConstitutiveLaw
-# framework. impK is the coefficient of the Laplacian term, so it affects how
-# the solution is reached and not what it is, and the two runs must agree.
+# The implicit stiffness comes from the mechanicalConstitutiveLaw framework.
+# impK is the coefficient of the Laplacian term, so it affects how the solution
+# is reached and not what it is, and the answer must be the one the removed
+# legacy mechanicalModel reached.
 #
 # The case also carries the framework's own checks, because its law is
 # StVenantKirchhoffElastic, which is finite-strain only.
@@ -34,9 +34,16 @@ CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 # Stress threshold (deliberately loose)
 SIGMA_TOL=1e4
 
+# The final sigmaEq of the removed legacy mechanicalModel, from the last commit
+# that had it (mcl-stage8-coverage, c3a92b3d), the same on every fork. It is
+# near zero, so it is compared on the absolute scale of the threshold - 1% of
+# it - rather than relative to a value that is itself almost zero, as the two
+# models were
+LEGACY_SIGMA=3700.73
+LEGACY_SIGMA_TOL=$(awk "BEGIN {print 0.01*${SIGMA_TOL}}")
+
 APPROACHES=(
-    legacy
-    framework
+    main
 )
 
 failures=0
@@ -45,7 +52,7 @@ declare -A RESULT_SIGMA
 echo "============================================================"
 echo "Rigid rotation cylinder regression test"
 echo "Stress threshold: sigmaEq < ${SIGMA_TOL}"
-echo "Legacy and framework impK both run and compared"
+echo "sigmaEq within ${LEGACY_SIGMA_TOL} of the legacy model"
 echo "============================================================"
 
 prepare_case() {
@@ -62,24 +69,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${case_dir}/"
     done
-
-    if [[ "${approach}" == "framework" ]]; then
-        # The switch is read from solidModelDict(), which is the <type>Coeffs
-        # sub-dictionary, so it must go inside those braces. Appended at the
-        # top level it is silently ignored and this approach would quietly be
-        # a second legacy run
-        sed -i.bak \
-            's/^    \/\/nCorrectors\(.*\)$/    useMechanicalConstitutiveLawManager yes;\n    \/\/nCorrectors\1/' \
-            "${case_dir}/constant/solidProperties"
-        rm -f "${case_dir}/constant/solidProperties.bak"
-
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${case_dir}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
-    fi
 }
 
 # Exercise the framework's own checks on this case. Its law is
@@ -138,23 +127,12 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
-    # Assert the run really took the path this approach names. Without this a
-    # misplaced switch makes "framework" a second legacy run that passes
     marker='Implicit stiffness from the mechanicalConstitutiveLaw framework'
     if grep -q "${marker}" "${CASE_DIR}/${SOLVER_LOGFILE}"; then
-        used_framework=true
+        echo "PASS: ${approach} took impK from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not use the framework impK"
+        echo "FAIL: ${approach} did not take impK from the framework"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly used the framework impK"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected impK path"
     fi
 
     sigma=$(grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
@@ -189,24 +167,24 @@ for approach in "${APPROACHES[@]}"; do
     ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
 done
 
-# The point of running both: impK changes the path, not the answer. Both are
-# near zero here, so compare on the absolute scale of the threshold rather
-# than relative to a value that is itself almost zero
-if [[ -n "${RESULT_SIGMA[legacy]:-}" && -n "${RESULT_SIGMA[framework]:-}" ]]
+# impK changes the path, not the answer
+if [[ -n "${RESULT_SIGMA[main]:-}" ]]
 then
-    a="${RESULT_SIGMA[legacy]}"
-    b="${RESULT_SIGMA[framework]}"
+    a="${LEGACY_SIGMA}"
+    b="${RESULT_SIGMA[main]}"
 
-    if awk "BEGIN {exit !(($a - $b)^2 < (0.01*$SIGMA_TOL)^2)}"; then
-        printf "PASS: legacy and framework sigmaEq agree (%.6g vs %.6g)\n" \
-            "$a" "$b"
+    if awk "BEGIN {exit !(($a - $b)^2 < (${LEGACY_SIGMA_TOL})^2)}"; then
+        printf "PASS: sigmaEq matches the legacy model (%.6g vs %.6g)\n" \
+            "$b" "$a"
     else
-        printf "FAIL: legacy and framework sigmaEq differ (%.6g vs %.6g)\n" \
-            "$a" "$b"
+        printf "FAIL: sigmaEq differs from the legacy model (%.6g vs %.6g)\n" \
+            "$b" "$a"
         failures=$((failures + 1))
     fi
-else
-    echo "SKIP: cross-check needs both approaches to have run"
+elif ! solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"
+then
+    echo "FAIL: the main arm produced no sigmaEq to compare with the legacy model"
+    failures=$((failures + 1))
 fi
 
 echo

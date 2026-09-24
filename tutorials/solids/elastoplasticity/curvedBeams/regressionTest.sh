@@ -5,7 +5,6 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
-FRAMEWORK_DIR="${REGRESSION_ROOT}/framework"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
@@ -20,10 +19,14 @@ fi
 FORCE_Y_MIN=-17.8
 FORCE_Y_MAX=-17.6
 
-# How closely the legacy and framework arms must agree with each other. The
-# band above is a correctness bound on one arm; this is a much tighter bound
-# on the difference between them, because the two paths solve the same problem
-ARM_AGREEMENT_TOL=0.02
+# The final force_y of the removed legacy mechanicalModel, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), on foam-extend 4.1, the
+# one fork this case runs on. The band above is a correctness bound; this is a
+# much tighter one, because the framework solves the same problem. It
+# reproduced this value to the eight digits printed; the tolerance is the
+# 0.02 N the two arms were held to when both ran
+LEGACY_FINAL_FORCE_Y=-17.724965
+LEGACY_FORCE_TOL=0.02
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/0/solidForcesdisplacement.dat"
@@ -51,13 +54,6 @@ prepare_case() {
     rm -f "${d}/system/controlDict.bak"
 }
 
-# Read the final displacement-patch reaction force from a case
-read_final_force_y() {
-    local d="$1"
-    [[ -f "${d}/${FORCE_FILE}" ]] || return 1
-    awk 'END {print $3}' "${d}/${FORCE_FILE}"
-}
-
 CHECK_ONLY=false
 
 for arg in "$@"; do
@@ -74,24 +70,6 @@ if [ "$CHECK_ONLY" = false ]; then
     prepare_case "${CASE_DIR}"
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
-
-    # The framework arm differs in this one entry and nothing else. It is
-    # applied after Allclean, which restores the stored dictionaries
-    prepare_case "${FRAMEWORK_DIR}"
-    ( cd "${FRAMEWORK_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    sed -i.bak \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${FRAMEWORK_DIR}/constant/solidProperties"
-    rm -f "${FRAMEWORK_DIR}/constant/solidProperties.bak"
-
-    if ! grep -q "useMechanicalConstitutiveLawManager" \
-        "${FRAMEWORK_DIR}/constant/solidProperties"
-    then
-        echo "FAIL: could not set the framework switch on the framework arm"
-        exit 1
-    fi
-
-    ( cd "${FRAMEWORK_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -123,80 +101,46 @@ else
 fi
 
 # ------------------------------------------------------------
-# The framework arm
+# Against the legacy answer
 #
-# This is the first framework coverage of a contact case. It matters beyond
-# this tutorial: the contact penalty models look impK up from the registry by
-# name, so frameworkImpK() has to register a field of the same name, with the
-# same dimensions and boundary types, as the legacy impK() it replaces.
-# Nothing else tests that, and the same lookup is used by the cohesive zone
-# models and by elasticWallPressure in FSI.
+# This is the framework's coverage of a contact case. It matters beyond this
+# tutorial: the contact penalty models look impK up from the registry by name,
+# so frameworkImpK() has to register a field of the same name, with the same
+# dimensions and boundary types, as the legacy impK() it replaced. Nothing else
+# tests that, and the same lookup is used by the cohesive zone models and by
+# elasticWallPressure in FSI.
 #
 # The material is also history dependent, so this exercises a framework law
 # carrying plastic state through a contact solve
 # ------------------------------------------------------------
 
-if [ "$CHECK_ONLY" = false ]; then
-    if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
-    then
-        echo "SKIP: framework arm skipped in this environment"
-    else
-        fw_log=$(find "${FRAMEWORK_DIR}" -name 'log.solids4Foam' | tail -n 1)
-        main_log=$(find "${CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
+solver_log=$(find "${CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
 
-        if [[ -n "${main_log}" ]] \
-            && grep -q "mechanicalConstitutiveLawManager" "${main_log}"
-        then
-            echo "FAIL: the legacy arm used the framework"
-            failures=$((failures + 1))
-        else
-            echo "PASS: legacy arm took the legacy path"
-        fi
+if [[ -n "${solver_log}" ]] \
+    && grep -q "Selecting mechanical constitutive law" "${solver_log}"
+then
+    echo "PASS: the material came from the framework"
+else
+    echo "FAIL: the solver log shows no mechanical constitutive law"
+    failures=$((failures + 1))
+fi
 
-        if [[ -n "${fw_log}" ]] \
-            && grep -q "mechanicalConstitutiveLawManager" "${fw_log}"
-        then
-            echo "PASS: framework arm took the framework path"
-        else
-            echo "FAIL: framework arm did not take the framework path"
-            failures=$((failures + 1))
-        fi
-
-        fw_force_y=$(read_final_force_y "${FRAMEWORK_DIR}" || true)
-
-        if [[ -z "${fw_force_y}" ]]; then
-            echo "FAIL: framework arm produced no force history"
-            failures=$((failures + 1))
-        elif awk "BEGIN {exit !(${fw_force_y} >= ${FORCE_Y_MIN} \
-                  && ${fw_force_y} <= ${FORCE_Y_MAX})}"
-        then
-            printf "PASS: framework final force_y = %.6g\n" "${fw_force_y}"
-
-            # The band is wide enough that both arms can sit inside it while
-            # disagreeing materially, so compare them with each other too.
-            # The two paths solve the same problem, so they should agree far
-            # more closely than the band allows
-            if awk "BEGIN {d = ${fw_force_y} - ${final_force_y};
-                           if (d < 0) d = -d;
-                           exit !(d <= ${ARM_AGREEMENT_TOL})}"
-            then
-                printf "PASS: legacy and framework force_y agree (%.8g vs %.8g)\n" \
-                    "${final_force_y}" "${fw_force_y}"
-            else
-                printf "FAIL: legacy and framework force_y differ (%.8g vs %.8g)\n" \
-                    "${final_force_y}" "${fw_force_y}"
-                failures=$((failures + 1))
-            fi
-        else
-            printf "FAIL: framework final force_y = %.6g\n" "${fw_force_y}"
-            failures=$((failures + 1))
-        fi
-    fi
+# The band is wide enough to hold answers that disagree materially, so the
+# legacy answer is checked too
+if awk "BEGIN {d = ${final_force_y} - ${LEGACY_FINAL_FORCE_Y};
+               if (d < 0) d = -d;
+               exit !(d <= ${LEGACY_FORCE_TOL})}"
+then
+    printf "PASS: force_y matches the legacy model (%.8g vs %.8g)\n" \
+        "${final_force_y}" "${LEGACY_FINAL_FORCE_Y}"
+else
+    printf "FAIL: force_y differs from the legacy model (%.8g vs %.8g)\n" \
+        "${final_force_y}" "${LEGACY_FINAL_FORCE_Y}"
+    failures=$((failures + 1))
 fi
 
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${FRAMEWORK_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo

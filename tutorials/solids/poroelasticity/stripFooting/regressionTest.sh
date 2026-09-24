@@ -27,6 +27,30 @@ EPS_MAX=0.021
 P_MIN=5.0e4
 P_MAX=9.0e4
 
+# The final D of the removed legacy mechanicalModel, as the max and mean
+# component magnitude of the field written to fourteen figures, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. This is the
+# case that exercises the Mohr-Coulomb return mapping and the history it
+# carries, over thirty-eight steps, underneath the poro composite, and the
+# framework reproduced the legacy D field exactly, in every one of those
+# figures. The tolerance, 1e-12 of the largest value, is that agreement less
+# the last figure written
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_D_MAX=0.045900554625415
+        LEGACY_D_MEAN=0.00582265661842307
+        ;;
+    org)
+        LEGACY_D_MAX=0.045900554625415
+        LEGACY_D_MEAN=0.00582265661842306
+        ;;
+    foamextend)
+        LEGACY_D_MAX=0.047361024905273
+        LEGACY_D_MEAN=0.00607079996386413
+        ;;
+esac
+LEGACY_D_REL_TOL=1e-12
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -34,7 +58,7 @@ echo "============================================================"
 echo "stripFooting regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max |p|       in [${P_MIN}, ${P_MAX}]"
-echo "Plus the legacy-versus-framework comparison"
+echo "Plus the comparison with the legacy model"
 echo "============================================================"
 echo
 
@@ -105,63 +129,97 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-# Run the case again with the stress taken from the mechanicalConstitutiveLaw
-# framework rather than the legacy mechanicalModel, and require the two to
-# agree exactly.
-#
-# This is the case that exercises the Mohr-Coulomb return mapping and the
-# history it carries, over thirty-eight steps, underneath the poro composite
-run_framework_comparison() {
-    local dir="${REGRESSION_ROOT}/framework"
+# The largest magnitude of any component of a field's internal values, and the
+# mean magnitude, as "max<TAB>mean"
+internal_field_norms() {
+    python3 - "$1" << 'PYEOF'
+import re
+import sys
 
-    prepare_case "${dir}"
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+text = open(sys.argv[1]).read()
 
-    # The two arms differ in this one entry and nothing else
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${dir}/constant/solidProperties"
+uniform = re.search(
+    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
+)
+if uniform:
+    body = uniform.group(1)
+else:
+    field = re.search(
+        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not field:
+        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
+    body = field.group(1)
 
-    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-        echo "FAIL: the framework arm did not run"
+values = [abs(float(x)) for x in re.findall(number, body)]
+if not values:
+    sys.exit(f"empty internalField in {sys.argv[1]}")
+print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
+PYEOF
+}
+
+# A field against the removed legacy model's, through the norms above. Both
+# differences are bounded by the largest pointwise difference, so a field that
+# agrees with the legacy one to tol times its largest value passes, and one
+# that does not is caught by at least one of the two in all but contrived cases
+check_field_against_legacy() {
+    local label="$1"
+    local file="$2"
+    local legacy_max="$3"
+    local legacy_mean="$4"
+    local tol="$5"
+    local norms field_max field_mean
+
+    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
+        echo "FAIL: ${label}: no field to compare with the legacy model"
         return 1
-    }
+    fi
 
-    # Each arm must have taken the path it was set up for
-    if ! grep -q "Selecting mechanical constitutive law" \
-        "${dir}/${SOLVER_LOGFILE}"
+    read -r field_max field_mean <<< "${norms}"
+
+    if awk "BEGIN {
+            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
+            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
+            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
+                && b <= ${tol}*${legacy_max})
+        }"
     then
-        echo "FAIL: the framework arm did not use the framework"
-        return 1
-    fi
-
-    if grep -q "Selecting mechanical constitutive law" \
-        "${CASE_DIR}/${SOLVER_LOGFILE}"
-    then
-        echo "FAIL: the legacy arm used the framework"
-        return 1
-    fi
-
-    local tL tF
-    tL=$(solids4Foam::latestTime "${CASE_DIR}")
-    tF=$(solids4Foam::latestTime "${dir}")
-
-    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
-        echo "FAIL: the arms reached different times ('${tL}' vs '${tF}')"
-        return 1
-    fi
-
-    if [[ ! -f "${CASE_DIR}/${tL}/D" || ! -f "${dir}/${tF}/D" ]]; then
-        echo "FAIL: the comparison produced no D field"
-        return 1
-    fi
-
-    if diff -q "${CASE_DIR}/${tL}/D" "${dir}/${tF}/D" > /dev/null; then
-        echo "PASS: framework and legacy agree exactly"
+        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
+            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
         return 0
     fi
 
-    echo "FAIL: framework and legacy differ"
+    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
+        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
     return 1
+}
+
+# The case against the removed legacy model
+check_against_legacy() {
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the case constructed no mechanical constitutive law"
+        return 1
+    fi
+
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
+
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
+        return 1
+    fi
+
+    check_field_against_legacy "D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${LEGACY_D_REL_TOL}"
 }
 
 epsilon=$(grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
@@ -194,7 +252,7 @@ else
     failures=$((failures + 1))
 fi
 
-if [ "$CHECK_ONLY" = false ] && ! run_framework_comparison; then
+if ! check_against_legacy; then
     failures=$((failures + 1))
 fi
 
@@ -216,7 +274,7 @@ run_restart_test() {
 
     prepare_case "${d}"
     sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1restart yes;\n\1nCorrectors|' \
+        's|^\( *\)nCorrectors|\1restart yes;\n\1nCorrectors|' \
         "${d}/constant/solidProperties"
     sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
     sed -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
