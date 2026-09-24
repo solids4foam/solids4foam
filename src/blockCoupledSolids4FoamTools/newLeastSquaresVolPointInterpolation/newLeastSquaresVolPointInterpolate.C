@@ -857,6 +857,32 @@ void newLeastSquaresVolPointInterpolation::sumCoupledPointValues
 template<class Type>
 void newLeastSquaresVolPointInterpolation::interpolate
 (
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const GeometricField
+    <
+        typename outerProduct<vector, Type>::type,
+        fvPatchField,
+        volMesh
+    >& gradVf,
+    GeometricField<Type, pointPatchField, pointMesh>& pf
+) const
+{
+    // Access through GeometricField before delegating so that old-time values
+    // are stored before the internal field is overwritten
+#ifdef OPENFOAM_NOT_EXTEND
+    pf.primitiveFieldRef();
+    DimensionedField<Type, pointMesh>& pfI = pf;
+#else
+    DimensionedField<Type, pointMesh>& pfI = pf.internalField();
+#endif
+
+    interpolate(vf, gradVf, pfI);
+}
+
+
+template<class Type>
+void newLeastSquaresVolPointInterpolation::interpolate
+(
     const DimensionedField<Type, volMesh>& vf,
     const DimensionedField
     <

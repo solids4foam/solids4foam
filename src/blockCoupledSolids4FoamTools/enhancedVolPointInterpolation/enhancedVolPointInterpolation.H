@@ -182,6 +182,21 @@ public:
 
     // Interpolation Functions
 
+        //- Interpolate from volField to pointField, storing the point-field
+        //  history before overwriting its internal values
+        template<class Type>
+        void interpolate
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const GeometricField
+            <
+                typename outerProduct<vector, Type>::type,
+                fvPatchField,
+                volMesh
+            >& gradVf,
+            GeometricField<Type, pointPatchField, pointMesh>& pf
+        ) const;
+
         //- Interpolate from volField to pointField
         template<class Type>
         void interpolate
