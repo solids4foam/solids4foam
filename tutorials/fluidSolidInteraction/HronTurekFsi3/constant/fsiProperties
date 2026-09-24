@@ -51,10 +51,20 @@ fluidSolidInterface    IQNILS;
     // Defaults to 0.0
     couplingStartTime     2.0;
 
-    // Optional (only for IQNILS): re-use modes from previous time-steps.
-    // The number of modes to be re-used is specified
-    // Defaults to 0 modes
-    // couplingReuse     0;
+    // Optional (only for IQNILS): re-use the modes from the specified number
+    // of previous time-steps. Re-use roughly halves the outer correctors per
+    // time-step here, but on its own it diverges in the transient after
+    // coupling starts, as modes from earlier steps no longer describe the
+    // current one; the QR filter below removes those modes.
+    // Defaults to 0 time-steps
+    couplingReuse        2;
+
+    // Optional (only for IQNILS): drop a mode from the least-squares system
+    // when its component orthogonal to the other modes is less than this
+    // fraction of its magnitude, i.e. when it is nearly linearly dependent on
+    // them
+    // Defaults to -1, i.e. no filtering
+    qrFilterTolerance    1e-2;
 
     // Optional: if any point on the fluid interface moves greater than the
     // interfaceDeformationLimit then the entire fluid mesh is updated; if not

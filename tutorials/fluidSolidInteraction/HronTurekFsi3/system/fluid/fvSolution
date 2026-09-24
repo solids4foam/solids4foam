@@ -69,7 +69,12 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    1;
+    // Two outer correctors are needed for robust IQNILS coupling: the fluid
+    // solve in each FSI outer corrector starts from the previous one's
+    // solution, so with a single PIMPLE outer corrector the fluid response to
+    // a given interface displacement depends on the FSI iteration history,
+    // and IQNILS stalls near outerCorrTolerance
+    nOuterCorrectors    2;
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
 }
