@@ -116,10 +116,9 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
 
     // At the same equivalent plastic strain the yield function was solved
     // with, and that the strain update below uses. This law's DLambda is the
-    // equivalent plastic strain increment itself, where the legacy law's is
-    // the plastic multiplier and increments it by sqrt(2/3)*DLambda; this line
-    // kept the legacy form and so applied that factor a second time, storing a
-    // yield stress from a plastic strain the solve never visited
+    // equivalent plastic strain increment itself, not a plastic multiplier,
+    // so no sqrt(2/3) factor is applied here: applying it would store a yield
+    // stress from a plastic strain the solve never visited
     curSigmaY = yieldStress(epsilonPEq0 + DLambda);
 }
 
@@ -145,9 +144,8 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     maxNewtonIter_(dict.lookupOrDefault<label>("NewtonMaxIter", 200)),
     finiteDiff_(dict.lookupOrDefault<scalar>("NewtonFiniteDiffEps", 0.25e-6))
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy law, so that an existing case dictionary needs no change.
-    // The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -211,8 +209,7 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy
-    // linearElasticMisesPlastic
+    // Plane stress is not supported
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary

@@ -27,9 +27,8 @@ Description
     looks for a volField of the same name on the mesh and broadcasts it to the
     law's integration points.
 
-    This exists so that a law never touches an IOobject, a mesh or a registry.
-    The legacy laws construct their own fields, which is exactly the coupling
-    this framework removes.
+    This exists so that a law never touches an IOobject, a mesh or a registry:
+    a law that constructed its own fields would be coupled to all three.
 
     Two roles, which differ in direction:
 

@@ -36,8 +36,8 @@ Description
     same name stand in for it would all be wrong.
 
     Where nothing in the run solves for it, the temperature can be read at
-    each time step from another case directory, given as TcaseDirectory as on
-    the legacy law, or in an inputCaseDirectories sub-dictionary. That is the
+    each time step from another case directory, given as TcaseDirectory or in
+    an inputCaseDirectories sub-dictionary. That is the
     manager's business, not this law's, and works for any law's inputs: see
     mechanicalConstitutiveLawCaseInputs.
 

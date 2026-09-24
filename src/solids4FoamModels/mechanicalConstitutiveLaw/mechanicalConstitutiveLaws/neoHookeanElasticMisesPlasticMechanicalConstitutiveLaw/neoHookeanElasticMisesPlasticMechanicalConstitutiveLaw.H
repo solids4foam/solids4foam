@@ -41,11 +41,10 @@ Description
     treated as linear hardening with a closed-form return; three or more points
     are treated as nonlinear and solved with a local Newton iteration.
 
-    Note on the hydrostatic stress. The legacy neoHookeanElasticMisesPlastic
-    law passes its hydrostatic stress through updateSigmaHyd, which optionally
-    solves a Laplacian smoothing equation over the whole field (the legacy
-    solvePressureEqn option). As for MooneyRivlinElastic, that is deliberately
-    not done here: a mechanicalConstitutiveLaw is a pure function of
+    Note on the hydrostatic stress. The optional Laplacian smoothing of the
+    hydrostatic stress over the whole field (solvePressureEqn) is deliberately
+    not done here, as for MooneyRivlinElastic: a mechanicalConstitutiveLaw is
+    a pure function of
     integration-point kinematics and old-time state, and pressure smoothing
     stabilises the discretisation rather than describing the material, so it
     belongs to the solid model, which does it when the law entry sets
@@ -55,9 +54,8 @@ Description
     separately: J2 plasticity is isochoric, so the return mapping touches s
     alone and p is purely elastic.
 
-    The legacy law also under-relaxes the plastic strain increment between
-    outer iterations, which is solver-loop behaviour with no equivalent here,
-    and is likewise absent.
+    The plastic strain increment is not under-relaxed between outer
+    iterations: that is solver-loop behaviour, with no place in a law.
 
     This class implements only the constitutive response at a collection
     of integration points. Storage and management of history variables

@@ -171,8 +171,8 @@ viscousHookeanElasticMechanicalConstitutiveLaw
     }
 
     // The deviatoric response is instantaneous and relaxes; the volumetric
-    // response is the long-term one. This follows the legacy law exactly,
-    // including that lambda is built from EInfinity rather than E0
+    // response is the long-term one, so lambda is built from EInfinity rather
+    // than E0
     const Switch planeStress
     (
         dict.lookupOrDefault<Switch>("planeStress", false)

@@ -623,10 +623,9 @@ int main(int argc, char *argv[])
         // Asserted, not merely reported. This is the condition under which
         // a deviatoric projection of the total stress and the law's own
         // isochoric stress are the same thing - which is what the solid
-        // models did before they could ask, and what they still do on the
-        // legacy path. A law that declares a dilation invariant split and
-        // then returns a stress with a trace has quietly made that
-        // substitution wrong wherever it is still used
+        // models did before they could ask. A law that declares a dilation
+        // invariant split and then returns a stress with a trace has quietly
+        // made that substitution wrong wherever it is still used
         scalar maxStress = 0.0;
 
         forAll(isoStress, cellI)
@@ -852,8 +851,8 @@ int main(int argc, char *argv[])
             dimensionedScalar(hgoDict.lookup("mu")).value();
         const scalar k1Val =
             dimensionedScalar(hgoDict.lookup("k1")).value();
-        // Dimensioned, as the law reads them and as the legacy dictionary
-        // writes them
+        // Dimensioned, as the law reads them and as case dictionaries write
+        // them
         const scalar k2Val =
             dimensionedScalar(hgoDict.lookup("k2")).value();
         const scalar angle =

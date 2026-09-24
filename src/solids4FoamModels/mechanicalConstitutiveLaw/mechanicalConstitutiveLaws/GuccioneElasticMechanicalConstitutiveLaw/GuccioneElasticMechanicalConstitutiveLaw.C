@@ -117,8 +117,7 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     const scalar kVal = k_.value();
     const scalar bulkVal = bulkModulus_.value();
 
-    // Grouped as the legacy law groups them, so that the two agree term for
-    // term rather than only in exact arithmetic
+    // Coefficients of the fibre invariants
     const scalar cI4 = cf_ - 2.0*cfs_ + ct_;
     const scalar cI5 = cfs_ - ct_;
 
@@ -156,9 +155,9 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
         // the volume change, so Q depends on shape alone and the volumetric
         // response below is the only place volume enters.
         //
-        // The legacy law builds Q from the full strain, which makes its energy
-        // coupled: its deviatoric stress then varies with J, and a mixed
-        // formulation replacing the volumetric part gives a different material
+        // Building Q from the full strain would make the energy coupled: the
+        // deviatoric stress would then vary with J, and a mixed formulation
+        // replacing the volumetric part would give a different material
         // rather than the same one solved differently. Written this way the
         // two formulations describe one material, and both reduce to the
         // published model in the incompressible limit it was defined for
@@ -211,8 +210,8 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     {
         UIndirectList<scalar>& K = response.scalarTangent();
 
-        // The small-strain estimate the legacy law uses. It is a
-        // preconditioner, not a tangent of this energy
+        // A small-strain estimate. It is a preconditioner, not a tangent of
+        // this energy
         scalar Keff = 0.0;
 
         switch (response.tangentReq())

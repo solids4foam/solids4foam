@@ -25,13 +25,6 @@ License
 
 namespace Foam
 {
-    // The debug default must match the legacy law of the same TypeName.
-    // Debug switches are registered globally by name, and this law shares its
-    // name with the legacy neoHookeanElasticMisesPlastic so that a case
-    // dictionary needs no change. OpenFOAM.org makes two different defaults
-    // for one name a fatal error at start-up - "Multiple defaults set for
-    // debug switch" - which takes down every case in the run, while
-    // OpenFOAM.com tolerates it silently
     defineTypeNameAndDebug
     (
         neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw, 0
@@ -192,9 +185,8 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
         dict.lookupOrDefault<Switch>("updateBEbarConsistent", true)
     )
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy law, so that an existing case dictionary needs no change.
-    // The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -258,8 +250,7 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy
-    // neoHookeanElasticMisesPlastic
+    // Plane stress is not supported
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
@@ -545,8 +536,8 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         if (needScalarTan)
         {
-            // The legacy law scales the elastic stiffness down by how far the
-            // return mapping moved the stress, which keeps the Laplacian
+            // Scale the elastic stiffness down by how far the return mapping
+            // moved the stress, which keeps the Laplacian
             // coefficient representative once a point is yielding
             const scalar scaleFactor =
                 1.0 - 2.0*muBar*dLambda/max(magSTrial, SMALL);

@@ -676,14 +676,10 @@ class mechanicalConstitutiveLawManager
 
             // The file comes first, and the registry only after it.
             //
-            // The other way round looks more natural and is wrong: the legacy
-            // mechanical law registers its own sigma0, read from the current
-            // time directory alone, so on a restart there is a registered
-            // field of zeros sitting in front of the file the user actually
-            // wrote. Reading the file first means what the case says on disk
-            // is what the law gets, and the registry is left to serve the
-            // fields that only ever exist in memory because another model
-            // computes them
+            // Reading the file first means what the case says on disk is what
+            // the law gets, even if something has registered a field of the
+            // same name, and the registry is left to serve the fields that
+            // only ever exist in memory because another model computes them
             IOobject io
             (
                 name,
@@ -698,8 +694,7 @@ class mechanicalConstitutiveLawManager
                 // A prescribed field describes the case, not the state at a
                 // particular time, so it is written once into 0 and a restart
                 // will not find it beside the fields it restarts from. Look
-                // there before giving up, which is what the legacy Guccione
-                // law does for its fibre directions
+                // there before giving up
                 io.instance() = "0";
             }
 
@@ -725,8 +720,7 @@ class mechanicalConstitutiveLawManager
         //  and the only form setFields can write. How it reaches a point
         //  depends on where the point is. A point inside a cell takes that
         //  cell's value. A point that is a mesh face takes the interpolated
-        //  value, because that is what legacy does and because a face lies
-        //  between two cells rather than in one.
+        //  value, because a face lies between two cells rather than in one.
         //
         //  A topology that shares a point between cells without being able to
         //  say it is a face still broadcasts, and there the last cell to
@@ -766,8 +760,7 @@ class mechanicalConstitutiveLawManager
         //  and how another model produces one. How it reaches a point depends
         //  on where the point is. A point inside a cell takes that cell's
         //  value. A point that is a mesh face takes the interpolated value,
-        //  because a face lies between two cells rather than in one, and
-        //  because that is what the legacy code does.
+        //  because a face lies between two cells rather than in one.
         //
         //  A topology that shares a point between cells without being able to
         //  say it is a face still broadcasts, and there the last cell to reach

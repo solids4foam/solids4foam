@@ -54,10 +54,8 @@ StVenantKirchhoffElasticMechanicalConstitutiveLaw
     mu_("mu", dimPressure, 0.0),
     kappa_("kappa", dimPressure, 0.0)
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy StVenantKirchhoffElastic law, so that an existing case
-    // dictionary
-    // needs no change. Exactly one of the two pairs must be present
+    // The material may be given either as E and nu or as mu and K. Exactly
+    // one of the two pairs must be present
     const bool haveENu = dict.found("E") && dict.found("nu");
     const bool haveMuK = dict.found("mu") && dict.found("K");
 
@@ -195,8 +193,7 @@ void Foam::StVenantKirchhoffElasticMechanicalConstitutiveLaw::evaluate
         switch (response.tangentReq())
         {
             case tangentRequest::scalar:
-                // The optimum Laplacian coefficient for this law, matching
-                // the legacy impK of 2*mu + lambda
+                // The optimum Laplacian coefficient for this law, 2*mu + lambda
                 Keff = 2.0*mu_.value() + lambda_.value();
                 break;
 

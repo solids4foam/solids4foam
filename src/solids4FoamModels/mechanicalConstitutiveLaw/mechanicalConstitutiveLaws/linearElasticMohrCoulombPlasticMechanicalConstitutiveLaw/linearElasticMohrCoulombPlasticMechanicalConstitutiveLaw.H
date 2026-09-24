@@ -19,8 +19,8 @@ Class
     Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
 
 Description
-    Mohr-Coulomb plasticity with linear elasticity, in the return-mapping form
-    of the legacy law: a trial stress from the strain increment, then a mapping
+    Mohr-Coulomb plasticity with linear elasticity, in return-mapping form: a
+    trial stress from the strain increment, then a mapping
     back onto the yield surface, its apex, or one of its edges.
 
     The stress is carried as a variation from the initial stress,
@@ -107,13 +107,11 @@ class linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
     // Private Member Functions
 
         //- Map a trial stress back onto the yield surface, and record whether
-        //  the point is yielding. Carried over from the legacy law unchanged:
-        //  it is a function of one point's stress and the material constants,
-        //  and touches no fields
+        //  the point is yielding. A function of one point's stress and the
+        //  material constants, touching no fields
         void calculateStress(symmTensor& sigma, scalar& activeYield) const;
 
-        //- Principal stresses and their directions. Carried over from the
-        //  legacy law unchanged
+        //- Principal stresses and their directions
         void calculateEigens
         (
             vector& sigma_prin,

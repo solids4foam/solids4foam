@@ -234,9 +234,8 @@ public:
         //
         //  Two kinds of entry live on the parent and have to reach the child.
         //  A case gives rho once, on the composite, because it describes one
-        //  material; the legacy laws get away with not passing it down because
-        //  they read it only when asked and nothing asks a sub-law, where a
-        //  framework law reads its material properties when it is constructed.
+        //  material, and a law reads its material properties when it is
+        //  constructed.
         //  And the manager injects planeStress and solutionD into each
         //  top-level law's dictionary, which is not where a sub-law looks.
         //

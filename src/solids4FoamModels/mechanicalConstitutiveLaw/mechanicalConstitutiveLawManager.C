@@ -944,8 +944,8 @@ Foam::mechanicalConstitutiveLawManager::scalarInputSource
 
         if (!caseInputsPtr_->owns(registered))
         {
-            // Solved for, or at least supplied, by another model, which is
-            // the precedence the legacy thermoMechanicalLaw gives its T
+            // Solved for, or at least supplied, by another model, which takes
+            // precedence
             caseInputsPtr_->reportShadowed(lawI, name);
 
             return &registered;
@@ -2466,7 +2466,7 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
     {
         // Not registered. This is the manager's private cache; the solid
         // model's own copy (solidModel::makeRho) is the field registered as
-        // "rho", as it is on a legacy run. Were this one to hold the name, the
+        // "rho". Were this one to hold the name, the
         // solid model's copy could not register, and a topology-changing mesh
         // (crackerFvMesh) maps only registered fields, so the solid model's
         // rho would keep its old boundary sizes after the mesh changed

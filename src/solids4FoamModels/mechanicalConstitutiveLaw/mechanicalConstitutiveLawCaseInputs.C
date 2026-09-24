@@ -63,9 +63,9 @@ Foam::mechanicalConstitutiveLawCaseInputs::readSources
         }
     }
 
-    // The legacy spelling. It is what thermoMechanicalLaw's TcaseDirectory
+    // The older spelling. It is what thermoMechanicalLaw's TcaseDirectory
     // is, for its input T, and it is read for every input rather than for
-    // that one, so that the legacy dictionaries keep working without the
+    // that one, so that existing dictionaries keep working without the
     // framework knowing which law they came from
     forAll(requiredInputs, i)
     {
@@ -95,9 +95,8 @@ Foam::mechanicalConstitutiveLawCaseInputs::readSources
 
 void Foam::mechanicalConstitutiveLawCaseInputs::makeCase(sourceCase& sc) const
 {
-    // Relative to this case, as the legacy law's TcaseDirectory is. In
-    // parallel caseName() is the processor directory, so the second case is
-    // looked for inside it, again as the legacy law does
+    // Relative to this case. In parallel caseName() is the processor
+    // directory, so the second case is looked for inside it
     const fileName casePath(mesh_.time().caseName()/sc.caseDir_);
 
     // Checked here so that a missing case is named as such, rather than
@@ -119,8 +118,8 @@ void Foam::mechanicalConstitutiveLawCaseInputs::makeCase(sourceCase& sc) const
             << (Pstream::parRun() ? " on at least one processor." : ".")
             << nl
             << "    The directory is relative to the case. In parallel it is "
-            << "relative to each processor directory, as on the legacy "
-            << "thermoMechanicalLaw: processorN/" << sc.caseDir_
+            << "relative to each processor directory: processorN/"
+            << sc.caseDir_
             << " must hold system/controlDict and that processor's portion "
             << "of the input case, decomposed as this case is."
             << exit(FatalError);
@@ -268,7 +267,7 @@ void Foam::mechanicalConstitutiveLawCaseInputs::refresh
 {
     const label timeIndex = mesh_.time().timeIndex();
 
-    // Once per time step, as the legacy law does: the field is the input's
+    // Once per time step: the field is the input's
     // value over the step, not something that changes between iterations
     if (sf.timeIndex_ == timeIndex && sf.fieldPtr_.valid())
     {
@@ -333,9 +332,9 @@ void Foam::mechanicalConstitutiveLawCaseInputs::refresh
 
     if (!sf.fieldPtr_.valid())
     {
-        // Registered under the input's name, and written, as the legacy law's
-        // copy is: it lets the case's own time directories show the field the
-        // stress was computed with. Only if the name is free, though. A
+        // Registered under the input's name, and written: it lets the case's
+        // own time directories show the field the stress was computed with.
+        // Only if the name is free, though. A
         // second material reading the same input from another directory must
         // not displace the first one's copy, and an object this class did not
         // make is never replaced

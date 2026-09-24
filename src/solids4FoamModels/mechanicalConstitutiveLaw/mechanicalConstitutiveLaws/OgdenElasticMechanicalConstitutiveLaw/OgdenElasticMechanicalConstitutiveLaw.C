@@ -136,7 +136,7 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
         // Back to the global frame
         const symmTensor s(transform(eigVec.T(), prinStress));
 
-        // The volumetric term, as the legacy law forms it
+        // The volumetric term
         const scalar sigmaHyd = 0.5*KVal*(sqr(Ji) - 1.0);
 
         sigma[i] =

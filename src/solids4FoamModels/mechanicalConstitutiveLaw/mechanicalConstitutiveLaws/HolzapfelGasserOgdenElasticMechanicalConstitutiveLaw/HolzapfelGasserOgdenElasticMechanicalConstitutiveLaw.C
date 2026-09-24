@@ -51,12 +51,10 @@ HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw
     mu_(dict.lookup("mu")),
     k1_(dict.lookup("k1")),
     // k2 and fibreAngle are dimensionless, but they are read as dimensioned
-    // scalars because that is how the legacy law reads them and one material
-    // dictionary has to serve both: a case that runs the two side by side
-    // constructs both laws from the same entries
+    // scalars because that is how existing case dictionaries give them
     k2_(dimensionedScalar(dict.lookup("k2")).value()),
 
-    // Read in degrees, as the legacy law reads them, and kept in radians
+    // Read in degrees, and kept in radians
     fibreAngle_
     (
         dimensionedScalar(dict.lookup("fibreAngle")).value()*M_PI/180.0
@@ -83,10 +81,8 @@ HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "bulkModulus must be positive: it is the penalty that keeps "
-            << "this material near incompressible. The legacy law has no "
-            << "volumetric term at all and takes the whole spherical stress "
-            << "from the solid model's pressure; here the pressure replaces "
-            << "this response instead, so there has to be one."
+            << "this material near incompressible. The solid model's "
+            << "pressure replaces this response, so there has to be one."
             << exit(FatalIOError);
     }
 
@@ -246,9 +242,8 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
         // A preconditioner, not a tangent of this energy.
         //
         // The fibre stiffness is left out, and that is a provisional choice
-        // rather than a considered one: the legacy law does the opposite,
-        // computing a deformation-dependent effective stiffness for its
-        // impK(). A wrong preconditioner costs iterations rather than
+        // rather than a considered one: a deformation-dependent effective
+        // stiffness including it is the alternative. A wrong preconditioner costs iterations rather than
         // accuracy, so this is safe to start from, but it wants convergence
         // evidence on a fibre-dominated case before it is called adequate
         scalar Keff = 0.0;

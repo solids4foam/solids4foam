@@ -37,9 +37,8 @@ Description
     shear state as mu = 2 (c10 + c01), and where nu is given the bulk modulus
     is taken from linear elasticity with E = 6 (c10 + c01).
 
-    Note on the hydrostatic stress. The legacy MooneyRivlinElastic law passes
-    its hydrostatic stress through updateSigmaHyd, which optionally solves a
-    Laplacian smoothing equation over the whole field. That is deliberately
+    Note on the hydrostatic stress. The optional Laplacian smoothing of the
+    hydrostatic stress over the whole field (solvePressureEqn) is deliberately
     NOT done here: a mechanicalConstitutiveLaw is a pure function of
     integration-point kinematics and old-time state, and a field-level
     implicit solve does not belong in that interface. Pressure smoothing
@@ -49,13 +48,11 @@ Description
     therefore returns the unsmoothed p = K (J^2 - 1)/2, and separates it from
     the isochoric stress when asked, which is what the solid model needs.
 
-    The legacy law also adds a pushed-forward initial stress,
-    symm(F sigma0 F^T), to the Cauchy stress. No law in this framework carries
-    an initial stress yet, so that term is absent here; a case that relies on
-    a non-zero sigma0 is not yet reproduced.
+    No initial stress is carried, so a pushed-forward initial stress,
+    symm(F sigma0 F^T), is not added to the Cauchy stress.
 
-    The material constants are uniform here, whereas the legacy law holds them
-    as volScalarFields that may be read per cell. Spatially varying material
+    The material constants are uniform, not fields that may be read per cell.
+    Spatially varying material
     constants are part of the wider question of how the framework carries
     per-integration-point material data, along with initial stress and fibre
     directions.

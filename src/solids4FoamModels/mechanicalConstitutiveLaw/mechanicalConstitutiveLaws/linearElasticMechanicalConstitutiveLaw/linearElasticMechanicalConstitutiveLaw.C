@@ -55,9 +55,8 @@ linearElasticMechanicalConstitutiveLaw
     sigma0_(symmTensor::zero),
     sigma0FromDict_(false)
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy linearElastic law, so an existing case dictionary needs no
-    // change. The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -164,10 +163,9 @@ void Foam::linearElasticMechanicalConstitutiveLaw::declareState
     mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
-    // Legacy reads a sigma0 field if the case has one and then, if the law's
-    // dictionary also gives sigma0, assigns that over the whole field. The
-    // dictionary therefore wins, and saying so here is what keeps a case with
-    // both giving the same answer as before
+    // A sigma0 field is read if the case has one, but if the law's
+    // dictionary also gives sigma0, that is assigned over the whole field:
+    // the dictionary wins
     spec.addSymmTensor
     (
         "sigma0",

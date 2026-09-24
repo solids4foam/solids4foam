@@ -191,8 +191,8 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     // caller is handed.
     //
     // The scalar tangent is not recomputed and so does not see the active
-    // tension. That matches the legacy electroMechanicalLaw, whose impK()
-    // returns the passive law's, and it costs iterations rather than accuracy:
+    // tension: it is the passive law's, and that costs iterations rather than
+    // accuracy:
     // the scalar tangent is the segregated solver's stiffness estimate, not a
     // quantity the answer depends on. Worth revisiting once the active tension
     // modelling settles - a single isotropic number for a stress that acts

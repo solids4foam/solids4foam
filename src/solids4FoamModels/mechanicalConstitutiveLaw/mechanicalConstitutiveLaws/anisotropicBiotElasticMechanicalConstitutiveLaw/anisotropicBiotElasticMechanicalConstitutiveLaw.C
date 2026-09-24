@@ -62,10 +62,10 @@ anisotropicBiotElasticMechanicalConstitutiveLaw
     // law is constructed from a dictionary and cannot ask the mesh
     const labelVector solutionD(dict.lookup("solutionD"));
 
-    // A mesh is two-dimensional when z is the empty direction. The legacy law
-    // tested this the other way round, so it ran the reduced plane model on
-    // three-dimensional meshes and quietly ignored the out-of-plane constants
-    // they supplied. Fixed in both places together, so the two still agree
+    // A mesh is two-dimensional when z is the empty direction. Testing this
+    // the other way round would run the reduced plane model on
+    // three-dimensional meshes and quietly ignore the out-of-plane constants
+    // they supply
     model2d_ = (solutionD[vector::Z] < 0);
 
     // A mesh empty in x or y is two-dimensional too, and this law has no
@@ -203,8 +203,8 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested. The legacy impK uses the
-    // largest direct stiffness
+    // Scalar tangent: only if explicitly requested. The largest direct
+    // stiffness
     if (response.wantsScalarTangent())
     {
         UIndirectList<scalar>& K = response.scalarTangent();
