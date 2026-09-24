@@ -125,6 +125,13 @@ class nonLinGeomTotalLagTotalDispSolid
         //  mechanicalModel otherwise
         void correctStress();
 
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
         //- Update the stress at the face quadrature points, from the framework
         //  when the framework is in use and from the
         //  legacy mechanicalModel otherwise.

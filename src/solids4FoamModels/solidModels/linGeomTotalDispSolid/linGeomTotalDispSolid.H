@@ -142,6 +142,13 @@ class linGeomTotalDispSolid
         //  framework is in use and from the legacy mechanicalModel otherwise
         void correctStress();
 
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
         const List<mat66>& faceMaterialTangent

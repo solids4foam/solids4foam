@@ -48,11 +48,12 @@ Description
     not done here: a mechanicalConstitutiveLaw is a pure function of
     integration-point kinematics and old-time state, and pressure smoothing
     stabilises the discretisation rather than describing the material, so it
-    belongs to the solid model. A nearly incompressible case that needs it is
-    solved instead with the mixed displacement-pressure formulation of a solid
-    model that provides one (solvePressure), for which this law separates its
-    isochoric stress s/J from its volumetric response p/J: J2 plasticity is
-    isochoric, so the return mapping touches s alone and p is purely elastic.
+    belongs to the solid model, which does it when the law entry sets
+    solvePressureEqn (see solidModel::smoothHydrostaticStress()). Both that
+    and the mixed displacement-pressure formulation (solvePressure) ask this
+    law for its isochoric stress s/J and its volumetric response p/J
+    separately: J2 plasticity is isochoric, so the return mapping touches s
+    alone and p is purely elastic.
 
     The legacy law also under-relaxes the plastic strain increment between
     outer iterations, which is solver-loop behaviour with no equivalent here,

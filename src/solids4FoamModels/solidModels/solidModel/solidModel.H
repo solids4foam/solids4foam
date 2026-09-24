@@ -354,6 +354,36 @@ private:
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
         mutable autoPtr<volScalarField> pPtr_;
 
+        // Hydrostatic stress smoothing on the framework path: the legacy
+        // laws' solvePressureEqn, done here. See smoothHydrostaticStress()
+
+            //- Whether the law entries have been read for the setting
+            mutable bool hydrostaticSmoothingRead_;
+
+            //- Whether the law entries ask for the smoothing
+            mutable bool hydrostaticSmoothingRequested_;
+
+            //- Whether the request has been checked against the solid model
+            mutable bool hydrostaticSmoothingChecked_;
+
+            //- Scale factor on the smoothing diffusivity
+            mutable scalar pressureSmoothingScaleFactor_;
+
+            //- Smoothed hydrostatic stress, J times the mean Cauchy stress.
+            //  Named as the legacy law names it, so that a case's solver and
+            //  relaxation entries for it apply unchanged
+            autoPtr<volScalarField> sigmaHydPtr_;
+
+            //- Which sigmaHyd patches the leastSquaresS4f gradient uses: none,
+            //  as for the legacy law
+            autoPtr<boolIOList> useBoundaryFaceValuesSigmaHydPtr_;
+
+            //- Gradient of sigmaHyd, lagged by one outer iteration
+            autoPtr<volVectorField> gradSigmaHydPtr_;
+
+            //- The law's volumetric response, dU/dJ, before smoothing
+            autoPtr<volScalarField> smoothingVolumetricResponsePtr_;
+
 #ifdef OPENFOAM_COM
         //- fvOptions
         fv::options& fvOptions_;
@@ -382,6 +412,9 @@ private:
 
         //- Make the p field
         void makeP() const;
+
+        //- Read the hydrostatic smoothing setting from the law entries
+        void readHydrostaticSmoothing() const;
 
         //- Make the sigma at face quadrature points field
         void makeSigmaQuad() const;
@@ -498,6 +531,67 @@ protected:
         //  can still roll the history over: the two do unrelated work, and a
         //  model wanting one does not necessarily want the other
         void rollOverQuadratureHistory();
+
+        //- Does a framework run ask for the hydrostatic stress to be
+        //  smoothed? That is the legacy solvePressureEqn, still read from the
+        //  law entry in mechanicalProperties so that existing cases run
+        //  unchanged. Always false on the legacy path, where the law does it
+        bool hydrostaticSmoothingRequested() const;
+
+        //- Can this solid model smooth the hydrostatic stress? Only one that
+        //  asks for its stress as isochoric stress plus volumetric response
+        //  when smoothHydrostaticStress() says so, and registers its momentum
+        //  diagonal as DEqnA, can. Checked by New(), so that a model which
+        //  cannot refuses the request rather than ignoring it
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return false;
+        }
+
+        //- Is the hydrostatic stress to be smoothed on this run?
+        //
+        //  The legacy laws' solvePressureEqn replaces the explicit
+        //  hydrostatic stress with the solution of
+        //
+        //      sigmaHyd - lap(rDAf, sigmaHyd)
+        //    = sigmaHydExplicit - div(rDAf*interpolate(grad(sigmaHyd)) & Sf)
+        //
+        //  with rDAf = scale*interpolate(impK/DEqnA) and grad(sigmaHyd) lagged
+        //  by one outer iteration. The two Laplacians differ only by the
+        //  compact-minus-wide-stencil difference, so this damps the
+        //  checkerboard a segregated solve of a nearly incompressible
+        //  material leaves in its hydrostatic stress. It depends on the
+        //  momentum matrix and so is a solid-model stabilisation, not part of
+        //  the material, and a framework law does not do it.
+        //
+        //  When this answers yes, the solid model asks for the split stress
+        //  into smoothingVolumetricResponse() and then calls
+        //  addSmoothedHydrostaticStress(). Checked once: refuses the mixed
+        //  formulation (which solves for the pressure itself), any
+        //  algorithm but the implicit segregated one, and a law that cannot
+        //  separate its volumetric response
+        bool smoothHydrostaticStress() const;
+
+        //- Storage for the law's volumetric response on the smoothing path
+        volScalarField& smoothingVolumetricResponse();
+
+        //- Smooth the hydrostatic stress and add it to sigma, which on entry
+        //  holds the isochoric stress, with smoothingVolumetricResponse()
+        //  holding the volumetric response.
+        //
+        //  As in the legacy laws, the quantity smoothed is J times the
+        //  volumetric response, the hydrostatic Kirchhoff stress, and the
+        //  result is divided by J again; JPtr is null for small strain. impK
+        //  is the solid model's implicit stiffness, which on a cold start is
+        //  the (4/3)*mu + K the legacy laws pass. Only the cell-centred
+        //  stress is smoothed: the legacy laws' face stress takes its
+        //  hydrostatic part explicitly, and so does the framework's
+        void addSmoothedHydrostaticStress
+        (
+            volSymmTensorField& sigma,
+            const volScalarField& impK,
+            const volScalarField* JPtr
+        );
 
         //- The implicit stiffness taken from the mechanicalConstitutiveLaw
         //  framework.

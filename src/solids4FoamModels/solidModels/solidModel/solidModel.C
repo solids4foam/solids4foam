@@ -36,6 +36,10 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
 #include "hofvc.H"
+#include "fvm.H"
+#include "fvc.H"
+#include "fvMatrices.H"
+#include "zeroGradientFvPatchFields.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "enhancedVolPointInterpolation.H"
 #endif
@@ -1290,7 +1294,15 @@ Foam::solidModel::solidModel
     ),
     highOrderJacobian_(false),
     highOrderResidual_(false),
-    pPtr_()
+    pPtr_(),
+    hydrostaticSmoothingRead_(false),
+    hydrostaticSmoothingRequested_(false),
+    hydrostaticSmoothingChecked_(false),
+    pressureSmoothingScaleFactor_(100.0),
+    sigmaHydPtr_(),
+    useBoundaryFaceValuesSigmaHydPtr_(),
+    gradSigmaHydPtr_(),
+    smoothingVolumetricResponsePtr_()
 #ifdef OPENFOAM_COM
     ,
     fvOptions_(fv::options::New(*meshPtr_))
@@ -1670,6 +1682,325 @@ const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
     }
 
     return mechanicalPropertiesPtr_();
+}
+
+
+void Foam::solidModel::readHydrostaticSmoothing() const
+{
+    hydrostaticSmoothingRead_ = true;
+
+    // Read from the law entries, where the legacy laws read it, so that every
+    // existing case keeps working unchanged. It is a solid-model setting in
+    // all but location: one equation is solved, with the solid model's own
+    // momentum diagonal, so one answer is needed for the whole mesh
+    const PtrList<entry> lawEntries(mechanicalProperties().lookup("mechanical"));
+
+    label nRequested = 0;
+    word requestingLaw;
+
+    forAll(lawEntries, lawI)
+    {
+        const dictionary& lawDict = lawEntries[lawI].dict();
+
+        if (lawDict.lookupOrDefault<Switch>("solvePressureEqn", false))
+        {
+            nRequested++;
+            requestingLaw = lawEntries[lawI].keyword();
+
+            pressureSmoothingScaleFactor_ =
+                lawDict.lookupOrDefault<scalar>
+                (
+                    "pressureSmoothingScaleFactor", 100.0
+                );
+        }
+    }
+
+    if (nRequested == 0)
+    {
+        return;
+    }
+
+    // Not supported for more than one material. One equation over the whole
+    // mesh would diffuse the hydrostatic stress across a material interface,
+    // where it genuinely jumps; the legacy laws instead solved one per
+    // material sub-mesh on foam-extend, and refused on OpenFOAM
+    if (lawEntries.size() > 1)
+    {
+        FatalIOErrorInFunction(mechanicalProperties())
+            << "solvePressureEqn is set for material '" << requestingLaw
+            << "', and there are " << lawEntries.size() << " materials."
+            << nl << nl
+            << "    On the mechanicalConstitutiveLaw framework the hydrostatic "
+            << "stress smoothing is done by the solid model, as one equation "
+            << "over the whole mesh, and that would smear the hydrostatic "
+            << "stress across the material interfaces, where it jumps. It is "
+            << "therefore supported for a single material only." << nl
+            << "    Remove solvePressureEqn, or, on foam-extend, run on the "
+            << "legacy path with useMechanicalConstitutiveLawManager no."
+            << exit(FatalIOError);
+    }
+
+    hydrostaticSmoothingRequested_ = true;
+}
+
+
+bool Foam::solidModel::hydrostaticSmoothingRequested() const
+{
+    // On the legacy path the law does this itself, and reading
+    // mechanicalProperties here would clash with the legacy model's own
+    // registration of it
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return false;
+    }
+
+    if (!hydrostaticSmoothingRead_)
+    {
+        readHydrostaticSmoothing();
+    }
+
+    return hydrostaticSmoothingRequested_;
+}
+
+
+bool Foam::solidModel::smoothHydrostaticStress() const
+{
+    if (!hydrostaticSmoothingRequested())
+    {
+        return false;
+    }
+
+    if (hydrostaticSmoothingChecked_)
+    {
+        return true;
+    }
+
+    if (solvePressure())
+    {
+        FatalErrorInFunction
+            << "solvePressureEqn is set in mechanicalProperties and "
+            << "solvePressure in the " << type() << " coefficients." << nl
+            << "    They are alternatives: the mixed formulation solves for "
+            << "the pressure itself, and the smoothing would be applied to a "
+            << "volumetric response it has already replaced. Remove one."
+            << exit(FatalError);
+    }
+
+    if (solutionAlg() != solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        FatalErrorInFunction
+            << "solvePressureEqn is set in mechanicalProperties, and the "
+            << type() << " solution algorithm is "
+            << solutionAlgorithmNames_[solutionAlg()] << "." << nl
+            << "    The hydrostatic stress smoothing is scaled by the diagonal "
+            << "of the segregated momentum equation, so it is available with "
+            << "the implicitSegregated algorithm only. For another algorithm "
+            << "use the mixed formulation (solvePressure) instead."
+            << exit(FatalError);
+    }
+
+    // Asked by name here rather than left to the split update, whose refusal
+    // is written for the mixed formulation
+    if (!mechanicalManager().allLawsProvideVolumetricSplit())
+    {
+        const PtrList<entry> lawEntries
+        (
+            mechanicalProperties().lookup("mechanical")
+        );
+
+        FatalErrorInFunction
+            << "solvePressureEqn is set for material '"
+            << lawEntries[0].keyword() << "', of type "
+            << word(lawEntries[0].dict().lookup("type"))
+            << ", and that law cannot separate its isochoric stress from its "
+            << "volumetric response." << nl
+            << "    The smoothing replaces the volumetric response with a "
+            << "smoothed one, so it needs the two apart: taking the trace of "
+            << "a total stress would also smooth any spherical stress that "
+            << "is not a volumetric response." << nl
+            << "    Remove solvePressureEqn, or use a law that separates them."
+            << exit(FatalError);
+    }
+
+    Info<< type() << ": smoothing the hydrostatic stress (solvePressureEqn), "
+        << "with pressureSmoothingScaleFactor " << pressureSmoothingScaleFactor_
+        << endl;
+
+    hydrostaticSmoothingChecked_ = true;
+
+    return true;
+}
+
+
+Foam::volScalarField& Foam::solidModel::smoothingVolumetricResponse()
+{
+    if (smoothingVolumetricResponsePtr_.empty())
+    {
+        smoothingVolumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "smoothingVolumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return smoothingVolumetricResponsePtr_();
+}
+
+
+void Foam::solidModel::addSmoothedHydrostaticStress
+(
+    volSymmTensorField& sigma,
+    const volScalarField& impK,
+    const volScalarField* JPtr
+)
+{
+    if (sigmaHydPtr_.empty())
+    {
+        // As the legacy law makes it: not read, zero-gradient, and written
+        sigmaHydPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "sigmaHyd",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0),
+                zeroGradientFvPatchScalarField::typeName
+            )
+        );
+
+        // Looked up by name by the leastSquaresS4f gradient scheme
+        useBoundaryFaceValuesSigmaHydPtr_.set
+        (
+            new boolIOList
+            (
+                IOobject
+                (
+                    "useBoundaryFaceValues_sigmaHyd",
+                    mesh().time().constant(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                boolList(mesh().boundary().size(), false)
+            )
+        );
+
+        gradSigmaHydPtr_.set
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    "grad(sigmaHyd)",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedVector("zero", dimPressure/dimLength, vector::zero)
+            )
+        );
+    }
+
+    volScalarField& sigmaHyd = sigmaHydPtr_();
+    volVectorField& gradSigmaHyd = gradSigmaHydPtr_();
+
+    // The solid model registers its momentum diagonal under this name for the
+    // duration of each outer iteration, as it did for the legacy laws
+    if (!mesh().foundObject<volScalarField>("DEqnA"))
+    {
+        FatalErrorInFunction
+            << "The hydrostatic stress smoothing (solvePressureEqn) needs the "
+            << "momentum equation diagonal, DEqnA, and " << type()
+            << " has not registered one at this stress update." << nl
+            << "    It exists only inside the segregated momentum loop, so "
+            << "the smoothing is not available from a stress update outside "
+            << "it, such as the linear predictor; the legacy laws refused the "
+            << "same thing."
+            << exit(FatalError);
+    }
+
+    const volScalarField& AD = mesh().lookupObject<volScalarField>("DEqnA");
+
+    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ, which is what the
+    // legacy laws pass to updateSigmaHyd
+    const volScalarField& volumetricResponse = smoothingVolumetricResponse();
+    const volScalarField sigmaHydExplicit
+    (
+        "sigmaHydExplicit",
+        JPtr ? (*JPtr)*volumetricResponse : 1.0*volumetricResponse
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const int oldDebug = SolverPerformance<scalar>::debug;
+    SolverPerformance<scalar>::debug = 0;
+#endif
+
+    // Store previous iteration to allow relaxation, if needed
+    sigmaHyd.storePrevIter();
+
+    // Pressure diffusivity field
+    const surfaceScalarField rDAf
+    (
+        "rDAf",
+        pressureSmoothingScaleFactor_*fvc::interpolate
+        (
+            impK/AD, "interpolate(" + gradSigmaHyd.name() + ")"
+        )
+    );
+
+    const dimensionedScalar one("one", dimless, 1.0);
+
+    // The fvm and fvc Laplacians agree for a smooth field, and their
+    // difference damps the oscillations of one that is not
+    fvScalarMatrix sigmaHydEqn
+    (
+        fvm::Sp(one, sigmaHyd)
+      - fvm::laplacian(rDAf, sigmaHyd, "laplacian(rDA,sigmaHyd)")
+     ==
+        sigmaHydExplicit
+      - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd) & mesh().Sf())
+    );
+
+    sigmaHydEqn.solve();
+
+    sigmaHyd.relax();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar>::debug = oldDebug;
+#endif
+
+    gradSigmaHyd = fvc::grad(sigmaHyd);
+
+    // Recombine, including on the boundary, where the legacy law also takes
+    // the zero-gradient value of sigmaHyd
+    if (JPtr)
+    {
+        sigma = sigma + (sigmaHyd/(*JPtr))*I;
+    }
+    else
+    {
+        sigma = sigma + sigmaHyd*I;
+    }
 }
 
 
@@ -2373,7 +2704,36 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<solidModel>(ctorPtr(runTime, runRegion));
+    autoPtr<solidModel> modelPtr(ctorPtr(runTime, runRegion));
+
+    // Asked here, once the model is fully constructed and its override can be
+    // seen, so that a solid model which cannot smooth the hydrostatic stress
+    // refuses a case that asks for it rather than silently ignoring it.
+    //
+    // Only of a model that has built the framework manager, and so has read
+    // mechanicalProperties already. A model that uses the legacy
+    // mechanicalModel whatever the switch says registers mechanicalProperties
+    // itself, and reading it a second time here would clash with that; its
+    // legacy law smooths, or refuses, on its own
+    if
+    (
+        modelPtr->mechanicalManagerPtr_.valid()
+     && modelPtr->mechanicalPtr_.empty()
+     && !modelPtr->supportsHydrostaticSmoothing()
+     && modelPtr->hydrostaticSmoothingRequested()
+    )
+    {
+        FatalErrorIn("solidModel::New(Time&, const word&)")
+            << "solvePressureEqn is set in mechanicalProperties, and solid "
+            << "model " << modelType << " cannot smooth the hydrostatic stress "
+            << "on the mechanicalConstitutiveLaw framework." << nl
+            << "    It is supported by the updated Lagrangian, total "
+            << "Lagrangian and linear geometry total displacement models. "
+            << "Remove solvePressureEqn, or use one of those."
+            << exit(FatalError);
+    }
+
+    return modelPtr;
 }
 
 

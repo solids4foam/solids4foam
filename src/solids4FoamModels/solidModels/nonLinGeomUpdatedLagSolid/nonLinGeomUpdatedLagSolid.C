@@ -672,6 +672,28 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 
     const volTensorField Finv0(inv(F_.oldTime()));
 
+    // The legacy laws' solvePressureEqn: the law gives its stress in two
+    // parts, and the volumetric part is smoothed before it is added back
+    if (smoothHydrostaticStress())
+    {
+        mechanicalManager().updateStressFiniteStrainSplit
+        (
+            F_,
+            F_.oldTime(),
+            Finv,
+            Finv0,
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            smoothingVolumetricResponse()
+        );
+
+        addSmoothedHydrostaticStress(sigma(), impK_, &J_);
+
+        return;
+    }
+
     mechanicalManager().updateStressFiniteStrain
     (
         F_,

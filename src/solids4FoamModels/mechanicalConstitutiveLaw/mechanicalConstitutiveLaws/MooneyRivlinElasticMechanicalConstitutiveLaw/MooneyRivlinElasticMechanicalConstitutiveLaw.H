@@ -44,8 +44,10 @@ Description
     integration-point kinematics and old-time state, and a field-level
     implicit solve does not belong in that interface. Pressure smoothing
     stabilises the discretisation rather than describing the material, so it
-    belongs to the solid model, where it is to be provided separately. This
-    law therefore returns the unsmoothed p = K (J^2 - 1)/2.
+    belongs to the solid model, which does it when the law entry sets
+    solvePressureEqn (see solidModel::smoothHydrostaticStress()). This law
+    therefore returns the unsmoothed p = K (J^2 - 1)/2, and separates it from
+    the isochoric stress when asked, which is what the solid model needs.
 
     The legacy law also adds a pushed-forward initial stress,
     symm(F sigma0 F^T), to the Cauchy stress. No law in this framework carries
