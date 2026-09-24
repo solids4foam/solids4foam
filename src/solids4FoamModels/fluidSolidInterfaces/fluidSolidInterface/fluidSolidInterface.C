@@ -463,6 +463,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<int>("nOuterCorr", 30)
     ),
+    allowUnconvergedCoupling_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>
+        (
+            "allowUnconvergedCoupling", false
+        )
+    ),
     additionalMeshCorrection_
     (
         fsiProperties_.lookupOrAddDefault<Switch>

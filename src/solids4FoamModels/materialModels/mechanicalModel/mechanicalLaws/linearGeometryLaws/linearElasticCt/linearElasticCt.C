@@ -431,7 +431,7 @@ Foam::linearElasticCt::linearElasticCt
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        E_/(1.0 + nu_)
+        E_/(2.0*(1.0 + nu_))
     ),
     lambda_
     (
@@ -485,7 +485,7 @@ Foam::linearElasticCt::linearElasticCt
     setYoungsModulusFromCt();
 
     // Reset mechanical fields after E has been updated
-    mu_ = E_/(1.0 + nu_);
+    mu_ = E_/(2.0*(1.0 + nu_));
     lambda_ = E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_));
 
     muf_ = fvc::interpolate(mu_);

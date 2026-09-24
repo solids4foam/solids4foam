@@ -1,0 +1,37 @@
+# Compressed hollow spheres with frictionless contact between the spheres:
+# compression force versus displacement of the upper rigid plane, digitised
+# from the solution of
+#
+#   M. A. Puso and T. A. Laursen, "A mortar segment-to-segment contact method
+#   for large deformation solid mechanics", Computer Methods in Applied
+#   Mechanics and Engineering, 193(6), 601-629, 2004.
+#
+# Copied unchanged, apart from this header, from the solid-benchmarks
+# repository file hyperElasticity/compressedSpheres/data/frictionless/Puso&Laursen.csv,
+# prepared by Ivan Batistić. The values were digitised from a published
+# figure using WebPlotDigitizer, so they carry a digitisation uncertainty.
+# plot.gnuplot applies the unit conversions given below.
+#
+# Column 1: displacement of the upper rigid plane, as digitised; multiply
+#           by 10 to obtain mm
+# Column 2: compression force on the quarter-symmetry model, as digitised;
+#           multiply by -1 to obtain N
+0 0
+0.047243500190906 -0.034120931341062
+0.09705550349588 -0.144115321903256
+0.14383018952616 -0.367517722045089
+0.191212339011378 -0.626194185367213
+0.236164634676842 -0.810339966808402
+0.282939320707123 -1.11172459694881
+0.331536397102219 -1.36927266954017
+0.379526010042376 -1.73789611204924
+0.428123086437472 -1.92336941199722
+0.479150016652324 -2.22092320301804
+0.524709775772726 -2.44261879365115
+0.58849343854129 -2.81337574804613
+0.63071214865953 -2.74102598942635
+0.676575639507402 -2.85111520273902
+0.725172715902498 -3.33319406620298
+0.772827675330124 -3.92583625673204
+0.810825063048855 -4.14848007487
+0.852132577984687 -4.37264105701571

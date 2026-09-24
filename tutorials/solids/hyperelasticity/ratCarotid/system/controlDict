@@ -51,12 +51,12 @@ adjustTimeStep  no;
 maxCo           0.2;
 
 functions
-(
+{
     pointHistory
     {
         type          solidPointDisplacement;
         point         (0.0003 0 2.5e+5);
     }
-);
+}
 
 // ************************************************************************* //

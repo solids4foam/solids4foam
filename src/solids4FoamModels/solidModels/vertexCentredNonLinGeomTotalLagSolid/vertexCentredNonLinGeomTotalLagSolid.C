@@ -1286,6 +1286,30 @@ vertexCentredNonLinGeomTotalLagSolid
         notImplemented("Not implemented when solvePressure is active");
     }
 
+    // This model is not on the mechanicalConstitutiveLaw framework at all:
+    // both its stress and its tangent come from dualMechanicalModel and the
+    // legacy mechanicalModel, and it never reaches the manager. Accepting the
+    // switch would therefore run the whole case on the legacy laws while the
+    // dictionary said otherwise, which is a quieter failure than the mismatch
+    // vertexCentredLinGeomSolid refuses but no easier to notice.
+    //
+    // TODO: as for vertexCentredLinGeomSolid, this refusal has to go when the
+    // legacy mechanicalModel is deprecated or removed. Putting the stress on
+    // the framework here means giving the dual-mesh integration points their
+    // own topology registration and their own constitutive state, since they
+    // are a different set of points from the cell centres
+    if (useMechanicalConstitutiveLawManager())
+    {
+        FatalErrorInFunction
+            << type() << " does not support the mechanicalConstitutiveLaw "
+            << "framework." << nl << nl
+            << "    It takes its stress and its tangent from the legacy "
+            << "mechanicalModel, so the switch would be ignored rather than "
+            << "obeyed. Set `useMechanicalConstitutiveLawManager no;`, or use "
+            << "a cell-centred solid model."
+            << abort(FatalError);
+    }
+
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
 
@@ -1661,7 +1685,13 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
     // Calculate stress at dual faces
     dualMechanicalPtr_().correct(dualSigmaf_);
 
-    if (solidModelDict().lookupOrDefault<Switch>("approximateJacobian", false))
+    // Fidelity of the material tangent used to build the Jacobian. The
+    // default reproduces the previous behaviour, which was
+    // 'approximateJacobian' defaulting to false, i.e. a full material tangent
+    const tangentRequest jacTangent =
+        jacobianTangent(tangentRequest::fourthOrder);
+
+    if (jacTangent == tangentRequest::scalar)
     {
         // Add laplacian term as a compact approximate linearisation of
         // div(sigma)
@@ -1676,6 +1706,15 @@ label vertexCentredNonLinGeomTotalLagSolid::formJacobian
             dualImpKf(),
             false           // flip sign
         );
+    }
+    else if (jacTangent != tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "jacobianTangent " << tangentRequestName(jacTangent)
+            << " is not supported by " << type() << "." << nl
+            << "This solid model assembles its Jacobian either from a scalar "
+            << "tangent or from a full fourth-order material tangent."
+            << exit(FatalError);
     }
     else
     {

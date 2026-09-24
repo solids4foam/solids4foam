@@ -1,0 +1,5 @@
+{
+  "analytical_sigma_y_magnitude_pa": 10000.0,
+  "max_average_sigma_y_error_percent": 5.0,
+  "max_sigma_eq_relative_error_percent": 3.0
+}

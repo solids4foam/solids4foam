@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The seal is analysed using solids4foam's plane stress approximation: for
+// neoHookeanElastic this replaces the bulk modulus with its linear plane
+// stress equivalent, K = nu*E/((1 + nu)*(1 - nu)) + (2/3)*mu (about 1.13 MPa
+// here), which is exact for small strains and an approximation for finite
+// strains. With a near-incompressible material, plane strain conditions
+// become unstable at about 50% of the stroke.
+planeStress     yes;
+
+mechanical
+(
+    rubber
+    {
+        type            neoHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+
+        // E and nu give the initial shear modulus of the Ogden model below,
+        // mu = 0.5*sum(mu_i*alpha_i) = 0.4225 MPa, and a (3-D) bulk modulus
+        // of 1000 MPa
+        E               E [1 -1 -2 0 0 0 0] 1267321.5;
+        nu              nu [0 0 0 0 0 0 0] 0.4997887797;
+
+        // Compressible third-order Ogden model of the original benchmark,
+        // kept for reference. It is not used as OgdenElastic currently
+        // supports neither the plane stress approximation nor the mixed
+        // pressure-displacement formulation
+        //type            OgdenElastic;
+        //K               K [1 -1 -2 0 0 0 0] 1e9;
+        //mu1             mu1 [1 -1 -2 0 0 0 0] 0.63e6;
+        //mu2             mu2 [1 -1 -2 0 0 0 0] 0.0012e6;
+        //mu3             mu3 [1 -1 -2 0 0 0 0] -0.01e6;
+        //alpha1          alpha1 [0 0 0 0 0 0 0] 1.3;
+        //alpha2          alpha2 [0 0 0 0 0 0 0] 5;
+        //alpha3          alpha3 [0 0 0 0 0 0 0] -2;
+
+        // Solve a pressure Poisson equation for the hydrostatic stress
+        solvePressureEqn yes;
+
+        // Pressure smoothing scale factor: the default of 100 fails to
+        // converge at about 90% of the stroke
+        pressureSmoothingScaleFactor 1e4;
+    }
+);
+
+// ************************************************************************* //

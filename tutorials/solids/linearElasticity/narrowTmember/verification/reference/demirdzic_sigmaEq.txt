@@ -1,0 +1,31 @@
+# Equivalent (von Mises) stress along the arc r = 1.5R in the z = 0 plane of
+# the narrow T-member, taken from
+#
+#   I. Demirdzic, S. Muzaferija, M. Peric, Benchmark solutions of some
+#   structural analysis problems using finite-volume method and multigrid
+#   acceleration, International Journal for Numerical Methods in
+#   Engineering, 40(10), 1893-1908, 1997.
+#
+# R is the fillet radius, 5 mm, so the arc radius is 7.5 mm.
+#
+# Column 1: angle (degrees), measured anti-clockwise from the point
+#           (0, -1.5R), which is the sample angle theta plus 90 degrees
+# Column 2: equivalent (von Mises) stress (MPa)
+#
+# The values are read from a published figure, so they carry a digitisation
+# uncertainty of roughly one percent. They are used here to confirm
+# convergence towards the published solution, not to reproduce it to
+# plotting precision.
+0.7 0.653
+10.5 0.838
+49.9 3.030
+90.7 5.480
+100.5 5.830
+120.2 6.190
+139.9 6.270
+159.6 6.220
+180.7 5.940
+220.0 3.910
+249.6 1.740
+260.9 1.170
+269.3 0.938

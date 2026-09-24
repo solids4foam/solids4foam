@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+cleanCase
+\rm -rf system/*Subset constant/*Subset VTK postProcessing/ case.foam \
+        constant/polyMesh regressionTests \
+        constant/*.withDefaultValues *.withDefaultValues *.png
+
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .

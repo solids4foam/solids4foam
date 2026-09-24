@@ -11,7 +11,6 @@ Source a supported OpenFOAM environment, build solids4foam with PETSc, and run
 from either this directory or the repository root:
 
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/fluidSolidInteraction/beamInCrossFlow/verification
 ./Allverify --case original --study mesh
 ./Allverify --case modified --study mesh

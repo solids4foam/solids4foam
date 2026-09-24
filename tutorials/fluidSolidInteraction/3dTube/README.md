@@ -82,7 +82,7 @@ convergence, for example, see
 effects in strongly coupled fluid–solid interaction problems,” Engineering with
 Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
 
-In this tutorial, we will compare six variants of the approaches above:
+In this tutorial, we will compare seven variants of the approaches above:
 
 1. **Dirichlet-Neumann formulation with Aitken's acceleration and an
    incompressible fluid model**: We use the `pimpleFluid` fluid model.
@@ -110,6 +110,13 @@ In this tutorial, we will compare six variants of the approaches above:
    solids4foam's `pimpleFluid` fluid model). Due to implementation differences,
    this preCICE IQNILS approach may perform differently than the built-in
    solids4foam approach.
+
+7. **Robin-Neumann formulation with weak (explicit) coupling**: The fluid setup
+   is the same as approach 5, but the interface is advanced once per time-step
+   with no outer iterations, using the `weakCoupling` interface. Weak coupling
+   is not expected to reproduce the strongly coupled result on this case; the
+   variant is included so that the `weakCoupling` code path is exercised with a
+   Robin pressure condition.
 
 In all approaches, the solid domain setup is the same, where an
 incremental small strain formulation is used (the `linearGeometry` solid model).
@@ -139,6 +146,7 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 # ./Allrun # default behaviour is Robin-Neumann coupling
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
+# ./Allrun weakCoupling
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -210,7 +218,10 @@ As can be seen above, the `Allrun` script can be run with different values for
  weakly compressible fluid model (approaches 3 and 4) can be used by running the
  `Allrun` script with the argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`.
  Once again, switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled
- via the `fluidSolidInterface` setting in `constant/fsiProperties`.
+ via the `fluidSolidInterface` setting in `constant/fsiProperties`. Weak
+ coupling (approach 7) is selected with `./Allrun weakCoupling`, which uses the
+ same Robin-Neumann fluid setup as approach 5 but overrides
+ `constant/fsiProperties` with `constant/fsiProperties.weakCoupling`.
  Examining the `U` and `p` files in `0/fluid.robin/` shows that the Robin
  approach uses the custom conditions `elasticWallVelocity` and `elasticWallPressure`
  at the interface.
@@ -226,9 +237,12 @@ The `Allrun` script updates the case with links to the correct files to be used
   time.
 - `fsiConvergence.pdf`: this plots the number of FSI iterations per time step.
 
-The tutorial case for approach 6, which uses preCICE, is located at
-`solids4foam/tutorials/fluidSolidInteraction-preCICE/3dTube`; once again, the
-`Allrun` script runs the case.
+Approach 6 uses preCICE. solids4foam's preCICE cases are maintained in the
+[preCICE tutorials](https://precice.org/tutorials.html) rather than in this
+repository, and are exercised by `tests/precice`; see
+`tests/precice/README.md`. A standalone preCICE version of this case was
+distributed with solids4foam up to v2.4 and remains available as an archive
+from the solids4foam website.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included

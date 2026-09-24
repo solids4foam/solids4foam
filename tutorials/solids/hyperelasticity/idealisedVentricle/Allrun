@@ -6,6 +6,7 @@ IFS=$'\n\t'
 # solids4Foam Allrun script
 # Allows selection of solution approach:
 #   petsc                 (default; PETSc SNES)
+#   petscManager          (the same, with the constitutive-law framework)
 #   pressureDisplacement  (foam-extend; coupled pressure-displacement)
 # -------------------------------------------------------------------------
 
@@ -16,6 +17,7 @@ Usage:
 
 Where [approach] is one of:
   petsc                                (default)
+  petscManager                         (petsc, on the constitutive-law framework)
   pressureDisplacement
   parallel                             (shorthand for: petsc parallel)
 
@@ -23,6 +25,7 @@ Examples:
   ./Allrun
   ./Allrun petsc
   ./Allrun petsc parallel
+  ./Allrun petscManager
   ./Allrun pressureDisplacement
   ./Allrun parallel
 EOF
@@ -58,7 +61,7 @@ elif [[ "${2:-}" == "parallel" ]]; then
 fi
 
 case "${APPROACH}" in
-    petsc)
+    petsc|petscManager)
         solids4Foam::caseDoesNotRunWithFoamExtend
         solids4Foam::caseDoesNotRunWithOpenFOAMOrg
         solids4Foam::requirePetscOrExitSilently
@@ -108,15 +111,17 @@ reset_active_case() {
 }
 
 select_petsc_case() {
-    echo "Using petsc approach"
+    local variant="${1:-petsc}"
+
+    echo "Using ${variant} approach"
 
     reset_active_case
 
-    copy_contents caseOptions/petsc/0 0
-    copy_contents caseOptions/petsc/constant constant
-    copy_contents caseOptions/petsc/system system
+    copy_contents "caseOptions/${variant}/0" 0
+    copy_contents "caseOptions/${variant}/constant" constant
+    copy_contents "caseOptions/${variant}/system" system
 
-    cp -a caseOptions/petsc/petscOptions.* .
+    cp -a "caseOptions/${variant}"/petscOptions.* .
 }
 
 select_pressure_displacement_case() {
@@ -141,7 +146,10 @@ select_pressure_displacement_case() {
 
 case "${APPROACH}" in
     petsc)
-        select_petsc_case
+        select_petsc_case petsc
+        ;;
+    petscManager)
+        select_petsc_case petscManager
         ;;
     pressureDisplacement)
         select_pressure_displacement_case
@@ -156,7 +164,7 @@ solids4Foam::convertCaseFormat .
 # -------------------------------------------------------------------------
 
 echo
-if [[ "${APPROACH}" == "petsc" ]]; then
+if [[ "${APPROACH}" == "petsc" || "${APPROACH}" == "petscManager" ]]; then
     solids4Foam::runApplication blockMesh
     solids4Foam::runApplication extrudeMesh
     solids4Foam::runApplication createPatch -overwrite

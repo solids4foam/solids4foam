@@ -90,8 +90,8 @@ Foam::interpolationTable<Type>::interpolationTable(const dictionary& dict)
 :
     List<Tuple2<scalar, Type>>(),
     boundsHandling_(wordToBoundsHandling(word(dict.lookup("outOfBounds")))),
-    // Accept both keywords: foam-extend writes "fileName", so a restart must
-    // be able to read it back
+    // write() gives the entry as fileName on foam-extend, so a field written
+    // there has to be readable with either name or it cannot be restarted
     fileName_
     (
         dict.found("file") ? dict.lookup("file") : dict.lookup("fileName")

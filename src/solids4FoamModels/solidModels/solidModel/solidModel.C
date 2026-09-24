@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
@@ -34,6 +35,10 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "hofvc.H"
+    #include "enhancedVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -544,6 +549,83 @@ void Foam::solidModel::makeGradDQuad() const
             gradDQ[faceI][qpI] = tensor::zero;
         }
     }
+}
+
+
+const Foam::CompactListList<Foam::tensor>&
+Foam::solidModel::gradDQuad0() const
+{
+    if (gradDQuad0Ptr_.empty())
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        if (gradDQuadPtr_.empty())
+        {
+            makeGradDQuad();
+        }
+
+        // Build the previous-time store from the previous-time displacement,
+        // rather than copying the current gradient into it: on a restart the
+        // current gradient is not the previous step's
+        gradDQuad0Ptr_.set
+        (
+            new CompactListList<tensor>(gradDQuadPtr_().sizes())
+        );
+        hofvc::fGrad(D_.oldTime(), gradDQuad0Ptr_());
+#else
+        gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+#endif
+    }
+
+    return autoPtrRef(gradDQuad0Ptr_);
+}
+
+
+void Foam::solidModel::correctPointDisplacement
+(
+    pointVectorField& pointD
+) const
+{
+    pointD.correctBoundaryConditions();
+
+    const polyMesh& pMesh = pointD.mesh().mesh();
+    vectorField& pointDI = pointD;
+
+    forAll(pMesh.boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(pMesh.boundaryMesh()[patchI]))
+        {
+            const polyPatch& patch = pMesh.boundaryMesh()[patchI];
+
+            if (returnReduce(patch.size(), sumOp<int>()) == 0)
+            {
+                continue;
+            }
+
+            const labelList& meshPoints = patch.meshPoints();
+            const vector avgN = gAverage(patch.pointNormals());
+
+            forAll(meshPoints, pointI)
+            {
+                vector& pointValue = pointDI[meshPoints[pointI]];
+
+                if (mag(avgN.x()) > 0.95)
+                {
+                    pointValue.x() = 0;
+                }
+                else if (mag(avgN.y()) > 0.95)
+                {
+                    pointValue.y() = 0;
+                }
+                else if (mag(avgN.z()) > 0.95)
+                {
+                    pointValue.z() = 0;
+                }
+            }
+        }
+    }
+
+    twoDCorrector_.correctPoints(pointDI);
 }
 
 
@@ -1140,6 +1222,17 @@ Foam::solidModel::solidModel
     ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
+    useMechanicalConstitutiveLawManager_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "useMechanicalConstitutiveLawManager", false
+        )
+    ),
+    mechanicalManagerPtr_(),
+    jacobianTangentCached_(false),
+    jacobianTangent_(tangentRequest::none),
+    restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
@@ -1250,6 +1343,80 @@ Foam::solidModel::solidModel
     }
     else
     {
+        // Starting from a time that is not the first, without having been
+        // asked to write what a restart needs. The fields below are switched
+        // off in this branch, so the run is about to continue from a state it
+        // only partly has: the displacement comes back, the increment and the
+        // gradient it is measured against do not.
+        //
+        // Whether that matters depends on the material. A law written in total
+        // strain will not notice; an incremental one reads the whole run's
+        // strain as a single step's and is wrong by tens of percent while
+        // running happily to the end. That is too quiet a way to be wrong to
+        // leave unsaid, and too common a mistake to assume: the flag defaults
+        // to off and most cases never set it
+        if (runTime.startTimeIndex() > 0)
+        {
+            // Continuing from a time that is not the first, without having
+            // been asked to write what a restart needs. Whether that matters
+            // depends on the material: one written in total strain will not
+            // notice, while an incremental one reads the whole run's strain as
+            // a single step's and is wrong by tens of percent while running
+            // happily to the end.
+            //
+            // The fields may still be there, if the run that produced this
+            // time directory did ask for them, so look before complaining
+            IOobject gradD0IO
+            (
+                "grad(D)_0",
+                runTime.timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            );
+
+#ifdef OPENFOAM_NOT_EXTEND
+            const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+            const bool present = gradD0IO.headerOk();
+#endif
+
+            if (!present && !restartSpecified_)
+            {
+                // The case has not said anything about restarting, and is
+                // restarting. Refuse: this is a mistake far more often than it
+                // is a choice, and the cost of being wrong is a plausible
+                // answer rather than an obvious failure
+                FatalErrorInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << ", but the fields a consistent restart needs were "
+                    << "never written." << nl << nl
+                    << "    The displacement increment, the old-time "
+                    << "displacement gradient and the point fields are only "
+                    << "written when the case asks for them." << nl << nl
+                    << "    Either" << nl << nl
+                    << "        restart yes;" << nl << nl
+                    << "    in the solidModel's coefficients dictionary, and "
+                    << "run again from the start; or" << nl << nl
+                    << "        restart no;" << nl << nl
+                    << "    to say that this material does not need them and "
+                    << "continue. A material written in total strain does not; "
+                    << "an incremental one does, and without them reads the "
+                    << "whole run's strain as one step's."
+                    << exit(FatalError);
+            }
+            else if (!present)
+            {
+                // Said 'no' deliberately. Their call, said once
+                WarningInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << " with 'restart no': the displacement increment and "
+                    << "old-time gradient were not written, so an incremental "
+                    << "material would continue from the wrong strain."
+                    << endl;
+            }
+        }
+
         D_.oldTime().writeOpt() = IOobject::NO_WRITE;
         D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
         DD_.writeOpt() = IOobject::NO_WRITE;
@@ -1694,9 +1861,245 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 }
 
 
+void Foam::solidModel::rollOverQuadratureHistory()
+{
+    // The high-order discretisation, and hence gradDQuad(), does not exist on
+    // foam-extend
+#ifndef FOAMEXTEND
+    if (gradDQuadPtr_.valid())
+    {
+        if (gradDQuad0Ptr_.empty())
+        {
+            gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        }
+
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+    }
+#endif
+}
+
+
 void Foam::solidModel::updateTotalFields()
 {
     mechanical().updateTotalFields();
+
+    // A model overriding this must call rollOverQuadratureHistory() itself
+    rollOverQuadratureHistory();
+}
+
+
+// The high-order face quadrature does not run on foam-extend, but these
+// helpers are portable and the models that call them are compiled there
+void Foam::solidModel::quadDeformationGradient
+(
+    const CompactListList<tensor>& gradD,
+    autoPtr<CompactListList<tensor>>& FPtr
+)
+{
+    if (FPtr.empty())
+    {
+        FPtr.set(new CompactListList<tensor>());
+    }
+
+    FPtr().setSize(gradD.sizes());
+
+    const List<tensor>& gradDv = gradD.m();
+    List<tensor>& F = FPtr().m();
+
+    forAll(gradDv, i)
+    {
+        F[i] = I + gradDv[i].T();
+    }
+}
+
+
+void Foam::solidModel::quadInverseAndJacobian
+(
+    const CompactListList<tensor>& F,
+    autoPtr<CompactListList<tensor>>& FinvPtr,
+    autoPtr<CompactListList<scalar>>& JPtr
+)
+{
+    if (FinvPtr.empty())
+    {
+        FinvPtr.set(new CompactListList<tensor>());
+        JPtr.set(new CompactListList<scalar>());
+    }
+
+    FinvPtr().setSize(F.sizes());
+    JPtr().setSize(F.sizes());
+
+    const List<tensor>& Fv = F.m();
+    List<tensor>& Finv = FinvPtr().m();
+    List<scalar>& J = JPtr().m();
+
+    forAll(Fv, i)
+    {
+        Finv[i] = inv(Fv[i]);
+        J[i] = det(Fv[i]);
+    }
+}
+
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModel::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        // mechanicalModel is itself the mechanicalProperties IOdictionary, so
+        // both frameworks are built from exactly the same entries
+        //
+        // TODO: this also means a framework run constructs the whole legacy
+        // model and every legacy law, so the framework cannot yet exist
+        // without the thing it replaces. Breaking that is stage 5 work:
+        // solidModel should read mechanicalProperties itself and hand the
+        // dictionary to whichever implementation is in use, leaving
+        // mechanicalModel as one consumer of it rather than the owner
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanical())
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModel::frameworkGrad
+(
+    const volVectorField& D,
+    volTensorField& gradD
+) const
+{
+    // See the header for why this does not call mechanical().grad()
+    gradD = fvc::grad(D);
+}
+
+
+void Foam::solidModel::frameworkInterpolate
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD
+)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
+#else
+    if (mechanicalManager().nLaws() > 1)
+    {
+        FatalErrorInFunction
+            << "The constitutive-law framework does not support more than one "
+            << "material on foam-extend in this solid model." << nl << nl
+            << "    The point interpolation would fall back to the legacy "
+            << "per-material sub-mesh path, which the framework replaces, and "
+            << "this fork's interpolator has no gradient-corrected form."
+            << exit(FatalError);
+    }
+
+    mechanical().interpolate(D, gradD, pointD);
+#endif
+
+    correctPointDisplacement(pointD);
+}
+
+
+void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        return;
+    }
+
+    if (mechanicalManager().nLaws() < 2)
+    {
+        return;
+    }
+
+    const word gradScheme
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh().gradScheme("grad(" + fieldName + ')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + fieldName + ')')
+#endif
+    );
+
+    if (gradScheme != "leastSquaresS4f")
+    {
+        FatalErrorInFunction
+            << "More than one material on the mechanicalConstitutiveLaw "
+            << "framework needs a material-aware gradient for grad("
+            << fieldName << "), and `" << gradScheme << "` is not one."
+            << nl << nl
+            << "    The framework computes one gradient on one mesh in place "
+            << "of the legacy per-material subMeshes, which only works if the "
+            << "scheme keeps a cell's stencil within its own material. Set "
+            << "`grad(" << fieldName << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
+(
+    mechanicalConstitutiveLawManager& manager,
+    const tangentRequest req
+) const
+{
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // Evaluate the tangent at zero gradient against a state with no history.
+    // impK is formed once and kept, so this gives the same elastic
+    // preconditioner on a cold start and on a restart without disturbing the
+    // stored constitutive state
+    const volTensorField zeroGradD
+    (
+        IOobject
+        (
+            "zeroGradD",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("zero", gradD().dimensions(), tensor::zero)
+    );
+
+    manager.updateScalarTangent
+    (
+        zeroGradD,
+        zeroGradD,
+        mesh().time().deltaTValue(),
+        impK,
+        req,
+        true        // evaluate against a state with no history
+    );
+
+    return tImpK;
 }
 
 
@@ -2104,15 +2507,6 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
-Foam::scalar Foam::solidModel::newDeltaT()
-{
-    return min
-    (
-        runTime().deltaTValue(),
-        mechanical().newDeltaT()
-    );
-}
-
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
@@ -2157,6 +2551,58 @@ void Foam::solidModel::moveMesh
 const Foam::dictionary& Foam::solidModel::solidModelDict() const
 {
     return solidProperties_.subDict(type_ + "Coeffs");
+}
+
+
+Foam::tangentRequest Foam::solidModel::jacobianTangent
+(
+    const tangentRequest deflt
+) const
+{
+    if (jacobianTangentCached_)
+    {
+        return jacobianTangent_;
+    }
+
+    const dictionary& dict = solidModelDict();
+
+    if (dict.found("approximateJacobian"))
+    {
+        if (dict.found("jacobianTangent"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "Both 'approximateJacobian' and 'jacobianTangent' are set."
+                << nl
+                << "'approximateJacobian' is deprecated: use "
+                << "'jacobianTangent' only."
+                << exit(FatalIOError);
+        }
+
+        const Switch approximate(dict.lookup("approximateJacobian"));
+
+        jacobianTangent_ =
+            approximate
+          ? tangentRequest::scalar
+          : tangentRequest::fourthOrder;
+
+        WarningInFunction
+            << "'approximateJacobian' is deprecated. Replace it with "
+            << "'jacobianTangent " << tangentRequestName(jacobianTangent_)
+            << ";'" << endl;
+    }
+    else if (dict.found("jacobianTangent"))
+    {
+        jacobianTangent_ =
+            tangentRequestNamed(word(dict.lookup("jacobianTangent")));
+    }
+    else
+    {
+        jacobianTangent_ = deflt;
+    }
+
+    jacobianTangentCached_ = true;
+
+    return jacobianTangent_;
 }
 
 // ************************************************************************* //

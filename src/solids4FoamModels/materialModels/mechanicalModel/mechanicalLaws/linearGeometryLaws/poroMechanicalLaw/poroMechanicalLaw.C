@@ -188,7 +188,10 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     ),
     pName_
     (
-        mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")
+        mechanicalLaw::dict().lookupOrAddDefault<word>
+        (
+            "pressureFieldName", "porePressure"
+        )
     ),
     pRegion_
     (
@@ -263,13 +266,13 @@ void Foam::poroMechanicalLaw::correct(volSymmTensorField& sigma)
     // Lookup the pressure field
     const volScalarField& p = lookupPressureField();
 
-    // check if sigmaEff has been initialized (should be done only once per calculation)
+    // Check if sigmaEff has been initialized
     checkSigmaEffReady(sigma,p);
 
     // Calculate effective stress
-    //-- Note that we could just pass "sigma" here but we use a separate field
-    //-- called sigmaEff just for post-processing visualisation of the effective
-    //-- stress <-- for stress state dependent material laws like Mohr-Coulomb it is important to use sigmaEff since the strength depends on tr(sigmaEff)
+    // Use a separate sigmaEff field for post-processing and because
+    // stress-dependent laws such as Mohr-Coulomb use tr(sigmaEff) to calculate
+    // their strength
     effectiveStressMechLawPtr_->correct(sigmaEff_());
 
     // Calculate the total stress as the sum of the effective stress and the

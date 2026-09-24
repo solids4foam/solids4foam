@@ -1,0 +1,20 @@
+# Vertical displacement of the reference point (48, 52) mm, the mid-point of
+# the loaded edge, of the compressible neo-Hookean Cook's membrane, computed
+# with Abaqus using CPE4H (4-node bilinear plane strain, hybrid) elements.
+#
+# Copied from the solid-benchmarks repository,
+# hyperElasticity/cooksMembrane/plotScripts/abaqus.dat, where the benchmark
+# case was prepared by Ivan Batistić. The source file's CPU-time column,
+# which was populated for the finest mesh only (77 s), is omitted.
+#
+# Column 1: number of cells
+# Column 2: approximate cell spacing (mm)
+# Column 3: vertical displacement (m)
+# Column 4: vertical displacement (mm)
+9 1.26E+01 0.012177 1.22E+01
+36 6.32E+00 0.013424 1.34E+01
+144 3.16E+00 0.0143401 1.43E+01
+576 1.58E+00 0.0146183 1.46E+01
+2304 7.91E-01 0.0146976 1.47E+01
+9216 3.95E-01 0.0147205 1.47E+01
+36864 1.98E-01 0.0147273 1.47E+01

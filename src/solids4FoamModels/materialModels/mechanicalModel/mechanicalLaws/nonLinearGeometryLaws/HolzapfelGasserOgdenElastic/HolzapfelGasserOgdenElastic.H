@@ -115,7 +115,8 @@ class HolzapfelGasserOgdenElastic
 
     // Private Member Functions
 
-        //- Calculate the stress on faces (shared by correct(surfaceSymmTensorField&))
+        //- Calculate the stress on faces
+        //  Shared by correct(surfaceSymmTensorField&)
         void correctF
         (
             surfaceSymmTensorField& sigma,
@@ -177,6 +178,9 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Return the effective shear modulus
+        virtual tmp<volScalarField> shearModulus() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const;
