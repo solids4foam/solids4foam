@@ -354,6 +354,20 @@ public:
         template<class Type>
         void interpolate
         (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const GeometricField
+            <
+                typename outerProduct<vector, Type>::type,
+                fvPatchField,
+                volMesh
+            >& gradVf,
+            GeometricField<Type, pointPatchField, pointMesh>& pf
+        ) const;
+
+        //- Low-level gradient-corrected interpolation of internal fields
+        template<class Type>
+        void interpolate
+        (
             const DimensionedField<Type, volMesh>& vf,
             const DimensionedField
             <
