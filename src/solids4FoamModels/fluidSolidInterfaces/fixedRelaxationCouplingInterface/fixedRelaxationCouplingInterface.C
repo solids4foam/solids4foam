@@ -64,6 +64,8 @@ bool fixedRelaxationCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
+    bool converged = false;
+
     // Check if coupling switch needs to be updated
     if (!coupled())
     {
@@ -110,10 +112,13 @@ bool fixedRelaxationCouplingInterface::evolve()
 
         // Optional: write residuals to file
         writeResidualLine(residualNorm);
-    }
-    while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
-    if (!(residualNorm <= outerCorrTolerance()))
+        // Displacement residual and, on Robin interfaces, the Robin criteria
+        converged = couplingConverged(residualNorm);
+    }
+    while (!converged && outerCorr() < nOuterCorr());
+
+    if (!converged)
     {
         if (allowUnconvergedCoupling())
         {
