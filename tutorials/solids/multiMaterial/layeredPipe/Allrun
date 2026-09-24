@@ -9,32 +9,18 @@ source solids4FoamScripts.sh
 # Case does not run with OpenFOAM.org
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# Two arms: the legacy mechanicalModel by default, and the
-# mechanicalConstitutiveLaw framework with "./Allrun framework".
-#
-# The framework arm also switches grad(D) to the material-aware
-# leastSquaresS4f scheme. That pairing is the point: the framework replaces
-# the legacy per-material subMesh machinery, and the material-aware gradient
-# is what does that job on a single mesh
-#
-# "./Allrun framework parallel" runs in parallel instead, decomposed with
+# "./Allrun parallel" runs in parallel, decomposed with
 # system/decomposeParDict.interface, which puts the processor boundary on the
-# material interface; "./Allrun framework parallel simple" uses
+# material interface; "./Allrun parallel simple" uses
 # system/decomposeParDict.simple, whose processor boundary cuts across it
-APPROACH="legacy"
 PARALLEL=false
 DECOMPOSITION="interface"
 for arg in "$@"; do
     case "$arg" in
-        framework) APPROACH="framework" ;;
         parallel) PARALLEL=true ;;
         interface|simple) DECOMPOSITION="$arg" ;;
     esac
 done
-echo "Using the $APPROACH approach"
-
-cp "constant/solidProperties.${APPROACH}" constant/solidProperties
-cp "system/fvSchemes.${APPROACH}" system/fvSchemes
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
