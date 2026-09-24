@@ -867,19 +867,18 @@ void newLeastSquaresVolPointInterpolation::interpolate
     GeometricField<Type, pointPatchField, pointMesh>& pf
 ) const
 {
+#ifdef OPENFOAM_NOT_EXTEND
+    // The implementation these forks already have, so that there is one
+    enhancedVolPointInterpolation::New(mesh()).interpolate(vf, gradVf, pf);
+#else
     // Access through GeometricField before delegating so that old-time values
     // are stored before the internal field is overwritten
-#ifdef OPENFOAM_NOT_EXTEND
-    pf.primitiveFieldRef();
-    DimensionedField<Type, pointMesh>& pfI = pf;
-#else
-    DimensionedField<Type, pointMesh>& pfI = pf.dimensionedInternalField();
+    interpolate(vf, gradVf, pf.dimensionedInternalField());
 #endif
-
-    interpolate(vf, gradVf, pfI);
 }
 
 
+#ifndef OPENFOAM_NOT_EXTEND
 template<class Type>
 void newLeastSquaresVolPointInterpolation::interpolate
 (
@@ -901,10 +900,6 @@ void newLeastSquaresVolPointInterpolation::interpolate
             << pf.name() << endl;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
-    // The implementation these forks already have, so that there is one
-    enhancedVolPointInterpolation::New(mesh()).interpolate(vf, gradVf, pf);
-#else
     const fvMesh& mesh = vf.mesh();
 
     const labelListList& pointCells = mesh.pointCells();
@@ -953,8 +948,8 @@ void newLeastSquaresVolPointInterpolation::interpolate
             pf[pointI] = sumWVf[pointI];
         }
     }
-#endif
 }
+#endif
 
 
 template<class Type>
