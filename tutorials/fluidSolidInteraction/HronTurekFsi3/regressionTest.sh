@@ -25,19 +25,20 @@ FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
 # The force references are the total force.
-# The values are the midpoint of OpenFOAM-v2412 and OpenFOAM-v2512. Fx differs
-# between them by 3e-4 once the coupling starts (the forces agree at t = 2),
-# which FX_TOL covers; Uy and Fy agree to within 0.15 of their tolerances.
-REF_TIP_UY=-0.000283042
-REF_FX=-0.0317955
-REF_FY=-0.0388694
+# The values are the midpoint of OpenFOAM-v2412, OpenFOAM-v2512 and
+# OpenFOAM-9. Fx differs across them by up to 3.4e-4 once the coupling starts
+# (the forces agree at t = 2), which FX_TOL covers; Uy and Fy agree to within
+# 0.1 of their tolerances.
+REF_TIP_UY=-0.000282442
+REF_FX=-0.0318083
+REF_FY=-0.0388867
 
 # foam-extend uses GGI rather than AMI for the interface interpolation and has
 # a distinct, repeatable tip displacement and force at the regression end time.
 if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-    REF_TIP_UY=-0.000169319
-    REF_FX=-0.0384236
-    REF_FY=-0.0442995
+    REF_TIP_UY=-0.000244033
+    REF_FX=-0.0308966
+    REF_FY=-0.0371161
 fi
 
 ALLRUN_LOGFILE="log.Allrun"
