@@ -4,6 +4,24 @@ This changelog highlights significant user-facing changes in each solids4foam
 release. For complete commit-level details and contributor information, see the
 [GitHub Releases](https://github.com/solids4foam/solids4foam/releases) page.
 
+## [Unreleased]
+
+### Added
+
+- Added six hyperelastic tutorials ported from the `solid-benchmarks`
+  repository, each with a README comparing it with its published reference and
+  a `regressionTest.sh`: `cantileverVibration`, `cooksMembrane`,
+  `compressedSpheres`, `twistingHemisphere`, `rubberSealing` and
+  `shallowIroning` (all under `tutorials/solids/hyperelasticity`).
+- Added opt-in mesh-convergence verification studies, migrated from
+  `solid-benchmarks`, to the linear-elastic and elastoplastic Cook's membrane,
+  `sphericalCavity`, `ellipticPlate`, `narrowTmember`, `plateHole`,
+  `cantilever2d`, `curvedCantilever`, `curvedBeams`, `idealisedVentricle` and
+  `cavityFlexibleBottom` tutorials. Each lives in the tutorial's
+  `verification/` directory, is run with `./Allverify`, works on copies under
+  the ignored `verification/work/` directory, and is not run by
+  `tutorials/Alltest` or `tutorials/Alltest-regression`.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4
