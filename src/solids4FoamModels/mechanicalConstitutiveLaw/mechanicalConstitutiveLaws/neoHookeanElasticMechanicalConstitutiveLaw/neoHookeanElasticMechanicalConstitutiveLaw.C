@@ -123,8 +123,8 @@ neoHookeanElasticMechanicalConstitutiveLaw
     else if (planeStress)
     {
         // The plane-stress reduction keeps the bulk stiffness finite up to
-        // and including nu = 0.5, as the legacy law's does, so nothing here
-        // is incompressible or ill-conditioned
+        // and including nu = 0.5, so nothing here is incompressible or
+        // ill-conditioned
     }
     else if (mag(nu_.value() - 0.5) < SMALL)
     {
