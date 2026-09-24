@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.0                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -56,11 +56,11 @@ functions
         nu   0.3;
         ax   2e-6;
         ay   4e-6;
-	az   6e-6;
+        az   6e-6;
         cellDisplacement yes;
         pointDisplacement yes;
-	cellStress yes;
-	pointStress yes;
+        cellStress yes;
+        pointStress yes;
     }
 }
 
