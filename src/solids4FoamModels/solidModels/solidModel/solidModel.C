@@ -2635,6 +2635,21 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             << exit(FatalError);
     }
 
+    // And of a model that can, the request is validated here too, rather than
+    // at the first stress update: a model running the mixed formulation
+    // returns from its stress update before reaching the smoothing, so
+    // solvePressure with solvePressureEqn would otherwise be accepted and the
+    // smoothing silently ignored
+    if
+    (
+        modelPtr->mechanicalManagerPtr_.valid()
+     && modelPtr->supportsHydrostaticSmoothing()
+     && modelPtr->hydrostaticSmoothingRequested()
+    )
+    {
+        modelPtr->smoothHydrostaticStress();
+    }
+
     return modelPtr;
 }
 

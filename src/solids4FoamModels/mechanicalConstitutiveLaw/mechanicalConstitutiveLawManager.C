@@ -4502,6 +4502,20 @@ void Foam::mechanicalConstitutiveLawManager::checkVolumetricSplitSupported
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::anyLawIncompressible() const
+{
+    forAll(laws_, lawI)
+    {
+        if (incompressibleLawTree(laws_[lawI]))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 bool Foam::mechanicalConstitutiveLawManager::allLawsProvideVolumetricSplit
 () const
 {

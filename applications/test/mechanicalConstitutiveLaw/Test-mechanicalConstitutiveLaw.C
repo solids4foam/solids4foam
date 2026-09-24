@@ -750,29 +750,22 @@ int main(int argc, char *argv[])
         );
 
         // A fully incompressible law has no total stress to compare with, and
-        // the manager refuses to form one
-        bool haveTotal = true;
-        string whyNoTotal;
+        // the manager refuses to form one. Asked before evaluating, so that
+        // any other failure of the evaluation fails this check rather than
+        // being taken for that one
+        const bool haveTotal = !manager.anyLawIncompressible();
+        const string whyNoTotal
+        (
+            "a law is fully incompressible, so it has no total stress"
+        );
 
-        FatalError.throwExceptions();
-
-        try
+        if (haveTotal)
         {
             manager.updateStressFiniteStrain
             (
                 Fr, Fr0, Jr, Jr0, Finvr, Finvr0, dt, total
             );
-        }
-        catch (const Foam::error& err)
-        {
-            haveTotal = false;
-            whyNoTotal = err.message();
-        }
 
-        FatalError.dontThrowExceptions();
-
-        if (haveTotal)
-        {
             manager.updateStressFiniteStrainSplit
             (
                 Fr, Fr0, Finvr, Finvr0, Jr, Jr0, dt, iso, vol

@@ -1462,6 +1462,10 @@ public:
         //  checkVolumetricSplitSupported() instead and refuses by name
         bool allLawsProvideVolumetricSplit() const;
 
+        //- True if any law, or any law one of them wraps, is fully
+        //  incompressible, so that it has no total stress
+        bool anyLawIncompressible() const;
+
         //- True if every law's split stress is a function of the isochoric
         //  deformation alone, so that J*sigma_iso is invariant under a
         //  superposed dilation. Weaker than the above, and separate from it
