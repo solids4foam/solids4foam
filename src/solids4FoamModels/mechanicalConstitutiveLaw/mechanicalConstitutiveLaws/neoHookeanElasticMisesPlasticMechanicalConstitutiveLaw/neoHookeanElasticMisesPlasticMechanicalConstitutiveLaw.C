@@ -410,6 +410,17 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         scalarTanPtr = &response.scalarTangent();
     }
 
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
+    // The deviatoric-only scalar tangent, for a mixed formulation, whose
+    // pressure equation carries the bulk stiffness instead
+    const bool deviatoricTan =
+        response.tangentReq() == tangentRequest::scalarDeviatoric;
+
     const label nIP = sigma.size();
 
     // The Newton residual is normalised by the largest trial elastic strain,
@@ -518,6 +529,16 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         sigma[i] = (1.0/Ji)*(p*symmTensor(I) + sDev);
 
+        // J2 plasticity is isochoric, so the return mapping has touched sDev
+        // alone and p is the elastic volumetric response: the first term is
+        // the isochoric stress and the second is dU/dJ, and the split is the
+        // same two terms the total above is built from
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = p/Ji;
+            sigma[i] = sDev/Ji;
+        }
+
         // Commit the history
         epsilonPEq[i] = epsilonPEq0[i] + dEpsilonPEq;
         sigmaY[i] = curSigmaY;
@@ -530,7 +551,16 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             const scalar scaleFactor =
                 1.0 - 2.0*muBar*dLambda/max(magSTrial, SMALL);
 
-            (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu + kappa;
+            if (deviatoricTan)
+            {
+                // Scalar Laplacian surrogate for div(dev(sigma)), which is
+                // mu*lap(D) + (1/3)*mu*grad(div(D))
+                (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu;
+            }
+            else
+            {
+                (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu + kappa;
+            }
         }
     }
 

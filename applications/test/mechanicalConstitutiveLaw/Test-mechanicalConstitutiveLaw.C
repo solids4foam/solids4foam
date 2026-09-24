@@ -654,8 +654,169 @@ int main(int argc, char *argv[])
                  ? "these are small-strain laws, and this check superposes a "
                    "dilation on the deformation gradient"
                  : manager.allLawsProvideVolumetricSplit()
-                 ? "a law adds a stress that is not derived from a potential, "
-                   "so its split is not dilation invariant"
+                 ? "a law's split is not dilation invariant - it adds a "
+                   "stress that is not derived from a potential, or its "
+                   "yield surface scales with J"
+                 : "no law here separates its isochoric and volumetric "
+                   "responses"
+               )
+            << endl;
+    }
+
+    // ------------------------------------------------------------------
+    Info<< nl << "A declared split recomposes the total stress" << endl;
+
+    // The check above needs a law whose isochoric stress ignores a superposed
+    // dilation, and skips the rest. This one needs nothing but the
+    // declaration: whatever a law hands back as its isochoric stress and its
+    // volumetric response, the two together must be the total it returns when
+    // asked for the total, or a mixed formulation that replaces the second
+    // with a solved pressure is solving for a different material. It is the
+    // only check a law with history gets - neoHookeanElasticMisesPlastic,
+    // whose yield surface scales with J - so the deformation is large enough
+    // to take such a law well past yield
+    if (!smallStrainCapable && manager.allLawsProvideVolumetricSplit())
+    {
+        volTensorField Fr
+        (
+            IOobject
+            (
+                "Fr",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedTensor("I", dimless, I)
+        );
+        volTensorField Fr0(Fr), Finvr(Fr), Finvr0(Fr);
+        volScalarField Jr
+        (
+            IOobject
+            (
+                "Jr",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("one", dimless, 1.0)
+        );
+        volScalarField Jr0(Jr);
+
+        // Shear, stretch and a volume change, so that no part of the split is
+        // trivially zero
+        const tensor Fi
+        (
+            1.12, 0.07, 0.0,
+            0.03, 0.93, 0.02,
+            0.0, 0.01, 1.04
+        );
+
+        forAll(Fr, cellI)
+        {
+            Foam::primitiveFieldRef(Fr)[cellI] = Fi;
+            Foam::primitiveFieldRef(Finvr)[cellI] = inv(Fi);
+            Foam::primitiveFieldRef(Jr)[cellI] = det(Fi);
+        }
+
+        volSymmTensorField total
+        (
+            IOobject
+            (
+                "totalStress",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+        );
+        volSymmTensorField iso(total);
+        volScalarField vol
+        (
+            IOobject
+            (
+                "volResponseR",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        // A fully incompressible law has no total stress to compare with, and
+        // the manager refuses to form one
+        bool haveTotal = true;
+        string whyNoTotal;
+
+        FatalError.throwExceptions();
+
+        try
+        {
+            manager.updateStressFiniteStrain
+            (
+                Fr, Fr0, Jr, Jr0, Finvr, Finvr0, dt, total
+            );
+        }
+        catch (const Foam::error& err)
+        {
+            haveTotal = false;
+            whyNoTotal = err.message();
+        }
+
+        FatalError.dontThrowExceptions();
+
+        if (haveTotal)
+        {
+            manager.updateStressFiniteStrainSplit
+            (
+                Fr, Fr0, Finvr, Finvr0, Jr, Jr0, dt, iso, vol
+            );
+
+            scalar maxErr = 0.0;
+            scalar scale = SMALL;
+
+            forAll(total, cellI)
+            {
+                const symmTensor& t = Foam::primitiveField(total)[cellI];
+                const symmTensor recomposed
+                (
+                    Foam::primitiveField(iso)[cellI]
+                  + Foam::primitiveField(vol)[cellI]*symmTensor(I)
+                );
+
+                maxErr = max(maxErr, mag(t - recomposed));
+                scale = max(scale, mag(t));
+            }
+
+            reportError
+            (
+                "the isochoric stress plus the volumetric response is the "
+                "total",
+                maxErr/scale,
+                1e-10
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: the total stress could not be formed here, so "
+                << "there is nothing to compare with: " << whyNoTotal.c_str()
+                << endl;
+        }
+    }
+    else
+    {
+        Info<< "    SKIP: this check does not apply here - "
+            << (
+                   smallStrainCapable
+                 ? "these are small-strain laws, and this check evaluates a "
+                   "finite-strain split"
                  : "no law here separates its isochoric and volumetric "
                    "responses"
                )

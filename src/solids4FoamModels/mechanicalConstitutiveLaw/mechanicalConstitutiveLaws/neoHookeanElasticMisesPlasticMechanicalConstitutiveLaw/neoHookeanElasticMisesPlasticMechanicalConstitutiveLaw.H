@@ -43,14 +43,16 @@ Description
 
     Note on the hydrostatic stress. The legacy neoHookeanElasticMisesPlastic
     law passes its hydrostatic stress through updateSigmaHyd, which optionally
-    solves a Laplacian smoothing equation over the whole field. As for
-    MooneyRivlinElastic, that is deliberately not done here: a
-    mechanicalConstitutiveLaw is a pure function of integration-point
-    kinematics and old-time state, and pressure smoothing stabilises the
-    discretisation rather than describing the material, so it belongs to the
-    solid model. Cases setting smoothPressure will therefore not reproduce
-    their legacy results through this law until the solid model provides the
-    smoothing.
+    solves a Laplacian smoothing equation over the whole field (the legacy
+    solvePressureEqn option). As for MooneyRivlinElastic, that is deliberately
+    not done here: a mechanicalConstitutiveLaw is a pure function of
+    integration-point kinematics and old-time state, and pressure smoothing
+    stabilises the discretisation rather than describing the material, so it
+    belongs to the solid model. A nearly incompressible case that needs it is
+    solved instead with the mixed displacement-pressure formulation of a solid
+    model that provides one (solvePressure), for which this law separates its
+    isochoric stress s/J from its volumetric response p/J: J2 plasticity is
+    isochoric, so the return mapping touches s alone and p is purely elastic.
 
     The legacy law also under-relaxes the plastic strain increment between
     outer iterations, which is solver-loop behaviour with no equivalent here,
@@ -227,6 +229,28 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return kappa_;
+        }
+
+        //- This law separates its isochoric and volumetric responses. The
+        //  stress is (p I + s)/J with p = K (J^2 - 1)/2, and J2 plasticity is
+        //  isochoric: the return mapping acts on the deviatoric Kirchhoff
+        //  stress s alone and leaves p purely elastic. So s/J is the
+        //  isochoric stress and p/J is dU/dJ for
+        //  U(J) = 0.25*K*(J^2 - 1 - 2*log(J)), exactly as the total is built
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
+        //- But the isochoric stress is not a function of the isochoric
+        //  deformation alone once the material yields: the yield surface is
+        //  the Cauchy yield stress scaled by J, so the radius the return
+        //  mapping brings the Kirchhoff stress s back to changes with a
+        //  superposed dilation. It is invariant only while every point is
+        //  elastic, which is not a property worth claiming
+        virtual bool isochoricStressIsDilationInvariant() const override
+        {
+            return false;
         }
 
     // Edit
