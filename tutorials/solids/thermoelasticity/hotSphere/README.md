@@ -325,8 +325,9 @@ A **linear geometry** approach is also known as a “small strain” or “small
 ### The Mechanical Law
 
 A “solid” analysis requires the definition of the mechanical properties via the
-`mechanicalProperties` dictionary; in this case the `thermoLinearElastic` law is
-specified (Duhamel-Nuemann form of Hooke’s law):
+`mechanicalProperties` dictionary; in this case the `thermoMechanicalLaw` law is
+specified, wrapping the `linearElastic` law (the Duhamel-Neumann form of Hooke’s
+law):
 
 $$
 \boldsymbol{\sigma} = \mu \nabla \boldsymbol{u} + \mu (\nabla \boldsymbol{u})^T
@@ -344,19 +345,25 @@ mechanical
 (
     steel
     {
-        type  thermoLinearElastic;
-        rho   rho [1 -3 0 0 0 0 0] 7750;
-        E     E [1 -1 -2 0 0 0 0] 190e+9;
-        nu    nu [0 0 0 0 0 0 0] 0.305;
-        alpha alpha [0 0 0 -1 0 0 0] 9.7e-06;
-        T0    T0 [0 0 0 1 0 0 0] 300;
+        type            thermoMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 7750;
+        alpha           alpha [0 0 0 -1 0 0 0] 9.7e-06;
+        T0              T0 [0 0 0 1 0 0 0] 300;
+        mechanicalLaw
+        {
+            type            linearElastic;
+            E               E [1 -1 -2 0 0 0 0] 190e+9;
+            nu              nu [0 0 0 0 0 0 0] 0.305;
+        }
     }
 );
 ```
 
 where, in addition to the density, three mechanical properties must be
-specified: Elastic/Young’s modulus `E`, Poisson’s ratio `ν` and the coefficient
-of linear thermal expansion `α`.
+specified: Elastic/Young’s modulus `E` and Poisson’s ratio `ν`, given to the
+`linearElastic` law inside, and the coefficient of linear thermal expansion
+`α`, given to `thermoMechanicalLaw`, which subtracts the thermal stress from
+the stress of the law it wraps.
 
 As we are performing a heat analysis, so we also need to specify the thermal
 properties via the `thermalProperties` dictionary. In this case the constant law
@@ -531,7 +538,7 @@ $$
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + impK_*momentumStabilisation().cellVector(nullptr, true)
         );
 ...
 ```
@@ -580,7 +587,7 @@ $$
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + impK_*momentumStabilisation().cellVector(nullptr, true)
         );
 ...
 ```
@@ -610,13 +617,13 @@ $$
         U() = fvc::ddt(D());
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        gradD() = fvc::grad(D());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -625,7 +632,7 @@ $$
     ); // loop around TEqn and DEqn
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    frameworkInterpolate(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();
@@ -642,15 +649,18 @@ convergence is achieved.
 
 #### `mechanicalLaw`
 
-For the `hotSphere` test case, we have selected the `thermoLinearElastic`
-mechanical law in the `mechanicalProperties` dictionary: this class will perform
-the calculation of stress for the solid.
+The stress is calculated by the laws of the mechanicalConstitutiveLaw
+framework, selected in the `mechanicalProperties` dictionary: here
+`thermoMechanicalLaw`, wrapping `linearElastic`. `correctStress()` in the solid
+model gathers the displacement gradient and the temperature at each integration
+point and asks the law for the stress there.
 
-The code for the `thermoLinearElastic` mechanical law class is located at:
+The code for the `thermoMechanicalLaw` law is located at:
 
 ```bash
-solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/
-linearGeometryLaws/thermoLinearElastic/thermoLinearElastic.C
+solids4foam/src/solids4FoamModels/mechanicalConstitutiveLaw/
+mechanicalConstitutiveLaws/thermoMechanicalLawMechanicalConstitutiveLaw/
+thermoMechanicalLawMechanicalConstitutiveLaw.C
 ```
 
 $$
@@ -662,91 +672,61 @@ $$
 
 where $$(2\mu + 3\lambda) = 3K$$.
 
-Let us examine the “correct” function of this class to see how the stress is
+Let us examine the `evaluate` function of this class to see how the stress is
 calculated:
 
 ```c++
-void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
+void Foam::thermoMechanicalLawMechanicalConstitutiveLaw::evaluate
+(
+    const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    mechanicalConstitutiveLawResponse& response
+) const
 {
-    // Calculate linear elastic stress
-    linearElastic::correct(sigma);
+    // The mechanical response, written straight into the caller's storage.
+    // The sub-law gets its own child state, so its history is its own, and the
+    // response is a view rather than a copy, so there is nothing to write back
+    subLawPtr_->evaluate(kin, inputs, state.child(subStateName_), response);
 
-    if (TPtr_.valid())
-    {
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(TPtr_() - T0_)*symmTensor(I);
-    }
-    else
-    {
-        // Lookup the temperature field from the solver
-        const volScalarField& T = mesh().lookupObject<volScalarField>("T");
+    UIndirectList<symmTensor>& sigma = response.stress();
 
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(T - T0_)*symmTensor(I);
+    const scalarField& T = inputs.getScalar(TName_);
+
+    // The thermal term uses the sub-law's bulk modulus
+    const scalar threeKAlpha =
+        3.0*subLawPtr_->kappa().value()*alpha_.value();
+
+    const scalar T0 = T0_.value();
+
+    forAll(sigma, i)
+    {
+        sigma[i] -= (threeKAlpha*(T[i] - T0))*symmTensor(I);
     }
 }
 ```
 
-As `thermoLinearElastic` derives from the **linearElastic law**, we will also
-examine the “correct” function for this class:
+The stress of the wrapped law comes first, and the thermal stress is then
+subtracted from it. For the wrapped **linearElastic law**, the code is located
+at:
 
 ```bash
-solids4foam/src/solids4FoamModels/materialModels/mechanicalModel/mechanicalLaws/
-linearGeometryLaws/linearElastic/linearElastic.C
+solids4foam/src/solids4FoamModels/mechanicalConstitutiveLaw/
+mechanicalConstitutiveLaws/linearElasticMechanicalConstitutiveLaw/
+linearElasticMechanicalConstitutiveLaw.C
 ```
+
+and its `evaluate` function computes, integration point by integration point,
 
 ```c++
-void Foam::linearElastic::correct(volSymmTensorField& sigma)
-{
-   // Calculate total strain
-    if (incremental())
+    forAll(sigma, i)
     {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        epsilon_ = epsilon_.oldTime() + symm(gradDD);
+        sigma[i] =
+            muVal*twoSymm(gradD[i]) + lambdaVal*tr(gradD[i])*I + sigma0[i];
     }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        epsilon_ = symm(gradD);
-    }
-    // For planeStress, correct strain in the out of plane direction
-        if (planeStress())
-        {
-            if (mesh().solutionD()[vector::Z] > -1)
-            {
-                FatalErrorIn
-                (
-                    "void Foam::linearElasticMisesPlastic::"
-                    "correct(volSymmTensorField& sigma)"
-                )   << "For planeStress, this material law assumes the empty "
-                    << "direction is the Z direction!" << abort(FatalError);
-            }
-
-            epsilon_.replace
-            (
-                symmTensor::ZZ,
-            -(nu_/E_)
-            *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
-            );
-        }
-
-    // Hooke's law : standard form
-    //sigma = 2.0*mu_*epsilon_ + lambda_*tr(epsilon_)*I + sigma0_;
-
-    // Hooke's law : partitioned deviatoric and dilation form
-    const volScalarField trEpsilon = tr(epsilon_);
-    calculateHydrostaticStress(sigmaHyd_, trEpsilon);
-    sigma = 2.0*mu_*dev(epsilon_) + sigmaHyd_*I + sigma0_;
-}
 ```
 
-where `sigma0_` is an optional initial residual stress field, and the standard
+where `sigma0` is an optional initial residual stress field, and the standard
 Hooke’s law can be expressed in a number of equivalent forms:
 
 $$
