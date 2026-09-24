@@ -16,7 +16,6 @@ mesh convergence. Nothing here is run by `tutorials/Alltest` or
 Source an OpenFOAM.com environment, build solids4foam with PETSc, and run:
 
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/solids/hyperelasticity/idealisedVentricle/verification
 ./Allverify
 ```

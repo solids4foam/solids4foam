@@ -17,7 +17,6 @@ convergence towards a published benchmark. Nothing here is run by
 Source a supported OpenFOAM environment, build solids4foam with PETSc, and run:
 
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/solids/linearElasticity/ellipticPlate/verification
 ./Allverify
 ```

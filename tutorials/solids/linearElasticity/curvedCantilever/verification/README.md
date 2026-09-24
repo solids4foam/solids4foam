@@ -15,8 +15,9 @@ measures convergence. Nothing here is run by `tutorials/Alltest` or
 
 ## Running
 
+Source an OpenFOAM environment with solids4foam built, and run:
+
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/solids/linearElasticity/curvedCantilever/verification
 ./Allverify
 ```

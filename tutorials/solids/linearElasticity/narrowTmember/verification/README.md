@@ -14,8 +14,10 @@ convergence towards a published benchmark. Nothing here is run by
 
 ## Running
 
+Source an OpenFOAM environment with solids4foam built (with PETSc for the
+`petscSnes` variants), and run:
+
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/solids/linearElasticity/narrowTmember/verification
 ./Allverify
 ```

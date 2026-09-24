@@ -20,8 +20,10 @@ measures convergence. Nothing here is run by `tutorials/Alltest` or
 
 ## Running
 
+Source an OpenFOAM environment with solids4foam built (with PETSc for the
+`petscSnes` variants), and run:
+
 ```bash
-source ~/bin/load-openfoam v2512
 cd tutorials/solids/linearElasticity/cantilever2d/verification
 ./Allverify
 ```

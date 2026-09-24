@@ -24,7 +24,6 @@ The curvedBeams tutorial currently runs only in foam-extend, so the study does
 too. Source a foam-extend environment with solids4foam built, and run:
 
 ```bash
-source ~/bin/load-openfoam fe41
 cd tutorials/solids/elastoplasticity/curvedBeams/verification
 ./Allverify
 ```
