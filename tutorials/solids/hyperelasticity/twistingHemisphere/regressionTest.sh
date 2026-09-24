@@ -27,8 +27,8 @@ fi
 #      test was calibrated with (regression check);
 #   2. the vertical force and twisting torque at t = 6 against the digitised
 #      solution of Sauer and De Lorenzis at 40 degrees, linearly
-#      interpolated from deLorenzisForce.dat and deLorenzisMoment.dat
-#      (benchmark check). The torque tolerance is wide because, on the
+#      interpolated from reference/deLorenzisForce.dat and
+#      reference/deLorenzisMoment.dat (benchmark check). The torque tolerance is wide because, on the
 #      coarse mesh, the torque rises more slowly than in the reference.
 # ============================================================
 
@@ -55,8 +55,8 @@ ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
 FORCE_FILE="postProcessing/0/solidForcessphere-displacement.dat"
 TORQUE_FILE="postProcessing/0/solidTorquesphere-displacementsphereTorque.dat"
-REFERENCE_FORCE_FILE="deLorenzisForce.dat"
-REFERENCE_TORQUE_FILE="deLorenzisMoment.dat"
+REFERENCE_FORCE_FILE="reference/deLorenzisForce.dat"
+REFERENCE_TORQUE_FILE="reference/deLorenzisMoment.dat"
 
 echo "============================================================"
 echo "twistingHemisphere regression test (indentation + ${REGRESSION_ANGLE} degrees of twist)"

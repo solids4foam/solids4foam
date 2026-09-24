@@ -30,7 +30,7 @@ set ytics 0.25
 
 plot \
     s4fForce u (20*($1 - 4)):(-$3) w lp ls 1 pi 5 title "solids4foam", \
-    "deLorenzisForce.dat" u 1:2 w l ls 2 title "Sauer and De Lorenzis"
+    "reference/deLorenzisForce.dat" u 1:2 w l ls 2 title "Sauer and De Lorenzis"
 
 # Twisting torque
 set output "torque.png"
@@ -40,5 +40,5 @@ set ytics 0.1
 
 plot \
     s4fTorque u (20*($1 - 4)):2 w lp ls 1 pi 5 title "solids4foam", \
-    "deLorenzisMoment.dat" u 1:2 w l ls 2 title "Sauer and De Lorenzis", \
-    "febioMoment.dat" u 1:($2/10) w l ls 3 title "Zimmerman and Ateshian (FEBio)"
+    "reference/deLorenzisMoment.dat" u 1:2 w l ls 2 title "Sauer and De Lorenzis", \
+    "reference/febioMoment.dat" u 1:($2/10) w l ls 3 title "Zimmerman and Ateshian (FEBio)"

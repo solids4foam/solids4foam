@@ -110,7 +110,7 @@ for frictionless contact at a) 5 mm, b) 6 mm, c) 7.5 mm [1]
 
 Table 1 compares the compression force computed on the shipped coarse mesh
 with frictionless contact (foam-extend-4.1) with the published solutions,
-interpolated from the digitised curves in `referenceData/frictionless`. Before
+interpolated from the digitised curves in `reference/frictionless`. Before
 buckling (2.5 and 5 mm), the `solids4foam` force lies within the scatter of the
 published solutions. The coarse-mesh force starts to drop at about 5.5 mm,
 close to where the Abaqus and FEBio forces drop, but it drops further, so at
@@ -162,7 +162,7 @@ Figure 4: Evolution of the compression force for the frictionless case
 
 The results from [2], [3] and [4] were digitised using
 [WebPlotDigitizer](https://apps.automeris.io/wpd/); the digitised curves are
-provided in `referenceData`, where the header of each file states its source and
+provided in `reference`, where the header of each file states its source and
 units.
 
 The `regressionTest.sh` script runs the default frictionless case up to a

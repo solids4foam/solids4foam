@@ -118,9 +118,9 @@ history (peak 2.7247 m) but takes roughly three times longer (approximately
 ## Expected Results
 
 The solids4foam predictions are compared with an Abaqus solution using C3D8
-elements, supplied with the tutorial in `abaqusC3D8.dat` (copied from the
-`solid-benchmarks` repository [2]; see the comment header in the file for
-its provenance).
+elements, supplied with the tutorial in `reference/abaqusC3D8.dat` (copied
+from the `solid-benchmarks` repository [2]; see the comment header in the
+file for its provenance).
 
 ![Tip displacement history](images/tipDisplacement.png)
 

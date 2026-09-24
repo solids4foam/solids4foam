@@ -11,6 +11,6 @@ set key right top
 set xrange [0:0.65]
 
 plot \
-    "abaqusC3D8.dat" u 1:2 w l lw 2 lc "black" t "Abaqus (C3D8)", \
+    "reference/abaqusC3D8.dat" u 1:2 w l lw 2 lc "black" t "Abaqus (C3D8)", \
     "postProcessing/0/solidPointDisplacement_pointDisp.dat" u 1:5 \
         w lp pt 6 ps 0.8 lw 2 lc "red" t "solids4foam"

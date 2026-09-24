@@ -23,7 +23,7 @@ set xrange [0:10]
 set yrange [0:14]
 
 s4f = "postProcessing/0/solidForcesR_top.dat"
-ref = "referenceData/".contact."/"
+ref = "reference/".contact."/"
 
 set output "force-displacement.png"
 

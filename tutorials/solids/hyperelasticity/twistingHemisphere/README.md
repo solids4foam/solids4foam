@@ -112,8 +112,8 @@ and checks:
   twisting torque at $$t = 6$$ ($$40^{\circ}$$) against their calibrated
   values;
 - the vertical force and twisting torque at $$40^{\circ}$$ against the solution
-  of [3], interpolated from `deLorenzisForce.dat` and `deLorenzisMoment.dat`
-  (to within 3% and 25%, respectively; the calibration run gives deviations of
+  of [3], interpolated from `reference/deLorenzisForce.dat` and
+  `reference/deLorenzisMoment.dat` (to within 3% and 25%, respectively; the calibration run gives deviations of
   0.8% and 18%).
 
 The twisting phase beyond $$40^{\circ}$$ is not part of the regression test.
@@ -134,9 +134,9 @@ rotation, on the 35 424-cell mesh of [1]
 
 Table 1 compares the vertical force and the twisting torque on the
 `sphere-displacement` patch computed with the tutorial (coarse mesh,
-foam-extend-4.1) with the digitised solutions of [3] (`deLorenzisForce.dat`,
-`deLorenzisMoment.dat`) and [2] (`febioMoment.dat`, divided by 10 to use the
-same scale).
+foam-extend-4.1) with the digitised solutions of [3]
+(`reference/deLorenzisForce.dat`, `reference/deLorenzisMoment.dat`) and [2]
+(`reference/febioMoment.dat`, divided by 10 to use the same scale).
 
 **Table 1: Vertical force and twisting torque on the coarse mesh.**
 

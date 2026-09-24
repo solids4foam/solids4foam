@@ -18,7 +18,7 @@ fi
 # checks the compression force on the outer sphere (patch R_top):
 #   1. against the value this test was calibrated with (regression check);
 #   2. against the band spanned by the published solutions in
-#      referenceData/frictionless, interpolated to 2.5 mm and widened by
+#      reference/frictionless, interpolated to 2.5 mm and widened by
 #      REFERENCE_MARGIN (benchmark check).
 # ============================================================
 
@@ -36,7 +36,7 @@ REFERENCE_MARGIN=0.05
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
 FORCE_FILE="postProcessing/0/solidForcesR_top.dat"
-REFERENCE_DIR="referenceData/frictionless"
+REFERENCE_DIR="reference/frictionless"
 
 echo "============================================================"
 echo "compressedSpheres regression test"
