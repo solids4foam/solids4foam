@@ -108,6 +108,105 @@ namespace Foam
                 }
             }
         }
+
+
+        // Convergence test of one residual history of the current time step.
+        //
+        // For a linearly converging fixed-point iteration with contraction
+        // rate rho, the remaining error after the latest change R is at most
+        // R*rho/(1 - rho). The rate is the largest of the last two ratios of
+        // successive residuals, using only the iterations in which the solid
+        // solution changed (update[i]): when the solid solver skips its
+        // solve (its own tolerance is met) the interface data do not change,
+        // and the resulting plateaus carry no contraction information.
+        //
+        // The residual is converged if the error estimate satisfies the
+        // tolerance, or if the residual itself does and the iterations are
+        // not contracting slowly (rate below slowRate); slowly contracting
+        // iterations must satisfy the error estimate. It is stalled if the
+        // geometric-mean rate of the last nStall ratios is at or above
+        // stallRate.
+        void robinResidualTest
+        (
+            const UList<scalar>& history,
+            const UList<bool>& update,
+            const scalar tolerance,
+            const scalar slowRate,
+            const scalar stallRate,
+            const label nStall,
+            bool& converged,
+            bool& stalled,
+            scalar& error,
+            scalar& rate
+        )
+        {
+            converged = false;
+            stalled = false;
+            rate = -1;
+            error = GREAT;
+
+            if (history.empty())
+            {
+                return;
+            }
+
+            scalar maxValue = 0;
+            forAll(history, i)
+            {
+                maxValue = max(maxValue, history[i]);
+            }
+            const scalar zeroTol = 1e-12*maxValue + VSMALL;
+
+            const scalar R = history.last() > zeroTol ? history.last() : 0;
+
+            // Residuals of the iterations in which the solid solution changed
+            DynamicList<scalar> values;
+            forAll(history, i)
+            {
+                if (update[i] && history[i] > zeroTol)
+                {
+                    values.append(history[i]);
+                }
+            }
+
+            const label n = values.size();
+
+            if (n < 3)
+            {
+                // Too few iterations to estimate the rate
+                error = R;
+                converged = R <= tolerance;
+                return;
+            }
+
+            rate =
+                max
+                (
+                    values[n - 1]/values[n - 2],
+                    values[n - 2]/values[n - 3]
+                );
+
+            if (nStall > 0 && n > nStall)
+            {
+                scalar logRate = 0;
+                for (label i = n - nStall; i < n; i++)
+                {
+                    logRate += Foam::log(values[i]/values[i - 1]);
+                }
+                // A stall is a plateau: the mean rate is close to one from
+                // both sides, so growing (diverging) residuals are not
+                // accepted
+                const scalar meanRate = Foam::exp(logRate/nStall);
+                stalled = meanRate >= stallRate && meanRate <= 1/stallRate;
+            }
+
+            const scalar rho = min(rate, 0.99);
+            error = R*rho/(1 - rho);
+
+            converged =
+                error <= tolerance
+             || (R <= tolerance && rate < slowRate);
+        }
     }
 }
 
@@ -1998,102 +2097,6 @@ bool Foam::fluidSolidInterface::hasRobinInterface() const
     }
 
     return false;
-}
-
-
-namespace Foam
-{
-    // Convergence test of one residual history of the current time step.
-    //
-    // For a linearly converging fixed-point iteration with contraction rate
-    // rho, the remaining error after the latest change R is at most
-    // R*rho/(1 - rho). The rate is the largest of the last two ratios of
-    // successive residuals, using only the iterations in which the solid
-    // solution changed (update[i]): when the solid solver skips its solve
-    // (its own tolerance is met) the interface data do not change, and the
-    // resulting plateaus carry no contraction information.
-    //
-    // The residual is converged if the error estimate satisfies the
-    // tolerance, or if the residual itself does and the iterations are not
-    // contracting slowly (rate below slowRate); slowly contracting
-    // iterations must satisfy the error estimate. It is stalled if the
-    // geometric-mean rate of the last nStall ratios is at or above
-    // stallRate.
-    static void robinResidualTest
-    (
-        const UList<scalar>& history,
-        const UList<bool>& update,
-        const scalar tolerance,
-        const scalar slowRate,
-        const scalar stallRate,
-        const label nStall,
-        bool& converged,
-        bool& stalled,
-        scalar& error,
-        scalar& rate
-    )
-    {
-        converged = false;
-        stalled = false;
-        rate = -1;
-        error = GREAT;
-
-        if (history.empty())
-        {
-            return;
-        }
-
-        scalar maxValue = 0;
-        forAll(history, i)
-        {
-            maxValue = max(maxValue, history[i]);
-        }
-        const scalar zeroTol = 1e-12*maxValue + VSMALL;
-
-        const scalar R = history.last() > zeroTol ? history.last() : 0;
-
-        // Residuals of the iterations in which the solid solution changed
-        DynamicList<scalar> values;
-        forAll(history, i)
-        {
-            if (update[i] && history[i] > zeroTol)
-            {
-                values.append(history[i]);
-            }
-        }
-
-        const label n = values.size();
-
-        if (n < 3)
-        {
-            // Too few iterations to estimate the rate
-            error = R;
-            converged = R <= tolerance;
-            return;
-        }
-
-        rate = max(values[n - 1]/values[n - 2], values[n - 2]/values[n - 3]);
-
-        if (nStall > 0 && n > nStall)
-        {
-            scalar logRate = 0;
-            for (label i = n - nStall; i < n; i++)
-            {
-                logRate += Foam::log(values[i]/values[i - 1]);
-            }
-            // A stall is a plateau: the mean rate is close to one from both
-            // sides, so growing (diverging) residuals are not accepted
-            const scalar meanRate = Foam::exp(logRate/nStall);
-            stalled = meanRate >= stallRate && meanRate <= 1/stallRate;
-        }
-
-        const scalar rho = min(rate, 0.99);
-        error = R*rho/(1 - rho);
-
-        converged =
-            error <= tolerance
-         || (R <= tolerance && rate < slowRate);
-    }
 }
 
 

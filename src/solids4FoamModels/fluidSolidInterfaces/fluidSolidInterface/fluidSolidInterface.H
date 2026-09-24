@@ -217,18 +217,15 @@ class fluidSolidInterface
         //- Largest pressure norm in the current time step per interface
         List<scalar> maxRobinPressureNorm_;
 
-
         //- Current maximum normalized Robin pressure residual
         scalar robinPressureResidual_;
 
         //- Current maximum normalized Robin leakage-flux residual
         scalar robinFluxResidual_;
 
-
         //- Largest boundary-throughput plus interface-motion flux in the
         //  current time step
         scalar maxRobinKinematicNorm_;
-
 
         //- Residual histories of the current time step: displacement,
         //  pressure and kinematic residuals
@@ -325,7 +322,6 @@ protected:
         {
             return robinFluxResidual_;
         }
-
 
         //- Return the Robin convergence state of the latest iteration
         label robinConvergenceState() const
