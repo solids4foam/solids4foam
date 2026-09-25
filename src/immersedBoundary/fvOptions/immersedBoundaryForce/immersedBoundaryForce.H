@@ -208,8 +208,58 @@ class immersedBoundaryForce
         //  K*lambda/deltaT
         word weighting_;
 
+        //- Reconstruction of the target velocity in the cells next to the
+        //  surface: none (the body velocity) or linear (a linear profile
+        //  along the surface normal, through the body velocity on the
+        //  surface and the velocity of a donor fluid cell)
+        word reconstruction_;
+
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
+
+        // Ghost cell method: the cells whose centre is inside a body are
+        // penalised; the target velocity of those next to the fluid (the
+        // ghost cells) is extrapolated linearly from a donor fluid cell
+        // along the surface normal, so that the fluid velocity equals the
+        // body velocity on the surface
+
+            //- Penalised (inside) cells
+            labelList insideCells_;
+
+            //- Cells penalised in the previous configuration, which hold the
+            //  body velocity rather than a fluid velocity, and so are not
+            //  donors
+            boolList penalisedOld_;
+
+            //- Ghost cells
+            labelList ghostCells_;
+
+            //- Donor fluid cell of each ghost cell, -1 if none
+            labelList ghostDonors_;
+
+            //- Nearest surface point, outward unit normal, body velocity at
+            //  the surface point and distance to it, for each ghost cell
+            pointField ghostWallPoints_;
+            vectorField ghostNormals_;
+            vectorField ghostWallVelocities_;
+            scalarField ghostDistances_;
+
+            //- Ghost cells whose donor is on another processor: the ghost
+            //  index, and the donor processor, for each
+            labelList remoteGhosts_;
+            labelList remoteDonorProcs_;
+
+            //- Local donor cells sent to each processor
+            List<labelList> sendDonors_;
+
+            //- Remote ghost indices received from each processor, in the
+            //  order they are sent
+            List<labelList> recvGhosts_;
+
+            //- Velocity and centre of the donor cell of each ghost cell,
+            //  gathered from the donor processor
+            vectorField ghostDonorU_;
+            pointField ghostDonorC_;
 
         //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
@@ -299,6 +349,26 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Find the ghost cells and their donors, after the bodies are
+        //  updated
+        void findGhostCells();
+
+        //- Find a donor fluid cell for the image points of a ghost cell,
+        //  given its surface point, normal and width; -1 if none
+        label findDonor
+        (
+            const point& wallPoint,
+            const vector& normal,
+            const scalar width,
+            const volScalarField& inside
+        ) const;
+
+        //- Gather the velocity and centre of the donor cells
+        void gatherDonors(const volVectorField& U);
+
+        //- Reconstruct the target velocity in the cells next to the surface
+        void reconstructTargets(const volVectorField& U);
 
 
 public:

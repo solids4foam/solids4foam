@@ -115,10 +115,10 @@ Courant number of 0.5: with `MESH_LEVEL=1`, fixed time steps of 0.01 s and
 The other forcing methods of `immersedBoundaryForce` can be compared by
 editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):
 
-| Settings | $$C_d$$ at `MESH_LEVEL` 1, 2, 3 |
-| -------- | ------------------------------- |
-| `weighting occupancy;` and `occupancy vertexFraction;` | 5.45, 5.61, 5.61 |
-| `method incremental;`, `couplingCoeff 0.8;` and `occupancy vertexFraction;` | 6.04, 6.42, 6.60 |
+- `weighting occupancy;` and `occupancy vertexFraction;`: $$C_d$$ = 5.45,
+  5.61 and 5.61 for `MESH_LEVEL` 1, 2 and 3;
+- `method incremental;`, `couplingCoeff 0.8;` and
+  `occupancy vertexFraction;`: $$C_d$$ = 6.04, 6.42 and 6.60.
 
 The `incremental` method is the direct forcing of the `pimpleHFDIBFoam`
 solver from which the option is derived. Its results also depend on the

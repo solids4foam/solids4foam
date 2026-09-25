@@ -99,16 +99,24 @@ are written at write times; with the `incremental` method,
 
 ### Accuracy
 
-For the two tutorials, with 10, 20 and 40 cells across the cylinder:
+For the two tutorials, with 10, 20 and 40 cells across the cylinder, the
+static cylinder drag coefficient (reference 5.57-5.59) and the root mean
+square difference of the oscillating cylinder drag coefficient from the
+reference, including the inertia of the fluid inside the cylinder (reference
+root mean square 2.06), are:
 
-| Method | Static cylinder `Cd` (reference 5.57-5.59) | Oscillating cylinder RMS `Cd` error (reference RMS 2.06) |
-| ------ | ------------------------------------------ | -------------------------------------------------------- |
-| `penalty` (default) | 5.38, 5.43, 5.48 | 0.12, 0.07, 0.08 |
-| `penalty`, `weighting occupancy`, `occupancy vertexFraction` | 5.45, 5.61, 5.61 | 1.44, 0.33, 0.20 |
-| `incremental`, `occupancy vertexFraction` | 6.04, 6.42, 6.60 | 1.34, 0.53, 0.47 |
+| Settings | Static `Cd` | Oscillating `Cd` difference |
+| -------- | ----------- | --------------------------- |
+| A | 5.38, 5.43, 5.48 | 0.12, 0.07, 0.08 |
+| B | 5.45, 5.61, 5.61 | 1.44, 0.33, 0.20 |
+| C | 6.04, 6.42, 6.60 | 1.34, 0.53, 0.47 |
 
-The oscillating cylinder error includes the inertia of the fluid inside the
-cylinder. The accuracy is first order in the cell size for all the methods.
+where the settings are:
+
+- A: the defaults (`penalty`, `volumeFraction`, `signedDistance`);
+- B: `penalty` with `weighting occupancy` and `occupancy vertexFraction`;
+- C: `incremental` with `occupancy vertexFraction`.
+ The accuracy is first order in the cell size for all the methods.
 
 ## Provenance
 
