@@ -2795,14 +2795,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             lawInputs(lawI, topo, ipIDs, dt, tp)
         );
 
-        const UIndirectList<tensor> gradDView
+        const smallStrainKinematicsViews views
         (
-            gradD.internalField(), ipIDs
-        );
-
-        const UIndirectList<tensor> gradD0View
-        (
-            gradD0.internalField(), ipIDs
+            smallStrainKinematicsFields
+            (
+                gradD.internalField(), gradD0.internalField()
+            ),
+            ipIDs
         );
 
         UIndirectList<symmTensor> stressView
@@ -2810,15 +2809,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             stress.internalField(), ipIDs
         );
 
-        smallStrainMechanicalConstitutiveLawKinematics kin
-        (
-            gradDView, gradD0View
-        );
-
         evaluateResponse
         (
             laws_[lawI],
-            kin,
+            views.kin,
             inputs,
             tp.states_[lawI],
             stressView,
@@ -2889,24 +2883,19 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
                 // "View" into the kinematic and stress fields for this
                 // material => does not copy data
-                const UIndirectList<tensor> gradDView
+                const smallStrainKinematicsViews views
                 (
-                    gradD.boundaryField()[patchI], faces
+                    smallStrainKinematicsFields
+                    (
+                        gradD.boundaryField()[patchI],
+                        gradD0.boundaryField()[patchI]
+                    ),
+                    faces
                 );
-                const UIndirectList<tensor> gradD0View
-                (
-                    gradD0.boundaryField()[patchI], faces
-                );
+
                 UIndirectList<symmTensor> stressView
                 (
                     Foam::boundaryFieldRef(stress)[patchI], faces
-                );
-
-                // Create wrapper for kinematic data: input to material law
-                // This does not copy data
-                smallStrainMechanicalConstitutiveLawKinematics kin
-                (
-                    gradDView, gradD0View
                 );
 
                 // No fourth-order tangent is computed on this boundary,
@@ -2921,7 +2910,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 evaluateResponse
                 (
                     laws_[lawI],
-                    kin,
+                    views.kin,
                     patchInputs,
                     tp.boundaryStates_[lawI][patchI],
                     stressView,
@@ -3054,14 +3043,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             lawInputs(lawI, topo, ipIDs, dt, tp)
         );
 
-        const UIndirectList<tensor> gradDView
+        const smallStrainKinematicsViews views
         (
-            gradD.internalField(), ipIDs
-        );
-
-        const UIndirectList<tensor> gradD0View
-        (
-            gradD0.internalField(), ipIDs
+            smallStrainKinematicsFields
+            (
+                gradD.internalField(), gradD0.internalField()
+            ),
+            ipIDs
         );
 
         UIndirectList<symmTensor> stressView
@@ -3069,16 +3057,11 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             stress.internalField(), ipIDs
         );
 
-        smallStrainMechanicalConstitutiveLawKinematics kin
-        (
-            gradDView, gradD0View
-        );
-
         // This path computes no fourth-order tangent, so none is offered
         evaluateResponse
         (
             laws_[lawI],
-            kin,
+            views.kin,
             inputs,
             tp.states_[lawI],
             stressView,
@@ -3593,24 +3576,26 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
         }
 
-        const UIndirectList<tensor> FView(F.internalField(), ipIDs);
-        const UIndirectList<tensor> F0View(F0.internalField(), ipIDs);
-        const UIndirectList<scalar> JView(J.internalField(), ipIDs);
-        const UIndirectList<scalar> J0View(J0.internalField(), ipIDs);
-        const UIndirectList<tensor> FinvView(Finv.internalField(), ipIDs);
-        const UIndirectList<tensor> Finv0View(Finv0.internalField(), ipIDs);
+        const finiteStrainKinematicsViews views
+        (
+            finiteStrainKinematicsFields
+            (
+                F.internalField(),
+                F0.internalField(),
+                Finv.internalField(),
+                Finv0.internalField(),
+                J.internalField(),
+                J0.internalField()
+            ),
+            ipIDs
+        );
 
         UIndirectList<symmTensor> stressView(stress.internalField(), ipIDs);
-
-        const finiteStrainMechanicalConstitutiveLawKinematics kin
-        (
-            FView, F0View, JView, J0View, FinvView, Finv0View
-        );
 
         evaluateResponse
         (
             laws_[lawI],
-            kin,
+            views.kin,
             inputs,
             tp.states_[lawI],
             stressView,
@@ -3669,44 +3654,29 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     );
                 }
 
-                const UIndirectList<tensor> FView
+                const finiteStrainKinematicsViews views
                 (
-                    F.boundaryField()[patchI], faces
+                    finiteStrainKinematicsFields
+                    (
+                        F.boundaryField()[patchI],
+                        F0.boundaryField()[patchI],
+                        Finv.boundaryField()[patchI],
+                        Finv0.boundaryField()[patchI],
+                        J.boundaryField()[patchI],
+                        J0.boundaryField()[patchI]
+                    ),
+                    faces
                 );
-                const UIndirectList<tensor> F0View
-                (
-                    F0.boundaryField()[patchI], faces
-                );
-                const UIndirectList<scalar> JView
-                (
-                    J.boundaryField()[patchI], faces
-                );
-                const UIndirectList<scalar> J0View
-                (
-                    J0.boundaryField()[patchI], faces
-                );
-                const UIndirectList<tensor> FinvView
-                (
-                    Finv.boundaryField()[patchI], faces
-                );
-                const UIndirectList<tensor> Finv0View
-                (
-                    Finv0.boundaryField()[patchI], faces
-                );
+
                 UIndirectList<symmTensor> stressView
                 (
                     Foam::boundaryFieldRef(stress)[patchI], faces
                 );
 
-                const finiteStrainMechanicalConstitutiveLawKinematics kin
-                (
-                    FView, F0View, JView, J0View, FinvView, Finv0View
-                );
-
                 evaluateResponse
                 (
                     laws_[lawI],
-                    kin,
+                    views.kin,
                     patchInputs,
                     tp.boundaryStates_[lawI][patchI],
                     stressView,
