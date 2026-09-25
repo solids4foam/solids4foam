@@ -350,6 +350,75 @@ void evaluateResponse
 
 } // End namespace Foam
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+//- Warn about the entries of a law's dictionary, or of one below it, that only
+//  the removed legacy laws read
+static void reportRemovedLegacyEntries
+(
+    const dictionary& dict,
+    const word& lawName
+)
+{
+    static const char* removed[] =
+    {
+        "pressureDisplacement",
+        "pressureDisplacementCoeff",
+        "alternatePressureDefinition",
+        "impKcoeff",
+        "calculateStressInLocalCoordinateSystem",
+        "writeS0N0R",
+        "tangentEps",
+        "regionName",
+        "pressureFieldRegion",
+        "solvePressureEquation",
+        "maxDeltaErr",
+        "writeSubMeshes"
+    };
+
+    DynamicList<word> found;
+
+    const label nRemoved = sizeof(removed)/sizeof(removed[0]);
+
+    for (label i = 0; i < nRemoved; ++i)
+    {
+        const word name(removed[i]);
+
+        if (dict.found(name))
+        {
+            found.append(name);
+        }
+    }
+
+    if (found.size())
+    {
+        WarningInFunction
+            << "Mechanical law '" << lawName << "' sets "
+            << wordList(found) << ", which only the removed legacy "
+            << "mechanical model read. They are ignored and can be removed."
+            << endl;
+    }
+
+    const wordList keys(dict.toc());
+
+    forAll(keys, i)
+    {
+        if (dict.isDict(keys[i]))
+        {
+            reportRemovedLegacyEntries
+            (
+                dict.subDict(keys[i]), lawName + '.' + keys[i]
+            );
+        }
+    }
+}
+
+} // End namespace Foam
+
+
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
 
@@ -2272,6 +2341,20 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     forAll(lawNames, lawI)
     {
         lawNames[lawI] = lawEntries[lawI].keyword();
+    }
+
+    // Entries only the removed legacy laws read. A case migrated from it
+    // keeps them, and nothing reads them now, so say so rather than let a
+    // setting that does nothing look as though it does
+    forAll(lawEntries, lawI)
+    {
+        if (lawEntries[lawI].isDict())
+        {
+            reportRemovedLegacyEntries
+            (
+                lawEntries[lawI].dict(), lawEntries[lawI].keyword()
+            );
+        }
     }
 
     // Kept, because the state written for restart is named after the material

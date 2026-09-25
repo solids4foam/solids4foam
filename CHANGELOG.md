@@ -65,6 +65,11 @@ release. For complete commit-level details and contributor information, see the
   longer depends on the decomposition. No tutorial uses the nonlinear
   hardening branch.
 
+- A law dictionary that still sets an entry only the removed legacy laws read,
+  such as `pressureDisplacement`, `impKcoeff`, `tangentEps`, `regionName` or
+  `pressureFieldRegion`, gives a warning naming it; the entries were ignored
+  silently.
+
 - The coupling inputs a `mechanicalConstitutiveLaw` reads, such as the
   active tension of `electroMechanicalLaw` or the temperature of
   `thermoMechanicalLaw`, are gathered on every evaluation path, where before
