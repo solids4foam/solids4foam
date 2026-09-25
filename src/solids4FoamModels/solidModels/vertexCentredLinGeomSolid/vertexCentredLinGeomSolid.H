@@ -281,6 +281,7 @@ protected:
             return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
+
 public:
 
     //- Runtime type information

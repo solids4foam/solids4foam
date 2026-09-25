@@ -28,6 +28,19 @@ release. For complete commit-level details and contributor information, see the
   catch a regression introduced on a branch; this closes that gap. Run by the
   `preCICE coupling test` workflow for pull requests targeting `master`, for
   any pull request labelled `test-precice`, and on request.
+- Added six hyperelastic tutorials ported from the `solid-benchmarks`
+  repository, each with a README comparing it with its published reference and
+  a `regressionTest.sh`: `cantileverVibration`, `cooksMembrane`,
+  `compressedSpheres`, `twistingHemisphere`, `rubberSealing` and
+  `shallowIroning` (all under `tutorials/solids/hyperelasticity`).
+- Added opt-in mesh-convergence verification studies, migrated from
+  `solid-benchmarks`, to the linear-elastic and elastoplastic Cook's membrane,
+  `sphericalCavity`, `ellipticPlate`, `narrowTmember`, `plateHole`,
+  `cantilever2d`, `curvedCantilever`, `curvedBeams`, `idealisedVentricle` and
+  `cavityFlexibleBottom` tutorials. Each lives in the tutorial's
+  `verification/` directory, is run with `./Allverify`, works on copies under
+  the ignored `verification/work/` directory, and is not run by
+  `tutorials/Alltest` or `tutorials/Alltest-regression`.
 
 ### Changed
 

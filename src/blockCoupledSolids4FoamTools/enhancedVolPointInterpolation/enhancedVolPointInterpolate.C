@@ -137,6 +137,10 @@ void Foam::enhancedVolPointInterpolation::interpolateInternalField
 
     const labelListList& pointCells = vf.mesh().pointCells();
 
+    // Write through primitiveFieldRef() so that the old-time field is stored
+    // before it is overwritten
+    Field<Type>& pfi = pf.primitiveFieldRef();
+
     // Multiply volField by weighting factor matrix to create pointField
     forAll(pointCells, pointi)
     {
@@ -145,11 +149,11 @@ void Foam::enhancedVolPointInterpolation::interpolateInternalField
             const scalarList& pw = pointWeights_[pointi];
             const labelList& ppc = pointCells[pointi];
 
-            pf[pointi] = Zero;
+            pfi[pointi] = Zero;
 
             forAll(ppc, pointCelli)
             {
-                pf[pointi] += pw[pointCelli]*vf[ppc[pointCelli]];
+                pfi[pointi] += pw[pointCelli]*vf[ppc[pointCelli]];
             }
         }
     }
@@ -358,28 +362,6 @@ void Foam::enhancedVolPointInterpolation::interpolateBoundaryField
 template<class Type>
 void Foam::enhancedVolPointInterpolation::interpolate
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const GeometricField
-    <
-        typename outerProduct<vector, Type>::type,
-        fvPatchField,
-        volMesh
-    >& gradVf,
-    GeometricField<Type, pointPatchField, pointMesh>& pf
-) const
-{
-    // Access through GeometricField before delegating so that old-time values
-    // are stored before the internal field is overwritten
-    pf.primitiveFieldRef();
-    DimensionedField<Type, pointMesh>& pfI = pf;
-
-    interpolate(vf, gradVf, pfI);
-}
-
-
-template<class Type>
-void Foam::enhancedVolPointInterpolation::interpolate
-(
     const DimensionedField<Type, volMesh>& vf,
     const DimensionedField
     <
@@ -448,6 +430,31 @@ void Foam::enhancedVolPointInterpolation::interpolate
             pf[pointi] /= s;
         }
     }
+}
+
+
+template<class Type>
+void Foam::enhancedVolPointInterpolation::interpolate
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const GeometricField
+    <
+        typename outerProduct<vector, Type>::type,
+        fvPatchField,
+        volMesh
+    >& gradVf,
+    GeometricField<Type, pointPatchField, pointMesh>& pf
+) const
+{
+    // Pass pf.ref() rather than pf so that the old-time field is stored before
+    // it is overwritten; writing through the DimensionedField base class
+    // bypasses GeometricField::storeOldTimes()
+    interpolate
+    (
+        vf.internalField(),
+        gradVf.internalField(),
+        pf.ref()
+    );
 }
 
 

@@ -107,6 +107,27 @@ in the solid part at the final time step, from [1].  Mesh spacing  0.025 m**
 **Figure 6: Displacement of point A and force at the plate
 as a funcion of cell size [1]**
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh study
+from `solid-benchmarks` into this tutorial. It doubles the in-plane divisions
+of both meshes through the four spacings used in [1], runs each level to a
+steady response, and compares the steady displacement at $$(4, -1, 0.5)$$ and
+the steady interface force with the published values:
+
+```bash
+cd verification
+./Allverify
+```
+
+The interface force agrees with [1] to within $$0.2$$% on every mesh once the
+published thickness of $$0.05$$ m is accounted for. The displacement converges
+cleanly at a net order of $$1.96$$, towards a value about $$5$$% away from the
+published curve, consistent with the offset already noted above at the
+coarsest spacing. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
+
 ---
 
 ## References

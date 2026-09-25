@@ -25,7 +25,6 @@ boundaryField
     interface
     {
         type            elasticWallPressure;
-        constantHs      0.1;
         value           uniform 0;
     }
 

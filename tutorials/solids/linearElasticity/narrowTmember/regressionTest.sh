@@ -62,13 +62,18 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing is a failure.
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     echo "Skipping regression checks because the tutorial skipped in this environment"
     exit 0
 fi
 
 extract_max_sigma() {
-    grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+    # A missing solver log or a log without the expected line is reported as an
+    # empty result, so that the check below can fail with a clear message
+    { grep "Max sigmaEq (von Mises stress)" "${CASE_DIR}/${SOLVER_LOGFILE}" \
+        2> /dev/null || true; } \
         | tail -n 1 \
         | awk '{print $NF}'
 }
@@ -76,8 +81,11 @@ extract_max_sigma() {
 sigma=$(extract_max_sigma)
 
 if [[ -z "${sigma}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      no 'Max sigmaEq' line was found in ${CASE_DIR}/${SOLVER_LOGFILE}"
+    echo "      and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 failures=0

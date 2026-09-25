@@ -1,0 +1,20 @@
+{
+  "reference_curve": "demirdzic_sigmaEq.txt",
+  "default_levels": [1, 2, 3, 4],
+  "default_variants": ["petscSnes"],
+  "base_divisions": [6, 4, 3],
+  "sample_line": {
+    "radius_m": 2.1,
+    "z_m": 0.3,
+    "samples": 40
+  },
+  "variants": {
+    "petscSnes": {"approach": "petscSnes"},
+    "segregated": {"approach": "segregated"}
+  },
+  "acceptance": {
+    "reference_rms_relative_error_tolerance": 0.05,
+    "reference_peak_relative_error_tolerance": 0.05,
+    "minimum_net_order": 0.0
+  }
+}

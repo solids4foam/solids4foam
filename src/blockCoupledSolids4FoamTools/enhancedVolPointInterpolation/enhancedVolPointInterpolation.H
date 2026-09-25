@@ -146,6 +146,22 @@ class enhancedVolPointInterpolation
             GeometricField<Type, pointPatchField, pointMesh>&
         ) const;
 
+        //- Interpolate from volField to pointField
+        //  Private because writing a GeometricField through its
+        //  DimensionedField base class bypasses
+        //  GeometricField::storeOldTimes(), leaving a stale oldTime();
+        //  use the GeometricField overload instead
+        template<class Type>
+        void interpolate
+        (
+            const DimensionedField<Type, volMesh>& vf,
+            const DimensionedField
+            <
+                typename outerProduct<vector, Type>::type, volMesh
+            >& gradVf,
+            DimensionedField<Type, pointMesh>& pf
+        ) const;
+
         //- No copy construct
         enhancedVolPointInterpolation(const enhancedVolPointInterpolation&) = delete;
 
@@ -182,8 +198,8 @@ public:
 
     // Interpolation Functions
 
-        //- Interpolate from volField to pointField, storing the point-field
-        //  history before overwriting its internal values
+        //- Interpolate from volField to pointField, storing the old-time
+        //  pointField before it is overwritten
         template<class Type>
         void interpolate
         (
@@ -195,18 +211,6 @@ public:
                 volMesh
             >& gradVf,
             GeometricField<Type, pointPatchField, pointMesh>& pf
-        ) const;
-
-        //- Interpolate from volField to pointField
-        template<class Type>
-        void interpolate
-        (
-            const DimensionedField<Type, volMesh>& vf,
-            const DimensionedField
-            <
-                typename outerProduct<vector, Type>::type, volMesh
-            >& gradVf,
-            DimensionedField<Type, pointMesh>& pf
         ) const;
 
         //- Interpolate volField using inverse distance weighting
