@@ -640,6 +640,14 @@ class mechanicalConstitutiveLawManager
         //- No copy assignment
         void operator=(const mechanicalConstitutiveLawManager&) = delete;
 
+        //- A law's cold boundary states, one per patch, sized to its faces
+        //  there and prepared as declared
+        void allocateBoundaryStates
+        (
+            const label lawI,
+            PtrList<mechanicalConstitutiveLawState>& bStates
+        ) const;
+
         //- Check that the requested tangent can be provided at the integration
         //  points of the given topology for the current set of laws
         void checkTangentRequest

@@ -177,6 +177,57 @@ void reportRemovedLegacyEntries
     }
 }
 
+
+// A scalar tangent the flat-list primitive filled on the internal integration
+// points only, given usable boundary values. A scalar tangent is a per-cell
+// material property, and a boundary face belongs to the material of its owner
+// cell, so taking the patch-internal value is exact rather than an
+// approximation. Without this the boundary stays at whatever the field was
+// constructed with, which a caller forming 1/tangent then divides by. The
+// coupled patches are then synced
+void fillScalarTangentBoundary(volScalarField& scalarTangent)
+{
+    forAll(scalarTangent.boundaryField(), patchI)
+    {
+        if (!scalarTangent.boundaryField()[patchI].coupled())
+        {
+            Foam::boundaryFieldRef(scalarTangent)[patchI] =
+                scalarTangent.boundaryField()[patchI].patchInternalField();
+        }
+    }
+
+    scalarTangent.correctBoundaryConditions();
+}
+
+
+// The boundary conditions of a volField stress update, coupled patches
+// synced. The volumetric response is corrected with the others: coupled
+// patches are skipped when it is evaluated, exactly as the stress is, so
+// without this its processor values are whatever the field was constructed
+// with. Only the internal field is read today, which makes that harmless
+// rather than correct - and harmless-for-now is a poor thing to leave for
+// whoever next reads a boundary value
+void correctStressBoundaries
+(
+    volSymmTensorField& stress,
+    volScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
+)
+{
+    stress.correctBoundaryConditions();
+
+    if (scalarTangentPtr && needsScalarTangent(tangentReq))
+    {
+        scalarTangentPtr->correctBoundaryConditions();
+    }
+
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
+}
+
 } // End anonymous namespace
 } // End namespace Foam
 
@@ -321,14 +372,6 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
     (
         integrationPointTopology::New(topologyTypeName, mesh_)
     );
-
-    if (!topoPtr.valid())
-    {
-        FatalErrorInFunction
-            << "Failed to construct integrationPointTopology of type "
-            << topologyTypeName
-            << exit(FatalError);
-    }
 
     // Cache and return
     topologyCache_.insert(topologyTypeName, topoPtr);
@@ -667,28 +710,10 @@ Foam::mechanicalConstitutiveLawManager::topology
             entry.boundaryStates_.set
             (
                 lawI,
-                new PtrList<mechanicalConstitutiveLawState>
-                (
-                    mesh_.boundary().size()
-                )
+                new PtrList<mechanicalConstitutiveLawState>()
             );
 
-            forAll(mesh_.boundary(), patchI)
-            {
-                const label nFaces =
-                    lawBoundaryFaces_[lawI][patchI].size();
-
-                entry.boundaryStates_[lawI].set
-                (
-                    patchI,
-                    new mechanicalConstitutiveLawState(nFaces)
-                );
-
-                stateSetup_.applyStateSpecPatch
-                (
-                    lawI, patchI, entry.boundaryStates_[lawI][patchI]
-                );
-            }
+            allocateBoundaryStates(lawI, entry.boundaryStates_[lawI]);
         }
     }
 
@@ -697,6 +722,31 @@ Foam::mechanicalConstitutiveLawManager::topology
     setupStateRestart(entry, topo, key);
 
     return entry;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::allocateBoundaryStates
+(
+    const label lawI,
+    PtrList<mechanicalConstitutiveLawState>& bStates
+) const
+{
+    bStates.clear();
+    bStates.setSize(mesh_.boundary().size());
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        bStates.set
+        (
+            patchI,
+            new mechanicalConstitutiveLawState
+            (
+                lawBoundaryFaces_[lawI][patchI].size()
+            )
+        );
+
+        stateSetup_.applyStateSpecPatch(lawI, patchI, bStates[patchI]);
+    }
 }
 
 
@@ -889,25 +939,7 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
         // state these faces would have had anyway
         forAll(laws_, lawI)
         {
-            PtrList<mechanicalConstitutiveLawState>& bStates =
-                entry.boundaryStates_[lawI];
-
-            bStates.clear();
-            bStates.setSize(mesh_.boundary().size());
-
-            forAll(mesh_.boundary(), patchI)
-            {
-                bStates.set
-                (
-                    patchI,
-                    new mechanicalConstitutiveLawState
-                    (
-                        lawBoundaryFaces_[lawI][patchI].size()
-                    )
-                );
-
-                stateSetup_.applyStateSpecPatch(lawI, patchI, bStates[patchI]);
-            }
+            allocateBoundaryStates(lawI, entry.boundaryStates_[lawI]);
         }
     }
 
@@ -2189,23 +2221,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
         coldState
     );
 
-    // The flat-list primitive fills internal integration points only, so give
-    // the boundary usable values. A scalar tangent is a per-cell material
-    // property, and a boundary face belongs to the material of its owner cell,
-    // so taking the patch-internal value is exact rather than an
-    // approximation. Without this the boundary stays at whatever the field was
-    // constructed with, which a caller forming 1/tangent then divides by
-    forAll(scalarTangent.boundaryField(), patchI)
-    {
-        if (!scalarTangent.boundaryField()[patchI].coupled())
-        {
-            Foam::boundaryFieldRef(scalarTangent)[patchI] =
-                scalarTangent.boundaryField()[patchI].patchInternalField();
-        }
-    }
-
-    // Sync the coupled patches
-    scalarTangent.correctBoundaryConditions();
+    // The flat-list primitive fills internal integration points only
+    fillScalarTangentBoundary(scalarTangent);
 }
 
 
@@ -2260,21 +2277,8 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
         tangentReq
     );
 
-    // As in updateScalarTangent: a boundary face belongs to the material of
-    // its owner cell, so the patch-internal value is exact, and a caller
-    // forming 1/tangent must not be handed whatever the field was constructed
-    // with
-    forAll(scalarTangent.boundaryField(), patchI)
-    {
-        if (!scalarTangent.boundaryField()[patchI].coupled())
-        {
-            Foam::boundaryFieldRef(scalarTangent)[patchI] =
-                scalarTangent.boundaryField()[patchI].patchInternalField();
-        }
-    }
-
-    // Sync the coupled patches
-    scalarTangent.correctBoundaryConditions();
+    // The flat-list primitive fills internal integration points only
+    fillScalarTangentBoundary(scalarTangent);
 }
 
 
@@ -2328,11 +2332,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
 
             // The same scale the internal points were evaluated with. Taking
             // it over this rank's faces instead would make the convergence
-            // tolerance depend on where the mesh was cut
-            if (lawI < tp.lawConvergenceScales_.size())
-            {
-                inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
-            }
+            // tolerance depend on where the mesh was cut. The flat-list
+            // evaluation that precedes this loop set one for every law
+            inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
 
             // Views into the kinematic and stress fields for this material,
             // which do not copy data, and the kinematics built on them
@@ -2458,24 +2460,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         volumetricResponsePtr
     );
 
-    // Update boundaries including syncing coupled boundaries
-    stress.correctBoundaryConditions();
-
-    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-    {
-        scalarTangentPtr->correctBoundaryConditions();
-    }
-
-    // The volumetric response is corrected with the others. Coupled patches
-    // are skipped when it is evaluated, exactly as the stress is, so without
-    // this its processor values are whatever the field was constructed with.
-    // Only the internal field is read today, which makes that harmless rather
-    // than correct - and harmless-for-now is a poor thing to leave for
-    // whoever next reads a boundary value
-    if (volumetricResponsePtr)
-    {
-        volumetricResponsePtr->correctBoundaryConditions();
-    }
+    correctStressBoundaries
+    (
+        stress, scalarTangentPtr, tangentReq, volumetricResponsePtr
+    );
 }
 
 
@@ -3183,24 +3171,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         volumetricResponsePtr
     );
 
-    // Update boundaries including syncing coupled boundaries
-    stress.correctBoundaryConditions();
-
-    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-    {
-        scalarTangentPtr->correctBoundaryConditions();
-    }
-
-    // The volumetric response is corrected with the others. Coupled patches
-    // are skipped when it is evaluated, exactly as the stress is, so without
-    // this its processor values are whatever the field was constructed with.
-    // Only the internal field is read today, which makes that harmless rather
-    // than correct - and harmless-for-now is a poor thing to leave for
-    // whoever next reads a boundary value
-    if (volumetricResponsePtr)
-    {
-        volumetricResponsePtr->correctBoundaryConditions();
-    }
+    correctStressBoundaries
+    (
+        stress, scalarTangentPtr, tangentReq, volumetricResponsePtr
+    );
 }
 
 
