@@ -72,8 +72,14 @@ electroMechanicalLawMechanicalConstitutiveLaw
     }
 
     Info<< "    Active tension law over " << subLawPtr_->type()
-        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_
-        << (TaFromField_ ? ", from field " + TaName_ : word("")) << endl;
+        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_;
+
+    if (TaFromField_)
+    {
+        Info<< ", from field " << TaName_;
+    }
+
+    Info<< endl;
 }
 
 

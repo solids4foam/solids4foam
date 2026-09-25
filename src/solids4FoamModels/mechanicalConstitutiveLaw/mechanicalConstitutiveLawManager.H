@@ -117,6 +117,10 @@ class mechanicalConstitutiveLawManager
         //  serves, and the registry does not own these
         mutable PtrList<regIOobject> stateWriteProxies_;
 
+        //- The optional coupling inputs already reported as registered but
+        //  unread, so that each is reported once rather than per evaluation
+        mutable HashSet<word> reportedUnreadInputs_;
+
         //- Cell indices defining the material support for each mechanical
         //  constitutive law.
         //  Materials in solids4foam are always defined per cell (via
@@ -517,16 +521,6 @@ class mechanicalConstitutiveLawManager
             topologyEntry& tp
         ) const;
 
-        //- An inputs object for an evaluation path that does not gather
-        //  coupling inputs yet. Fatal if any law asks for one, because the
-        //  alternative is handing that law an empty inputs object and letting
-        //  it read a zero it cannot distinguish from a real value
-        mechanicalConstitutiveLawInputs inputsWithoutCoupling
-        (
-            const scalar dt,
-            const word& path
-        ) const;
-
         //- The coupling inputs this law needs, including every law below it.
         //
         //  A composite's sub-law reads its own inputs, and asking only the top
@@ -535,6 +529,15 @@ class mechanicalConstitutiveLawManager
         //  gathers what the inner law asked for instead of silently omitting
         //  it
         wordList requiredScalarInputsRecursive
+        (
+            const mechanicalConstitutiveLaw& law
+        ) const;
+
+        //- Warn, once per field, where a law could read a registered field as
+        //  a coupling input but was not asked to, and so uses its own
+        //  substitute: the case then runs, but not on the field it has. This
+        //  law and every law below it
+        void reportUnreadScalarInputs
         (
             const mechanicalConstitutiveLaw& law
         ) const;

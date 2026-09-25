@@ -25,10 +25,13 @@ Description
 
         sigma = sigma_passive + (1/J)*F & (Ta*f0 (x) f0) & F^T
 
-    The active tension Ta is either a field, when an electrophysiology model
-    supplies one, or a constant ramped over rampTime. The field wins if it is
-    there, which is how a coupled run overrides the standalone one without
-    either knowing about the other.
+    The active tension Ta is either a field, supplied by an electrophysiology
+    model or read from the case, or a constant ramped over rampTime. The field
+    is read when activeTensionFromField is set, under the name given by
+    activeTensionFieldName (default Ta), and the constant is used otherwise.
+    Unlike the removed legacy law, a registered field is not picked up
+    unasked: a coupled case sets activeTensionFromField, and one that does not
+    is warned that it is running on the constant.
 
     The passive law is given in a passiveMechanicalLaw sub-dictionary and owns
     a child state of its own, exactly as poroMechanicalLaw's effective stress
@@ -154,15 +157,23 @@ public:
 
         //- The coupling inputs this law reads.
         //
-        //  Declared only when the case asks for a field-based tension. The
-        //  manager gathers these on the paths that support them and refuses on
-        //  the paths that do not, which is why this is conditional: a law that
-        //  declared it unconditionally would stop every finite-strain case
-        //  from running, and one that never declared it would silently ignore
-        //  the field it was given
+        //  Declared only when the case asks for a field-based tension, since
+        //  the manager stops a run whose declared input is neither registered
+        //  nor given in the case, and a standalone run has neither
         virtual wordList requiredScalarInputs() const override
         {
             if (TaFromField_)
+            {
+                return wordList(1, TaName_);
+            }
+
+            return wordList();
+        }
+
+        //- The active tension field, when the constant is used in its place
+        virtual wordList optionalScalarInputs() const override
+        {
+            if (!TaFromField_)
             {
                 return wordList(1, TaName_);
             }

@@ -1044,34 +1044,6 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 
 
 Foam::mechanicalConstitutiveLawInputs
-Foam::mechanicalConstitutiveLawManager::inputsWithoutCoupling
-(
-    const scalar dt,
-    const word& path
-) const
-{
-    forAll(laws_, lawI)
-    {
-        const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
-
-        if (!names.empty())
-        {
-            FatalErrorInFunction
-                << "Mechanical constitutive law '" << laws_[lawI].type()
-                << "' reads the coupling input(s) " << names
-                << ", but the evaluation path '" << path
-                << "' does not gather them yet." << nl
-                << "Use a solid model that evaluates through a path which "
-                << "does, or add the gather to this one."
-                << exit(FatalError);
-        }
-    }
-
-    return mechanicalConstitutiveLawInputs(dt, mesh_.time().value());
-}
-
-
-Foam::mechanicalConstitutiveLawInputs
 Foam::mechanicalConstitutiveLawManager::lawInputs
 (
     const label lawI,
@@ -1082,6 +1054,8 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
 ) const
 {
     mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
+
+    reportUnreadScalarInputs(laws_[lawI]);
 
     const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
 
@@ -3112,14 +3086,6 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation. Built once and passed through
-    // every evaluation, including each finite-difference perturbation,
-    // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs
-    (
-        inputsWithoutCoupling(dt, "evaluateFiniteStrain")
-    );
-
     topologyEntry& tp = topology(topo);
 
     // One collective per law, before any of them is evaluated.
@@ -3143,6 +3109,15 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
         {
             continue;
         }
+
+        // Live inputs for this law's evaluation, as on the small-strain path:
+        // built per law, because a coupling input is handed over as a view of
+        // that law's own integration points, and passed through every
+        // evaluation below, including each finite-difference perturbation
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
 
         inputs.setConvergenceScale(lawScales[lawI]);
 
@@ -3243,6 +3218,18 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                 }
 
                 mechanicalConstitutiveLawState& bState = *bStatePtr;
+
+                // Live inputs for this law on this patch. The boundary points
+                // are a different set from the internal ones, so the coupling
+                // input has to be gathered for them rather than reused, and
+                // they are judged by the same scale as the law's internal
+                // points
+                const mechanicalConstitutiveLawInputs inputs
+                (
+                    lawInputs(lawI, topo, ipIDs, dt, tp)
+                );
+
+                inputs.setConvergenceScale(lawScales[lawI]);
 
                 const UIndirectList<tensor> FView(F, ipIDs);
                 const UIndirectList<tensor> F0View(F0, ipIDs);
@@ -3762,13 +3749,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation. Built once and passed through
-    // every evaluation, including each finite-difference perturbation,
-    // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs
-    (
-        inputsWithoutCoupling(dt, "updateStressSmallStrain")
-    );
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -3791,6 +3778,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     forAll(laws_, lawI)
     {
         const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        // Live inputs for this law, as a view of its own integration points
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
 
         const UIndirectList<tensor> gradDView
         (
@@ -4010,11 +4003,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation, passed through unchanged
-    const mechanicalConstitutiveLawInputs inputs
-    (
-        inputsWithoutCoupling(dt, "updateStressSmallStrain")
-    );
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
 
     // Accumulation fields
 
@@ -4038,6 +4033,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     forAll(laws_, lawI)
     {
         const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        // Live inputs for this law, as a view of its own integration points
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
 
         const UIndirectList<tensor> gradDView
         (
@@ -4270,14 +4271,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Live inputs for this evaluation. Built once and passed through
-    // every evaluation, including each finite-difference perturbation,
-    // so there is no per-call forwarding to get wrong
-    const mechanicalConstitutiveLawInputs inputs
-    (
-        inputsWithoutCoupling(dt, "updateStressFiniteStrain")
-    );
-
     // Look up the map and state for cell-based topologies
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
@@ -4316,14 +4309,6 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     {
         forAll(laws_, lawI)
         {
-            // The same scale the internal points were evaluated with. Taking
-            // it over this rank's faces instead would make the convergence
-            // tolerance depend on where the mesh was cut
-            if (lawI < tp.lawConvergenceScales_.size())
-            {
-                inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
-            }
-
             forAll(F.boundaryField(), patchI)
             {
                 if (!F.boundaryField()[patchI].coupled())
@@ -4339,6 +4324,25 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     )
                     {
                         continue;
+                    }
+
+                    // Live inputs for this law on this patch. The patch
+                    // values are what a boundary face sees, not the values
+                    // in the cells behind it
+                    const mechanicalConstitutiveLawInputs inputs
+                    (
+                        lawInputsPatch(lawI, patchI, faces, dt, tp)
+                    );
+
+                    // The same scale the internal points were evaluated with.
+                    // Taking it over this rank's faces instead would make the
+                    // convergence tolerance depend on where the mesh was cut
+                    if (lawI < tp.lawConvergenceScales_.size())
+                    {
+                        inputs.setConvergenceScale
+                        (
+                            tp.lawConvergenceScales_[lawI]
+                        );
                     }
 
 
@@ -4629,10 +4633,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    const mechanicalConstitutiveLawInputs inputs
-    (
-        inputsWithoutCoupling(dt, "updateStressFiniteStrain")
-    );
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -4653,14 +4660,20 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     forAll(laws_, lawI)
     {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        // Live inputs for this law, as a view of its own integration points
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
+
         // The scale the law's points are judged by, as the cell-centred
         // boundary loop sets it
         if (lawI < tp.lawConvergenceScales_.size())
         {
             inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
         }
-
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
 
         const UIndirectList<tensor> FView(F.internalField(), ipIDs);
         const UIndirectList<tensor> F0View(F0.internalField(), ipIDs);
@@ -4930,6 +4943,44 @@ Foam::mechanicalConstitutiveLawManager::requiredScalarInputsRecursive
     }
 
     return names.toc();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::reportUnreadScalarInputs
+(
+    const mechanicalConstitutiveLaw& law
+) const
+{
+    const wordList names(law.optionalScalarInputs());
+
+    forAll(names, i)
+    {
+        const word& name = names[i];
+
+        if
+        (
+            !reportedUnreadInputs_.found(name)
+         && mesh_.foundObject<volScalarField>(name)
+        )
+        {
+            reportedUnreadInputs_.insert(name);
+
+            WarningInFunction
+                << "Mechanical constitutive law '" << law.type()
+                << "' can read the registered field '" << name
+                << "' as a coupling input, but has not been asked to, so it "
+                << "is using its own substitute instead. Set the law's "
+                << "option to read the field if the field should drive it."
+                << endl;
+        }
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        reportUnreadScalarInputs(law.childLaw(childNames[i]));
+    }
 }
 
 

@@ -229,6 +229,15 @@ public:
             return wordList();
         }
 
+        //- Names of fields this law could read as coupling inputs but has not
+        //  been asked to, using a substitute of its own instead, such as a
+        //  prescribed constant. The manager warns if one of them is
+        //  registered, since the case would then run without the field it has
+        virtual wordList optionalScalarInputs() const
+        {
+            return wordList();
+        }
+
         //- A sub-law's dictionary, carrying the entries it needs from the
         //  composite's own.
         //

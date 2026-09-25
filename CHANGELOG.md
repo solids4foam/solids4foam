@@ -41,6 +41,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The coupling inputs a `mechanicalConstitutiveLaw` reads, such as the
+  active tension of `electroMechanicalLaw` or the temperature of
+  `thermoMechanicalLaw`, are gathered on every evaluation path, where before
+  only the small-strain cell paths gathered them and the others stopped. So
+  `electroMechanicalLaw` with `activeTensionFromField yes` now runs under the
+  finite-strain solid models, which are the only ones it supports. With the
+  switch off, the law uses its ramped constant and the run warns once if a
+  field of that name is registered: unlike the removed legacy law, a
+  registered `Ta` is not picked up unasked.
+
 - `vertexCentredLinearGeometry` takes its whole constitutive response from the
   `mechanicalConstitutiveLaw` framework: the residual stress at the dual mesh
   faces, on the PETSc SNES and explicit paths alike, as well as the Jacobian
