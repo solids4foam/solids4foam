@@ -22,17 +22,20 @@ echo "============================================================"
 echo "mechanicalConstitutiveLaw law checks"
 echo "============================================================"
 
-cd "${SCRIPT_DIR}"
-
 # A skip where the application is not built, and a failure in CI, where it
 # always is
 solids4Foam::requireTestApp Test-mechanicalConstitutiveLawChecks \
     || exit $(( $? - 1 ))
 
-rm -rf 0 constant/polyMesh "${LOGFILE}" log.blockMesh
-mkdir -p 0
+# Run on a copy, as the tutorials' regression tests do: converting the case
+# format moves files, which must not happen to the case itself
+CASE_DIR="${SCRIPT_DIR}/regressionTests/main"
+rm -rf "${CASE_DIR}"
+mkdir -p "${CASE_DIR}/0"
+cp -a "${SCRIPT_DIR}/constant" "${SCRIPT_DIR}/system" "${CASE_DIR}/"
+cd "${CASE_DIR}"
 
-solids4Foam::convertCaseFormat .
+solids4Foam::convertCaseFormat . > /dev/null
 blockMesh > log.blockMesh 2>&1
 
 status=0
