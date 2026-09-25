@@ -279,7 +279,7 @@ void thermalLinGeomSolid::correctStress()
 
 Foam::tmp<Foam::volScalarField> thermalLinGeomSolid::makeImpK() const
 {
-    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 
@@ -400,7 +400,7 @@ bool thermalLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();

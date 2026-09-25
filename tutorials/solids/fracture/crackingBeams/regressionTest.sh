@@ -280,7 +280,7 @@ fi
 # Against the legacy answer
 #
 # The cohesive zone laws take their penalty stiffness from the field the solid
-# model registers as impK, looked up by name, which is frameworkImpK(), so this
+# model registers as impK, looked up by name, which is lawImpK(), so this
 # is the test of it for fracture, as curvedBeams is for contact and 3dTube is
 # for fluid-solid interaction. It is also the framework's run on a mesh whose
 # topology changes: the crack patch gains faces as it cracks, and the

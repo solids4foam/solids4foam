@@ -2388,7 +2388,7 @@ Foam::solidModel::mechanicalManager() const
 }
 
 
-void Foam::solidModel::frameworkInterpolate
+void Foam::solidModel::interpolatePointDisplacement
 (
     const volVectorField& D,
     const volTensorField& gradD,
@@ -2491,7 +2491,7 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::solidModel::frameworkImpK
+Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 (
     mechanicalConstitutiveLawManager& manager,
     const tangentRequest req

@@ -589,7 +589,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     );
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
@@ -699,7 +699,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     }
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
     // Increment of displacement
     DD() = D() - D().oldTime();
 

@@ -214,7 +214,7 @@ fi
 # legacy mixed arm: the old and new Guccione implementations differ, so that
 # comparison would not isolate the effect of the split.
 run_mixed_framework() {
-    local d="${REGRESSION_ROOT}/frameworkPressure"
+    local d="${REGRESSION_ROOT}/pressure"
 
     rm -rf "${d}"; mkdir -p "${d}"
     for item in "${SCRIPT_DIR}"/*; do

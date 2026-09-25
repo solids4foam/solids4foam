@@ -428,7 +428,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         );
 
         // Interpolate cell displacements to vertices
-        frameworkInterpolate(D(), gradD(), pointD());
+        interpolatePointDisplacement(D(), gradD(), pointD());
 
         // Increment of displacement
         DD() = D() - D().oldTime();
@@ -528,7 +528,7 @@ bool linGeomTotalDispSolid::evolveSnes()
     }
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
     // Increment of displacement
     DD() = D() - D().oldTime();
 
@@ -735,7 +735,7 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
       ? tangentRequest::scalarDeviatoric
       : tangentRequest::scalar;
 
-    return frameworkImpK(mechanicalManager(), req);
+    return lawImpK(mechanicalManager(), req);
 }
 
 

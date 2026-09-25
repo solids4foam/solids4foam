@@ -309,9 +309,9 @@ prepare_written_traction_series_for_restart() {
 }
 
 run_restart_test() {
-    local base="${REGRESSION_ROOT}/frameworkRestart"
+    local base="${REGRESSION_ROOT}/restart"
 
-    prepare_case "frameworkRestart"
+    prepare_case "restart"
     CASE_DIR="${base}"
 
     sed -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
@@ -344,7 +344,7 @@ run_restart_test() {
     fi
 
     # 2. the negative control: without the history, refuse
-    local guard_dir="${REGRESSION_ROOT}/frameworkRestartMissing"
+    local guard_dir="${REGRESSION_ROOT}/restartMissing"
     rm -rf "${guard_dir}"
     cp -a "${CASE_DIR}" "${guard_dir}"
     rm -f "${guard_dir}"/10/*IntegrationPointTopology_epsilonP
@@ -430,9 +430,9 @@ run_parallel_restart_test() {
         return 0
     fi
 
-    local d="${REGRESSION_ROOT}/frameworkParallel"
+    local d="${REGRESSION_ROOT}/parallel"
 
-    prepare_case "frameworkParallel"
+    prepare_case "parallel"
     CASE_DIR="${d}"
 
     sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
@@ -542,9 +542,9 @@ run_reconstructed_restart_test() {
         return 0
     fi
 
-    local d="${REGRESSION_ROOT}/frameworkReconstructed"
+    local d="${REGRESSION_ROOT}/reconstructed"
 
-    prepare_case "frameworkReconstructed"
+    prepare_case "reconstructed"
     CASE_DIR="${d}"
 
     sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \

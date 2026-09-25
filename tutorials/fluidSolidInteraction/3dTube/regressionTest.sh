@@ -115,7 +115,7 @@ prepare_unmasked_case() {
 # The first framework coverage of a fluid-solid interaction case. It matters
 # beyond this tutorial: elasticWallPressure looks impK up from the solid mesh
 # by name, to build the p-wave speed it uses for its added-mass term, so
-# frameworkImpK() has to register a field the fluid side can find. The same
+# lawImpK() has to register a field the fluid side can find. The same
 # lookup is used by the contact penalty models and the cohesive zone models
 check_against_legacy() {
     local failures=0

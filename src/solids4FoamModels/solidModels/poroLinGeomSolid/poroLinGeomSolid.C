@@ -261,7 +261,7 @@ void poroLinGeomSolid::correctStress()
 
 Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
 {
-    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 
@@ -387,7 +387,7 @@ bool poroLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

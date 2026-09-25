@@ -693,7 +693,7 @@ void vertexCentredLinGeomSolid::correctCellStress()
 
 tmp<volScalarField> vertexCentredLinGeomSolid::impK() const
 {
-    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 

@@ -273,8 +273,8 @@ fi
 # CHILD's file alone has to stop the run. Without it this would only show that
 # two runs agree, not that they agree because the child's history came back
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
-    local g="${REGRESSION_ROOT}/frameworkRestartMissingChild"
+    local d="${REGRESSION_ROOT}/restart"
+    local g="${REGRESSION_ROOT}/restartMissingChild"
 
     prepare_case "${d}"
     sed -i \

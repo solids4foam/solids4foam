@@ -88,13 +88,13 @@ addToRunTimeSelectionTable
 
 tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
 {
-    if (frameworkImpKPtr_.empty())
+    if (lawImpKPtr_.empty())
     {
         // Announce where the stiffness is taken from
         Info<< type() << ": taking the stiffness from the "
             << "mechanicalConstitutiveLaw framework" << endl;
 
-        frameworkImpKPtr_.set
+        lawImpKPtr_.set
         (
             new volScalarField
             (
@@ -128,14 +128,14 @@ tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
         (
             F, F0, Finv, Finv0, J, J0,
             mesh().time().deltaTValue(),
-            frameworkImpKPtr_(),
+            lawImpKPtr_(),
             tangentRequest::scalarDeviatoric
         );
 
-        frameworkImpKPtr_() *= 0.75;
+        lawImpKPtr_() *= 0.75;
     }
 
-    return tmp<volScalarField>(new volScalarField(frameworkImpKPtr_()));
+    return tmp<volScalarField>(new volScalarField(lawImpKPtr_()));
 }
 
 
@@ -609,7 +609,7 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
         mesh(),
         dimensionedVector("0", dimless, vector::zero)
     ),
-    frameworkImpKPtr_(),
+    lawImpKPtr_(),
     impKf_
     (
         IOobject

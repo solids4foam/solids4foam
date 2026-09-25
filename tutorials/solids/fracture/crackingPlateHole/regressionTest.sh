@@ -294,7 +294,7 @@ fi
 #
 # simpleCohesiveZone sets its traction through the solid model's
 # tractionBoundarySnGrad, which takes the implicit stiffness from impK, so
-# this runs on frameworkImpK()
+# this runs on lawImpK()
 # ------------------------------------------------------------
 
 if grep -q "Selecting mechanical constitutive law" \

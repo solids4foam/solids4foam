@@ -105,7 +105,7 @@ fi
 #
 # This is the framework's coverage of a contact case. It matters beyond this
 # tutorial: the contact penalty models look impK up from the registry by name,
-# so frameworkImpK() has to register a field of the same name, with the same
+# so lawImpK() has to register a field of the same name, with the same
 # dimensions and boundary types, as the legacy impK() it replaced. Nothing else
 # tests that, and the same lookup is used by the cohesive zone models and by
 # elasticWallPressure in FSI.

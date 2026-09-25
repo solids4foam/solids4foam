@@ -447,7 +447,7 @@ protected:
         void correctPointDisplacement(pointVectorField& pointD) const;
 
         //- Interpolate displacement to points on the primary mesh
-        void frameworkInterpolate
+        void interpolatePointDisplacement
         (
             const volVectorField& D,
             const volTensorField& gradD,
@@ -555,7 +555,7 @@ protected:
         //  Shared by the solid models, because the field is registered under
         //  "impK" and looked up by that name by the contact and cohesive zone
         //  models, so its name, dimensions and boundary types are not free
-        tmp<volScalarField> frameworkImpK
+        tmp<volScalarField> lawImpK
         (
             mechanicalConstitutiveLawManager& manager,
             const tangentRequest req

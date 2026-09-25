@@ -103,6 +103,13 @@ Derived examples:
 - `linearElasticMechanicalConstitutiveLaw`
 - `neoHookeanElasticMechanicalConstitutiveLaw`
 
+A law is selected by its runtime type, `linearElastic` say, and its class
+carries the `MechanicalConstitutiveLaw` suffix. The suffix is not only a
+leftover from when the legacy laws of the same names existed: foam-extend
+4.1's `solidModels` library has a `Foam::linearElastic` with a
+`linearElastic.H`, so the short name would clash in both the namespace and the
+include path, and the suffix keeps every law named the same way.
+
 ---
 
 ### `mechanicalConstitutiveLawState`

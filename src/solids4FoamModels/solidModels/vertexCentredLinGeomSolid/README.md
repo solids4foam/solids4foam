@@ -264,7 +264,7 @@ private members:
 - `correctCellStress()`, the cell-centred `sigma` for output, through the
   manager's `volTensorField` overload, so that each cell takes its own law;
 - `impK()`, the implicit stiffness behind the default `fixedDofScale` and the
-  explicit wave speed, through `solidModel::frameworkImpK()`.
+  explicit wave speed, through `solidModel::lawImpK()`.
 
 The constitutive state is rolled over by the manager at the first evaluation
 of each new time step, and `solidModel::updateTotalFields()` tells the manager

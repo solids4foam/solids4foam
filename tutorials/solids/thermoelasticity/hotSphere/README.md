@@ -630,7 +630,7 @@ $$
     ); // loop around TEqn and DEqn
 
     // Interpolate cell displacements to vertices
-    frameworkInterpolate(D(), gradD(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();

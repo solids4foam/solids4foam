@@ -179,10 +179,10 @@ echo
 # perforatedPlate and stripFooting. What is uncovered, and what this covers, is
 # finite-strain history through a different solid model
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
+    local d="${REGRESSION_ROOT}/restart"
 
     if [ "$CHECK_ONLY" = false ]; then
-        prepare_case "frameworkRestart"
+        prepare_case "restart"
 
         sed -i.bak \
             's/^writePrecision.*/writePrecision  14;/; s/^endTime         1;/endTime         0.1;/; s/^deltaT          0.002;/deltaT          0.01;/; s/^writeInterval   10;/writeInterval   5;/' \
@@ -254,7 +254,7 @@ PYEOF
     # tolerate a difference this solid model shows with or without the
     # framework, and a tolerance wide enough to pass would also be wide enough
     # to hide a lost state if nothing else were checked
-    local m="${REGRESSION_ROOT}/frameworkRestartMissing"
+    local m="${REGRESSION_ROOT}/restartMissing"
     if [ "$CHECK_ONLY" = false ]; then
         rm -rf "${m}"; cp -a "${d}" "${m}"
         rm -rf "${m}"/0.0[6-9] "${m}"/0.1 "${m}"/postProcessing
@@ -277,7 +277,7 @@ PYEOF
     fi
 
     # Continue from halfway in a copy, so the reference stays intact
-    local g="${REGRESSION_ROOT}/frameworkRestartLeg"
+    local g="${REGRESSION_ROOT}/restartLeg"
     if [ "$CHECK_ONLY" = false ]; then
         rm -rf "${g}"; cp -a "${d}" "${g}"
         rm -rf "${g}"/0.0[6-9] "${g}"/0.1 "${g}"/postProcessing

@@ -242,9 +242,9 @@ fi
 # history survived: relaxation is the whole behaviour, and a run that forgot
 # how far each arm had relaxed starts again from an unstressed state
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
+    local d="${REGRESSION_ROOT}/restart"
 
-    prepare_case "frameworkRestart"
+    prepare_case "restart"
     CASE_DIR="${d}"
 
     sed -i.bak 's/^endTime         7000;/endTime         3500;/' \

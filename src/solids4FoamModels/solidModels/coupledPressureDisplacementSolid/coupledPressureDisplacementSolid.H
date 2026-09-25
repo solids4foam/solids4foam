@@ -139,7 +139,7 @@ class coupledPressureDisplacementSolid
 
         //- Shear stiffness of the linearised operator, formed once: see
         //  momentumImpK()
-        mutable autoPtr<volScalarField> frameworkImpKPtr_;
+        mutable autoPtr<volScalarField> lawImpKPtr_;
 
         //- Implicit stiffness surface field
         mutable surfaceScalarField impKf_;
