@@ -73,6 +73,11 @@ release. For complete commit-level details and contributor information, see the
   `neoHookeanElasticMisesPlastic` already did, so the plastic update no
   longer depends on the decomposition. No tutorial uses the nonlinear
   hardening branch.
+- A prescribed field, such as a fibre direction or residual stress, that a
+  law reads at integration points shared by several cells - the points of a
+  point-centred topology - takes the average of that law's cells around each
+  point. It took the value of whichever cell was visited last, which depended
+  on the cell ordering.
 - A law dictionary that still sets an entry only the removed legacy laws read,
   such as `pressureDisplacement`, `impKcoeff`, `tangentEps`, `regionName` or
   `pressureFieldRegion`, gives a warning naming it; the entries were ignored

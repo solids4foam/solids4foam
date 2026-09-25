@@ -759,11 +759,9 @@ class mechanicalConstitutiveLawManager
         //  cell's value. A point that is a mesh face takes the interpolated
         //  value, because a face lies between two cells rather than in one.
         //
-        //  A topology that shares a point between cells without being able to
-        //  say it is a face still broadcasts, and there the last cell to
-        //  reach the point wins: exact where the field is continuous across
-        //  the interface, ambiguous where it is not. That mapping policy is
-        //  an open question
+        //  A point shared between cells without being a face, as a
+        //  point-centred one is, takes the average of this law's cells around
+        //  it, which does not depend on the order they are visited in
         template<class Type>
         void readPrescribed
         (
@@ -799,11 +797,9 @@ class mechanicalConstitutiveLawManager
         //  value. A point that is a mesh face takes the interpolated value,
         //  because a face lies between two cells rather than in one.
         //
-        //  A topology that shares a point between cells without being able to
-        //  say it is a face still broadcasts, and there the last cell to reach
-        //  the point wins: exact where the field is continuous across the
-        //  interface, ambiguous where it is not. That mapping policy is an
-        //  open question
+        //  A point shared between cells without being a face, as a
+        //  point-centred one is, takes the average of this law's cells around
+        //  it, which does not depend on the order they are visited in
         template<class Type>
         void gatherToIntegrationPoints
         (
@@ -859,6 +855,13 @@ class mechanicalConstitutiveLawManager
 
             const labelList& cells = lawCells_[lawI];
 
+            // A point shared between cells, as a point-centred one is, takes
+            // the average of this law's cells around it, so that the value
+            // does not depend on the order the cells are visited in. A point
+            // inside one cell has one contribution, and takes that cell's
+            Field<Type> sum(fld.size(), pTraits<Type>::zero);
+            labelList count(fld.size(), 0);
+
             forAll(cells, i)
             {
                 const label cellI = cells[i];
@@ -874,8 +877,17 @@ class mechanicalConstitutiveLawManager
                     // writing outside the field
                     if (localI >= 0)
                     {
-                        fld[localI] = src[cellI];
+                        sum[localI] += src[cellI];
+                        ++count[localI];
                     }
+                }
+            }
+
+            forAll(fld, localI)
+            {
+                if (count[localI] > 0)
+                {
+                    fld[localI] = sum[localI]/scalar(count[localI]);
                 }
             }
         }
