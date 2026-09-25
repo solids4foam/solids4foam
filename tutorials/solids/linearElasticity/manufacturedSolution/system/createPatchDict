@@ -19,12 +19,12 @@ FoamFile
 pointSync   false;
 
 // Patches to create
-patches
+"patches|patchInfo"
 (
     {
         //- Master side patch
         name            patch0;
-        patchInfo
+        "patchInfo|dictionary"
         {
             type            patch;
         }

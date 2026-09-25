@@ -23,6 +23,7 @@ License
 #include "pointFields.H"
 #include "coordinateSystem.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -73,10 +74,10 @@ calculateAnalyticalCellDisplacement
     {
         const fvMeshQuadrature& quadrature =
             solMod.displacementLeastSquares().quadrature();
-        const CompactListList<point>& cellQuadPoints =
-            quadrature.cellQuadPoints();
-        const CompactListList<scalar>& cellQuadWeights =
-            quadrature.cellQuadWeights();
+        auto& cellQuadPoints =
+            compactListListCRef(quadrature.cellQuadPoints());
+        auto& cellQuadWeights =
+            compactListListCRef(quadrature.cellQuadWeights());
         const scalarField& cellVolumes = mesh.V();
 
         Info<< "Using cell-average analytical displacement" << endl;

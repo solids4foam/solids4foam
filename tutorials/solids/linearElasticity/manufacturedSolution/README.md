@@ -49,14 +49,21 @@ The run script also accepts a solution approach and mesh type:
 ```
 
 The `petscSnes` and high-order approaches require a PETSc-enabled solids4foam
-build. The `tet`
-and `poly` meshes require Gmsh. This tutorial currently supports OpenFOAM.com.
+build. The `tet` and `poly` meshes require Gmsh. The tutorial supports OpenFOAM.com,
+OpenFOAM.org, and foam-extend.
 
 The high-order approaches use cubic displacement reconstruction, face
 quadrature, and volume integration of the manufactured body force. The
 integrated body force is divided by cell volume before insertion as an
-`fvOptions` source density. The boundary condition evaluates the analytical
-displacement at face quadrature points.
+`fvOptions` source density on OpenFOAM.com. On OpenFOAM.org and foam-extend,
+`Allrun` selects the tutorial-local `manufacturedSolutionSolid` model, which
+adds the same source through the linear solid model's `fvOptionsSource()` function.
+The source coefficients remain in `constant/fvOptions` on all versions. The
+boundary condition evaluates the analytical displacement at face quadrature
+points.
+
+Rebuild solids4foam after updating the core source interface. `Allrun`
+builds the tutorial library, but does not rebuild the core libraries or solver.
 
 `movingLeastSquares` stores point values, so displacement errors use the
 analytical solution at cell centres. `kExactLeastSquares` stores cell averages,

@@ -26,8 +26,6 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 : "${FOAM_LD_LIBRARY_PATH:=}"
 source solids4FoamScripts.sh
-solids4Foam::caseDoesNotRunWithFoamExtend
-solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
 CHECK_ONLY=false
 for arg in "$@"; do

@@ -3,6 +3,19 @@ SOLIDS4FOAM_ROOT := $(shell d="$(CURDIR)"; while [ "$$d" != "/" ]; do if [ -f "$
 sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
+ifdef PETSC_DIR
+    ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+        include $(RULES)/mplib$(WM_MPLIB)
+    else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
+        include $(GENERAL_RULES)/mplibType
+    else
+        include $(GENERAL_RULES)/mpi-rules
+    endif
+    VERSION_SPECIFIC_INC += \
+        $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
+        -DUSE_PETSC
+endif
+
 EXE_INC = \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \

@@ -20,6 +20,7 @@ License
 #include "manufacturedSolutionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -129,11 +130,13 @@ manufacturedSolutionFvPatchVectorField::evaluateQuadrature
     const solidModel& solMod = lookupSolidModel(mesh);
 
     // Quadrature points are indexed by global face labels
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
+    const label start = this->patch().patch().start();
     forAll(nQpPerFace, faceI)
     {
         const label globalFaceID = faceI + start;

@@ -47,8 +47,6 @@ export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
-solids4Foam::caseDoesNotRunWithFoamExtend
-solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
 if [[ "$APPROACH" != "segregated" ]]; then
     solids4Foam::requirePetscOrExitSilently
@@ -64,6 +62,13 @@ for file in constant/solidProperties."${APPROACH}" \
 do
     ln -vnsf "${file##*/}" "${file%.*}"
 done
+
+if [[ "$WM_PROJECT" == "foam" || "$WM_PROJECT_VERSION" != v* ]]; then
+    # Use the tutorial source model where fvOptions is unavailable.
+    rm -f constant/solidProperties
+    sed 's/^solidModel .*/solidModel manufacturedSolutionSolid;/' \
+        "constant/solidProperties.$APPROACH" > constant/solidProperties
+fi
 
 solids4Foam::convertCaseFormat .
 

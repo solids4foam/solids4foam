@@ -5,10 +5,13 @@ This opt-in study migrates the active convergence variants from
 combines the segregated and PETSc SNES solution procedures with regular
 hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Tetrahedral
 variants, which were disabled in the legacy driver, remain available
-explicitly.
+explicitly. Both cubic high-order approaches, `highOrder-movingLeastSquares`
+and `highOrder-kExactLeastSquares`, are included on the regular hex mesh in the
+default sweep. They are also available explicitly for `tet` and `poly` meshes
+and require a PETSc-enabled build.
 
-Source an OpenFOAM.com environment, ensure the tutorial library can be built,
-and run:
+Source an OpenFOAM.com, OpenFOAM.org, or foam-extend environment, ensure the
+tutorial library can be built, and run:
 
 ```bash
 cd tutorials/solids/linearElasticity/manufacturedSolution/verification
@@ -24,10 +27,15 @@ for custom cell counts, and `--reuse` when resuming a sweep. For example:
 ./Allverify --quick
 ./Allverify --variants hex-segregated,poly-petscSnes
 ./Allverify --variants tet-segregated,tet-petscSnes --quick
+./Allverify --variants hex-highOrder-movingLeastSquares,hex-highOrder-kExactLeastSquares
 ```
 
 Results are written under the ignored `verification/postProcessing/`
 directory. Each variant must produce finite positive errors and, in a full
 sweep, lower finest-mesh errors with positive net convergence order for the
-displacement and stress L2 and L-infinity norms. The study is not run by
+displacement and stress L2 and L-infinity norms. Quick runs check finite positive
+errors and successful solver completion without asserting convergence order.
+The kExact displacement errors compare cell averages; MLS errors compare
+point values at cell centres. Stress errors use cell-centre values in both.
+The study is not run by
 `tutorials/Alltest` or `tutorials/Alltest-regression`.

@@ -182,6 +182,11 @@ protected:
 
     // Protected member functions
 
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit volume (zero by default)
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
+
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {

@@ -20,6 +20,7 @@ License
 #include "manufacturedSolution.H"
 #include "mathematicalConstants.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -67,10 +68,10 @@ void Foam::manufacturedSolution::calcBodyForces() const
     {
         const fvMeshQuadrature& quadrature =
             solMod.displacementLeastSquares().quadrature();
-        const CompactListList<point>& cellQuadPoints =
-            quadrature.cellQuadPoints();
-        const CompactListList<scalar>& cellQuadWeights =
-            quadrature.cellQuadWeights();
+        auto& cellQuadPoints =
+            compactListListCRef(quadrature.cellQuadPoints());
+        auto& cellQuadWeights =
+            compactListListCRef(quadrature.cellQuadWeights());
 
         Info<< "Using volume-averaged manufactured body force" << endl;
 
@@ -83,7 +84,7 @@ void Foam::manufacturedSolution::calcBodyForces() const
                    *calculateBodyForce(cellQuadPoints[cellI][pointI]);
             }
 
-            // fvOptions multiplies the source density by the cell volume.
+            // Momentum assembly multiplies the force density by cell volume.
             bodyForcesI[cellI] /= mesh.V()[cellI];
         }
     }
@@ -170,7 +171,11 @@ Foam::symmTensor Foam::manufacturedSolution::calculateStress
     const scalar lambda = (E_*nu_)/((1.0 + nu_)*(1.0 - 2.0*nu_));
 
     // pi
-    const scalar pi = Foam::constant::mathematical::pi;
+#ifdef FOAMEXTEND
+    const scalar pi = mathematicalConstant::pi;
+#else
+    const scalar pi = constant::mathematical::pi;
+#endif
 
     sigma.xx() =
         lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z())
@@ -220,7 +225,11 @@ Foam::symmTensor Foam::manufacturedSolution::calculateStrain
     symmTensor epsilon = symmTensor::zero;
 
     //pi
-    const scalar pi = Foam::constant::mathematical::pi;
+#ifdef FOAMEXTEND
+    const scalar pi = mathematicalConstant::pi;
+#else
+    const scalar pi = constant::mathematical::pi;
+#endif
 
     epsilon.xx() =
         4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
@@ -255,7 +264,11 @@ Foam::vector Foam::manufacturedSolution::calculateDisplacement
 )
 {
     //pi
-    const scalar pi = Foam::constant::mathematical::pi;
+#ifdef FOAMEXTEND
+    const scalar pi = mathematicalConstant::pi;
+#else
+    const scalar pi = constant::mathematical::pi;
+#endif
 
     return vector
     (
@@ -271,7 +284,11 @@ Foam::vector Foam::manufacturedSolution::calculateBodyForce
     const vector& point
 ) const
 {
+#ifdef FOAMEXTEND
+    const scalar pi = mathematicalConstant::pi;
+#else
     const scalar pi = constant::mathematical::pi;
+#endif
     const scalar x = point.x();
     const scalar y = point.y();
     const scalar z = point.z();
