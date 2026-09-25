@@ -63,6 +63,8 @@ Author
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
 #include "integrationPointTopology.H"
 #include "mechanicalConstitutiveLawCaseInputs.H"
+#include "mechanicalConstitutiveLawGather.H"
+#include "mechanicalConstitutiveLawInputGatherer.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -258,12 +260,10 @@ class mechanicalConstitutiveLawManager
         //  whose dictionaries ask for that; empty if none does
         autoPtr<mechanicalConstitutiveLawCaseInputs> caseInputsPtr_;
 
-        //- Coupling inputs that exist only as files, read once per time step
-        //  on every rank by refreshScalarInputs, and the time index they were
-        //  read at. Unregistered, so that nothing else takes them for a field
-        //  another model supplies
-        mutable HashTable<autoPtr<volScalarField>> diskScalarInputs_;
-        mutable label diskScalarInputsTimeIndex_;
+        //- Gathers the coupling inputs each law reads, from the registry, a
+        //  case directory or a file. Holds references to the members above,
+        //  so it is declared after them
+        mechanicalConstitutiveLawInputGatherer inputGatherer_;
 
         //- Whether a continued run has the kinematic history a constitutive
         //  history is measured against. Said by the solid model, which knows
@@ -547,25 +547,18 @@ class mechanicalConstitutiveLawManager
             mechanicalConstitutiveLawState*& bState
         ) const;
 
-        //- The field a law's scalar input is gathered from, or nullptr if
-        //  neither the registry nor a case directory supplies it, in which
-        //  case the caller falls back to a field on disk.
-        //
-        //  A field registered by another model comes first, so that one
-        //  solved for in this run is always what the law sees. A case
-        //  directory source comes next; the copy it registers is recognised
-        //  as its own and refreshed, once per time step, rather than taken as
-        //  another model's
+        //- The coupling-input gathering below is done by inputGatherer_; see
+        //  mechanicalConstitutiveLawInputGatherer for what each one does
+
         const volScalarField* scalarInputSource
         (
             const label lawI,
             const word& name
-        ) const;
+        ) const
+        {
+            return inputGatherer_.scalarInputSource(lawI, name);
+        }
 
-        //- Gather the live coupling inputs a law asked for, as views over its
-        //  own integration points, and hand back an inputs object carrying
-        //  them. A law that asks for nothing gets an inputs object holding
-        //  only the time step, which is what every law had before
         mechanicalConstitutiveLawInputs lawInputs
         (
             const label lawI,
@@ -573,11 +566,14 @@ class mechanicalConstitutiveLawManager
             const labelList& ipIDs,
             const scalar dt,
             topologyEntry& tp
-        ) const;
+        ) const
+        {
+            return inputGatherer_.lawInputs
+            (
+                lawI, topo, ipIDs, dt, tp.lawScalarInputs_
+            );
+        }
 
-        //- As lawInputs, for a law's faces on one boundary patch. The values
-        //  come from the field's patch values, not from the cells behind it,
-        //  and on a coupled patch are interpolated as on an internal face
         mechanicalConstitutiveLawInputs lawInputsPatch
         (
             const label lawI,
@@ -585,39 +581,28 @@ class mechanicalConstitutiveLawManager
             const labelList& faces,
             const scalar dt,
             topologyEntry& tp
-        ) const;
+        ) const
+        {
+            return inputGatherer_.lawInputsPatch
+            (
+                lawI, patchI, faces, dt, tp.lawScalarInputs_
+            );
+        }
 
-        //- Bring every coupling input source up to date for this time step:
-        //  the case-directory inputs, and the inputs that exist only as files.
-        //  Called at the start of every evaluation path, on every rank and
-        //  before any material is skipped for having no points there, since
-        //  reading a file can be collective
-        void refreshScalarInputs() const;
+        void refreshScalarInputs() const
+        {
+            inputGatherer_.refreshScalarInputs();
+        }
 
-        //- A coupling input that exists only as a file, as refreshScalarInputs
-        //  read it for this time step, or nullptr if there is none
-        const volScalarField* diskScalarInput(const word& name) const;
-
-        //- The coupling inputs this law needs, including every law below it.
-        //
-        //  A composite's sub-law reads its own inputs, and asking only the top
-        //  of the tree loses them. State already recurses this way; this makes
-        //  dependencies match, so that nesting one composite inside another
-        //  gathers what the inner law asked for instead of silently omitting
-        //  it
-        wordList requiredScalarInputsRecursive
+        static wordList requiredScalarInputsRecursive
         (
             const mechanicalConstitutiveLaw& law
-        ) const;
-
-        //- Warn, once per field, where a law could read a registered field as
-        //  a coupling input but was not asked to, and so uses its own
-        //  substitute: the case then runs, but not on the field it has. This
-        //  law and every law below it
-        void reportUnreadScalarInputs
-        (
-            const mechanicalConstitutiveLaw& law
-        ) const;
+        )
+        {
+            return
+                mechanicalConstitutiveLawInputGatherer::
+                requiredScalarInputsRecursive(law);
+        }
 
         //- Tell a law and every law below it that the step has ended
         void endTimeStepLaw
@@ -736,11 +721,7 @@ class mechanicalConstitutiveLawManager
         template<class FieldType>
         static bool headerIsA(IOobject& io)
         {
-#ifdef FOAMEXTEND
-            return io.headerOk() && io.headerClassName() == FieldType::typeName;
-#else
-            return io.typeHeaderOk<FieldType>(true);
-#endif
+            return mechanicalConstitutiveLawHeaderIsA<FieldType>(io);
         }
 
         //- The volField a prescribed state is to be read from, if there is
@@ -832,17 +813,8 @@ class mechanicalConstitutiveLawManager
             gatherToIntegrationPoints(src, lawI, topo, ipIDs, fld);
         }
 
-        //- Fill a law's integration points from a volField on the mesh.
-        //
-        //  The value is specified per cell, which is how a user prepares one
-        //  and how another model produces one. How it reaches a point depends
-        //  on where the point is. A point inside a cell takes that cell's
-        //  value. A point that is a mesh face takes the interpolated value,
-        //  because a face lies between two cells rather than in one.
-        //
-        //  A point shared between cells without being a face, as a
-        //  point-centred one is, takes the average of this law's cells around
-        //  it, which does not depend on the order they are visited in
+        //- Fill a law's integration points from a volField on the mesh;
+        //  see gatherToIntegrationPoints in mechanicalConstitutiveLawGather.H
         template<class Type>
         void gatherToIntegrationPoints
         (
@@ -853,86 +825,10 @@ class mechanicalConstitutiveLawManager
             Field<Type>& fld
         ) const
         {
-            if (topo.integrationPointsAreFaces())
-            {
-                // The integration point index is the face index here, which is
-                // what lets the interpolated field be read straight off
-                const GeometricField<Type, fvsPatchField, surfaceMesh> srcf
-                (
-                    linearInterpolate(src)
-                );
-
-                const label nInternal = mesh_.nInternalFaces();
-
-                forAll(ipIDs, localI)
-                {
-                    const label faceI = ipIDs[localI];
-
-                    if (faceI < nInternal)
-                    {
-                        fld[localI] = srcf[faceI];
-                    }
-                    else
-                    {
-                        const label patchI =
-                            mesh_.boundaryMesh().whichPatch(faceI);
-
-                        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
-
-                        fld[localI] =
-                            srcf.boundaryField()[patchI][faceI - pp.start()];
-                    }
-                }
-
-                return;
-            }
-
-            // A state field is indexed by the law's own integration points,
-            // 0 to n-1, while the topology hands out global indices, so the
-            // two have to be related before anything can be written
-            labelList globalToLocal(topo.nIntegrationPoints(), -1);
-            forAll(ipIDs, localI)
-            {
-                globalToLocal[ipIDs[localI]] = localI;
-            }
-
-            const labelList& cells = lawCells_[lawI];
-
-            // A point shared between cells, as a point-centred one is, takes
-            // the average of this law's cells around it, so that the value
-            // does not depend on the order the cells are visited in. A point
-            // inside one cell has one contribution, and takes that cell's
-            Field<Type> sum(fld.size(), pTraits<Type>::zero);
-            labelList count(fld.size(), 0);
-
-            forAll(cells, i)
-            {
-                const label cellI = cells[i];
-                const labelUList ips = topo.cellIntegrationPointIDs(cellI);
-
-                forAll(ips, j)
-                {
-                    const label localI = globalToLocal[ips[j]];
-
-                    // A point of this cell that is not one of this law's own
-                    // points cannot happen while materials are assigned per
-                    // cell, but the guard costs nothing and the alternative is
-                    // writing outside the field
-                    if (localI >= 0)
-                    {
-                        sum[localI] += src[cellI];
-                        ++count[localI];
-                    }
-                }
-            }
-
-            forAll(fld, localI)
-            {
-                if (count[localI] > 0)
-                {
-                    fld[localI] = sum[localI]/scalar(count[localI]);
-                }
-            }
+            Foam::gatherToIntegrationPoints
+            (
+                mesh_, lawCells_[lawI], src, topo, ipIDs, fld
+            );
         }
 
         //- Read a prescribed field into a law's state on one boundary patch.
