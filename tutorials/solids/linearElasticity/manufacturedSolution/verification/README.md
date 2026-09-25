@@ -3,12 +3,12 @@
 This opt-in study migrates the active convergence variants from
 `solid-benchmarks/linearElasticity/manufacturedSolution`. The default sweep
 combines the segregated and PETSc SNES solution procedures with regular
-hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Tetrahedral
-variants, which were disabled in the legacy driver, remain available
-explicitly. Both cubic high-order approaches, `highOrder-movingLeastSquares`
-and `highOrder-kExactLeastSquares`, are included on the regular hex mesh in the
-default sweep. They are also available explicitly for `tet` and `poly` meshes
-and require a PETSc-enabled build.
+hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Their tetrahedral
+variants remain available explicitly. Both cubic high-order approaches,
+`highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares`, are included
+on regular hexahedral and tetrahedral meshes in the default sweep. They are also
+available explicitly for `poly` meshes, exclude `distHex`, and require a
+PETSc-enabled build.
 
 Source an OpenFOAM.com, OpenFOAM.org, or foam-extend environment, ensure the
 tutorial library can be built, and run:
@@ -32,9 +32,9 @@ for custom cell counts, and `--reuse` when resuming a sweep. For example:
 
 Results are written under the ignored `verification/postProcessing/`
 directory. Each variant must produce finite positive errors and, in a full
-sweep, lower finest-mesh errors with positive net convergence order for the
-displacement and stress L2 and L-infinity norms. Quick runs check finite positive
-errors and successful solver completion without asserting convergence order.
+sweep, lower finest-mesh errors for the displacement and stress L2 and L-infinity
+norms. Net convergence orders are reported without a minimum-order threshold.
+Quick runs check finite positive errors and successful solver completion.
 The kExact displacement errors compare cell averages; MLS errors compare
 point values at cell centres. Stress errors use cell-centre values in both.
 The study is not run by

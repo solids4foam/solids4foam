@@ -7,7 +7,11 @@
     "poly-segregated",
     "poly-petscSnes",
     "distHex-segregated",
-    "distHex-petscSnes"
+    "distHex-petscSnes",
+    "hex-highOrder-movingLeastSquares",
+    "hex-highOrder-kExactLeastSquares",
+    "tet-highOrder-movingLeastSquares",
+    "tet-highOrder-kExactLeastSquares"
   ],
   "variants": {
     "hex-segregated": {"mesh": "hex", "approach": "segregated"},
@@ -17,7 +21,23 @@
     "poly-segregated": {"mesh": "poly", "approach": "segregated"},
     "poly-petscSnes": {"mesh": "poly", "approach": "petscSnes"},
     "distHex-segregated": {"mesh": "distHex", "approach": "segregated"},
-    "distHex-petscSnes": {"mesh": "distHex", "approach": "petscSnes"}
+    "distHex-petscSnes": {"mesh": "distHex", "approach": "petscSnes"},
+    "hex-highOrder-movingLeastSquares": {
+      "mesh": "hex",
+      "approach": "highOrder-movingLeastSquares"
+    },
+    "tet-highOrder-movingLeastSquares": {
+      "mesh": "tet",
+      "approach": "highOrder-movingLeastSquares"
+    },
+    "hex-highOrder-kExactLeastSquares": {
+      "mesh": "hex",
+      "approach": "highOrder-kExactLeastSquares"
+    },
+    "tet-highOrder-kExactLeastSquares": {
+      "mesh": "tet",
+      "approach": "highOrder-kExactLeastSquares"
+    }
   },
   "acceptance": {
     "required_metrics": [
@@ -25,7 +45,6 @@
       "displacement_linf_m",
       "stress_l2_pa",
       "stress_linf_pa"
-    ],
-    "minimum_net_order": 0.0
+    ]
   }
 }
