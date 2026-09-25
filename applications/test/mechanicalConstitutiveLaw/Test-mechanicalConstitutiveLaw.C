@@ -62,6 +62,10 @@ Description
          registerTopology key, and - where the case has more than one
          material - a face shared by two materials with no collapse rule to
          combine them, which must be refused where a rule is accepted.
+     11. A field given per cell reaches a point on a face as the interpolated
+         face value, for a face-centred and a compact face topology alike,
+         including on a processor face, and a point in a cell as the cell
+         value.
 
 Author
     Philip Cardiff, UCD.
@@ -80,6 +84,7 @@ Author
 #include "mechanicalConstitutiveLaw.H"
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "OFstream.H"
+#include "mechanicalConstitutiveLawGather.H"
 
 using namespace Foam;
 
@@ -2749,6 +2754,170 @@ int main(int argc, char *argv[])
                 "writing through a shadow's child leaves the child alone",
                 mag(csub.scalarField("h")[0] - 2.0) < SMALL,
                 "got " + Foam::name(csub.scalarField("h")[0])
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 11. Gathering a cell field onto integration points
+    //
+    // A prescribed field or coupling input is given per cell. A point on a
+    // face must see the interpolated face value whichever topology holds it:
+    // a compact face topology reaches an internal face's points from both
+    // cells, and a processor face's from one, so anything built from the
+    // cells around a point would differ between serial and parallel runs
+    // ---------------------------------------------------------------------
+    {
+        Info<< nl << "11. Gathering a cell field onto integration points"
+            << endl;
+
+        // A field that differs from cell to cell, so that a face value and
+        // either cell's value are told apart
+        volScalarField src
+        (
+            IOobject
+            (
+                "gatherTestField",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimless, 0.0),
+            "zeroGradient"
+        );
+
+        forAll(src, cellI)
+        {
+            src[cellI] = 1.0 + mesh.C()[cellI].x() + 2*mesh.C()[cellI].y();
+        }
+
+        src.correctBoundaryConditions();
+
+        const surfaceScalarField srcf(linearInterpolate(src));
+
+        const labelList allCells(identity(mesh.nCells()));
+
+        // The value a point on face faceI must take: the interpolated face
+        // value, or the owner cell's on an empty patch, which holds none
+        const label nInternal = mesh.nInternalFaces();
+        const polyBoundaryMesh& bm = mesh.boundaryMesh();
+
+        const labelList& own = mesh.faceOwner();
+
+        const auto faceValue = [&](const label faceI) -> scalar
+        {
+            if (faceI < nInternal)
+            {
+                return srcf[faceI];
+            }
+
+            const label patchI = bm.whichPatch(faceI);
+
+            if (srcf.boundaryField()[patchI].empty())
+            {
+                return src[own[faceI]];
+            }
+
+            return srcf.boundaryField()[patchI][faceI - bm[patchI].start()];
+        };
+
+        // A compact face topology with two points on every face
+        {
+            const labelList sizes(mesh.nFaces(), 2);
+            CompactListList<label> rows(sizes);
+
+            for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+            {
+                rows(faceI, 0) = 2*faceI;
+                rows(faceI, 1) = 2*faceI + 1;
+            }
+
+            const compactFaceIntegrationPointTopology topo
+            (
+                mesh, std::move(rows)
+            );
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+            {
+                const scalar expected = faceValue(faceI);
+                maxErr = max(maxErr, mag(fld[2*faceI] - expected));
+                maxErr = max(maxErr, mag(fld[2*faceI + 1] - expected));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "compact face points take the interpolated face value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
+            );
+        }
+
+        // A face-centred topology, whose points are the faces themselves
+        {
+            const faceCentredIntegrationPointTopology topo(mesh);
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            forAll(ipIDs, faceI)
+            {
+                maxErr = max(maxErr, mag(fld[faceI] - faceValue(faceI)));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "face-centred points take the interpolated face value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
+            );
+        }
+
+        // A cell-centred topology, whose points are the cells
+        {
+            const cellCentredIntegrationPointTopology topo(mesh);
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            forAll(ipIDs, cellI)
+            {
+                maxErr = max(maxErr, mag(fld[cellI] - src[cellI]));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "cell-centred points take the cell value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
             );
         }
     }

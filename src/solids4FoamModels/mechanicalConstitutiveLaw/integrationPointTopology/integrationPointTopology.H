@@ -199,6 +199,19 @@ public:
     {
         return false;
     }
+
+    //- The mesh face an integration point lies on, or -1 if it lies inside
+    //  a cell or is shared between cells without being a face.
+    //
+    //  What depends on it: a value given per cell reaches a point on a face
+    //  as the interpolated face value, which a decomposed run can form from
+    //  what each rank holds, rather than from the cells around the face,
+    //  which a processor face has on two ranks. A topology whose points are
+    //  the faces answers with the index itself
+    virtual label integrationPointFace(const label ipI) const
+    {
+        return integrationPointsAreFaces() ? ipI : -1;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

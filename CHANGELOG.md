@@ -73,11 +73,14 @@ release. For complete commit-level details and contributor information, see the
   `neoHookeanElasticMisesPlastic` already did, so the plastic update no
   longer depends on the decomposition. No tutorial uses the nonlinear
   hardening branch.
-- A prescribed field, such as a fibre direction or residual stress, that a
-  law reads at integration points shared by several cells - the points of a
-  point-centred topology - takes the average of that law's cells around each
-  point. It took the value of whichever cell was visited last, which depended
-  on the cell ordering.
+- A prescribed field or coupling input, such as a residual stress or a
+  temperature, reaches an integration point shared by several cells in a way
+  that no longer depends on the cell ordering or the decomposition. A point on
+  a mesh face - including every point of the compact face topology the
+  high-order path uses - takes the interpolated face value, as a face-centred
+  point already did, and a processor face forms it from the neighbour values
+  the rank holds. A point-centred point takes the average of the law's cells
+  around it. Both took the value of whichever cell was visited last.
 - A law dictionary that still sets an entry only the removed legacy laws read,
   such as `pressureDisplacement`, `impKcoeff`, `tangentEps`, `regionName` or
   `pressureFieldRegion`, gives a warning naming it; the entries were ignored

@@ -59,20 +59,25 @@ inline bool mechanicalConstitutiveLawHeaderIsA(IOobject& io)
 //
 //  The value is specified per cell, which is how a user prepares one
 //  and how another model produces one. How it reaches a point depends
-//  on where the point is. A point inside a cell takes that cell's
-//  value. A point that is a mesh face takes the interpolated value,
-//  because a face lies between two cells rather than in one.
+//  on where the point is, as the topology says through
+//  integrationPointFace.
 //
-//  A point shared between cells without being a face, as a
-//  point-centred one is, takes the average of this law's cells around
-//  it, which does not depend on the order they are visited in
+//  A point on a mesh face takes the interpolated face value, because a
+//  face lies between two cells rather than in one. That holds for a
+//  face-centred topology and for a compact face one alike, and on a
+//  processor face too: the interpolation there uses the neighbour
+//  values the rank already holds, so a decomposed run sees what a
+//  serial one does without anything being exchanged.
 //
-//  Only this rank's cells are averaged. A point on a processor boundary
-//  has cells on other ranks too, and would take a different value on
-//  each; exchanging them would be a collective, and this is called only
-//  on ranks that hold the law's points. No topology in use has such a
-//  point - a dual face lies in one cell - and the pointField overload,
-//  whose points are shared, refuses a parallel run
+//  A point inside a cell takes that cell's value. A point shared
+//  between cells without being a face, as a point-centred one is,
+//  takes the average of this law's cells around it on this rank; the
+//  pointField overload, whose points these are, refuses a parallel run.
+//  The average is independent of the order the cells are visited in up
+//  to rounding, and exactly so for two cells.
+//
+//  Every type is treated alike. A direction, such as a fibre, is
+//  therefore interpolated too, and a law reading one normalises it
 template<class Type>
 inline void gatherToIntegrationPoints
 (
@@ -84,38 +89,20 @@ inline void gatherToIntegrationPoints
     Field<Type>& fld
 )
 {
-    if (topo.integrationPointsAreFaces())
+    // The face each point lies on, or -1 for a point that lies in a cell
+    const label nInternal = mesh.nInternalFaces();
+
+    labelList ipFace(ipIDs.size(), -1);
+    bool anyFace = false;
+
+    forAll(ipIDs, localI)
     {
-        // The integration point index is the face index here, which is
-        // what lets the interpolated field be read straight off
-        const GeometricField<Type, fvsPatchField, surfaceMesh> srcf
-        (
-            linearInterpolate(src)
-        );
+        ipFace[localI] = topo.integrationPointFace(ipIDs[localI]);
 
-        const label nInternal = mesh.nInternalFaces();
-
-        forAll(ipIDs, localI)
+        if (ipFace[localI] >= 0)
         {
-            const label faceI = ipIDs[localI];
-
-            if (faceI < nInternal)
-            {
-                fld[localI] = srcf[faceI];
-            }
-            else
-            {
-                const label patchI =
-                    mesh.boundaryMesh().whichPatch(faceI);
-
-                const polyPatch& pp = mesh.boundaryMesh()[patchI];
-
-                fld[localI] =
-                    srcf.boundaryField()[patchI][faceI - pp.start()];
-            }
+            anyFace = true;
         }
-
-        return;
     }
 
     // A state field is indexed by the law's own integration points,
@@ -127,18 +114,14 @@ inline void gatherToIntegrationPoints
         globalToLocal[ipIDs[localI]] = localI;
     }
 
-    const labelList& cells = lawCells;
-
-    // A point shared between cells, as a point-centred one is, takes
-    // the average of this law's cells around it, so that the value
-    // does not depend on the order the cells are visited in. A point
-    // inside one cell has one contribution, and takes that cell's
+    // The points in cells: the average of this law's cells around each,
+    // which for a point inside one cell is that cell's value
     Field<Type> sum(fld.size(), pTraits<Type>::zero);
     labelList count(fld.size(), 0);
 
-    forAll(cells, i)
+    forAll(lawCells, i)
     {
-        const label cellI = cells[i];
+        const label cellI = lawCells[i];
         const labelUList ips = topo.cellIntegrationPointIDs(cellI);
 
         forAll(ips, j)
@@ -149,7 +132,7 @@ inline void gatherToIntegrationPoints
             // points cannot happen while materials are assigned per
             // cell, but the guard costs nothing and the alternative is
             // writing outside the field
-            if (localI >= 0)
+            if (localI >= 0 && ipFace[localI] < 0)
             {
                 sum[localI] += src[cellI];
                 ++count[localI];
@@ -162,6 +145,46 @@ inline void gatherToIntegrationPoints
         if (count[localI] > 0)
         {
             fld[localI] = sum[localI]/scalar(count[localI]);
+        }
+    }
+
+    if (!anyFace)
+    {
+        return;
+    }
+
+    // The points on faces
+    const GeometricField<Type, fvsPatchField, surfaceMesh> srcf
+    (
+        linearInterpolate(src)
+    );
+
+    forAll(ipIDs, localI)
+    {
+        const label faceI = ipFace[localI];
+
+        if (faceI < 0)
+        {
+            continue;
+        }
+
+        if (faceI < nInternal)
+        {
+            fld[localI] = srcf[faceI];
+            continue;
+        }
+
+        const label patchI = mesh.boundaryMesh().whichPatch(faceI);
+        const fvsPatchField<Type>& pf = srcf.boundaryField()[patchI];
+
+        if (pf.empty())
+        {
+            // A face of an empty patch holds no value, and has one cell
+            fld[localI] = src[mesh.faceOwner()[faceI]];
+        }
+        else
+        {
+            fld[localI] = pf[faceI - mesh.boundaryMesh()[patchI].start()];
         }
     }
 }
