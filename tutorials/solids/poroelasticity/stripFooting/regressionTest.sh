@@ -290,7 +290,7 @@ run_restart_test() {
 
     # The child's history must actually be on disk, under a name that says
     # which sub-law owns it
-    if ! ls "${d}"/0.2/*:effectiveStressMechanicalLaw:deltaSigma > /dev/null 2>&1
+    if ! ls "${d}"/0.2/*IntegrationPointTopology_effectiveStressMechanicalLaw_deltaSigma > /dev/null 2>&1
     then
         echo "FAIL: restart: the sub-law's history was not written"
         return 1
@@ -299,7 +299,7 @@ run_restart_test() {
 
     # Negative control, on the child specifically
     rm -rf "${g}"; cp -a "${d}" "${g}"
-    rm -f "${g}"/0.2/*:effectiveStressMechanicalLaw:*
+    rm -f "${g}"/0.2/*IntegrationPointTopology_effectiveStressMechanicalLaw_*
     sed -i \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
         "${g}/system/controlDict"
