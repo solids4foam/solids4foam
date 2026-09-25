@@ -247,7 +247,7 @@ void Foam::mechanicalConstitutiveLawStateSetup::readPrescribedFields
 
             state.tensorField0(e.name) = f;
         }
-        else
+        else if (e.typeName == "symmTensor")
         {
             Field<symmTensor>& f = state.symmTensorField(e.name);
 
@@ -264,6 +264,16 @@ void Foam::mechanicalConstitutiveLawStateSetup::readPrescribedFields
             }
 
             state.symmTensorField0(e.name) = f;
+        }
+        else
+        {
+            // As at the other places a state type is dispatched on. No law
+            // can reach this, since only the typed adders set a type name,
+            // but a type added to one place and not here must not be read as
+            // a symmTensor
+            FatalErrorInFunction
+                << "State field '" << e.name << "' has unsupported type '"
+                << e.typeName << "'." << exit(FatalError);
         }
     }
 }
