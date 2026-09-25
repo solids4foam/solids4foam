@@ -1,5 +1,10 @@
 {
-  "default_levels": [5, 10, 20, 40],
+  "default_levels": [
+    5,
+    10,
+    20,
+    40
+  ],
   "domain_length_m": 0.2,
   "default_variants": [
     "hex-segregated",
@@ -8,35 +13,191 @@
     "poly-petscSnes",
     "distHex-segregated",
     "distHex-petscSnes",
-    "hex-highOrder-movingLeastSquares",
-    "hex-highOrder-kExactLeastSquares",
-    "tet-highOrder-movingLeastSquares",
-    "tet-highOrder-kExactLeastSquares"
+    "hex-highOrder-movingLeastSquares-p1",
+    "hex-highOrder-kExactLeastSquares-p1",
+    "tet-highOrder-movingLeastSquares-p1",
+    "tet-highOrder-kExactLeastSquares-p1",
+    "hex-highOrder-movingLeastSquares-p2",
+    "hex-highOrder-kExactLeastSquares-p2",
+    "tet-highOrder-movingLeastSquares-p2",
+    "tet-highOrder-kExactLeastSquares-p2",
+    "hex-highOrder-movingLeastSquares-p3",
+    "hex-highOrder-kExactLeastSquares-p3",
+    "tet-highOrder-movingLeastSquares-p3",
+    "tet-highOrder-kExactLeastSquares-p3"
   ],
   "variants": {
-    "hex-segregated": {"mesh": "hex", "approach": "segregated"},
-    "hex-petscSnes": {"mesh": "hex", "approach": "petscSnes"},
-    "tet-segregated": {"mesh": "tet", "approach": "segregated"},
-    "tet-petscSnes": {"mesh": "tet", "approach": "petscSnes"},
-    "poly-segregated": {"mesh": "poly", "approach": "segregated"},
-    "poly-petscSnes": {"mesh": "poly", "approach": "petscSnes"},
-    "distHex-segregated": {"mesh": "distHex", "approach": "segregated"},
-    "distHex-petscSnes": {"mesh": "distHex", "approach": "petscSnes"},
-    "hex-highOrder-movingLeastSquares": {
+    "hex-segregated": {
       "mesh": "hex",
-      "approach": "highOrder-movingLeastSquares"
+      "approach": "segregated",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
     },
-    "tet-highOrder-movingLeastSquares": {
-      "mesh": "tet",
-      "approach": "highOrder-movingLeastSquares"
-    },
-    "hex-highOrder-kExactLeastSquares": {
+    "hex-petscSnes": {
       "mesh": "hex",
-      "approach": "highOrder-kExactLeastSquares"
+      "approach": "petscSnes",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
     },
-    "tet-highOrder-kExactLeastSquares": {
+    "tet-segregated": {
       "mesh": "tet",
-      "approach": "highOrder-kExactLeastSquares"
+      "approach": "segregated",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "tet-petscSnes": {
+      "mesh": "tet",
+      "approach": "petscSnes",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "poly-segregated": {
+      "mesh": "poly",
+      "approach": "segregated",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "poly-petscSnes": {
+      "mesh": "poly",
+      "approach": "petscSnes",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "distHex-segregated": {
+      "mesh": "distHex",
+      "approach": "segregated",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "distHex-petscSnes": {
+      "mesh": "distHex",
+      "approach": "petscSnes",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "hex-highOrder-movingLeastSquares-p1": {
+      "mesh": "hex",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 1,
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "hex-highOrder-kExactLeastSquares-p1": {
+      "mesh": "hex",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 1,
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "tet-highOrder-movingLeastSquares-p1": {
+      "mesh": "tet",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 1,
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "tet-highOrder-kExactLeastSquares-p1": {
+      "mesh": "tet",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 1,
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5
+      }
+    },
+    "hex-highOrder-movingLeastSquares-p2": {
+      "mesh": "hex",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 2,
+      "minimum_net_order": {
+        "displacement": 2.5,
+        "stress": 1.5
+      }
+    },
+    "hex-highOrder-kExactLeastSquares-p2": {
+      "mesh": "hex",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 2,
+      "minimum_net_order": {
+        "displacement": 2.5,
+        "stress": 1.5
+      }
+    },
+    "tet-highOrder-movingLeastSquares-p2": {
+      "mesh": "tet",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 2,
+      "minimum_net_order": {
+        "displacement": 2.5,
+        "stress": 1.5
+      }
+    },
+    "tet-highOrder-kExactLeastSquares-p2": {
+      "mesh": "tet",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 2,
+      "minimum_net_order": {
+        "displacement": 2.5,
+        "stress": 1.5
+      }
+    },
+    "hex-highOrder-movingLeastSquares-p3": {
+      "mesh": "hex",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 3,
+      "minimum_net_order": {
+        "displacement": 3.5,
+        "stress": 2.5
+      }
+    },
+    "hex-highOrder-kExactLeastSquares-p3": {
+      "mesh": "hex",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 3,
+      "minimum_net_order": {
+        "displacement": 3.5,
+        "stress": 2.5
+      }
+    },
+    "tet-highOrder-movingLeastSquares-p3": {
+      "mesh": "tet",
+      "approach": "highOrder-movingLeastSquares",
+      "p": 3,
+      "minimum_net_order": {
+        "displacement": 3.5,
+        "stress": 2.5
+      }
+    },
+    "tet-highOrder-kExactLeastSquares-p3": {
+      "mesh": "tet",
+      "approach": "highOrder-kExactLeastSquares",
+      "p": 3,
+      "minimum_net_order": {
+        "displacement": 3.5,
+        "stress": 2.5
+      }
     }
   },
   "acceptance": {

@@ -99,6 +99,35 @@ def set_resolution(run_dir: Path, divisions: int, domain_length: float) -> None:
     )
 
 
+def set_polynomial_order(run_dir: Path, variant: dict) -> None:
+    if not variant["approach"].startswith("highOrder-"):
+        return
+    path = run_dir / "constant" / f"solidProperties.{variant['approach']}"
+    text, count = re.subn(
+        r"(?m)^(\s*polynomialOrder\s+)\d+(\s*;)",
+        rf"\g<1>{variant['p']}\g<2>",
+        path.read_text(),
+    )
+    if count != 1:
+        raise RuntimeError(f"could not set polynomialOrder in {path}")
+    path.write_text(text)
+
+
+def validate_variant(name: str, variant: dict) -> None:
+    if variant["approach"].startswith("highOrder-"):
+        if type(variant.get("p")) is not int or variant["p"] not in (1, 2, 3):
+            raise RuntimeError(f"{name}: p must be 1, 2 or 3")
+    for field in ("displacement", "stress"):
+        value = variant.get("minimum_net_order", {}).get(field)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise RuntimeError(f"{name}: invalid minimum net order for {field}")
+
+
 def extract_norms(log_text: str, marker: str) -> tuple[float, float]:
     sections = log_text.split(marker)
     if len(sections) < 2:
@@ -138,8 +167,11 @@ def run_level(
 ) -> dict[str, float | int | str]:
     run_dir = WORK_DIR / variant_name / f"n{divisions}"
     solver_log = run_dir / "log.solids4Foam"
+    degree_file = run_dir / "verification_degree.json"
     completed_case = (
         reuse
+        and degree_file.exists()
+        and json.loads(degree_file.read_text()) == variant.get("p")
         and solver_log.exists()
         and re.search(r"^End\s*$", solver_log.read_text(), re.MULTILINE)
     )
@@ -151,6 +183,8 @@ def run_level(
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
         set_resolution(run_dir, divisions, domain_length)
+        set_polynomial_order(run_dir, variant)
+        degree_file.write_text(json.dumps(variant.get("p")) + "\n")
         command = ["./Allrun", variant["approach"], variant["mesh"]]
         print(f"Running {variant_name} n={divisions} in {run_dir}", flush=True)
         with (run_dir / "log.Allverify").open("w") as log:
@@ -195,6 +229,7 @@ def run_level(
         "variant": variant_name,
         "approach": variant["approach"],
         "mesh": variant["mesh"],
+        "p": variant.get("p", ""),
         "divisions": divisions,
         "cells": cell_count,
         "effective_spacing_m": (domain_length**3 / cell_count) ** (1.0 / 3.0),
@@ -207,7 +242,7 @@ def run_level(
     numeric_values = (
         value
         for key, value in result.items()
-        if key not in {"variant", "approach", "mesh"}
+        if key not in {"variant", "approach", "mesh", "p"}
     )
     if not all(math.isfinite(float(value)) for value in numeric_values):
         raise RuntimeError(f"non-finite result extracted from {solver_log}")
@@ -258,6 +293,10 @@ def write_results(
     if not quick:
         passed = passed and all(
             float(grouped[name][-1][metric]) < float(grouped[name][0][metric])
+            and math.isfinite(orders[name][metric])
+            and orders[name][metric] >= reference["variants"][name][
+                "minimum_net_order"
+            ][metric.split("_")[0]]
             for name in variant_names
             for metric in metrics
         )
@@ -280,10 +319,30 @@ def write_results(
                 f"- Finest mesh: {int(variant_results[-1]['cells'])} cells",
             ]
         )
+        variant = reference["variants"][name]
+        if "p" in variant:
+            lines.append(f"- Polynomial degree: p={variant['p']}")
         for metric in metrics:
+            minimum = variant["minimum_net_order"][metric.split("_")[0]]
+            metric_passed = all(
+                math.isfinite(float(row[metric])) and float(row[metric]) > 0
+                for row in variant_results
+            )
+            if not quick:
+                metric_passed = (
+                    metric_passed
+                    and float(variant_results[-1][metric])
+                    < float(variant_results[0][metric])
+                    and math.isfinite(orders[name][metric])
+                    and orders[name][metric] >= minimum
+                )
+            status = "PASS" if metric_passed else "FAIL"
+            if quick:
+                status += " (order not checked)"
             lines.append(
                 f"- {metric}: finest {float(variant_results[-1][metric]):.8g}, "
-                f"net order {orders[name][metric]:.3f}"
+                f"net order {orders[name][metric]:.3f}, "
+                f"minimum {minimum:g}: {status}"
             )
     lines.extend(["", f"- Result: {'PASS' if passed else 'FAIL'}"])
     summary = "\n".join(lines) + "\n"
@@ -316,6 +375,12 @@ def main() -> int:
         raise SystemExit("at least two positive levels are required")
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
+
+    try:
+        for name in variant_names:
+            validate_variant(name, all_variants[name])
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
 
     selected = [all_variants[name] for name in variant_names]
     required = ["checkMesh", "solids4Foam"]
