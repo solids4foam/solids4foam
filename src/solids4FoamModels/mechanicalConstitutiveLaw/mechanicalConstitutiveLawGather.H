@@ -33,6 +33,7 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "surfaceInterpolate.H"
+#include "linear.H"
 #include "integrationPointTopology.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
