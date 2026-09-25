@@ -119,7 +119,7 @@ StVenantKirchhoffElasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
+            << ". Expected -1 < nu for linear elasticity."
             << exit(FatalIOError);
     }
 

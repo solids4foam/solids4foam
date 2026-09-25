@@ -105,7 +105,7 @@ calculateEigens
         {
             const scalar disc = Foam::max(sqr(a) - 4*b, 0.0);
 
-            WarningIn("poroMohrCoulob::calculateEigens(...)")
+            WarningIn("linearElasticMohrCoulombPlastic::calculateEigens(...)")
                 << "Stress tensor has a zero root!" << endl;
 
             const scalar q = -0.5*Foam::sqrt(max(scalar(0), disc));
@@ -468,6 +468,27 @@ linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
 
     K_ = lambda_ + (2.0/3.0)*mu_;
 
+    // The derived parameter k = (1 + sin(varPhi))/(1 - sin(varPhi)) tends to 1
+    // as varPhi tends to zero, and the apex stress 2*c*sqrt(k)/(k - 1) then
+    // tends to infinity: the apex of the Mohr-Coulomb surface moves to
+    // infinity. That limiting, Tresca-like case is not implemented, so it is
+    // refused here rather than dividing by zero below, as the legacy law did
+    const scalar smallFrictionAngle = 1e-3;
+
+    if (mag(varPhi_.value()) < smallFrictionAngle)
+    {
+        FatalIOErrorInFunction(dict)
+            << "The 'frictionAngle' is " << varPhi_.value() << " degrees, "
+            << "which is at or near zero." << nl
+            << "As the friction angle tends to zero, the apex of the "
+            << "Mohr-Coulomb surface moves to infinity and the law's derived "
+            << "parameters become singular." << nl
+            << "Give a 'frictionAngle' of at least " << smallFrictionAngle
+            << " degrees in magnitude or, for a pressure-independent law, use "
+            << "linearElasticMisesPlastic."
+            << exit(FatalIOError);
+    }
+
 #ifdef OPENFOAM_NOT_EXTEND
     const scalar piBy180 = constant::mathematical::pi/180.0;
 #else
@@ -603,7 +624,12 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::evaluate
     {
         UIndirectList<scalar>& K = response.scalarTangent();
 
-        const scalar Keff = 2.0*muVal + lambdaVal;
+        // The deviatoric request is the scalar Laplacian surrogate for
+        // div(dev(sigma)), as for linearElastic
+        const scalar Keff =
+            response.tangentReq() == tangentRequest::scalarDeviatoric
+          ? (4.0/3.0)*muVal
+          : 2.0*muVal + lambdaVal;
 
         forAll(K, i)
         {

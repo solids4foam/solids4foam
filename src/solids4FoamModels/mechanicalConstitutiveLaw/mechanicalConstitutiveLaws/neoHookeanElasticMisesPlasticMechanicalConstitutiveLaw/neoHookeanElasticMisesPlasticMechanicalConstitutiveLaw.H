@@ -113,7 +113,7 @@ class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
         //  mu and K instead
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- Second Lamé parameter (shear modulus)

@@ -402,6 +402,14 @@ class mechanicalConstitutiveLawManager
             const UList<scalar>& J0
         ) const;
 
+        //- The small-strain counterpart of finiteStrainConvergenceScales
+        scalarList smallStrainConvergenceScales
+        (
+            topologyEntry& tp,
+            const UList<tensor>& gradD,
+            const UList<tensor>& gradD0
+        ) const;
+
         //- The key a topology is registered under in topologyCache_.
         //
         //  Identity is the registration key, not the object's address. The

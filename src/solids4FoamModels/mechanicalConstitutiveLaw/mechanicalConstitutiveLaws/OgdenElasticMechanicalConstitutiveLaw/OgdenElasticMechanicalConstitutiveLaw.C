@@ -110,14 +110,18 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
         const tensor& Fi = F[i];
         const scalar Ji = J[i];
 
-        // Right Cauchy-Green tensor
-        const symmTensor C(symm(Fi.T() & Fi));
+        // Left Cauchy-Green tensor. Its eigenvalues are the squared principal
+        // stretches, as are those of the right one, but its eigenvectors are
+        // the spatial principal directions, which the Cauchy stress is
+        // assembled along. The right tensor's are the material directions,
+        // and assembling along those rotated the stress back by the rigid
+        // rotation, so the answer changed with a superposed rotation.
+        // Stored in the rows
+        const symmTensor b(symm(Fi & Fi.T()));
 
-        // Its eigenvalues are the squared principal stretches, and its
-        // eigenvectors are stored in the rows
         tensor eigVec(tensor::zero);
         vector lambdaSqr(vector::zero);
-        eig3().eigen_decomposition(C, eigVec, lambdaSqr);
+        eig3().eigen_decomposition(b, eigVec, lambdaSqr);
 
         // Principal stresses from the principal stretches
         const scalar l1 = max(sqrt(lambdaSqr.x()), VSMALL);
@@ -153,7 +157,12 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
     {
         UIndirectList<scalar>& K = response.scalarTangent();
 
-        const scalar Keff = (4.0/3.0)*muVal + KVal;
+        // The deviatoric request is the scalar Laplacian surrogate for
+        // div(dev(sigma)), which does not include the bulk stiffness
+        const scalar Keff =
+            response.tangentReq() == tangentRequest::scalarDeviatoric
+          ? (4.0/3.0)*muVal
+          : (4.0/3.0)*muVal + KVal;
 
         forAll(K, i)
         {

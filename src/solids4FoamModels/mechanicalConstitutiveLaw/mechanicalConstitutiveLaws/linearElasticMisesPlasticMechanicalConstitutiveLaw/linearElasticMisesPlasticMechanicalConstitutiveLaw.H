@@ -39,7 +39,7 @@ Description
 
     Elastic parameters may be specified as:
       - Young's modulus (E) and Poisson's ratio (nu), or
-      - Shear modulus (mu) and bulk modulus (kappa).
+      - Shear modulus (mu) and bulk modulus (K).
 
     References:
       - J.C. Simo & T.J.R. Hughes, Computational Inelasticity, Springer, 1998.
@@ -84,7 +84,7 @@ class linearElasticMisesPlasticMechanicalConstitutiveLaw
         //  mu and K instead
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- Second Lamé parameter (shear modulus)
@@ -204,6 +204,15 @@ public:
         }
 
         //- Small-strain constitutive evaluation
+        //- The largest strain magnitude over these points, which the Newton
+        //  residual is normalised by. Reduced over every rank by the manager,
+        //  so that the tolerance does not depend on the decomposition
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override;
+
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,

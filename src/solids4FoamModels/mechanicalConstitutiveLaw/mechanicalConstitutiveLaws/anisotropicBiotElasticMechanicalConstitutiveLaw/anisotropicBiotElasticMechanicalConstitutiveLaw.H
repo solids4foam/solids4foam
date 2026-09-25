@@ -60,8 +60,7 @@ class anisotropicBiotElasticMechanicalConstitutiveLaw
         //- Density
         dimensionedScalar rho_;
 
-        //- True when the z direction is solved. The name is the opposite way
-        //  round from what it selects
+        //- True when the z direction is not solved, i.e. a 2-D case
         bool model2d_;
 
         //- Orthotropic stiffness coefficients

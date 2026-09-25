@@ -701,6 +701,44 @@ Foam::mechanicalConstitutiveLawManager::finiteStrainConvergenceScales
 }
 
 
+Foam::scalarList
+Foam::mechanicalConstitutiveLawManager::smallStrainConvergenceScales
+(
+    topologyEntry& tp,
+    const UList<tensor>& gradD,
+    const UList<tensor>& gradD0
+) const
+{
+    scalarList scales(laws_.size(), 0.0);
+
+    // Every law, on every rank, as for the finite-strain scales
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> gradDView(gradD, ipIDs);
+        const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
+
+        const smallStrainMechanicalConstitutiveLawKinematics kin
+        (
+            gradDView, gradD0View
+        );
+
+        scales[lawI] =
+            laws_[lawI].smallStrainConvergenceScale(kin, tp.states_[lawI]);
+    }
+
+    forAll(scales, lawI)
+    {
+        reduce(scales[lawI], maxOp<scalar>());
+    }
+
+    tp.lawConvergenceScales_ = scales;
+
+    return scales;
+}
+
+
 const Foam::word&
 Foam::mechanicalConstitutiveLawManager::topologyKeyFor
 (
@@ -2994,6 +3032,10 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
 
     topologyEntry& tp = topology(topo);
 
+    // One collective per law, before any of them is evaluated, as on the
+    // finite-strain path
+    const scalarList lawScales(smallStrainConvergenceScales(tp, gradD, gradD0));
+
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
@@ -3013,6 +3055,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
         (
             lawInputs(lawI, topo, ipIDs, dt, tp)
         );
+
+        inputs.setConvergenceScale(lawScales[lawI]);
 
         // A tangent query evaluates against a shadow of the law's state: the
         // shadow aliases the old-time fields, so history is read but never
@@ -3123,11 +3167,15 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
 
                 // Live inputs for this law on this patch. The boundary points
                 // are a different set from the internal ones, so the coupling
-                // input has to be gathered for them rather than reused
+                // input has to be gathered for them rather than reused, and
+                // they are judged by the same scale as the law's internal
+                // points
                 const mechanicalConstitutiveLawInputs inputs
                 (
                     lawInputs(lawI, topo, ipIDs, dt, tp)
                 );
+
+                inputs.setConvergenceScale(lawScales[lawI]);
 
                 const UIndirectList<tensor> gradDView(gradD, ipIDs);
                 const UIndirectList<tensor> gradD0View(gradD0, ipIDs);
@@ -3801,6 +3849,17 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     (
                         lawInputsPatch(lawI, patchI, faces, dt, tp)
                     );
+
+                    // The same scale the internal points were evaluated with.
+                    // Taking it over this rank's faces instead would make the
+                    // convergence tolerance depend on where the mesh was cut
+                    if (lawI < tp.lawConvergenceScales_.size())
+                    {
+                        inputs.setConvergenceScale
+                        (
+                            tp.lawConvergenceScales_[lawI]
+                        );
+                    }
 
                     // "View" into the kinematic and stress fields for this
                     // material => does not copy data

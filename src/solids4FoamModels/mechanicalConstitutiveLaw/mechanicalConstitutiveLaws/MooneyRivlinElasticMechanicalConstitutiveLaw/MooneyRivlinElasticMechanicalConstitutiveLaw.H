@@ -62,9 +62,9 @@ Description
     and may be used alongside history-dependent laws in multi-material
     simulations.
 
-    Material parameters are provided in terms of Young's modulus and
-    Poisson's ratio, specified as dimensioned quantities and validated at
-    construction time.
+    Material parameters are the Mooney-Rivlin coefficients c10, c01 and c11,
+    with the bulk modulus K or Poisson's ratio nu, specified as dimensioned
+    quantities and validated at construction time.
 
     The implementation is intended as a simple, robust finite-strain
     reference law and as a demonstrator for the finite-strain constitutive
@@ -104,7 +104,7 @@ class MooneyRivlinElasticMechanicalConstitutiveLaw
         //- Density
         const dimensionedScalar rho_;
 
-        //- Young's modulus
+        //- Mooney-Rivlin coefficient
         dimensionedScalar c10_;
 
         //- Mooney-Rivlin coefficient
@@ -116,7 +116,7 @@ class MooneyRivlinElasticMechanicalConstitutiveLaw
         //- Young's modulus, only used to derive K from nu
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- First Lamé parameter
@@ -187,7 +187,7 @@ public:
             return true;
         }
 
-        //- Small-strain constitutive evaluation
+        //- Finite-strain constitutive evaluation
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,

@@ -408,6 +408,18 @@ public:
             return 0;
         }
 
+        //- The small-strain counterpart of localConvergenceScale, reduced and
+        //  supplied by the manager in the same way. Named apart rather than
+        //  overloaded, so that a law overriding one does not hide the other
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics&,
+            const mechanicalConstitutiveLawState&
+        ) const
+        {
+            return 0;
+        }
+
         //- Optional hook called once at the end of each time step.
         //  Default implementation does nothing.
         //  Can be used for diagnostics, logging, or state bookkeeping.

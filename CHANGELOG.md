@@ -49,6 +49,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `OgdenElastic` assembles its Cauchy stress along the principal directions
+  of the left Cauchy-Green tensor, the spatial ones. It used the right
+  tensor's, the material ones, so under a stretch with a finite rotation the
+  stress was rotated back by the rotation and the law was not objective. No
+  tutorial selects it; results of a case with large rotations change.
+- `linearElasticMohrCoulombPlastic` refuses a friction angle below 1e-3
+  degrees in magnitude again, as the legacy law did: the apex of the
+  Mohr-Coulomb surface moves to infinity in that limit and the law's derived
+  parameters divide by zero. Its deviatoric scalar tangent is `(4/3)*mu`, as
+  for `linearElastic`, and so is `OgdenElastic`'s.
+- `linearElasticMisesPlastic` normalises its Newton residual for nonlinear
+  hardening by the largest strain over every rank, as
+  `neoHookeanElasticMisesPlastic` already did, so the plastic update no
+  longer depends on the decomposition. No tutorial uses the nonlinear
+  hardening branch.
+
 - The coupling inputs a `mechanicalConstitutiveLaw` reads, such as the
   active tension of `electroMechanicalLaw` or the temperature of
   `thermoMechanicalLaw`, are gathered on every evaluation path, where before

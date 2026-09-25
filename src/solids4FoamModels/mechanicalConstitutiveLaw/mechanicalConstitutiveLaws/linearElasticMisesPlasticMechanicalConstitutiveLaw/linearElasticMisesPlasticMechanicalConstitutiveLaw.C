@@ -205,7 +205,7 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
+            << ". Expected -1 < nu for linear elasticity."
             << exit(FatalIOError);
     }
 
@@ -278,6 +278,27 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 }
 
 
+Foam::scalar
+Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::
+smallStrainConvergenceScale
+(
+    const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawState&
+) const
+{
+    const UIndirectList<tensor>& gradD = kin.gradD();
+
+    scalar maxMagEpsilon = 0;
+
+    forAll(gradD, i)
+    {
+        maxMagEpsilon = max(maxMagEpsilon, mag(symm(gradD[i])));
+    }
+
+    return maxMagEpsilon;
+}
+
+
 void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
@@ -325,14 +346,17 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         scalarTanPtr = &response.scalarTangent();
     }
 
-    // Normalisation for Newton residual
-    // Use max equivalent strain (small strain) as a scale
-    scalar maxMagDEpsilon = SMALL;
-    forAll(sigma, i)
+    // Normalisation for the Newton residual: the largest strain magnitude,
+    // over every rank where the manager has reduced it, and over these points
+    // alone where it has not, as on the face and point paths
+    scalar maxMagDEpsilon = inputs.convergenceScale();
+
+    if (maxMagDEpsilon <= 0)
     {
-        const symmTensor eps = symm(gradD[i]);
-        maxMagDEpsilon = max(maxMagDEpsilon, mag(eps));
+        maxMagDEpsilon = smallStrainConvergenceScale(kin, state);
     }
+
+    maxMagDEpsilon = max(maxMagDEpsilon, SMALL);
 
     // Loop over integration points
     forAll(sigma, i)
