@@ -304,8 +304,32 @@ class immersedBoundaryForce
             //  weighted by their rates
             List<pointField> linkWallPoints_;
 
+            //- Links of each body: the fluid cell, the penalised cell (or -1
+            //  if on another processor, with the coupled patch and face),
+            //  the diffusion coefficient over the volume of the fluid cell,
+            //  and the surface point, for the explicit correction of the
+            //  flux to the penalised cell
+            List<labelList> linkFluidCells_;
+            List<labelList> linkPenalisedCells_;
+            List<labelList> linkPatches_;
+            List<labelList> linkPatchFaces_;
+            List<scalarField> linkCoeffs_;
+            List<pointField> linkPoints_;
+
+            //- Correct the flux from each fluid cell to its penalised
+            //  neighbours explicitly with the body velocity at the surface,
+            //  so that it does not depend on the stiffness of the penalised
+            //  cells
+            bool linkCorrection_;
+
             //- Surface traction of each body, for the forces
             PtrList<immersedSurfaceTraction> tractions_;
+
+            //- If positive, the coefficient C of the rate of the penalised
+            //  cells of the cutLink method, C*(nu/w^2 + |Ub|/w), which does
+            //  not depend on the time step (at most K/deltaT), and bounds
+            //  the rates of the fluid cells next to them
+            scalar pinnedRateCoeff_;
 
             //- Couple the pressure equation to the bodies through the face
             //  apertures: the fluid model blends the face fluxes and
@@ -319,6 +343,31 @@ class immersedBoundaryForce
             //  immersedBoundaryWallFlux
             autoPtr<surfaceScalarField> aperturePtr_;
             autoPtr<surfaceScalarField> wallFluxPtr_;
+
+            //- Apertures at the end of the previous time step, and the time
+            //  index of the apertures
+            autoPtr<surfaceScalarField> aperture0Ptr_;
+            label apertureTimeIndex_;
+
+            //- Flux of the body velocity through the solid part of the faces
+            //  with the mean of the old and new apertures (trapezoidal
+            //  swept volume), else with the new apertures
+            bool apertureTimeAverage_;
+
+            //- Solid fraction of the cells at the end of the previous time
+            //  step and now
+            scalarField solidFraction0_;
+            scalarField solidFraction_;
+
+            //- Add the volume conservation source of the cut cells to the
+            //  pressure equation
+            bool volumeSource_;
+
+            //- Volume conservation source (1/s): the rate of change of the
+            //  solid volume of each cell plus the net flux of the body
+            //  velocity through the solid part of its faces, per unit
+            //  volume, registered as immersedBoundaryVolumeSource
+            autoPtr<volScalarField::Internal> volumeSourcePtr_;
 
         // Ghost cell method
 
@@ -440,6 +489,9 @@ class immersedBoundaryForce
         List<vector> force_;
         List<vector> torque_;
         List<vector> inertia_;
+
+        //- Force from the surface traction, with the cutLink method
+        List<vector> tractionForce_;
         word forceTimeName_;
         bool forcesPending_;
 
@@ -484,6 +536,9 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Rate of a penalised cell of the cutLink method
+        scalar pinnedRate(const label celli, const vector& Ub);
 
         //- Find the fluid cells next to the penalised cells of the cut link
         //  method and their rates, after the bodies are updated

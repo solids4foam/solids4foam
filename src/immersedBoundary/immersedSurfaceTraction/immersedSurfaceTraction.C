@@ -524,10 +524,12 @@ void Foam::immersedSurfaceTraction::force
     F = Zero;
     T = Zero;
     scalar area = 0;
+    vector Fp(Zero);
     forAll(t, i)
     {
         if (h_[i] > 0)
         {
+            Fp += rho*((t[i] & normals_[i])*normals_[i])*areas_[i];
             const vector dF(rho*t[i]*areas_[i]);
             F += dF;
             T += (points_[i] - CofR) ^ dF;
@@ -536,7 +538,8 @@ void Foam::immersedSurfaceTraction::force
     }
 
     Info<< "    Immersed body " << body_.name() << ": traction area " << area
-        << endl;
+        << ", normal part of the force " << Fp << ", tangential part "
+        << F - Fp << endl;
 }
 
 
