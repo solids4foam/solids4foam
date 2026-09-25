@@ -41,7 +41,8 @@ case "$(solids4Foam::foamFlavour)" in
         LEGACY_POINT_D_MEAN=3.77106432123373e-08
         ;;
     *)
-        # The case does not run here
+        # The legacy model never ran this case here, so there is no answer
+        # of its to compare with
         LEGACY_POINT_D_MAX=""
         LEGACY_POINT_D_MEAN=""
         ;;
@@ -391,6 +392,8 @@ if [ "$CHECK_ONLY" = false ]; then
     then
         echo "FAIL: the case constructed no mechanical constitutive law"
         failures=$((failures + 1))
+    elif [[ -z "${LEGACY_POINT_D_MAX}" ]]; then
+        echo "SKIP: pointD against the legacy model: no legacy answer on this fork"
     elif ! check_field_against_legacy "pointD" \
         "${CASE_DIR}/$(solids4Foam::latestTime "${CASE_DIR}")/pointD" \
         "${LEGACY_POINT_D_MAX}" "${LEGACY_POINT_D_MEAN}" \

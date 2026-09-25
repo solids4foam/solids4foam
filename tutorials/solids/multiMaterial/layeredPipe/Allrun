@@ -6,9 +6,6 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# Case does not run with OpenFOAM.org
-solids4Foam::caseDoesNotRunWithOpenFOAMOrg
-
 # "./Allrun parallel" runs in parallel, decomposed with
 # system/decomposeParDict.interface, which puts the processor boundary on the
 # material interface; "./Allrun parallel simple" uses
