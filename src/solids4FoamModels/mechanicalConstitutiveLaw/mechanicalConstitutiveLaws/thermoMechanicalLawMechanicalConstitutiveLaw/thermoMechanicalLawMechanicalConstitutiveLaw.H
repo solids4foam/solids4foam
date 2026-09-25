@@ -155,6 +155,20 @@ public:
             return wordList(1, TName_);
         }
 
+        //- The sub-law's convergence scale, over its own state, so that a
+        //  plastic sub-law is judged by the scale the manager reduces
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override
+        {
+            return subLawPtr_->smallStrainConvergenceScale
+            (
+                kin, state.child(subStateName_)
+            );
+        }
+
         //- The sub-law's history lives in a child state
         virtual wordList childStateNames() const override
         {

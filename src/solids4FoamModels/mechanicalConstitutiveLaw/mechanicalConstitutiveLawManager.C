@@ -1069,6 +1069,93 @@ Foam::mechanicalConstitutiveLawManager::scalarInputSource
 }
 
 
+void Foam::mechanicalConstitutiveLawManager::refreshScalarInputs() const
+{
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
+
+    const label timeIndex = mesh_.time().timeIndex();
+
+    if (diskScalarInputsTimeIndex_ == timeIndex)
+    {
+        return;
+    }
+
+    diskScalarInputsTimeIndex_ = timeIndex;
+    diskScalarInputs_.clear();
+
+    // Every law and every input, in the same order on every rank. Only the
+    // inputs that neither another model supplies nor a case directory does
+    // are read: those are the ones a law would otherwise have read from the
+    // file itself, on whichever ranks hold its points
+    forAll(laws_, lawI)
+    {
+        const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+
+        forAll(names, i)
+        {
+            const word& name = names[i];
+
+            if (diskScalarInputs_.found(name) || scalarInputSource(lawI, name))
+            {
+                continue;
+            }
+
+            IOobject io
+            (
+                name,
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            );
+
+            // An input given once in 0 is found on a restart too
+            if (!headerIsA<volScalarField>(io))
+            {
+                io.instance() = "0";
+            }
+
+            if (headerIsA<volScalarField>(io))
+            {
+                diskScalarInputs_.insert
+                (
+                    name,
+                    autoPtr<volScalarField>(new volScalarField(io, mesh_))
+                );
+            }
+        }
+    }
+}
+
+
+const Foam::volScalarField*
+Foam::mechanicalConstitutiveLawManager::diskScalarInput
+(
+    const word& name
+) const
+{
+    if (diskScalarInputsTimeIndex_ != mesh_.time().timeIndex())
+    {
+        FatalErrorInFunction
+            << "The coupling input '" << name << "' was asked for before the "
+            << "inputs were refreshed for this time step." << nl
+            << "Every evaluation path must call refreshScalarInputs first."
+            << abort(FatalError);
+    }
+
+    if (diskScalarInputs_.found(name))
+    {
+        return &autoPtrRef(diskScalarInputs_[name]);
+    }
+
+    return nullptr;
+}
+
+
 Foam::mechanicalConstitutiveLawInputs
 Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 (
@@ -1118,14 +1205,12 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
         // one that holds a reference
         const volScalarField* srcPtr = scalarInputSource(lawI, name);
 
-        const tmp<volScalarField> tsrc
-        (
-            srcPtr
-          ? tmp<volScalarField>()
-          : prescribedField<scalar>(name)
-        );
+        if (!srcPtr)
+        {
+            srcPtr = diskScalarInput(name);
+        }
 
-        if (!srcPtr && !tsrc.valid())
+        if (!srcPtr)
         {
             FatalErrorInFunction
                 << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -1135,7 +1220,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
                 << exit(FatalError);
         }
 
-        const volScalarField& src = srcPtr ? *srcPtr : tsrc();
+        const volScalarField& src = *srcPtr;
 
         const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
@@ -1216,9 +1301,9 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
         }
         else
         {
-            const tmp<volScalarField> tsrc(prescribedField<scalar>(name));
+            const volScalarField* diskPtr = diskScalarInput(name);
 
-            if (!tsrc.valid())
+            if (!diskPtr)
             {
                 FatalErrorInFunction
                     << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -1230,7 +1315,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
                     << exit(FatalError);
             }
 
-            gatherToIntegrationPoints(tsrc(), lawI, topo, ipIDs, fld);
+            gatherToIntegrationPoints(*diskPtr, lawI, topo, ipIDs, fld);
         }
 
         inputs.setScalar(name, fld);
@@ -2327,6 +2412,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     compactFingerprints_(),
     addressingMeshSizes_(),
     caseInputsPtr_(),
+    diskScalarInputs_(),
+    diskScalarInputsTimeIndex_(-1),
     restartKinematicsAvailable_(true)
 {
     // Read the mechanical laws
@@ -3040,13 +3127,10 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     UList<scalar>* volumetricPtr
 )
 {
-    // Every processor refreshes every case-directory input here, before any
-    // material is skipped for having no points on it, since reading a source
-    // case is collective
-    if (caseInputsPtr_.valid())
-    {
-        caseInputsPtr_->refreshAll();
-    }
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
 
     const word context = "updateStressSmallStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
@@ -3307,13 +3391,10 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     UList<scalar>* volumetricPtr
 )
 {
-    // Every processor refreshes every case-directory input here, before any
-    // material is skipped for having no points on it, since reading a source
-    // case is collective
-    if (caseInputsPtr_.valid())
-    {
-        caseInputsPtr_->refreshAll();
-    }
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
 
     const word context = "updateStressFiniteStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
@@ -4056,13 +4137,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Every processor refreshes every case-directory input here, before any
-    // material is skipped for having no points on it, since reading a source
-    // case is collective
-    if (caseInputsPtr_.valid())
-    {
-        caseInputsPtr_->refreshAll();
-    }
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -4177,6 +4255,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                     continue;
                 }
 
+                // Live inputs for this law on this patch: the patch values,
+                // which are a different set from the internal faces'
+                const mechanicalConstitutiveLawInputs patchInputs
+                (
+                    lawInputsPatch(lawI, patchI, faces, dt, tp)
+                );
+
                 // "View" into the kinematic and stress fields for this
                 // material => does not copy data
                 const UIndirectList<tensor> gradDView
@@ -4212,7 +4297,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 (
                     laws_[lawI],
                     kin,
-                    inputs,
+                    patchInputs,
                     tp.boundaryStates_[lawI][patchI],
                     stressView,
                     faces,
@@ -4310,13 +4395,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     updateOldTimeIfNeeded();
 
-    // Every processor refreshes every case-directory input here, before any
-    // material is skipped for having no points on it, since reading a source
-    // case is collective
-    if (caseInputsPtr_.valid())
-    {
-        caseInputsPtr_->refreshAll();
-    }
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
 
     // Accumulation fields
 
@@ -4940,13 +5022,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
-    // Every processor refreshes every case-directory input here, before any
-    // material is skipped for having no points on it, since reading a source
-    // case is collective
-    if (caseInputsPtr_.valid())
-    {
-        caseInputsPtr_->refreshAll();
-    }
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -5042,6 +5121,22 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     continue;
                 }
 
+                // Live inputs for this law on this patch: the patch values,
+                // which are a different set from the internal faces', judged
+                // by the same scale
+                const mechanicalConstitutiveLawInputs patchInputs
+                (
+                    lawInputsPatch(lawI, patchI, faces, dt, tp)
+                );
+
+                if (lawI < tp.lawConvergenceScales_.size())
+                {
+                    patchInputs.setConvergenceScale
+                    (
+                        tp.lawConvergenceScales_[lawI]
+                    );
+                }
+
                 const UIndirectList<tensor> FView
                 (
                     F.boundaryField()[patchI], faces
@@ -5080,7 +5175,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                 (
                     laws_[lawI],
                     kin,
-                    inputs,
+                    patchInputs,
                     tp.boundaryStates_[lawI][patchI],
                     stressView,
                     faces,

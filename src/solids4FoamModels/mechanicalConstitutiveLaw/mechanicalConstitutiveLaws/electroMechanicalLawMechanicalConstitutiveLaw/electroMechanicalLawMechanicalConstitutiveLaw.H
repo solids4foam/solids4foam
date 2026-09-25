@@ -215,6 +215,20 @@ public:
             return false;
         }
 
+        //- The passive law's convergence scale, over its own state, so that a
+        //  plastic passive law is judged by the scale the manager reduces
+        virtual scalar localConvergenceScale
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override
+        {
+            return subLawPtr_->localConvergenceScale
+            (
+                kin, state.child(subStateName_)
+            );
+        }
+
         //- The child state the passive law owns
         virtual wordList childStateNames() const override
         {

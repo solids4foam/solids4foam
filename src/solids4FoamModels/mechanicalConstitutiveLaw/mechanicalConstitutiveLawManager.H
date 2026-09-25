@@ -254,6 +254,13 @@ class mechanicalConstitutiveLawManager
         //  whose dictionaries ask for that; empty if none does
         autoPtr<mechanicalConstitutiveLawCaseInputs> caseInputsPtr_;
 
+        //- Coupling inputs that exist only as files, read once per time step
+        //  on every rank by refreshScalarInputs, and the time index they were
+        //  read at. Unregistered, so that nothing else takes them for a field
+        //  another model supplies
+        mutable HashTable<autoPtr<volScalarField>> diskScalarInputs_;
+        mutable label diskScalarInputsTimeIndex_;
+
         //- Whether a continued run has the kinematic history a constitutive
         //  history is measured against. Said by the solid model, which knows
         //  what it wrote; true until it says otherwise
@@ -533,6 +540,17 @@ class mechanicalConstitutiveLawManager
             const scalar dt,
             topologyEntry& tp
         ) const;
+
+        //- Bring every coupling input source up to date for this time step:
+        //  the case-directory inputs, and the inputs that exist only as files.
+        //  Called at the start of every evaluation path, on every rank and
+        //  before any material is skipped for having no points there, since
+        //  reading a file can be collective
+        void refreshScalarInputs() const;
+
+        //- A coupling input that exists only as a file, as refreshScalarInputs
+        //  read it for this time step, or nullptr if there is none
+        const volScalarField* diskScalarInput(const word& name) const;
 
         //- The coupling inputs this law needs, including every law below it.
         //
