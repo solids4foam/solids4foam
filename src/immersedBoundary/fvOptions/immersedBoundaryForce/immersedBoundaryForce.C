@@ -19,6 +19,7 @@ License
 
 #include "immersedBoundaryForce.H"
 #include "fvMatrices.H"
+#include "fvmSup.H"
 #include "pimpleControl.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -190,6 +191,50 @@ void Foam::fv::immersedBoundaryForce::writeForces()
 }
 
 
+void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
+{
+    const scalar deltaT = mesh_.time().deltaTValue();
+    const bool volumeFraction = (weighting_ == "volumeFraction");
+    const scalarField& lambdaI = lambda_.primitiveField();
+
+    kappa_ = 0;
+
+    for (const immersedBody& body : bodies_)
+    {
+        for (const labelList* cellsPtr :
+            {&body.internalCells(), &body.surfaceCells()})
+        {
+            for (const label celli : *cellsPtr)
+            {
+                const scalar lambda = lambdaI[celli];
+
+                if (volumeFraction)
+                {
+                    // The penalised velocity is lambda*Ui + (1 - lambda)*U
+                    kappa_[celli] =
+                        min
+                        (
+                            penaltyCoeff_,
+                            lambda/max(1 - lambda, 1/penaltyCoeff_)
+                        )/deltaT;
+                }
+                else
+                {
+                    kappa_[celli] = penaltyCoeff_*lambda/deltaT;
+                }
+            }
+        }
+    }
+
+    Ui_ = U;
+
+    for (const immersedBody& body : bodies_)
+    {
+        body.setVelocity(Ui_);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fv::immersedBoundaryForce::immersedBoundaryForce
@@ -202,6 +247,10 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
 :
     fv::option(name, modelType, dict, mesh),
     bodies_(),
+    method_("penalty"),
+    penaltyCoeff_(1e3),
+    weighting_("volumeFraction"),
+    kappa_(mesh.nCells(), Zero),
     couplingCoeff_(0.8),
     surfaceThreshold_(1e-4),
     rho_(1),
@@ -427,6 +476,35 @@ void Foam::fv::immersedBoundaryForce::addSup
         updated = true;
     }
 
+    if (method_ == "penalty")
+    {
+        // Implicit volume penalisation: kappa*(Ui - U)
+        const volVectorField& U = eqn.psi();
+
+        setPenalty(U);
+
+        volScalarField::Internal kappa
+        (
+            IOobject
+            (
+                IOobject::scopedName(name_, "kappa"),
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh_,
+            dimensionedScalar(dimless/dimTime, Zero)
+        );
+        kappa.field() = kappa_;
+
+        eqn += kappa*Ui_();
+        eqn -= fvm::Sp(kappa, U);
+
+        return;
+    }
+
     if (pimple().firstIter())
     {
         // Start the time step, or a repeated solution of the time step, e.g.
@@ -487,6 +565,21 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
     // Nothing to do after the momentum predictor
     if (pimple.corrPISO() < 1)
     {
+        return;
+    }
+
+    if (method_ == "penalty")
+    {
+        // The forcing exerted by the penalisation, for the forces
+        f_.primitiveFieldRef() =
+            kappa_*(Ui_.primitiveField() - U.primitiveField());
+        f_.correctBoundaryConditions();
+
+        if (pimple.corrPISO() == pimple.nCorrPISO() && pimple.finalIter())
+        {
+            calcForces(U);
+        }
+
         return;
     }
 
@@ -579,6 +672,30 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
 {
     if (fv::option::read(dict))
     {
+        coeffs_.readIfPresent("method", method_);
+
+        if (method_ != "incremental" && method_ != "penalty")
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown method " << method_ << ": valid methods are "
+                << "incremental and penalty" << exit(FatalIOError);
+        }
+
+        coeffs_.readCheckIfPresent
+        (
+            "penaltyCoeff",
+            penaltyCoeff_,
+            scalarMinMax::ge(1)
+        );
+        coeffs_.readIfPresent("weighting", weighting_);
+
+        if (weighting_ != "volumeFraction" && weighting_ != "occupancy")
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown weighting " << weighting_ << ": valid weightings "
+                << "are volumeFraction and occupancy" << exit(FatalIOError);
+        }
+
         coeffs_.readCheckIfPresent
         (
             "couplingCoeff",
@@ -601,8 +718,17 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             rhoSet_ = true;
         }
 
-        Info<< "    Coupling coefficient " << couplingCoeff_
-            << ", surface threshold " << surfaceThreshold_ << endl;
+        if (method_ == "penalty")
+        {
+            Info<< "    Penalty method: coefficient " << penaltyCoeff_
+                << ", " << weighting_ << " weighting";
+        }
+        else
+        {
+            Info<< "    Incremental method: coupling coefficient "
+                << couplingCoeff_;
+        }
+        Info<< ", surface threshold " << surfaceThreshold_ << endl;
 
         return true;
     }

@@ -24,20 +24,45 @@ Description
     incompressible flow, as a finite volume option for the momentum equation.
 
     Each body is a closed surface (see immersedBody) that covers some cells of
-    the fluid mesh with an occupancy lambda. The option adds the forcing f
-    (an acceleration) to the right-hand side of the momentum equation, and
-    after each pressure corrector drives the velocity U of the covered cells
-    towards the velocity of the bodies Ui:
+    the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
+    Two forcing methods are available.
+
+    penalty (the default): the implicit volume penalisation
+
+    \f[
+        f = \kappa (U_i - U)
+    \f]
+
+    is added to the right-hand side of the momentum equation, with the
+    \f$ -\kappa U \f$ part in the matrix, so that it also enters the pressure
+    equation through 1/A. The penalisation rate is \f$ \kappa = K/\Delta t \f$
+    in the fully covered cells, where K is the penalty coefficient. With the
+    volumeFraction weighting (the default), \f$ \kappa \Delta t =
+    \min(K, \lambda/(1 - \lambda)) \f$ in the partially covered cells, so
+    that the penalised velocity is \f$ \lambda U_i + (1 - \lambda) U \f$; with
+    the occupancy weighting, \f$ \kappa = K \lambda/\Delta t \f$, which for
+    large K blocks every covered cell. The results do not depend on K for
+    K of 1e3 or more, nor on the number of pressure correctors. With the
+    occupancy weighting they do not depend on the time step either; with the
+    volumeFraction weighting, the partially covered cells are relaxed towards
+    Ui once per time step, so the results depend on the time step, and are
+    closer to the body-fitted results for smaller time steps.
+
+    incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
+    solver. The explicit forcing f is added to the right-hand side of the
+    momentum equation, and after each pressure corrector
 
     \f[
         f \leftarrow f + c \frac{U_i - U}{\Delta t}
     \f]
 
-    where \f$ c \f$ is the coupling coefficient. The updated forcing is used by
-    the next pressure corrector. At the start of each time step, the bodies
-    are moved to the new time and f is multiplied by the new occupancy; if the
-    mesh moves again within the time step (moveMeshOuterCorrectors), f is set
-    to zero in the cells no longer covered.
+    in the covered cells, where \f$ c \f$ is the coupling coefficient; the
+    updated forcing is used by the next pressure corrector. At the start of
+    each time step, f is multiplied by the new occupancy; if the mesh moves
+    again within the time step (moveMeshOuterCorrectors), f is set to zero in
+    the cells no longer covered. The results depend on c, the time step and
+    the number of pressure correctors. This method is kept for comparison, and
+    reproduces pimpleHFDIBFoam with the vertexFraction occupancy.
 
     The force on each body is written every time step to
     postProcessing/<name>/<startTime>/<body>.dat, as the force -rho*sum(f*V)
@@ -76,8 +101,19 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Coupling coefficient c, optional, default 0.8
-        couplingCoeff   0.2;
+        // Forcing method, optional, default penalty
+        method          penalty;
+
+        // Penalty coefficient K, optional, default 1e3
+        penaltyCoeff    1e3;
+
+        // Weighting of the penalty in partially covered cells, optional,
+        // default volumeFraction
+        weighting       volumeFraction;
+
+        // Coupling coefficient c of the incremental method, optional,
+        // default 0.8
+        couplingCoeff   0.8;
 
         // Occupancy threshold for a covered cell, optional, default 1e-4
         surfaceThreshold 1e-4;
@@ -101,7 +137,8 @@ Description
     \endverbatim
 
     The fields lambda, Ui and f are written with the name of the option as a
-    prefix, e.g. immersedBoundary:lambda. f is read on restart.
+    prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
+    read on restart.
 
 Author
     Derived from the pimpleHFDIBFoam solver of openHFDIB-DEM
@@ -155,7 +192,26 @@ class immersedBoundaryForce
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
-        //- Coupling coefficient
+        //- Forcing method: penalty (implicit volume penalisation, the
+        //  default) or incremental (the explicit direct forcing of
+        //  openHFDIB-DEM, increased after each pressure corrector)
+        word method_;
+
+        //- Penalty coefficient K: the penalisation rate in a fully covered
+        //  cell is K/deltaT
+        scalar penaltyCoeff_;
+
+        //- Weighting of the penalisation in the partially covered cells:
+        //  volumeFraction (the default), where the rate times deltaT is
+        //  min(K, lambda/(1 - lambda)), so that the penalised velocity is
+        //  lambda*Ui + (1 - lambda)*U, or occupancy, where the rate is
+        //  K*lambda/deltaT
+        word weighting_;
+
+        //- Penalisation rate (1/s) in each cell
+        scalarField kappa_;
+
+        //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
 
         //- Occupancy threshold for a covered cell
@@ -240,6 +296,9 @@ class immersedBoundaryForce
 
         //- Write the forces of the last completed time step
         void writeForces();
+
+        //- Set the penalisation rate and the velocity of the bodies
+        void setPenalty(const volVectorField& U);
 
 
 public:

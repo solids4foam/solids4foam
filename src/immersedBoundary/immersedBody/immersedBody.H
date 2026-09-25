@@ -23,11 +23,19 @@ Description
     file) and a prescribed motion.
 
     The body gives the solid volume fraction (occupancy) lambda of the cells
-    it covers, following the non-convex body of openHFDIB-DEM: the occupancy
-    of a cell is half the fraction of its vertices that are inside the surface
-    plus a half if its centre is inside the surface. Cells with an occupancy
-    greater than 1 - threshold are internal cells, and cells with an
-    occupancy greater than threshold are surface cells.
+    it covers:
+
+    - signedDistance (the default): lambda = 0.5 + d/w, clipped to [0, 1],
+      where d is the distance of the cell centre to the surface, positive
+      inside the body, and w is the width of the cell normal to the surface
+      (the width of its bounding box in the direction of the normal of the
+      nearest surface face). lambda varies continuously as the body moves.
+    - vertexFraction: half the fraction of the cell vertices inside the
+      surface, plus a half if the cell centre is inside the surface, as in
+      the non-convex body of openHFDIB-DEM.
+
+    Cells with an occupancy greater than 1 - threshold are internal cells, and
+    cells with an occupancy greater than threshold are surface cells.
 
     The surface is replicated on every processor, so every processor moves it
     identically and locates the cells of its own part of the mesh.
@@ -50,6 +58,9 @@ Description
         // Centre of rotation for the torque, optional, default the mean of
         // the reference surface points
         CofR        (0 0 0);
+
+        // Occupancy, optional, default signedDistance
+        occupancy   signedDistance;
     }
     \endverbatim
 
@@ -114,6 +125,10 @@ class immersedBody
 
         //- Centre of rotation for the torque, in the reference configuration
         const point CofR0_;
+
+        //- Occupancy from the signed distance of the cell centres to the
+        //  surface, rather than from the fraction of cell vertices inside
+        const bool signedDistance_;
 
         //- Time of the current configuration
         scalar time_;

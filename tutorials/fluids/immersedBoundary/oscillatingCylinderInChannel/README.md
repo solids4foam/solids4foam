@@ -44,7 +44,7 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    couplingCoeff   0.8;
+    method          penalty;
 
     bodies
     {
@@ -110,16 +110,19 @@ square is 2.16:
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | Forcing only | Forcing and inertia |
 | ------------ | ----- | ------------------ | ------------ | ------------------- |
-| 1 | 5 084 | 10 | 1.31 | 1.36 |
-| 2 | 20 336 | 20 | 0.73 | 0.53 |
-| 3 | 81 344 | 40 | 0.73 | 0.49 |
+| 1 | 5 084 | 10 | 0.48 | 0.12 |
+| 2 | 20 336 | 20 | 0.40 | 0.07 |
+| 3 | 81 344 | 40 | 0.38 | 0.08 |
 
-The inertia of the fluid inside the cylinder is noisy, as it jumps when cells
-enter or leave the cylinder, and a moving average over 0.1 s reduces the
-difference with inertia to 1.17, 0.47 and 0.44 for levels 1, 2 and 3. Beyond
-level 2 the difference no longer decreases with the mesh, as the time step is
-limited to 0.0025 s and the direct forcing depends on the time step (see the
-`staticCylinderInChannel` tutorial).
+Including the inertia of the fluid inside the cylinder, the drag agrees with
+the reference to within about 5% of its root mean square from the coarsest
+mesh. As the occupancy varies continuously with the position of the cylinder,
+the force is smooth as the cylinder crosses the cells.
+
+With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
+incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
+differences including the inertia are 1.36, 0.53 and 0.49 for levels 1-3;
+the inertia is noisy, as it jumps when cells enter or leave the cylinder.
 
 ## References
 
