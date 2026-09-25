@@ -51,7 +51,7 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    couplingCoeff   0.8;
+    method          penalty;
 
     bodies
     {
@@ -63,8 +63,9 @@ immersedBoundary
 }
 ```
 
-The option forces the velocity of the cells covered by the cylinder towards
-the velocity of the cylinder, here zero. The method is described in
+The option penalises the difference between the velocity of the cells covered
+by the cylinder and the velocity of the cylinder, here zero, implicitly in the
+momentum equation. The method is described in
 `src/immersedBoundary/README.md`. The force on the cylinder is written every
 time step to `postProcessing/immersedBoundary/0/cylinder.dat`, and the solid
 volume fraction, target velocity and forcing fields are written as
@@ -100,19 +101,29 @@ coefficients in `forceCoeffs.pdf`.
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | $$C_d$$ | $$C_l$$ |
 | ------------ | ----- | ------------------ | ------- | ------- |
-| 1 | 4 510 | 10 | 6.04 | 0.014 |
-| 2 | 18 040 | 20 | 6.42 | 0.018 |
-| 3 | 72 160 | 40 | 6.60 | 0.014 |
+| 1 | 4 510 | 10 | 5.24 | 0.004 |
+| 2 | 18 040 | 20 | 5.38 | 0.009 |
+| 3 | 72 160 | 40 | 5.48 | 0.010 |
 | Schäfer and Turek (1996) | | | 5.57–5.59 | 0.0104–0.0110 |
 
-The direct forcing of the immersed boundary method over-predicts the drag.
-The forcing in the cells partially covered by the cylinder (the surface cells)
-is multiplied by their solid volume fraction every time step, so the results
-depend on the coupling coefficient and the time step as well as on the mesh:
-for example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
-$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$. This
-behaviour is inherent to the method: the option reproduces the forces of the
-`pimpleHFDIBFoam` solver from which it is derived.
+The drag converges towards the reference at first order in the cell size.
+The results do not depend on the penalty coefficient, the number of pressure
+correctors or the time step: with `MESH_LEVEL=1`, fixed time steps of 0.01 s
+and 0.0025 s give $$C_d = 5.236$$ and $$C_d = 5.239$$.
+
+The other forcing methods of `immersedBoundaryForce` can be compared by
+editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):
+
+- `weighting occupancy;` and `occupancy vertexFraction;`: $$C_d$$ = 5.45,
+  5.61 and 5.61 for `MESH_LEVEL` 1, 2 and 3;
+- `method incremental;`, `couplingCoeff 0.8;` and
+  `occupancy vertexFraction;`: $$C_d$$ = 6.04, 6.42 and 6.60.
+
+The `incremental` method is the direct forcing of the `pimpleHFDIBFoam`
+solver from which the option is derived. Its results also depend on the
+coupling coefficient, the time step and the number of pressure correctors: for
+example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
+$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$.
 
 ## References
 

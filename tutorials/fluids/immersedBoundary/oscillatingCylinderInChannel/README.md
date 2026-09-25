@@ -44,7 +44,7 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    couplingCoeff   0.8;
+    method          penalty;
 
     bodies
     {
@@ -81,8 +81,13 @@ $$
 
 where the reference velocity is the maximum velocity of the cylinder,
 $$U_{ref} = 2 \pi A/T = 0.3927$$ m/s, and $$L_z = 0.1$$ m is the thickness of
-the mesh, i.e. $$C_d = 1296.9 F_x$$. The coefficients of Wan and Turek (2006)
-are in `verificationData`.
+the mesh, i.e. $$C_d = 1296.9 F_x$$. The `verificationData` directory has the
+coefficients of Wan and Turek (2006) (`Cd.dat`, `Cl.dat`), and those of a
+moving body-fitted mesh solution (`CdBodyFitted.dat`, `ClBodyFitted.dat`),
+computed by the `newtonIcoFluid` solver in the `oscillatingCylinderInChannel`
+case of fluid-benchmarks, on its finest quadrilateral mesh (level 6, 282 624
+cells), with the backward scheme and a time step of 0.005 s, up to
+$$t = 7.58$$ s.
 
 ## Running the Case
 
@@ -99,27 +104,36 @@ MESH_LEVEL=2 ./Allrun
 
 The case runs for two periods. The time step is at most 0.0025 s, and is
 reduced if needed to give a maximum Courant number of 0.5. If gnuplot is
-installed, `Allrun` plots the force coefficients against those of Wan and
-Turek (2006) in `forceCoeffs.pdf`.
+installed, `Allrun` plots the force coefficients against the reference
+coefficients in `forceCoeffs.pdf`.
 
 ## Expected Results
 
-The root mean square difference between the drag coefficient and that of Wan
-and Turek (2006), over the two periods ($$0.25 < t < 8$$ s), whose root mean
-square is 2.16:
+The root mean square difference between the drag coefficient, including the
+inertia of the fluid inside the cylinder, and the reference drag coefficients,
+over $$0.25 < t < 7.5$$ s, where the root mean square of the drag coefficient
+is 2.05:
 
-| `MESH_LEVEL` | Cells | Cells across $$D$$ | Forcing | With inertia |
-| ------------ | ----- | ------------------ | ------- | ------------ |
-| 1 | 5 084 | 10 | 1.31 | 1.36 |
-| 2 | 20 336 | 20 | 0.73 | 0.53 |
-| 3 | 81 344 | 40 | 0.73 | 0.49 |
+| `MESH_LEVEL` | Cells | Cells across $$D$$ | Body-fitted | Wan and Turek |
+| ------------ | ----- | ------------------ | ----------- | ------------- |
+| 1 | 5 084 | 10 | 0.11 | 0.13 |
+| 2 | 20 336 | 20 | 0.05 | 0.09 |
+| 3 | 81 344 | 40 | 0.02 | 0.08 |
 
-The inertia of the fluid inside the cylinder is noisy, as it jumps when cells
-enter or leave the cylinder, and a moving average over 0.1 s reduces the
-difference with inertia to 1.17, 0.47 and 0.44 for levels 1, 2 and 3. Beyond
-level 2 the difference no longer decreases with the mesh, as the time step is
-limited to 0.0025 s and the direct forcing depends on the time step (see the
-`staticCylinderInChannel` tutorial).
+The difference from the body-fitted mesh solution decreases by about a factor
+of two with each refinement. That from the Wan and Turek (2006) coefficients
+stops decreasing at about 0.08, which is the difference between the body-fitted
+mesh solution and the Wan and Turek (2006) coefficients: these lag the
+converged solutions by about 0.015 s. Without the inertia of the fluid inside
+the cylinder, the difference from the body-fitted mesh solution is about 0.46
+on all the meshes. As the occupancy varies continuously with the position of
+the cylinder, the force is smooth as the cylinder crosses the cells.
+
+With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
+incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
+differences from the Wan and Turek (2006) coefficients, including the
+inertia, are 1.36, 0.53 and 0.49 for levels 1-3;
+the inertia is noisy, as it jumps when cells enter or leave the cylinder.
 
 ## References
 

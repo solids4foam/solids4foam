@@ -69,6 +69,11 @@ Foam::immersedBody::immersedBody
     searchPtr_(),
     motionPtr_(),
     CofR0_(dict.getOrDefault<point>("CofR", average(points0_))),
+    signedDistance_
+    (
+        dict.getOrDefault<word>("occupancy", "signedDistance")
+     == "signedDistance"
+    ),
     time_(-GREAT),
     internalCells_(),
     surfaceCells_()
@@ -86,6 +91,21 @@ Foam::immersedBody::immersedBody
     }
 
     motionPtr_ = immersedBodyMotion::New(motionDict);
+
+    {
+        const word occupancy
+        (
+            dict.getOrDefault<word>("occupancy", "signedDistance")
+        );
+
+        if (occupancy != "signedDistance" && occupancy != "vertexFraction")
+        {
+            FatalIOErrorInFunction(dict)
+                << "Unknown occupancy " << occupancy << ": valid occupancies "
+                << "are signedDistance and vertexFraction"
+                << exit(FatalIOError);
+        }
+    }
 
     // The inside test requires a closed surface with outward normals
     if (surface_.nInternalEdges() != surface_.nEdges())
@@ -149,33 +169,103 @@ void Foam::immersedBody::addOccupancy
     treeBoundBox surfaceBb(surface_.points());
     surfaceBb.grow(SMALL*mag(surfaceBb.span()));
 
-    const labelList cells(mesh_.cellTree().findBox(surfaceBb));
-
-    // Test each point of these cells once
-    const labelListList& cellPoints = mesh_.cellPoints();
-    Map<label> pointToIndex(4*cells.size());
-    DynamicList<label> points(4*cells.size());
-
-    forAll(cells, i)
+    // Grow the box by the largest size of these cells: a cell whose centre is
+    // within half a cell of the surface may be partially covered
     {
-        for (const label pointi : cellPoints[cells[i]])
+        const labelList cells0(mesh_.cellTree().findBox(surfaceBb));
+        const pointField& meshPoints = mesh_.points();
+
+        vector maxSpan(Zero);
+        for (const label celli : cells0)
         {
-            if (pointToIndex.insert(pointi, points.size()))
-            {
-                points.append(pointi);
-            }
+            maxSpan = max
+            (
+                maxSpan,
+                boundBox(meshPoints, mesh_.cellPoints()[celli], false).span()
+            );
         }
+
+        surfaceBb.grow(maxSpan);
     }
 
-    const boolList pointInside
-    (
-        searchPtr_->calcInside(pointField(mesh_.points(), points))
-    );
+    const labelList cells(mesh_.cellTree().findBox(surfaceBb));
+
+    const labelListList& cellPoints = mesh_.cellPoints();
+
+    // For the vertex fraction occupancy, test each point of these cells once
+    Map<label> pointToIndex;
+    boolList pointInside;
+
+    if (!signedDistance_)
+    {
+        pointToIndex.resize(4*cells.size());
+        DynamicList<label> points(4*cells.size());
+
+        forAll(cells, i)
+        {
+            for (const label pointi : cellPoints[cells[i]])
+            {
+                if (pointToIndex.insert(pointi, points.size()))
+                {
+                    points.append(pointi);
+                }
+            }
+        }
+
+        pointInside =
+            searchPtr_->calcInside(pointField(mesh_.points(), points));
+    }
 
     const boolList centreInside
     (
         searchPtr_->calcInside(pointField(mesh_.C(), cells))
     );
+
+    // Signed distance occupancy: the distance of the cell centre to the
+    // surface, relative to the width of the cell normal to the surface
+    scalarField distanceLambda;
+
+    if (signedDistance_)
+    {
+        const pointField centres(mesh_.C(), cells);
+        const pointField& meshPoints = mesh_.points();
+
+        // Width of each cell bounding box in each direction
+        vectorField spans(cells.size());
+        scalarField searchDistSqr(cells.size());
+        forAll(cells, i)
+        {
+            const boundBox cellBb(meshPoints, cellPoints[cells[i]], false);
+            spans[i] = cellBb.span();
+            searchDistSqr[i] = magSqr(spans[i]);
+        }
+
+        List<pointIndexHit> nearest;
+        searchPtr_->findNearest(centres, searchDistSqr, nearest);
+
+        const vectorField& faceNormals = surface_.faceNormals();
+
+        distanceLambda.setSize(cells.size());
+        forAll(cells, i)
+        {
+            if (nearest[i].hit())
+            {
+                const vector& n = faceNormals[nearest[i].index()];
+                const scalar width = cmptSum(cmptMultiply(cmptMag(n), spans[i]));
+                const scalar d = mag(nearest[i].hitPoint() - centres[i]);
+
+                distanceLambda[i] =
+                    0.5 + (centreInside[i] ? d : -d)/max(width, VSMALL);
+            }
+            else
+            {
+                // Further from the surface than the cell size
+                distanceLambda[i] = (centreInside[i] ? 1 : 0);
+            }
+        }
+
+        distanceLambda = min(max(distanceLambda, scalar(0)), scalar(1));
+    }
 
     // Occupancy: half the fraction of the cell vertices inside the surface,
     // plus a half if the cell centre is inside the surface
@@ -186,22 +276,29 @@ void Foam::immersedBody::addOccupancy
     forAll(cells, i)
     {
         const label celli = cells[i];
-        const labelList& curPoints = cellPoints[celli];
-        const scalar pointWeight = 0.5/curPoints.size();
-
         scalar cellLambda = 0;
 
-        for (const label pointi : curPoints)
+        if (signedDistance_)
         {
-            if (pointInside[pointToIndex[pointi]])
-            {
-                cellLambda += pointWeight;
-            }
+            cellLambda = distanceLambda[i];
         }
-
-        if (centreInside[i])
+        else
         {
-            cellLambda += 0.5;
+            const labelList& curPoints = cellPoints[celli];
+            const scalar pointWeight = 0.5/curPoints.size();
+
+            for (const label pointi : curPoints)
+            {
+                if (pointInside[pointToIndex[pointi]])
+                {
+                    cellLambda += pointWeight;
+                }
+            }
+
+            if (centreInside[i])
+            {
+                cellLambda += 0.5;
+            }
         }
 
         if (cellLambda > threshold)
