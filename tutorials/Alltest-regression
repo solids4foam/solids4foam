@@ -167,6 +167,8 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
     "fluidSolidInteraction/fillingElasticContainer"
+    # Not tutorials: tests kept under tests/, run the same way
+    "../tests/mechanicalConstitutiveLaw/lawChecks"
 )
 
 failures=0
@@ -186,9 +188,12 @@ run_regression_test()
 {
     local testCase="$1"
     local srcCase="${ROOT_DIR}/${testCase}"
-    local dstCase="${REG_ROOT}/${testCase}"
-    local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    # A test outside tutorials is named from here, as ../tests/..., and is
+    # copied into the regression tree without the leading ../, which would
+    # otherwise put the copy on top of the source and delete it
+    local dstCase="${REG_ROOT}/${testCase#../}"
+    local logFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    local statusFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
     local status=0
 
     echo
@@ -255,8 +260,8 @@ done
 wait
 
 for testCase in "${REGRESSION_TESTS[@]}"; do
-    LOG_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    STATUS_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    LOG_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    STATUS_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
 
     echo
     echo "------------------------------------------------------------"
