@@ -143,6 +143,8 @@ REGRESSION_TESTS=(
     "fluids/decayingTaylorGreenVortex"
     "fluids/cylinderInChannel"
     "fluids/poiseuilleChannel"
+    "fluids/immersedBoundary/staticCylinderInChannel"
+    "fluids/immersedBoundary/oscillatingCylinderInChannel"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"

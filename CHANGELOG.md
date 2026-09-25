@@ -41,6 +41,17 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added the `immersedBoundary` library (OpenFOAM.com only) with the
+  `immersedBoundaryForce` finite volume option: a hybrid fictitious
+  domain-immersed boundary method for bodies with a prescribed motion, given
+  as closed surfaces, in incompressible flow. It works with the `pimpleFluid`
+  fluid model and the `pimpleFoam` solver. It is a rewrite of the immersed
+  boundary code contributed to cardiacFoam by Sairam Pamulaparthi Venkata,
+  which is based on openHFDIB-DEM and openHFDIB; see
+  `src/immersedBoundary/README.md` for the provenance. Added the
+  `fluids/immersedBoundary/staticCylinderInChannel` and
+  `fluids/immersedBoundary/oscillatingCylinderInChannel` tutorials, with
+  regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
