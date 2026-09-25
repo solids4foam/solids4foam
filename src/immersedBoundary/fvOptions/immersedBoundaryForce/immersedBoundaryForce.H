@@ -25,7 +25,7 @@ Description
 
     Each body is a closed surface (see immersedBody) that covers some cells of
     the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
-    Three forcing methods are available.
+    Four forcing methods are available.
 
     penalty (the default): the implicit volume penalisation
 
@@ -72,6 +72,27 @@ Description
     weighting, surfaceRateCoeff and nu entries are not used. For moving
     bodies the cells that the body leaves (fresh cells) disturb the force,
     and the penalty method is recommended.
+
+    cutLink: the cells whose centre is inside a body are penalised with the
+    rate \f$ K/\Delta t \f$ towards the body velocity, and each fluid cell
+    P next to them is penalised towards the body velocity at the surface with
+    the rate
+
+    \f[
+        \kappa_P = \frac{1}{V_P} \sum_f \nu |S_f| \Delta_f
+            \left( \frac{|d_f|}{\phi_f} - 1 \right)
+    \f]
+
+    summed over its faces f with a penalised neighbour, where \f$ |d_f| \f$
+    is the distance between the cell centres, \f$ \Delta_f \f$ the
+    diffusion coefficient of the face and \f$ \phi_f \f$ the distance from
+    the centre of P to the surface along the line between the centres. This
+    replaces the viscous flux through the face by that of a linear profile
+    through the body velocity on the surface (Shortley-Weller), so that the
+    wall is on the surface to second order. The rate does not depend on the
+    time step, and varies continuously as the body moves: it tends to
+    infinity as the centre of P reaches the surface, where P becomes
+    penalised.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -212,6 +233,7 @@ SourceFiles
 #include "OFstream.H"
 #include "IOdictionary.H"
 #include "immersedBody.H"
+#include "immersedSurfaceTraction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -269,6 +291,34 @@ class immersedBoundaryForce
 
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
+
+        // Cut link method
+
+            //- Fluid cells next to the penalised cells of each body
+            List<labelList> linkCells_;
+
+            //- Penalisation rate of each of these cells
+            List<scalarField> linkRates_;
+
+            //- Mean surface point of the links of each of these cells,
+            //  weighted by their rates
+            List<pointField> linkWallPoints_;
+
+            //- Surface traction of each body, for the forces
+            PtrList<immersedSurfaceTraction> tractions_;
+
+            //- Couple the pressure equation to the bodies through the face
+            //  apertures: the fluid model blends the face fluxes and
+            //  diffusivity of the pressure equation with those of the
+            //  bodies on the faces they cut
+            bool apertureCoupling_;
+
+            //- Fluid fraction of the area of each face (aperture), and the
+            //  flux of the body velocity through each face, registered for
+            //  the fluid model as immersedBoundaryAperture and
+            //  immersedBoundaryWallFlux
+            autoPtr<surfaceScalarField> aperturePtr_;
+            autoPtr<surfaceScalarField> wallFluxPtr_;
 
         // Ghost cell method
 
@@ -418,6 +468,14 @@ class immersedBoundaryForce
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
 
+        //- Residual of the momentum equation of the final velocity and
+        //  pressure without the forcing: the forcing received by the fluid
+        tmp<vectorField> residual(const volVectorField& U);
+
+        //- Time derivative of the velocity with the time scheme of the
+        //  momentum equation
+        tmp<vectorField> ddtU(const volVectorField& U) const;
+
         //- Calculate the force on each body
         void calcForces(const volVectorField& U);
 
@@ -426,6 +484,13 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Find the fluid cells next to the penalised cells of the cut link
+        //  method and their rates, after the bodies are updated
+        void findLinks();
+
+        //- Update the face apertures and the flux of the body velocity
+        void updateApertures();
 
         //- Find the ghost cells and their donors, after the bodies are
         //  updated

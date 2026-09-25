@@ -20,6 +20,11 @@ License
 #include "immersedBoundaryForce.H"
 #include "fvMatrices.H"
 #include "fvmSup.H"
+#include "cutFaceIso.H"
+#include "fvcDdt.H"
+#include "fvcDiv.H"
+#include "fvcLaplacian.H"
+#include "fvcGrad.H"
 #include "indexedOctree.H"
 #include "treeDataCell.H"
 #include "interpolationCellPoint.H"
@@ -175,6 +180,36 @@ void Foam::fv::immersedBoundaryForce::updateBodies(const bool move)
 }
 
 
+Foam::tmp<Foam::vectorField>
+Foam::fv::immersedBoundaryForce::ddtU(const volVectorField& U) const
+{
+    return tmp<vectorField>::New(fvc::ddt(U)().primitiveField());
+}
+
+
+Foam::tmp<Foam::vectorField>
+Foam::fv::immersedBoundaryForce::residual(const volVectorField& U)
+{
+    // The residual ddt(U) + div(phi, U) - laplacian(nu, U) + grad(p) of the
+    // final fields, which is the forcing that the fluid receives
+    const volScalarField& p = mesh_.lookupObject<volScalarField>("p");
+    const surfaceScalarField& phi =
+        mesh_.lookupObject<surfaceScalarField>("phi");
+
+    const dimensionedScalar nu("nu", dimViscosity, this->nu());
+
+    return tmp<vectorField>::New
+    (
+        (
+            fvc::ddt(U)
+          + fvc::div(phi, U)
+          - fvc::laplacian(nu, U)
+          + fvc::grad(p)
+        )().primitiveField()
+    );
+}
+
+
 void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
 {
     const label timeIndex = mesh_.time().timeIndex();
@@ -191,17 +226,132 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
         momentumTimeIndex_ = timeIndex;
     }
 
+    tmp<vectorField> residualPtr;
+    tmp<vectorField> ddtUPtr;
+    if (method_ == "cutLink")
+    {
+        residualPtr = residual(U);
+        ddtUPtr = ddtU(U);
+    }
+
     forAll(bodies_, bodyi)
     {
         const immersedBody& body = bodies_[bodyi];
 
-        force_[bodyi] = body.force(f_, rho);
-        torque_[bodyi] = body.torque(f_, rho);
+        if (method_ == "cutLink")
+        {
+            // Momentum exchange from the residual of the momentum equation
+            // of the final velocity and pressure without the forcing, in the
+            // penalised cells and the fluid cells next to them, and the rate
+            // of change of the momentum of the penalised cells with the time
+            // scheme of the momentum equation, both over the same cells, so
+            // that the force does not jump as cells change role
+            const vectorField& R = residualPtr();
+            const vectorField& dUdt = ddtUPtr();
+            const scalarField& V = mesh_.V();
+            const vectorField& C = mesh_.C();
+            const point CofR(body.CofR());
 
-        momentum_[bodyi] = body.momentum(U, lambda_);
+            vector F(Zero);
+            vector T(Zero);
+            for (const label celli : body.insideCells())
+            {
+                const vector fc((R[celli] - dUdt[celli])*V[celli]);
+                F -= fc;
+                T -= (C[celli] - CofR) ^ fc;
+            }
+            for (const label celli : linkCells_[bodyi])
+            {
+                const vector fc(R[celli]*V[celli]);
+                F -= fc;
+                T -= (C[celli] - CofR) ^ fc;
+            }
+            reduce(F, sumOp<vector>());
+            reduce(T, sumOp<vector>());
+
+            // Force from the surface traction, which is smooth as the body
+            // crosses the cells; the momentum exchange, which includes the
+            // inertia of the fluid inside, is reported for comparison
+            if (tractions_.size() != bodies_.size())
+            {
+                tractions_.setSize(bodies_.size());
+            }
+            if (!tractions_.set(bodyi))
+            {
+                tractions_.set
+                (
+                    bodyi,
+                    new immersedSurfaceTraction(body, mesh_)
+                );
+            }
+
+            vector Fs(Zero);
+            vector Ts(Zero);
+            tractions_[bodyi].force
+            (
+                U,
+                mesh_.lookupObject<volScalarField>("p"),
+                nu(),
+                rho,
+                CofR,
+                Fs,
+                Ts
+            );
+
+            Info<< "    Immersed body " << body.name()
+                << ": momentum exchange force " << rho*F << endl;
+
+            if (std::getenv("IB_FORCE_DEBUG"))
+            {
+                // Parts of the momentum exchange: pressure gradient in the
+                // penalised cells, the rest of their residual, and the fluid
+                // cells next to them; and the number of penalised cells
+                const volScalarField& p =
+                    mesh_.lookupObject<volScalarField>("p");
+                const vectorField gradp(fvc::grad(p)().primitiveField());
+
+                vector Fp(Zero);
+                vector Fr(Zero);
+                vector Fl(Zero);
+                for (const label celli : body.insideCells())
+                {
+                    Fp -= gradp[celli]*V[celli];
+                    Fr -= (R[celli] - dUdt[celli] - gradp[celli])*V[celli];
+                }
+                for (const label celli : linkCells_[bodyi])
+                {
+                    Fl -= R[celli]*V[celli];
+                }
+                reduce(Fp, sumOp<vector>());
+                reduce(Fr, sumOp<vector>());
+                reduce(Fl, sumOp<vector>());
+
+                Info<< "FORCEDBG " << mesh_.time().value()
+                    << " pinnedPressure " << Fp.x() << " " << Fp.y()
+                    << " pinnedRest " << Fr.x() << " " << Fr.y()
+                    << " link " << Fl.x() << " " << Fl.y()
+                    << " traction " << Fs.x() << " " << Fs.y()
+                    << " nPinned "
+                    << returnReduce(body.insideCells().size(), sumOp<label>())
+                    << " nLink "
+                    << returnReduce(linkCells_[bodyi].size(), sumOp<label>())
+                    << endl;
+            }
+
+            force_[bodyi] = Fs;
+            torque_[bodyi] = Ts;
+            momentum_[bodyi] = Zero;
+        }
+        else
+        {
+            force_[bodyi] = body.force(f_, rho);
+            torque_[bodyi] = body.torque(f_, rho);
+
+            momentum_[bodyi] = body.momentum(U, lambda_);
+        }
 
         inertia_[bodyi] = Zero;
-        if (momentum0Valid_)
+        if (momentum0Valid_ && method_ != "cutLink")
         {
             inertia_[bodyi] =
                 rho*(momentum_[bodyi] - momentum0_[bodyi])/deltaT;
@@ -266,6 +416,69 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
 
     kappa_ = 0;
 
+    if (method_ == "cutLink")
+    {
+        Ui_ = U;
+        vectorField& UiI = Ui_.primitiveFieldRef();
+
+        // Penalised cells: the body velocity at their centre
+        for (const immersedBody& body : bodies_)
+        {
+            const labelList& cells = body.insideCells();
+            const vectorField Ub
+            (
+                body.velocity(pointField(mesh_.C(), cells))
+            );
+
+            forAll(cells, i)
+            {
+                kappa_[cells[i]] = penaltyCoeff_/deltaT;
+                UiI[cells[i]] = Ub[i];
+            }
+        }
+
+        // Fluid cells next to them: the body velocity at the surface,
+        // weighted by the rates of the bodies
+        forAll(bodies_, bodyi)
+        {
+            for (const label celli : linkCells_[bodyi])
+            {
+                UiI[celli] = Zero;
+            }
+        }
+        forAll(bodies_, bodyi)
+        {
+            const labelList& cells = linkCells_[bodyi];
+            const scalarField& rates = linkRates_[bodyi];
+            const vectorField Ub
+            (
+                bodies_[bodyi].velocity(linkWallPoints_[bodyi])
+            );
+
+            forAll(cells, i)
+            {
+                kappa_[cells[i]] += rates[i];
+                UiI[cells[i]] += rates[i]*Ub[i];
+            }
+        }
+        forAll(bodies_, bodyi)
+        {
+            for (const label celli : linkCells_[bodyi])
+            {
+                if (kappa_[celli] > VSMALL)
+                {
+                    UiI[celli] /= kappa_[celli];
+                }
+                else
+                {
+                    UiI[celli] = U[celli];
+                }
+            }
+        }
+
+        return;
+    }
+
     for (const immersedBody& body : bodies_)
     {
         if (method_ == "ghostCell")
@@ -314,6 +527,325 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                     kappa_[celli] = penaltyCoeff_*lambda/deltaT;
                 }
             }
+        }
+    }
+}
+
+
+void Foam::fv::immersedBoundaryForce::findLinks()
+{
+    const label nBodies = bodies_.size();
+    const scalar nu = this->nu();
+    const labelUList& own = mesh_.owner();
+    const labelUList& nei = mesh_.neighbour();
+    const vectorField& C = mesh_.C();
+    const scalarField& V = mesh_.V();
+    const surfaceScalarField& deltaCoeffs = mesh_.nonOrthDeltaCoeffs();
+    const surfaceScalarField& magSf = mesh_.magSf();
+
+    // Body whose surface contains the centre of each cell (the first), -1
+    // if none
+    volScalarField insideBody
+    (
+        IOobject
+        (
+            IOobject::scopedName(name_, "insideBody"),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh_,
+        dimensionedScalar(dimless, -1)
+    );
+    forAll(bodies_, bodyi)
+    {
+        for (const label celli : bodies_[bodyi].insideCells())
+        {
+            if (insideBody[celli] < 0)
+            {
+                insideBody[celli] = bodyi;
+            }
+        }
+    }
+    insideBody.correctBoundaryConditions();
+
+    auto bodyOf = [](const scalar b) { return label(std::lround(b)); };
+
+    // Links from a fluid cell P to a penalised cell N: P, the centre of N and
+    // the diffusion coefficient of the face divided by the volume of P
+    List<DynamicList<label>> linkP(nBodies);
+    List<DynamicList<point>> linkEnd(nBodies);
+    List<DynamicList<scalar>> linkCoeff(nBodies);
+
+    auto addLink = [&]
+    (
+        const label P,
+        const label bodyi,
+        const point& end,
+        const scalar coeff
+    )
+    {
+        linkP[bodyi].append(P);
+        linkEnd[bodyi].append(end);
+        linkCoeff[bodyi].append(coeff);
+    };
+
+    forAll(nei, facei)
+    {
+        const label o = own[facei];
+        const label n = nei[facei];
+        const label bo = bodyOf(insideBody[o]);
+        const label bn = bodyOf(insideBody[n]);
+        const scalar coeff = nu*magSf[facei]*deltaCoeffs[facei];
+
+        if (bo < 0 && bn >= 0)
+        {
+            addLink(o, bn, C[n], coeff/V[o]);
+        }
+        else if (bn < 0 && bo >= 0)
+        {
+            addLink(n, bo, C[o], coeff/V[n]);
+        }
+    }
+
+    forAll(insideBody.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& pf = insideBody.boundaryField()[patchi];
+
+        if (pf.coupled())
+        {
+            const scalarField nbrBody(pf.patchNeighbourField());
+            const labelUList& faceCells = pf.patch().faceCells();
+            const vectorField delta(pf.patch().delta());
+            const scalarField& pMagSf = magSf.boundaryField()[patchi];
+            const scalarField& pDeltaCoeffs =
+                deltaCoeffs.boundaryField()[patchi];
+
+            forAll(faceCells, i)
+            {
+                const label P = faceCells[i];
+                const label bn = bodyOf(nbrBody[i]);
+
+                if (bodyOf(insideBody[P]) < 0 && bn >= 0)
+                {
+                    addLink
+                    (
+                        P,
+                        bn,
+                        C[P] + delta[i],
+                        nu*pMagSf[i]*pDeltaCoeffs[i]/V[P]
+                    );
+                }
+            }
+        }
+    }
+
+    linkCells_.setSize(nBodies);
+    linkRates_.setSize(nBodies);
+    linkWallPoints_.setSize(nBodies);
+
+    label nLinks = 0;
+
+    forAll(bodies_, bodyi)
+    {
+        const labelList& P = linkP[bodyi];
+        const pointField start(C, P);
+        const pointField end(linkEnd[bodyi]);
+
+        List<pointIndexHit> hits;
+        bodies_[bodyi].findLine(start, end, hits);
+
+        Map<label> cellToLink(2*P.size());
+        DynamicList<label> cells(P.size());
+        DynamicList<scalar> rates(P.size());
+        DynamicList<point> wallPoints(P.size());
+        DynamicList<scalar> weights(P.size());
+
+        forAll(P, linki)
+        {
+            const scalar d = mag(end[linki] - start[linki]);
+
+            // Distance to the surface along the link: half the link if the
+            // segment does not cross the surface (round-off)
+            scalar phi = 0.5*d;
+            point wallPoint = 0.5*(start[linki] + end[linki]);
+            if (hits[linki].hit())
+            {
+                wallPoint = hits[linki].hitPoint();
+                phi = mag(wallPoint - start[linki]);
+            }
+            phi = min(max(phi, 1e-3*d), d);
+
+            const scalar rate = linkCoeff[bodyi][linki]*(d/phi - 1);
+
+            // Weight of the surface point: the rate, and a small part of the
+            // coefficient for the links whose rate is zero
+            const scalar weight = rate + 1e-6*linkCoeff[bodyi][linki];
+
+            const auto iter = cellToLink.cfind(P[linki]);
+            if (iter.good())
+            {
+                rates[iter.val()] += rate;
+                wallPoints[iter.val()] += weight*wallPoint;
+                weights[iter.val()] += weight;
+            }
+            else
+            {
+                cellToLink.insert(P[linki], cells.size());
+                cells.append(P[linki]);
+                rates.append(rate);
+                wallPoints.append(weight*wallPoint);
+                weights.append(weight);
+            }
+        }
+
+        forAll(cells, i)
+        {
+            wallPoints[i] /= weights[i];
+        }
+
+        linkCells_[bodyi].transfer(cells);
+        linkRates_[bodyi].transfer(rates);
+        linkWallPoints_[bodyi].transfer(wallPoints);
+
+        nLinks += linkCells_[bodyi].size();
+    }
+
+    Info<< "    Cut link cells: " << returnReduce(nLinks, sumOp<label>())
+        << endl;
+}
+
+
+void Foam::fv::immersedBoundaryForce::updateApertures()
+{
+    if (!aperturePtr_)
+    {
+        aperturePtr_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "immersedBoundaryAperture",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    true
+                ),
+                mesh_,
+                dimensionedScalar(dimless, 1)
+            )
+        );
+        wallFluxPtr_.reset
+        (
+            new surfaceScalarField
+            (
+                IOobject
+                (
+                    "immersedBoundaryWallFlux",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    true
+                ),
+                mesh_,
+                dimensionedScalar(dimVolume/dimTime, Zero)
+            )
+        );
+    }
+
+    surfaceScalarField& alpha = *aperturePtr_;
+    surfaceScalarField& wallFlux = *wallFluxPtr_;
+
+    // The flux is oriented with the face area vectors
+    wallFlux.setOriented();
+
+    // Signed distance to the bodies at the points, positive in the fluid
+    scalarField f(mesh_.nPoints(), GREAT);
+    for (const immersedBody& body : bodies_)
+    {
+        body.addPointDistances(f);
+    }
+
+    cutFaceIso cutFace(mesh_, f);
+
+    const surfaceScalarField& magSf = mesh_.magSf();
+    const surfaceVectorField& Cf = mesh_.Cf();
+    const surfaceVectorField& Sf = mesh_.Sf();
+
+    // Aperture of a face: the fluid (positive) part of its area
+    auto aperture = [&](const label facei, const scalar magS)
+    {
+        const label status = cutFace.calcSubFace(facei, 0);
+        if (status == -1)
+        {
+            return scalar(1);
+        }
+        else if (status == 1)
+        {
+            return scalar(0);
+        }
+        return min(mag(cutFace.subFaceArea())/max(magS, VSMALL), scalar(1));
+    };
+
+    // Body velocity at the faces: that of the body nearest to the face,
+    // approximated by the body whose surface bounding box contains it
+    auto bodyVelocity = [&](const point& x)
+    {
+        for (const immersedBody& body : bodies_)
+        {
+            treeBoundBox bb(body.surface().points());
+            bb.grow(0.1*mag(bb.span()));
+            if (bb.contains(x))
+            {
+                return body.velocity(pointField(1, x))()[0];
+            }
+        }
+        return vector(Zero);
+    };
+
+    scalarField& alphaI = alpha.primitiveFieldRef();
+    scalarField& wallFluxI = wallFlux.primitiveFieldRef();
+    forAll(alphaI, facei)
+    {
+        alphaI[facei] = aperture(facei, magSf[facei]);
+        wallFluxI[facei] =
+        (
+            alphaI[facei] < 1
+          ? (bodyVelocity(Cf[facei]) & Sf[facei])
+          : 0
+        );
+    }
+
+    // Coupled boundary faces; the other boundary faces keep their fluxes
+    forAll(alpha.boundaryField(), patchi)
+    {
+        fvsPatchScalarField& palpha = alpha.boundaryFieldRef()[patchi];
+        fvsPatchScalarField& pflux = wallFlux.boundaryFieldRef()[patchi];
+        const fvPatch& patch = mesh_.boundary()[patchi];
+
+        if (patch.coupled())
+        {
+            forAll(palpha, i)
+            {
+                const label facei = patch.start() + i;
+                palpha[i] = aperture(facei, patch.magSf()[i]);
+                pflux[i] =
+                (
+                    palpha[i] < 1
+                  ? (bodyVelocity(patch.Cf()[i]) & patch.Sf()[i])
+                  : 0
+                );
+            }
+        }
+        else
+        {
+            palpha = 1;
+            pflux = 0;
         }
     }
 }
@@ -904,6 +1436,13 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     nu_(0),
     nuSet_(false),
     kappa_(mesh.nCells(), Zero),
+    linkCells_(),
+    linkRates_(),
+    linkWallPoints_(),
+    tractions_(),
+    apertureCoupling_(false),
+    aperturePtr_(),
+    wallFluxPtr_(),
     imageDistance_(1.5),
     imageInterpolation_("cellPoint"),
     insideCells_(),
@@ -1148,10 +1687,26 @@ void Foam::fv::immersedBoundaryForce::addSup
         updated = true;
     }
 
-    if (method_ == "penalty" || method_ == "ghostCell")
+    if
+    (
+        method_ == "penalty"
+     || method_ == "ghostCell"
+     || method_ == "cutLink"
+    )
     {
         // Implicit volume penalisation: kappa*(Ui - U)
         const volVectorField& U = eqn.psi();
+
+        // Collective: updated is the same on every processor
+        if (method_ == "cutLink" && (updated || linkCells_.empty()))
+        {
+            findLinks();
+
+            if (apertureCoupling_)
+            {
+                updateApertures();
+            }
+        }
 
         setPenalty(U);
 
@@ -1250,7 +1805,12 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         return;
     }
 
-    if (method_ == "penalty" || method_ == "ghostCell")
+    if
+    (
+        method_ == "penalty"
+     || method_ == "ghostCell"
+     || method_ == "cutLink"
+    )
     {
         // The forcing exerted by the penalisation, for the forces
         f_.primitiveFieldRef() =
@@ -1361,11 +1921,13 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             method_ != "incremental"
          && method_ != "penalty"
          && method_ != "ghostCell"
+         && method_ != "cutLink"
         )
         {
             FatalIOErrorInFunction(coeffs_)
                 << "Unknown method " << method_ << ": valid methods are "
-                << "penalty, ghostCell and incremental" << exit(FatalIOError);
+                << "penalty, cutLink, ghostCell and incremental"
+                << exit(FatalIOError);
         }
 
         coeffs_.readCheckIfPresent
@@ -1395,6 +1957,7 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             scalarMinMax::ge(0.5)
         );
         coeffs_.readIfPresent("imageInterpolation", imageInterpolation_);
+        coeffs_.readIfPresent("apertureCoupling", apertureCoupling_);
 
         if (imageInterpolation_ != "cellPoint" && imageInterpolation_ != "cell")
         {
@@ -1426,7 +1989,12 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             rhoSet_ = true;
         }
 
-        if (method_ == "ghostCell")
+        if (method_ == "cutLink")
+        {
+            Info<< "    Cut link method: penalty coefficient "
+                << penaltyCoeff_;
+        }
+        else if (method_ == "ghostCell")
         {
             Info<< "    Ghost cell method: penalty coefficient "
                 << penaltyCoeff_ << ", image distance " << imageDistance_

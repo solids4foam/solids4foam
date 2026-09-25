@@ -33,6 +33,10 @@ Description
     - vertexFraction: half the fraction of the cell vertices inside the
       surface, plus a half if the cell centre is inside the surface, as in
       the non-convex body of openHFDIB-DEM.
+    - cut: the exact volume fraction of the cell inside the zero isosurface
+      of the signed distance to the surface at the cell vertices, from the
+      geometric cutting of the cells of the geometricVoF library
+      (cutCellIso). lambda varies continuously as the body moves.
 
     Cells with an occupancy greater than 1 - threshold are internal cells, and
     cells with an occupancy greater than threshold are surface cells.
@@ -130,6 +134,9 @@ class immersedBody
         //  surface, rather than from the fraction of cell vertices inside
         const bool signedDistance_;
 
+        //- Cut cell occupancy
+        const bool cut_;
+
         //- Time of the current configuration
         scalar time_;
 
@@ -221,6 +228,35 @@ public:
             {
                 return motionPtr_->velocity(x, time_);
             }
+
+            //- Acceleration of the body at the points x, from a central
+            //  difference over dt for the motions without an exact
+            //  acceleration
+            tmp<vectorField> acceleration
+            (
+                const pointField& x,
+                const scalar dt
+            ) const
+            {
+                return motionPtr_->acceleration(x, time_, dt);
+            }
+
+            //- First intersection of the surface with each segment from
+            //  start to end
+            void findLine
+            (
+                const pointField& start,
+                const pointField& end,
+                List<pointIndexHit>& hits
+            ) const
+            {
+                searchPtr_->findLine(start, end, hits);
+            }
+
+            //- Set the signed distance to the surface, positive outside the
+            //  body, at the points of the cells near the surface, where it is
+            //  lower than the value in f
+            void addPointDistances(scalarField& f) const;
 
             //- Nearest points on the surface to the points x, within the
             //  distances sqrt(searchDistSqr), and the unit normals of the
