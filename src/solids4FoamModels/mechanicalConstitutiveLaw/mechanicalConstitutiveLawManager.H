@@ -78,6 +78,8 @@ namespace Foam
 class integrationPointTopology;
 class CompactListListBase;
 struct mat66;
+struct smallStrainKinematicsFields;
+struct finiteStrainKinematicsFields;
 
 //- OpenFOAM.org's CompactListList has two template parameters, so its header
 //  is included above. The other forks have one template parameter; forward
@@ -399,24 +401,14 @@ class mechanicalConstitutiveLawManager
 
         //- Each law's convergence scale, reduced over every rank.
         //  Asked of every law whether or not this rank holds any of its
-        //  points, so that the number of reductions is the same everywhere
-        scalarList finiteStrainConvergenceScales
+        //  points, so that the number of reductions is the same everywhere.
+        //  Fields is smallStrainKinematicsFields or
+        //  finiteStrainKinematicsFields
+        template<class Fields>
+        scalarList convergenceScales
         (
             topologyEntry& tp,
-            const UList<tensor>& F,
-            const UList<tensor>& F0,
-            const UList<tensor>& Finv,
-            const UList<tensor>& Finv0,
-            const UList<scalar>& J,
-            const UList<scalar>& J0
-        ) const;
-
-        //- The small-strain counterpart of finiteStrainConvergenceScales
-        scalarList smallStrainConvergenceScales
-        (
-            topologyEntry& tp,
-            const UList<tensor>& gradD,
-            const UList<tensor>& gradD0
+            const Fields& fields
         ) const;
 
         //- The key a topology is registered under in topologyCache_.
