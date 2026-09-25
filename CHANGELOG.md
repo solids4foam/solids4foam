@@ -41,6 +41,9 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
+  by the `meanVelocityForce` finite volume option, compared with the plane
+  Poiseuille solution, with a `regressionTest.sh`.
 
 ### Changed
 
@@ -162,6 +165,16 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+
+### Fixed
+
+- `pimpleFluid` now applies finite volume options: `fvOptions` in
+  OpenFOAM.com, and `fvModels` and `fvConstraints` in OpenFOAM.org, called
+  where the standard `pimpleFoam` solver calls them. Previously they were
+  read and reported but silently ignored.
+- With OpenFOAM.org, `libsolids4FoamModels` now links `libfvModels` and
+  `libfvConstraints`, without which a fluid case with an `fvConstraints` file
+  crashed with a segmentation fault.
 
 ## [v2.4] - 2026-08-24
 

@@ -142,6 +142,7 @@ REGRESSION_TESTS=(
     "solids/viscoelasticity/viscoTube"
     "fluids/decayingTaylorGreenVortex"
     "fluids/cylinderInChannel"
+    "fluids/poiseuilleChannel"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"
