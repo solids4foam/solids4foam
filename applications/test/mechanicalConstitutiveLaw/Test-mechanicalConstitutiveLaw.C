@@ -2679,6 +2679,104 @@ int main(int argc, char *argv[])
                 "a shared face with a collapse rule is accepted",
                 !threwWithRule
             );
+
+            // The collapsed values, in closed form: a face inside one
+            // material has that material's stress and tangent, and a face on
+            // the interface the arithmetic mean of the two stresses and the
+            // chosen mean of the two tangents
+            if (allLinearElastic && !threwWithRule)
+            {
+                surfaceScalarField faceK
+                (
+                    IOobject
+                    (
+                        "faceK",
+                        runTime.timeName(),
+                        mesh,
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh,
+                    dimensionedScalar("0", dimPressure, 0.0)
+                );
+
+                const labelList& own = mesh.faceOwner();
+                const labelList& nei = mesh.faceNeighbour();
+
+                const stressCollapseRule rules[2] =
+                {
+                    stressCollapseRule::average,
+                    stressCollapseRule::harmonic
+                };
+
+                for (label ruleI = 0; ruleI < 2; ++ruleI)
+                {
+                    const bool harmonic =
+                        rules[ruleI] == stressCollapseRule::harmonic;
+
+                    manager.updateStressSmallStrain
+                    (
+                        faceGradD,
+                        faceGradD,
+                        dt,
+                        faceSigma,
+                        rules[ruleI],
+                        &faceK,
+                        nullptr,
+                        tangentRequest::scalar
+                    );
+
+                    symmTensorField refSigma(mesh.nInternalFaces());
+                    scalarField refK(mesh.nInternalFaces());
+
+                    forAll(refSigma, faceI)
+                    {
+                        const tensor& g = faceGradD[faceI];
+                        const label a = own[faceI];
+                        const label b = nei[faceI];
+
+                        const symmTensor sa =
+                            refMu[a]*twoSymm(g) + refLambda[a]*tr(g)*I;
+                        const symmTensor sb =
+                            refMu[b]*twoSymm(g) + refLambda[b]*tr(g)*I;
+
+                        const scalar ka = 2.0*refMu[a] + refLambda[a];
+                        const scalar kb = 2.0*refMu[b] + refLambda[b];
+
+                        const bool interface =
+                            refMu[a] != refMu[b]
+                         || refLambda[a] != refLambda[b];
+
+                        refSigma[faceI] = interface ? 0.5*(sa + sb) : sa;
+
+                        refK[faceI] =
+                            !interface ? ka
+                          : harmonic ? 2.0/(1.0/ka + 1.0/kb)
+                          : 0.5*(ka + kb);
+                    }
+
+                    const word rule(harmonic ? "harmonic" : "average");
+
+                    reportError
+                    (
+                        "the " + rule + " collapse gives the closed-form "
+                        "stress",
+                        relativeDifference
+                        (
+                            Foam::primitiveField(faceSigma), refSigma
+                        ),
+                        1e-12
+                    );
+
+                    reportError
+                    (
+                        "the " + rule + " collapse gives the closed-form "
+                        "tangent",
+                        relativeDifference(Foam::primitiveField(faceK), refK),
+                        1e-12
+                    );
+                }
+            }
         }
 
         // A key already in use by a topology of a different type
