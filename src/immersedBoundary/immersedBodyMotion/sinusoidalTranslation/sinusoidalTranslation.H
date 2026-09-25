@@ -65,7 +65,8 @@ namespace Foam
 namespace immersedBodyMotions
 {
 
-/*---------------------------------------------------------------------------*                   Class sinusoidalTranslation Declaration
+/*---------------------------------------------------------------------------*\
+                   Class sinusoidalTranslation Declaration
 \*---------------------------------------------------------------------------*/
 
 class sinusoidalTranslation
