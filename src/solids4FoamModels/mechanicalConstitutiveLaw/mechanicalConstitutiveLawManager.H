@@ -531,7 +531,8 @@ class mechanicalConstitutiveLawManager
         ) const;
 
         //- As lawInputs, for a law's faces on one boundary patch. The values
-        //  come from the field's patch values, not from the cells behind it
+        //  come from the field's patch values, not from the cells behind it,
+        //  and on a coupled patch are interpolated as on an internal face
         mechanicalConstitutiveLawInputs lawInputsPatch
         (
             const label lawI,

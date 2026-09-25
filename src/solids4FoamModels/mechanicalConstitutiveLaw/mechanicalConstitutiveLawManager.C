@@ -1224,9 +1224,28 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 
         const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
-        forAll(faces, faceI)
+        if (psrc.coupled())
         {
-            fld[faceI] = psrc[faces[faceI]];
+            // A coupled face lies between two cells, as an internal face does,
+            // and the surface paths give an internal face the interpolated
+            // value. So does this, with the same weights, so that a face does
+            // not see a different input for having become a processor face
+            const scalarField& w = mesh_.weights().boundaryField()[patchI];
+            const scalarField pif(psrc.patchInternalField());
+            const scalarField pnf(psrc.patchNeighbourField());
+
+            forAll(faces, faceI)
+            {
+                const label f = faces[faceI];
+                fld[faceI] = w[f]*pif[f] + (1.0 - w[f])*pnf[f];
+            }
+        }
+        else
+        {
+            forAll(faces, faceI)
+            {
+                fld[faceI] = psrc[faces[faceI]];
+            }
         }
 
         inputs.setScalar(name, fld);
