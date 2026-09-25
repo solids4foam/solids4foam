@@ -152,11 +152,19 @@ class mechanicalConstitutiveLawState
         //  rather than a silent field of zeros that looks like an initial
         //  condition
         template<class Type>
-        const Field<Type>& getField
+        const Field<Type>& lookupField
         (
             const HashTable<autoPtr<Field<Type>>>& table,
             const word& name
         ) const;
+
+        //- Resize this type's current and old-time fields
+        template<class Type>
+        void resizeFields(const label newSize);
+
+        //- Copy this type's current fields into its old-time ones
+        template<class Type>
+        void storeOldTimeFields();
 
         //- Fatal error if this state is a shadow, for operations that would
         //  write history
@@ -268,15 +276,15 @@ public:
         void storeOldTime();
 
 
-    // Scalar fields
+    // Fields
     //
     // Two families, and the difference between them is deliberate rather
-    // than historical. The vector, tensor and symmTensor blocks below repeat
-    // the same pattern, so this is the only place it is spelled out.
+    // than historical.
     //
-    //   xField(name)    creates the field if it is not there, when called
-    //                   on a non-const state; the const overload fails
-    //   getXField(name) fails if the field is not there
+    //   field(name), xField(name)       create the field if it is not there,
+    //                                   when called on a non-const state; the
+    //                                   const xField overload fails
+    //   getField(name), getXField(name) fail if the field is not there
     //
     // A law wants the first when it is declaring what history it keeps -
     // typically on its first evaluation, where a plastic strain or a yield
@@ -298,111 +306,129 @@ public:
     // is what lets a tangent query perturb a law without disturbing the
     // history it will be asked to integrate for real afterwards.
 
-        //- Current-time scalar field, created zeroed if absent
-        Field<scalar>& scalarField(const word& name);
+        //- Current-time field, created zeroed if absent
+        template<class Type>
+        Field<Type>& field(const word& name);
 
-        //- As above, const. Does not create: fatal if it was never
-        //  declared
-        const Field<scalar>& scalarField(const word& name) const;
-
-        //- Old-time scalar field, created zeroed if absent.
+        //- Old-time field, created zeroed if absent.
         //  Fatal on a shadow: only current-time fields may be written
         //  through a shadow
-        Field<scalar>& scalarField0(const word& name);
+        template<class Type>
+        Field<Type>& field0(const word& name);
 
-        //- As above, const. Does not create; on a shadow this reads the
-        //  parent's field
-        const Field<scalar>& scalarField0(const word& name) const;
+        //- Current-time field, fatal if it was never declared
+        template<class Type>
+        const Field<Type>& getField(const word& name) const;
 
-        //- Current-time scalar field, fatal if it was never declared
-        const Field<scalar>& getScalarField(const word& name) const;
-
-        //- Old-time scalar field, fatal if it was never declared
-        const Field<scalar>& getScalarField0(const word& name) const;
-
-
-    // Vector fields
-    //
-    // As the scalar block above: the plain form creates, the get form fails,
-    // and the trailing 0 is old time.
-
-        //- Current-time vector field, created zeroed if absent
-        Field<vector>& vectorField(const word& name);
-
-        //- As above, const. Does not create: fatal if it was never
-        //  declared
-        const Field<vector>& vectorField(const word& name) const;
-
-        //- Old-time vector field, created zeroed if absent.
-        //  Fatal on a shadow: only current-time fields may be written
-        //  through a shadow
-        Field<vector>& vectorField0(const word& name);
-
-        //- As above, const. Does not create; on a shadow this reads the
-        //  parent's field
-        const Field<vector>& vectorField0(const word& name) const;
-
-        //- Current-time vector field, fatal if it was never declared
-        const Field<vector>& getVectorField(const word& name) const;
-
-        //- Old-time vector field, fatal if it was never declared
-        const Field<vector>& getVectorField0(const word& name) const;
+        //- Old-time field, fatal if it was never declared. On a shadow this
+        //  reads the parent's field
+        template<class Type>
+        const Field<Type>& getField0(const word& name) const;
 
 
-    // Tensor fields
-    //
-    // As the scalar block above: the plain form creates, the get form fails,
-    // and the trailing 0 is old time.
+    // The same by type name, which is how a law spells them. Type above is
+    // scalar, vector, tensor or symmTensor. The const forms of the plain
+    // names do not create: they are the get forms
 
-        //- Current-time tensor field, created zeroed if absent
-        Field<tensor>& tensorField(const word& name);
+        Field<scalar>& scalarField(const word& n)
+        {
+            return field<scalar>(n);
+        }
+        const Field<scalar>& scalarField(const word& n) const
+        {
+            return getField<scalar>(n);
+        }
+        Field<scalar>& scalarField0(const word& n)
+        {
+            return field0<scalar>(n);
+        }
+        const Field<scalar>& scalarField0(const word& n) const
+        {
+            return getField0<scalar>(n);
+        }
+        const Field<scalar>& getScalarField(const word& n) const
+        {
+            return getField<scalar>(n);
+        }
+        const Field<scalar>& getScalarField0(const word& n) const
+        {
+            return getField0<scalar>(n);
+        }
 
-        //- As above, const. Does not create: fatal if it was never
-        //  declared
-        const Field<tensor>& tensorField(const word& name) const;
+        Field<vector>& vectorField(const word& n)
+        {
+            return field<vector>(n);
+        }
+        const Field<vector>& vectorField(const word& n) const
+        {
+            return getField<vector>(n);
+        }
+        Field<vector>& vectorField0(const word& n)
+        {
+            return field0<vector>(n);
+        }
+        const Field<vector>& vectorField0(const word& n) const
+        {
+            return getField0<vector>(n);
+        }
+        const Field<vector>& getVectorField(const word& n) const
+        {
+            return getField<vector>(n);
+        }
+        const Field<vector>& getVectorField0(const word& n) const
+        {
+            return getField0<vector>(n);
+        }
 
-        //- Old-time tensor field, created zeroed if absent.
-        //  Fatal on a shadow: only current-time fields may be written
-        //  through a shadow
-        Field<tensor>& tensorField0(const word& name);
+        Field<tensor>& tensorField(const word& n)
+        {
+            return field<tensor>(n);
+        }
+        const Field<tensor>& tensorField(const word& n) const
+        {
+            return getField<tensor>(n);
+        }
+        Field<tensor>& tensorField0(const word& n)
+        {
+            return field0<tensor>(n);
+        }
+        const Field<tensor>& tensorField0(const word& n) const
+        {
+            return getField0<tensor>(n);
+        }
+        const Field<tensor>& getTensorField(const word& n) const
+        {
+            return getField<tensor>(n);
+        }
+        const Field<tensor>& getTensorField0(const word& n) const
+        {
+            return getField0<tensor>(n);
+        }
 
-        //- As above, const. Does not create; on a shadow this reads the
-        //  parent's field
-        const Field<tensor>& tensorField0(const word& name) const;
-
-        //- Current-time tensor field, fatal if it was never declared
-        const Field<tensor>& getTensorField(const word& name) const;
-
-        //- Old-time tensor field, fatal if it was never declared
-        const Field<tensor>& getTensorField0(const word& name) const;
-
-
-    // Symmetric tensor fields
-    //
-    // As the scalar block above: the plain form creates, the get form fails,
-    // and the trailing 0 is old time.
-
-        //- Current-time symmTensor field, created zeroed if absent
-        Field<symmTensor>& symmTensorField(const word& name);
-
-        //- As above, const. Does not create: fatal if it was never
-        //  declared
-        const Field<symmTensor>& symmTensorField(const word& name) const;
-
-        //- Old-time symmTensor field, created zeroed if absent.
-        //  Fatal on a shadow: only current-time fields may be written
-        //  through a shadow
-        Field<symmTensor>& symmTensorField0(const word& name);
-
-        //- As above, const. Does not create; on a shadow this reads the
-        //  parent's field
-        const Field<symmTensor>& symmTensorField0(const word& name) const;
-
-        //- Current-time symmTensor field, fatal if it was never declared
-        const Field<symmTensor>& getSymmTensorField(const word& name) const;
-
-        //- Old-time symmTensor field, fatal if it was never declared
-        const Field<symmTensor>& getSymmTensorField0(const word& name) const;
+        Field<symmTensor>& symmTensorField(const word& n)
+        {
+            return field<symmTensor>(n);
+        }
+        const Field<symmTensor>& symmTensorField(const word& n) const
+        {
+            return getField<symmTensor>(n);
+        }
+        Field<symmTensor>& symmTensorField0(const word& n)
+        {
+            return field0<symmTensor>(n);
+        }
+        const Field<symmTensor>& symmTensorField0(const word& n) const
+        {
+            return getField0<symmTensor>(n);
+        }
+        const Field<symmTensor>& getSymmTensorField(const word& n) const
+        {
+            return getField<symmTensor>(n);
+        }
+        const Field<symmTensor>& getSymmTensorField0(const word& n) const
+        {
+            return getField0<symmTensor>(n);
+        }
 };
 
 

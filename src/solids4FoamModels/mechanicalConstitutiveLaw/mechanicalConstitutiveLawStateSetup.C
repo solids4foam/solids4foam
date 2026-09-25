@@ -157,7 +157,7 @@ void writeStateVolField
         const stateFieldPart& part = plan.parts[partI];
 
         const Field<Type>& f =
-            stateFieldAccess<Type>::get(*part.internal, plan.variable);
+            part.internal->getField<Type>(plan.variable);
         const labelList& cells = *part.cells;
 
         forAll(cells, i)
@@ -173,10 +173,7 @@ void writeStateVolField
             }
 
             const Field<Type>& pf =
-                stateFieldAccess<Type>::get
-                (
-                    *part.patchStates[patchI], plan.variable
-                );
+                part.patchStates[patchI]->getField<Type>(plan.variable);
             const labelList& faces = *part.patchFaces[patchI];
 
             if (pf.size() != faces.size())
