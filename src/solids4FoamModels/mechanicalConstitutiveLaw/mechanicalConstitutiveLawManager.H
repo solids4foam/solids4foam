@@ -540,10 +540,10 @@ class mechanicalConstitutiveLawManager
             mechanicalConstitutiveLawState*& bState
         ) const;
 
-        //- A law's coupling inputs, gathered by inputGatherer_ into the
-        //  topology entry's storage; see
-        //  mechanicalConstitutiveLawInputGatherer. Everything else the
-        //  gatherer does is called on it directly
+        // A law's coupling inputs, gathered by inputGatherer_ into the
+        // topology entry's storage; see
+        // mechanicalConstitutiveLawInputGatherer. Everything else the
+        // gatherer does is called on it directly
 
         mechanicalConstitutiveLawInputs lawInputs
         (
@@ -588,9 +588,9 @@ class mechanicalConstitutiveLawManager
             DynamicList<label>* counts = nullptr
         ) const;
 
-        //- Register a topology entry's persistent state for restart, through
-        //  stateSetup_; see mechanicalConstitutiveLawStateSetup. Everything
-        //  else the state setup does is called on it directly
+        // Register a topology entry's persistent state for restart, through
+        // stateSetup_; see mechanicalConstitutiveLawStateSetup. Everything
+        // else the state setup does is called on it directly
 
         void setupStateRestart
         (

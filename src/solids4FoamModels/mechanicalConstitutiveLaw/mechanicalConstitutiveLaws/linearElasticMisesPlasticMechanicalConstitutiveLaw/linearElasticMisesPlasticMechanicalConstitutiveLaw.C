@@ -347,8 +347,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
     }
 
     // Normalisation for the Newton residual: the largest strain magnitude,
-    // over every rank where the manager has reduced it, and over these points
-    // alone where it has not, as on the face and point paths
+    // over every rank, as the manager reduces it. Over these points alone
+    // where no scale was supplied, as on the point path
     scalar maxMagDEpsilon = inputs.convergenceScale();
 
     if (maxMagDEpsilon <= 0)

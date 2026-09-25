@@ -244,7 +244,8 @@ public:
 
             //- Supply a scalar input. The field must outlive this object and
             //  must have one value per integration point of the law
-            void setScalar(const word& name, const scalarField& fld);};
+            void setScalar(const word& name, const scalarField& fld);
+};
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -149,10 +149,7 @@ void evaluateResponse
 
         const bool bulkTangent =
             tangentReq == tangentRequest::scalar
-         || needsFourthOrderTangent
-            (
-                tangentReq
-            );
+         || needsFourthOrderTangent(tangentReq);
 
         if (totalStress || bulkTangent)
         {
