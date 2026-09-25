@@ -318,6 +318,36 @@ void Foam::immersedBody::addOccupancy
 
     internalCells_.transfer(internalCells);
     surfaceCells_.transfer(surfaceCells);
+
+    DynamicList<label> insideCells(cells.size());
+    forAll(cells, i)
+    {
+        if (centreInside[i])
+        {
+            insideCells.append(cells[i]);
+        }
+    }
+    insideCells_.transfer(insideCells);
+}
+
+
+void Foam::immersedBody::nearest
+(
+    const pointField& x,
+    const scalarField& searchDistSqr,
+    List<pointIndexHit>& hits,
+    vectorField& normals
+) const
+{
+    searchPtr_->findNearest(x, searchDistSqr, hits);
+
+    const vectorField& faceNormals = surface_.faceNormals();
+
+    normals.setSize(x.size());
+    forAll(hits, i)
+    {
+        normals[i] = (hits[i].hit() ? faceNormals[hits[i].index()] : Zero);
+    }
 }
 
 

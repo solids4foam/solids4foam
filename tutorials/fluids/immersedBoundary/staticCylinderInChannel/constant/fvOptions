@@ -22,12 +22,15 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    // Implicit penalisation (the default); the direct forcing of
-    // openHFDIB-DEM is available for comparison with
+    // Sharp penalisation with a linear reconstruction of the velocity next
+    // to the surface, for static bodies; the implicit volume penalisation
+    // (the default, for moving bodies) is available with
+    //     method          penalty;
+    // and the direct forcing of openHFDIB-DEM, for comparison, with
     //     method          incremental;
     //     couplingCoeff   0.8;
     // and "occupancy vertexFraction;" for the body
-    method          penalty;
+    method          ghostCell;
 
     bodies
     {

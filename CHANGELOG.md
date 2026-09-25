@@ -48,7 +48,10 @@ release. For complete commit-level details and contributor information, see the
   is an implicit volume penalisation weighted by the solid volume fraction,
   which is found from the signed distance to the surface, with a
   penalisation rate in the partially covered cells that does not depend on
-  the time step. The explicit direct
+  the time step. For static bodies, `method ghostCell` penalises the cells
+  whose centre is inside a body, with the velocity of the cells next to the
+  fluid extrapolated linearly from an image point in the fluid, so that the
+  velocity equals the body velocity on the surface. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and

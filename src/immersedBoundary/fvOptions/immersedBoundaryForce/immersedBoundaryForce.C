@@ -20,6 +20,10 @@ License
 #include "immersedBoundaryForce.H"
 #include "fvMatrices.H"
 #include "fvmSup.H"
+#include "indexedOctree.H"
+#include "treeDataCell.H"
+#include "interpolationCellPoint.H"
+#include "DynamicField.H"
 #include "pimpleControl.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -264,6 +268,16 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
 
     for (const immersedBody& body : bodies_)
     {
+        if (method_ == "ghostCell")
+        {
+            // Sharp penalisation of the cells whose centre is inside
+            for (const label celli : body.insideCells())
+            {
+                kappa_[celli] = penaltyCoeff_/deltaT;
+            }
+            continue;
+        }
+
         for (const labelList* cellsPtr :
             {&body.internalCells(), &body.surfaceCells()})
         {
@@ -305,6 +319,572 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
 }
 
 
+void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
+{
+    // polyMesh::findCell uses the tet base points, whose construction is
+    // collective: construct them on every processor before searching
+    (void)mesh_.tetBasePtIs();
+    (void)mesh_.cellTree();
+
+    const labelUList& own = mesh_.owner();
+    const labelUList& nei = mesh_.neighbour();
+    const pointField& meshPoints = mesh_.points();
+    const labelListList& cellPoints = mesh_.cellPoints();
+
+    // Penalised cells: those whose centre is inside a body
+    volScalarField inside
+    (
+        IOobject
+        (
+            IOobject::scopedName(name_, "inside"),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh_,
+        dimensionedScalar(dimless, Zero)
+    );
+
+    // The body containing each penalised cell (the first, if several)
+    labelList cellBody(mesh_.nCells(), -1);
+
+    DynamicList<label> insideCells;
+    forAll(bodies_, bodyi)
+    {
+        for (const label celli : bodies_[bodyi].insideCells())
+        {
+            if (inside[celli] < 0.5)
+            {
+                inside[celli] = 1;
+                cellBody[celli] = bodyi;
+                insideCells.append(celli);
+            }
+        }
+    }
+    inside.correctBoundaryConditions();
+
+    // Cells penalised at the end of the previous time step, which are not
+    // donors; when the bodies are updated again within a time step (e.g. the
+    // mesh moves), these are kept. The mesh topology is assumed not to change
+    if (newTimeStep || penalisedOld_.size() != mesh_.nCells())
+    {
+        penalisedOld_.setSize(mesh_.nCells());
+        penalisedOld_ = false;
+        for (const label celli : insideCells_)
+        {
+            if (celli < mesh_.nCells())
+            {
+                penalisedOld_[celli] = true;
+            }
+        }
+    }
+    insideCells_.transfer(insideCells);
+
+    // Inside cells with a fluid neighbour
+    boolList isGhost(mesh_.nCells(), false);
+    forAll(nei, facei)
+    {
+        const bool ownIn = inside[own[facei]] > 0.5;
+        const bool neiIn = inside[nei[facei]] > 0.5;
+        if (ownIn && !neiIn)
+        {
+            isGhost[own[facei]] = true;
+        }
+        else if (neiIn && !ownIn)
+        {
+            isGhost[nei[facei]] = true;
+        }
+    }
+    forAll(inside.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& pf = inside.boundaryField()[patchi];
+        if (pf.coupled())
+        {
+            const scalarField nbr(pf.patchNeighbourField());
+            const labelUList& faceCells = pf.patch().faceCells();
+            forAll(faceCells, i)
+            {
+                if (inside[faceCells[i]] > 0.5 && nbr[i] < 0.5)
+                {
+                    isGhost[faceCells[i]] = true;
+                }
+            }
+        }
+    }
+
+    // Ghost cells: the penalised cells next to a fluid cell
+    DynamicList<label> ghostCells;
+    for (const label celli : insideCells_)
+    {
+        if (isGhost[celli])
+        {
+            ghostCells.append(celli);
+        }
+    }
+    ghostCells_.transfer(ghostCells);
+
+    const label nGhosts = ghostCells_.size();
+    ghostDonors_.setSize(nGhosts);
+    ghostDonors_ = -1;
+    ghostWallPoints_.setSize(nGhosts);
+    ghostWallPoints_ = Zero;
+    ghostNormals_.setSize(nGhosts);
+    ghostNormals_ = Zero;
+    ghostWallVelocities_.setSize(nGhosts);
+    ghostWallVelocities_ = Zero;
+    ghostDistances_.setSize(nGhosts);
+    ghostDistances_ = Zero;
+    ghostImagePoints_.setSize(nGhosts);
+    ghostImagePoints_ = Zero;
+
+    const pointField ghostCentres(mesh_.C(), ghostCells_);
+
+    vectorField spans(nGhosts);
+    scalarField searchDistSqr(nGhosts);
+    forAll(ghostCells_, gi)
+    {
+        spans[gi] =
+            boundBox(meshPoints, cellPoints[ghostCells_[gi]], false).span();
+        searchDistSqr[gi] = 4*magSqr(spans[gi]);
+    }
+
+    // Nearest surface point of the body that contains each ghost cell
+    forAll(bodies_, bodyi)
+    {
+        List<pointIndexHit> hits;
+        vectorField normals;
+        bodies_[bodyi].nearest(ghostCentres, searchDistSqr, hits, normals);
+
+        DynamicList<label> hitGhosts(nGhosts);
+        DynamicField<point> hitPoints(nGhosts);
+
+        forAll(hits, gi)
+        {
+            if (cellBody[ghostCells_[gi]] == bodyi && hits[gi].hit())
+            {
+                ghostWallPoints_[gi] = hits[gi].hitPoint();
+
+                // Outward normal along the line from the cell centre, which
+                // is inside the body, to the surface point, so that it varies
+                // continuously as the body moves; the normal of the nearest
+                // face if the centre is on the surface
+                const vector r(ghostCentres[gi] - hits[gi].hitPoint());
+                const scalar magR = mag(r);
+                if (magR > 1e-3*mag(spans[gi]))
+                {
+                    ghostNormals_[gi] = -r/magR;
+                }
+                else
+                {
+                    ghostNormals_[gi] = normals[gi];
+                }
+
+                // Signed distance from the surface, along the outward
+                // normal: negative inside the body
+                ghostDistances_[gi] = r & ghostNormals_[gi];
+
+                hitGhosts.append(gi);
+                hitPoints.append(hits[gi].hitPoint());
+            }
+        }
+
+        const vectorField Ub(bodies_[bodyi].velocity(hitPoints));
+        forAll(hitGhosts, i)
+        {
+            ghostWallVelocities_[hitGhosts[i]] = Ub[i];
+        }
+    }
+
+    // Donor fluid cell of each ghost cell: the fluid cell containing the
+    // first valid image point along the normal (level 0, 1, ...), about
+    // imageDistance cell widths beyond the surface. The image points of a
+    // level are searched on all the processors before the next level, so
+    // that the donor does not depend on the decomposition: a ghost cell
+    // without a local donor at level 0 is also requested from the other
+    // processors
+    scalarField widths(nGhosts, Zero);
+    labelList localLevels(nGhosts, nImageLevels_);
+    DynamicList<label> remoteGhosts;
+    forAll(ghostCells_, gi)
+    {
+        const vector& n = ghostNormals_[gi];
+        widths[gi] = cmptSum(cmptMultiply(cmptMag(n), spans[gi]));
+
+        if (magSqr(n) > SMALL)
+        {
+            ghostDonors_[gi] = findDonor
+            (
+                ghostWallPoints_[gi],
+                n,
+                widths[gi],
+                inside,
+                ghostImagePoints_[gi],
+                localLevels[gi]
+            );
+
+            if (localLevels[gi] > 0 && Pstream::parRun())
+            {
+                remoteGhosts.append(gi);
+            }
+        }
+    }
+    remoteGhosts_.transfer(remoteGhosts);
+
+    const label nProcs = Pstream::nProcs();
+    const label myProc = Pstream::myProcNo();
+    sendDonors_.clear();
+    sendDonors_.setSize(nProcs);
+    sendImagePoints_.clear();
+    sendImagePoints_.setSize(nProcs);
+    recvGhosts_.clear();
+    recvGhosts_.setSize(nProcs);
+    remoteDonorProcs_.setSize(remoteGhosts_.size());
+    remoteDonorProcs_ = -1;
+
+    if (Pstream::parRun())
+    {
+        // Requests of every processor
+        List<pointField> reqPoints(nProcs);
+        List<vectorField> reqNormals(nProcs);
+        List<scalarField> reqWidths(nProcs);
+        reqPoints[myProc] = pointField(ghostWallPoints_, remoteGhosts_);
+        reqNormals[myProc] = vectorField(ghostNormals_, remoteGhosts_);
+        reqWidths[myProc] = scalarField(widths, remoteGhosts_);
+        Pstream::allGatherList(reqPoints);
+        Pstream::allGatherList(reqNormals);
+        Pstream::allGatherList(reqWidths);
+
+        // Requests this processor can serve
+        List<labelList> canServe(nProcs);
+        List<labelList> canServeLevels(nProcs);
+        List<labelList> canServeCells(nProcs);
+        List<pointField> canServeImages(nProcs);
+        forAll(reqPoints, proci)
+        {
+            if (proci == myProc)
+            {
+                continue;
+            }
+
+            DynamicList<label> reqs;
+            DynamicList<label> levels;
+            DynamicList<label> cells;
+            DynamicList<point> images;
+            forAll(reqPoints[proci], k)
+            {
+                point imagePoint;
+                label level;
+                const label donori = findDonor
+                (
+                    reqPoints[proci][k],
+                    reqNormals[proci][k],
+                    reqWidths[proci][k],
+                    inside,
+                    imagePoint,
+                    level
+                );
+
+                if (donori >= 0)
+                {
+                    reqs.append(k);
+                    levels.append(level);
+                    cells.append(donori);
+                    images.append(imagePoint);
+                }
+            }
+            canServe[proci].transfer(reqs);
+            canServeLevels[proci].transfer(levels);
+            canServeCells[proci].transfer(cells);
+            canServeImages[proci].transfer(images);
+        }
+
+        // Tell the requesters which requests can be served
+        PstreamBuffers offerBufs(UPstream::commsTypes::nonBlocking);
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                UOPstream os(proci, offerBufs);
+                os << canServe[proci] << canServeLevels[proci];
+            }
+        }
+        offerBufs.finishedSends();
+
+        // Choose the offer with the lowest level, then the lowest
+        // processor, if its level is lower than that of the local donor
+        labelList bestLevels(remoteGhosts_.size());
+        forAll(remoteGhosts_, k)
+        {
+            bestLevels[k] = localLevels[remoteGhosts_[k]];
+        }
+
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                UIPstream is(proci, offerBufs);
+                labelList offers(is);
+                labelList offerLevels(is);
+                forAll(offers, i)
+                {
+                    const label k = offers[i];
+                    if (offerLevels[i] < bestLevels[k])
+                    {
+                        bestLevels[k] = offerLevels[i];
+                        remoteDonorProcs_[k] = proci;
+                    }
+                }
+            }
+        }
+
+        // The ghost cells with a remote donor do not use the local one
+        forAll(remoteGhosts_, k)
+        {
+            if (remoteDonorProcs_[k] >= 0)
+            {
+                ghostDonors_[remoteGhosts_[k]] = -1;
+            }
+        }
+
+        List<DynamicList<label>> chosen(nProcs);
+        forAll(remoteDonorProcs_, k)
+        {
+            if (remoteDonorProcs_[k] >= 0)
+            {
+                chosen[remoteDonorProcs_[k]].append(k);
+            }
+        }
+
+        // Tell the donors which of their offers are taken
+        PstreamBuffers chosenBufs(UPstream::commsTypes::nonBlocking);
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                recvGhosts_[proci] = chosen[proci];
+                UOPstream os(proci, chosenBufs);
+                os << recvGhosts_[proci];
+            }
+        }
+        chosenBufs.finishedSends();
+
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                UIPstream is(proci, chosenBufs);
+                labelList taken(is);
+
+                // Map the requests to the donor cells found above
+                Map<label> requestToIndex(2*canServe[proci].size());
+                forAll(canServe[proci], i)
+                {
+                    requestToIndex.insert(canServe[proci][i], i);
+                }
+
+                labelList& send = sendDonors_[proci];
+                pointField& sendImages = sendImagePoints_[proci];
+                send.setSize(taken.size());
+                sendImages.setSize(taken.size());
+                forAll(taken, i)
+                {
+                    const label j = requestToIndex[taken[i]];
+                    send[i] = canServeCells[proci][j];
+                    sendImages[i] = canServeImages[proci][j];
+                }
+            }
+        }
+    }
+
+    label nLocal = 0;
+    for (const label donori : ghostDonors_)
+    {
+        if (donori >= 0)
+        {
+            ++nLocal;
+        }
+    }
+
+    label nRemote = 0;
+    for (const label proci : remoteDonorProcs_)
+    {
+        if (proci >= 0)
+        {
+            ++nRemote;
+        }
+    }
+
+    reduce(nLocal, sumOp<label>());
+    reduce(nRemote, sumOp<label>());
+    const label nTotal = returnReduce(nGhosts, sumOp<label>());
+
+    Info<< "    Ghost cells: " << nTotal << ", with a donor on another "
+        << "processor: " << nRemote << ", without a donor fluid cell (the "
+        << "body velocity is imposed): " << nTotal - nLocal - nRemote << endl;
+}
+
+
+Foam::label Foam::fv::immersedBoundaryForce::findDonor
+(
+    const point& wallPoint,
+    const vector& normal,
+    const scalar width,
+    const volScalarField& inside,
+    point& imagePoint,
+    label& level
+) const
+{
+    const vectorField& C = mesh_.C();
+
+    for (label k = 0; k < nImageLevels_; ++k)
+    {
+        imagePoint = wallPoint + (imageDistance_ + 0.5*k)*width*normal;
+
+        const label donori = mesh_.findCell(imagePoint);
+
+        if
+        (
+            donori >= 0
+         && inside[donori] < 0.5
+         && !penalisedOld_[donori]
+         && ((C[donori] - wallPoint) & normal) > 0.25*width
+        )
+        {
+            level = k;
+            return donori;
+        }
+    }
+
+    level = nImageLevels_;
+    return -1;
+}
+
+
+void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
+{
+    const vectorField& C = mesh_.C();
+    const label nGhosts = ghostCells_.size();
+    const bool cellPoint = (imageInterpolation_ == "cellPoint");
+
+    autoPtr<interpolationCellPoint<vector>> interpPtr;
+    if (cellPoint)
+    {
+        interpPtr.reset(new interpolationCellPoint<vector>(U));
+    }
+
+    // Velocity and position used for a donor cell and its image point
+    auto donorValue = [&](const label donori, const point& imagePoint)
+    {
+        return
+        (
+            cellPoint
+          ? interpPtr->interpolate(imagePoint, donori)
+          : U[donori]
+        );
+    };
+    auto donorPoint = [&](const label donori, const point& imagePoint)
+    {
+        return (cellPoint ? imagePoint : C[donori]);
+    };
+
+    ghostDonorU_.setSize(nGhosts, Zero);
+    ghostDonorC_.setSize(nGhosts, Zero);
+
+    forAll(ghostCells_, gi)
+    {
+        const label donori = ghostDonors_[gi];
+        if (donori >= 0)
+        {
+            ghostDonorU_[gi] = donorValue(donori, ghostImagePoints_[gi]);
+            ghostDonorC_[gi] = donorPoint(donori, ghostImagePoints_[gi]);
+        }
+    }
+
+    if (Pstream::parRun())
+    {
+        const label nProcs = Pstream::nProcs();
+        const label myProc = Pstream::myProcNo();
+
+        PstreamBuffers pBufs(UPstream::commsTypes::nonBlocking);
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                const labelList& donors = sendDonors_[proci];
+                const pointField& images = sendImagePoints_[proci];
+
+                vectorField values(donors.size());
+                pointField points(donors.size());
+                forAll(donors, i)
+                {
+                    values[i] = donorValue(donors[i], images[i]);
+                    points[i] = donorPoint(donors[i], images[i]);
+                }
+
+                UOPstream os(proci, pBufs);
+                os  << values << points;
+            }
+        }
+        pBufs.finishedSends();
+
+        for (label proci = 0; proci < nProcs; ++proci)
+        {
+            if (proci != myProc)
+            {
+                UIPstream is(proci, pBufs);
+                vectorField donorU(is);
+                pointField donorC(is);
+
+                const labelList& ks = recvGhosts_[proci];
+                forAll(ks, i)
+                {
+                    const label gi = remoteGhosts_[ks[i]];
+                    ghostDonorU_[gi] = donorU[i];
+                    ghostDonorC_[gi] = donorC[i];
+                    // Mark the ghost as having a donor
+                    ghostDonors_[gi] = -2;
+                }
+            }
+        }
+    }
+}
+
+
+void Foam::fv::immersedBoundaryForce::reconstructTargets
+(
+    const volVectorField& U
+)
+{
+    // Linear velocity profile along the surface normal, through the body
+    // velocity Ub on the surface and the donor cell velocity Ud:
+    // U(s) = Ub + (Ud - Ub)*s/sd, where s is the signed distance from the
+    // surface (negative inside the body) and sd that of the donor centre
+    gatherDonors(U);
+
+    vectorField& UiI = Ui_.primitiveFieldRef();
+    forAll(ghostCells_, gi)
+    {
+        if (ghostDonors_[gi] != -1)
+        {
+            const label celli = ghostCells_[gi];
+            const vector& Ub = ghostWallVelocities_[gi];
+            const scalar sd =
+                (ghostDonorC_[gi] - ghostWallPoints_[gi]) & ghostNormals_[gi];
+            const scalar ratio = min(ghostDistances_[gi]/sd, scalar(1));
+
+            // Deeper inside than the donor is outside: the body velocity,
+            // as set by setPenalty
+            if (ratio >= -1)
+            {
+                UiI[celli] = Ub + ratio*(ghostDonorU_[gi] - Ub);
+            }
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fv::immersedBoundaryForce::immersedBoundaryForce
@@ -324,6 +904,24 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     nu_(0),
     nuSet_(false),
     kappa_(mesh.nCells(), Zero),
+    imageDistance_(1.5),
+    imageInterpolation_("cellPoint"),
+    insideCells_(),
+    penalisedOld_(),
+    ghostCells_(),
+    ghostDonors_(),
+    ghostWallPoints_(),
+    ghostNormals_(),
+    ghostWallVelocities_(),
+    ghostDistances_(),
+    remoteGhosts_(),
+    remoteDonorProcs_(),
+    ghostImagePoints_(),
+    sendDonors_(),
+    sendImagePoints_(),
+    recvGhosts_(),
+    ghostDonorU_(),
+    ghostDonorC_(),
     couplingCoeff_(0.8),
     surfaceThreshold_(1e-4),
     rho_(1),
@@ -498,6 +1096,7 @@ void Foam::fv::immersedBoundaryForce::addSup
     const label timeIndex = mesh_.time().timeIndex();
 
     bool updated = false;
+    const bool newTimeStep = (timeIndex != timeIndex_);
 
     if (timeIndex != timeIndex_)
     {
@@ -549,12 +1148,22 @@ void Foam::fv::immersedBoundaryForce::addSup
         updated = true;
     }
 
-    if (method_ == "penalty")
+    if (method_ == "penalty" || method_ == "ghostCell")
     {
         // Implicit volume penalisation: kappa*(Ui - U)
         const volVectorField& U = eqn.psi();
 
         setPenalty(U);
+
+        if (method_ == "ghostCell")
+        {
+            // Collective: updated is the same on every processor
+            if (updated)
+            {
+                findGhostCells(newTimeStep);
+            }
+            reconstructTargets(U);
+        }
 
         volScalarField::Internal kappa
         (
@@ -641,7 +1250,7 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         return;
     }
 
-    if (method_ == "penalty")
+    if (method_ == "penalty" || method_ == "ghostCell")
     {
         // The forcing exerted by the penalisation, for the forces
         f_.primitiveFieldRef() =
@@ -747,11 +1356,16 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
     {
         coeffs_.readIfPresent("method", method_);
 
-        if (method_ != "incremental" && method_ != "penalty")
+        if
+        (
+            method_ != "incremental"
+         && method_ != "penalty"
+         && method_ != "ghostCell"
+        )
         {
             FatalIOErrorInFunction(coeffs_)
                 << "Unknown method " << method_ << ": valid methods are "
-                << "incremental and penalty" << exit(FatalIOError);
+                << "penalty, ghostCell and incremental" << exit(FatalIOError);
         }
 
         coeffs_.readCheckIfPresent
@@ -776,6 +1390,22 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
 
         coeffs_.readCheckIfPresent
         (
+            "imageDistance",
+            imageDistance_,
+            scalarMinMax::ge(0.5)
+        );
+        coeffs_.readIfPresent("imageInterpolation", imageInterpolation_);
+
+        if (imageInterpolation_ != "cellPoint" && imageInterpolation_ != "cell")
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown imageInterpolation " << imageInterpolation_
+                << ": valid options are cellPoint and cell"
+                << exit(FatalIOError);
+        }
+
+        coeffs_.readCheckIfPresent
+        (
             "couplingCoeff",
             couplingCoeff_,
             scalarMinMax::ge(SMALL)
@@ -796,7 +1426,13 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             rhoSet_ = true;
         }
 
-        if (method_ == "penalty")
+        if (method_ == "ghostCell")
+        {
+            Info<< "    Ghost cell method: penalty coefficient "
+                << penaltyCoeff_ << ", image distance " << imageDistance_
+                << ", " << imageInterpolation_ << " image interpolation";
+        }
+        else if (method_ == "penalty")
         {
             Info<< "    Penalty method: coefficient " << penaltyCoeff_
                 << ", " << weighting_ << " weighting, surface rate "

@@ -139,6 +139,9 @@ class immersedBody
         //- Local cells partially covered by the body
         labelList surfaceCells_;
 
+        //- Local cells whose centre is inside the body
+        labelList insideCells_;
+
 
     // Private Member Functions
 
@@ -203,9 +206,32 @@ public:
                 return surfaceCells_;
             }
 
+            //- Local cells whose centre is inside the body
+            const labelList& insideCells() const
+            {
+                return insideCells_;
+            }
+
             //- Centre of rotation for the torque, in the current
             //  configuration
             point CofR() const;
+
+            //- Velocity of the body at the points x
+            tmp<vectorField> velocity(const pointField& x) const
+            {
+                return motionPtr_->velocity(x, time_);
+            }
+
+            //- Nearest points on the surface to the points x, within the
+            //  distances sqrt(searchDistSqr), and the unit normals of the
+            //  nearest surface faces
+            void nearest
+            (
+                const pointField& x,
+                const scalarField& searchDistSqr,
+                List<pointIndexHit>& hits,
+                vectorField& normals
+            ) const;
 
 
         // Edit
