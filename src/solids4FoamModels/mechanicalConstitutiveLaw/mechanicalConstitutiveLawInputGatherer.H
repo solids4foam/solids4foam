@@ -87,8 +87,15 @@ class mechanicalConstitutiveLawInputGatherer
         mutable HashTable<autoPtr<volScalarField>> diskScalarInputs_;
         mutable label diskScalarInputsTimeIndex_;
 
+        //- The coupling inputs of each law and every law below it, worked
+        //  out on first use
+        mutable List<wordList> lawInputNames_;
+
 
     // Private Member Functions
+
+        //- The coupling inputs law lawI needs, including every law below it
+        const wordList& lawInputNames(const label lawI) const;
 
         //- The field a law's scalar input is gathered from, or nullptr if
         //  neither the registry nor a case directory supplies it, in which

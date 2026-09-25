@@ -39,7 +39,8 @@ mechanicalConstitutiveLawInputGatherer
     caseInputsPtr_(caseInputsPtr),
     reportedUnreadInputs_(reportedUnreadInputs),
     diskScalarInputs_(),
-    diskScalarInputsTimeIndex_(-1)
+    diskScalarInputsTimeIndex_(-1),
+    lawInputNames_()
 {}
 
 
@@ -107,7 +108,7 @@ void Foam::mechanicalConstitutiveLawInputGatherer::refreshScalarInputs() const
     // file itself, on whichever ranks hold its points
     forAll(laws_, lawI)
     {
-        const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+        const wordList& names = lawInputNames(lawI);
 
         forAll(names, i)
         {
@@ -183,7 +184,7 @@ Foam::mechanicalConstitutiveLawInputGatherer::lawInputsPatch
 {
     mechanicalConstitutiveLawInputs inputs(dt, mesh_.time().value());
 
-    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+    const wordList& names = lawInputNames(lawI);
 
     if (names.empty())
     {
@@ -284,7 +285,7 @@ Foam::mechanicalConstitutiveLawInputGatherer::lawInputs
 
     reportUnreadScalarInputs(laws_[lawI]);
 
-    const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+    const wordList& names = lawInputNames(lawI);
 
     if (names.empty())
     {
@@ -362,6 +363,28 @@ Foam::mechanicalConstitutiveLawInputGatherer::lawInputs
     }
 
     return inputs;
+}
+
+
+const Foam::wordList&
+Foam::mechanicalConstitutiveLawInputGatherer::lawInputNames
+(
+    const label lawI
+) const
+{
+    // The laws are all in place before the first evaluation and do not change
+    // after it, so their inputs are worked out once rather than on every call
+    if (lawInputNames_.size() != laws_.size())
+    {
+        lawInputNames_.setSize(laws_.size());
+
+        forAll(laws_, lawJ)
+        {
+            lawInputNames_[lawJ] = requiredScalarInputsRecursive(laws_[lawJ]);
+        }
+    }
+
+    return lawInputNames_[lawI];
 }
 
 
