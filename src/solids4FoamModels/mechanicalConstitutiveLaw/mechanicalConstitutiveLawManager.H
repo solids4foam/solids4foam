@@ -62,6 +62,7 @@ Author
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "mechanicalConstitutiveLawStressCollapseRule.H"
 #include "integrationPointTopology.H"
+#include "mechanicalConstitutiveLawCaseInputs.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -237,6 +238,17 @@ class mechanicalConstitutiveLawManager
         //  under the same role is refused rather than silently given the
         //  first one's history
         mutable HashTable<word> compactFingerprints_;
+
+        //- Mesh sizes the per-patch addressing above was built for: the
+        //  number of cells, then the number of faces on each patch.
+        //  A topology-changing mesh (e.g. crackerFvMesh, which moves internal
+        //  faces onto a crack patch) changes the patch sizes under the
+        //  manager; comparing against these is how that is detected
+        labelList addressingMeshSizes_;
+
+        //- Scalar inputs read from another case directory, for the laws
+        //  whose dictionaries ask for that; empty if none does
+        autoPtr<mechanicalConstitutiveLawCaseInputs> caseInputsPtr_;
 
 
     // Private Member Functions
@@ -464,6 +476,21 @@ class mechanicalConstitutiveLawManager
             autoPtr<mechanicalConstitutiveLawState>& bScratchPtr,
             autoPtr<mechanicalConstitutiveLawState>& bShadowPtr,
             mechanicalConstitutiveLawState*& bState
+        ) const;
+
+        //- The field a law's scalar input is gathered from, or nullptr if
+        //  neither the registry nor a case directory supplies it, in which
+        //  case the caller falls back to a field on disk.
+        //
+        //  A field registered by another model comes first, so that one
+        //  solved for in this run is always what the law sees. A case
+        //  directory source comes next; the copy it registers is recognised
+        //  as its own and refreshed, once per time step, rather than taken as
+        //  another model's
+        const volScalarField* scalarInputSource
+        (
+            const label lawI,
+            const word& name
         ) const;
 
         //- Gather the live coupling inputs a law asked for, as views over its
@@ -865,6 +892,21 @@ class mechanicalConstitutiveLawManager
         //  rather than by the solid model, so that a law's history advances
         //  exactly once per step however many times its stress is evaluated
         void updateOldTimeIfNeeded();
+
+        //- The current mesh sizes, in the layout of addressingMeshSizes_
+        labelList currentMeshSizes() const;
+
+        //- Build lawBoundaryFaces_ from cellToLaw_ for the current mesh
+        void calcLawBoundaryFaces();
+
+        //- Rebuild the per-patch addressing and boundary states if the mesh
+        //  topology has changed since they were built. Checked on every
+        //  evaluation, not once per time step, because a cracking mesh
+        //  changes topology within a time step. Cell addressing and cell
+        //  states are kept, so a change in the number of cells is refused,
+        //  as is any change when a law carries persistent state, which would
+        //  need mapping onto the new boundary faces
+        void updateAddressingIfTopologyChanged();
 
 
         //- No copy construct

@@ -254,6 +254,44 @@ Materials are always **defined per cell**, via cellZones.
 
 ---
 
+## Scalar inputs from another case directory
+
+A law that reads a scalar field solved by some other equation - the
+temperature of `thermoMechanicalLaw`, say - declares it with
+`requiredScalarInputs()`, and the manager gathers it on every evaluation. It
+looks, in order, for:
+
+1. a field of that name registered by another model, such as the temperature
+   a thermal solid model solves for;
+2. a case directory named for that input in the law's dictionary;
+3. a field of that name in this case's current, or initial, time directory.
+
+The second is for a field computed beforehand, e.g. a temperature history
+from a separate thermal run, and works for any input of any law:
+
+```text
+steel
+{
+    type            thermoMechanicalLaw;
+    ...
+    inputCaseDirectories
+    {
+        T           "hotCylinderTemperatureField";
+    }
+}
+```
+
+`<input>caseDirectory` means the same, so the legacy `TcaseDirectory` entry
+works unchanged on the framework. The manager (via
+`mechanicalConstitutiveLawCaseInputs`) builds a `Time` and mesh for the
+directory, relative to the case, checks that the mesh matches, and reads the
+field once per time step at the current time. A step with no such field keeps
+the last one read; none at all is fatal. The copy is registered under the
+input's name and written, as the legacy law's is. In parallel the directory is
+looked for inside each `processorN`, again as on the legacy path.
+
+---
+
 ## Small vs finite strain
 
 Two independent stress update pathways exist:

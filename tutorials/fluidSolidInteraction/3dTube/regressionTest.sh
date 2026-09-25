@@ -350,6 +350,13 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 check_backward_restart
 
+# Said, so that a run which reached this check can be told from one which
+# skipped it: the check used to be skipped silently on two forks (#455).
+# A failure has already stopped the script under set -e
+echo "PASS: fluxCorrectedVelocity backward restart" \
+    "($(grep -o 'Checked [0-9]* fluxCorrectedVelocity patches' \
+        "${BACKWARD_CASE_DIR}/log.Test-fluxCorrectedVelocityRestart"))"
+
 if [ "$CHECK_ONLY" = false ]; then
     run_framework_test || true
 fi

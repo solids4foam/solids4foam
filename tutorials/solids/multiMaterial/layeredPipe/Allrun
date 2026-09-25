@@ -16,9 +16,20 @@ solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 # leastSquaresS4f scheme. That pairing is the point: the framework replaces
 # the legacy per-material subMesh machinery, and the material-aware gradient
 # is what does that job on a single mesh
+#
+# "./Allrun framework parallel" runs in parallel instead, decomposed with
+# system/decomposeParDict.interface, which puts the processor boundary on the
+# material interface; "./Allrun framework parallel simple" uses
+# system/decomposeParDict.simple, whose processor boundary cuts across it
 APPROACH="legacy"
+PARALLEL=false
+DECOMPOSITION="interface"
 for arg in "$@"; do
-    if [[ "$arg" == "framework" ]]; then APPROACH="framework"; fi
+    case "$arg" in
+        framework) APPROACH="framework" ;;
+        parallel) PARALLEL=true ;;
+        interface|simple) DECOMPOSITION="$arg" ;;
+    esac
 done
 echo "Using the $APPROACH approach"
 
@@ -36,7 +47,45 @@ solids4Foam::runApplication setSet -batch batch.setSet
 solids4Foam::runApplication setsToZones
 
 # Run solver
-solids4Foam::runApplication solids4Foam
+if [[ "${PARALLEL}" == true ]]
+then
+    echo "Running in parallel with the ${DECOMPOSITION} decomposition"
+    cp "system/decomposeParDict.${DECOMPOSITION}" system/decomposeParDict
+
+    if [[ "${DECOMPOSITION}" == "interface" ]]
+    then
+        # Processor 0 for the inner material, processor 1 for the outer: every
+        # cell is 1 except those listed in the inner cellSet, which is written
+        # as a count, "(", one label per line, then ")"
+        nCells=$(grep -o 'nCells:[ ]*[0-9]*' constant/polyMesh/owner \
+            | grep -o '[0-9]*$')
+        awk -v n="${nCells}" '
+            BEGIN { for (i = 0; i < n; i++) proc[i] = 1 }
+            /^\($/ { inList = 1; next }
+            /^\)$/ { inList = 0; next }
+            inList { proc[$1] = 0 }
+            END {
+                print "FoamFile"
+                print "{"
+                print "    version     2.0;"
+                print "    format      ascii;"
+                print "    class       labelList;"
+                print "    object      cellDecomposition;"
+                print "}"
+                print n
+                print "("
+                for (i = 0; i < n; i++) print proc[i]
+                print ")"
+            }
+        ' constant/polyMesh/sets/inner > constant/cellDecomposition
+    fi
+
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
+else
+    solids4Foam::runApplication solids4Foam
+fi
 
 # Sample stress along lines
 if [[ $WM_PROJECT = "foam" ]]

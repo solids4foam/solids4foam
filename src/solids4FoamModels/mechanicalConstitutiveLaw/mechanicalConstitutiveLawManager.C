@@ -922,6 +922,45 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
 }
 
 
+const Foam::volScalarField*
+Foam::mechanicalConstitutiveLawManager::scalarInputSource
+(
+    const label lawI,
+    const word& name
+) const
+{
+    const bool sourced =
+        caseInputsPtr_.valid() && caseInputsPtr_->found(lawI, name);
+
+    if (mesh_.foundObject<volScalarField>(name))
+    {
+        const volScalarField& registered =
+            mesh_.lookupObject<volScalarField>(name);
+
+        if (!sourced)
+        {
+            return &registered;
+        }
+
+        if (!caseInputsPtr_->owns(registered))
+        {
+            // Solved for, or at least supplied, by another model, which is
+            // the precedence the legacy thermoMechanicalLaw gives its T
+            caseInputsPtr_->reportShadowed(lawI, name);
+
+            return &registered;
+        }
+    }
+
+    if (sourced)
+    {
+        return &caseInputsPtr_->field(lawI, name);
+    }
+
+    return nullptr;
+}
+
+
 Foam::mechanicalConstitutiveLawInputs
 Foam::mechanicalConstitutiveLawManager::lawInputsPatch
 (
@@ -965,19 +1004,20 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
         scalarField& fld = store[key]();
         fld.setSize(faces.size(), 0.0);
 
-        // A registered field is used where it is; only a missing one is built.
-        // The two are kept apart rather than put through one tmp, because
-        // foam-extend's tmp refuses to be assigned one that holds a reference
-        const bool registered = mesh_.foundObject<volScalarField>(name);
+        // A registered or case-directory field is used where it is; only a
+        // missing one is built. The two are kept apart rather than put
+        // through one tmp, because foam-extend's tmp refuses to be assigned
+        // one that holds a reference
+        const volScalarField* srcPtr = scalarInputSource(lawI, name);
 
         const tmp<volScalarField> tsrc
         (
-            registered
+            srcPtr
           ? tmp<volScalarField>()
           : prescribedField<scalar>(name)
         );
 
-        if (!registered && !tsrc.valid())
+        if (!srcPtr && !tsrc.valid())
         {
             FatalErrorInFunction
                 << "Mechanical constitutive law '" << laws_[lawI].type()
@@ -987,8 +1027,7 @@ Foam::mechanicalConstitutiveLawManager::lawInputsPatch
                 << exit(FatalError);
         }
 
-        const volScalarField& src =
-            registered ? mesh_.lookupObject<volScalarField>(name) : tsrc();
+        const volScalarField& src = srcPtr ? *srcPtr : tsrc();
 
         const fvPatchField<scalar>& psrc = src.boundaryField()[patchI];
 
@@ -1083,16 +1122,15 @@ Foam::mechanicalConstitutiveLawManager::lawInputs
         // field has not reached its own members yet - the base class runs
         // first. At that moment the field exists only as the initial condition
         // on disk, which is the right value to evaluate against anyway
-        if (mesh_.foundObject<volScalarField>(name))
+        //
+        // A case that reads the field from another case directory, because
+        // nothing in this run solves for it, is served in between: after any
+        // registered field and before the file
+        const volScalarField* srcPtr = scalarInputSource(lawI, name);
+
+        if (srcPtr)
         {
-            gatherToIntegrationPoints
-            (
-                mesh_.lookupObject<volScalarField>(name),
-                lawI,
-                topo,
-                ipIDs,
-                fld
-            );
+            gatherToIntegrationPoints(*srcPtr, lawI, topo, ipIDs, fld);
         }
         else
         {
@@ -1806,8 +1844,173 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
 }
 
 
+Foam::labelList
+Foam::mechanicalConstitutiveLawManager::currentMeshSizes() const
+{
+    labelList sizes(mesh_.boundary().size() + 1);
+
+    sizes[0] = mesh_.nCells();
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        sizes[patchI + 1] = mesh_.boundary()[patchI].size();
+    }
+
+    return sizes;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::calcLawBoundaryFaces()
+{
+    forAll(lawBoundaryFaces_, lawI)
+    {
+        lawBoundaryFaces_[lawI].clear();
+        lawBoundaryFaces_[lawI].setSize(mesh_.boundary().size());
+
+        forAll(lawBoundaryFaces_[lawI], patchI)
+        {
+            const labelUList& faceCells =
+                mesh_.boundary()[patchI].faceCells();
+
+            // Collected in ascending face order: the boundary constitutive
+            // state is indexed by position in this list, so the order must be
+            // reproducible
+            DynamicList<label> curFaces(faceCells.size());
+
+            forAll(faceCells, faceI)
+            {
+                if (cellToLaw_[faceCells[faceI]] == lawI)
+                {
+                    curFaces.append(faceI);
+                }
+            }
+
+            lawBoundaryFaces_[lawI][patchI].transfer(curFaces);
+        }
+    }
+
+    addressingMeshSizes_ = currentMeshSizes();
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
+{
+    const labelList sizes(currentMeshSizes());
+
+    if (sizes == addressingMeshSizes_)
+    {
+        return;
+    }
+
+    if (sizes[0] != addressingMeshSizes_[0])
+    {
+        FatalErrorInFunction
+            << "The number of cells changed from " << addressingMeshSizes_[0]
+            << " to " << sizes[0] << "." << nl
+            << "    The mechanicalConstitutiveLaw framework keeps its cell "
+            << "addressing and cell states through a topology change, so it "
+            << "supports changes that only move faces between patches, as "
+            << "crackerFvMesh does, and not ones that add or remove cells."
+            << exit(FatalError);
+    }
+
+    if (caseInputsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "The mesh topology changed while one or more mechanical "
+            << "constitutive law inputs are read from another case "
+            << "directory." << nl
+            << "    The input is copied by cell and face index from a static "
+            << "source mesh, so case-directory inputs cannot be combined "
+            << "with a topology-changing mesh."
+            << exit(FatalError);
+    }
+
+    forAll(laws_, lawI)
+    {
+        if (declaresPersistentState(laws_[lawI]))
+        {
+            FatalErrorInFunction
+                << "The mesh topology changed, and the mechanical "
+                << "constitutive law " << lawNames_[lawI] << " carries "
+                << "persistent state." << nl
+                << "    The framework does not map a law's history onto new "
+                << "boundary faces, so it cannot continue without silently "
+                << "restarting that history on them."
+                << exit(FatalError);
+        }
+    }
+
+    DebugInfo
+        << "Mesh topology changed: rebuilding the boundary addressing and "
+        << "boundary states" << endl;
+
+    calcLawBoundaryFaces();
+
+    forAllIters(topologyEntries_, topoIter)
+    {
+        topologyEntry& entry = autoPtrRef(topoIter());
+
+        // A cell-centred topology indexes cells only, and keeps a state per
+        // patch face, sized from lawBoundaryFaces_. The others index faces or
+        // points, which the topology itself would have to be rebuilt for
+        if (!isA<cellCentredIntegrationPointTopology>(entry.topology_))
+        {
+            FatalErrorInFunction
+                << "The mesh topology changed, and the integration-point "
+                << "topology " << entry.topology_.type() << " is in use." << nl
+                << "    Only " << cellCentredIntegrationPointTopology::typeName
+                << " is rebuilt on a topology change."
+                << exit(FatalError);
+        }
+
+        if (!entry.boundaryAware_)
+        {
+            continue;
+        }
+
+        // No law carries persistent state, so a cold boundary state is the
+        // state these faces would have had anyway
+        forAll(laws_, lawI)
+        {
+            PtrList<mechanicalConstitutiveLawState>& bStates =
+                entry.boundaryStates_[lawI];
+
+            bStates.clear();
+            bStates.setSize(mesh_.boundary().size());
+
+            forAll(mesh_.boundary(), patchI)
+            {
+                bStates.set
+                (
+                    patchI,
+                    new mechanicalConstitutiveLawState
+                    (
+                        lawBoundaryFaces_[lawI][patchI].size()
+                    )
+                );
+
+                applyStateSpecPatch(lawI, patchI, bStates[patchI]);
+            }
+        }
+    }
+
+    // Scratch and cached fields sized to the old mesh
+    surfaceStressSumPtr_.clear();
+    surfaceStressWeightPtr_.clear();
+    surfaceTangentWeightPtr_.clear();
+    pointStressSumPtr_.clear();
+    pointStressWeightPtr_.clear();
+    pointTangentWeightPtr_.clear();
+    resetMaterialPropertyFields();
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateOldTimeIfNeeded()
 {
+    // First, so that the states rolled over below are the current ones
+    updateAddressingIfTopologyChanged();
+
     const label timeIndex = mesh_.time().timeIndex();
 
     if (timeIndex != curTimeIndex_)
@@ -2052,7 +2255,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     kappaPtr_(),
     topologyCache_(),
     topologyEntries_(),
-    compactFingerprints_()
+    compactFingerprints_(),
+    addressingMeshSizes_(),
+    caseInputsPtr_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -2124,6 +2329,41 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
             mechanicalConstitutiveLaw::New(lawDict)
         );
 
+        // Any of the law's scalar inputs that the case reads from another
+        // case directory rather than from this run. Read from the dictionary
+        // as the user gave it, and for the inputs the whole law tree reads,
+        // so that a sub-law's input can be sourced like its parent's
+        {
+            const HashTable<fileName> sources
+            (
+                mechanicalConstitutiveLawCaseInputs::readSources
+                (
+                    lawEntries[lawI].dict(),
+                    lawName,
+                    requiredScalarInputsRecursive(laws_[lawI])
+                )
+            );
+
+            if (sources.size() && !caseInputsPtr_.valid())
+            {
+                caseInputsPtr_.reset
+                (
+                    new mechanicalConstitutiveLawCaseInputs
+                    (
+                        mesh_,
+                        lawEntries.size()
+                    )
+                );
+            }
+
+            const wordList names(sources.sortedToc());
+
+            forAll(names, i)
+            {
+                caseInputsPtr_->addSource(lawI, names[i], sources[names[i]]);
+            }
+        }
+
         if (lawNames.size() == 1)
         {
             // A single law covers the whole domain, so no cellZone is needed
@@ -2179,33 +2419,54 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         }
     }
 
-    // Set lawBoundaryFaces
-    forAll(lawNames, lawI)
+    // An input read from a case directory by one material must be read that
+    // way by every material that reads it. The sourced copy is registered and
+    // written under the input's own name, so a material left to find the
+    // input in this run would find the other material's copy instead, or
+    // read it back from disk at the next write
+    if (caseInputsPtr_.valid())
     {
-        lawBoundaryFaces_[lawI].resize(mesh.boundary().size());
-
-        forAll(lawBoundaryFaces_[lawI], patchI)
+        forAll(laws_, lawI)
         {
-            const labelList& faceCells = mesh.boundary()[patchI].faceCells();
+            const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
 
-            // Collected in ascending face order: the boundary constitutive
-            // state is indexed by position in this list, so the order must be
-            // reproducible
-            DynamicList<label> curFaces(faceCells.size());
-
-            forAll(faceCells, faceI)
+            forAll(names, i)
             {
-                const label cellID = faceCells[faceI];
-
-                if (cellToLaw[cellID] == lawI)
+                if (caseInputsPtr_->found(lawI, names[i]))
                 {
-                    curFaces.append(faceI);
+                    continue;
+                }
+
+                // A field already supplied by another model shadows every
+                // case-directory source of the same name at evaluation time
+                if (mesh_.foundObject<volScalarField>(names[i]))
+                {
+                    continue;
+                }
+
+                forAll(laws_, otherI)
+                {
+                    if (caseInputsPtr_->found(otherI, names[i]))
+                    {
+                        FatalErrorInFunction
+                            << "Material " << lawEntries[otherI].keyword()
+                            << " reads '" << names[i] << "' from a case "
+                            << "directory, but material "
+                            << lawEntries[lawI].keyword() << " reads it from "
+                            << "this run." << nl
+                            << "    Every material that reads an input must "
+                            << "read it the same way: give "
+                            << lawEntries[lawI].keyword() << " a case "
+                            << "directory for '" << names[i] << "' too."
+                            << exit(FatalError);
+                    }
                 }
             }
-
-            lawBoundaryFaces_[lawI][patchI].transfer(curFaces);
         }
     }
+
+    // Set lawBoundaryFaces
+    calcLawBoundaryFaces();
 }
 
 
@@ -2222,6 +2483,12 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
 {
     if (!rhoPtr_.valid())
     {
+        // Not registered. This is the manager's private cache; the solid
+        // model's own copy (solidModel::makeRho) is the field registered as
+        // "rho", as it is on a legacy run. Were this one to hold the name, the
+        // solid model's copy could not register, and a topology-changing mesh
+        // (crackerFvMesh) maps only registered fields, so the solid model's
+        // rho would keep its old boundary sizes after the mesh changed
         rhoPtr_.reset
         (
             new volScalarField
@@ -2233,7 +2500,7 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
                     mesh_,
                     IOobject::NO_READ,
                     IOobject::NO_WRITE,
-                    false
+                    false  // Do not register
                 ),
                 mesh_,
                 dimensionedScalar("rho", dimDensity, 0.0),
@@ -2513,6 +2780,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     UList<scalar>* volumetricPtr
 )
 {
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
+
     const word context = "updateStressSmallStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
 
@@ -2762,6 +3037,14 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
     UList<scalar>* volumetricPtr
 )
 {
+    // Every processor refreshes every case-directory input here, before any
+    // material is skipped for having no points on it, since reading a source
+    // case is collective
+    if (caseInputsPtr_.valid())
+    {
+        caseInputsPtr_->refreshAll();
+    }
+
     const word context = "updateStressFiniteStrain (flat list)";
     const label nIP = topo.nIntegrationPoints();
 

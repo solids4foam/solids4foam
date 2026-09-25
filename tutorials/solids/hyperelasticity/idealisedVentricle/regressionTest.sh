@@ -55,6 +55,18 @@ fi
 SIGMA_MIN=1.0e2
 SIGMA_MAX=2.5e2
 
+# The pressureDisplacement arm has a band of its own: it is a different mesh
+# (the Fluent ventricle) and a fully incompressible material, and its peak von
+# Mises stress at the same time is 719 Pa rather than 155 - so the band above
+# never applied to it, which went unnoticed while it never ran to completion.
+# 718.97 on foam-extend 4.1 with the loosened tolerances below and 718.78 with
+# the tutorial's own, so +-5 % is loose on convergence and tight enough to
+# catch the law or the formulation moving. There is no independent reference:
+# at the first step the legacy law, which does not get further, differs by
+# 4.5 % in this quantity (#466, #410)
+SIGMA_PD_MIN=6.8e2
+SIGMA_PD_MAX=7.6e2
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -102,6 +114,26 @@ loosen_pressureDisplacement_tolerances() {
     fi
 }
 
+# The pressureDisplacement arm runs on the mechanicalConstitutiveLaw
+# framework. The legacy GuccioneElastic pressureDisplacement mode does not get
+# past the second step at any time step or tolerance tried, and did not before
+# the framework existed either; the framework path converges in a few hundred
+# iterations a step (#466). The framework law takes its penalty from
+# bulkModulus, which the legacy dictionary has no entry for; 1e15 makes it
+# fully incompressible, as nu = 0.5 is on the legacy path, since
+# coupledPressureDisplacementSolid then drops the penalty to zero
+use_framework_for_pressureDisplacement() {
+    local dir="$1"
+    local switch="    useMechanicalConstitutiveLawManager yes;"
+
+    sed -i \
+        "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
+        "${dir}/solidProperties"
+    sed -i \
+        's|^\( *\)k k \[|\1bulkModulus bulkModulus [ 1 -1 -2 0 0 0 0 ] 1e15;\n\1k k [|' \
+        "${dir}/mechanicalProperties"
+}
+
 prepare_case() {
     local case_dir="$1"
     local approach="$2"
@@ -126,6 +158,8 @@ prepare_case() {
     if [[ "${approach}" == "pressureDisplacement" ]]; then
         loosen_pressureDisplacement_tolerances \
             "${case_dir}/caseOptions/${approach}/constant/solidProperties"
+        use_framework_for_pressureDisplacement \
+            "${case_dir}/caseOptions/${approach}/constant"
     fi
 }
 
@@ -217,7 +251,8 @@ for approach in "${APPROACHES[@]}"; do
 
     # And each arm has to have taken the path it was set up for, or the
     # comparison below is a run against itself
-    if [[ "${approach}" == "petscManager" ]]; then
+    if [[ "${approach}" == "petscManager" \
+       || "${approach}" == "pressureDisplacement" ]]; then
         if ! grep -q "Selecting mechanical constitutive law" \
             "${case_dir}/${SOLVER_LOGFILE}"
         then
@@ -243,12 +278,19 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
-    if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"
+    sigma_min="${SIGMA_MIN}"
+    sigma_max="${SIGMA_MAX}"
+    if [[ "${approach}" == "pressureDisplacement" ]]; then
+        sigma_min="${SIGMA_PD_MIN}"
+        sigma_max="${SIGMA_PD_MAX}"
+    fi
+
+    if awk "BEGIN {exit !(${sigma} >= ${sigma_min} && ${sigma} <= ${sigma_max})}"
     then
         printf "PASS: %s: Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
     else
         printf "FAIL: %s: Max sigmaEq = %.6g (outside [%g, %g])\n" \
-            "${approach}" "${sigma}" "${SIGMA_MIN}" "${SIGMA_MAX}"
+            "${approach}" "${sigma}" "${sigma_min}" "${sigma_max}"
         failures=$((failures + 1))
     fi
 
@@ -290,9 +332,14 @@ fi
 # not apply, because the active tension is not derived from a potential - so
 # this is where it does apply
 run_split_check() {
+    # Run on any arm that actually selected the framework, so a renamed or
+    # added framework arm remains covered while a meshed legacy arm is not
+    # selected merely because it appears first (#466)
     local d
     for d in "${REGRESSION_ROOT}"/*; do
         [[ -d "${d}/constant/polyMesh" ]] || continue
+        grep -q "Selecting mechanical constitutive law" \
+            "${d}/${SOLVER_LOGFILE}" 2>/dev/null || continue
 
         if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
             echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
@@ -317,7 +364,7 @@ run_split_check() {
         return 0
     done
 
-    echo "SKIP: mechanicalConstitutiveLaw checks (no meshed case)"
+    echo "SKIP: mechanicalConstitutiveLaw checks (the framework arm did not run)"
     return 0
 }
 
