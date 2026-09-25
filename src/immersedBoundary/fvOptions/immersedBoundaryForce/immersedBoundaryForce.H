@@ -41,12 +41,12 @@ Description
     \min(K, \lambda/(1 - \lambda)) \f$ in the partially covered cells, so
     that the penalised velocity is \f$ \lambda U_i + (1 - \lambda) U \f$; with
     the occupancy weighting, \f$ \kappa = K \lambda/\Delta t \f$, which for
-    large K blocks every covered cell. The results do not depend on K for
-    K of 1e3 or more, nor on the number of pressure correctors. With the
-    occupancy weighting they do not depend on the time step either; with the
-    volumeFraction weighting, the partially covered cells are relaxed towards
-    Ui once per time step, so the results depend on the time step, and are
-    closer to the body-fitted results for smaller time steps.
+    large K blocks every covered cell. With the volumeFraction weighting, the
+    rate in the partially covered cells is also limited to
+    \f$ \lambda/(1 - \lambda) C (\nu/w^2 + |U_i|/w) \f$, where w is the cell
+    width and C the surface rate coefficient (default 3), so that it does
+    not depend on the time step. The results do not depend on K for K of 1e3
+    or more, the number of pressure correctors or the time step.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -110,6 +110,15 @@ Description
         // Weighting of the penalty in partially covered cells, optional,
         // default volumeFraction
         weighting       volumeFraction;
+
+        // Coefficient of the penalisation rate in partially covered cells
+        // with the volumeFraction weighting, optional, default 3; 0 for a
+        // rate of lambda/((1 - lambda)*deltaT)
+        surfaceRateCoeff 3;
+
+        // Kinematic viscosity for the surface rate, optional, default the
+        // nu entry of transportProperties
+        nu              1e-3;
 
         // Coupling coefficient c of the incremental method, optional,
         // default 0.8
@@ -208,6 +217,19 @@ class immersedBoundaryForce
         //  K*lambda/deltaT
         word weighting_;
 
+        //- Coefficient C of the penalisation rate in the partially covered
+        //  cells with the volumeFraction weighting: the rate is
+        //  lambda/(1 - lambda)*C*(nu/w^2 + |Ui|/w), where w is the cell
+        //  width, so that it does not depend on the time step. The rate is
+        //  lambda/((1 - lambda)*deltaT) if C is not positive
+        scalar surfaceRateCoeff_;
+
+        //- Kinematic viscosity for the surface rate
+        scalar nu_;
+
+        //- Has the viscosity been set?
+        bool nuSet_;
+
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
 
@@ -287,6 +309,14 @@ class immersedBoundaryForce
         //  of transportProperties, else 1. The fluid model may construct
         //  transportProperties after the option, so it is looked up on use
         scalar rho();
+
+        //- Kinematic viscosity for the surface rate: the nu entry, else the
+        //  nu entry of transportProperties
+        scalar nu();
+
+        //- Width of a cell: its smallest bounding box width in the solved
+        //  directions
+        scalar cellWidth(const label celli) const;
 
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);

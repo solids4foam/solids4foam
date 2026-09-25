@@ -70,14 +70,16 @@ Two forcing methods are available:
   1e3). In the partially covered cells, `kappa*deltaT = lambda/(1 - lambda)`
   (`weighting volumeFraction`, the default), so that the penalised velocity is
   `lambda*Ui + (1 - lambda)*U`; or `kappa = K*lambda/deltaT` (`weighting
-  occupancy`), which blocks every covered cell. The results do not depend on
-  `K` for `K` of 1e3 or more, nor on the number of pressure correctors. With
-  the `occupancy` weighting they do not depend on the time step either. With
-  the `volumeFraction` weighting, the partially covered cells are relaxed
-  towards `Ui` once per time step, so the results depend on the time step:
-  for the static cylinder with 10 cells across it, `Cd` is 5.37, 5.38 and
-  5.49 for time steps of 0.01 s, about 0.011 s (a maximum Courant number of
-  0.5) and 0.0025 s, where the reference is 5.57-5.59.
+  occupancy`), which blocks every covered cell. With the `volumeFraction`
+  weighting, the rate in the partially covered cells is also limited to
+  `lambda/(1 - lambda)*C*(nu/w^2 + |Ui|/w)`, where `w` is the cell width and
+  `C` is `surfaceRateCoeff` (default 3), so that it does not depend on the
+  time step. The results do not depend on `K` for `K` of 1e3 or more, the
+  number of pressure correctors or the time step: for the static cylinder
+  with 10 cells across it, `Cd` is 5.236 and 5.239 for time steps of 0.01 s
+  and 0.0025 s. With `surfaceRateCoeff 0`, the partially covered cells are
+  relaxed towards `Ui` once per time step, and `Cd` is 5.37 and 5.49 for the
+  same time steps.
 - `incremental`: the direct forcing of the openHFDIB-DEM `pimpleHFDIBFoam`
   solver. An explicit forcing `f` is added to the momentum equation. After
   each pressure corrector, `f` is increased by `couplingCoeff*(Ui - U)/deltaT`
@@ -107,7 +109,7 @@ root mean square 2.06), are:
 
 | Settings | Static `Cd` | Oscillating `Cd` difference |
 | -------- | ----------- | --------------------------- |
-| A | 5.38, 5.43, 5.48 | 0.12, 0.07, 0.08 |
+| A | 5.24, 5.38, 5.48 | 0.13, 0.09, 0.08 |
 | B | 5.45, 5.61, 5.61 | 1.44, 0.33, 0.20 |
 | C | 6.04, 6.42, 6.60 | 1.34, 0.53, 0.47 |
 

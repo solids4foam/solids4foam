@@ -101,16 +101,15 @@ coefficients in `forceCoeffs.pdf`.
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | $$C_d$$ | $$C_l$$ |
 | ------------ | ----- | ------------------ | ------- | ------- |
-| 1 | 4 510 | 10 | 5.38 | 0.009 |
-| 2 | 18 040 | 20 | 5.43 | 0.010 |
+| 1 | 4 510 | 10 | 5.24 | 0.004 |
+| 2 | 18 040 | 20 | 5.38 | 0.009 |
 | 3 | 72 160 | 40 | 5.48 | 0.010 |
 | Schäfer and Turek (1996) | | | 5.57–5.59 | 0.0104–0.0110 |
 
 The drag converges towards the reference at first order in the cell size.
-The results do not depend on the penalty coefficient or the number of pressure
-correctors, but they depend on the time step, which is set by the maximum
-Courant number of 0.5: with `MESH_LEVEL=1`, fixed time steps of 0.01 s and
-0.0025 s give $$C_d = 5.37$$ and $$C_d = 5.49$$.
+The results do not depend on the penalty coefficient, the number of pressure
+correctors or the time step: with `MESH_LEVEL=1`, fixed time steps of 0.01 s
+and 0.0025 s give $$C_d = 5.236$$ and $$C_d = 5.239$$.
 
 The other forcing methods of `immersedBoundaryForce` can be compared by
 editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):

@@ -46,7 +46,9 @@ release. For complete commit-level details and contributor information, see the
   motion, given as closed surfaces, in incompressible flow. It works with the
   `pimpleFluid` fluid model and the `pimpleFoam` solver. The default forcing
   is an implicit volume penalisation weighted by the solid volume fraction,
-  which is found from the signed distance to the surface. The explicit direct
+  which is found from the signed distance to the surface, with a
+  penalisation rate in the partially covered cells that does not depend on
+  the time step. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and

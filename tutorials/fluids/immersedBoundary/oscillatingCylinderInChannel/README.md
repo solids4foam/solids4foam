@@ -110,12 +110,12 @@ square is 2.16:
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | Forcing | With inertia |
 | ------------ | ----- | ------------------ | ------- | ------------ |
-| 1 | 5 084 | 10 | 0.48 | 0.12 |
-| 2 | 20 336 | 20 | 0.40 | 0.07 |
+| 1 | 5 084 | 10 | 0.39 | 0.13 |
+| 2 | 20 336 | 20 | 0.38 | 0.09 |
 | 3 | 81 344 | 40 | 0.38 | 0.08 |
 
 Including the inertia of the fluid inside the cylinder, the drag agrees with
-the reference to within about 5% of its root mean square from the coarsest
+the reference to within about 6% of its root mean square from the coarsest
 mesh. As the occupancy varies continuously with the position of the cylinder,
 the force is smooth as the cylinder crosses the cells.
 

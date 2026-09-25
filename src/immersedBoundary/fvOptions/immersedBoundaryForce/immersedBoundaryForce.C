@@ -88,6 +88,60 @@ Foam::scalar Foam::fv::immersedBoundaryForce::rho()
 }
 
 
+Foam::scalar Foam::fv::immersedBoundaryForce::nu()
+{
+    if (!nuSet_)
+    {
+        const IOdictionary* transportPropertiesPtr =
+            mesh_.findObject<IOdictionary>("transportProperties");
+
+        if (!transportPropertiesPtr || !transportPropertiesPtr->found("nu"))
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "The " << typeName << " option " << name_ << " requires "
+                << "the kinematic viscosity for the surface rate: give nu in "
+                << "the option, or set surfaceRateCoeff 0" << exit(FatalIOError);
+        }
+
+        nu_ =
+            dimensionedScalar
+            (
+                "nu",
+                dimViscosity,
+                *transportPropertiesPtr
+            ).value();
+        nuSet_ = true;
+    }
+
+    return nu_;
+}
+
+
+Foam::scalar Foam::fv::immersedBoundaryForce::cellWidth
+(
+    const label celli
+) const
+{
+    const vector span
+    (
+        boundBox(mesh_.points(), mesh_.cellPoints()[celli], false).span()
+    );
+
+    const Vector<label>& solD = mesh_.solutionD();
+
+    scalar w = GREAT;
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] == 1)
+        {
+            w = min(w, span[d]);
+        }
+    }
+
+    return w;
+}
+
+
 void Foam::fv::immersedBoundaryForce::updateBodies(const bool move)
 {
     lambda_.primitiveFieldRef() = 0;
@@ -197,6 +251,15 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
     const bool volumeFraction = (weighting_ == "volumeFraction");
     const scalarField& lambdaI = lambda_.primitiveField();
 
+    Ui_ = U;
+
+    for (const immersedBody& body : bodies_)
+    {
+        body.setVelocity(Ui_);
+    }
+
+    const scalar nu = (surfaceRateCoeff_ > 0 ? this->nu() : 0);
+
     kappa_ = 0;
 
     for (const immersedBody& body : bodies_)
@@ -217,6 +280,20 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                             penaltyCoeff_,
                             lambda/max(1 - lambda, 1/penaltyCoeff_)
                         )/deltaT;
+
+                    // Rate independent of the time step in the partially
+                    // covered cells
+                    if (surfaceRateCoeff_ > 0 && lambda < 1 - surfaceThreshold_)
+                    {
+                        const scalar w = cellWidth(celli);
+
+                        kappa_[celli] = min
+                        (
+                            kappa_[celli],
+                            lambda/(1 - lambda)*surfaceRateCoeff_
+                           *(nu/sqr(w) + mag(Ui_[celli])/w)
+                        );
+                    }
                 }
                 else
                 {
@@ -224,13 +301,6 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                 }
             }
         }
-    }
-
-    Ui_ = U;
-
-    for (const immersedBody& body : bodies_)
-    {
-        body.setVelocity(Ui_);
     }
 }
 
@@ -250,6 +320,9 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     method_("penalty"),
     penaltyCoeff_(1e3),
     weighting_("volumeFraction"),
+    surfaceRateCoeff_(3),
+    nu_(0),
+    nuSet_(false),
     kappa_(mesh.nCells(), Zero),
     couplingCoeff_(0.8),
     surfaceThreshold_(1e-4),
@@ -688,6 +761,11 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             scalarMinMax::ge(1)
         );
         coeffs_.readIfPresent("weighting", weighting_);
+        coeffs_.readIfPresent("surfaceRateCoeff", surfaceRateCoeff_);
+        if (coeffs_.readIfPresent("nu", nu_))
+        {
+            nuSet_ = true;
+        }
 
         if (weighting_ != "volumeFraction" && weighting_ != "occupancy")
         {
@@ -721,7 +799,8 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         if (method_ == "penalty")
         {
             Info<< "    Penalty method: coefficient " << penaltyCoeff_
-                << ", " << weighting_ << " weighting";
+                << ", " << weighting_ << " weighting, surface rate "
+                << "coefficient " << surfaceRateCoeff_;
         }
         else
         {
