@@ -325,7 +325,7 @@ run_restart_test() {
 
     # 3. the state must be on disk, and the material must have yielded
     local state_file
-    state_file=$(ls "${CASE_DIR}"/10/*:*:epsilonPEq 2>/dev/null | head -n 1)
+    state_file=$(ls "${CASE_DIR}"/10/*IntegrationPointTopology_epsilonPEq 2>/dev/null | head -n 1)
 
     if [[ -z "${state_file}" ]]; then
         echo "FAIL: restart: no constitutive state was written at t = 10"
@@ -347,7 +347,7 @@ run_restart_test() {
     local guard_dir="${REGRESSION_ROOT}/frameworkRestartMissing"
     rm -rf "${guard_dir}"
     cp -a "${CASE_DIR}" "${guard_dir}"
-    rm -f "${guard_dir}"/10/*:*:epsilonP
+    rm -f "${guard_dir}"/10/*IntegrationPointTopology_epsilonP
     sed -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
         "${guard_dir}/system/controlDict"
@@ -472,7 +472,7 @@ EOD
     # The premise of the whole test: decomposePar leaves the state behind. If
     # some future version starts copying it, this test would quietly become a
     # test of something else
-    if ls "${d}"/processor0/10/*:*:epsilonP > /dev/null 2>&1; then
+    if ls "${d}"/processor0/10/*IntegrationPointTopology_epsilonP > /dev/null 2>&1; then
         echo "FAIL: parallel restart: decomposePar copied the state, so this"
         echo "      test is no longer exercising the mapping it was written for"
         return 1
@@ -584,7 +584,7 @@ EOD
     # The premise: reconstructPar leaves the state in the processor
     # directories. If it ever starts gathering it, this stops testing the
     # gather and nobody would notice
-    if ls "${d}"/10/*:*:epsilonP > /dev/null 2>&1; then
+    if ls "${d}"/10/*IntegrationPointTopology_epsilonP > /dev/null 2>&1; then
         echo "FAIL: reconstructed restart: reconstructPar gathered the state,"
         echo "      so this test no longer exercises what it was written for"
         return 1

@@ -8,6 +8,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The `mechanicalConstitutiveLaw` history, such as the plastic strain, is
+  written at each write time as volFields named after the variable
+  (`epsilonPEq`, `epsilonP`, `sigmaY` and so on), so that it can be viewed in
+  ParaView as the legacy laws' fields could. They cover every material that
+  declares the variable and are zero in the others' cells, carry no
+  dimensions, and are written, not read: the restart files remain the
+  authoritative copy.
+
 - Regression coverage of the `mechanicalConstitutiveLaw` framework in
   `squarePlate`, `cantilever2d`, `thermalCavity`, `curvedBeams` and `3dTube`,
   each held to the answer of the removed legacy model. `curvedBeams` and
@@ -50,6 +58,10 @@ release. For complete commit-level details and contributor information, see the
   switch off, the law uses its ramped constant and the run warns once if a
   field of that name is registered: unlike the removed legacy law, a
   registered `Ta` is not picked up unasked.
+- The restart files of the `mechanicalConstitutiveLaw` history are named
+  `<material>_<topology>_<variable>`, where the development branch had
+  colons, which Windows file systems, archive tools and CI artifact uploads
+  refuse.
 
 - `vertexCentredLinearGeometry` takes its whole constitutive response from the
   `mechanicalConstitutiveLaw` framework: the residual stress at the dual mesh

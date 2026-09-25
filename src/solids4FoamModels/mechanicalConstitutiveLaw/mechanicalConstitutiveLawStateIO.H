@@ -52,7 +52,8 @@ Description
     mismatch here is fatal rather than mapped.
 
     One file per law, per topology, per state variable, holding that law's
-    integration points followed by its boundary points patch by patch. The name
+    integration points followed by its boundary points patch by patch, named
+    <law>_<topology>[_<sub-law>]_<variable>. The name
     carries the law and the topology because two laws may legitimately hold
     different values of the same variable name, and the same law may hold state
     on more than one topology in the same run.

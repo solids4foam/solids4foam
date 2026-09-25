@@ -258,9 +258,9 @@ run_restart_test() {
 
     # One file per arm, plus the relaxing deviatoric stress
     local nArms
-    nArms=$(ls "${d}"/3500/*:*:h[0-9]* 2>/dev/null | wc -l)
+    nArms=$(ls "${d}"/3500/*IntegrationPointTopology_h[0-9]* 2>/dev/null | wc -l)
 
-    if ! ls "${d}"/3500/*:*:s > /dev/null 2>&1 || (( nArms == 0 )); then
+    if ! ls "${d}"/3500/*IntegrationPointTopology_s > /dev/null 2>&1 || (( nArms == 0 )); then
         echo "FAIL: restart: the viscous history was not written"
         return 1
     fi

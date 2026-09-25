@@ -214,7 +214,7 @@ run_restart_test() {
     # The state has to be real history, or this proves nothing. bEbar starts as
     # the identity, so a deformed state is one whose diagonal has moved off one
     local bfile
-    bfile=$(ls "${d}"/0.05/*:*:bEbar 2>/dev/null | head -n 1)
+    bfile=$(ls "${d}"/0.05/*IntegrationPointTopology_bEbar 2>/dev/null | head -n 1)
 
     if [[ -z "${bfile}" ]]; then
         echo "FAIL: finite-strain restart: bEbar was not written"
@@ -258,7 +258,7 @@ PYEOF
     if [ "$CHECK_ONLY" = false ]; then
         rm -rf "${m}"; cp -a "${d}" "${m}"
         rm -rf "${m}"/0.0[6-9] "${m}"/0.1 "${m}"/postProcessing
-        rm -f "${m}"/0.05/*:*:bEbar
+        rm -f "${m}"/0.05/*IntegrationPointTopology_bEbar
         sed -i.bak 's/^startFrom       startTime;/startFrom       latestTime;/' \
             "${m}/system/controlDict"
         rm -f "${m}/system/controlDict.bak"

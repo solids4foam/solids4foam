@@ -2942,6 +2942,13 @@ void Foam::solidModel::writeFields(const Time& runTime)
 
     Info<< "Max sigmaEq (von Mises stress) = " << gMax(sigmaEq) << endl;
 
+    // The constitutive history, such as the plastic strain, as fields that
+    // can be viewed. The restart files hold it in a form ParaView cannot read
+    if (mechanicalManagerPtr_.valid())
+    {
+        mechanicalManagerPtr_->writeStateFields();
+    }
+
     // If asked, write the residual field
     if (writeResidualField_)
     {

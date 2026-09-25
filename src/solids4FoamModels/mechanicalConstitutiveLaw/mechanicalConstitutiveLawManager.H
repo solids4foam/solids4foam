@@ -1478,6 +1478,21 @@ public:
         //  reached.
         //  Can be used for diagnostics, logging, or state bookkeeping.
         void endTimeStep();
+
+        //- Write the cell-centred history of every law as volFields, for
+        //  viewing.
+        //
+        //  The restart files hold the state as it is kept, which ParaView
+        //  cannot show. These are a projection of it, written and never read:
+        //  one field per persistent state variable, named after the variable
+        //  and covering every material that declares it, zero in the cells of
+        //  the others. A variable a composite and its sub-law both declare is
+        //  qualified with the sub-law's name, and one whose name another
+        //  model has registered is not written, rather than overwrite that
+        //  model's field. Only the cell-centred topology is written: its
+        //  points are the cells, so nothing is interpolated. The fields carry
+        //  no dimensions, since a law does not declare them
+        void writeStateFields() const;
 };
 
 
