@@ -5,6 +5,10 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+# For solids4Foam::requireTestApp
+source "${SOLIDS4FOAM_SCRIPTS}"
 
 # ============================================================
 # cylinderExpansion regression test
