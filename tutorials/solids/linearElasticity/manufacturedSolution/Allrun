@@ -89,8 +89,11 @@ case "$MESH" in
             exit 1
         fi
         mv 0 0.tmp
-        solids4Foam::runApplication gmsh -3 -format msh2 gmsh/cube.geo
-        solids4Foam::runApplication gmshToFoam gmsh/cube.msh
+        # Select tet-unstructured for the alternative unstructured tet mesh.
+        # Both Gmsh scripts are available in gmsh/ and use meshSpacing.geo.
+        GMSH_MESH=tet-structured
+        solids4Foam::runApplication gmsh -3 -format msh2 "gmsh/$GMSH_MESH.geo"
+        solids4Foam::runApplication gmshToFoam "gmsh/$GMSH_MESH.msh"
         solids4Foam::runApplication createPatch -overwrite
         if [[ "$MESH" == "poly" ]]; then
             solids4Foam::runApplication polyDualMesh 30 -overwrite

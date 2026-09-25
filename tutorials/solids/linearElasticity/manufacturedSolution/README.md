@@ -52,6 +52,11 @@ The `petscSnes` and high-order approaches require a PETSc-enabled solids4foam
 build. The `tet` and `poly` meshes require Gmsh. The tutorial supports OpenFOAM.com,
 OpenFOAM.org, and foam-extend.
 
+The `tet` and `poly` runs use `gmsh/tet-structured.geo` by default. Set
+`GMSH_MESH=tet-unstructured` in `Allrun` to use the unstructured tetrahedral
+alternative. A standalone `gmsh/hex-structured.geo` is also provided; the
+standard `hex` run uses `blockMesh`. All Gmsh scripts read `gmsh/meshSpacing.geo`.
+
 The high-order approaches use cubic displacement reconstruction, face
 quadrature, and volume integration of the manufactured body force. The
 integrated body force is divided by cell volume before insertion as an
