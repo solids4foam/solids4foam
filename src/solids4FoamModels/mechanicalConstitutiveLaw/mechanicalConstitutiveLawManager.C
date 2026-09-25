@@ -165,6 +165,31 @@ public:
 //  primitiveFieldRef, and those are not the same thing: they call
 //  setUpToDate() and storeOldTimes(), so merely reaching for the pointer would
 //  snapshot an old time that nothing asked for.
+// True if the law, or any law it wraps, is fully incompressible. Asked of
+// the whole tree because a wrapper such as electroMechanicalLaw evaluates
+// its passive law directly: an incompressible law inside one would otherwise
+// reach a total-stress evaluation unseen
+bool incompressibleLawTree(const mechanicalConstitutiveLaw& law)
+{
+    if (law.incompressible())
+    {
+        return true;
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        if (incompressibleLawTree(law.childLaw(childNames[i])))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 template<class KinematicsType>
 void evaluateResponse
 (
@@ -177,9 +202,45 @@ void evaluateResponse
     const UList<scalar>* scalarTangentStore,
     const UList<mat66>* fourthOrderTangentStore,
     const tangentRequest tangentReq,
-    const UList<scalar>* volumetricStore = nullptr
+    const UList<scalar>* volumetricStore = nullptr,
+    const bool stressReturned = true
 )
 {
+    // A fully incompressible law has no volumetric response of its own, so
+    // only a caller that replaces it - one asking for the split - can use it,
+    // and only a tangent that leaves the bulk stiffness out means anything.
+    // Checked here because every evaluation, stress or tangent, comes this way
+    if (incompressibleLawTree(law))
+    {
+        // Whatever tangent comes with it: a total stress handed back to the
+        // caller is undefined for this law. Only a tangent query, which
+        // evaluates into a shadow state and discards the stress, may leave
+        // the split out
+        const bool totalStress = stressReturned && !volumetricStore;
+
+        const bool bulkTangent =
+            tangentReq == tangentRequest::scalar
+         || mechanicalConstitutiveLawManager::needsFourthOrderTangent
+            (
+                tangentReq
+            );
+
+        if (totalStress || bulkTangent)
+        {
+            FatalErrorInFunction
+                << "The mechanical constitutive law " << law.type()
+                << " is fully incompressible (nu = 0.5), and was asked for "
+                << (bulkTangent ? "a tangent that includes" : "a total stress")
+                << (bulkTangent ? " the bulk stiffness." : ".") << nl << nl
+                << "    Its bulk modulus is infinite, so neither exists. An "
+                << "incompressible material needs a mixed displacement-"
+                << "pressure formulation, which solves for the pressure: for "
+                << "example coupledPressureDisplacementSolid, or a solid "
+                << "model with solvePressure. Otherwise set nu below 0.5."
+                << exit(FatalError);
+        }
+    }
+
     // One place, because every law is reached through here.
     //
     // A law that needs the stress already standing at its points is handed it
@@ -2599,7 +2660,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             scalarTangentPtr,
             fourthOrderTangentPtr,
             tangentReq,
-            volumetricPtr
+            volumetricPtr,
+            !preserveState
         );
     }
 
@@ -2673,7 +2735,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
                     tangentReq,
-                    volumetricPtr
+                    volumetricPtr,
+                    !preserveState
                 );
             }
         }
@@ -2851,7 +2914,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
             scalarTangentPtr,
             fourthOrderTangentPtr,
             tangentReq,
-            volumetricPtr
+            volumetricPtr,
+            !preserveState
         );
     }
 
@@ -2921,7 +2985,8 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
                     scalarTangentPtr,
                     fourthOrderTangentPtr,
                     tangentReq,
-                    volumetricPtr
+                    volumetricPtr,
+                    !preserveState
                 );
             }
         }
@@ -4200,6 +4265,282 @@ allLawsHaveDilationInvariantIsochoricStress() const
     }
 
     return true;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
+(
+    const surfaceTensorField& F,
+    const surfaceTensorField& F0,
+    const surfaceScalarField& J,
+    const surfaceScalarField& J0,
+    const surfaceTensorField& Finv,
+    const surfaceTensorField& Finv0,
+    const scalar dt,
+    surfaceSymmTensorField& stress,
+    const stressCollapseRule collapseRule,
+    surfaceScalarField* volumetricResponsePtr
+)
+{
+    // The face twin of the cell-centred finite-strain overload, laid out as
+    // the small-strain face overload is: a face can be reached by two laws at
+    // a material interface, so contributions are accumulated and collapsed
+    // rather than written once
+    //
+    // In parallel a material interface can lie on a processor boundary, where
+    // each side holds only its own material's contribution and nothing
+    // exchanges them before the collapse, so the two sides would disagree
+    // with each other and with serial. Refused rather than answered wrongly:
+    // the only caller is single-material
+    if (Pstream::parRun() && laws_.size() > 1)
+    {
+        FatalErrorInFunction
+            << "The face finite-strain stress update does not support more "
+            << "than one material in parallel: contributions at a material "
+            << "interface on a processor boundary are not reconciled"
+            << exit(FatalError);
+    }
+    checkMeshConsistency(mesh_, F.mesh(), F.name());
+    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
+    checkMeshConsistency(mesh_, J.mesh(), J.name());
+    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
+    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
+    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
+    checkMeshConsistency(mesh_, stress.mesh(), stress.name());
+
+    if (volumetricResponsePtr)
+    {
+        checkMeshConsistency
+        (
+            mesh_,
+            volumetricResponsePtr->mesh(),
+            volumetricResponsePtr->name()
+        );
+
+        // Checked where the split is asked for, as the cell-centred overload
+        // does: a law that cannot separate the two would otherwise hand back
+        // a total stress the caller would treat as isochoric
+        checkVolumetricSplitSupported("updateStressFiniteStrain");
+    }
+
+    // Look up the map and state for face-based topologies
+    const integrationPointTopology& topo =
+        topologyFor(faceCentredIntegrationPointTopology::typeName);
+
+    topologyEntry& tp = topology(topo);
+
+    // Update old time fields at the start of a new time step
+    updateOldTimeIfNeeded();
+
+    const mechanicalConstitutiveLawInputs inputs
+    (
+        inputsWithoutCoupling(dt, "updateStressFiniteStrain")
+    );
+
+    surfaceSymmTensorField& stressSum = surfaceStressSum();
+    surfaceScalarField& weightSum = surfaceStressWeight();
+
+    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
+    weightSum = 0.0;
+
+    // The volumetric response is collapsed as the stress is. Only allocated
+    // when the split is asked for
+    autoPtr<scalarField> volumetricSumPtr;
+
+    if (volumetricResponsePtr)
+    {
+        volumetricSumPtr.reset(new scalarField(mesh_.nInternalFaces(), 0.0));
+    }
+
+    checkTangentRequest(topo, tangentRequest::none);
+
+    forAll(laws_, lawI)
+    {
+        // The scale the law's points are judged by, as the cell-centred
+        // boundary loop sets it
+        if (lawI < tp.lawConvergenceScales_.size())
+        {
+            inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
+        }
+
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        const UIndirectList<tensor> FView(F.internalField(), ipIDs);
+        const UIndirectList<tensor> F0View(F0.internalField(), ipIDs);
+        const UIndirectList<scalar> JView(J.internalField(), ipIDs);
+        const UIndirectList<scalar> J0View(J0.internalField(), ipIDs);
+        const UIndirectList<tensor> FinvView(Finv.internalField(), ipIDs);
+        const UIndirectList<tensor> Finv0View(Finv0.internalField(), ipIDs);
+
+        UIndirectList<symmTensor> stressView(stress.internalField(), ipIDs);
+
+        const finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView, F0View, JView, J0View, FinvView, Finv0View
+        );
+
+        evaluateResponse
+        (
+            laws_[lawI],
+            kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            static_cast<const UList<scalar>*>(nullptr),
+            static_cast<const UList<mat66>*>(nullptr),
+            tangentRequest::none,
+            volumetricResponsePtr
+        );
+
+        forAll(ipIDs, i)
+        {
+            const label faceI = ipIDs[i];
+
+            stressSum[faceI] += stress[faceI];
+            weightSum[faceI] += 1.0;
+
+            if (volumetricResponsePtr)
+            {
+                volumetricSumPtr()[faceI] += (*volumetricResponsePtr)[faceI];
+            }
+        }
+
+        // Boundary faces carry their own state, as in the other overloads.
+        // Coupled patches are included: unlike a volField, a surface field's
+        // coupled patch is not filled in by correctBoundaryConditions(), so
+        // skipping it would leave the stress there at zero
+        if (tp.boundaryAware_)
+        {
+            forAll(F.boundaryField(), patchI)
+            {
+                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+                if
+                (
+                    faces.empty()
+                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
+                )
+                {
+                    continue;
+                }
+
+                const UIndirectList<tensor> FView
+                (
+                    F.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> F0View
+                (
+                    F0.boundaryField()[patchI], faces
+                );
+                const UIndirectList<scalar> JView
+                (
+                    J.boundaryField()[patchI], faces
+                );
+                const UIndirectList<scalar> J0View
+                (
+                    J0.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> FinvView
+                (
+                    Finv.boundaryField()[patchI], faces
+                );
+                const UIndirectList<tensor> Finv0View
+                (
+                    Finv0.boundaryField()[patchI], faces
+                );
+                UIndirectList<symmTensor> stressView
+                (
+                    Foam::boundaryFieldRef(stress)[patchI], faces
+                );
+
+                const finiteStrainMechanicalConstitutiveLawKinematics kin
+                (
+                    FView, F0View, JView, J0View, FinvView, Finv0View
+                );
+
+                evaluateResponse
+                (
+                    laws_[lawI],
+                    kin,
+                    inputs,
+                    tp.boundaryStates_[lawI][patchI],
+                    stressView,
+                    faces,
+                    static_cast<const UList<scalar>*>(nullptr),
+                    static_cast<const UList<mat66>*>(nullptr),
+                    tangentRequest::none,
+                    volumetricResponsePtr
+                  ? &volumetricResponsePtr->boundaryField()[patchI]
+                  : nullptr
+                );
+            }
+        }
+    }
+
+    // Collapse the accumulated contributions on internal faces
+    forAll(stress.internalField(), faceI)
+    {
+        const scalar w = weightSum[faceI];
+
+        if (w <= SMALL)
+        {
+            FatalErrorInFunction
+                << "Face " << faceI << " received no constitutive contributions"
+                << exit(FatalError);
+        }
+
+        checkCollapsePermitted(collapseRule, w, faceI, "Face");
+
+        stress[faceI] = stressSum[faceI]/w;
+
+        if (volumetricResponsePtr)
+        {
+            (*volumetricResponsePtr)[faceI] = volumetricSumPtr()[faceI]/w;
+        }
+    }
+
+// As in the small-strain face overload: OpenFOAM.org's fvsPatchField has no
+// evaluate(), so correctBoundaryConditions() does not compile for a surface
+// field there
+#ifndef OPENFOAM_ORG
+    stress.correctBoundaryConditions();
+
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
+#endif
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrainSplit
+(
+    const surfaceTensorField& F,
+    const surfaceTensorField& F0,
+    const surfaceTensorField& Finv,
+    const surfaceTensorField& Finv0,
+    const surfaceScalarField& J,
+    const surfaceScalarField& J0,
+    const scalar dt,
+    surfaceSymmTensorField& isochoricStress,
+    surfaceScalarField& volumetricResponse,
+    const stressCollapseRule collapseRule
+)
+{
+    updateStressFiniteStrain
+    (
+        F,
+        F0,
+        J,
+        J0,
+        Finv,
+        Finv0,
+        dt,
+        isochoricStress,
+        collapseRule,
+        &volumetricResponse
+    );
 }
 
 

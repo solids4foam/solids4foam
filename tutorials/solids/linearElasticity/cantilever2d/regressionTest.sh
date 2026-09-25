@@ -23,6 +23,10 @@ EPS_MAX=5.0e-4
 SIGMA_MIN=8.5e7
 SIGMA_MAX=1.05e8
 HIGH_ORDER_DISP_TOL=1e-10
+# Largest difference in pointD between the legacy and framework arms of the
+# vertex-centred model, relative to the largest legacy pointD component. Both
+# solve the same linear elastic problem, so this is round-off
+VERTEX_CENTRED_DISP_REL_TOL=1e-10
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -34,6 +38,8 @@ APPROACHES=(
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrderJacobian
+    vertexCentred
+    vertexCentredManager
 )
 
 echo "============================================================"
@@ -41,12 +47,17 @@ echo "cantilever2d regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "High-order DDifference LInf < ${HIGH_ORDER_DISP_TOL}"
+echo "Vertex-centred pointD rel. diff <= ${VERTEX_CENTRED_DISP_REL_TOL}"
 echo "============================================================"
 echo
 
 prepare_case() {
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
+
+    # Results kept from the vertex-centred arms of an earlier run would let
+    # this run's comparison pass without either arm having produced anything
+    rm -f "${REGRESSION_ROOT}"/pointD.vertexCentred*
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
@@ -453,12 +464,15 @@ extract_disp_linf() {
 
 # The framework arm of an approach differs in one dictionary entry and
 # nothing else. It is applied after Allclean, which ends in restoreCaseFormat
-# and would otherwise put the stored dictionary back, and before Allrun
+# and would otherwise put the stored dictionary back, and before Allrun.
+# The unsCoupled coeffs block is empty; the vertexCentred one is not, so the
+# entry goes at the top of it
 apply_framework_switch() {
     local dict="$1"
 
     sed -i.bak \
-        's|^\(coupledUnsLinearGeometryLinearElasticCoeffs\)|\1|; s|^{}$|{\n    useMechanicalConstitutiveLawManager yes;\n}|' \
+        -e 's|^{}$|{\n    useMechanicalConstitutiveLawManager yes;\n}|' \
+        -e '/^vertexCentredLinearGeometryCoeffs/,/^{/ s|^{$|{\n    useMechanicalConstitutiveLawManager yes;|' \
         "${dict}"
     rm -f "${dict}.bak"
 
@@ -477,6 +491,10 @@ select_run_approach() {
         unsCoupledManager)
             USE_FRAMEWORK=true
             RUN_APPROACH=unsCoupled
+            ;;
+        vertexCentredManager)
+            USE_FRAMEWORK=true
+            RUN_APPROACH=vertexCentred
             ;;
         highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
             local least_squares_type="${requested#highOrder-}"
@@ -534,6 +552,179 @@ check_solver_extrema() {
     return "${failures}"
 }
 
+# Largest absolute difference between the internal fields of two ascii
+# pointVectorField files, and the largest absolute component of the first,
+# printed as "maxDiff maxFirst". Prints "nan nan" if either list is missing or
+# the two differ in length, so that a comparison cannot pass by reading nothing
+compare_point_vector_fields() {
+    awk '
+        FNR == 1 { f++; hdr = 0; inList = 0; n = 0 }
+        /^internalField/ { hdr = 1; next }
+        hdr && /^\($/ { hdr = 0; inList = 1; next }
+        inList && /^\)/ { inList = 0; next }
+        inList {
+            gsub(/[()]/, "")
+            n++
+            for (c = 1; c <= 3; c++) v[f, n, c] = $c
+            cnt[f] = n
+        }
+        END {
+            if (cnt[1] == 0 || cnt[1] != cnt[2]) { print "nan nan"; exit }
+            maxd = 0; maxa = 0
+            for (i = 1; i <= cnt[1]; i++) for (c = 1; c <= 3; c++) {
+                a = v[1, i, c]; d = a - v[2, i, c]
+                if (d < 0) d = -d
+                if (a < 0) a = -a
+                if (d > maxd) maxd = d
+                if (a > maxa) maxa = a
+            }
+            printf "%.6e %.6e\n", maxd, maxa
+        }' "$1" "$2"
+}
+
+# Compare the legacy and framework results of the vertex-centred model. The
+# legacy result must not be trivially zero, or agreement proves nothing
+check_vertex_centred_agreement() {
+    local label="$1"
+    local legacy="$2"
+    local framework="$3"
+    local result maxd maxa
+
+    if [[ ! -f "${legacy}" || ! -f "${framework}" ]]; then
+        echo "FAIL: ${label}: missing pointD (${legacy}, ${framework})"
+        return 1
+    fi
+
+    result=$(compare_point_vector_fields "${legacy}" "${framework}")
+    maxd="${result% *}"
+    maxa="${result#* }"
+
+    if [[ "${maxd}" == nan ]] \
+        || ! awk "BEGIN {exit !(${maxa} > 1e-12)}"
+    then
+        echo "FAIL: ${label}: legacy pointD is empty or zero (${result})"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !(${maxd} <= ${VERTEX_CENTRED_DISP_REL_TOL}*${maxa})}"
+    then
+        printf "PASS: %s legacy and framework agree: %s %s, %s %s\n" \
+            "${label}" "max|dPointD| =" "${maxd}" "max|pointD| =" "${maxa}"
+        return 0
+    fi
+
+    printf "FAIL: %s legacy and framework differ: %s %s, %s %s\n" \
+        "${label}" "max|dPointD| =" "${maxd}" "max|pointD| =" "${maxa}"
+    return 1
+}
+
+# The legacy dualMechanicalModel is built only on the legacy path. A framework
+# arm that still builds it is taking its stress, or part of it, from the
+# legacy laws, whatever the manager lines in its log say
+check_dual_mechanical_model() {
+    local approach="$1"
+    local logfile="$2"
+
+    if grep -q "Creating the dualMechanicalModel" "${logfile}"; then
+        if [[ "${USE_FRAMEWORK}" == true ]]; then
+            echo "FAIL: ${approach} constructed the legacy dualMechanicalModel"
+            return 1
+        fi
+    elif [[ "${USE_FRAMEWORK}" != true ]]; then
+        echo "FAIL: ${approach} did not construct the dualMechanicalModel"
+        return 1
+    fi
+
+    if [[ "${USE_FRAMEWORK}" == true ]] \
+        && ! grep -q "Selecting mechanical constitutive law" "${logfile}"
+    then
+        echo "FAIL: ${approach} selected no mechanical constitutive law"
+        return 1
+    fi
+
+    return 0
+}
+
+# The explicit path of the vertex-centred model, which no tutorial runs, on
+# both implementations: twenty steps of the cantilever from rest, in two case
+# directories of their own. The time step comes from the wave speed, so
+# it is also a check that the framework gives the same density and stiffness
+run_vertex_centred_explicit_comparison() {
+    local legacy_dir="${REGRESSION_ROOT}/vertexCentredExplicitLegacy"
+    local framework_dir="${REGRESSION_ROOT}/vertexCentredExplicitFramework"
+    local d item base_item
+
+    for d in "${legacy_dir}" "${framework_dir}"; do
+        rm -rf "${d}"
+        mkdir -p "${d}"
+
+        for item in "${SCRIPT_DIR}"/*; do
+            base_item=$(basename "${item}")
+            if [[ "${base_item}" == "regressionTests" ]]; then
+                continue
+            fi
+            cp -a "${item}" "${d}/"
+        done
+
+        sed -i \
+            "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
+            "${d}/src/Make/options"
+
+        sed -i \
+            's|solutionAlgorithm PETScSNES;|solutionAlgorithm explicit;|' \
+            "${d}/constant/solidProperties.vertexCentred"
+
+        # Twenty steps, and only the last one written. The time step is set
+        # by the model, so the run is stopped by step count rather than time
+        sed -i \
+            -e 's|^stopAt .*|stopAt          nextWrite;|' \
+            -e 's|^deltaT .*|deltaT          1e-8;|' \
+            -e 's|^writeControl .*|writeControl    timeStep;|' \
+            -e 's|^writeInterval .*|writeInterval   20;|' \
+            -e 's|^writePrecision .*|writePrecision  16;|' \
+            "${d}/system/controlDict"
+    done
+
+    apply_framework_switch \
+        "${framework_dir}/constant/solidProperties.vertexCentred" || return 1
+
+    for d in "${legacy_dir}" "${framework_dir}"; do
+        ( cd "${d}" && ./Allrun vertexCentred > "${ALLRUN_LOGFILE}" 2>&1 ) \
+            || { echo "FAIL: a vertexCentred explicit arm failed"; return 1; }
+    done
+
+    if solids4Foam::regressionCaseSkipped "${legacy_dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "Skipping vertexCentred explicit because it is unavailable here"
+        return 0
+    fi
+
+    USE_FRAMEWORK=false
+    check_dual_mechanical_model "vertexCentred explicit legacy" \
+        "${legacy_dir}/${SOLVER_LOGFILE}" || return 1
+    USE_FRAMEWORK=true
+    check_dual_mechanical_model "vertexCentred explicit framework" \
+        "${framework_dir}/${SOLVER_LOGFILE}" || return 1
+
+    if ! grep -q "Setting deltaT" "${legacy_dir}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: vertexCentred explicit legacy arm did not run explicitly"
+        return 1
+    fi
+
+    if [[ "$(grep "Setting deltaT" "${legacy_dir}/${SOLVER_LOGFILE}")" \
+       != "$(grep "Setting deltaT" "${framework_dir}/${SOLVER_LOGFILE}")" ]]
+    then
+        echo "FAIL: vertexCentred explicit arms chose different time steps"
+        return 1
+    fi
+
+    local t
+    t=$(solids4Foam::latestTime "${legacy_dir}")
+
+    check_vertex_centred_agreement "vertexCentred explicit" \
+        "${legacy_dir}/${t}/pointD" "${framework_dir}/${t}/pointD"
+}
+
 check_high_order_errors() {
     local displacement
     local failures=0
@@ -576,11 +767,25 @@ if [ "$CHECK_ONLY" = false ]; then
             fi
         fi
 
+        # The vertex-centred arms are compared with each other, which the
+        # default six significant figures would only do to six figures
+        if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
+            sed -i 's|^writePrecision .*|writePrecision  16;|' \
+                "${CASE_DIR}/system/controlDict"
+        fi
+
         ( cd "${CASE_DIR}" && ./Allrun "${RUN_APPROACH}" > "${ALLRUN_LOGFILE}" 2>&1 )
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
             echo "Skipping ${approach} because it is unavailable in this environment"
             continue
+        fi
+
+        # Recorded so that a vertex-centred arm which ran but wrote no
+        # displacement fails below, rather than quietly switching the
+        # comparison off
+        if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
+            VERTEX_CENTRED_RAN="${VERTEX_CENTRED_RAN:-} ${approach}"
         fi
 
         # Each arm must have taken the path it was set up for, or a
@@ -609,7 +814,41 @@ if [ "$CHECK_ONLY" = false ]; then
             failures=$((failures + 1))
         fi
 
+        # Keep each vertex-centred result, since the case directory is
+        # cleaned before the next arm runs
+        if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
+            if ! check_dual_mechanical_model "${approach}" \
+                "${CASE_DIR}/${SOLVER_LOGFILE}"
+            then
+                failures=$((failures + 1))
+            fi
+
+            t=$(solids4Foam::latestTime "${CASE_DIR}")
+            if [[ -n "${t}" && -f "${CASE_DIR}/${t}/pointD" ]]; then
+                cp "${CASE_DIR}/${t}/pointD" \
+                    "${REGRESSION_ROOT}/pointD.${approach}"
+            fi
+        fi
+
     done
+
+    # As for unsCoupled, but compared field by field rather than on one
+    # extremum, since the two arms should agree to round-off everywhere.
+    # Scheduled on whether the arms ran, not on whether they wrote output: an
+    # arm that ran and wrote no pointD is a failure, not a reason to skip
+    if [[ -n "${VERTEX_CENTRED_RAN:-}" ]]
+    then
+        if ! check_vertex_centred_agreement "vertexCentred" \
+            "${REGRESSION_ROOT}/pointD.vertexCentred" \
+            "${REGRESSION_ROOT}/pointD.vertexCentredManager"
+        then
+            failures=$((failures + 1))
+        fi
+
+        if ! run_vertex_centred_explicit_comparison; then
+            failures=$((failures + 1))
+        fi
+    fi
 
     # The bands above are correctness bounds on one arm. These two arms solve
     # the same problem with the same material constants read two ways, so they

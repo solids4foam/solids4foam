@@ -58,45 +58,88 @@ const Foam::fvMesh& Foam::plateHoleAnalyticalSolution::mesh() const
 }
 
 
-bool Foam::plateHoleAnalyticalSolution::planeStress(const fvMesh& mesh) const
+const Foam::IOdictionary&
+Foam::plateHoleAnalyticalSolution::mechanicalProperties
+(
+    const fvMesh& mesh
+) const
 {
     if (mesh.foundObject<IOdictionary>("mechanicalProperties"))
     {
-        return Switch
-        (
-            mesh.lookupObject<IOdictionary>
-            (
-                "mechanicalProperties"
-            ).lookup("planeStress")
-        );
+        return mesh.lookupObject<IOdictionary>("mechanicalProperties");
     }
     else if
     (
         mesh.objectRegistry::parent().foundObject<objectRegistry>("region0")
     )
     {
-        return Switch
+        return mesh.objectRegistry::parent().subRegistry
         (
-            mesh.objectRegistry::parent().subRegistry
-            (
-                "region0"
-            ).lookupObject<IOdictionary>
-            (
-                "mechanicalProperties"
-            ).lookup("planeStress")
-        );
+            "region0"
+        ).lookupObject<IOdictionary>("mechanicalProperties");
     }
 
-    return Switch
+    return mesh.objectRegistry::parent().subRegistry
     (
-        mesh.objectRegistry::parent().subRegistry
-        (
-            "solid"
-        ).lookupObject<IOdictionary>
-        (
-            "mechanicalProperties"
-        ).lookup("planeStress")
+        "solid"
+    ).lookupObject<IOdictionary>("mechanicalProperties");
+}
+
+
+bool Foam::plateHoleAnalyticalSolution::planeStress(const fvMesh& mesh) const
+{
+    return Switch(mechanicalProperties(mesh).lookup("planeStress"));
+}
+
+
+void Foam::plateHoleAnalyticalSolution::derivedMaterial
+(
+    const fvMesh& mesh,
+    scalar& mu,
+    scalar& nu
+) const
+{
+    // Read from the law's own entry in mechanicalProperties rather than asked
+    // of the solid model, so the answer is the same whichever implementation
+    // the run uses: the legacy mechanicalModel and the mechanicalConstitutiveLaw
+    // framework read this same entry
+    const PtrList<entry> laws
+    (
+        mechanicalProperties(mesh).lookup("mechanical")
     );
+
+    if (laws.size() != 1)
+    {
+        FatalErrorInFunction
+            << "The analytical solution is for one material, but "
+            << "mechanicalProperties defines " << laws.size()
+            << exit(FatalError);
+    }
+
+    const dictionary& lawDict = laws[0].dict();
+
+    if (lawDict.found("E") && lawDict.found("nu"))
+    {
+        const scalar E = dimensionedScalar(lawDict.lookup("E")).value();
+        nu = dimensionedScalar(lawDict.lookup("nu")).value();
+        mu = E/(2*(1 + nu));
+
+        return;
+    }
+
+    mu = dimensionedScalar(lawDict.lookup("mu")).value();
+    const scalar K = dimensionedScalar(lawDict.lookup("K")).value();
+
+    nu = 0.5;
+    if (K + SMALL < GREAT)
+    {
+        nu = (3*K - 2*mu)/(2*(3*K + mu));
+
+        if (planeStress(mesh))
+        {
+            nu = (K - mu)/(K + mu);
+        }
+    }
 }
 
 
@@ -128,21 +171,9 @@ Foam::vector Foam::plateHoleAnalyticalSolution::plateHoleDisplacement
         );
     }
 
-    const solidModel& solMod = lookupSolidModel(mesh);
-
-    const scalar mu = solMod.mechanical().shearModulus()()[0];
-    const scalar K = solMod.mechanical().bulkModulus()()[0];
-
-    scalar nu = 0.5;
-    if (K + SMALL < GREAT)
-    {
-        nu = (3*K - 2*mu)/(2*(3*K + mu));
-
-        if (planeStress(mesh))
-        {
-            nu = (K - mu)/(K + mu);
-        }
-    }
+    scalar mu = 0;
+    scalar nu = 0;
+    derivedMaterial(mesh, mu, nu);
 
     scalar kappa = 3 - 4*nu;
     if (planeStress(mesh))
@@ -171,21 +202,8 @@ Foam::scalar Foam::plateHoleAnalyticalSolution::plateHoleHydPressure
 
     if (deriveMaterialProperties_)
     {
-        const solidModel& solMod = lookupSolidModel(mesh);
-
-        const scalar mu = solMod.mechanical().shearModulus()()[0];
-        const scalar K = solMod.mechanical().bulkModulus()()[0];
-
-        nu = 0.5;
-        if (K + SMALL < GREAT)
-        {
-            nu = (3*K - 2*mu)/(2*(3*K + mu));
-
-            if (planeStress(mesh))
-            {
-                nu = (K - mu)/(K + mu);
-            }
-        }
+        scalar mu = 0;
+        derivedMaterial(mesh, mu, nu);
     }
 
     return plateHoleAnalyticalFields::hydPressure(C, T_, holeR_, nu);

@@ -172,17 +172,24 @@ PYEOF
 }
 
 run_framework_comparison() {
-    # Not on foam-extend, where the two arms are known to differ, by 0.6 % in D.
-    # They match to 1e-13 for two correctors and part on the third, and only in
-    # the stress on the three symmetryPlane patches: the framework corrects the
-    # stress's boundary conditions after evaluating it and the legacy law does
-    # not, and on foam-extend's symmetryPlane that correction changes the value.
-    # Correcting the legacy stress too reproduces the framework's answer to
-    # 2e-8. Dropping the correction from the framework instead breaks the exact
-    # agreement perforatedPlate has on foam-extend, so which one is right is
-    # still open, and until it is settled this comparison would only report it
+    # Not on foam-extend, where the two arms differ by 0.6 % in D, and the
+    # framework's answer is the one kept. They match to 1e-13 for two correctors
+    # and part of the third, and differ only in the stress on the three
+    # symmetryPlane patches. The framework corrects the stress's boundary
+    # conditions after evaluating it; the legacy law does not. On foam-extend's
+    # symmetryPlane that correction replaces the law's boundary value with the
+    # symmetry transform of the adjacent cell's stress, which has zero shear
+    # traction on the plane, as symmetry requires. Correcting the legacy stress
+    # too reproduces the framework's answer to 2e-8.
+    #
+    # The transform was checked because older OpenFOAM versions were thought to
+    # get it wrong for tensors: 0.5*(x + transform(I - 2nn, x)) matches a
+    # hand-written reference to 4e-16 for symmTensor and tensor, with zero shear
+    # traction and all other components kept, on v1912-v2606, OpenFOAM.org 8-13
+    # and foam-extend 4.1 and 5.0. The two arms still differ, so an exact
+    # comparison here would only report the known difference
     if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-        echo "SKIP: framework comparison (open foam-extend symmetryPlane difference)"
+        echo "SKIP: framework comparison (known foam-extend symmetryPlane difference)"
         return 0
     fi
 

@@ -26,6 +26,25 @@ CASES=(
     "pressureDisplacement:pressureDisplacement:2.20:2.32"
     "pressureDisplacementLinear:pressureDisplacementLinear:0.15:0.17"
     "pressureDisplacementUnsteady:pressureDisplacementUnsteady:1.50:1.60"
+    "pressureDisplacementManager:pressureDisplacement:2.20:2.32"
+    "pressureDisplacementLinearManager:pressureDisplacementLinear:0.15:0.17"
+)
+
+# The *Manager arms run the same case with coupledPressureDisplacementSolid
+# taking its constitutive response from the mechanicalConstitutiveLaw
+# framework, and are compared with their legacy twin below. The switch goes in
+# the solid model's coeffs sub-dictionary, which is where the model reads it
+FRAMEWORK_PAIRS=(
+    # legacy arm : framework arm : relative tolerance
+    #
+    # Nonlinear: the framework takes the law's isochoric stress minus the
+    # solved pressure, where the legacy law's pressureDisplacement mode uses
+    # mu*(b - I)/J, which is not deviatoric. At nu = 0.5 the two differ by
+    # about 1e-4 in this probe
+    "pressureDisplacement:pressureDisplacementManager:1e-3"
+    # Linear: the law is not evaluated and the stiffness is the same shear
+    # modulus, so the two agree to round-off
+    "pressureDisplacementLinear:pressureDisplacementLinearManager:1e-9"
 )
 
 echo "============================================================"
@@ -55,6 +74,19 @@ run_case() {
     local case_dir="${REGRESSION_ROOT}/${case_name}"
 
     prepare_case "${case_dir}"
+
+    if [[ "${case_name}" == *Manager ]]; then
+        local dict
+        local switch="    useMechanicalConstitutiveLawManager yes;"
+        for dict in \
+            "${case_dir}"/caseOptions/pressureDisplacement*/*/constant/solidProperties
+        do
+            sed -i \
+                "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
+                "${dict}"
+        done
+    fi
+
     ( cd "${case_dir}" && ./Allclean > /dev/null 2>&1 ) || true
 
     if [[ -n "${allrun_arg}" ]]; then
@@ -140,6 +172,55 @@ for case_spec in "${CASES[@]}"; do
         "${case_name}" "final probe displacement magnitude" \
         "$(extract_final_probe_displacement "${case_dir}")" \
         "${min_value}" "${max_value}"
+done
+
+# Each framework arm against its legacy twin. Asserted positively that each
+# took the path it was set up for, or the comparison is a run against itself
+for pair in "${FRAMEWORK_PAIRS[@]}"; do
+    IFS=':' read -r legacy_name framework_name rel_tol <<< "${pair}"
+    legacy_dir="${REGRESSION_ROOT}/${legacy_name}"
+    framework_dir="${REGRESSION_ROOT}/${framework_name}"
+
+    if solids4Foam::regressionCaseSkipped "${framework_dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${framework_name} against ${legacy_name}"
+        continue
+    fi
+
+    if ! grep -q "taking the stiffness from the mechanicalConstitutiveLaw" \
+        "${framework_dir}/log.solids4Foam" 2>/dev/null
+    then
+        echo "FAIL: ${framework_name}: did not use the framework"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if grep -q "Creating the mechanicalConstitutiveLawManager" \
+        "${legacy_dir}/log.solids4Foam" 2>/dev/null
+    then
+        echo "FAIL: ${legacy_name}: used the framework"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    legacy_value="$(extract_final_probe_displacement "${legacy_dir}")"
+    framework_value="$(extract_final_probe_displacement "${framework_dir}")"
+
+    if [[ -z "${legacy_value}" || -z "${framework_value}" ]]; then
+        echo "FAIL: ${framework_name}: could not extract both probe values"
+        failures=$((failures + 1))
+    elif awk "BEGIN {d = ${framework_value} - ${legacy_value}; \
+        exit !(${legacy_value} > 0 && d*d <= (${rel_tol}*${legacy_value})^2)}"
+    then
+        printf "PASS: %s against %s: %.12g vs %.12g\n" \
+            "${framework_name}" "${legacy_name}" \
+            "${framework_value}" "${legacy_value}"
+    else
+        printf "FAIL: %s against %s: %.12g vs %.12g (tolerance %s)\n" \
+            "${framework_name}" "${legacy_name}" \
+            "${framework_value}" "${legacy_value}" "${rel_tol}"
+        failures=$((failures + 1))
+    fi
 done
 
 if [ "$CHECK_ONLY" = false ]; then

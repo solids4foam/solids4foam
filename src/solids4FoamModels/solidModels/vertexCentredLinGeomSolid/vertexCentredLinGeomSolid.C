@@ -79,7 +79,7 @@ void vertexCentredLinGeomSolid::updatePointDivSigma
     );
 
     // Calculate stress at dual faces
-    dualMechanicalPtr_().correct(dualSigmaf);
+    correctDualStress(dualGradDf, dualSigmaf);
 
     // Dual mesh unit normals
     const surfaceVectorField dualN(dualMesh().Sf()/dualMesh().magSf());
@@ -512,8 +512,6 @@ void vertexCentredLinGeomSolid::makeFixedDofRowsIS() const
 #endif // USE_PETSC
 
 
-// Not reached while the constructor refuses the framework for this model.
-// Kept for when the stress moves onto it, which is when that refusal goes
 const integrationPointTopology&
 vertexCentredLinGeomSolid::dualFaceTopology() const
 {
@@ -540,6 +538,191 @@ vertexCentredLinGeomSolid::dualFaceTopology() const
     }
 
     return *dualFaceTopologyPtr_;
+}
+
+
+const integrationPointTopology&
+vertexCentredLinGeomSolid::dualBoundaryFaceTopology() const
+{
+    if (!dualBoundaryFaceTopologyPtr_)
+    {
+        // The boundary dual faces are integration points of their own, with
+        // their own constitutive state, as they were for dualMechanicalModel.
+        // They cannot join the internal dual-face topology, whose integration
+        // points are the internal dual faces in order: the Jacobian assembly
+        // reads the tangent by that index.
+        // Empty patches hold no values, and the tractions on coupled patches
+        // are set to zero in updatePointDivSigma(), so neither is evaluated
+        const fvMesh& dMesh = dualMesh();
+        const labelList& dualFaceToCell = dualMeshMap().dualFaceToCell();
+        const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
+        const labelList& dualOwn = dMesh.faceOwner();
+        const labelListList& pointCells = mesh().pointCells();
+
+        DynamicList<label> faces(dMesh.nFaces() - dMesh.nInternalFaces());
+        DynamicList<label> faceToCell(faces.capacity());
+
+        forAll(dMesh.boundary(), patchI)
+        {
+            const fvPatch& fvp = dMesh.boundary()[patchI];
+
+            if (fvp.coupled() || fvp.size() == 0)
+            {
+                continue;
+            }
+
+            const label start = dMesh.boundaryMesh()[patchI].start();
+
+            forAll(fvp, faceI)
+            {
+                const label dFaceID = start + faceI;
+                label cellID = dualFaceToCell[dFaceID];
+
+                if (cellID < 0)
+                {
+                    // dualMeshToMeshMap leaves a boundary dual face unmapped
+                    // when its centre projects onto none of the boundary faces
+                    // about its point. vfvc::fGrad gives such a face a zero
+                    // gradient, so the cell chosen here only decides which
+                    // material's stress at zero strain it takes: use the first
+                    // primary cell about the point at the centre of its dual
+                    // cell
+                    cellID = pointCells[dualCellToPoint[dualOwn[dFaceID]]][0];
+                }
+
+                faces.append(dFaceID);
+                faceToCell.append(cellID);
+            }
+        }
+
+        dualBoundaryFaces_ = faces;
+
+        // A dual-face topology holds the first n entries of the map it is
+        // given, which here are exactly these faces
+        dualBoundaryFaceTopologyPtr_ =
+            &mechanicalManager().registerTopology
+            (
+                "dualBoundaryFaces",
+                autoPtr<integrationPointTopology>
+                (
+                    new dualFaceIntegrationPointTopology
+                    (
+                        mesh(),
+                        faceToCell,
+                        faceToCell.size()
+                    )
+                )
+            );
+    }
+
+    return *dualBoundaryFaceTopologyPtr_;
+}
+
+
+void vertexCentredLinGeomSolid::correctDualStress
+(
+    const surfaceTensorField& dualGradDf,
+    surfaceSymmTensorField& dualSigmaf
+)
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        // dualMechanicalModel looks up the gradient from the registry, where
+        // it is dualGradDf
+        dualMechanicalPtr_().correct(dualSigmaf);
+
+        return;
+    }
+
+    // Each dual face takes the law of the primary cell it lies in, so more
+    // than one material needs no collapse rule and no sub-meshes.
+    // There is no separate commit of the constitutive state: the manager rolls
+    // it over at the first evaluation of a new time step, and
+    // solidModel::updateTotalFields() tells it that the step has ended
+    const scalar deltaT = mesh().time().deltaTValue();
+
+    // Internal dual faces are the integration points of the dual-face
+    // topology, in order
+    mechanicalManager().updateStressSmallStrain
+    (
+        dualFaceTopology(),
+        Foam::primitiveField(dualGradDf),
+        Foam::primitiveField(dualGradDf.oldTime()),
+        deltaT,
+        Foam::primitiveFieldRef(dualSigmaf)
+    );
+
+    // Boundary dual faces are gathered into a flat list, evaluated, and
+    // scattered back
+    const integrationPointTopology& bTopo = dualBoundaryFaceTopology();
+    const polyBoundaryMesh& bMesh = dualMesh().boundaryMesh();
+    const surfaceTensorField& dualGradDf0 = dualGradDf.oldTime();
+
+    tensorField bGradD(dualBoundaryFaces_.size(), tensor::zero);
+    tensorField bGradD0(dualBoundaryFaces_.size(), tensor::zero);
+    symmTensorField bSigma(dualBoundaryFaces_.size(), symmTensor::zero);
+
+    forAll(dualBoundaryFaces_, i)
+    {
+        const label dFaceID = dualBoundaryFaces_[i];
+        const label patchID = bMesh.whichPatch(dFaceID);
+        const label localFaceID = dFaceID - bMesh[patchID].start();
+
+        bGradD[i] = dualGradDf.boundaryField()[patchID][localFaceID];
+        bGradD0[i] = dualGradDf0.boundaryField()[patchID][localFaceID];
+    }
+
+    mechanicalManager().updateStressSmallStrain
+    (
+        bTopo, bGradD, bGradD0, deltaT, bSigma
+    );
+
+    forAll(dualBoundaryFaces_, i)
+    {
+        const label dFaceID = dualBoundaryFaces_[i];
+        const label patchID = bMesh.whichPatch(dFaceID);
+        const label localFaceID = dFaceID - bMesh[patchID].start();
+
+        boundaryFieldRef(dualSigmaf)[patchID][localFaceID] = bSigma[i];
+    }
+}
+
+
+void vertexCentredLinGeomSolid::correctCellStress()
+{
+    if (!useMechanicalConstitutiveLawManager())
+    {
+        // Map primary cell gradD field to sub-meshes for multi-material cases
+        if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+        {
+            mechanical().mapGradToSubMeshes(gradD());
+        }
+
+        mechanical().correct(sigma());
+
+        return;
+    }
+
+    // Each cell takes the law of its own material, so there are no sub-meshes
+    // to map the gradient to
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+tmp<volScalarField> vertexCentredLinGeomSolid::impK() const
+{
+    if (useMechanicalConstitutiveLawManager())
+    {
+        return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+    }
+
+    return mechanical().impK();
 }
 
 
@@ -679,19 +862,13 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
-    // Map primary cell gradD field to sub-meshes for multi-material cases
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    {
-        mechanical().mapGradToSubMeshes(gradD());
-    }
-
     // Update dual face stress field
-    dualMechanicalPtr_().correct(dualSigmaf_);
+    correctDualStress(dualGradDf_, dualSigmaf_);
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
     // This stress will be first-order accurate
-    mechanical().correct(sigma());
+    correctCellStress();
 
 #ifdef OPENFOAM_COM
     // Interpolate pointD to D
@@ -824,7 +1001,9 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 #endif
     dualMechanicalPtr_
     (
-        new dualMechanicalModel
+        useMechanicalConstitutiveLawManager()
+      ? nullptr
+      : new dualMechanicalModel
         (
             dualMesh(),
             nonLinGeom(),
@@ -834,6 +1013,8 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         )
     ),
     dualFaceTopologyPtr_(nullptr),
+    dualBoundaryFaceTopologyPtr_(nullptr),
+    dualBoundaryFaces_(),
     blockSize_
     (
         solvePressure()
@@ -851,7 +1032,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         (
             "fixedDofScale",
             (
-                average(mechanical().impK())
+                average(impK())
                *Foam::sqrt(gAverage(mesh().magSf()))
             ).value()
         )
@@ -975,42 +1156,29 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         notImplemented("Not implemented when solvePressure is active");
     }
 
-    // This model is not on the mechanicalConstitutiveLaw framework yet, and
-    // half-using it is worse than not using it at all: the residual comes from
-    // mechanical().correct(), which is the legacy path, while the tangent
-    // would come from mechanicalManager().updateTangentSmallStrain(). Residual
-    // and Jacobian would then describe different materials - converging to the
-    // legacy answer where it converges at all, and stalling without saying why
-    // where the two disagree enough.
-    //
-    // TODO: this refusal has to go when the legacy mechanicalModel is
-    // deprecated or removed, because there will then be no legacy path for the
-    // residual to come from.
-    //
-    // The dual-face topology plumbing is already here: dualFaceTopology()
-    // builds it and registers it with the manager as "dualFaces". What is
-    // missing is the residual itself - routing dualSigmaf_, and so
-    // updatePointDivSigma(), through the manager rather than
-    // dualMechanicalModel; committing the manager's state at the end of the
-    // step; covering the explicit and SNES paths the same way; and dropping
-    // dualMechanicalModel ownership once nothing reads it
-    if (useMechanicalConstitutiveLawManager())
-    {
-        FatalErrorInFunction
-            << type() << " does not support the mechanicalConstitutiveLaw "
-            << "framework." << nl << nl
-            << "    It would take its stress from the legacy mechanicalModel "
-            << "and its tangent from the framework, which are not required to "
-            << "agree. Set `useMechanicalConstitutiveLawManager no;`, or use "
-            << "a cell-centred solid model."
-            << abort(FatalError);
-    }
-
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
 
     // pointD field must be defined
     pointDisRequired();
+
+    // Start the dual-face gradient's history from the displacement the run
+    // starts from: zero on a cold start, the restart value otherwise. Taken
+    // lazily at the first stress update instead, the old time would be a copy
+    // of the first new gradient, so a law that works from the increment would
+    // see none in the first step, and after a restart would pair its restored
+    // state with the wrong previous gradient
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        solidModelDict().lookupOrDefault<scalar>("zeta", 1.0),
+        debug
+    );
+    dualGradDf_.oldTime();
 
     // Set fixed degree of freedom list
     setFixedDofs
@@ -1097,7 +1265,7 @@ void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
         // Max wave speed in the domain
         const scalar waveSpeed = max
         (
-            Foam::sqrt(mechanical().impK()/mechanical().rho())
+            Foam::sqrt(impK()/rho())
         ).value();
 
         // deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
@@ -1370,7 +1538,7 @@ label vertexCentredLinGeomSolid::formJacobian
     );
 
     // Calculate stress at dual faces
-    dualMechanicalPtr_().correct(dualSigmaf_);
+    correctDualStress(dualGradDf_, dualSigmaf_);
 
     // Fidelity of the material tangent used to build the Jacobian. The
     // default reproduces the previous behaviour, which was
@@ -1380,7 +1548,6 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (jacTangent == tangentRequest::scalar)
     {
-        // Not reached while the constructor refuses the framework here
         if (useMechanicalConstitutiveLawManager())
         {
             // Scalar tangent at the internal dual faces, taken from the
@@ -1388,9 +1555,9 @@ label vertexCentredLinGeomSolid::formJacobian
             // constitutive state, so this is safe alongside the residual
             // stress update above.
             // The field is built here rather than copied from dualImpKf(),
-            // which would pull in dualMechanicalModel::impKf() and with it the
-            // "interpolate(impK)" scheme, on a path whose whole point is not
-            // to need either
+            // which reads dualMechanicalModel::impKf(): there is no
+            // dualMechanicalModel on this path, and it would also need the
+            // "interpolate(impK)" scheme
             surfaceScalarField dualImpKfNew
             (
                 IOobject
@@ -1595,16 +1762,10 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
-    // Map primary cell gradD field to sub-meshes for multi-material cases
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-    {
-        mechanical().mapGradToSubMeshes(gradD());
-    }
-
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
     // This stress will be first-order accurate
-    mechanical().correct(sigma());
+    correctCellStress();
 
     // Calculate gradD at the primary points using least squares: this should
     // be second-order accurate (... I think).
