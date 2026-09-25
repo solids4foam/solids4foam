@@ -1290,6 +1290,7 @@ Foam::solidModel::solidModel
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
+    restartKinematicsAvailable_(true),
     rhoD2dt2DPtr_(),
     twoDCorrector_(mesh()),
     twoD_(mesh().nGeometricD() == 2),
@@ -1389,6 +1390,29 @@ Foam::solidModel::solidModel
     gradDD_.oldTime();
     sigma_.oldTime();
 
+    // Whether a continued run has the old-time gradient a constitutive
+    // history is measured against. Looked for rather than assumed from
+    // 'restart yes', since the run that wrote this time may not have asked
+    // for it
+    if (runTime.startTimeIndex() > 0)
+    {
+        IOobject gradD0IO
+        (
+            gradD_.oldTime().name(),
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        restartKinematicsAvailable_ =
+            gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+        restartKinematicsAvailable_ = gradD0IO.headerOk();
+#endif
+    }
+
     if (restart_)
     {
         // Enable writing of fields which are needed for restart
@@ -1429,20 +1453,7 @@ Foam::solidModel::solidModel
             //
             // The fields may still be there, if the run that produced this
             // time directory did ask for them, so look before complaining
-            IOobject gradD0IO
-            (
-                "grad(D)_0",
-                runTime.timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            );
-
-#ifdef OPENFOAM_NOT_EXTEND
-            const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
-#else
-            const bool present = gradD0IO.headerOk();
-#endif
+            const bool present = restartKinematicsAvailable_;
 
             if (!present && !restartSpecified_)
             {
@@ -2365,6 +2376,11 @@ Foam::solidModel::mechanicalManager() const
         mechanicalManagerPtr_.set
         (
             new mechanicalConstitutiveLawManager(mesh(), mechanicalProperties())
+        );
+
+        mechanicalManagerPtr_->setRestartKinematicsAvailable
+        (
+            restartKinematicsAvailable_
         );
     }
 

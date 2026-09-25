@@ -254,6 +254,11 @@ class mechanicalConstitutiveLawManager
         //  whose dictionaries ask for that; empty if none does
         autoPtr<mechanicalConstitutiveLawCaseInputs> caseInputsPtr_;
 
+        //- Whether a continued run has the kinematic history a constitutive
+        //  history is measured against. Said by the solid model, which knows
+        //  what it wrote; true until it says otherwise
+        bool restartKinematicsAvailable_;
+
 
     // Private Member Functions
 
@@ -1473,6 +1478,15 @@ public:
         //  deformation alone, so that J*sigma_iso is invariant under a
         //  superposed dilation. Weaker than the above, and separate from it
         bool allLawsHaveDilationInvariantIsochoricStress() const;
+
+        //- Say whether a continued run has the kinematic history that the
+        //  laws' constitutive history is measured against. A client that
+        //  continues a run without it must say so, and a law that keeps
+        //  history then refuses to restart
+        void setRestartKinematicsAvailable(const bool available)
+        {
+            restartKinematicsAvailable_ = available;
+        }
 
         //- Let each material law know the end of each time step has been
         //  reached.

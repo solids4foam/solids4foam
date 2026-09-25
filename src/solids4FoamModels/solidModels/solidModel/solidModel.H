@@ -305,6 +305,11 @@ private:
         //  Write out all fields required for a consistent restart
         const Switch restart_;
 
+        //- Whether a continued run has the kinematic history, the old-time
+        //  displacement gradient, that a constitutive history is measured
+        //  against. True for a run from the start, which has none to restore
+        bool restartKinematicsAvailable_;
+
         //- Store rho*d2d2t(D) for efficiency
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 

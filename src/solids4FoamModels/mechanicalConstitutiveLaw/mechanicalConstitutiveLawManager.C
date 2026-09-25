@@ -1340,22 +1340,9 @@ void Foam::mechanicalConstitutiveLawManager::checkRestartKinematics() const
     // the run as though it happened in one step, which is not a small error
     // and does not announce itself: the run continues and the answer is wrong.
     //
-    // The solid model writes the kinematic history only when asked, so the
-    // presence of grad(D) at old time is what says whether it was
-    IOobject gradD0IO
-    (
-        "grad(D)_0",
-        mesh_.time().timeName(),
-        mesh_,
-        IOobject::NO_READ,
-        IOobject::NO_WRITE
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const bool present = gradD0IO.typeHeaderOk<volTensorField>(false);
-#else
-    const bool present = gradD0IO.headerOk();
-#endif
+    // Whether the kinematic history was written is the solid model's to say,
+    // since it is the solid model that writes it
+    const bool present = restartKinematicsAvailable_;
 
     if (!present)
     {
@@ -2232,7 +2219,8 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     topologyEntries_(),
     compactFingerprints_(),
     addressingMeshSizes_(),
-    caseInputsPtr_()
+    caseInputsPtr_(),
+    restartKinematicsAvailable_(true)
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
