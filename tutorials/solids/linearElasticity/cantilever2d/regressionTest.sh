@@ -60,14 +60,18 @@ declare -A LEGACY_SIGMA0_D_DIGEST=(
 
 # unsCoupled: the final max epsilonEq. The same problem with the same material
 # constants read two ways, so the two agreed far more closely than the band
-# allows: 1e-8 relative
-UNSCOUPLED_REL_TOL=1e-8
+# allows, in every figure logged. The log gives five, so a round-off difference
+# on another machine can move the last one; the tolerance, 1e-4 relative, is
+# a few units in that figure
+UNSCOUPLED_REL_TOL=1e-4
 
 # The vertex-centred model's final pointD, implicit and explicit: the same
 # linear elastic problem, so the framework reproduced the legacy field to
-# round-off, and exactly as written. The tolerance is 1e-10 of the largest
-# component, written to sixteen figures
-VERTEX_CENTRED_DISP_REL_TOL=1e-10
+# round-off, and exactly as written. CI measures 3.6e-10 relative against the
+# values recorded on macOS, on every fork. The tolerance, 1e-6 of the largest
+# component, allows for that, and is ten times below the 1e-5 that a 0.001%
+# change in E makes
+VERTEX_CENTRED_DISP_REL_TOL=1e-6
 
 # sigma0, given in the law's dictionary, as a field, and as both: the final D
 # agreed with the legacy model's exactly, in all six figures written, and is

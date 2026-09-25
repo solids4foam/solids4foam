@@ -24,9 +24,11 @@ WF_MAX=7.0e-4
 # this case runs on. kirchhoffPlate reads rho, E and nu from its single
 # linearElastic material rather than asking for a stress, and the deflection is
 # linear in those constants, so the framework reproduced this in every written
-# digit; the tolerance is the 1e-12 relative that comparison used
+# digit. The value is written to six figures, so a round-off difference on
+# another machine can move its last digit; the tolerance, 1e-5 relative, is
+# a few units in that digit, and a 0.001% change in E or nu still reaches it
 LEGACY_MAX_WVF=0.000691225
-LEGACY_REL_TOL=1e-12
+LEGACY_REL_TOL=1e-5
 
 ALLRUN_LOGFILE="log.Allrun"
 

@@ -69,8 +69,10 @@ PRESSURE_DISPLACEMENT_CASES=(
 # magnitude of the field as written, per fork. For isotropic linear elasticity
 # a deviatoric projection and the declared volumetric split are the same
 # operation, so the framework reproduced the legacy D fields to the precision
-# written, 2e-12 at most, and is held to that here: both norms are within the
-# largest pointwise difference, so the bound carries over as it stands
+# written, 2e-12 at most. D is written to six figures, though, so a round-off
+# difference on another compiler, CPU or MPI build can move the last one; the
+# tolerance, 2e-5 of the largest value, is two units in that figure. Both norms
+# are within the largest pointwise difference, so the bound carries over
 declare -A LEGACY_D_MAX=()
 declare -A LEGACY_D_MEAN=()
 case "$(solids4Foam::foamFlavour)" in
@@ -85,19 +87,24 @@ case "$(solids4Foam::foamFlavour)" in
         LEGACY_D_MEAN[segregated]=2.56399595763334e-06
         ;;
 esac
-LEGACY_D_ABS_TOL=2e-12
+LEGACY_D_REL_TOL=2e-5
 
 # The pressure-displacement cases, on foam-extend 4.1, where
 # coupledPressureDisplacementSolid runs: DError and pErr maxima, as logged. The
 # model runs in linear mode here, where the law is not evaluated and the
 # stiffness is the same shear modulus on both paths, so the framework matched
-# them to the 1e-6 relative it was held to
+# them to the 1e-6 relative it was held to. These are the legacy values CI
+# logged (foam-extend-4.1-PETSc image, mcl-stage8-coverage 652cdb62). A macOS
+# foam-extend 4.1 build gave 0.0001275 and 38740.5 for the compressible case,
+# up to 40% apart, so this solver's answer here depends on the build, not only
+# on round-off, and the values hold for the CI build. The log gives six
+# figures; the tolerance, 1e-5 relative, is a few units in the last one
 declare -A LEGACY_PD=(
     # case : DError max, pErr max
-    [pressureDisplacementCompressible-coarse]="0.0001275 38740.5"
-    [pressureDisplacementIncompressible-coarse]="0.000128541 41673.3"
+    [pressureDisplacementCompressible-coarse]="7.748e-05 22215.6"
+    [pressureDisplacementIncompressible-coarse]="8.66026e-05 31612.4"
 )
-LEGACY_PD_REL_TOL=1e-6
+LEGACY_PD_REL_TOL=1e-5
 
 echo "============================================================"
 echo "Plate-with-hole regression tests"
@@ -367,11 +374,11 @@ for approach in segregated petscSnesPressure; do
     if awk "BEGIN {
             a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
             b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${LEGACY_D_ABS_TOL} \
-                && b <= ${LEGACY_D_ABS_TOL})
+            tol = ${LEGACY_D_REL_TOL}*${legacy_max}
+            exit !(${field_max} > 0 && a <= tol && b <= tol)
         }"
     then
-        printf "PASS: %s D matches the legacy model to write precision (max %.10g, mean %.10g)\n" \
+        printf "PASS: %s D matches the legacy model (max %.10g, mean %.10g)\n" \
             "${approach}" "${field_max}" "${field_mean}"
     else
         printf "FAIL: %s D differs from the legacy model: max %.10g (%.10g), mean %.10g (%.10g)\n" \

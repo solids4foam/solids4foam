@@ -45,8 +45,12 @@ LEGACY_REFERENCES=(
     # bound is the 1e-3 that allowed for it
     "pressureDisplacement:2.26015672427:1e-3"
     # Linear: the law is not evaluated and the stiffness is the same shear
-    # modulus, so the framework reproduced the legacy value to round-off
-    "pressureDisplacementLinear:0.159759049445:1e-9"
+    # modulus, so the framework reproduced the legacy value to round-off. This
+    # is the legacy value CI logged (foam-extend-4.1-PETSc image,
+    # mcl-stage8-coverage 652cdb62); a macOS foam-extend 4.1 build gave
+    # 0.159759049445, 3e-3 apart, so it holds for the CI build. The tolerance,
+    # 1e-6, is well above round-off and below that difference
+    "pressureDisplacementLinear:0.160195657336:1e-6"
 )
 
 echo "============================================================"

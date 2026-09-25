@@ -105,10 +105,15 @@ COMPARISON_END_TIME=2
 # on the removed legacy mechanicalModel, from the last commit that had it
 # (mcl-stage8-coverage, c3a92b3d), on foam-extend 4.1, the one fork this case
 # runs on. The framework reproduced the legacy D field to round-off, 1e-10 of
-# its largest value, and that is the tolerance here
+# its largest value. These are
+# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
 LEGACY_D_MAX=0.0066666666744038
 LEGACY_D_MEAN=0.00116545530838457
-LEGACY_D_REL_TOL=1e-10
+LEGACY_D_REL_TOL=1e-6
 
 # The latest written time directory.
 #

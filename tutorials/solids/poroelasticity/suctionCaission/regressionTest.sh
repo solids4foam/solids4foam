@@ -38,8 +38,12 @@ COMPARISON_END_TIME=1
 # The legacy model's D and porePressure at t = 1, as the max and mean component
 # magnitude of each field written to fourteen figures, from the last commit
 # that had it (mcl-stage8-coverage, c3a92b3d), per fork. The framework
-# reproduced both fields exactly, in every one of those figures. The tolerance,
-# 1e-12 of the largest value, is that agreement less the last figure written
+# reproduced both fields exactly, in every one of those figures. These are
+# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
         LEGACY_D_MAX=0.039970270753559
@@ -60,7 +64,7 @@ case "$(solids4Foam::foamFlavour)" in
         LEGACY_P_MEAN=17304.5184317787
         ;;
 esac
-LEGACY_REL_TOL=1e-12
+LEGACY_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
