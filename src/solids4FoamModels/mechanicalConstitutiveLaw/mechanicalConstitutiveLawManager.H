@@ -344,6 +344,57 @@ class mechanicalConstitutiveLawManager
             }
         }
 
+        //- The flat-list evaluation, written once for both strain measures.
+        //  Fields is smallStrainKinematicsFields or
+        //  finiteStrainKinematicsFields; evaluateSmallStrain and
+        //  evaluateFiniteStrain forward to it
+        template<class Fields>
+        void evaluateFlat
+        (
+            const integrationPointTopology& topo,
+            const Fields& fields,
+            const scalar dt,
+            UList<symmTensor>& stress,
+            UList<scalar>* scalarTangentPtr,
+            UList<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq,
+            const bool preserveState,
+            const bool coldState,
+            UList<scalar>* volumetricPtr
+        );
+
+        //- The boundary faces of the volField stress updates, written once
+        //  for both strain measures. patchFields(patchI) gives the patch's
+        //  kinematic lists as Fields; lead is the field whose patches say
+        //  which are coupled
+        template<class Fields, class PatchFields>
+        void updateStressVolBoundary
+        (
+            topologyEntry& tp,
+            const volTensorField& lead,
+            const PatchFields& patchFields,
+            const scalar dt,
+            volSymmTensorField& stress,
+            volScalarField* scalarTangentPtr,
+            const tangentRequest tangentReq,
+            volScalarField* volumetricResponsePtr
+        );
+
+        //- Check each kinematic list has the size the topology requires
+        void checkKinematicsListSizes
+        (
+            const label nIP,
+            const smallStrainKinematicsFields& fields,
+            const word& context
+        ) const;
+
+        void checkKinematicsListSizes
+        (
+            const label nIP,
+            const finiteStrainKinematicsFields& fields,
+            const word& context
+        ) const;
+
         //- Check that an integration point reached by more than one
         //  constitutive law has been given a rule for combining them.
         //  stressCollapseRule::none says there is no such rule, so a second
