@@ -362,6 +362,18 @@ void checkSurfaceOverloads
             );
             kMax = max(kMax, mag(flatK[faceI]));
         }
+        forAll(faceK.boundaryField(), patchI)
+        {
+            const fvsPatchField<scalar>& pk = faceK.boundaryField()[patchI];
+
+            forAll(pk, i)
+            {
+                const label faceI = bm[patchI].start() + i;
+                kDiff = max(kDiff, mag(pk[i] - flatK[faceI]));
+                kMax = max(kMax, mag(flatK[faceI]));
+            }
+        }
+
         reduce(kDiff, maxOp<scalar>());
         reduce(kMax, maxOp<scalar>());
         kDiff /= max(kMax, VSMALL);
@@ -375,7 +387,8 @@ void checkSurfaceOverloads
 
         report
         (
-            "small strain: the surfaceField tangent is the flat-list one",
+            "small strain: the surfaceField tangent is the flat-list one, "
+            "patches included",
             kDiff < 1e-12,
             "max relative difference " + Foam::name(kDiff)
         );
@@ -399,8 +412,10 @@ void checkSurfaceOverloads
 
         symmTensorField flatSigma(nFaces, symmTensor::zero);
 
-        // The surfaceField overload first: it must find its own convergence
-        // scale rather than one a flat-list call left behind
+        // The flat-list call goes first, and only it may fail: a law with no
+        // finite-strain evaluation says so there. Once it has one, a failure
+        // of the surfaceField overload is a failure of the check. Neither can
+        // borrow the other's convergence scale, since each takes its own
         bool finiteCapable = true;
 
         FatalError.throwExceptions();
@@ -409,14 +424,15 @@ void checkSurfaceOverloads
         {
             manager.updateStressFiniteStrain
             (
-                faceF,
-                faceF0,
-                faceJ,
-                faceJ0,
-                faceFinv,
-                faceFinv0,
+                faceTopo,
+                flatF,
+                flatF0,
+                flatFinv,
+                flatFinv0,
+                flatJ,
+                flatJ0,
                 dt,
-                faceSigma
+                flatSigma
             );
         }
         catch (const Foam::error&)
@@ -430,15 +446,14 @@ void checkSurfaceOverloads
         {
             manager.updateStressFiniteStrain
             (
-                faceTopo,
-                flatF,
-                flatF0,
-                flatFinv,
-                flatFinv0,
-                flatJ,
-                flatJ0,
+                faceF,
+                faceF0,
+                faceJ,
+                faceJ0,
+                faceFinv,
+                faceFinv0,
                 dt,
-                flatSigma
+                faceSigma
             );
 
             const scalar stressDiff = maxRelDiff(faceSigma, flatSigma);
@@ -2674,17 +2689,31 @@ int main(int argc, char *argv[])
                 threwWithRule = true;
             }
 
-            report
-            (
-                "a shared face with a collapse rule is accepted",
-                !threwWithRule
-            );
+            // In parallel a face overload refuses more than one material,
+            // since nothing reconciles the two sides of an interface on a
+            // processor boundary; in serial a rule must be accepted
+            if (Pstream::parRun())
+            {
+                report
+                (
+                    "a shared face in parallel is refused, rule or not",
+                    threwWithRule
+                );
+            }
+            else
+            {
+                report
+                (
+                    "a shared face with a collapse rule is accepted",
+                    !threwWithRule
+                );
+            }
 
             // The collapsed values, in closed form: a face inside one
             // material has that material's stress and tangent, and a face on
             // the interface the arithmetic mean of the two stresses and the
             // chosen mean of the two tangents
-            if (allLinearElastic && !threwWithRule)
+            if (allLinearElastic && !Pstream::parRun())
             {
                 surfaceScalarField faceK
                 (
