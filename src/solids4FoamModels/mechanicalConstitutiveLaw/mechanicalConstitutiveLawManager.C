@@ -2718,6 +2718,265 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 }
 
 
+template<class Fields, class PatchFieldsFn>
+void Foam::mechanicalConstitutiveLawManager::updateStressSurface
+(
+    const integrationPointTopology& topo,
+    topologyEntry& tp,
+    const Fields& fields,
+    const PatchFieldsFn& patchFields,
+    const scalar dt,
+    surfaceSymmTensorField& stress,
+    const stressCollapseRule collapseRule,
+    surfaceScalarField* scalarTangentPtr,
+    List<mat66>* fourthOrderTangentPtr,
+    const tangentRequest tangentReq,
+    surfaceScalarField* volumetricResponsePtr
+)
+{
+    // Update old time fields at the start of a new time step
+    updateOldTimeIfNeeded();
+
+    // Every processor refreshes every coupling input source here, before any
+    // material is skipped for having no points on it, since reading is
+    // collective
+    refreshScalarInputs();
+
+    // The scale each law's convergence test is normalised by, taken over its
+    // internal faces on every rank, and used on its boundary faces too, as
+    // the other paths do. Every rank calls this, whatever points it holds
+    const scalarList scales(convergenceScales(tp, fields));
+
+    // A face can be reached by two laws at a material interface, so the
+    // contributions are accumulated and collapsed rather than written once
+    surfaceSymmTensorField& stressSum = surfaceStressSum();
+    surfaceScalarField& weightSum = surfaceStressWeight();
+
+    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
+    weightSum = 0.0;
+
+    const bool scalarTangent =
+        scalarTangentPtr && needsScalarTangent(tangentReq);
+
+    surfaceScalarField* tangentWeightPtr = nullptr;
+
+    if (scalarTangent)
+    {
+        surfaceScalarField& tangentWeight = surfaceTangentWeight();
+        tangentWeight = dimensionedScalar("0", dimPressure, 0.0);
+        tangentWeightPtr = &tangentWeight;
+    }
+
+    // The volumetric response is collapsed as the stress is. Only allocated
+    // when the split is asked for
+    autoPtr<scalarField> volumetricSumPtr;
+
+    if (volumetricResponsePtr)
+    {
+        volumetricSumPtr.reset(new scalarField(mesh_.nInternalFaces(), 0.0));
+    }
+
+    checkTangentRequest(topo, tangentReq);
+
+    forAll(laws_, lawI)
+    {
+        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
+
+        // Live inputs for this law, as a view of its own integration points.
+        //
+        // A law with no faces on this rank is not skipped, unlike on the
+        // flat-list and volField paths. Its boundary faces are visited inside
+        // this loop, so skipping the law would skip this rank's patch faces
+        // of it too; and evaluating nothing costs nothing
+        const mechanicalConstitutiveLawInputs inputs
+        (
+            lawInputs(lawI, topo, ipIDs, dt, tp)
+        );
+
+        inputs.setConvergenceScale(scales[lawI]);
+
+        const typename kinematicsViewsOf<Fields>::type views(fields, ipIDs);
+
+        UIndirectList<symmTensor> stressView(stress.internalField(), ipIDs);
+
+        evaluateResponse
+        (
+            laws_[lawI],
+            views.kin,
+            inputs,
+            tp.states_[lawI],
+            stressView,
+            ipIDs,
+            scalarTangentPtr,
+            fourthOrderTangentPtr,
+            tangentReq,
+            volumetricResponsePtr
+        );
+
+        // Update stress accumulation fields used for stress collapse
+        forAll(ipIDs, i)
+        {
+            const label faceI = ipIDs[i];
+
+            stressSum[faceI] += stress[faceI];
+            weightSum[faceI] += 1.0;
+
+            if (scalarTangent)
+            {
+                const scalar K = (*scalarTangentPtr)[faceI];
+
+                if (collapseRule == stressCollapseRule::harmonic)
+                {
+                    (*tangentWeightPtr)[faceI] += 1.0/max(K, SMALL);
+                }
+                else
+                {
+                    // 'average', and 'none', which is only reached with a
+                    // single contribution and so is the same sum
+                    (*tangentWeightPtr)[faceI] += K;
+                }
+            }
+
+            if (volumetricResponsePtr)
+            {
+                volumetricSumPtr()[faceI] += (*volumetricResponsePtr)[faceI];
+            }
+        }
+
+        // Optionally, update the boundary field
+        // Boundary constitutive response uses independent state objects,
+        // allowing history-dependent laws to operate correctly on boundary
+        // faces
+        if (!tp.boundaryAware_)
+        {
+            continue;
+        }
+
+        forAll(mesh_.boundary(), patchI)
+        {
+            // Coupled patches are included. A processor face carries a real
+            // stress that only this rank can compute: unlike a volField, a
+            // surface field's coupled patch is not filled in by
+            // correctBoundaryConditions(), so skipping it would leave the
+            // stress there at zero
+
+            // Select all faces on the patch for which the adjacent cell is in
+            // this material
+            const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+            if (faces.empty() || isA<emptyFvPatch>(mesh_.boundary()[patchI]))
+            {
+                continue;
+            }
+
+            // Live inputs for this law on this patch: the patch values, which
+            // are a different set from the internal faces', judged by the
+            // same scale
+            const mechanicalConstitutiveLawInputs patchInputs
+            (
+                lawInputsPatch(lawI, patchI, faces, dt, tp)
+            );
+
+            patchInputs.setConvergenceScale(scales[lawI]);
+
+            // "View" into the kinematic and stress fields for this material
+            // => does not copy data
+            const Fields pf(patchFields(patchI));
+
+            const typename kinematicsViewsOf<Fields>::type
+                patchViews(pf, faces);
+
+            UIndirectList<symmTensor> patchStressView
+            (
+                Foam::boundaryFieldRef(stress)[patchI], faces
+            );
+
+            // No fourth-order tangent is computed on this boundary, so a
+            // request for one becomes a request for nothing. The law must not
+            // be told a fourth-order tangent is wanted when there is nowhere
+            // to put it
+            const tangentRequest boundaryReq =
+                scalarTangent ? tangentReq : tangentRequest::none;
+
+            evaluateResponse
+            (
+                laws_[lawI],
+                patchViews.kin,
+                patchInputs,
+                tp.boundaryStates_[lawI][patchI],
+                patchStressView,
+                faces,
+                scalarTangentPtr
+              ? &scalarTangentPtr->boundaryField()[patchI]
+              : nullptr,
+                static_cast<const UList<mat66>*>(nullptr),
+                boundaryReq,
+                volumetricResponsePtr
+              ? &volumetricResponsePtr->boundaryField()[patchI]
+              : nullptr
+            );
+        }
+    }
+
+    // Collapse the accumulated contributions on internal faces
+    forAll(stress.internalField(), faceI)
+    {
+        const scalar w = weightSum[faceI];
+
+        if (w <= SMALL)
+        {
+            FatalErrorInFunction
+                << "Face " << faceI << " received no constitutive contributions"
+                << exit(FatalError);
+        }
+
+        checkCollapsePermitted(collapseRule, w, faceI, "Face");
+
+        // Stress collapse as arithmetic mean. With 'none' the weight is one,
+        // so this is the single contribution unchanged
+        stress[faceI] = stressSum[faceI]/w;
+
+        // Tangent collapse, if requested
+        if (scalarTangent)
+        {
+            if (collapseRule == stressCollapseRule::harmonic)
+            {
+                // Harmonically average the tangent
+                (*scalarTangentPtr)[faceI] =
+                    w/max((*tangentWeightPtr)[faceI], SMALL);
+            }
+            else
+            {
+                // Arithmetic mean of the contributing tangents
+                (*scalarTangentPtr)[faceI] = (*tangentWeightPtr)[faceI]/w;
+            }
+        }
+
+        if (volumetricResponsePtr)
+        {
+            (*volumetricResponsePtr)[faceI] = volumetricSumPtr()[faceI]/w;
+        }
+    }
+
+// This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
+// has no evaluate(), so correctBoundaryConditions() does not compile for a
+// SURFACE field there. It compiles and is needed for volFields
+#ifndef OPENFOAM_ORG
+    stress.correctBoundaryConditions();
+
+    if (scalarTangent)
+    {
+        scalarTangentPtr->correctBoundaryConditions();
+    }
+
+    if (volumetricResponsePtr)
+    {
+        volumetricResponsePtr->correctBoundaryConditions();
+    }
+#endif
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
     const surfaceTensorField& gradD,
@@ -2784,238 +3043,30 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
     topologyEntry& tp = topology(topo);
 
-    // Update old time fields at the start of a new time step
-    updateOldTimeIfNeeded();
-
-    // Every processor refreshes every coupling input source here, before any
-    // material is skipped for having no points on it, since reading is
-    // collective
-    refreshScalarInputs();
-
-    // The scale each law's convergence test is normalised by, taken over its
-    // internal faces on every rank, and used on its boundary faces too, as
-    // the other paths do. Every rank calls this, whatever points it holds
-    const scalarList scales
+    updateStressSurface
     (
-        convergenceScales
+        topo,
+        tp,
+        smallStrainKinematicsFields
         (
-            tp,
-            smallStrainKinematicsFields
+            gradD.internalField(), gradD0.internalField()
+        ),
+        [&](const label patchI)
+        {
+            return smallStrainKinematicsFields
             (
-                gradD.internalField(), gradD0.internalField()
-            )
-        )
+                gradD.boundaryField()[patchI],
+                gradD0.boundaryField()[patchI]
+            );
+        },
+        dt,
+        stress,
+        collapseRule,
+        scalarTangentPtr,
+        fourthOrderTangentPtr,
+        tangentReq,
+        nullptr
     );
-
-    surfaceSymmTensorField& stressSum = surfaceStressSum();
-    surfaceScalarField& weightSum = surfaceStressWeight();
-
-    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
-    weightSum = 0.0;
-
-    surfaceScalarField* tangentWeightPtr = nullptr;
-
-    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-    {
-        surfaceScalarField& tangentWeight = surfaceTangentWeight();
-        tangentWeight = dimensionedScalar("0", dimPressure, 0.0);
-        tangentWeightPtr = &tangentWeight;
-    }
-
-    checkTangentRequest(topo, tangentReq);
-
-    // Loop over constitutive laws
-    forAll(laws_, lawI)
-    {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Live inputs for this law, as a view of its own integration points
-        const mechanicalConstitutiveLawInputs inputs
-        (
-            lawInputs(lawI, topo, ipIDs, dt, tp)
-        );
-
-        inputs.setConvergenceScale(scales[lawI]);
-
-        const smallStrainKinematicsViews views
-        (
-            smallStrainKinematicsFields
-            (
-                gradD.internalField(), gradD0.internalField()
-            ),
-            ipIDs
-        );
-
-        UIndirectList<symmTensor> stressView
-        (
-            stress.internalField(), ipIDs
-        );
-
-        evaluateResponse
-        (
-            laws_[lawI],
-            views.kin,
-            inputs,
-            tp.states_[lawI],
-            stressView,
-            ipIDs,
-            scalarTangentPtr,
-            fourthOrderTangentPtr,
-            tangentReq
-        );
-
-        // Update stress accumulation fields used for stress collapse
-        forAll(ipIDs, i)
-        {
-            const label faceI = ipIDs[i];
-
-            stressSum[faceI] += stress[faceI];
-            weightSum[faceI] += 1.0;
-
-            if (scalarTangentPtr && needsScalarTangent(tangentReq))
-            {
-                const scalar K = (*scalarTangentPtr)[faceI];
-
-                if (collapseRule == stressCollapseRule::harmonic)
-                {
-                    (*tangentWeightPtr)[faceI] += 1.0/max(K, SMALL);
-                }
-                else
-                {
-                    // 'average', and 'none', which is only reached with a
-                    // single contribution and so is the same sum
-                    (*tangentWeightPtr)[faceI] += K;
-                }
-            }
-        }
-
-        // Optionally, update the boundary field
-        // Boundary constitutive response uses independent state objects,
-        // allowing history-dependent laws to operate correctly on boundary
-        // faces
-        if (tp.boundaryAware_)
-        {
-            forAll(gradD.boundaryField(), patchI)
-            {
-                // Coupled patches are included. A processor face carries a
-                // real stress that only this rank can compute: unlike a
-                // volField, a surface field's coupled patch is not filled in
-                // by correctBoundaryConditions(), so skipping it would leave
-                // the stress there at zero
-
-                // Select all faces on the patch for which the adjacent
-                // cell is in this material
-                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                if
-                (
-                    faces.empty()
-                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                )
-                {
-                    continue;
-                }
-
-                // Live inputs for this law on this patch: the patch values,
-                // which are a different set from the internal faces'
-                const mechanicalConstitutiveLawInputs patchInputs
-                (
-                    lawInputsPatch(lawI, patchI, faces, dt, tp)
-                );
-
-                patchInputs.setConvergenceScale(scales[lawI]);
-
-                // "View" into the kinematic and stress fields for this
-                // material => does not copy data
-                const smallStrainKinematicsViews views
-                (
-                    smallStrainKinematicsFields
-                    (
-                        gradD.boundaryField()[patchI],
-                        gradD0.boundaryField()[patchI]
-                    ),
-                    faces
-                );
-
-                UIndirectList<symmTensor> stressView
-                (
-                    Foam::boundaryFieldRef(stress)[patchI], faces
-                );
-
-                // No fourth-order tangent is computed on this boundary,
-                // so a request for one becomes a request for nothing. The
-                // law must not be told a fourth-order tangent is wanted
-                // when there is nowhere to put it
-                const tangentRequest boundaryReq =
-                    scalarTangentPtr && needsScalarTangent(tangentReq)
-                  ? tangentReq
-                  : tangentRequest::none;
-
-                evaluateResponse
-                (
-                    laws_[lawI],
-                    views.kin,
-                    patchInputs,
-                    tp.boundaryStates_[lawI][patchI],
-                    stressView,
-                    faces,
-                    scalarTangentPtr
-                  ? &scalarTangentPtr->boundaryField()[patchI]
-                  : nullptr,
-                    static_cast<const UList<mat66>*>(nullptr),
-                    boundaryReq
-                );
-            }
-        }
-    }
-
-    // Collapse accumulated stress on internal faces
-
-    forAll(stress.internalField(), faceI)
-    {
-        const scalar w = weightSum[faceI];
-
-        if (w <= SMALL)
-        {
-            FatalErrorInFunction
-                << "Face " << faceI << " received no constitutive contributions"
-                << exit(FatalError);
-        }
-
-        checkCollapsePermitted(collapseRule, w, faceI, "Face");
-
-        // Stress collapse as arithmetic mean. With 'none' the weight is one,
-        // so this is the single contribution unchanged
-        stress[faceI] = stressSum[faceI]/w;
-
-        // Tangent collapse, if requested
-        if (scalarTangentPtr && needsScalarTangent(tangentReq))
-        {
-            if (collapseRule == stressCollapseRule::harmonic)
-            {
-                // Harmonically average the tangent
-                (*scalarTangentPtr)[faceI] =
-                    w/max((*tangentWeightPtr)[faceI], SMALL);
-            }
-            else
-            {
-                // Arithmetic mean of the contributing tangents
-                (*scalarTangentPtr)[faceI] = (*tangentWeightPtr)[faceI]/w;
-            }
-        }
-    }
-
-// This one guard is real, and only this one. OpenFOAM.org's fvsPatchField
-// has no evaluate(), so correctBoundaryConditions() does not compile for a
-// SURFACE field there. It compiles and is needed for volFields
-#ifndef OPENFOAM_ORG
-    stress.correctBoundaryConditions();
-
-    if (scalarTangentPtr && needsScalarTangent(tangentReq))
-    {
-        scalarTangentPtr->correctBoundaryConditions();
-    }
-#endif
 }
 
 
@@ -3531,10 +3582,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     surfaceScalarField* volumetricResponsePtr
 )
 {
-    // The face twin of the cell-centred finite-strain overload, laid out as
-    // the small-strain face overload is: a face can be reached by two laws at
-    // a material interface, so contributions are accumulated and collapsed
-    // rather than written once
+    // The face twin of the cell-centred finite-strain overload. The
+    // evaluation and the collapse are shared with the small-strain face
+    // overload, in updateStressSurface; what is here is what differs.
     //
     // In parallel a material interface can lie on a processor boundary, where
     // each side holds only its own material's contribution and nothing
@@ -3578,207 +3628,40 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     topologyEntry& tp = topology(topo);
 
-    // Update old time fields at the start of a new time step
-    updateOldTimeIfNeeded();
-
-    // Every processor refreshes every coupling input source here, before any
-    // material is skipped for having no points on it, since reading is
-    // collective
-    refreshScalarInputs();
-
-    // The scale each law's convergence test is normalised by, taken over its
-    // internal faces on every rank, and used on its boundary faces too. It
-    // was read from whatever a flat-list call on this topology had left,
-    // which is usually nothing and otherwise another evaluation's
-    const scalarList scales
+    // No tangent is computed on this path
+    updateStressSurface
     (
-        convergenceScales
+        topo,
+        tp,
+        finiteStrainKinematicsFields
         (
-            tp,
-            finiteStrainKinematicsFields
+            F.internalField(),
+            F0.internalField(),
+            Finv.internalField(),
+            Finv0.internalField(),
+            J.internalField(),
+            J0.internalField()
+        ),
+        [&](const label patchI)
+        {
+            return finiteStrainKinematicsFields
             (
-                F.internalField(),
-                F0.internalField(),
-                Finv.internalField(),
-                Finv0.internalField(),
-                J.internalField(),
-                J0.internalField()
-            )
-        )
+                F.boundaryField()[patchI],
+                F0.boundaryField()[patchI],
+                Finv.boundaryField()[patchI],
+                Finv0.boundaryField()[patchI],
+                J.boundaryField()[patchI],
+                J0.boundaryField()[patchI]
+            );
+        },
+        dt,
+        stress,
+        collapseRule,
+        nullptr,
+        nullptr,
+        tangentRequest::none,
+        volumetricResponsePtr
     );
-
-    surfaceSymmTensorField& stressSum = surfaceStressSum();
-    surfaceScalarField& weightSum = surfaceStressWeight();
-
-    stressSum = dimensionedSymmTensor("0", dimPressure, symmTensor::zero);
-    weightSum = 0.0;
-
-    // The volumetric response is collapsed as the stress is. Only allocated
-    // when the split is asked for
-    autoPtr<scalarField> volumetricSumPtr;
-
-    if (volumetricResponsePtr)
-    {
-        volumetricSumPtr.reset(new scalarField(mesh_.nInternalFaces(), 0.0));
-    }
-
-    checkTangentRequest(topo, tangentRequest::none);
-
-    forAll(laws_, lawI)
-    {
-        const labelList& ipIDs = tp.lawIntegrationPointIDs_[lawI];
-
-        // Live inputs for this law, as a view of its own integration points
-        const mechanicalConstitutiveLawInputs inputs
-        (
-            lawInputs(lawI, topo, ipIDs, dt, tp)
-        );
-
-        inputs.setConvergenceScale(scales[lawI]);
-
-        const finiteStrainKinematicsViews views
-        (
-            finiteStrainKinematicsFields
-            (
-                F.internalField(),
-                F0.internalField(),
-                Finv.internalField(),
-                Finv0.internalField(),
-                J.internalField(),
-                J0.internalField()
-            ),
-            ipIDs
-        );
-
-        UIndirectList<symmTensor> stressView(stress.internalField(), ipIDs);
-
-        evaluateResponse
-        (
-            laws_[lawI],
-            views.kin,
-            inputs,
-            tp.states_[lawI],
-            stressView,
-            ipIDs,
-            static_cast<const UList<scalar>*>(nullptr),
-            static_cast<const UList<mat66>*>(nullptr),
-            tangentRequest::none,
-            volumetricResponsePtr
-        );
-
-        forAll(ipIDs, i)
-        {
-            const label faceI = ipIDs[i];
-
-            stressSum[faceI] += stress[faceI];
-            weightSum[faceI] += 1.0;
-
-            if (volumetricResponsePtr)
-            {
-                volumetricSumPtr()[faceI] += (*volumetricResponsePtr)[faceI];
-            }
-        }
-
-        // Boundary faces carry their own state, as in the other overloads.
-        // Coupled patches are included: unlike a volField, a surface field's
-        // coupled patch is not filled in by correctBoundaryConditions(), so
-        // skipping it would leave the stress there at zero
-        if (tp.boundaryAware_)
-        {
-            forAll(F.boundaryField(), patchI)
-            {
-                const labelList& faces = lawBoundaryFaces_[lawI][patchI];
-
-                if
-                (
-                    faces.empty()
-                 || isA<emptyFvPatch>(mesh_.boundary()[patchI])
-                )
-                {
-                    continue;
-                }
-
-                // Live inputs for this law on this patch: the patch values,
-                // which are a different set from the internal faces', judged
-                // by the same scale
-                const mechanicalConstitutiveLawInputs patchInputs
-                (
-                    lawInputsPatch(lawI, patchI, faces, dt, tp)
-                );
-
-                patchInputs.setConvergenceScale(scales[lawI]);
-
-                const finiteStrainKinematicsViews views
-                (
-                    finiteStrainKinematicsFields
-                    (
-                        F.boundaryField()[patchI],
-                        F0.boundaryField()[patchI],
-                        Finv.boundaryField()[patchI],
-                        Finv0.boundaryField()[patchI],
-                        J.boundaryField()[patchI],
-                        J0.boundaryField()[patchI]
-                    ),
-                    faces
-                );
-
-                UIndirectList<symmTensor> stressView
-                (
-                    Foam::boundaryFieldRef(stress)[patchI], faces
-                );
-
-                evaluateResponse
-                (
-                    laws_[lawI],
-                    views.kin,
-                    patchInputs,
-                    tp.boundaryStates_[lawI][patchI],
-                    stressView,
-                    faces,
-                    static_cast<const UList<scalar>*>(nullptr),
-                    static_cast<const UList<mat66>*>(nullptr),
-                    tangentRequest::none,
-                    volumetricResponsePtr
-                  ? &volumetricResponsePtr->boundaryField()[patchI]
-                  : nullptr
-                );
-            }
-        }
-    }
-
-    // Collapse the accumulated contributions on internal faces
-    forAll(stress.internalField(), faceI)
-    {
-        const scalar w = weightSum[faceI];
-
-        if (w <= SMALL)
-        {
-            FatalErrorInFunction
-                << "Face " << faceI << " received no constitutive contributions"
-                << exit(FatalError);
-        }
-
-        checkCollapsePermitted(collapseRule, w, faceI, "Face");
-
-        stress[faceI] = stressSum[faceI]/w;
-
-        if (volumetricResponsePtr)
-        {
-            (*volumetricResponsePtr)[faceI] = volumetricSumPtr()[faceI]/w;
-        }
-    }
-
-// As in the small-strain face overload: OpenFOAM.org's fvsPatchField has no
-// evaluate(), so correctBoundaryConditions() does not compile for a surface
-// field there
-#ifndef OPENFOAM_ORG
-    stress.correctBoundaryConditions();
-
-    if (volumetricResponsePtr)
-    {
-        volumetricResponsePtr->correctBoundaryConditions();
-    }
-#endif
 }
 
 

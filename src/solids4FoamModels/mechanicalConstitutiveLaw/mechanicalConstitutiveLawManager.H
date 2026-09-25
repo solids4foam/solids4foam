@@ -385,6 +385,28 @@ class mechanicalConstitutiveLawManager
             volScalarField* volumetricResponsePtr
         );
 
+        //- The surfaceField stress updates, written once for both strain
+        //  measures: each law's internal faces and its boundary faces are
+        //  evaluated, and a face reached by more than one law collapsed by
+        //  collapseRule. patchFields(patchI) gives the patch's kinematic
+        //  lists as Fields. A null tangent or volumetric pointer is not
+        //  computed
+        template<class Fields, class PatchFieldsFn>
+        void updateStressSurface
+        (
+            const integrationPointTopology& topo,
+            topologyEntry& tp,
+            const Fields& fields,
+            const PatchFieldsFn& patchFields,
+            const scalar dt,
+            surfaceSymmTensorField& stress,
+            const stressCollapseRule collapseRule,
+            surfaceScalarField* scalarTangentPtr,
+            List<mat66>* fourthOrderTangentPtr,
+            const tangentRequest tangentReq,
+            surfaceScalarField* volumetricResponsePtr
+        );
+
         //- Check each kinematic list has the size the topology requires
         void checkKinematicsListSizes
         (
