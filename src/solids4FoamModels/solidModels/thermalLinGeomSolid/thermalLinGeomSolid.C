@@ -114,13 +114,10 @@ bool thermalLinGeomSolid::converged
             )
         );
 
-    // Calculate material residual
-    const scalar materialResidual = this->materialResidual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         bool convergedD = false;
         bool convergedT = false;
@@ -163,8 +160,7 @@ bool thermalLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
-            << endl;
+        Info<< "    Corr, res (T & D), relRes (T & D), iters (T & D)" << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
@@ -173,7 +169,6 @@ bool thermalLinGeomSolid::converged
             << ", " << mag(solverPerfD.initialResidual())
             << ", " << residualT
             << ", " << residualD
-            << ", " << materialResidual
             << ", " << solverPerfT.nIterations()
             << ", " << solverPerfD.nIterations() << endl;
 

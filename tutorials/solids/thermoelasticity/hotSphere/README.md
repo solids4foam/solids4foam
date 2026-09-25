@@ -394,12 +394,12 @@ Time = 1
 
 Evolving thermal solid solver
 Solving coupled energy and displacements equation for T and D
-    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)
-    100, 3.37856e-10, 9.48897e-06, 0, 3.1907e-05, 0, 0, 12
-    200, 1.97288e-10, 2.07022e-06, 0, 7.17093e-06, 0, 0, 10
-    300, 9.26738e-10, 4.86841e-07, 0, 1.6726e-06, 0, 0, 10
+    Corr, res (T & D), relRes (T & D), iters (T & D)
+    100, 3.37856e-10, 9.48897e-06, 0, 3.1907e-05, 0, 12
+    200, 1.97288e-10, 2.07022e-06, 0, 7.17093e-06, 0, 10
+    300, 9.26738e-10, 4.86841e-07, 0, 1.6726e-06, 0, 10
     The residuals have converged
-    337, 1.64639e-10, 2.83573e-07, 0, 9.86025e-07, 0, 0, 12
+    337, 1.64639e-10, 2.83573e-07, 0, 9.86025e-07, 0, 12
 
 Max T = 340
 Min T = 301.118
@@ -409,15 +409,13 @@ Max sigmaEq (von Mises stress) = 5.56883e+07
 ExecutionTime = 8.73 s  ClockTime = 9 s
 ```
 
-For solid analyses, the `solids4Foam` solver checks three types of residuals:
+For solid analyses, the `solids4Foam` solver checks two types of residuals:
 
 - `res`: linear solver residual
 - `relRes`: relative residual - change of the primitive variable
-- `matRes`: material residual - for nonlinear material laws
 
 where the tolerances are specified in the `solidProperties` dictionary. In this
-case, there are residuals for `T` and `D`. The material residual is zero because
-a linear mechanical law was selected (no need to iterate).
+case, there are residuals for `T` and `D`.
 
 ---
 

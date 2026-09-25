@@ -109,13 +109,10 @@ bool poroLinGeomSolid::converged
             )
         );
 
-    // Calculate material residual
-    const scalar materialResidual = this->materialResidual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         if
         (
@@ -155,7 +152,7 @@ bool poroLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, resD, resP, relResD, relResP, matRes, iters" << endl;
+        Info<< "    Corr, resD, resP, relResD, relResP, iters" << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
@@ -164,7 +161,6 @@ bool poroLinGeomSolid::converged
             << ", " << solverPerfp.initialResidual()
             << ", " << residualD
             << ", " << residualp
-            << ", " << materialResidual
             << ", " << solverPerfD.nIterations() << endl;
 
         if (converged)

@@ -106,6 +106,15 @@ release. For complete commit-level details and contributor information, see the
   `unsNonLinearGeometryUpdatedLagrangian`, `weakThermalLinearGeometry` and
   `vertexCentredNonLinTotalLagGeometry` solid models, which depended on the
   legacy model, are deleted.
+- The material residual is removed from every solid model, with the `matRes`
+  column of the residual output and of `residual.dat`, which now hold one
+  column fewer. The legacy laws under-relaxed their plastic strain increment,
+  so the constitutive update lagged the displacement between outer iterations
+  and was tested against `materialTolerance`; a `mechanicalConstitutiveLaw` is
+  a pure function of the kinematics and the old-time state, so there was
+  nothing left to measure and the column was always zero. `materialTolerance`
+  is ignored with a note that it can be removed, and the tutorials no longer
+  set it.
 - **Breaking:** `nonLinearGeometryUpdatedLagrangian` no longer supports
   `solvePressure`. The mixed formulation replaces a law's volumetric response
   with the solved pressure; this model takes `dev()` of the total stress to

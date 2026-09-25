@@ -330,8 +330,21 @@ void Foam::solidModel::makeMechanicalProperties() const
 }
 
 
-void Foam::solidModel::checkRemovedMechanicalModelSwitch() const
+void Foam::solidModel::checkRemovedMechanicalModelEntries() const
 {
+    // The legacy laws under-relaxed their plastic strain increment, so the
+    // constitutive update lagged the displacement between outer iterations and
+    // its own convergence was tested against materialTolerance. A
+    // mechanicalConstitutiveLaw is a pure function of the kinematics and the
+    // old-time state, so there is nothing for a material residual to measure,
+    // and convergence is governed by the displacement residuals alone
+    if (solidModelDict().found("materialTolerance"))
+    {
+        Info<< "    'materialTolerance' is ignored and can be removed: the "
+            << "mechanicalConstitutiveLaw framework has no material residual"
+            << endl;
+    }
+
     // The switch chose between the mechanicalConstitutiveLaw framework and the
     // legacy mechanicalModel. The legacy model has been removed, so a case
     // that asks for it must stop rather than silently run on the framework
@@ -357,8 +370,9 @@ void Foam::solidModel::checkRemovedMechanicalModelSwitch() const
         << "'" << key << " no' selects the legacy mechanicalModel, which has "
         << "been removed from solids4foam." << nl << nl
         << "    The mechanicalConstitutiveLaw framework is now the only "
-        << "mechanical model. It reads the same constant/mechanicalProperties "
-        << "and provides every law the legacy model did. Remove '" << key
+        << "mechanical model. It reads the same constant/mechanicalProperties, "
+        << "and a law it does not provide stops the run at construction. "
+        << "Remove '" << key
         << "' from " << type_ << "Coeffs in constant/solidProperties to run "
         << "on it, and check the results: they are not guaranteed to match "
         << "the legacy model's." << nl
@@ -1224,10 +1238,6 @@ Foam::solidModel::solidModel
             "alternativeTolerance", 1e-07
         )
     ),
-    materialTol_
-    (
-        solidModelDict().lookupOrAddDefault<scalar>("materialTolerance", 1e-05)
-    ),
     infoFrequency_
     (
         solidModelDict().lookupOrAddDefault<int>("infoFrequency", 100)
@@ -1314,7 +1324,7 @@ Foam::solidModel::solidModel
     // moving mesh" error (issue #184). So the flag is cleared here
     mesh().moving(false);
 
-    checkRemovedMechanicalModelSwitch();
+    checkRemovedMechanicalModelEntries();
 
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)

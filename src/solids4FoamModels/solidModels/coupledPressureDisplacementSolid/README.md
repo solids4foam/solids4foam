@@ -86,7 +86,6 @@ The relevant inherited `solidModel` entries are:
 | --- | --- | --- |
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `stabilisation` | auto-created | Both sub-dictionaries are used |
@@ -154,7 +153,6 @@ coupledPressureDisplacementSolidCoeffs
     nCorrectors             2000;
     solutionTolerance       1e-7;
     alternativeTolerance    1e-06;
-    materialTolerance       1e-05;
     infoFrequency           1;
 
     stabilisation

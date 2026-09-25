@@ -118,7 +118,6 @@ loosen_pressureDisplacement_tolerances() {
             -e 's/^\(\s*nCorrectors\s*\)[0-9]\+\s*;/\1            200;/' \
             -e 's/^\(\s*solutionTolerance\s*\)[0-9eE.+-]\+\s*;/\1      1e-04;/' \
             -e 's/^\(\s*alternativeTolerance\s*\)[0-9eE.+-]\+\s*;/\1   1e-03;/' \
-            -e 's/^\(\s*materialTolerance\s*\)[0-9eE.+-]\+\s*;/\1      1e-03;/' \
             "${file}"
         rm -f "${file}.bak"
     fi

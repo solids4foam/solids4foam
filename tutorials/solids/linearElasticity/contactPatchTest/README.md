@@ -125,11 +125,10 @@ solver (`> solids4Foam`).
 ### Verification study
 
 The opt-in [`verification`](./verification/README.md) directory reproduces the
-two formulation variants formerly stored in the separate `solid-benchmarks`
-repository. Its `Allverify` driver runs both
-`linearGeometryTotalDisplacement` and `unsLinearGeometry` on isolated copies
-of this case and checks their transmitted stress against the analytical
-solution. This study is not run by the standard tutorial regression suite.
+formulation study formerly stored in the separate `solid-benchmarks`
+repository. Its `Allverify` driver runs `linearGeometryTotalDisplacement` on an
+isolated copy of this case and checks the transmitted stress against the
+analytical solution. This study is not run by the standard tutorial regression suite.
 
 ---
 

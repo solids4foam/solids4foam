@@ -87,9 +87,9 @@ The hydrostatic stress is smoothed by solving a pressure equation
 value of 100 fails to converge at about 90% of the stroke. The problem is
 solved as static using the segregated updated Lagrangian
 `nonLinearGeometryUpdatedLagrangian` solid model, with the
-`solutionTolerance`, `alternativeTolerance` and `materialTolerance` settings
-given in `constant/solidProperties`. The mesh, created with `blockMesh`,
-consists of 258 hexahedral cells in five blocks.
+`solutionTolerance` and `alternativeTolerance` settings given in
+`constant/solidProperties`. The mesh, created with `blockMesh`, consists of
+258 hexahedral cells in five blocks.
 
 ![Figure 1: Problem geometry [2]](./images/rubberSeal-geometry.png)
 

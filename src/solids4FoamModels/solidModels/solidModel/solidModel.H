@@ -243,9 +243,6 @@ private:
         //- Solution tighter tolerance
         const scalar alternativeTol_;
 
-        //- Material law tolerance
-        const scalar materialTol_;
-
         //- Write frequency for residuals information
         const int infoFrequency_;
 
@@ -375,9 +372,10 @@ private:
         //- Make the mechanicalProperties dictionary
         void makeMechanicalProperties() const;
 
-        //- Refuse 'useMechanicalConstitutiveLawManager no': the legacy
-        //  mechanical model it selected has been removed
-        void checkRemovedMechanicalModelSwitch() const;
+        //- Refuse 'useMechanicalConstitutiveLawManager no', whose legacy
+        //  mechanical model has been removed, and note the entries that only
+        //  that model used and that are now ignored
+        void checkRemovedMechanicalModelEntries() const;
 
         //- Make the rho field
         void makeRho() const;
@@ -632,12 +630,6 @@ protected:
         scalar alternativeTol() const
         {
             return alternativeTol_;
-        }
-
-        //- Return material law tolerance
-        scalar materialTol() const
-        {
-            return materialTol_;
         }
 
         //- Return write frequency for residuals information
@@ -1262,19 +1254,6 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const = 0;
-
-            //- Residual of the material update between outer iterations.
-            //  Zero: a mechanicalConstitutiveLaw is a pure function of the
-            //  kinematics and the old-time state, and the framework does not
-            //  under-relax the plastic strain increment, so the constitutive
-            //  update does not lag the displacement solution between outer
-            //  iterations. There is therefore nothing for a material residual
-            //  to measure, and convergence is governed by the displacement
-            //  residuals alone
-            virtual scalar materialResidual()
-            {
-                return 0.0;
-            }
 
             //- Update total accumulated fields
             virtual void updateTotalFields();
