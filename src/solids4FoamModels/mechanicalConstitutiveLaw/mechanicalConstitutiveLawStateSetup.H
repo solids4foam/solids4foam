@@ -47,6 +47,7 @@ SourceFiles
 #include "fvMesh.H"
 #include "volFields.H"
 #include "regIOobject.H"
+#include "HashSet.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
@@ -277,6 +278,21 @@ public:
             const label lawI,
             const label patchI,
             mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- Write the history held on a cell-centred topology as volFields,
+        //  for viewing: one field per persistent state variable, covering
+        //  every material that declares it. A field another model has
+        //  registered is not overwritten, and is reported once through
+        //  reportedStateFields
+        void writeStateFields
+        (
+            const List<labelList>& lawIntegrationPointIDs,
+            const PtrList<mechanicalConstitutiveLawState>& states,
+            const PtrList<PtrList<mechanicalConstitutiveLawState>>&
+                boundaryStates,
+            const bool boundaryAware,
+            HashSet<word>& reportedStateFields
         ) const;
 };
 
