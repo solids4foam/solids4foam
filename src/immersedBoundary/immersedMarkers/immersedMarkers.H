@@ -238,6 +238,10 @@ public:
             //- Add the spreading of the marker forces F (accelerations) to
             //  the cell field f
             void spread(const UList<vector>& F, UList<vector>& f) const;
+
+            //- Add the spreading of the scalar marker values F to the cell
+            //  field f
+            void spread(const UList<scalar>& F, UList<scalar>& f) const;
 };
 
 

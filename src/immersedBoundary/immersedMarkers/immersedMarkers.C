@@ -540,4 +540,23 @@ void Foam::immersedMarkers::spread
 }
 
 
+void Foam::immersedMarkers::spread
+(
+    const UList<scalar>& F,
+    UList<scalar>& f
+) const
+{
+    const scalarField& V = mesh_.V();
+
+    forAll(F, m)
+    {
+        for (label k = offsets_[m]; k < offsets_[m + 1]; ++k)
+        {
+            const label celli = cells_[k];
+            f[celli] += weights_[k]*F[m]*volumes_[m]/V[celli];
+        }
+    }
+}
+
+
 // ************************************************************************* //

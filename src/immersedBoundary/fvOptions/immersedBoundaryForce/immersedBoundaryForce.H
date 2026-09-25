@@ -249,6 +249,10 @@ class immersedBoundaryForce
             //- Number of forcing iterations after the momentum predictor
             label nMarkerIterations_;
 
+            //- Marker velocity response used in the forcing iterations:
+            //  rowSum or diagonal
+            word markerResponse_;
+
             //- Markers of each body
             PtrList<immersedMarkers> markers_;
 

@@ -378,7 +378,23 @@ void Foam::fv::immersedBoundaryForce::markerForcing
             const immersedMarkers& markers = markers_[bodyi];
 
             const vectorField Um(markers.interpolate(U.primitiveField()));
-            const scalarField a(markers.interpolate(rAU));
+
+            // Velocity response of each marker to a unit forcing of all the
+            // markers of the body (rowSum), which accounts for the overlap
+            // of the kernels of neighbouring markers, or to its own forcing
+            // at the cell response (diagonal)
+            scalarField a;
+            if (markerResponse_ == "rowSum")
+            {
+                scalarField s1(mesh_.nCells(), Zero);
+                markers.spread(scalarField(markers.size(), 1), s1);
+                s1 *= rAU;
+                a = markers.interpolate(s1);
+            }
+            else
+            {
+                a = markers.interpolate(rAU);
+            }
             const vectorField& Ub = markers.velocities();
 
             vectorField dF(markers.size(), Zero);
@@ -446,6 +462,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     markerSpacing_(1),
     markerRetraction_(0),
     nMarkerIterations_(3),
+    markerResponse_("rowSum"),
     markers_(),
     markerForces_(),
     markerForces0_(),
@@ -847,6 +864,21 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
 
             if (pimple.finalIter())
             {
+                forAll(markers_, bodyi)
+                {
+                    const immersedMarkers& markers = markers_[bodyi];
+                    const vectorField slip
+                    (
+                        markers.velocities()
+                      - markers.interpolate(U.primitiveField())
+                    );
+
+                    Info<< "    Immersed body " << bodies_[bodyi].name()
+                        << ": marker slip rms "
+                        << Foam::sqrt(average(magSqr(slip)))
+                        << ", max " << max(mag(slip)) << endl;
+                }
+
                 calcForces(U);
             }
         }
@@ -981,6 +1013,14 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         coeffs_.readIfPresent("markerSpacing", markerSpacing_);
         coeffs_.readIfPresent("markerRetraction", markerRetraction_);
         coeffs_.readIfPresent("nMarkerIterations", nMarkerIterations_);
+        coeffs_.readIfPresent("markerResponse", markerResponse_);
+        if (markerResponse_ != "rowSum" && markerResponse_ != "diagonal")
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown markerResponse " << markerResponse_
+                << ": valid options are rowSum and diagonal"
+                << exit(FatalIOError);
+        }
 
         coeffs_.readCheckIfPresent
         (
