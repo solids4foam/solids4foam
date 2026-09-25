@@ -2730,6 +2730,20 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
+    // In parallel a material interface can lie on a processor boundary,
+    // where each side holds only its own material's contribution and nothing
+    // exchanges them before the collapse, so the two sides would disagree
+    // with each other and with serial. Refused rather than answered wrongly,
+    // as the finite-strain face overload does
+    if (Pstream::parRun() && laws_.size() > 1)
+    {
+        FatalErrorInFunction
+            << "The face small-strain stress update does not support more "
+            << "than one material in parallel: contributions at a material "
+            << "interface on a processor boundary are not reconciled"
+            << exit(FatalError);
+    }
+
     // Check gradD is defined on the correct mesh
     checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
     checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
@@ -2741,7 +2755,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
         );
     }
-    else if (fourthOrderTangentPtr)
+
+    // Both storages are checked, whichever of them is given: a scalar
+    // tangent does not excuse a fourth-order one of the wrong size
+    if (fourthOrderTangentPtr)
     {
         if (fourthOrderTangentPtr->size() != gradD.mesh().nInternalFaces())
         {
@@ -2752,6 +2769,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 << exit(FatalError);
         }
     }
+
+    checkTangentStorage
+    (
+        scalarTangentPtr != nullptr,
+        fourthOrderTangentPtr != nullptr,
+        tangentReq,
+        "updateStressSmallStrain (surfaceField)"
+    );
 
     // Look up the map and state for face-based topologies
     const integrationPointTopology& topo =
@@ -2766,6 +2791,21 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // material is skipped for having no points on it, since reading is
     // collective
     refreshScalarInputs();
+
+    // The scale each law's convergence test is normalised by, taken over its
+    // internal faces on every rank, and used on its boundary faces too, as
+    // the other paths do. Every rank calls this, whatever points it holds
+    const scalarList scales
+    (
+        convergenceScales
+        (
+            tp,
+            smallStrainKinematicsFields
+            (
+                gradD.internalField(), gradD0.internalField()
+            )
+        )
+    );
 
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
@@ -2794,6 +2834,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         (
             lawInputs(lawI, topo, ipIDs, dt, tp)
         );
+
+        inputs.setConvergenceScale(scales[lawI]);
 
         const smallStrainKinematicsViews views
         (
@@ -2880,6 +2922,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
                 (
                     lawInputsPatch(lawI, patchI, faces, dt, tp)
                 );
+
+                patchInputs.setConvergenceScale(scales[lawI]);
 
                 // "View" into the kinematic and stress fields for this
                 // material => does not copy data
@@ -3542,6 +3586,27 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // collective
     refreshScalarInputs();
 
+    // The scale each law's convergence test is normalised by, taken over its
+    // internal faces on every rank, and used on its boundary faces too. It
+    // was read from whatever a flat-list call on this topology had left,
+    // which is usually nothing and otherwise another evaluation's
+    const scalarList scales
+    (
+        convergenceScales
+        (
+            tp,
+            finiteStrainKinematicsFields
+            (
+                F.internalField(),
+                F0.internalField(),
+                Finv.internalField(),
+                Finv0.internalField(),
+                J.internalField(),
+                J0.internalField()
+            )
+        )
+    );
+
     surfaceSymmTensorField& stressSum = surfaceStressSum();
     surfaceScalarField& weightSum = surfaceStressWeight();
 
@@ -3569,12 +3634,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             lawInputs(lawI, topo, ipIDs, dt, tp)
         );
 
-        // The scale the law's points are judged by, as the cell-centred
-        // boundary loop sets it
-        if (lawI < tp.lawConvergenceScales_.size())
-        {
-            inputs.setConvergenceScale(tp.lawConvergenceScales_[lawI]);
-        }
+        inputs.setConvergenceScale(scales[lawI]);
 
         const finiteStrainKinematicsViews views
         (
@@ -3646,13 +3706,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
                     lawInputsPatch(lawI, patchI, faces, dt, tp)
                 );
 
-                if (lawI < tp.lawConvergenceScales_.size())
-                {
-                    patchInputs.setConvergenceScale
-                    (
-                        tp.lawConvergenceScales_[lawI]
-                    );
-                }
+                patchInputs.setConvergenceScale(scales[lawI]);
 
                 const finiteStrainKinematicsViews views
                 (
