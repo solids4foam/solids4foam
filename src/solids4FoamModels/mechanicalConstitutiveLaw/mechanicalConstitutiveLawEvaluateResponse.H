@@ -96,10 +96,9 @@ inline bool incompressibleLawTree(const mechanicalConstitutiveLaw& law)
 
 //- Build the response a law writes into, and evaluate the law.
 //
-//  Every evaluation in this file ends in the same three lines: work out which
-//  tangent storage was supplied, wrap it and the stress in a response, and
-//  call the law. That was written out at each of the twenty-odd places a law
-//  is evaluated, which is why the file is as long as it is.
+//  Every evaluation in the manager ends in the same three lines: work out
+//  which tangent storage was supplied, wrap it and the stress in a response,
+//  and call the law. This is those lines, written once.
 //
 //  What the caller keeps is everything that actually differs between those
 //  places: which state to evaluate against - real, shadow or scratch - which

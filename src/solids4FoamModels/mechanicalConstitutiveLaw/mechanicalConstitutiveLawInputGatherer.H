@@ -88,6 +88,28 @@ class mechanicalConstitutiveLawInputGatherer
         mutable label diskScalarInputsTimeIndex_;
 
 
+    // Private Member Functions
+
+        //- The field a law's scalar input is gathered from, or nullptr if
+        //  neither the registry nor a case directory supplies it, in which
+        //  case the caller falls back to a field on disk.
+        //
+        //  A field registered by another model comes first, so that one
+        //  solved for in this run is always what the law sees. A case
+        //  directory source comes next; the copy it registers is recognised
+        //  as its own and refreshed, once per time step, rather than taken as
+        //  another model's
+        const volScalarField* scalarInputSource
+        (
+            const label lawI,
+            const word& name
+        ) const;
+
+        //- A coupling input that exists only as a file, as refreshScalarInputs
+        //  read it for this time step, or nullptr if there is none
+        const volScalarField* diskScalarInput(const word& name) const;
+
+
 public:
 
     // Constructors
@@ -106,77 +128,58 @@ public:
 
     // Member Functions
 
-    //- The field a law's scalar input is gathered from, or nullptr if
-    //  neither the registry nor a case directory supplies it, in which
-    //  case the caller falls back to a field on disk.
-    //
-    //  A field registered by another model comes first, so that one
-    //  solved for in this run is always what the law sees. A case
-    //  directory source comes next; the copy it registers is recognised
-    //  as its own and refreshed, once per time step, rather than taken as
-    //  another model's
-    const volScalarField* scalarInputSource
-    (
-        const label lawI,
-        const word& name
-    ) const;
+        //- Gather the live coupling inputs a law asked for, as views over its
+        //  own integration points, and hand back an inputs object carrying
+        //  them. A law that asks for nothing gets an inputs object holding
+        //  only the time step, which is what every law had before
+        mechanicalConstitutiveLawInputs lawInputs
+        (
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            const scalar dt,
+            List<HashTable<autoPtr<scalarField>>>& lawScalarInputs
+        ) const;
 
-    //- Gather the live coupling inputs a law asked for, as views over its
-    //  own integration points, and hand back an inputs object carrying
-    //  them. A law that asks for nothing gets an inputs object holding
-    //  only the time step, which is what every law had before
-    mechanicalConstitutiveLawInputs lawInputs
-    (
-        const label lawI,
-        const integrationPointTopology& topo,
-        const labelList& ipIDs,
-        const scalar dt,
-        List<HashTable<autoPtr<scalarField>>>& lawScalarInputs
-    ) const;
+        //- As lawInputs, for a law's faces on one boundary patch. The values
+        //  come from the field's patch values, not from the cells behind it,
+        //  and on a coupled patch are interpolated as on an internal face
+        mechanicalConstitutiveLawInputs lawInputsPatch
+        (
+            const label lawI,
+            const label patchI,
+            const labelList& faces,
+            const scalar dt,
+            List<HashTable<autoPtr<scalarField>>>& lawScalarInputs
+        ) const;
 
-    //- As lawInputs, for a law's faces on one boundary patch. The values
-    //  come from the field's patch values, not from the cells behind it,
-    //  and on a coupled patch are interpolated as on an internal face
-    mechanicalConstitutiveLawInputs lawInputsPatch
-    (
-        const label lawI,
-        const label patchI,
-        const labelList& faces,
-        const scalar dt,
-        List<HashTable<autoPtr<scalarField>>>& lawScalarInputs
-    ) const;
+        //- Bring every coupling input source up to date for this time step:
+        //  the case-directory inputs, and the inputs that exist only as files.
+        //  Called at the start of every evaluation path, on every rank and
+        //  before any material is skipped for having no points there, since
+        //  reading a file can be collective
+        void refreshScalarInputs() const;
 
-    //- Bring every coupling input source up to date for this time step:
-    //  the case-directory inputs, and the inputs that exist only as files.
-    //  Called at the start of every evaluation path, on every rank and
-    //  before any material is skipped for having no points there, since
-    //  reading a file can be collective
-    void refreshScalarInputs() const;
+        //- The coupling inputs this law needs, including every law below it.
+        //
+        //  A composite's sub-law reads its own inputs, and asking only the top
+        //  of the tree loses them. State already recurses this way; this makes
+        //  dependencies match, so that nesting one composite inside another
+        //  gathers what the inner law asked for instead of silently omitting
+        //  it
+        static wordList requiredScalarInputsRecursive
+        (
+            const mechanicalConstitutiveLaw& law
+        );
 
-    //- A coupling input that exists only as a file, as refreshScalarInputs
-    //  read it for this time step, or nullptr if there is none
-    const volScalarField* diskScalarInput(const word& name) const;
-
-    //- The coupling inputs this law needs, including every law below it.
-    //
-    //  A composite's sub-law reads its own inputs, and asking only the top
-    //  of the tree loses them. State already recurses this way; this makes
-    //  dependencies match, so that nesting one composite inside another
-    //  gathers what the inner law asked for instead of silently omitting
-    //  it
-    static wordList requiredScalarInputsRecursive
-    (
-        const mechanicalConstitutiveLaw& law
-    );
-
-    //- Warn, once per field, where a law could read a registered field as
-    //  a coupling input but was not asked to, and so uses its own
-    //  substitute: the case then runs, but not on the field it has. This
-    //  law and every law below it
-    void reportUnreadScalarInputs
-    (
-        const mechanicalConstitutiveLaw& law
-    ) const;
+        //- Warn, once per field, where a law could read a registered field as
+        //  a coupling input but was not asked to, and so uses its own
+        //  substitute: the case then runs, but not on the field it has. This
+        //  law and every law below it
+        void reportUnreadScalarInputs
+        (
+            const mechanicalConstitutiveLaw& law
+        ) const;
 };
 
 

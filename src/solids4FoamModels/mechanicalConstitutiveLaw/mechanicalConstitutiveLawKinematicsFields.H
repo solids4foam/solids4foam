@@ -63,6 +63,10 @@ namespace Foam
 
 struct smallStrainKinematicsFields
 {
+    // The lists are held by reference, as are the views built on them, so
+    // each must outlive both: pass a field that exists, never a temporary
+    // such as a tmp or a patchInternalField()
+
     typedef smallStrainMechanicalConstitutiveLawKinematics kinematicsType;
 
     const UList<tensor>& gradD;
@@ -138,6 +142,10 @@ public:
 
 struct finiteStrainKinematicsFields
 {
+    // The lists are held by reference, as are the views built on them, so
+    // each must outlive both: pass a field that exists, never a temporary
+    // such as a tmp or a patchInternalField()
+
     typedef finiteStrainMechanicalConstitutiveLawKinematics kinematicsType;
 
     const UList<tensor>& F;

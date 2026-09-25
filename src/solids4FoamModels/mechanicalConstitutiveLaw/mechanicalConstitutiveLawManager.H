@@ -372,12 +372,12 @@ class mechanicalConstitutiveLawManager
         //  for both strain measures. patchFields(patchI) gives the patch's
         //  kinematic lists as Fields; lead is the field whose patches say
         //  which are coupled
-        template<class Fields, class PatchFields>
+        template<class Fields, class PatchFieldsFn>
         void updateStressVolBoundary
         (
             topologyEntry& tp,
             const volTensorField& lead,
-            const PatchFields& patchFields,
+            const PatchFieldsFn& patchFields,
             const scalar dt,
             volSymmTensorField& stress,
             volScalarField* scalarTangentPtr,
@@ -521,15 +521,6 @@ class mechanicalConstitutiveLawManager
 
         //- The coupling-input gathering below is done by inputGatherer_; see
         //  mechanicalConstitutiveLawInputGatherer for what each one does
-
-        const volScalarField* scalarInputSource
-        (
-            const label lawI,
-            const word& name
-        ) const
-        {
-            return inputGatherer_.scalarInputSource(lawI, name);
-        }
 
         mechanicalConstitutiveLawInputs lawInputs
         (

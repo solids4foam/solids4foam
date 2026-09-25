@@ -20,6 +20,124 @@ License
 #include "mechanicalConstitutiveLawStateSetup.H"
 #include "mechanicalConstitutiveLawStateIO.H"
 #include "labelIOList.H"
+#include "mechanicalConstitutiveLawGather.H"
+
+// * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+template<class Type>
+Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
+Foam::mechanicalConstitutiveLawStateSetup::prescribedField
+(
+    const word& name
+) const
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+    // The file comes first, and the registry only after it.
+    //
+    // Reading the file first means what the case says on disk is what
+    // the law gets, even if something has registered a field of the
+    // same name, and the registry is left to serve the fields that
+    // only ever exist in memory because another model computes them
+    IOobject io
+    (
+        name,
+        mesh_.time().timeName(),
+        mesh_,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    );
+
+    if (!mechanicalConstitutiveLawHeaderIsA<VolFieldType>(io))
+    {
+        // A prescribed field describes the case, not the state at a
+        // particular time, so it is written once into 0 and a restart
+        // will not find it beside the fields it restarts from. Look
+        // there before giving up
+        io.instance() = "0";
+    }
+
+    if (mechanicalConstitutiveLawHeaderIsA<VolFieldType>(io))
+    {
+        return tmp<VolFieldType>(new VolFieldType(io, mesh_));
+    }
+
+    if (mesh_.foundObject<VolFieldType>(name))
+    {
+        return tmp<VolFieldType>
+        (
+            mesh_.lookupObject<VolFieldType>(name)
+        );
+    }
+
+    return tmp<VolFieldType>();
+}
+
+
+template<class Type>
+void Foam::mechanicalConstitutiveLawStateSetup::readPrescribed
+(
+    const word& name,
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    Field<Type>& fld
+) const
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+    const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
+
+    if (!tsrc.valid())
+    {
+        return;
+    }
+
+    const VolFieldType& src = tsrc();
+
+    Info<< "    Prescribed state '" << name
+        << "' read from the field of the same name" << endl;
+
+    gatherToIntegrationPoints
+    (
+        mesh_, lawCells_[lawI], src, topo, ipIDs, fld
+    );
+}
+
+
+template<class Type>
+void Foam::mechanicalConstitutiveLawStateSetup::readPrescribedPatch
+(
+    const word& name,
+    const label lawI,
+    const label patchI,
+    Field<Type>& fld
+) const
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+
+    const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
+
+    if (!tsrc.valid())
+    {
+        return;
+    }
+
+    const VolFieldType& src = tsrc();
+
+    // The patch values of the supplied field, which for the uniform
+    // and zero-gradient cases a user writes are the owner cell values
+    const fvPatchField<Type>& psrc = src.boundaryField()[patchI];
+
+    // This law's faces on this patch, indexing into the patch
+    const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+
+    forAll(faces, i)
+    {
+        fld[i] = psrc[faces[i]];
+    }
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 

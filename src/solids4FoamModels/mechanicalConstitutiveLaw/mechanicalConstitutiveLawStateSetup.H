@@ -51,7 +51,6 @@ SourceFiles
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "integrationPointTopology.H"
-#include "mechanicalConstitutiveLawGather.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -92,217 +91,123 @@ class mechanicalConstitutiveLawStateSetup
 
     // Private Member Functions
 
-    //- Where a prescribed field is read from.
-    //
-    //  The internal points of a law and its faces on one patch are read
-    //  by different functions but through the same per-type dispatch, so
-    //  the dispatch is written once and told which to use.
-    //
-    //  Note that writing state out for restart is not a third source.
-    //  This reads into a field that already exists, at
-    //  addresses it is given; writing state out has to register an
-    //  IOobject and scatter per-integration-point state into a geometric
-    //  field, which is the other direction and a different shape
-    enum class prescribedSource
-    {
-        //- The law's own integration points, from a volField
-        internalPoints,
-
-        //- The law's faces on one boundary patch, from its patch values
-        patchFaces
-    };
-
-    //- Read every prescribed field a law declared, from one source
-    void readPrescribedFields
-    (
-        const mechanicalConstitutiveLawStateSpec& spec,
-        mechanicalConstitutiveLawState& state,
-        const prescribedSource source,
-        const label lawI,
-        const integrationPointTopology* topoPtr,
-        const labelList* ipIDsPtr,
-        const label patchI
-    ) const;
-
-    //- Refuse a restart that would restore constitutive history without
-    //  the kinematic history it is measured against
-    void checkRestartKinematics() const;
-
-    //- One law's persistent state, recursing into any child states
-    void setupStateRestartLaw
-    (
-        const mechanicalConstitutiveLaw& law,
-        const word& lawName,
-        const word& topologyName,
-        const wordList& childPath,
-        const word& entityName,
-        const labelUList& entities,
-        const List<mechanicalConstitutiveLawState*>& parts,
-        const bool isRestart
-    ) const;
-
-    //- Allocate each declared field and set it to its declared default
-    void applyStateDefaults
-    (
-        const mechanicalConstitutiveLawStateSpec& spec,
-        mechanicalConstitutiveLawState& state
-    ) const;
-
-    //- As applyStateSpec, for a named law, which is how a composite's
-    //  sub-laws are reached
-    void applyStateSpec
-    (
-        const mechanicalConstitutiveLaw& law,
-        const label lawI,
-        const integrationPointTopology& topo,
-        const labelList& ipIDs,
-        mechanicalConstitutiveLawState& state
-    ) const;
-
-    //- As applyStateSpecPatch, for a named law
-    void applyStateSpecPatch
-    (
-        const mechanicalConstitutiveLaw& law,
-        const label lawI,
-        const label patchI,
-        mechanicalConstitutiveLawState& state
-    ) const;
-
-    //- As applyStateSpecScratch, for a named law
-    void applyStateSpecScratch
-    (
-        const mechanicalConstitutiveLaw& law,
-        mechanicalConstitutiveLawState& state
-    ) const;
-
-    //- The volField a prescribed state is to be read from, if there is
-    //  one. It may be a field another model has already registered, or it
-    //  may exist only as a file in the current time directory, which is
-    //  how a user supplies one. If it is neither then nothing was
-    //  prescribed and the caller leaves the declared default in place
-    template<class Type>
-    tmp<GeometricField<Type, fvPatchField, volMesh>>
-    prescribedField(const word& name) const
-    {
-        typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
-
-        // The file comes first, and the registry only after it.
+        //- Where a prescribed field is read from.
         //
-        // Reading the file first means what the case says on disk is what
-        // the law gets, even if something has registered a field of the
-        // same name, and the registry is left to serve the fields that
-        // only ever exist in memory because another model computes them
-        IOobject io
+        //  The internal points of a law and its faces on one patch are read
+        //  by different functions but through the same per-type dispatch, so
+        //  the dispatch is written once and told which to use.
+        //
+        //  Note that writing state out for restart is not a third source.
+        //  This reads into a field that already exists, at
+        //  addresses it is given; writing state out has to register an
+        //  IOobject and scatter per-integration-point state into a geometric
+        //  field, which is the other direction and a different shape
+        enum class prescribedSource
+        {
+            //- The law's own integration points, from a volField
+            internalPoints,
+
+            //- The law's faces on one boundary patch, from its patch values
+            patchFaces
+        };
+
+        //- Read every prescribed field a law declared, from one source
+        void readPrescribedFields
         (
-            name,
-            mesh_.time().timeName(),
-            mesh_,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        );
+            const mechanicalConstitutiveLawStateSpec& spec,
+            mechanicalConstitutiveLawState& state,
+            const prescribedSource source,
+            const label lawI,
+            const integrationPointTopology* topoPtr,
+            const labelList* ipIDsPtr,
+            const label patchI
+        ) const;
 
-        if (!mechanicalConstitutiveLawHeaderIsA<VolFieldType>(io))
-        {
-            // A prescribed field describes the case, not the state at a
-            // particular time, so it is written once into 0 and a restart
-            // will not find it beside the fields it restarts from. Look
-            // there before giving up
-            io.instance() = "0";
-        }
+        //- Refuse a restart that would restore constitutive history without
+        //  the kinematic history it is measured against
+        void checkRestartKinematics() const;
 
-        if (mechanicalConstitutiveLawHeaderIsA<VolFieldType>(io))
-        {
-            return tmp<VolFieldType>(new VolFieldType(io, mesh_));
-        }
-
-        if (mesh_.foundObject<VolFieldType>(name))
-        {
-            return tmp<VolFieldType>
-            (
-                mesh_.lookupObject<VolFieldType>(name)
-            );
-        }
-
-        return tmp<VolFieldType>();
-    }
-
-    //- Fill a law's internal integration points from a prescribed field
-    //
-    //  The value is specified per cell, which is how a user prepares one
-    //  and the only form setFields can write. How it reaches a point
-    //  depends on where the point is. A point inside a cell takes that
-    //  cell's value. A point that is a mesh face takes the interpolated
-    //  value, because a face lies between two cells rather than in one.
-    //
-    //  A point shared between cells without being a face, as a
-    //  point-centred one is, takes the average of this law's cells around
-    //  it, which does not depend on the order they are visited in
-    template<class Type>
-    void readPrescribed
-    (
-        const word& name,
-        const label lawI,
-        const integrationPointTopology& topo,
-        const labelList& ipIDs,
-        Field<Type>& fld
-    ) const
-    {
-        typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
-
-        const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
-
-        if (!tsrc.valid())
-        {
-            return;
-        }
-
-        const VolFieldType& src = tsrc();
-
-        Info<< "    Prescribed state '" << name
-            << "' read from the field of the same name" << endl;
-
-        gatherToIntegrationPoints
+        //- One law's persistent state, recursing into any child states
+        void setupStateRestartLaw
         (
-            mesh_, lawCells_[lawI], src, topo, ipIDs, fld
-        );
-    }
+            const mechanicalConstitutiveLaw& law,
+            const word& lawName,
+            const word& topologyName,
+            const wordList& childPath,
+            const word& entityName,
+            const labelUList& entities,
+            const List<mechanicalConstitutiveLawState*>& parts,
+            const bool isRestart
+        ) const;
 
-    //- Read a prescribed field into a law's state on one boundary patch.
-    //  A boundary state is evaluated exactly as the internal points are,
-    //  so it needs the prescribed value too; without this the law would
-    //  see a silently zero field on every patch
-    template<class Type>
-    void readPrescribedPatch
-    (
-        const word& name,
-        const label lawI,
-        const label patchI,
-        Field<Type>& fld
-    ) const
-    {
-        typedef GeometricField<Type, fvPatchField, volMesh> VolFieldType;
+        //- Allocate each declared field and set it to its declared default
+        void applyStateDefaults
+        (
+            const mechanicalConstitutiveLawStateSpec& spec,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-        const tmp<VolFieldType> tsrc(prescribedField<Type>(name));
+        //- As applyStateSpec, for a named law, which is how a composite's
+        //  sub-laws are reached
+        void applyStateSpec
+        (
+            const mechanicalConstitutiveLaw& law,
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-        if (!tsrc.valid())
-        {
-            return;
-        }
+        //- As applyStateSpecPatch, for a named law
+        void applyStateSpecPatch
+        (
+            const mechanicalConstitutiveLaw& law,
+            const label lawI,
+            const label patchI,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-        const VolFieldType& src = tsrc();
+        //- As applyStateSpecScratch, for a named law
+        void applyStateSpecScratch
+        (
+            const mechanicalConstitutiveLaw& law,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-        // The patch values of the supplied field, which for the uniform
-        // and zero-gradient cases a user writes are the owner cell values
-        const fvPatchField<Type>& psrc = src.boundaryField()[patchI];
+        //- The volField a prescribed state is to be read from, if there is
+        //  one. It may be a field another model has already registered, or it
+        //  may exist only as a file in the current time directory, which is
+        //  how a user supplies one. If it is neither then nothing was
+        //  prescribed and the caller leaves the declared default in place
+        template<class Type>
+        tmp<GeometricField<Type, fvPatchField, volMesh>>
+        prescribedField(const word& name) const;
 
-        // This law's faces on this patch, indexing into the patch
-        const labelList& faces = lawBoundaryFaces_[lawI][patchI];
+        //- Fill a law's internal integration points from a prescribed field.
+        //  The value is given per cell; gatherToIntegrationPoints says how it
+        //  reaches each point
+        template<class Type>
+        void readPrescribed
+        (
+            const word& name,
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            Field<Type>& fld
+        ) const;
 
-        forAll(faces, i)
-        {
-            fld[i] = psrc[faces[i]];
-        }
-    }
+        //- Read a prescribed field into a law's state on one boundary patch.
+        //  A boundary state is evaluated exactly as the internal points are,
+        //  so it needs the prescribed value too; without this the law would
+        //  see a silently zero field on every patch
+        template<class Type>
+        void readPrescribedPatch
+        (
+            const word& name,
+            const label lawI,
+            const label patchI,
+            Field<Type>& fld
+        ) const;
 
 
 public:
@@ -325,54 +230,54 @@ public:
 
     // Member Functions
 
-    //- True if this law, or any law below it, keeps history
-    bool declaresPersistentState
-    (
-        const mechanicalConstitutiveLaw& law
-    ) const;
+        //- True if this law, or any law below it, keeps history
+        bool declaresPersistentState
+        (
+            const mechanicalConstitutiveLaw& law
+        ) const;
 
-    //- Register the persistent state of every law on this topology for
-    //  writing, and on a restart read it back
-    //  Named by the key the topology was registered under, not by its
-    //  class name: two topologies of one class under different keys keep
-    //  their own history, and naming the files by class would have them
-    //  overwrite and then restore each other's
-    void setupStateRestart
-    (
-        const List<labelList>& lawIntegrationPointIDs,
-        PtrList<mechanicalConstitutiveLawState>& states,
-        PtrList<PtrList<mechanicalConstitutiveLawState>>& boundaryStates,
-        const bool boundaryAware,
-        const integrationPointTopology& topo,
-        const word& topologyKey
-    ) const;
+        //- Register the persistent state of every law on this topology for
+        //  writing, and on a restart read it back
+        //  Named by the key the topology was registered under, not by its
+        //  class name: two topologies of one class under different keys keep
+        //  their own history, and naming the files by class would have them
+        //  overwrite and then restore each other's
+        void setupStateRestart
+        (
+            const List<labelList>& lawIntegrationPointIDs,
+            PtrList<mechanicalConstitutiveLawState>& states,
+            PtrList<PtrList<mechanicalConstitutiveLawState>>& boundaryStates,
+            const bool boundaryAware,
+            const integrationPointTopology& topo,
+            const word& topologyKey
+        ) const;
 
-    //- Apply what a law declared in declareState: allocate each field,
-    //  set its default, and read any prescribed field from the mesh
-    void applyStateSpec
-    (
-        const label lawI,
-        const integrationPointTopology& topo,
-        const labelList& ipIDs,
-        mechanicalConstitutiveLawState& state
-    ) const;
+        //- Apply what a law declared in declareState: allocate each field,
+        //  set its default, and read any prescribed field from the mesh
+        void applyStateSpec
+        (
+            const label lawI,
+            const integrationPointTopology& topo,
+            const labelList& ipIDs,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-    //- As applyStateSpec, for a scratch state that no field addresses:
-    //  declared defaults and the law's own initialisation, no
-    //  prescribed read
-    void applyStateSpecScratch
-    (
-        const label lawI,
-        mechanicalConstitutiveLawState& state
-    ) const;
+        //- As applyStateSpec, for a scratch state that no field addresses:
+        //  declared defaults and the law's own initialisation, no
+        //  prescribed read
+        void applyStateSpecScratch
+        (
+            const label lawI,
+            mechanicalConstitutiveLawState& state
+        ) const;
 
-    //- As applyStateSpec, for a law's state on one boundary patch
-    void applyStateSpecPatch
-    (
-        const label lawI,
-        const label patchI,
-        mechanicalConstitutiveLawState& state
-    ) const;
+        //- As applyStateSpec, for a law's state on one boundary patch
+        void applyStateSpecPatch
+        (
+            const label lawI,
+            const label patchI,
+            mechanicalConstitutiveLawState& state
+        ) const;
 };
 
 

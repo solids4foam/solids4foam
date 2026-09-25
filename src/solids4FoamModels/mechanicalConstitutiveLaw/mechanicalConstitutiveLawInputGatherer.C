@@ -23,7 +23,8 @@ License
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::mechanicalConstitutiveLawInputGatherer::mechanicalConstitutiveLawInputGatherer
+Foam::mechanicalConstitutiveLawInputGatherer::
+mechanicalConstitutiveLawInputGatherer
 (
     const fvMesh& mesh,
     const PtrList<mechanicalConstitutiveLaw>& laws,

@@ -2520,12 +2520,12 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
 }
 
 
-template<class Fields, class PatchFields>
+template<class Fields, class PatchFieldsFn>
 void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
 (
     topologyEntry& tp,
     const volTensorField& lead,
-    const PatchFields& patchFields,
+    const PatchFieldsFn& patchFields,
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
