@@ -66,6 +66,13 @@ inline bool mechanicalConstitutiveLawHeaderIsA(IOobject& io)
 //  A point shared between cells without being a face, as a
 //  point-centred one is, takes the average of this law's cells around
 //  it, which does not depend on the order they are visited in
+//
+//  Only this rank's cells are averaged. A point on a processor boundary
+//  has cells on other ranks too, and would take a different value on
+//  each; exchanging them would be a collective, and this is called only
+//  on ranks that hold the law's points. No topology in use has such a
+//  point - a dual face lies in one cell - and the pointField overload,
+//  whose points are shared, refuses a parallel run
 template<class Type>
 inline void gatherToIntegrationPoints
 (
