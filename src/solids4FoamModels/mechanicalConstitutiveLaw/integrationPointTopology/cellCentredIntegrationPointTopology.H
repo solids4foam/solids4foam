@@ -110,6 +110,12 @@ public:
     {
         return false;
     }
+
+    //- One integration point per cell, indexed by the cell
+    virtual bool integrationPointsAreCells() const override
+    {
+        return true;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

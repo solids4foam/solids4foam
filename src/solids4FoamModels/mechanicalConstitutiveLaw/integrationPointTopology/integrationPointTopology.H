@@ -185,6 +185,20 @@ public:
     {
         return false;
     }
+
+    //- Is each internal integration point a mesh cell, with the integration
+    //  point index equal to the cell index?
+    //
+    //  What depends on it: a state held this way can be written as a volField
+    //  for viewing, located on a different decomposition through the cell
+    //  addressing, and kept through a topology change that only moves faces
+    //  between patches, since the cells are unchanged. A topology holding
+    //  several points per cell, as the compact cell one does, must answer
+    //  false
+    virtual bool integrationPointsAreCells() const
+    {
+        return false;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

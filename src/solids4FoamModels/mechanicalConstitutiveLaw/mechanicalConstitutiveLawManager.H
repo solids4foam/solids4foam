@@ -243,11 +243,13 @@ class mechanicalConstitutiveLawManager
         //  first one's history
         mutable HashTable<word> compactFingerprints_;
 
-        //- Mesh sizes the per-patch addressing above was built for: the
-        //  number of cells, then the number of faces on each patch.
+        //- Signature of the mesh the per-patch addressing above was built
+        //  for: the number of cells, the number of faces on each patch, and a
+        //  checksum of each patch's face-to-cell addressing.
         //  A topology-changing mesh (e.g. crackerFvMesh, which moves internal
-        //  faces onto a crack patch) changes the patch sizes under the
-        //  manager; comparing against these is how that is detected
+        //  faces onto a crack patch) changes these under the manager;
+        //  comparing against them is how that is detected. The checksums
+        //  catch a change that leaves every size as it was
         labelList addressingMeshSizes_;
 
         //- Scalar inputs read from another case directory, for the laws
@@ -921,7 +923,7 @@ class mechanicalConstitutiveLawManager
         //  exactly once per step however many times its stress is evaluated
         void updateOldTimeIfNeeded();
 
-        //- The current mesh sizes, in the layout of addressingMeshSizes_
+        //- The current mesh signature, in the layout of addressingMeshSizes_
         labelList currentMeshSizes() const;
 
         //- Build lawBoundaryFaces_ from cellToLaw_ for the current mesh

@@ -1622,15 +1622,15 @@ void Foam::mechanicalConstitutiveLawManager::setupStateRestart
         // instead of by position - the state's own order comes from a hash set
         // for the boundary part and means nothing across decompositions.
         //
-        // Only the cell-centred topology for now: a cell maps through
-        // decomposePar's addressing directly, whereas a point- or dual-based
-        // one needs its own translation that is not written yet. The others
-        // write no locations, and a restart on a changed decomposition then
-        // refuses rather than guessing
+        // Only a topology whose points are the cells for now: a cell maps
+        // through decomposePar's addressing directly, whereas a point- or
+        // dual-based one needs its own translation that is not written yet.
+        // The others write no locations, and a restart on a changed
+        // decomposition then refuses rather than guessing
         labelList entities;
 
         const bool topologyRecordsLocations =
-            (topo.type() == cellCentredIntegrationPointTopology::typeName);
+            topo.integrationPointsAreCells();
 
         if (topologyRecordsLocations)
         {
@@ -2020,13 +2020,29 @@ void Foam::mechanicalConstitutiveLawManager::applyStateSpecPatch
 Foam::labelList
 Foam::mechanicalConstitutiveLawManager::currentMeshSizes() const
 {
-    labelList sizes(mesh_.boundary().size() + 1);
+    const label nPatches = mesh_.boundary().size();
+
+    labelList sizes(2*nPatches + 1);
 
     sizes[0] = mesh_.nCells();
 
     forAll(mesh_.boundary(), patchI)
     {
-        sizes[patchI + 1] = mesh_.boundary()[patchI].size();
+        const labelUList& faceCells = mesh_.boundary()[patchI].faceCells();
+
+        sizes[patchI + 1] = faceCells.size();
+
+        // Order-sensitive, so that faces moved between cells or reordered
+        // within a patch change it; kept below the label maximum on every
+        // label size
+        long long checksum = 0;
+
+        forAll(faceCells, i)
+        {
+            checksum = (31*checksum + faceCells[i] + 1) % 2147483629LL;
+        }
+
+        sizes[nPatches + patchI + 1] = label(checksum);
     }
 
     return sizes;
@@ -2124,16 +2140,20 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
     {
         topologyEntry& entry = autoPtrRef(topoIter());
 
-        // A cell-centred topology indexes cells only, and keeps a state per
-        // patch face, sized from lawBoundaryFaces_. The others index faces or
-        // points, which the topology itself would have to be rebuilt for
-        if (!isA<cellCentredIntegrationPointTopology>(entry.topology_))
+        // A topology whose points are the cells keeps its internal addressing
+        // through a change that only moves faces between patches, and keeps a
+        // state per patch face, sized from lawBoundaryFaces_. The others index
+        // faces or points, which the topology itself would have to be rebuilt
+        // for
+        if (!entry.topology_.integrationPointsAreCells())
         {
             FatalErrorInFunction
                 << "The mesh topology changed, and the integration-point "
                 << "topology " << entry.topology_.type() << " is in use." << nl
-                << "    Only " << cellCentredIntegrationPointTopology::typeName
-                << " is rebuilt on a topology change."
+                << "    Only a topology whose integration points are the "
+                << "cells, such as "
+                << cellCentredIntegrationPointTopology::typeName
+                << ", is kept through a topology change."
                 << exit(FatalError);
         }
 
@@ -5473,7 +5493,7 @@ void Foam::mechanicalConstitutiveLawManager::writeStateFields() const
     {
         const topologyEntry& entry = autoPtrRef(topoIter());
 
-        if (isA<cellCentredIntegrationPointTopology>(entry.topology_))
+        if (entry.topology_.integrationPointsAreCells())
         {
             entryPtr = &entry;
             break;
