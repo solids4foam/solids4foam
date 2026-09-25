@@ -8,6 +8,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- A documentation page for each `mechanicalConstitutiveLaw`, next to its
+  class, giving its entries and defaults, its state, its tangents, whether it
+  supports the mixed displacement-pressure formulation, how it differs from
+  the removed legacy law, and the tutorials that use it, with an index in the
+  material models page. The legacy laws' pages were removed with them.
+
 - The `mechanicalConstitutiveLaw` history, such as the plastic strain, is
   written at each write time as volFields named after the variable
   (`epsilonPEq`, `epsilonP`, `sigmaY` and so on), so that it can be viewed in
@@ -64,7 +70,6 @@ release. For complete commit-level details and contributor information, see the
   `neoHookeanElasticMisesPlastic` already did, so the plastic update no
   longer depends on the decomposition. No tutorial uses the nonlinear
   hardening branch.
-
 - A law dictionary that still sets an entry only the removed legacy laws read,
   such as `pressureDisplacement`, `impKcoeff`, `tangentEps`, `regionName` or
   `pressureFieldRegion`, gives a warning naming it; the entries were ignored

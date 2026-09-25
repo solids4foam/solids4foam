@@ -71,6 +71,29 @@ A linear geometry solid model asks for the small-strain update and a
 nonlinear geometry solid model for the finite-strain one; a law that does not
 implement the one asked for stops the run with an error.
 
+### Available laws
+
+Each law has a page describing its entries, its state and the tutorials that
+use it:
+
+| Law | Strain | Description |
+| --- | --- | --- |
+| [`linearElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity, with an optional residual stress |
+| [`linearElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with von Mises plasticity and hardening |
+| [`linearElasticMohrCoulombPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with Mohr-Coulomb plasticity |
+| [`viscousHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscousHookeanElasticMechanicalConstitutiveLaw/README.md) | small | Linear viscoelasticity (Prony series) |
+| [`anisotropicBiotElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/anisotropicBiotElasticMechanicalConstitutiveLaw/README.md) | small | Orthotropic elasticity for poroelastic soils |
+| [`thermoMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/thermoMechanicalLawMechanicalConstitutiveLaw/README.md) | small | Thermal expansion over a sub-law, from a temperature field |
+| [`poroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/poroMechanicalLawMechanicalConstitutiveLaw/README.md) | small | Biot effective stress over a sub-law, from a pore pressure |
+| [`StVenantKirchhoffElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/StVenantKirchhoffElasticMechanicalConstitutiveLaw/README.md) | finite | St. Venant-Kirchhoff hyperelasticity |
+| [`neoHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean hyperelasticity |
+| [`neoHookeanElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean elasticity with von Mises plasticity |
+| [`MooneyRivlinElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/MooneyRivlinElasticMechanicalConstitutiveLaw/README.md) | finite | Mooney-Rivlin hyperelasticity |
+| [`OgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/OgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Three-term Ogden hyperelasticity |
+| [`GuccioneElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/GuccioneElasticMechanicalConstitutiveLaw/README.md) | finite | Transversely isotropic myocardium (Guccione) |
+| [`HolzapfelGasserOgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Fibre-reinforced arterial tissue (HGO) |
+| [`electroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/electroMechanicalLawMechanicalConstitutiveLaw/README.md) | finite | Active fibre tension over a passive sub-law |
+
 `rho`, the density, is read by every law. The optional `solvePressureEqn` and
 `pressureSmoothingScaleFactor` (default `100`) entries of a law ask the solid
 model to smooth the hydrostatic stress; see the solid model pages for which
