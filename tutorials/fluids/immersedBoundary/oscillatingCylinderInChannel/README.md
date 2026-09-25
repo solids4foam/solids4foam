@@ -108,8 +108,8 @@ The root mean square difference between the drag coefficient and that of Wan
 and Turek (2006), over the two periods ($$0.25 < t < 8$$ s), whose root mean
 square is 2.16:
 
-| `MESH_LEVEL` | Cells | Cells across $$D$$ | Forcing only | Forcing and inertia |
-| ------------ | ----- | ------------------ | ------------ | ------------------- |
+| `MESH_LEVEL` | Cells | Cells across $$D$$ | Forcing | With inertia |
+| ------------ | ----- | ------------------ | ------- | ------------ |
 | 1 | 5 084 | 10 | 1.31 | 1.36 |
 | 2 | 20 336 | 20 | 0.73 | 0.53 |
 | 3 | 81 344 | 40 | 0.73 | 0.49 |
