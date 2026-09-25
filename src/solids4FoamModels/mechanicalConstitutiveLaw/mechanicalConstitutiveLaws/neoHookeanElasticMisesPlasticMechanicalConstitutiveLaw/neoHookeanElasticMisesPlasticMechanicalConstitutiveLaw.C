@@ -555,20 +555,8 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Fourth-order tangent by finite differences, as for the other
-    // finite-strain laws. There is no analytical spatial tangent here
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

@@ -311,49 +311,22 @@ void Foam::viscousHookeanElasticMechanicalConstitutiveLaw::evaluate
     // the relaxation factor, so this law's Jacobian is a function of dt
     if (response.wantsScalarTangent())
     {
-        UIndirectList<scalar>& K = response.scalarTangent();
-
         scalar scaleFactor = gammaInf;
         forAll(gamma_, m)
         {
             scaleFactor += gamma_[m]*exp(-dt/(2.0*tau_[m]));
         }
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = scaleFactor*2.0*mu + lambda_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                Keff = scaleFactor*(4.0/3.0)*mu;
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
+        fillScalarTangent
+        (
+            response,
+            scaleFactor*2.0*mu + lambda_.value(),
+            scaleFactor*(4.0/3.0)*mu
+        );
     }
 
-    // Fourth-order tangent by finite differences
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

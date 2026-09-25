@@ -228,35 +228,17 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        2.0*mu_.value() + lambda_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = 2.0*mu_.value() + lambda_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                // mu*lap(D) + (1/3)*mu*grad(div(D))
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-    else if
+    // Fourth-order tangent, analytically or by finite differences
+    if
     (
         response.tangentReq()
      == tangentRequest::fourthOrderFiniteDifference

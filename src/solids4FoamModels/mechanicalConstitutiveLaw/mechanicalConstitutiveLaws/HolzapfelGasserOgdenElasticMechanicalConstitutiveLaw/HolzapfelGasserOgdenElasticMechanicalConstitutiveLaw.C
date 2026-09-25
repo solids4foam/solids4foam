@@ -232,63 +232,24 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for: a preconditioner, not a tangent of this
+    // energy.
+    //
+    // The fibre stiffness is left out, and that is a provisional choice
+    // rather than a considered one: a deformation-dependent effective
+    // stiffness including it is the alternative. A wrong preconditioner costs
+    // iterations rather than accuracy, so this is safe to start from, but it
+    // wants convergence evidence on a fibre-dominated case before it is
+    // called adequate.
+    //
+    // The deviatoric surrogate is the one for div(dev(sigma)) alone, which a
+    // mixed displacement-pressure formulation uses. Including the bulk
+    // modulus - a near-incompressibility penalty orders above the shear
+    // modulus - makes it stiff enough that the linear solve does not converge
+    fillScalarTangent(response, (4.0/3.0)*muVal + bulkVal, (4.0/3.0)*muVal);
 
-        // A preconditioner, not a tangent of this energy.
-        //
-        // The fibre stiffness is left out, and that is a provisional choice
-        // rather than a considered one: a deformation-dependent effective
-        // stiffness including it is the alternative. A wrong preconditioner costs iterations rather than
-        // accuracy, so this is safe to start from, but it wants convergence
-        // evidence on a fibre-dominated case before it is called adequate
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = (4.0/3.0)*muVal + bulkVal;
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // A mixed displacement-pressure formulation carries the
-                // volumetric response in its own equation, so the surrogate
-                // here is the one for div(dev(sigma)) alone. Including the
-                // bulk modulus - a near-incompressibility penalty orders
-                // above the shear modulus - makes it stiff enough that the
-                // linear solve does not converge
-                Keff = (4.0/3.0)*muVal;
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // No analytical consistent tangent has been derived for this law. The
-    // finite-difference one of the base class is well defined for any law and
-    // is evaluated against a shadow state, so it disturbs neither the stress
-    // just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

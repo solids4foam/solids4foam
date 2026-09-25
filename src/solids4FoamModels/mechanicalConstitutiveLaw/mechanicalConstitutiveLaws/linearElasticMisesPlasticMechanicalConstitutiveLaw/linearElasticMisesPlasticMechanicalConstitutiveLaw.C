@@ -541,23 +541,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Fourth-order tangent.
-    // There is no analytical consistent tangent for this law yet, but the
-    // finite-difference tangent of the base class is well defined for any law
-    // and is evaluated against a shadow state, so it neither disturbs the
-    // return mapping just performed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

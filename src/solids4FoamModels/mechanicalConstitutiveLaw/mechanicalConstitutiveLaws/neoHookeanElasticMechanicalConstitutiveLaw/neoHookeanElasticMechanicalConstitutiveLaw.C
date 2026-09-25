@@ -231,52 +231,17 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        (4.0/3.0)*mu_.value() + kappa_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = (4.0/3.0)*mu_.value() + kappa_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                // mu*lap(D) + (1/3)*mu*grad(div(D))
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // There is no analytical spatial tangent for this law yet, but the
-    // finite-difference tangent of the base class is well defined for any
-    // finite-strain law and is evaluated against a shadow state, so it leaves
-    // neither the stress just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

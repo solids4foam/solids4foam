@@ -123,6 +123,41 @@ protected:
             mechanicalConstitutiveLawResponse& response
         ) const;
 
+        //- Fill the scalar tangent the response asks for, if it asks for
+        //  one: Kfull for a scalar request and Kdev for a scalarDeviatoric
+        //  one, the same at every point. Kdev is the Laplacian surrogate for
+        //  div(dev(sigma)), which a mixed formulation uses because it carries
+        //  the volumetric response in an equation of its own
+        static void fillScalarTangent
+        (
+            mechanicalConstitutiveLawResponse& response,
+            const scalar Kfull,
+            const scalar Kdev
+        );
+
+        //- The fourth-order tangent of a law with no analytical one: by
+        //  finite differences when that is asked for, and refused, naming
+        //  the law, when an analytical one is. The finite-difference tangent
+        //  is well defined for any law and is evaluated against a shadow
+        //  state, so it disturbs neither the stress just computed nor the
+        //  history it started from
+        void fourthOrderByFiniteDifferenceOnly
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const;
+
+        //- Finite-strain counterpart of the above
+        void fourthOrderByFiniteDifferenceOnly
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const;
+
 
 public:
 
