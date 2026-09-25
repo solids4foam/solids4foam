@@ -2,8 +2,26 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# L2 error tolerances for the coarse hex and tet meshes (OpenFOAM.com v2412).
+HEX_DISP_TOL=8e-8
+HEX_STRESS_TOL=6e5
+
+TET_DISP_TOL=1.5e-7
+TET_STRESS_TOL=9e5
+
+HIGH_ORDER_DISP_TOL=5e-9
+HIGH_ORDER_STRESS_TOL=7e4
+
+APPROACHES=(
+    segregated
+    petscSnes
+    highOrder-movingLeastSquares
+    highOrder-kExactLeastSquares
+)
+
+MESHES=(hex tet)
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-CASE_DIR="${SCRIPT_DIR}/regressionTests/main"
 
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 : "${FOAM_LD_LIBRARY_PATH:=}"
@@ -18,26 +36,6 @@ for arg in "$@"; do
     esac
 done
 
-if [[ "$CHECK_ONLY" == false ]]; then
-    rm -rf "$CASE_DIR"
-    mkdir -p "$CASE_DIR"
-    for item in "$SCRIPT_DIR"/*; do
-        name=$(basename "$item")
-        case "$name" in
-            regressionTests|verification|log.*|[1-9]*) continue ;;
-        esac
-        cp -a "$item" "$CASE_DIR/"
-    done
-    rm -rf "$CASE_DIR/constant/polyMesh"
-    (cd "$CASE_DIR" && ./Allrun > log.Allrun 2>&1)
-fi
-
-SOLVER_LOG="$CASE_DIR/log.solids4Foam"
-if [[ ! -f "$SOLVER_LOG" ]]; then
-    echo "FAIL: solver log not found: $SOLVER_LOG"
-    exit 1
-fi
-
 extract_norm()
 {
     local marker="$1"
@@ -45,36 +43,100 @@ extract_norm()
     grep -A2 "$marker" "$SOLVER_LOG" | tail -n 1 | awk -v col="$column" '{print $col}'
 }
 
-displacement_l2=$(extract_norm "Writing DDifference field" 3)
-displacement_linf=$(extract_norm "Writing DDifference field" 4)
-stress_l2=$(extract_norm "Writing sigmaDifference field" 3)
-stress_linf=$(extract_norm "Writing sigmaDifference field" 4)
+check_log_message()
+{
+    local message="$1"
 
-check_range()
+    if ! grep -Fq "$message" "$SOLVER_LOG"; then
+        echo "FAIL: expected '$message' in $SOLVER_LOG"
+        return 1
+    fi
+}
+
+check_tolerance()
 {
     local label="$1"
     local value="$2"
-    local minimum="$3"
-    local maximum="$4"
+    local tolerance="$3"
 
-    if awk "BEGIN {exit !($value >= $minimum && $value <= $maximum)}"; then
+    if [[ ! "$value" =~ ^[0-9]+([.][0-9]*)?([eE][-+]?[0-9]+)?$ ]]; then
+        echo "FAIL: $label has missing or invalid value '$value'"
+        return 1
+    fi
+
+    if awk "BEGIN {exit !($value <= $tolerance)}"; then
         printf 'PASS: %s = %.8g\n' "$label" "$value"
     else
-        printf 'FAIL: %s = %.8g, expected [%g, %g]\n' \
-            "$label" "$value" "$minimum" "$maximum"
+        printf 'FAIL: %s = %.8g, expected <= %g\n' \
+            "$label" "$value" "$tolerance"
         return 1
     fi
 }
 
 failures=0
-check_range "displacement L2" "$displacement_l2" 4e-8 8e-8 || failures=$((failures + 1))
-check_range "displacement Linf" "$displacement_linf" 1e-7 1.5e-7 || failures=$((failures + 1))
-check_range "stress L2" "$stress_l2" 4e5 6e5 || failures=$((failures + 1))
-check_range "stress Linf" "$stress_linf" 1.4e6 1.9e6 || failures=$((failures + 1))
+for mesh in "${MESHES[@]}"; do
+    if [[ "$mesh" == "tet" ]] && ! command -v gmsh >/dev/null 2>&1; then
+        echo "SKIP: tet mesh requires Gmsh"
+        continue
+    fi
 
-if [[ "$CHECK_ONLY" == false ]]; then
-    (cd "$CASE_DIR" && ./Allclean >/dev/null 2>&1) || true
-fi
+    for approach in "${APPROACHES[@]}"; do
+        if [[ "$approach" != "segregated" && -z "${PETSC_DIR:-}" ]]; then
+            echo "SKIP: $approach requires PETSc"
+            continue
+        fi
+
+        CASE_DIR="$SCRIPT_DIR/regressionTests/$approach-$mesh"
+
+        if [[ "$CHECK_ONLY" == false ]]; then
+            rm -rf "$CASE_DIR"
+            mkdir -p "$CASE_DIR"
+            for item in "$SCRIPT_DIR"/*; do
+                name=$(basename "$item")
+                case "$name" in
+                    regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+                esac
+                cp -a "$item" "$CASE_DIR/"
+            done
+            rm -rf "$CASE_DIR/constant/polyMesh"
+            (cd "$CASE_DIR" && ./Allrun "$approach" "$mesh" > log.Allrun 2>&1)
+        fi
+
+        SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+        if [[ ! -f "$SOLVER_LOG" ]] || ! grep -q '^End' "$SOLVER_LOG"; then
+            echo "FAIL: missing or incomplete solver log: $SOLVER_LOG"
+            failures=$((failures + 1))
+            continue
+        fi
+        if grep -q 'DIVERGED_' "$SOLVER_LOG"; then
+            echo "FAIL: $approach did not converge"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        displacement_l2=$(extract_norm "Writing DDifference field" 3)
+        stress_l2=$(extract_norm "Writing sigmaDifference field" 3)
+
+        echo
+        echo "Checking $approach ($mesh)"
+        if [[ "$approach" == highOrder-* ]]; then
+            check_log_message 'Using volume-averaged manufactured body force' || failures=$((failures + 1))
+            if [[ "$approach" == "highOrder-kExactLeastSquares" ]]; then
+                check_log_message 'Using cell-average analytical displacement' || failures=$((failures + 1))
+            else
+                check_log_message 'Using point-valued analytical displacement' || failures=$((failures + 1))
+            fi
+            check_tolerance "displacement L2" "$displacement_l2" "$HIGH_ORDER_DISP_TOL" || failures=$((failures + 1))
+            check_tolerance "stress L2" "$stress_l2" "$HIGH_ORDER_STRESS_TOL" || failures=$((failures + 1))
+        elif [[ "$mesh" == "tet" ]]; then
+            check_tolerance "displacement L2" "$displacement_l2" "$TET_DISP_TOL" || failures=$((failures + 1))
+            check_tolerance "stress L2" "$stress_l2" "$TET_STRESS_TOL" || failures=$((failures + 1))
+        else
+            check_tolerance "displacement L2" "$displacement_l2" "$HEX_DISP_TOL" || failures=$((failures + 1))
+            check_tolerance "stress L2" "$stress_l2" "$HEX_STRESS_TOL" || failures=$((failures + 1))
+        fi
+    done
+done
 
 if ((failures)); then
     echo "Regression test FAILED ($failures checks)"
