@@ -8,19 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
-- Framework regression arms for `squarePlate`, `cantilever2d`, `thermalCavity`,
-  `curvedBeams` and `3dTube`. Each runs its tutorial on both implementations
-  and asserts that each arm took the path it was set up for before comparing
-  them. `curvedBeams` and `3dTube` are the first coverage of the `impK`
-  registry lookup that the contact penalty models, the cohesive zone models
-  and `elasticWallPressure` all depend on; `thermalCavity` is the first
-  framework arm under `thermoFluidSolidInteraction`; and `cantilever2d`'s
-  `unsCoupled` arms are the first regression coverage of
-  `coupledUnsLinearGeometryLinearElastic` on either implementation.
-- `cantilever2d` regression arms for `vertexCentredLinearGeometry`, on both
-  implementations, which no regression case ran before. The legacy and
-  framework results are compared field by field, for the PETSc SNES path and
-  for a short run of the explicit path, which no tutorial exercises.
+- Regression coverage of the `mechanicalConstitutiveLaw` framework in
+  `squarePlate`, `cantilever2d`, `thermalCavity`, `curvedBeams` and `3dTube`,
+  each held to the answer of the removed legacy model. `curvedBeams` and
+  `3dTube` are the first coverage of the `impK` registry lookup that the
+  contact penalty models, the cohesive zone models and `elasticWallPressure`
+  all depend on, and `cantilever2d`'s `unsCoupled` case is the first
+  regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
+  regression case ran before, on the PETSc SNES path and a short run of the
+  explicit path, which no tutorial exercises.
 - Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
   the [preCICE tutorials](https://github.com/precice/tutorials) against the
   current source and checks them against stored reference values. The preCICE
@@ -44,36 +41,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
-- The `mechanicalConstitutiveLaw` framework no longer requires the legacy
-  `mechanicalModel` it replaces. `solidModel` reads
-  `constant/mechanicalProperties` itself and hands it to whichever
-  implementation is in use, where previously the manager was built from the
-  legacy model, so every framework run constructed the whole legacy hierarchy
-  and every legacy law. Reaching the legacy model on a framework run is now a
-  fatal error rather than a silent fallback, for every solid model.
 - `vertexCentredLinearGeometry` takes its whole constitutive response from the
-  `mechanicalConstitutiveLaw` framework when
-  `useMechanicalConstitutiveLawManager` is set: the residual stress at the dual
-  mesh faces, on the PETSc SNES and explicit paths alike, as well as the
-  Jacobian tangent, the cell stress and the stiffness behind the default
-  `fixedDofScale` and the explicit time step. It previously refused the
-  switch, and it no longer constructs the legacy `mechanicalModel` or
-  `dualMechanicalModel` on a framework run. More than one material is
-  supported on the framework path. The legacy path of this model does not
-  manage it: with more than one material, constructing its dual-mesh laws
-  stops with "SubMesh not found when looking for a field in the base mesh".
+  `mechanicalConstitutiveLaw` framework: the residual stress at the dual mesh
+  faces, on the PETSc SNES and explicit paths alike, as well as the Jacobian
+  tangent, the cell stress and the stiffness behind the default
+  `fixedDofScale` and the explicit time step. More than one material is now
+  supported; the removed legacy path stopped with "SubMesh not found when
+  looking for a field in the base mesh".
 - `kirchhoffPlate`, `coupledUnsLinearGeometryLinearElastic` and `thermalSolid`
-  accept `useMechanicalConstitutiveLawManager`. The first two read material
-  constants from a single isotropic linear elastic law rather than asking it
-  for a stress - a plate has one bending stiffness, and the block-coupled
-  solver assembles one set of Lame constants - so both keep that restriction
-  and only change where the constants come from.
-- `kirchhoffPlate` no longer reports or tests a material residual. It admits
-  only `linearElastic`, which does not override `mechanicalLaw::residual()`,
-  and that returns zero, so the value was always zero and its convergence test
-  always passed. The `matRes` column is gone from its residual output.
-- On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
-  one material now runs, in `linearGeometryTotalDisplacement`,
+  take their material from the `mechanicalConstitutiveLaw` framework. The
+  first two read material constants from a single isotropic linear elastic law
+  rather than asking it for a stress - a plate has one bending stiffness, and
+  the block-coupled solver assembles one set of Lame constants - so both keep
+  that restriction.
+- On foam-extend, a run with more than one material now runs, in `linearGeometryTotalDisplacement`,
   `nonLinearGeometryTotalLagrangianTotalDisplacement`,
   `nonLinearGeometryUpdatedLagrangian`, `poroLinearGeometry` and
   `thermalLinearGeometry`. The displacement is interpolated to the points the
@@ -83,10 +64,10 @@ release. For complete commit-level details and contributor information, see the
   extrapolated values are averaged with inverse-distance weights. foam-extend's
   least squares interpolation, which a stencil straddling a material interface
   smears, is not used for these runs, and nor are the legacy per-material
-  sub-meshes. On `layeredPipe` the framework's point displacement is within
-  1.5e-3 of the legacy arm's, where the least squares interpolation is 4.9e-3
-  away. Single-material framework runs on foam-extend keep the least squares
-  interpolation, as before.
+  sub-meshes. On `layeredPipe` the point displacement is within 1.5e-3 of the
+  legacy model's, where the least squares interpolation is 4.9e-3 away.
+  Single-material runs on foam-extend keep the least squares interpolation, as
+  before.
 - **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
   pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
   than `p`. An existing case carrying `0/p` fails at construction with a
@@ -125,6 +106,14 @@ release. For complete commit-level details and contributor information, see the
   `unsNonLinearGeometryUpdatedLagrangian`, `weakThermalLinearGeometry` and
   `vertexCentredNonLinTotalLagGeometry` solid models, which depended on the
   legacy model, are deleted.
+- **Breaking:** `nonLinearGeometryUpdatedLagrangian` no longer supports
+  `solvePressure`. The mixed formulation replaces a law's volumetric response
+  with the solved pressure; this model takes `dev()` of the total stress to
+  recover the rest, which is right only where everything the pressure must not
+  replace is trace free - true of an isotropic hyperelastic law, false of an
+  active tension along a fibre. It stops at construction rather than solving a
+  different material. Use `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+  which asks the law for the two parts separately.
 - **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
   `linearElasticCt`, `linearElasticFromFile`, `orthotropicLinearElastic`,
   `GentElastic`, `StVenantKirchhoffOrthotropicElastic`, `YeohElastic`,

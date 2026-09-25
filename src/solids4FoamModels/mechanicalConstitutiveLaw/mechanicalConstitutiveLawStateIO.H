@@ -39,7 +39,11 @@ Description
     here.
 
     The cost of an IOField is that decomposePar and reconstructPar do not map
-    it, so the state can only be read back on the decomposition that wrote it.
+    it. For the cell-centred topology the manager writes, alongside the state,
+    where each entry sits on the mesh in the numbering of the undecomposed
+    mesh, so that a run on a different decomposition, or a serial one, can
+    match the state entry by entry. The other topologies write no locations,
+    so their state can only be read back on the decomposition that wrote it.
     That is a real limit, and the alternative was worse: a volField restart
     would buy decomposition changes for two of the six topologies at the price
     of two IO paths, a dimensionSet that no law declares, and a boundary field

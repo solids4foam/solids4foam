@@ -38,6 +38,10 @@ mechanicalConstitutiveLawManager
           |
           +-- cellCentredIntegrationPointTopology
           +-- compactCellIntegrationPointTopology
+          +-- faceCentredIntegrationPointTopology
+          +-- compactFaceIntegrationPointTopology
+          +-- pointCentredIntegrationPointTopology
+          +-- dualFaceIntegrationPointTopology
 ```
 
 At runtime, a client of the framework:
@@ -229,6 +233,7 @@ Current implementations:
 - `cellCentredIntegrationPointTopology`
 - `compactCellIntegrationPointTopology`
 - `faceCentredIntegrationPointTopology`
+- `compactFaceIntegrationPointTopology`
 - `pointCentredIntegrationPointTopology`
 - `dualFaceIntegrationPointTopology`
 
@@ -357,13 +362,15 @@ dual-face topology addressing and its fourth-order tangent, and the misuse
 guards.
 
 The closed-form checks need every material to be `linearElastic`; the rest
-apply to any law. It is run by two tutorials' `regressionTest.sh`:
-`layeredPipe`, the only one with more than one material, and `perforatedPlate`,
-the only one whose material is history dependent and so the only place a
-tangent query has any history to disturb.
+apply to any law. It is run by ten tutorials' `regressionTest.sh`, each on the
+laws and mesh of its own case: `layeredPipe` (more than one material),
+`perforatedPlate` and `cylinderExpansion` (history-dependent plasticity, where
+a tangent query has history to disturb), `viscoTube` (viscoelasticity),
+`blockPunch`, `longWall`, `rotatingCylinder`, `ratCarotid`,
+`idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
 
-No solid model sources its stress or tangent from this framework yet, so that
-is currently its only runtime coverage.
+Every solid model takes its stress and tangent from this framework, so every
+tutorial's regression test is runtime coverage of it as well.
 
 ---
 
