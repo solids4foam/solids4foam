@@ -255,11 +255,12 @@ private members:
   `dualFaces`, and the Jacobian tangent is evaluated on the same topology. The
   boundary dual faces are a second topology of the same class, registered as
   `dualBoundaryFaces` and built from the boundary part of the dual-face-to-cell
-  map, so that they keep their own constitutive state. Faces of empty patches hold no values and are not
-  evaluated, nor are faces of coupled patches, whose tractions
-  `updatePointDivSigma()` sets to zero. A boundary dual face that
-  `dualMeshToMeshMap` leaves unmapped has a zero gradient from `vfvc::fGrad`,
-  and takes the law of the first primary cell about its dual cell's point;
+  map, so that they keep their own constitutive state. Faces of empty patches
+  hold no values and are not evaluated, nor are faces of coupled patches,
+  whose tractions `updatePointDivSigma()` sets to zero. A boundary dual face
+  that `dualMeshToMeshMap` leaves unmapped has a zero gradient from
+  `vfvc::fGrad`, and takes the law of the first primary cell about its dual
+  cell's point;
 - `correctCellStress()`, the cell-centred `sigma` for output, through the
   manager's `volTensorField` overload, so that each cell takes its own law;
 - `impK()`, the implicit stiffness behind the default `fixedDofScale` and the
