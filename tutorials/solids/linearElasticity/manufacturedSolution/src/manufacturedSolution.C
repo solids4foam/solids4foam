@@ -19,6 +19,7 @@ License
 
 #include "manufacturedSolution.H"
 #include "mathematicalConstants.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -59,60 +60,40 @@ void Foam::manufacturedSolution::calcBodyForces() const
         )
     );
 
-    // Set the body force term
-    const vectorField& C = mesh.C();
-    const scalar pi = constant::mathematical::pi;
     vectorField& bodyForcesI = bodyForcesPtr_();
-    forAll(bodyForcesI, cellI)
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    if (solMod.highOrderResidual())
     {
-        const scalar x = C[cellI].x();
-        const scalar y = C[cellI].y();
-        const scalar z = C[cellI].z();
+        const fvMeshQuadrature& quadrature =
+            solMod.displacementLeastSquares().quadrature();
+        const CompactListList<point>& cellQuadPoints =
+            quadrature.cellQuadPoints();
+        const CompactListList<scalar>& cellQuadWeights =
+            quadrature.cellQuadWeights();
 
-        bodyForcesI[cellI][vector::X] =
-            lambda_
-           *(
-                8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
-              + 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
-              - 16*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-            )
-          + mu_
-           *(
-                8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
-              + 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
-              - 5*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-            )
-          - 32*ax_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+        Info<< "Using volume-averaged manufactured body force" << endl;
 
-        bodyForcesI[cellI][vector::Y] =
-            lambda_
-           *(
-                8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
-              + 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
-              - 4*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-            )
-          + mu_
-           *(
-                8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
-              + 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
-              - 17*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-           )
-          - 8*ay_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+        forAll(bodyForcesI, cellI)
+        {
+            forAll(cellQuadPoints[cellI], pointI)
+            {
+                bodyForcesI[cellI] +=
+                    cellQuadWeights[cellI][pointI]
+                   *calculateBodyForce(cellQuadPoints[cellI][pointI]);
+            }
 
-        bodyForcesI[cellI][vector::Z] =
-            lambda_
-           *(
-               4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
-              + 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
-              - az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-            )
-          + mu_
-           *(
-               4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
-              + 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
-              - 20*az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
-            )
-          - 2*az_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+            // fvOptions multiplies the source density by the cell volume.
+            bodyForcesI[cellI] /= mesh.V()[cellI];
+        }
+    }
+    else
+    {
+        const vectorField& C = mesh.C();
+        forAll(bodyForcesI, cellI)
+        {
+            bodyForcesI[cellI] = calculateBodyForce(C[cellI]);
+        }
     }
 
     bodyForcesPtr_().correctBoundaryConditions();
@@ -282,6 +263,66 @@ Foam::vector Foam::manufacturedSolution::calculateDisplacement
         ay_*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()),
         az_*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z())
     );
+}
+
+
+Foam::vector Foam::manufacturedSolution::calculateBodyForce
+(
+    const vector& point
+) const
+{
+    const scalar pi = constant::mathematical::pi;
+    const scalar x = point.x();
+    const scalar y = point.y();
+    const scalar z = point.z();
+    vector bodyForce = vector::zero;
+
+    bodyForce[vector::X] =
+        lambda_
+       *(
+            8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+          + 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+          - 16*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+        )
+      + mu_
+       *(
+            8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+          + 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+          - 5*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+        )
+      - 32*ax_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+
+    bodyForce[vector::Y] =
+        lambda_
+       *(
+            8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+          + 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+          - 4*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+        )
+      + mu_
+       *(
+            8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+          + 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+          - 17*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+       )
+      - 8*ay_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+
+    bodyForce[vector::Z] =
+        lambda_
+       *(
+           4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+          + 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+          - az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+        )
+      + mu_
+       *(
+           4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+          + 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+          - 20*az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)
+        )
+      - 2*az_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+
+    return bodyForce;
 }
 
 

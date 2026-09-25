@@ -481,9 +481,7 @@ const Foam::dictionary& Foam::solidModel::highOrderCoeffsDict() const
 {
     if (!solidModelDict().found("highOrderCoeffs"))
     {
-        FatalErrorInFunction
-            << "The solid model dictionary does not contain 'highOrderCoeffs'."
-            << abort(FatalError);
+        return dictionary::null;
     }
 
     return solidModelDict().subDict("highOrderCoeffs");
@@ -1495,10 +1493,16 @@ Foam::solidModel::solidModel
         gradDD_.writeOpt() = IOobject::NO_WRITE;
     }
 
-    if (solidModelDict().found("highOrderCoeffs"))
-    {
-        const dictionary& hoDict = highOrderCoeffsDict();
+    const dictionary& hoDict = highOrderCoeffsDict();
 
+    highOrderJacobian_ =
+        hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
+
+    highOrderResidual_ =
+        hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
+
+    if (highOrderJacobian_ || highOrderResidual_)
+    {
         if (!hoDict.found("displacement"))
         {
             FatalErrorInFunction
@@ -1506,17 +1510,7 @@ Foam::solidModel::solidModel
                 << abort(FatalError);
         }
 
-        highOrderJacobian_ =
-            hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
-
-        highOrderResidual_ =
-            hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
-
-        if
-        (
-            (highOrderJacobian_ || highOrderResidual_)
-         && solutionAlg() != solutionAlgorithm::PETSC_SNES
-        )
+        if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
         {
             FatalErrorInFunction
                 << "highOrderResidual/highOrderJacobian are only supported "

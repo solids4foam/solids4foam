@@ -7,7 +7,10 @@ usage()
     cat <<'EOF'
 Usage: ./Allrun [approach] [mesh]
 
-approach: segregated (default), petscSnes
+approach: segregated (default),
+          petscSnes,
+          highOrder-movingLeastSquares,
+          highOrder-kExactLeastSquares
 mesh:     hex (default), tet, poly, distHex
 EOF
 }
@@ -21,7 +24,7 @@ APPROACH="${1:-segregated}"
 MESH="${2:-hex}"
 
 case "$APPROACH" in
-    segregated|petscSnes) ;;
+    segregated|petscSnes|highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
     *)
         echo "Error: unknown approach '$APPROACH'"
         usage
@@ -47,12 +50,17 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-if [[ "$APPROACH" == "petscSnes" ]]; then
+if [[ "$APPROACH" != "segregated" ]]; then
     solids4Foam::requirePetscOrExitSilently
 fi
 
+FV_SOLUTION="$APPROACH"
+if [[ "$APPROACH" == highOrder-* ]]; then
+    FV_SOLUTION=highOrder
+fi
+
 for file in constant/solidProperties."${APPROACH}" \
-            system/fvSolution."${APPROACH}"
+            system/fvSolution."${FV_SOLUTION}"
 do
     ln -vnsf "${file##*/}" "${file%.*}"
 done

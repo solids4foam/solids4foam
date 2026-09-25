@@ -19,6 +19,7 @@ License
 
 #include "manufacturedSolutionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -117,6 +118,63 @@ void manufacturedSolutionFvPatchVectorField::updateCoeffs()
     }
 
     fixedDisplacementFvPatchVectorField::updateCoeffs();
+}
+
+
+autoPtr<CompactListList<vector>>
+manufacturedSolutionFvPatchVectorField::evaluateQuadrature
+() const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // Quadrature points are indexed by global face labels
+    const CompactListList<point>& faceQuadPoints =
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints();
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Set the MMS object, if required
+    if (!mmsPtr_.valid())
+    {
+        mmsPtr_.reset
+        (
+            new manufacturedSolution(patch().boundaryMesh().mesh(), dict_)
+        );
+    }
+
+    // Loop over faces
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the values to face quadrature points
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const point quadPoint = faceQuadPoints[globalFaceID][pointI];
+            quadPointsValue[faceI][pointI] =
+                mmsPtr_->calculateDisplacement(quadPoint);
+        }
+    }
+
+    return tQuadPointsValue;
 }
 
 

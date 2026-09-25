@@ -44,18 +44,38 @@ The run script also accepts a solution approach and mesh type:
 ./Allrun segregated distHex
 ./Allrun petscSnes tet
 ./Allrun petscSnes poly
+./Allrun highOrder-movingLeastSquares hex
+./Allrun highOrder-kExactLeastSquares hex
 ```
 
-The `petscSnes` approach requires a PETSc-enabled solids4foam build. The `tet`
+The `petscSnes` and high-order approaches require a PETSc-enabled solids4foam
+build. The `tet`
 and `poly` meshes require Gmsh. This tutorial currently supports OpenFOAM.com.
+
+The high-order approaches use cubic displacement reconstruction, face
+quadrature, and volume integration of the manufactured body force. The
+integrated body force is divided by cell volume before insertion as an
+`fvOptions` source density. The boundary condition evaluates the analytical
+displacement at face quadrature points.
+
+`movingLeastSquares` stores point values, so displacement errors use the
+analytical solution at cell centres. `kExactLeastSquares` stores cell averages,
+so its displacement errors use the volume-averaged analytical solution.
+Analytical stress is evaluated at cell centres for both approaches.
 
 ## Verification and regression
 
-The default case has a regression test:
+The regression test checks `segregated`, `petscSnes`, and both high-order
+approaches on coarse hex and tet meshes. Both high-order reconstructions share
+the same displacement and stress L2 tolerances:
 
 ```bash
 ./regressionTest.sh
 ```
+
+PETSc regression runs are skipped when `PETSC_DIR` is unset; tet runs are
+skipped when Gmsh is unavailable. Logs are retained under `regressionTests/`;
+use `./regressionTest.sh --check-only` to check existing results.
 
 The opt-in [`verification/`](verification/) directory migrates the mesh and
 solver variants from `solid-benchmarks/linearElasticity/manufacturedSolution`.
