@@ -1,5 +1,5 @@
 # Drag and lift coefficients of the immersed oscillating cylinder, compared
-# with Wan and Turek (2006)
+# with Wan and Turek (2006) and a moving body-fitted mesh solution
 #
 # C = 2 F/(rho Uref^2 D Lz), with rho = 1 kg/m^3, the maximum cylinder
 # velocity Uref = 2 pi A/T = 0.3927 m/s, D = 0.1 m and Lz = 0.1 m, i.e.
@@ -21,7 +21,9 @@ plot \
     forceFile u 1:(scale*($2 + $8)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
     "verificationData/Cd.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
-        t "Wan and Turek (2006)"
+        t "Wan and Turek (2006)", \
+    "verificationData/CdBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
+        t "Body-fitted mesh"
 
 set ylabel "C_l"
 set yrange [-0.1:0.1]
@@ -29,6 +31,8 @@ plot \
     forceFile u 1:(scale*($3 + $9)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
     "verificationData/Cl.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
-        t "Wan and Turek (2006)"
+        t "Wan and Turek (2006)", \
+    "verificationData/ClBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
+        t "Body-fitted mesh"
 
 unset multiplot
