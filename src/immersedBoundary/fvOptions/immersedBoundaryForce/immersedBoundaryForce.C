@@ -22,6 +22,7 @@ License
 #include "fvmSup.H"
 #include "indexedOctree.H"
 #include "treeDataCell.H"
+#include "interpolationCellPoint.H"
 #include "pimpleControl.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -151,15 +152,197 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                 rho*(momentum_[bodyi] - momentum0_[bodyi])/deltaT;
         }
 
+        // Image point distance for the surface force: 1.5 times the mean
+        // width of the reconstructed cells, else of the mesh
+        scalar l = 0;
+        {
+            scalar sumW = 0;
+            label nW = 0;
+            const Vector<label>& solD = mesh_.solutionD();
+            forAll(ghostCells_, gi)
+            {
+                const vector span
+                (
+                    boundBox
+                    (
+                        mesh_.points(),
+                        mesh_.cellPoints()[ghostCells_[gi]],
+                        false
+                    ).span()
+                );
+
+                scalar w = GREAT;
+                for (direction d = 0; d < vector::nComponents; ++d)
+                {
+                    if (solD[d] == 1)
+                    {
+                        w = min(w, span[d]);
+                    }
+                }
+                sumW += w;
+                ++nW;
+            }
+            reduce(sumW, sumOp<scalar>());
+            reduce(nW, sumOp<label>());
+            l = 1.5*(nW > 0 ? sumW/nW : Foam::cbrt(gAverage(mesh_.V())));
+        }
+        if (surfaceForceDistance_ > 0)
+        {
+            l = surfaceForceDistance_;
+        }
+
+        surfaceForce_[bodyi] = rho*surfaceForce(body, U, l);
+
         Info<< "    Immersed body " << body.name() << ": force "
             << force_[bodyi] << ", torque " << torque_[bodyi]
-            << ", inertia of the fluid inside " << inertia_[bodyi] << endl;
+            << ", inertia of the fluid inside " << inertia_[bodyi]
+            << ", surface force " << surfaceForce_[bodyi] << endl;
     }
 
     // In a partitioned fluid-solid interaction, the fluid may be solved
     // several times per time step: only the last solution is written
     forceTimeName_ = mesh_.time().timeName();
     forcesPending_ = true;
+}
+
+
+Foam::vector Foam::fv::immersedBoundaryForce::surfaceForce
+(
+    const immersedBody& body,
+    const volVectorField& U,
+    const scalar l
+) const
+{
+    const volScalarField& p = mesh_.lookupObject<volScalarField>("p");
+    const dimensionedScalar nu
+    (
+        "nu",
+        dimViscosity,
+        mesh_.lookupObject<IOdictionary>("transportProperties")
+    );
+
+    interpolationCellPoint<vector> interpU(U);
+    interpolationCellPoint<scalar> interpP(p);
+
+    const triSurface& surf = body.surface();
+    const pointField& pts = surf.points();
+    const boundBox& meshBb = mesh_.bounds();
+    const scalar deltaT = mesh_.time().deltaTValue();
+
+    vector F(Zero);
+
+    // Clip each face to the mesh bounding box, e.g. to the thickness of a
+    // two-dimensional mesh
+    DynamicList<point> poly(8);
+    DynamicList<point> clipped(8);
+
+    DynamicList<point> centres(surf.size());
+    DynamicList<vector> areaNormals(surf.size());
+
+    forAll(surf, facei)
+    {
+        poly.clear();
+        for (const label pointi : surf[facei])
+        {
+            poly.append(pts[pointi]);
+        }
+
+        for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+        {
+            for (const label side : {0, 1})
+            {
+                const scalar bound =
+                    (side == 0 ? meshBb.min()[cmpt] : meshBb.max()[cmpt]);
+                const scalar sgn = (side == 0 ? 1 : -1);
+
+                clipped.clear();
+                forAll(poly, i)
+                {
+                    const point& a = poly[i];
+                    const point& b = poly[(i + 1) % poly.size()];
+                    const scalar da = sgn*(a[cmpt] - bound);
+                    const scalar db = sgn*(b[cmpt] - bound);
+
+                    if (da >= 0)
+                    {
+                        clipped.append(a);
+                    }
+                    if ((da >= 0) != (db >= 0))
+                    {
+                        clipped.append(a + (da/(da - db))*(b - a));
+                    }
+                }
+                poly.transfer(clipped);
+
+                if (poly.size() < 3)
+                {
+                    break;
+                }
+            }
+            if (poly.size() < 3)
+            {
+                break;
+            }
+        }
+
+        if (poly.size() < 3)
+        {
+            continue;
+        }
+
+        // Centroid and area normal of the clipped polygon
+        vector areaNormal(Zero);
+        point centre(Zero);
+        scalar sumA = 0;
+        for (label i = 1; i + 1 < poly.size(); ++i)
+        {
+            const vector an = 0.5*((poly[i] - poly[0]) ^ (poly[i + 1] - poly[0]));
+            const scalar a = mag(an);
+            areaNormal += an;
+            centre += a*(poly[0] + poly[i] + poly[i + 1])/3;
+            sumA += a;
+        }
+
+        if (sumA > VSMALL)
+        {
+            centres.append(centre/sumA);
+            areaNormals.append(areaNormal);
+        }
+    }
+
+    const pointField centreField(centres);
+    const vectorField Ub(body.velocity(centreField));
+    const vectorField ab(body.acceleration(centreField, deltaT));
+
+    forAll(centres, i)
+    {
+        const scalar A = mag(areaNormals[i]);
+        const vector n(areaNormals[i]/A);
+        const point imagePoint(centres[i] + l*n);
+
+        const label celli = mesh_.findCell(imagePoint);
+
+        if (celli < 0)
+        {
+            continue;
+        }
+
+        const vector UI(interpU.interpolate(imagePoint, celli));
+        const scalar pI = interpP.interpolate(imagePoint, celli);
+
+        // Wall pressure from dp/dn = -a.n on the surface
+        const scalar pw = pI + l*(ab[i] & n);
+
+        // Viscous traction from the tangential slip at the image point
+        const vector dU(UI - Ub[i]);
+        const vector tau(nu.value()*(dU - (dU & n)*n)/l);
+
+        F += (-pw*n + tau)*A;
+    }
+
+    reduce(F, sumOp<vector>());
+
+    return F;
 }
 
 
@@ -180,6 +363,7 @@ void Foam::fv::immersedBoundaryForce::writeForces()
             const vector& F = force_[bodyi];
             const vector& T = torque_[bodyi];
             const vector& Fi = inertia_[bodyi];
+            const vector& Fs = surfaceForce_[bodyi];
 
             os  << forceTimeName_ << token::TAB
                 << F.x() << token::SPACE << F.y() << token::SPACE << F.z()
@@ -187,9 +371,44 @@ void Foam::fv::immersedBoundaryForce::writeForces()
                 << T.x() << token::SPACE << T.y() << token::SPACE << T.z()
                 << token::TAB
                 << Fi.x() << token::SPACE << Fi.y() << token::SPACE << Fi.z()
+                << token::TAB
+                << Fs.x() << token::SPACE << Fs.y() << token::SPACE << Fs.z()
                 << endl;
         }
     }
+}
+
+
+Foam::scalar Foam::fv::immersedBoundaryForce::bandRate
+(
+    const label celli,
+    const vector& Ub
+) const
+{
+    const vector span
+    (
+        boundBox(mesh_.points(), mesh_.cellPoints()[celli], false).span()
+    );
+
+    const Vector<label>& solD = mesh_.solutionD();
+    scalar w = GREAT;
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] == 1)
+        {
+            w = min(w, span[d]);
+        }
+    }
+
+    const scalar nu =
+        dimensionedScalar
+        (
+            "nu",
+            dimViscosity,
+            mesh_.lookupObject<IOdictionary>("transportProperties")
+        ).value();
+
+    return bandRateCoeff_*(nu/sqr(w) + mag(Ub)/w);
 }
 
 
@@ -198,6 +417,13 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
     const scalar deltaT = mesh_.time().deltaTValue();
     const bool volumeFraction = (weighting_ == "volumeFraction");
     const scalarField& lambdaI = lambda_.primitiveField();
+
+    Ui_ = U;
+
+    for (const immersedBody& body : bodies_)
+    {
+        body.setVelocity(Ui_);
+    }
 
     kappa_ = 0;
 
@@ -228,6 +454,17 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                             penaltyCoeff_,
                             lambda/max(1 - lambda, 1/penaltyCoeff_)
                         )/deltaT;
+
+                    // Physical rate in the partially covered cells
+                    if (bandRateCoeff_ > 0 && lambda < 1 - surfaceThreshold_)
+                    {
+                        kappa_[celli] = min
+                        (
+                            kappa_[celli],
+                            lambda/(1 - lambda)
+                           *bandRate(celli, Ui_[celli])
+                        );
+                    }
                 }
                 else
                 {
@@ -235,13 +472,6 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                 }
             }
         }
-    }
-
-    Ui_ = U;
-
-    for (const immersedBody& body : bodies_)
-    {
-        body.setVelocity(Ui_);
     }
 }
 
@@ -372,6 +602,7 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
     ghostNormals_.setSize(nGhosts, Zero);
     ghostWallVelocities_.setSize(nGhosts, Zero);
     ghostDistances_.setSize(nGhosts, Zero);
+    ghostImagePoints_.setSize(nGhosts, Zero);
 
     const pointField ghostCentres(mesh_.C(), ghostCells_);
 
@@ -403,11 +634,27 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
                 {
                     bestDistSqr[gi] = dSqr;
                     ghostWallPoints_[gi] = hits[gi].hitPoint();
-                    ghostNormals_[gi] = normals[gi];
+
+                    // Normal along the line from the surface point to the
+                    // cell centre, oriented out of the body, so that it
+                    // varies continuously as the body moves; the normal of
+                    // the nearest face if the centre is on the surface
+                    const vector r(ghostCentres[gi] - hits[gi].hitPoint());
+                    const scalar magR = mag(r);
+                    if (magR > 1e-3*mag(spans[gi]))
+                    {
+                        ghostNormals_[gi] =
+                            ((r & normals[gi]) >= 0 ? r : -r)/magR;
+                    }
+                    else
+                    {
+                        ghostNormals_[gi] = normals[gi];
+                    }
                     // Signed distance from the surface, along the outward
                     // normal: negative inside the body
                     ghostDistances_[gi] =
-                        (ghostCentres[gi] - hits[gi].hitPoint()) & normals[gi];
+                        (ghostCentres[gi] - hits[gi].hitPoint())
+                      & ghostNormals_[gi];
                     ghostWallVelocities_[gi] =
                         bodies_[bodyi].velocity
                         (
@@ -430,8 +677,14 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
 
         if (magSqr(n) > SMALL)
         {
-            ghostDonors_[gi] =
-                findDonor(ghostWallPoints_[gi], n, widths[gi], inside);
+            ghostDonors_[gi] = findDonor
+            (
+                ghostWallPoints_[gi],
+                n,
+                widths[gi],
+                inside,
+                ghostImagePoints_[gi]
+            );
 
             if (ghostDonors_[gi] < 0 && Pstream::parRun())
             {
@@ -445,6 +698,8 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
     const label myProc = Pstream::myProcNo();
     sendDonors_.clear();
     sendDonors_.setSize(nProcs);
+    sendImagePoints_.clear();
+    sendImagePoints_.setSize(nProcs);
     recvGhosts_.clear();
     recvGhosts_.setSize(nProcs);
     remoteDonorProcs_.setSize(remoteGhosts_.size(), -1);
@@ -465,6 +720,7 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
         // Requests this processor can serve
         List<labelList> canServe(nProcs);
         List<labelList> canServeCells(nProcs);
+        List<pointField> canServeImages(nProcs);
         forAll(reqPoints, proci)
         {
             if (proci == myProc)
@@ -474,24 +730,29 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
 
             DynamicList<label> reqs;
             DynamicList<label> cells;
+            DynamicList<point> images;
             forAll(reqPoints[proci], k)
             {
+                point imagePoint;
                 const label donori = findDonor
                 (
                     reqPoints[proci][k],
                     reqNormals[proci][k],
                     reqWidths[proci][k],
-                    inside
+                    inside,
+                    imagePoint
                 );
 
                 if (donori >= 0)
                 {
                     reqs.append(k);
                     cells.append(donori);
+                    images.append(imagePoint);
                 }
             }
             canServe[proci].transfer(reqs);
             canServeCells[proci].transfer(cells);
+            canServeImages[proci].transfer(images);
         }
 
         // Tell the requesters which requests can be served
@@ -553,21 +814,21 @@ void Foam::fv::immersedBoundaryForce::findGhostCells()
                 labelList taken(is);
 
                 // Map the requests to the donor cells found above
-                Map<label> requestToCell(2*canServe[proci].size());
+                Map<label> requestToIndex(2*canServe[proci].size());
                 forAll(canServe[proci], i)
                 {
-                    requestToCell.insert
-                    (
-                        canServe[proci][i],
-                        canServeCells[proci][i]
-                    );
+                    requestToIndex.insert(canServe[proci][i], i);
                 }
 
                 labelList& send = sendDonors_[proci];
+                pointField& sendImages = sendImagePoints_[proci];
                 send.setSize(taken.size());
+                sendImages.setSize(taken.size());
                 forAll(taken, i)
                 {
-                    send[i] = requestToCell[taken[i]];
+                    const label j = requestToIndex[taken[i]];
+                    send[i] = canServeCells[proci][j];
+                    sendImages[i] = canServeImages[proci][j];
                 }
             }
         }
@@ -606,14 +867,15 @@ Foam::label Foam::fv::immersedBoundaryForce::findDonor
     const point& wallPoint,
     const vector& normal,
     const scalar width,
-    const volScalarField& inside
+    const volScalarField& inside,
+    point& imagePoint
 ) const
 {
     const vectorField& C = mesh_.C();
 
     for (label k = 0; k < 4; ++k)
     {
-        const point imagePoint = wallPoint + (1 + 0.5*k)*width*normal;
+        imagePoint = wallPoint + (imageDistance_ + 0.5*k)*width*normal;
 
         const label donori = mesh_.findCell(imagePoint);
 
@@ -637,6 +899,28 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
 {
     const vectorField& C = mesh_.C();
     const label nGhosts = ghostCells_.size();
+    const bool cellPoint = (imageInterpolation_ == "cellPoint");
+
+    autoPtr<interpolationCellPoint<vector>> interpPtr;
+    if (cellPoint)
+    {
+        interpPtr.reset(new interpolationCellPoint<vector>(U));
+    }
+
+    // Velocity and position used for a donor cell and its image point
+    auto donorValue = [&](const label donori, const point& imagePoint)
+    {
+        return
+        (
+            cellPoint
+          ? interpPtr->interpolate(imagePoint, donori)
+          : U[donori]
+        );
+    };
+    auto donorPoint = [&](const label donori, const point& imagePoint)
+    {
+        return (cellPoint ? imagePoint : C[donori]);
+    };
 
     ghostDonorU_.setSize(nGhosts, Zero);
     ghostDonorC_.setSize(nGhosts, Zero);
@@ -646,8 +930,8 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
         const label donori = ghostDonors_[gi];
         if (donori >= 0)
         {
-            ghostDonorU_[gi] = U[donori];
-            ghostDonorC_[gi] = C[donori];
+            ghostDonorU_[gi] = donorValue(donori, ghostImagePoints_[gi]);
+            ghostDonorC_[gi] = donorPoint(donori, ghostImagePoints_[gi]);
         }
     }
 
@@ -661,9 +945,19 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
         {
             if (proci != myProc)
             {
+                const labelList& donors = sendDonors_[proci];
+                const pointField& images = sendImagePoints_[proci];
+
+                vectorField values(donors.size());
+                pointField points(donors.size());
+                forAll(donors, i)
+                {
+                    values[i] = donorValue(donors[i], images[i]);
+                    points[i] = donorPoint(donors[i], images[i]);
+                }
+
                 UOPstream os(proci, pBufs);
-                os  << vectorField(U.primitiveField(), sendDonors_[proci])
-                    << pointField(C, sendDonors_[proci]);
+                os  << values << points;
             }
         }
         pBufs.finishedSends();
@@ -723,7 +1017,12 @@ void Foam::fv::immersedBoundaryForce::reconstructTargets
                 UiI[celli] = Ub + ratio*(ghostDonorU_[gi] - Ub);
             }
 
-            kappa_[celli] = rate;
+            kappa_[celli] =
+            (
+                bandRateCoeff_ > 0
+              ? min(rate, bandRate(celli, Ub))
+              : rate
+            );
         }
     }
 }
@@ -744,7 +1043,10 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     method_("penalty"),
     penaltyCoeff_(1e3),
     weighting_("volumeFraction"),
+    bandRateCoeff_(-1),
+    imageDistance_(1.5),
     reconstruction_("none"),
+    imageInterpolation_("cellPoint"),
     kappa_(mesh.nCells(), Zero),
     couplingCoeff_(0.8),
     surfaceThreshold_(1e-4),
@@ -860,6 +1162,9 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     momentum_.setSize(nBodies, Zero);
     momentum0_.setSize(nBodies, Zero);
     force_.setSize(nBodies, Zero);
+    surfaceForce_.setSize(nBodies, Zero);
+    surfaceForceDistance_ =
+        coeffs_.getOrDefault<scalar>("surfaceForceDistance", -1);
     torque_.setSize(nBodies, Zero);
     inertia_.setSize(nBodies, Zero);
 
@@ -1208,6 +1513,9 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         }
 
         coeffs_.readIfPresent("reconstruction", reconstruction_);
+        coeffs_.readIfPresent("bandRateCoeff", bandRateCoeff_);
+        coeffs_.readIfPresent("imageDistance", imageDistance_);
+        coeffs_.readIfPresent("imageInterpolation", imageInterpolation_);
 
         if (reconstruction_ != "none" && reconstruction_ != "linear")
         {

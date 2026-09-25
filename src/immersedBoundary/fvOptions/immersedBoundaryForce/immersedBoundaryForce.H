@@ -214,8 +214,25 @@ class immersedBoundaryForce
         //  surface and the velocity of a donor fluid cell)
         word reconstruction_;
 
+        //- Velocity at the image point: cellPoint (interpolated, so that the
+        //  target varies continuously as the body moves) or cell (the donor
+        //  cell centre value)
+        word imageInterpolation_;
+
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
+
+        //- If positive, the coefficient C of the penalisation rate in the
+        //  cells next to the surface, C*(nu/w^2 + |Ub|/w) with w the cell
+        //  width, which does not depend on the time step
+        scalar bandRateCoeff_;
+
+        //- Distance of the first image point from the surface, relative to
+        //  the cell width
+        scalar imageDistance_;
+
+        //- Physical penalisation rate of a cell next to the surface
+        scalar bandRate(const label celli, const vector& Ub) const;
 
         // Ghost cell method: the cells whose centre is inside a body are
         // penalised; the target velocity of those next to the fluid (the
@@ -249,8 +266,13 @@ class immersedBoundaryForce
             labelList remoteGhosts_;
             labelList remoteDonorProcs_;
 
-            //- Local donor cells sent to each processor
+            //- Image point of each ghost cell with a local donor
+            pointField ghostImagePoints_;
+
+            //- Local donor cells sent to each processor, and their image
+            //  points
             List<labelList> sendDonors_;
+            List<pointField> sendImagePoints_;
 
             //- Remote ghost indices received from each processor, in the
             //  order they are sent
@@ -321,6 +343,14 @@ class immersedBoundaryForce
         List<vector> force_;
         List<vector> torque_;
         List<vector> inertia_;
+
+        //- Force on each body from the surface stress, sampled at image
+        //  points along the surface normal
+        List<vector> surfaceForce_;
+
+        //- Image point distance for the surface force, if positive, else
+        //  1.5 times the mean cell size of the reconstructed cells
+        scalar surfaceForceDistance_;
         word forceTimeName_;
         bool forcesPending_;
 
@@ -347,6 +377,17 @@ class immersedBoundaryForce
         //- Write the forces of the last completed time step
         void writeForces();
 
+        //- Force on a body from the pressure and viscous stress on its
+        //  surface, sampled at image points at the distance l along the
+        //  surface normal, with the wall pressure extrapolated with the body
+        //  acceleration
+        vector surfaceForce
+        (
+            const immersedBody& body,
+            const volVectorField& U,
+            const scalar l
+        ) const;
+
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
 
@@ -361,7 +402,8 @@ class immersedBoundaryForce
             const point& wallPoint,
             const vector& normal,
             const scalar width,
-            const volScalarField& inside
+            const volScalarField& inside,
+            point& imagePoint
         ) const;
 
         //- Gather the velocity and centre of the donor cells

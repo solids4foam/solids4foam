@@ -222,6 +222,16 @@ public:
                 return motionPtr_->velocity(x, time_);
             }
 
+            //- Acceleration of the body at the points x
+            tmp<vectorField> acceleration
+            (
+                const pointField& x,
+                const scalar dt
+            ) const
+            {
+                return motionPtr_->acceleration(x, time_, dt);
+            }
+
             //- Nearest points on the surface to the points x, within the
             //  distances sqrt(searchDistSqr), and the unit normals of the
             //  nearest surface faces
