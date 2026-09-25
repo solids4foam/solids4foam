@@ -44,19 +44,21 @@ REF_MAX_DISP=2.23646e-07
 REF_MEAN_FORCE=0.0320942
 
 # The final probe displacement magnitude of the removed legacy
-# mechanicalModel, from the last commit that had it (mcl-stage8-coverage,
-# c3a92b3d), per fork: the coupled answer moves between forks by more than the
-# framework moved from legacy on any one of them. The material is linear
-# elastic, so the framework solves the same problem, and it reproduced these in
-# all eight digits printed. The comparison it replaces allowed 1e-6 absolute,
-# which is more than the value itself and so could not fail; 1e-6 relative is
-# the same agreement stated in a form that can
+# mechanicalModel, per fork, as CI logged it on the last commit that had it
+# (mcl-stage8-coverage, 9b46ef47, which carries development's fluid-solid
+# coupling changes; the answer before them was 7.18043e-07 on OpenFOAM.com):
+# the coupled answer moves between forks by more than the framework moved from
+# legacy on any one of them. The material is linear elastic, so the framework
+# solves the same problem, and it reproduced these in every figure printed.
+# The log gives six, so a round-off difference on another machine can move
+# the last one; the tolerance, 1e-5 relative, is a few units in that figure.
+# These are v2512's; v2412 differs by about 2%
 case "$(solids4Foam::foamFlavour)" in
-    com)        LEGACY_FINAL_MAGD=7.18043e-07 ;;
-    org)        LEGACY_FINAL_MAGD=7.06215e-07 ;;
-    foamextend) LEGACY_FINAL_MAGD=7.08637e-07 ;;
+    com)        LEGACY_FINAL_MAGD=7.15479e-07 ;;
+    org)        LEGACY_FINAL_MAGD=7.06217e-07 ;;
+    foamextend) LEGACY_FINAL_MAGD=7.0864e-07 ;;
 esac
-LEGACY_MAGD_REL_TOL=1e-6
+LEGACY_MAGD_REL_TOL=1e-5
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
