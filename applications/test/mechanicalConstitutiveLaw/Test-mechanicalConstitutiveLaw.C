@@ -2453,12 +2453,28 @@ int main(int argc, char *argv[])
             gradD, gradD0, dt, queriedImpK, tangentRequest::scalar
         );
 
+        // Against a stress update from the same state, not the one in check
+        // 1: check 8 has committed a time step since, and a law with history
+        // gives a different tangent at the same strain once it has moved on -
+        // a plastic law that yielded in the first step is elastic in the
+        // second, which starts on the yield surface. The stress update here
+        // is within the time step the query was made in, so it evaluates
+        // from the same history and commits what check 8 already did
+        volSymmTensorField sigmaNow(sigma);
+        volScalarField impKNow(impK);
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, dt, sigmaNow, &impKNow, tangentRequest::scalar
+        );
+
         reportError
         (
             "agrees with the tangent from the stress update",
             relativeDifference
             (
-                Foam::primitiveField(impK), Foam::primitiveField(queriedImpK)
+                Foam::primitiveField(impKNow),
+                Foam::primitiveField(queriedImpK)
             ),
             1e-15
         );
